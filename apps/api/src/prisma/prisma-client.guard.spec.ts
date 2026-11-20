@@ -54,6 +54,12 @@ describe('central Prisma retry guard', () => {
       'src/modules/community/community-comments.outbox.ts',
       'src/modules/community/community-send-guard.ts',
       'src/modules/telemetry/telemetry.service.ts',
+      // Round 4 upload review: removes one storage object under its row lock; writes only
+      // WardrobeObjectDeletion, which has no triggers. An abort leaves the row for its retry.
+      'src/modules/wardrobe/wardrobe-object-deletion.outbox.ts',
+      // Round 6 upload review: writes a held garment's immutable copy under its row lock, then
+      // records the digest. GarmentItem has no triggers; a repeat finds the copy and verifies it.
+      'src/modules/wardrobe/wardrobe-retention.service.ts',
     ])
   })
 })

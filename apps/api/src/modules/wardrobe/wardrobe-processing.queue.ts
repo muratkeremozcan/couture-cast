@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common'
-import { Queue } from 'bullmq'
+import { Inject, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common'
+import { Queue, type QueueOptions } from 'bullmq'
 import { z } from 'zod'
 
 import { queueConfigs, type QueueConfig } from '../../config/queues'
@@ -13,8 +13,22 @@ export const garmentColorProcessingJobSchema = z
 
 export type GarmentColorProcessingJob = z.infer<typeof garmentColorProcessingJobSchema>
 
+/**
+ * The queue a producer publishes to. Production binds nothing and gets `color-extraction`; an
+ * integration suite binds a per-run name so a worker sharing its Redis never claims its jobs,
+ * as `SilhouettePhotoProcessingQueue` does.
+ */
+export const WARDROBE_PROCESSING_QUEUE_BINDING = Symbol('WardrobeProcessingQueueBinding')
+
+export type WardrobeProcessingQueueBinding = { name: string; options: QueueOptions }
+
 export interface GarmentProcessingPublisher {
-  enqueue(garmentId: string): Promise<void>
+  /**
+   * `jobId` defaults to the garment id. A garment whose processing a legal hold deferred is
+   * enqueued again under the id `garmentProcessingJobId` derives, since the first job's id is
+   * retained as completed. The payload is the garment id either way.
+   */
+  enqueue(garmentId: string, jobId?: string): Promise<void>
 }
 
 /**
@@ -30,10 +44,18 @@ export class WardrobeProcessingQueue
   implements GarmentProcessingPublisher, OnModuleDestroy
 {
   private readonly logger = new Logger(WardrobeProcessingQueue.name)
-  private readonly config: QueueConfig
+  private readonly config: QueueConfig | WardrobeProcessingQueueBinding
   private queue: Queue<GarmentColorProcessingJob> | null = null
 
-  constructor() {
+  constructor(
+    @Optional()
+    @Inject(WARDROBE_PROCESSING_QUEUE_BINDING)
+    binding?: WardrobeProcessingQueueBinding
+  ) {
+    if (binding) {
+      this.config = binding
+      return
+    }
     const found = queueConfigs.find((c) => c.name === 'color-extraction')
     if (!found) {
       throw new Error('color-extraction queue configuration is missing')
@@ -53,10 +75,10 @@ export class WardrobeProcessingQueue
     return this.queue
   }
 
-  async enqueue(garmentId: string): Promise<void> {
+  async enqueue(garmentId: string, jobId: string = garmentId): Promise<void> {
     const data = garmentColorProcessingJobSchema.parse({ garmentId })
     await this.getQueue().add(GARMENT_COLOR_PROCESSING_JOB, data, {
-      jobId: garmentId,
+      jobId,
       removeOnComplete: { age: JOB_RETENTION_SECONDS },
       removeOnFail: { age: JOB_RETENTION_SECONDS },
     })

@@ -1,6 +1,10 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
+import {
+  SIGNED_UPLOAD_LIFETIME_MS,
+  signedUploadExpiry as readSignedUploadExpiry,
+} from '../../common/signed-upload-expiry.js'
 
 export const COMMUNITY_IMAGES_BUCKET = 'community-images'
 
@@ -11,11 +15,9 @@ export interface CommunityUploadSession {
 }
 
 /**
- * How long a signed upload token lets a request start. Storage sets this per deployment and clients
- * cannot shorten it: Supabase documents 2 hours, and the storage server checks the token's expiry
- * when a request starts, before it reads the body.
+ * How long a signed upload token lets a request start; see `SIGNED_UPLOAD_LIFETIME_MS`.
  */
-export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = 2 * 60 * 60 * 1000
+export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = SIGNED_UPLOAD_LIFETIME_MS
 
 /**
  * Storage checks the token once and does not cut a request already running, so this process ends its
@@ -23,29 +25,13 @@ export const COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS = 2 * 60 * 60 * 1000
  */
 export const COMMUNITY_SIGNED_UPLOAD_REQUEST_TIMEOUT_MS = 5 * 60 * 1000
 
-/** Allowance for the storage server's clock when reading a token's expiry. */
-const TOKEN_CLOCK_SKEW_MS = 60 * 1000
-
 /**
  * The expiry in the token itself. Erasure's delete window is sized for this lifetime, so a deployment
  * that signs longer tokens, or a token this cannot read, fails closed.
  */
 function signedUploadExpiry(token: string): Date {
-  const payload = token.split('.')[1]
-  let exp: unknown
-  try {
-    exp = (
-      JSON.parse(Buffer.from(payload ?? '', 'base64url').toString()) as { exp?: unknown }
-    ).exp
-  } catch {
-    throw storageUnavailable()
-  }
-  if (typeof exp !== 'number') throw storageUnavailable()
-  const expiresAt = new Date(exp * 1000)
-  const latest = Date.now() + COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS + TOKEN_CLOCK_SKEW_MS
-  if (expiresAt.getTime() > latest || expiresAt.getTime() <= Date.now()) {
-    throw storageUnavailable()
-  }
+  const expiresAt = readSignedUploadExpiry(token)
+  if (!expiresAt) throw storageUnavailable()
   return expiresAt
 }
 

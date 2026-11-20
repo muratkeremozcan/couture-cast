@@ -139,7 +139,8 @@
       "network_timeout": "Le téléversement a expiré.",
       "storage_forbidden": "L'accès au stockage est interdit.",
       "consent_required": "Le consentement d'un tuteur est requis pour téléverser des vêtements.",
-      "upload_expired": "La session de téléversement a expiré."
+      "upload_expired": "La session de téléversement a expiré.",
+      "upload_session_changed": "Vous vous êtes déconnecté ou avez changé de compte pendant ce téléversement. Choisissez la photo de nouveau."
     },
     "crop": {
       "title": "Recadrer et positionner",
@@ -316,7 +317,8 @@
         "privacy_violation": "Cette photo ne peut pas être utilisée. Choisissez une autre photo.",
         "timeout": "Le traitement a pris trop de temps. Réessayez.",
         "storage_error": "Nous n'avons pas pu enregistrer cette photo. Réessayez.",
-        "confirm_required": "Confirmez la consigne sur les vêtements de base avant de téléverser."
+        "confirm_required": "Confirmez la consigne sur les vêtements de base avant de téléverser.",
+        "session_changed": "Vous vous êtes déconnecté ou avez changé de compte pendant ce téléversement. Choisissez la photo de nouveau."
       }
     }
   },

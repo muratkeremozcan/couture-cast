@@ -3,7 +3,7 @@
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as NativeUtilsModule from '@/src/lib/native-utils'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
@@ -78,7 +78,10 @@ vi.mock('@/src/lib/native-utils', async (importOriginal) => {
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { press } from '@/src/test-utils/press'
 import { WardrobeOnboardingScreen } from './wardrobe-onboarding-screen'
@@ -328,6 +331,54 @@ describe('WardrobeOnboardingScreen', () => {
         body: { targetStep: 'silhouette', usedStarterWardrobe: true },
       },
     ])
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  //
+  // Final review F-3: the screen stored A's token at load and mounts the editor only on the
+  // silhouette step. A sign-out in that interval leaves the token in the screen; the editor
+  // mounted afterwards must not read (or remove) My Form with it.
+  it('4.4-MOB-ONB-15 an editor mounted after sign-out never reads My Form with the screen token', async () => {
+    const silhouetteReads: (string | null)[] = []
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...inProgressState, currentStep: 'capture', revision: 1 },
+        })
+      ),
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] })),
+      http.get('*/api/v1/wardrobe/silhouette', ({ request }) => {
+        silhouetteReads.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: defaultSilhouetteProfile })
+      }),
+      http.patch('*/api/v1/wardrobe/onboarding', () =>
+        HttpResponse.json({
+          data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
+        })
+      )
+    )
+    setMobileApplicationUserId('member-a')
+    renderScreen()
+    await waitFor(() => screen.getByTestId('onboarding-use-starter'))
+
+    // A signs out: the app's resolver has no bearer any more; the screen still holds A's.
+    const restoreSignedOut = setMobileAccessTokenResolver(() => undefined)
+    try {
+      act(() => setMobileApplicationUserId(null))
+      fireEvent.click(screen.getByTestId('onboarding-use-starter'))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('onboarding-silhouette-step')).toHaveTextContent(
+          'Your session could not be verified. Sign in again.'
+        )
+      )
+      expect(silhouetteReads).toEqual([])
+      expect(screen.queryByTestId('silhouette-my-form-remove')).not.toBeInTheDocument()
+    } finally {
+      restoreSignedOut()
+      setMobileApplicationUserId(null)
+    }
   })
 
   it('4.4-MOB-ONB-06 shows a checklist row and blocks Continue while a garment needs tags', async () => {

@@ -139,7 +139,8 @@
       "network_timeout": "Yükleme zaman aşımına uğradı.",
       "storage_forbidden": "Depolama erişimi reddedildi.",
       "consent_required": "Giysi yüklemek için vasi onayı gerekiyor.",
-      "upload_expired": "Yükleme oturumunun süresi doldu."
+      "upload_expired": "Yükleme oturumunun süresi doldu.",
+      "upload_session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin."
     },
     "crop": {
       "title": "Kırp ve konumlandır",
@@ -316,7 +317,8 @@
         "privacy_violation": "Bu fotoğraf kullanılamaz. Farklı bir fotoğraf seçin.",
         "timeout": "İşlem çok uzun sürdü. Tekrar deneyin.",
         "storage_error": "Bu fotoğraf kaydedilemedi. Tekrar deneyin.",
-        "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın."
+        "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın.",
+        "session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin."
       }
     }
   },

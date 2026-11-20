@@ -19,6 +19,7 @@ import {
   MODERATION_SLA_SWEEP_JOB_NAME,
   ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
+  WARDROBE_DELETION_DRAIN_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
 
@@ -51,7 +52,10 @@ export type MaintenanceSweeps = {
   featureFlags: Pick<FeatureFlagsService, 'syncFlags'>
   guardian: Pick<GuardianService, 'emancipateEligibleTeens'>
   telemetry: Pick<TelemetryService, 'pruneOldTelemetryEvents'>
-  wardrobeRetention: Pick<WardrobeRetentionService, 'purgeExpiredAndDeletedGarments'>
+  wardrobeRetention: Pick<
+    WardrobeRetentionService,
+    'purgeExpiredAndDeletedGarments' | 'drainDeletions'
+  >
   /**
    * Story 6.1 community sweeps. Structural rather than a service reference, so
    * this module routes job names without depending on the community module's
@@ -123,6 +127,13 @@ export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
           'wardrobe_retention_purge_completed',
           'wardrobe_retention_purge_failed',
           () => deps.wardrobeRetention.purgeExpiredAndDeletedGarments()
+        )
+      case WARDROBE_DELETION_DRAIN_JOB_NAME:
+        return run(
+          job.name,
+          'wardrobe_deletion_drain_completed',
+          'wardrobe_deletion_drain_failed',
+          () => deps.wardrobeRetention.drainDeletions()
         )
       case TELEMETRY_EVENT_PRUNE_JOB_NAME:
         return run(

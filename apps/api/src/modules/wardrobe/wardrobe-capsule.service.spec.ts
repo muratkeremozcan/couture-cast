@@ -1,5 +1,7 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read vi.fn() members off their mock object, which is the established pattern for these suites. */
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -38,7 +40,8 @@ function garmentJoin(id: string, order: number, overrides: Record<string, unknow
       comfort_range: 'mild',
       upload_status: 'ready',
       retention_status: 'active',
-      object_path: `user-1/${id}.png`,
+      user_id: 'user-1',
+      object_path: `wardrobe/user-1/${id}.png`,
       ...overrides,
     },
   }
@@ -388,6 +391,46 @@ describe('WardrobeCapsuleService', () => {
       await service.listCapsules(actor, 'user-1', { limit: 20, offset: 0 })
 
       expect(storage.signReadUrl).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('garment image paths', () => {
+    /**
+     * Review round 2, 2026-11-19: `object_path` was member-writable before the revoke
+     * migration, so the service role never signs a path that is not the garment's own object.
+     */
+    it('serves a garment whose path names another member object without an image', async () => {
+      const repo = createMockRepo()
+      vi.mocked(repo.listCapsules).mockResolvedValue({
+        items: [
+          capsuleRow({
+            garment_joins: [
+              garmentJoin('garment-1', 0),
+              garmentJoin('garment-2', 1, {
+                object_path: 'wardrobe/user-2/garment-9.png',
+              }),
+            ],
+          }),
+        ],
+        total: 1,
+      } as never)
+      const storage = createMockStorage()
+      const { service } = createService({ repo, storage })
+
+      const page = await service.listCapsules(actor, 'user-1', { limit: 20, offset: 0 })
+
+      expect(storage.signReadUrl).toHaveBeenCalledTimes(1)
+      expect(storage.signReadUrl).toHaveBeenCalledWith(
+        'wardrobe/user-1/garment-1.png',
+        900
+      )
+      const garments = page.data[0]?.garments ?? []
+      expect(
+        garments.find((garment) => garment.id === 'garment-2')?.imageAccess
+      ).toBeNull()
+      expect(
+        garments.find((garment) => garment.id === 'garment-1')?.imageAccess
+      ).not.toBeNull()
     })
   })
 

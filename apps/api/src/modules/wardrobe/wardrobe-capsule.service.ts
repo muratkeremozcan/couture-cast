@@ -26,6 +26,7 @@ import {
   type AnalyticsClient,
 } from '../../analytics/analytics.service.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { isOwnGarmentObject } from './wardrobe-upload-paths.js'
 import { RitualService } from '../personalization/ritual.service.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeAccessService } from './wardrobe-access.service.js'
@@ -159,6 +160,19 @@ export class WardrobeCapsuleService {
    * concurrency. Formatting per garment would issue one signing call per join,
    * which is up to 1,000 serial calls for a full page of capsules.
    */
+  /**
+   * A garment image is signed only from that garment's own object. Before the 2026-11-19 revoke
+   * migration a member could write `object_path`, so a path naming anything else is skipped
+   * and logged, and the garment is served without an image.
+   */
+  private isSignableGarment(
+    garment: CapsuleWithGarmentJoins['garment_joins'][number]['garment']
+  ): boolean {
+    if (isOwnGarmentObject(garment)) return true
+    this.logger.error({ garmentId: garment.id }, 'capsule_garment_path_not_own_skipped')
+    return false
+  }
+
   private async signReadUrls(objectPaths: string[]): Promise<Map<string, string>> {
     const distinct = Array.from(new Set(objectPaths))
     const signed = new Map<string, string>()
@@ -249,7 +263,10 @@ export class WardrobeCapsuleService {
     const objectPaths = capsules.flatMap((capsule) =>
       capsule.garment_joins
         .filter(
-          (join) => this.isGarmentAvailable(join.garment) && join.garment?.object_path
+          (join) =>
+            this.isGarmentAvailable(join.garment) &&
+            join.garment?.object_path &&
+            this.isSignableGarment(join.garment)
         )
         .map((join) => join.garment.object_path as string)
     )

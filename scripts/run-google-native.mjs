@@ -488,7 +488,6 @@ async function main() {
       PORT: String(GOOGLE_NATIVE_PORTS.api),
       API_LISTEN_HOST: '127.0.0.1',
       API_BASE_URL,
-      PUBLIC_API_URL: API_BASE_URL,
       WEB_E2E_BASE_URL: `http://127.0.0.1:${GOOGLE_NATIVE_PORTS.web}`,
       HTTP_CORS_ORIGIN: `http://127.0.0.1:${GOOGLE_NATIVE_PORTS.web}`,
       E2E_WEATHER_DOUBLE_PORT: String(GOOGLE_NATIVE_PORTS.weatherDouble),

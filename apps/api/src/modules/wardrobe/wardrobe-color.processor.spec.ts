@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import type { PrismaClient } from '@prisma/client'
 import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -28,6 +30,8 @@ describe('WardrobeColorProcessor', () => {
       upsert: mockUpsert,
     },
     $transaction: mockTransaction,
+    // The row lock the deferral takes before it classifies the garment.
+    $queryRaw: vi.fn().mockResolvedValue([]),
   } as unknown as PrismaClient
 
   const mockStorage = {
@@ -38,6 +42,8 @@ describe('WardrobeColorProcessor', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // A test's standing answer for the garment read never reaches the next test.
+    mockFindUnique.mockReset()
     mockUpdateMany.mockResolvedValue({ count: 1 })
   })
 
@@ -171,11 +177,129 @@ describe('WardrobeColorProcessor', () => {
       retention_status: 'active',
       upload_status: 'processing',
     })
+    // The guarded transition misses; the locked re-read finds the garment already advanced.
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'g_duplicate',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_duplicate.png',
+      retention_status: 'active',
+      upload_status: 'awaiting_tags',
+    })
     mockUpdateMany.mockResolvedValueOnce({ count: 0 })
 
     await processor.process('g_duplicate')
 
     expect(mockUpsert).not.toHaveBeenCalled()
+    expect(mockDownload).toHaveBeenCalledOnce()
+  })
+
+  /**
+   * Review round 1, 2026-11-19: the path column was member-writable before the revoke
+   * migration, so the service role must never read an object that is not the member's own.
+   */
+  it('fails a garment whose path names another member object without reading it', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'g_foreign',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_2/g_other.png',
+      retention_status: 'active',
+      upload_status: 'processing',
+    } as unknown as Awaited<ReturnType<typeof mockPrisma.garmentItem.findUnique>>)
+
+    await processor.process('g_foreign')
+
+    expect(mockDownload).not.toHaveBeenCalled()
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'g_foreign', upload_status: 'processing' },
+      data: { upload_status: 'failed', failure_code: 'COLOR_PROCESSING_FAILED' },
+    })
+  })
+
+  /**
+   * Learning path Step 58, round 6 (Codex C5-7): the worker declines a garment under legal hold
+   * and leaves its image alone, but the job completes and its id stays retained, so the marker
+   * it leaves set made the garment unrecoverable after release. It now records the deferral and
+   * clears the marker, guarded on the hold, so the maintenance handoff can enqueue it again.
+   * See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+   */
+  const DEFER_FOR_HOLD = {
+    where: { id: 'g_held', upload_status: 'processing', retention_status: 'legal_hold' },
+    data: {
+      processing_job_enqueued_at: null,
+      processing_deferred_at: expect.any(Date) as Date,
+    },
+  }
+
+  it('defers a processing garment under legal hold without reading its image', async () => {
+    mockFindUnique.mockResolvedValue({
+      id: 'g_held',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_held.png',
+      retention_status: 'legal_hold',
+      upload_status: 'processing',
+    })
+
+    await processor.process('g_held')
+
+    expect(mockDownload).not.toHaveBeenCalled()
+    expect(mockUpdateMany).toHaveBeenCalledExactlyOnceWith(DEFER_FOR_HOLD)
+  })
+
+  it('defers a garment whose hold landed while it was being processed', async () => {
+    const garment = {
+      id: 'g_held',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_held.png',
+      upload_status: 'processing',
+    }
+    mockFindUnique
+      .mockResolvedValueOnce({ ...garment, retention_status: 'active' })
+      .mockResolvedValueOnce({ ...garment, retention_status: 'legal_hold' })
+    // The checkpoint lands; the final transition finds the row no longer active.
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 })
+
+    await processor.process('g_held')
+
+    expect(mockUpsert).not.toHaveBeenCalled()
+    expect(mockUpdateMany).toHaveBeenLastCalledWith(DEFER_FOR_HOLD)
+  })
+
+  /**
+   * Final review F-7: the job read the garment held, and the operator released the hold before
+   * the deferral ran. The deferral classifies under the row lock, sees the release, and the job
+   * processes the garment, so it is never left processing with its marker set and no job.
+   */
+  it('processes a garment whose hold was released between its read and the deferral', async () => {
+    const garment = {
+      id: 'g_released',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_released.png',
+      upload_status: 'processing',
+    }
+    mockFindUnique
+      .mockResolvedValueOnce({ ...garment, retention_status: 'legal_hold' })
+      .mockResolvedValue({ ...garment, retention_status: 'active' })
+
+    await processor.process('g_released')
+
+    expect(mockDownload).toHaveBeenCalledExactlyOnceWith('wardrobe/user_1/g_released.png')
+    const deferrals = mockUpdateMany.mock.calls.filter(
+      ([args]) =>
+        (args as { data: object }).data &&
+        'processing_deferred_at' in (args as { data: object }).data
+    )
+    expect(deferrals).toEqual([])
+    expect(mockUpdateMany).toHaveBeenLastCalledWith({
+      where: {
+        id: 'g_released',
+        user_id: 'user_1',
+        object_path: 'wardrobe/user_1/g_released.png',
+        retention_status: 'active',
+        upload_status: 'processing',
+      },
+      data: expect.objectContaining({ upload_status: 'awaiting_tags' }) as object,
+    })
+    expect(mockUpsert).toHaveBeenCalledOnce()
   })
 
   it('marks processing garment as failed', async () => {

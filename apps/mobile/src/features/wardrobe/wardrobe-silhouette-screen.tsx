@@ -40,7 +40,7 @@ export function WardrobeSilhouetteScreen() {
       {isResolvingToken ? (
         <ActivityIndicator accessibilityLabel={t('wardrobe.silhouette.title')} />
       ) : accessToken ? (
-        <SilhouetteEditor accessToken={accessToken} />
+        <SilhouetteEditor />
       ) : (
         <Text accessibilityRole="alert">Sign in to edit your silhouette.</Text>
       )}

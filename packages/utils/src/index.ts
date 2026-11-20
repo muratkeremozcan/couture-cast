@@ -60,9 +60,19 @@ export {
   buildGarmentObjectPath,
   buildPaletteSelfieObjectPath,
   buildSilhouetteObjectPath,
+  buildWardrobeHeldObjectPath,
+  buildWardrobeObjectPath,
+  buildWardrobeStagingObjectPath,
+  isWardrobePathSegment,
+  isWardrobeUuid,
   parseCommunityObjectPath,
+  parseWardrobeHeldObjectPath,
+  parseWardrobeObjectPath,
+  parseWardrobeStagingObjectPath,
+  WARDROBE_HELD_FOLDER,
+  WARDROBE_STAGING_FOLDER,
 } from './wardrobe-object-path'
-export type { GarmentObjectExtension } from './wardrobe-object-path'
+export type { GarmentObjectExtension, WardrobeObjectKind } from './wardrobe-object-path'
 
 export {
   chroma,

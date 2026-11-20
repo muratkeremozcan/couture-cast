@@ -39,7 +39,6 @@ import {
   openAffiliatePartnerSite,
 } from '@/src/lib/commerce'
 import { sha256Hex } from '@/src/lib/expo-native-helpers'
-import { randomUuidV4 } from '@/src/lib/uuid'
 import {
   analyzeWardrobePaletteFromMobile,
   erasePaletteAdvisorFromMobile,
@@ -50,6 +49,7 @@ import {
   uploadPaletteSelfieFromMobile,
   type PaletteSelfieUploadState,
 } from '@/src/lib/palette-advisor'
+import { currentUploadSession, isUploadSessionCurrent } from '@/src/lib/upload-attempts'
 
 type ScreenState = 'loading' | 'signed_out' | 'ready' | 'load_failed'
 
@@ -587,16 +587,16 @@ async function pickSelfieAsset(): Promise<ImagePicker.ImagePickerAsset | null> {
 /**
  * Re-encodes the picked asset to the bytes the allocate call declares.
  *
- * Always re-encoded, and to PNG rather than JPEG. Re-encoded because the
- * allocate call declares a MIME type the server re-decodes and checks, and the
- * OS hands back whatever the camera captured. PNG because the server classifies
- * undertone from Cb/Cr chroma (Decision 3), and JPEG's 4:2:0 chroma subsampling
- * throws away exactly the two channels the classification reads. The silhouette
- * editor re-encodes to PNG too, for a weaker reason.
+ * Always re-encoded, to JPEG. Re-encoded because the allocate call declares a
+ * MIME type the server re-decodes and checks, and the OS hands back whatever the
+ * camera captured. JPEG because a selfie has no transparency and as PNG it came
+ * to several megabytes. The server classifies undertone from Cb/Cr chroma
+ * (Decision 3) after shrinking the frame to 256 px, and JPEG's 4:2:0 subsampling
+ * keeps chroma at half of this 1536 px edge, far finer than the classifier reads.
  */
 async function prepareSelfieBytes(asset: ImagePicker.ImagePickerAsset): Promise<{
   bytes: Uint8Array<ArrayBuffer>
-  mimeType: 'image/png'
+  mimeType: 'image/jpeg'
   widthPx: number
   heightPx: number
   sha256: string
@@ -611,13 +611,13 @@ async function prepareSelfieBytes(asset: ImagePicker.ImagePickerAsset): Promise<
   const prepared = await manipulateAsync(
     asset.uri,
     [{ resize: { width: widthPx, height: heightPx } }],
-    { compress: 1, format: SaveFormat.PNG }
+    { compress: 0.9, format: SaveFormat.JPEG }
   )
   const bytes = await new File(prepared.uri).bytes()
 
   return {
     bytes,
-    mimeType: 'image/png',
+    mimeType: 'image/jpeg',
     widthPx: prepared.width,
     heightPx: prepared.height,
     sha256: await sha256Hex(bytes),
@@ -889,17 +889,21 @@ export function PaletteAdvisorScreen() {
   async function handleChooseSelfie(): Promise<void> {
     if (busy !== null) return
 
+    // Round 5 account epoch: the photo belongs to the account signed in when the picker opened.
+    // One picked before an account change is dropped, so nothing uploads under the next account.
+    const uploadSession = currentUploadSession()
     const asset = await pickSelfieAsset()
-    if (!asset) return
+    if (!asset || !isUploadSessionCurrent(uploadSession)) return
 
     setLastDismissal(null)
-    const idempotencyKey = randomUuidV4()
 
+    // Picking the same photo again after a failure resumes its pending upload attempt with the
+    // same keys (the lib keys attempts by the prepared bytes).
     void runWrite('selfie', 'commerce.premium.palette.saveError', async (signal) => {
       const prepared = await prepareSelfieBytes(asset)
       return uploadPaletteSelfieFromMobile({
         ...prepared,
-        idempotencyKey,
+        uploadSession,
         signal,
         onStateChange: setUploadState,
       })

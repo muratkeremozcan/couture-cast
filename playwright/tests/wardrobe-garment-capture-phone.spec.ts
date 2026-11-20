@@ -1,10 +1,13 @@
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Tester report 2026-11-17, Android Chrome on the Wardrobe Hub: the camera preview showed only a
 // wide strip of the garment, and "Use This Image" failed with "Failed to fetch".
 //
 // G-1: production handed the browser an upload address it cannot reach (the API's
-// PUBLIC_API_URL was unset, so it named http://localhost:3001). The browser reaches the API
-// only through the web app's own /api/v1 path, so the upload must go there whatever host the
-// API names. The route below hands the browser the same unreachable address production did.
+// PUBLIC_API_URL was unset, so it named http://localhost:3001). Since 2026-11-19 (G-4) the bytes
+// no longer pass through the API at all: the API hands out a signed storage upload URL for one
+// object, and the browser must put the bytes at exactly that URL, on the storage host, never
+// on the API or web host.
 //
 // G-2: a phone camera streams a portrait frame, and the preview cropped it to a 16:9 box with
 // object-fit cover while Snap Photo kept the whole frame. The preview must show the whole frame
@@ -13,23 +16,41 @@
 // G-3: on the same screen the two crop actions wrapped to two lines each, and the background
 // cleanup switch drew its track at the 44 px touch size, a disc instead of a switch. Stacked on
 // a phone, the actions keep DOM order on screen so keyboard focus moves top to bottom.
+//
+// Tester report 2026-11-19, Android Chrome at 448 px, a new account on the Wardrobe Hub:
+// "Upload fail". G-4 reproduces one cause with a generated 12 MP phone photo: prepared with the
+// default settings (1:1 crop, background cleanup on, so PNG) it is over 5 MB, and the upload sent
+// those bytes through a Vercel Function, which refuses a body over about 4.5 MB with
+// 413 FUNCTION_PAYLOAD_TOO_LARGE before the API sees it (production probes, 2026-11-19). No trace
+// ties the tester's own attempt to this response. The local API has no such cap, so a route
+// answers every /api/v1 PUT the way production does.
+//
+// G-5, a separate camera-path case: Snap Photo drew the camera frame into a PNG, so even with
+// cleanup off the camera path uploaded lossless bytes. The fix stores a JPEG straight in
+// storage, and G-5 holds it there.
 import path from 'node:path'
-import { signupResponseSchema } from '@couture/api-client/contracts/http'
+import {
+  garmentListResponseSchema,
+  signupResponseSchema,
+} from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
 import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
 import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
+import { writePhoneCameraPhoto } from '../support/helpers/phone-camera-photo'
+import {
+  vercelFunctionBodyLimit,
+  watchPuts,
+} from '../support/helpers/vercel-function-body-limit'
+import { expectSignedStorageUpload } from '../support/helpers/storage-upload-url'
 
 const environment = resolveEnvironmentConfig('local')
 const garmentFixturePath = path.resolve(
   __dirname,
   '../../apps/api/test/fixtures/garment-tagging/neutral-top.png'
 )
-// Nothing listens on the discard port: a request there fails as the localhost address did on
-// the tester's phone.
-const UNREACHABLE_API_ORIGIN = 'http://127.0.0.1:9'
 // A portrait phone camera frame (the tester's phone streams 3:4 or 9:16).
 const CAMERA_FRAME = { width: 720, height: 1280 }
 
@@ -87,19 +108,13 @@ phoneTest.describe('Garment capture on a phone', () => {
   })
 
   phoneTest(
-    'G-1: Use This Image uploads through the web app when the API names a host the browser cannot reach',
-    async ({ page }) => {
-      await page.route('**/api/v1/wardrobe/upload-url', async (route) => {
-        const response = await route.fetch()
-        const body = (await response.json()) as { data: { uploadUrl: string } }
-        const named = new URL(body.data.uploadUrl)
-        body.data.uploadUrl = `${UNREACHABLE_API_ORIGIN}${named.pathname}${named.search}`
-        await route.fulfill({ response, json: body })
+    'G-1: Use This Image puts the bytes at the signed storage URL the API hands out',
+    async ({ cleanupState, interceptNetworkCall, page }) => {
+      const allocation = interceptNetworkCall({
+        method: 'POST',
+        url: '**/api/v1/wardrobe/upload-url',
       })
-      const uploads: string[] = []
-      page.on('request', (request) => {
-        if (request.method() === 'PUT') uploads.push(request.url())
-      })
+      const uploads = watchPuts(page)
 
       await page.goto('/wardrobe')
       await waitForAccessibilityReady(page)
@@ -107,14 +122,24 @@ phoneTest.describe('Garment capture on a phone', () => {
       await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
       await page.getByRole('button', { name: 'Use This Image' }).click()
 
+      const { status, responseJson } = await allocation
+      expect(status).toBe(201)
+      const { uploadUrl, uploadSessionId } = (
+        responseJson as { data: { uploadUrl: string; uploadSessionId: string } }
+      ).data
       await expect(page.getByText('Garment Upload Complete!')).toBeVisible()
       await expect(page.getByText('Failed to fetch')).toHaveCount(0)
-      // The web app's own /api/v1 path, or the API base the web build was given.
-      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
-      const origin = apiBase ? new URL(apiBase).origin : new URL(page.url()).origin
-      expect(uploads).toHaveLength(1)
-      expect(new URL(uploads[0]!).origin).toBe(origin)
-      expect(new URL(uploads[0]!).pathname).toMatch(/^\/api\/v1\/wardrobe\/uploads\//)
+
+      // The one PUT is the signed URL exactly as given: this member's garment staging key in
+      // the wardrobe bucket (commit publishes the verified bytes to the member's folder).
+      expect(uploads).toEqual([uploadUrl])
+      expect(new URL(uploadUrl).pathname).toMatch(
+        new RegExp(
+          `^/storage/v1/object/upload/sign/wardrobe-images/staging/${cleanupState.userId}/garment/${uploadSessionId}\\.(jpg|jpeg|png|webp)$`
+        )
+      )
+      // On the configured storage host, not merely somewhere other than the API or web.
+      expectSignedStorageUpload(uploadUrl)
     }
   )
 
@@ -252,6 +277,155 @@ phoneTest.describe('Garment capture on a phone', () => {
         path: testInfo.outputPath('crop-step.png'),
         contentType: 'image/png',
       })
+    }
+  )
+
+  phoneTest(
+    'G-4: a full-size phone camera photo uploads with the default crop and cleanup',
+    async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
+      const photoPath = testInfo.outputPath('phone-camera-photo.jpg')
+      const photoBytes = await writePhoneCameraPhoto(photoPath)
+      // A file the picker accepts: under the 10 MiB cap, and the size class of a real phone photo.
+      expect(photoBytes).toBeGreaterThan(1_500_000)
+      expect(photoBytes).toBeLessThan(10 * 1024 * 1024)
+
+      void interceptNetworkCall({
+        method: 'PUT',
+        url: '**/api/v1/**',
+        handler: vercelFunctionBodyLimit(),
+      })
+      const allocation = interceptNetworkCall({
+        method: 'POST',
+        url: '**/api/v1/wardrobe/upload-url',
+      })
+      const uploads = watchPuts(page)
+
+      await page.goto('/wardrobe')
+      await waitForAccessibilityReady(page)
+      await page.getByRole('button', { name: '+ Add Garment' }).click()
+      await page.getByLabel('Garment image file').setInputFiles(photoPath)
+      // The tester kept the defaults.
+      await expect(
+        page.getByRole('switch', { name: 'Auto Background Cleanup' })
+      ).toBeChecked()
+      await page.getByRole('button', { name: 'Use This Image' }).click()
+
+      await expect(page.getByText('Garment Upload Complete!')).toBeVisible({
+        timeout: 30_000,
+      })
+      await expect(
+        page.getByText(/Upload failed|FUNCTION_PAYLOAD_TOO_LARGE/)
+      ).toHaveCount(0)
+      // The large photo went to the signed storage URL and nowhere else.
+      const { responseJson } = await allocation
+      const { uploadUrl } = (responseJson as { data: { uploadUrl: string } }).data
+      expectSignedStorageUpload(uploadUrl)
+      expect(uploads).toEqual([uploadUrl])
+
+      const garments = await apiRequest({
+        method: 'GET',
+        path: '/api/v1/wardrobe/garments',
+        baseUrl: environment.apiBaseUrl,
+        headers: { Authorization: `Bearer ${cleanupState.accessToken}` },
+      })
+      expect(garments.status).toBe(200)
+      const listed = garmentListResponseSchema.parse(garments.body).data
+      expect(listed).toHaveLength(1)
+
+      // The tester's Wardrobe Hub card printed the raw garment id; a member sees no ids.
+      await page.getByRole('button', { name: 'Close capture modal' }).click()
+      await expect(page.getByRole('dialog')).toHaveCount(0)
+      const card = page.getByTestId(`garment-card-${listed[0]!.id}`)
+      await expect(card).toBeVisible()
+      // For review: the card as the phone shows it.
+      await card.screenshot({ path: testInfo.outputPath('garment-card.png') })
+      await testInfo.attach('garment card', {
+        path: testInfo.outputPath('garment-card.png'),
+        contentType: 'image/png',
+      })
+      await expect(card).not.toContainText(listed[0]!.id)
+      await expect(card).not.toContainText(
+        /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      )
+    }
+  )
+
+  phoneTest(
+    'G-5: Snap Photo with cleanup off stores a JPEG straight in storage',
+    async ({ interceptNetworkCall, page }) => {
+      // A grainy 1080x1920 portrait stream, the size a phone camera streams when asked for HD.
+      await page.addInitScript(() => {
+        const width = 1080
+        const height = 1920
+        const still = document.createElement('canvas')
+        still.width = width
+        still.height = height
+        const stillContext = still.getContext('2d')!
+        const pixels = stillContext.createImageData(width, height)
+        let seed = 7
+        for (let offset = 0; offset < pixels.data.length; offset += 4) {
+          const inGarment =
+            (offset / 4) % width > width * 0.25 && (offset / 4) % width < width * 0.75
+          const base = inGarment ? [70, 90, 140] : [225, 215, 195]
+          for (let channel = 0; channel < 3; channel++) {
+            seed = (seed * 1103515245 + 12345) & 0x7fffffff
+            pixels.data[offset + channel] = base[channel]! + ((seed >> 16) % 17) - 8
+          }
+          pixels.data[offset + 3] = 255
+        }
+        stillContext.putImageData(pixels, 0, 0)
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const context = canvas.getContext('2d')!
+        const paint = () => context.drawImage(still, 0, 0)
+        paint()
+        const stream = canvas.captureStream(15)
+        setInterval(paint, 66)
+        Object.defineProperty(navigator, 'mediaDevices', {
+          configurable: true,
+          value: { getUserMedia: () => Promise.resolve(stream) },
+        })
+      })
+      const allocation = interceptNetworkCall({
+        method: 'POST',
+        url: '**/api/v1/wardrobe/upload-url',
+      })
+      const uploads: { url: string; contentType: string; bytes: number }[] = []
+      page.on('request', (request) => {
+        if (request.method() !== 'PUT') return
+        uploads.push({
+          url: request.url(),
+          contentType: request.headers()['content-type'] ?? '',
+          bytes: request.postDataBuffer()?.byteLength ?? 0,
+        })
+      })
+
+      await page.goto('/wardrobe')
+      await waitForAccessibilityReady(page)
+      await page.getByRole('button', { name: '+ Add Garment' }).click()
+      await page.getByRole('button', { name: 'Take Photo' }).click()
+      const video = page.getByRole('dialog').locator('video')
+      await expect
+        .poll(() => video.evaluate((element: HTMLVideoElement) => element.videoHeight))
+        .toBe(1920)
+      await page.getByRole('button', { name: 'Snap Photo' }).click()
+      const cleanup = page.getByRole('switch', { name: 'Auto Background Cleanup' })
+      await cleanup.click()
+      await expect(cleanup).not.toBeChecked()
+      await page.getByRole('button', { name: 'Use This Image' }).click()
+
+      await expect(page.getByText('Garment Upload Complete!')).toBeVisible({
+        timeout: 30_000,
+      })
+      // One PUT, to the signed storage URL, carrying a JPEG.
+      const { responseJson } = await allocation
+      const { uploadUrl } = (responseJson as { data: { uploadUrl: string } }).data
+      expectSignedStorageUpload(uploadUrl)
+      expect(uploads.map(({ url }) => url)).toEqual([uploadUrl])
+      expect(uploads[0]!.contentType).toBe('image/jpeg')
+      expect(uploads[0]!.bytes).toBeGreaterThan(0)
+      expect(uploads[0]!.bytes).toBeLessThan(1_500_000)
     }
   )
 })

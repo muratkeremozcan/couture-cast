@@ -207,10 +207,15 @@ describe('moderation console RLS', () => {
                   'UPDATE public."AuditLog" SET "event_type" = \'x\' WHERE "id" = $1',
                   'DELETE FROM public."AuditLog" WHERE "id" = $1',
                 ]) {
+                  // A savepoint per statement: where the role lacks the grant, the refused
+                  // UPDATE would otherwise abort the transaction and the DELETE would report
+                  // 25P02 instead of its own outcome.
+                  await client.query('SAVEPOINT audit_write')
                   const outcome = await client.query(statement, [id]).then(
                     (result) => ({ rowCount: result.rowCount }),
                     (error: { code?: string }) => ({ code: error.code })
                   )
+                  await client.query('ROLLBACK TO SAVEPOINT audit_write')
                   expect([{ rowCount: 0 }, { code: PERMISSION_DENIED }]).toContainEqual(
                     outcome
                   )

@@ -35,6 +35,7 @@ import {
   type AdvisorRecommendationCard,
   type PaletteAdvisorProfile,
   type PaletteAnalysisFailureReason,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import {
   beginAffiliatePartnerHandoff,
@@ -43,7 +44,6 @@ import {
 import {
   analyzeWardrobePaletteFromWeb,
   erasePaletteAdvisorFromWeb,
-  generateIdempotencyKey,
   getPaletteAdvisorFromWeb,
   paletteAdvisorFailureReason,
   setPaletteConsentFromWeb,
@@ -61,6 +61,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import { currentUploadSession, isUploadSessionCurrent } from '../../lib/upload-attempts'
 
 /**
  * True when a stored palette was derived under a rule table this build has
@@ -476,12 +477,14 @@ function SourceChoice({
   isAnalysisEnabled,
   showUnavailableNote,
   onAnalyzeWardrobe,
+  onSelfiePickerOpen,
   onSelfieChosen,
 }: {
   isBusy: boolean
   isAnalysisEnabled: boolean
   showUnavailableNote: boolean
   onAnalyzeWardrobe: () => void
+  onSelfiePickerOpen: () => void
   onSelfieChosen: (event: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   const { t } = useTranslation()
@@ -535,6 +538,7 @@ function SourceChoice({
             : SELFIE_HINT_ID
         }
         disabled={isBusy || !isAnalysisEnabled}
+        onClick={onSelfiePickerOpen}
         onChange={onSelfieChosen}
       />
     </div>
@@ -696,6 +700,8 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
   const writeControllerRef = useRef<AbortController | null>(null)
   /** This mount's lifetime: a sponsored click answering after it ends navigates nothing. */
   const mountSignal = useMountSignal()
+  /** The session captured when the selfie picker last opened; the photo it returns belongs to it. */
+  const selfiePickerSessionRef = useRef<UploadAttemptSession | null>(null)
   useEffect(() => () => writeControllerRef.current?.abort(), [])
 
   /*
@@ -921,14 +927,25 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     )
   }
 
+  function handleSelfiePickerOpen(): void {
+    selfiePickerSessionRef.current = currentUploadSession()
+  }
+
   function handleSelfieChosen(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
     // Reset immediately so choosing the same file twice still fires `change`.
     event.target.value = ''
-    if (!file) return
+    // Round 5 account epoch: the photo belongs to the account signed in when the picker opened
+    // (a file that arrives without the picker opening, a drop, belongs to the session now). A
+    // photo picked before an account change is dropped; nothing uploads under the next account.
+    const uploadSession = selfiePickerSessionRef.current ?? currentUploadSession()
+    selfiePickerSessionRef.current = null
+    if (!file || !isUploadSessionCurrent(uploadSession)) return
 
     setLastDismissal(null)
-    const idempotencyKey = generateIdempotencyKey()
+    // Picking the same photo again after a failure resumes its pending upload attempt with the
+    // same keys (the lib keys attempts by the prepared bytes), so a lost answer replays the
+    // analysis already started.
     void runWrite('selfie', 'commerce.premium.palette.saveError', async (signal) => {
       // Allocated only once the write is accepted (a busy panel or a member who has left
       // returns before this runs), so every object URL made here is revoked below.
@@ -936,7 +953,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
       try {
         return await uploadPaletteSelfieFromWeb({
           imagePreview,
-          idempotencyKey,
+          uploadSession,
           signal,
           onStateChange: setUploadState,
         })
@@ -1110,6 +1127,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
           isAnalysisEnabled={profile?.analysisEnabled !== false}
           showUnavailableNote={view.showUnavailableNote}
           onAnalyzeWardrobe={handleAnalyzeWardrobe}
+          onSelfiePickerOpen={handleSelfiePickerOpen}
           onSelfieChosen={handleSelfieChosen}
         />
       )}

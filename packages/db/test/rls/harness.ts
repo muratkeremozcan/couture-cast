@@ -10,7 +10,7 @@
 // `SeededScenario`, insert it in `seedScenario`, delete it in `cleanupScenario` before
 // the rows it depends on, and put the actor matrix in that story's own spec file.
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
 import {
   buildLookbookPostCreateInput,
@@ -113,6 +113,10 @@ export const workerOnlyTables = [
   'CommunitySanction',
   // Story 6.14: owner-granted complimentary access, written only by the owner's operator command.
   'ComplimentaryAccessGrant',
+  // Production follow-up 2026-11-19: the wardrobe-images deletion outbox, API-only.
+  'WardrobeObjectDeletion',
+  // Production follow-up round 4: the wardrobe maintenance job's state, API-only.
+  'WardrobeMaintenanceState',
 ] as const
 
 export const selfOnlyTables = [
@@ -145,6 +149,41 @@ export const selfOnlyTables = [
 ] as const
 
 export const ownerOrGlobalReadTables = ['EventEnvelope'] as const
+
+/**
+ * Tables a member reads under the category policies above and never writes (production
+ * follow-up 2026-11-19, migration 20261119120000_revoke_member_wardrobe_upload_writes). They
+ * hold the storage paths the API's service role reads, moves and deletes, so a member writing
+ * their own row could point a path at another member's object. Members keep the SELECT policy;
+ * INSERT, UPDATE, DELETE and TRUNCATE are revoked from `anon` and `authenticated`, and the
+ * write policies are gone. The API writes them on the database owner role.
+ */
+export const memberReadOnlyTables = [
+  'GarmentItem',
+  'SilhouetteProfile',
+  'PaletteProfile',
+] as const
+
+/** The write privileges no client role holds on `memberReadOnlyTables`. */
+export const memberWritePrivileges = ['DELETE', 'INSERT', 'TRUNCATE', 'UPDATE'] as const
+
+/**
+ * Asserts a statement is refused for lack of privilege (SQLSTATE 42501) without aborting the
+ * caller's transaction: the statement runs inside a savepoint that is rolled back afterwards,
+ * so the test can keep querying in the same role session.
+ */
+export const expectPermissionDenied = async (
+  client: PoolClient,
+  sql: string,
+  params: unknown[] = []
+) => {
+  await client.query('SAVEPOINT expect_permission_denied')
+  try {
+    await expect(client.query(sql, params)).rejects.toMatchObject({ code: '42501' })
+  } finally {
+    await client.query('ROLLBACK TO SAVEPOINT expect_permission_denied')
+  }
+}
 
 export const adminPool = new Pool({
   connectionString: databaseUrl,

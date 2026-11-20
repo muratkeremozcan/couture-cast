@@ -1,3 +1,5 @@
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.5 TEA coverage-gate follow-up: the mobile colour palette advisor network
 // boundary, tested directly.
 //
@@ -11,10 +13,14 @@
 // map onto it.
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { PALETTE_ANALYSIS_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
+import { currentUploadSession, forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
+import {
+  PALETTE_ANALYSIS_DISABLED_MESSAGE,
+  UploadSessionChangedError,
+} from '@couture/api-client/contracts/http'
 
 import { server } from '../test-utils/msw/server'
-import { setMobileAccessTokenResolver } from './mobile-auth'
+import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
 import {
   erasePaletteAdvisorFromMobile,
   getPaletteAdvisorFromMobile,
@@ -53,6 +59,9 @@ describe('mobile palette advisor boundary', () => {
   })
 
   afterEach(() => {
+    // Upload attempts live for the app session; each test starts signed out with none open.
+    setMobileApplicationUserId(null)
+    forgetAllUploadAttempts()
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
   })
@@ -184,14 +193,15 @@ describe('mobile palette advisor boundary', () => {
   })
 
   describe('uploadPaletteSelfieFromMobile', () => {
-    const uploadInput = {
+    /** The prepared photo, bound to the session current when the test picks it. */
+    const uploadInput = () => ({
       bytes: new Uint8Array([1, 2, 3, 4]),
       mimeType: 'image/png' as const,
       widthPx: 512,
       heightPx: 512,
       sha256: 'a'.repeat(64),
-      idempotencyKey: 'idem-1',
-    }
+      uploadSession: currentUploadSession(),
+    })
 
     it('classifies a rejected allocate call', async () => {
       server.use(
@@ -200,7 +210,7 @@ describe('mobile palette advisor boundary', () => {
         )
       )
 
-      await uploadPaletteSelfieFromMobile(uploadInput).then(
+      await uploadPaletteSelfieFromMobile(uploadInput()).then(
         () => expect.unreachable('the allocate should have rejected'),
         (error: unknown) => {
           expect(paletteAdvisorFailureReason(error)).toBe('not_entitled')
@@ -214,23 +224,22 @@ describe('mobile palette advisor boundary', () => {
           HttpResponse.json({
             data: {
               uploadSessionId: 'session-1',
-              uploadUrl: `${window.location.origin}/api/v1/commerce/premium/palette/selfie/uploads/session-1`,
+              uploadUrl: `${window.location.origin}/mock-storage/selfie-session-1`,
               uploadToken: 'upload-token',
               requiredHeaders: { 'content-type': 'image/png' },
               expiresAt: '2026-09-04T17:00:00.000Z',
             },
           })
         ),
-        http.put(
-          `${window.location.origin}/api/v1/commerce/premium/palette/selfie/uploads/session-1`,
-          () => HttpResponse.json({})
+        http.put(`${window.location.origin}/mock-storage/selfie-session-1`, () =>
+          HttpResponse.json({})
         ),
         http.post(`${PALETTE_ROUTE}/selfie/commit`, () =>
           errorEnvelope(500, 'Storage error.')
         )
       )
 
-      await uploadPaletteSelfieFromMobile(uploadInput).then(
+      await uploadPaletteSelfieFromMobile(uploadInput()).then(
         () => expect.unreachable('the commit should have rejected'),
         (error: unknown) => {
           expect(paletteAdvisorFailureReason(error)).toBe('unknown')
@@ -244,23 +253,228 @@ describe('mobile palette advisor boundary', () => {
           HttpResponse.json({
             data: {
               uploadSessionId: 'session-2',
-              uploadUrl: `${window.location.origin}/api/v1/commerce/premium/palette/selfie/uploads/session-2`,
+              uploadUrl: `${window.location.origin}/mock-storage/selfie-session-2`,
               uploadToken: 'upload-token',
               requiredHeaders: { 'content-type': 'image/png' },
               expiresAt: '2026-09-04T17:00:00.000Z',
             },
           })
         ),
-        http.put(
-          `${window.location.origin}/api/v1/commerce/premium/palette/selfie/uploads/session-2`,
-          () => HttpResponse.json({})
+        http.put(`${window.location.origin}/mock-storage/selfie-session-2`, () =>
+          HttpResponse.json({})
         ),
         http.post(`${PALETTE_ROUTE}/selfie/commit`, () => HttpResponse.json(profile()))
       )
 
-      await expect(uploadPaletteSelfieFromMobile(uploadInput)).resolves.toEqual(
+      await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
         profile().data
       )
+    })
+
+    /**
+     * Production follow-up 2026-11-19 (review round 2, Codex 6): one upload attempt keeps its
+     * allocation and keys across retries. Choosing the same photo again commits first; the
+     * bytes go out again only when commit reports them missing.
+     */
+    describe('retrying the same photo', () => {
+      type Seen = { allocateKeys: string[]; puts: number; commitKeys: string[] }
+
+      function selfieRoutes(commitAnswers: (() => Response)[]): Seen {
+        const seen: Seen = { allocateKeys: [], puts: 0, commitKeys: [] }
+        server.use(
+          http.post(`${PALETTE_ROUTE}/selfie/upload-url`, ({ request }) => {
+            seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+            return HttpResponse.json({
+              data: {
+                uploadSessionId: 'session-retry',
+                uploadUrl: `${window.location.origin}/mock-storage/selfie-retry`,
+                uploadToken: 'upload-token',
+                requiredHeaders: { 'content-type': 'image/png' },
+                expiresAt: '2026-09-04T17:00:00.000Z',
+              },
+            })
+          }),
+          http.put(`${window.location.origin}/mock-storage/selfie-retry`, () => {
+            seen.puts += 1
+            return HttpResponse.json({})
+          }),
+          http.post(`${PALETTE_ROUTE}/selfie/commit`, ({ request }) => {
+            seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+            const answer = commitAnswers[seen.commitKeys.length - 1]
+            if (!answer) throw new Error('unexpected commit')
+            return answer()
+          })
+        )
+        return seen
+      }
+
+      it('replays a commit whose answer was lost, with no second allocation or PUT', async () => {
+        const seen = selfieRoutes([
+          () => errorEnvelope(503, 'Service Unavailable'),
+          () => HttpResponse.json(profile()),
+        ])
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toThrow()
+        // Picking the same photo again resumes the open attempt for these bytes with its keys.
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+          profile().data
+        )
+
+        expect(seen.allocateKeys).toHaveLength(1)
+        expect(seen.puts).toBe(1)
+        expect(seen.commitKeys).toEqual([seen.commitKeys[0], seen.commitKeys[0]])
+      })
+
+      it('keeps the attempt after UPLOAD_IN_PROGRESS, so the next pick commits again with its key', async () => {
+        const seen = selfieRoutes([
+          () => errorEnvelope(409, 'UPLOAD_IN_PROGRESS'),
+          () => HttpResponse.json(profile()),
+        ])
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toThrow()
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+          profile().data
+        )
+
+        expect(seen.allocateKeys).toHaveLength(1)
+        expect(seen.puts).toBe(1)
+        expect(seen.commitKeys).toEqual([seen.commitKeys[0], seen.commitKeys[0]])
+      })
+
+      it('re-sends the bytes only when commit reports them missing', async () => {
+        const seen = selfieRoutes([
+          () => errorEnvelope(503, 'Service Unavailable'),
+          () => errorEnvelope(409, 'UPLOAD_BYTES_MISSING'),
+          () => HttpResponse.json(profile()),
+        ])
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toThrow()
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+          profile().data
+        )
+
+        expect(seen.allocateKeys).toHaveLength(1)
+        expect(seen.puts).toBe(2)
+        expect(new Set(seen.commitKeys).size).toBe(1)
+        expect(seen.commitKeys).toHaveLength(3)
+      })
+
+      it('starts one fresh attempt in the same pick after a terminal answer, and a new one after a success', async () => {
+        const seen = selfieRoutes([
+          () => errorEnvelope(409, 'UPLOAD_SESSION_EXPIRED'),
+          () => HttpResponse.json(profile()),
+          () => HttpResponse.json(profile()),
+        ])
+
+        // The server ended the first attempt, so the same pick allocates, uploads and commits
+        // once more with fresh keys.
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+          profile().data
+        )
+        expect(seen.allocateKeys).toHaveLength(2)
+        expect(seen.puts).toBe(2)
+        expect(seen.commitKeys).toHaveLength(2)
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+          profile().data
+        )
+
+        expect(seen.puts).toBe(3)
+        expect(new Set(seen.allocateKeys).size).toBe(3)
+        expect(new Set(seen.commitKeys).size).toBe(3)
+      })
+
+      // Learning path Step 58: Image uploads straight to storage.
+      // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+      it.each([
+        'IMAGE_CHECKSUM_MISMATCH',
+        'IMAGE_DIMENSIONS_INVALID',
+        'IMAGE_DECODE_FAILED',
+      ])(
+        'starts one fresh attempt in the same pick when commit rejects the resumed bytes with 400 %s',
+        async (code) => {
+          const seen = selfieRoutes([
+            () => errorEnvelope(503, 'Service Unavailable'),
+            () => errorEnvelope(400, code),
+            () => HttpResponse.json(profile()),
+          ])
+
+          await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toThrow()
+          // The selfie commit ended the session on 400; this same pick restarts with this
+          // run's own bytes under fresh keys.
+          await expect(uploadPaletteSelfieFromMobile(uploadInput())).resolves.toEqual(
+            profile().data
+          )
+
+          expect(seen.allocateKeys).toHaveLength(2)
+          expect(new Set(seen.allocateKeys).size).toBe(2)
+          expect(seen.puts).toBe(2)
+          expect(seen.commitKeys).toHaveLength(3)
+          expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+          expect(seen.commitKeys[2]).not.toBe(seen.commitKeys[0])
+        }
+      )
+
+      it('shows a 400 IMAGE_CHECKSUM_MISMATCH of the bytes the same run uploaded, with no restart', async () => {
+        const seen = selfieRoutes([() => errorEnvelope(400, 'IMAGE_CHECKSUM_MISMATCH')])
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toSatisfy(
+          (error: unknown) => paletteAdvisorFailureReason(error) === 'unknown'
+        )
+
+        expect(seen.allocateKeys).toHaveLength(1)
+        expect(seen.puts).toBe(1)
+        expect(seen.commitKeys).toHaveLength(1)
+      })
+
+      it('refuses a photo picked before the account changed, before any request', async () => {
+        const seen = selfieRoutes([])
+        setMobileApplicationUserId('member-a')
+        const pickedUnderA = uploadInput()
+        setMobileApplicationUserId('member-b')
+
+        await expect(uploadPaletteSelfieFromMobile(pickedUnderA)).rejects.toBeInstanceOf(
+          UploadSessionChangedError
+        )
+
+        expect(seen.allocateKeys).toHaveLength(0)
+        expect(seen.puts).toBe(0)
+      })
+
+      it('refuses when resolving the bearer finds another account signed in', async () => {
+        const seen = selfieRoutes([])
+        setMobileApplicationUserId('member-a')
+        const pickedUnderA = uploadInput()
+        // Resolving the token is where the app notices the stored session now belongs to B.
+        restoreAccessTokenResolver?.()
+        restoreAccessTokenResolver = setMobileAccessTokenResolver(() => {
+          setMobileApplicationUserId('member-b')
+          return 'member-b-token'
+        })
+
+        await expect(uploadPaletteSelfieFromMobile(pickedUnderA)).rejects.toBeInstanceOf(
+          UploadSessionChangedError
+        )
+
+        expect(seen.allocateKeys).toHaveLength(0)
+        expect(seen.puts).toBe(0)
+      })
+
+      it('gives a different photo its own attempt and keys', async () => {
+        const seen = selfieRoutes([
+          () => errorEnvelope(503, 'Service Unavailable'),
+          () => HttpResponse.json(profile()),
+        ])
+
+        await expect(uploadPaletteSelfieFromMobile(uploadInput())).rejects.toThrow()
+        await expect(
+          uploadPaletteSelfieFromMobile({ ...uploadInput(), sha256: 'b'.repeat(64) })
+        ).resolves.toEqual(profile().data)
+
+        expect(seen.puts).toBe(2)
+        expect(new Set(seen.allocateKeys).size).toBe(2)
+        expect(new Set(seen.commitKeys).size).toBe(2)
+      })
     })
   })
 })

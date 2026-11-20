@@ -3,19 +3,30 @@
 // Story 4.4 Task 5 owner: unit-test the web silhouette settings panel
 // @vitest-environment jsdom
 import React from 'react'
+import { Blob as NodeBlob } from 'node:buffer'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
-import type { SilhouetteProfileContract } from '@couture/api-client/contracts/http'
+import {
+  UploadSessionChangedError,
+  type SilhouetteProfileContract,
+} from '@couture/api-client/contracts/http'
 import { SilhouetteSettingsPanel } from './silhouette-settings-panel'
-import { WardrobeRequestError } from '../../lib/wardrobe'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY, WardrobeRequestError } from '../../lib/wardrobe'
+import {
+  forgetAllUploadAttempts,
+  setUploadAttemptAccount,
+} from '../../lib/upload-attempts'
 import { getI18n } from '../../i18n'
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
+  window.sessionStorage.clear()
+  setUploadAttemptAccount(null)
+  forgetAllUploadAttempts()
 })
 
 function buildProfile(
@@ -118,7 +129,7 @@ describe('SilhouetteSettingsPanel', () => {
     expect(uploadMyFormPhoto).not.toHaveBeenCalled()
   })
 
-  it('uploads a My Form photo once confirmed and reuses one idempotency key across a retry', async () => {
+  it('uploads a My Form photo once confirmed and retries the same photo', async () => {
     const user = userEvent.setup()
     const getProfile = vi.fn().mockResolvedValue(buildProfile())
     const uploadMyFormPhoto = vi
@@ -149,10 +160,11 @@ describe('SilhouetteSettingsPanel', () => {
 
     await waitFor(() => expect(uploadMyFormPhoto).toHaveBeenCalledTimes(2))
     const [firstCall, secondCall] = uploadMyFormPhoto.mock.calls as [
-      [{ idempotencyKey: string }],
-      [{ idempotencyKey: string }],
+      [{ imagePreview: string }],
+      [{ imagePreview: string }],
     ]
-    expect(firstCall[0].idempotencyKey).toBe(secondCall[0].idempotencyKey)
+    // The lib keys the attempt by the prepared photo, so the same photo resumes it.
+    expect(secondCall[0].imagePreview).toBe(firstCall[0].imagePreview)
   })
 
   it('polls until a processing My Form photo becomes ready', async () => {
@@ -295,9 +307,12 @@ describe('SilhouetteSettingsPanel', () => {
     await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
 
     await waitFor(() => {
+      // Round 6: the session the profile was read under rides along, so the default remover
+      // resolves the bearer for that account.
       expect(removeMyFormPhoto).toHaveBeenCalledWith(
         '"silhouette:user-1:4"',
-        expect.anything()
+        expect.anything(),
+        expect.objectContaining({ account: null })
       )
     })
     await waitFor(() => {
@@ -321,8 +336,27 @@ describe('SilhouetteSettingsPanel', () => {
     })
   })
 
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  // Round 5 (Codex C4-1): an upload fenced by an account change shows the catalog's copy.
+  it('shows the localized account-change message when the upload is fenced', async () => {
+    const user = userEvent.setup()
+    const getProfile = vi.fn().mockResolvedValue(buildProfile())
+    const uploadMyFormPhoto = vi.fn().mockRejectedValue(new UploadSessionChangedError())
+    renderPanel({ userId: 'user-1', getProfile, uploadMyFormPhoto })
+
+    await screen.findByLabelText('Height')
+    await confirmAndStartMyFormUpload(user)
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'You signed out or switched accounts during this upload. Choose the photo again.'
+      )
+    })
+  })
+
   it('offers a fresh upload (not just retry) for a failed photo loaded after a reload', async () => {
-    // Regression: session-local `uploadPreview`/`idempotencyKey` don't exist
+    // Regression: the session-local `uploadPreview` doesn't exist
     // after a reload, so a naive `canRetry`-only gate hid every actionable
     // control. The upload button must still be offered.
     const getProfile = vi.fn().mockResolvedValue(
@@ -1131,6 +1165,324 @@ describe('SilhouetteSettingsPanel My Form file handling', () => {
   })
 })
 
+/**
+ * Production follow-up 2026-11-19, review round 5 (C4-1): the picked photo, its Retry and the
+ * basewear confirmation belong to the account signed in when the picker opened. An account
+ * change drops all three, so Retry can never send one account's photo under the next.
+ */
+describe('SilhouetteSettingsPanel My Form account epoch', () => {
+  /** FileReader loads held until the test finishes them, so a switch can land mid-read. */
+  function holdFileReads() {
+    const pending: (() => void)[] = []
+    class HeldFileReader {
+      onload: ((event: { target: { result: unknown } }) => void) | null = null
+      onerror: (() => void) | null = null
+      readAsDataURL() {
+        pending.push(() =>
+          this.onload?.({ target: { result: 'data:image/png;base64,ZmFrZQ==' } })
+        )
+      }
+    }
+    vi.stubGlobal('FileReader', HeldFileReader)
+    // The read resolves a promise; act flushes what the panel does after it.
+    return () =>
+      act(async () => {
+        for (const load of pending.splice(0)) load()
+        await Promise.resolve()
+      })
+  }
+
+  const myFormFileInput = () =>
+    screen.getByLabelText('My Form photo file', { selector: 'input' })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('drops a photo the picker returns after the account changed and clears the confirmation', async () => {
+    const user = userEvent.setup()
+    const finishReads = holdFileReads()
+    const uploadMyFormPhoto = vi.fn()
+    setUploadAttemptAccount('member-a')
+    renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(buildProfile()),
+      uploadMyFormPhoto,
+    })
+    await screen.findByLabelText('Height')
+
+    await user.click(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL))
+    await user.click(screen.getByRole('button', { name: 'Upload a full-body photo' }))
+    act(() => setUploadAttemptAccount('member-b'))
+    fireEvent.change(myFormFileInput(), { target: { files: [makeFile()] } })
+    await finishReads()
+
+    expect(uploadMyFormPhoto).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL)).not.toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
+  })
+
+  it('drops a photo whose read finishes after the account changed', async () => {
+    const user = userEvent.setup()
+    const finishReads = holdFileReads()
+    const uploadMyFormPhoto = vi.fn()
+    setUploadAttemptAccount('member-a')
+    renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(buildProfile()),
+      uploadMyFormPhoto,
+    })
+    await screen.findByLabelText('Height')
+
+    await confirmAndStartMyFormUpload(user)
+    act(() => setUploadAttemptAccount('member-b'))
+    await finishReads()
+
+    expect(uploadMyFormPhoto).not.toHaveBeenCalled()
+    expect(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL)).not.toBeChecked()
+  })
+
+  it("clears A's photo waiting on Retry and the confirmation, so Retry cannot upload it under B", async () => {
+    const user = userEvent.setup()
+    const uploadMyFormPhoto = vi.fn().mockRejectedValue(new Error('network down'))
+    setUploadAttemptAccount('member-a')
+    renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(buildProfile()),
+      uploadMyFormPhoto,
+    })
+    await screen.findByLabelText('Height')
+    await confirmAndStartMyFormUpload(user)
+    expect(
+      await screen.findByRole('button', { name: 'Retry upload' })
+    ).toBeInTheDocument()
+
+    act(() => setUploadAttemptAccount('member-b'))
+
+    expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
+    expect(screen.queryByText('network down')).not.toBeInTheDocument()
+    expect(screen.getByLabelText(CONFIRM_CHECKBOX_LABEL)).not.toBeChecked()
+    expect(uploadMyFormPhoto).toHaveBeenCalledOnce()
+    expect(uploadMyFormPhoto).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uploadSession: expect.objectContaining({ account: 'member-a' }) as unknown,
+      })
+    )
+  })
+})
+
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+//
+// Production follow-up 2026-11-19 (review round 6, Codex C5-1): an account change clears
+// everything read for the previous account (profile, revision, signed photo URL, a running poll)
+// and reads the profile again for the account signed in now. Remove comes back only once that
+// account's own read landed, and sends its revision with the session it was read under.
+describe('SilhouetteSettingsPanel round 6 account switch with a My Form photo on screen', () => {
+  const MEMBER_A_PHOTO = 'https://example.test/member-a.png'
+  const MEMBER_B_PHOTO = 'https://example.test/member-b.png'
+
+  function readyPhotoProfile(url: string, revision: number) {
+    return buildProfile({
+      mode: 'my_form',
+      revision,
+      myForm: { ...READY_MY_FORM, imageAccess: { ...READY_MY_FORM.imageAccess, url } },
+    })
+  }
+
+  const myFormImage = () => screen.queryByRole('img', { name: 'My Form' })
+
+  it("clears A's ready photo on the switch and removes with B's revision and session only", async () => {
+    const user = userEvent.setup()
+    let landMemberBRead: (profile: SilhouetteProfileContract) => void = () => undefined
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(readyPhotoProfile(MEMBER_A_PHOTO, 4))
+      .mockReturnValueOnce(
+        new Promise<SilhouetteProfileContract>((resolve) => {
+          landMemberBRead = resolve
+        })
+      )
+    const removeMyFormPhoto = vi.fn().mockResolvedValue(buildProfile({ revision: 10 }))
+    setUploadAttemptAccount('member-a')
+    renderPanel({ userId: 'member-a', getProfile, removeMyFormPhoto })
+    expect(await screen.findByRole('img', { name: 'My Form' })).toHaveAttribute(
+      'src',
+      MEMBER_A_PHOTO
+    )
+
+    act(() => setUploadAttemptAccount('member-b'))
+
+    // Nothing of A's is left while B's own read is still on the wire.
+    expect(myFormImage()).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Remove My Form photo' })
+    ).not.toBeInTheDocument()
+    expect(getProfile).toHaveBeenCalledTimes(2)
+
+    await act(async () => {
+      landMemberBRead(readyPhotoProfile(MEMBER_B_PHOTO, 9))
+      await Promise.resolve()
+    })
+    expect(await screen.findByRole('img', { name: 'My Form' })).toHaveAttribute(
+      'src',
+      MEMBER_B_PHOTO
+    )
+    await user.click(screen.getByRole('button', { name: 'Remove My Form photo' }))
+
+    expect(removeMyFormPhoto).toHaveBeenCalledOnce()
+    expect(removeMyFormPhoto).toHaveBeenCalledWith(
+      '"silhouette:member-b:9"',
+      expect.anything(),
+      expect.objectContaining({ account: 'member-b' })
+    )
+  })
+
+  it("drops A's poll answer that lands after the switch", async () => {
+    let landMemberAPoll: (profile: SilhouetteProfileContract) => void = () => undefined
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(
+        buildProfile({
+          mode: 'my_form',
+          myForm: {
+            status: 'processing',
+            failureReason: null,
+            committedAt: '2026-08-09T09:05:00.000Z',
+            imageAccess: null,
+          },
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise<SilhouetteProfileContract>((resolve) => {
+          landMemberAPoll = resolve
+        })
+      )
+      .mockResolvedValue(buildProfile({ revision: 2 }))
+    const onProfileChange = vi.fn()
+    setUploadAttemptAccount('member-a')
+    renderPanel({
+      userId: 'member-a',
+      getProfile,
+      onProfileChange,
+      pollIntervalsMs: [1, 1],
+    })
+    // A's poll read is on the wire when the account changes.
+    await waitFor(() => expect(getProfile).toHaveBeenCalledTimes(2))
+
+    act(() => setUploadAttemptAccount('member-b'))
+    await waitFor(() =>
+      expect(onProfileChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ mode: 'default_mannequin', revision: 2 })
+      )
+    )
+    onProfileChange.mockClear()
+
+    await act(async () => {
+      landMemberAPoll(readyPhotoProfile(MEMBER_A_PHOTO, 3))
+      await Promise.resolve()
+    })
+
+    expect(onProfileChange).not.toHaveBeenCalled()
+    expect(myFormImage()).not.toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  //
+  // Final review F-1: a sign-out leaves no account to read for, so the panel reads nothing.
+  it("reads nothing after a sign-out and keeps nothing of A's on screen", async () => {
+    const getProfile = vi.fn().mockResolvedValue(readyPhotoProfile(MEMBER_A_PHOTO, 4))
+    setUploadAttemptAccount('member-a')
+    renderPanel({ userId: 'member-a', getProfile })
+    expect(await screen.findByRole('img', { name: 'My Form' })).toHaveAttribute(
+      'src',
+      MEMBER_A_PHOTO
+    )
+
+    act(() => setUploadAttemptAccount(null))
+
+    expect(getProfile).toHaveBeenCalledOnce()
+    expect(myFormImage()).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Remove My Form photo' })
+    ).not.toBeInTheDocument()
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  //
+  // Pre-existing reload bug (real-session AS-0): a panel whose first read ran before this tab
+  // held a verified bearer recovers when the verified account is reported, with no reload.
+  it('reads again when the verified account arrives after a signed-out first read', async () => {
+    const getProfile = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new WardrobeRequestError(
+          'Your session expired. Sign in again before adding a garment.',
+          'SIGNED_OUT'
+        )
+      )
+      .mockResolvedValue(buildProfile({ heightSlider: 64 }))
+    renderPanel({ userId: 'member-a', getProfile })
+    expect(
+      await screen.findByText(/Your session expired\. Sign in again/)
+    ).toBeInTheDocument()
+
+    act(() => setUploadAttemptAccount('member-a'))
+
+    expect(await screen.findByLabelText('Height')).toHaveValue('64')
+    expect(screen.queryByText(/Your session expired/)).not.toBeInTheDocument()
+    expect(getProfile).toHaveBeenCalledTimes(2)
+  })
+
+  // Final review F-2: A's manual Reload after a revision conflict answers after B loaded.
+  it("drops A's delayed conflict Reload answer that lands after B's profile loaded", async () => {
+    const user = userEvent.setup()
+    let landMemberAReload: (profile: SilhouetteProfileContract) => void = () => undefined
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(readyPhotoProfile(MEMBER_A_PHOTO, 4))
+      .mockReturnValueOnce(
+        new Promise<SilhouetteProfileContract>((resolve) => {
+          landMemberAReload = resolve
+        })
+      )
+      .mockResolvedValueOnce(buildProfile({ revision: 9, heightSlider: 23 }))
+    const saveSliders = vi
+      .fn()
+      .mockRejectedValue(new Error('SILHOUETTE_REVISION_MISMATCH'))
+    const onProfileChange = vi.fn()
+    setUploadAttemptAccount('member-a')
+    renderPanel({
+      userId: 'member-a',
+      getProfile,
+      saveSliders,
+      onProfileChange,
+      sliderSaveDebounceMs: 5,
+    })
+    const heightSlider = await screen.findByLabelText('Height')
+    fireEvent.change(heightSlider, { target: { value: '80' } })
+    await user.click(
+      await screen.findByRole('button', { name: 'Reload the latest version' })
+    )
+    // A's Reload is on the wire when B signs in, and B's own read lands first.
+    await waitFor(() => expect(getProfile).toHaveBeenCalledTimes(2))
+    act(() => setUploadAttemptAccount('member-b'))
+    await waitFor(() => expect(heightSlider).toHaveValue('23'))
+    onProfileChange.mockClear()
+
+    await act(async () => {
+      landMemberAReload(readyPhotoProfile(MEMBER_A_PHOTO, 5))
+      await Promise.resolve()
+    })
+
+    expect(onProfileChange).not.toHaveBeenCalled()
+    expect(myFormImage()).not.toBeInTheDocument()
+    expect(heightSlider).toHaveValue('23')
+  })
+})
+
 describe('SilhouetteSettingsPanel My Form removal failures', () => {
   function readyProfile() {
     return buildProfile({ mode: 'my_form', revision: 4, myForm: READY_MY_FORM })
@@ -1242,5 +1594,188 @@ describe('SilhouetteSettingsPanel My Form removal failures', () => {
     // Nothing left to tell; reporting busy=false into a torn-down parent would
     // be a state update on a component that no longer exists.
     expect(onBusyChange).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * Production follow-up 2026-11-19, review round 4 (C3-8): these drive the real upload lib
+ * through the panel's own Retry button, with only the network and jsdom's missing image
+ * decoder and canvas stood in for. Retry resumes the attempt while its outcome is ambiguous;
+ * when the server has ended it, that same Retry tap starts one fresh attempt with fresh keys.
+ */
+describe('SilhouetteSettingsPanel My Form Retry through the real upload', () => {
+  type Leg = 'allocate' | 'upload' | 'commit'
+  const STAGING_URL = 'https://storage.test/staging/my-form-session'
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  const json = (status: number, body: unknown) => () =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+  const allocated = json(200, {
+    data: {
+      uploadSessionId: 'my-form-session',
+      uploadUrl: STAGING_URL,
+      uploadToken: 'upload-token',
+      requiredHeaders: { 'content-type': 'image/jpeg' },
+      expiresAt: '2026-11-19T10:15:00.000Z',
+    },
+  })
+  const stored = () => Promise.resolve(new Response(null, { status: 200 }))
+  const networkDown = () => Promise.reject(new TypeError('Failed to fetch'))
+  const committed = json(200, {
+    data: buildProfile({
+      mode: 'my_form',
+      revision: 1,
+      myForm: {
+        status: 'processing',
+        failureReason: null,
+        committedAt: '2026-11-19T10:01:00.000Z',
+        imageAccess: null,
+      },
+    }),
+  })
+
+  /** Every prepared photo encodes to the same bytes, as a re-encode of one photo does. */
+  function standInForImagePreparation() {
+    class DecodedImage {
+      naturalWidth = 900
+      naturalHeight = 1200
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.())
+      }
+    }
+    vi.stubGlobal('Image', DecodedImage as unknown as typeof Image)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+    } as unknown as CanvasRenderingContext2D)
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
+      (callback: BlobCallback, type?: string) => {
+        callback(
+          new NodeBlob(['same-full-body-photo'], {
+            type: type ?? 'image/jpeg',
+          }) as unknown as Blob
+        )
+      }
+    )
+  }
+
+  /** Answers each leg from its own queue and records the idempotency key of every call. */
+  function installLegs(queues: Record<Leg, (() => Promise<Response>)[]>) {
+    const keys: Record<Leg, (string | undefined)[]> = {
+      allocate: [],
+      upload: [],
+      commit: [],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input)
+        const leg: Leg | null = url.includes('/silhouette/my-form/upload-url')
+          ? 'allocate'
+          : url === STAGING_URL
+            ? 'upload'
+            : url.includes('/silhouette/my-form/commit')
+              ? 'commit'
+              : null
+        if (!leg) return Promise.reject(new Error(`Unhandled fetch in test: ${url}`))
+        keys[leg].push(
+          (init?.headers as Record<string, string> | undefined)?.['idempotency-key']
+        )
+        const answer = queues[leg].shift()
+        if (!answer) return Promise.reject(new Error(`No answer left for ${leg}`))
+        return answer()
+      })
+    )
+    return keys
+  }
+
+  async function renderWithRealUpload() {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    standInForImagePreparation()
+    const getProfile = vi
+      .fn()
+      .mockResolvedValueOnce(buildProfile())
+      .mockResolvedValue(
+        buildProfile({
+          mode: 'my_form',
+          revision: 2,
+          myForm: {
+            status: 'ready',
+            failureReason: null,
+            committedAt: '2026-11-19T10:01:00.000Z',
+            imageAccess: {
+              url: 'https://storage.test/signed/my-form.jpg',
+              expiresAt: '2026-11-19T11:01:00.000Z',
+            },
+          },
+        })
+      )
+    renderPanel({ userId: 'user-1', getProfile, pollIntervalsMs: [1] })
+    await screen.findByLabelText('Height')
+    return getProfile
+  }
+
+  it('starts one fresh attempt in the same Retry tap once the commit it resumed answers UPLOAD_SESSION_EXPIRED', async () => {
+    const user = userEvent.setup()
+    const keys = installLegs({
+      allocate: [allocated, allocated],
+      upload: [stored, stored],
+      commit: [networkDown, json(409, { message: 'UPLOAD_SESSION_EXPIRED' }), committed],
+    })
+    await renderWithRealUpload()
+
+    await confirmAndStartMyFormUpload(user)
+    await screen.findByRole('alert')
+    expect(keys.commit).toHaveLength(1)
+
+    // One Retry tap: it commits the open attempt again with its key, the server says the
+    // session expired, and the same tap allocates, uploads and commits with fresh keys.
+    await user.click(screen.getByRole('button', { name: 'Retry upload' }))
+
+    expect(await screen.findByText('My Form photo ready')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry upload' })).not.toBeInTheDocument()
+    expect(keys.allocate).toHaveLength(2)
+    expect(keys.allocate[1]).toMatch(UUID_V4)
+    expect(keys.allocate[1]).not.toBe(keys.allocate[0])
+    expect(keys.upload).toHaveLength(2)
+    expect(keys.commit).toHaveLength(3)
+    expect(keys.commit[0]).toMatch(UUID_V4)
+    expect(keys.commit[1]).toBe(keys.commit[0])
+    expect(keys.commit[2]).toMatch(UUID_V4)
+    expect(keys.commit[2]).not.toBe(keys.commit[0])
+  })
+
+  it('keeps the attempt on Retry after UPLOAD_IN_PROGRESS and shows a retryable message', async () => {
+    const user = userEvent.setup()
+    const keys = installLegs({
+      allocate: [allocated],
+      upload: [stored],
+      commit: [json(409, { message: 'UPLOAD_IN_PROGRESS' }), committed],
+    })
+    await renderWithRealUpload()
+
+    await confirmAndStartMyFormUpload(user)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This photo is still being saved. Try again in a moment.'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Retry upload' }))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Retry upload' })
+      ).not.toBeInTheDocument()
+    )
+    expect(keys.allocate).toHaveLength(1)
+    expect(keys.upload).toHaveLength(1)
+    expect(keys.commit[0]).toMatch(UUID_V4)
+    expect(keys.commit).toEqual([keys.commit[0], keys.commit[0]])
   })
 })

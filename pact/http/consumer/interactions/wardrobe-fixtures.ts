@@ -25,13 +25,10 @@ import { CAPSULE_OWNER_ID } from './wardrobe-capsules'
  * decision 7 requires on every silhouette route, exercised below for both a
  * read and a write by a teen actor without active guardian consent.
  *
- * The My Form bytes-PUT endpoint
- * (`PUT /api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}`) has
- * no Pact interaction here, matching the existing precedent: the sibling
- * garment bytes-PUT endpoint (`PUT /api/v1/wardrobe/uploads/{uploadSessionId}`)
- * has never had one either, since Web/Mobile upload raw bytes with the
- * shared `uploadGarmentBytes()` fetch helper straight to the signed
- * `uploadUrl`, not through a generated-SDK call this file can pin cleanly.
+ * Upload bytes have no Pact interaction: Web/Mobile PUT them with the shared
+ * `uploadGarmentBytes()` helper straight to the storage signed `uploadUrl`
+ * that upload-url returns. Storage is not this API's provider, and the API
+ * itself serves no byte route.
  * ------------------------------------------------------------------------- */
 
 export const ONBOARDING_OWNER_ID = CAPSULE_OWNER_ID

@@ -12,13 +12,19 @@ import { WardrobeColorProcessor } from '../modules/wardrobe/wardrobe-color.proce
 import { FixtureSilhouettePhotoModerationEngine } from '../modules/wardrobe/fixture-silhouette-photo-moderation.engine'
 import { HeuristicSilhouettePhotoModerationEngine } from '../modules/wardrobe/heuristic-silhouette-photo-moderation.engine'
 import type { SilhouettePhotoModerationEngine } from '../modules/wardrobe/silhouette-photo-moderation.engine'
-import { silhouettePhotoProcessingJobSchema } from '../modules/wardrobe/silhouette-photo-processing.queue'
+import {
+  silhouettePhotoProcessingJobSchema,
+  silhouetteSessionFromJobId,
+} from '../modules/wardrobe/silhouette-photo-processing.queue'
 import { SilhouettePhotoProcessor } from '../modules/wardrobe/silhouette-photo.processor'
 import { SupabaseWardrobeStorageAdapter } from '../modules/wardrobe/wardrobe-storage.adapter'
 import { FixturePaletteAnalysisEngine } from '../modules/commerce/fixture-palette-analysis.engine'
 import { HeuristicPaletteAnalysisEngine } from '../modules/commerce/heuristic-palette-analysis.engine'
 import type { PaletteAnalysisEngine } from '../modules/commerce/palette-analysis.engine'
-import { paletteAnalysisProcessingJobSchema } from '../modules/commerce/palette-analysis-processing.queue'
+import {
+  paletteAnalysisProcessingJobSchema,
+  paletteAttemptFromJobId,
+} from '../modules/commerce/palette-analysis-processing.queue'
 import { PaletteAnalysisProcessor } from '../modules/commerce/palette-analysis.processor'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { PostHogService } from '../posthog/posthog.service'
@@ -199,14 +205,17 @@ async function startWardrobeWorker() {
         'moderation-review',
         async (job) => {
           const data = silhouettePhotoProcessingJobSchema.parse(job.data)
+          // The job's own session, carried through failure handling too.
+          const uploadSessionId = silhouetteSessionFromJobId({ id: job.id, data })
           try {
-            await silhouetteProcessor.process(data.silhouetteProfileId)
+            await silhouetteProcessor.process(data.silhouetteProfileId, uploadSessionId)
           } catch (error) {
             const maxAttempts = job.opts.attempts ?? 1
             if (job.attemptsMade + 1 >= maxAttempts) {
               await silhouetteProcessor.markFailed(
                 data.silhouetteProfileId,
-                classifySilhouetteProcessingFailure(error)
+                classifySilhouetteProcessingFailure(error),
+                uploadSessionId
               )
             }
             throw error
@@ -244,14 +253,17 @@ async function startWardrobeWorker() {
         'palette-analysis',
         async (job) => {
           const data = paletteAnalysisProcessingJobSchema.parse(job.data)
+          // The job's own analysis attempt, carried through failure handling too.
+          const attemptId = paletteAttemptFromJobId({ id: job.id, data })
           try {
-            await paletteProcessor.process(data.paletteProfileId)
+            await paletteProcessor.process(data.paletteProfileId, attemptId)
           } catch (error) {
             const maxAttempts = job.opts.attempts ?? 1
             if (job.attemptsMade + 1 >= maxAttempts) {
               await paletteProcessor.markFailed(
                 data.paletteProfileId,
-                classifyPaletteProcessingFailure(error)
+                classifyPaletteProcessingFailure(error),
+                attemptId
               )
             }
             throw error

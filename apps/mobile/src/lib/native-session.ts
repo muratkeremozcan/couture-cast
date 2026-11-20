@@ -29,6 +29,7 @@ import {
 } from './signup'
 import { setMobileApplicationUserId } from './mobile-auth'
 import { secureSessionStorage } from './secure-session-storage'
+import { forgetAllUploadAttempts } from './upload-attempts'
 import { codeRejected, NativeSignInError } from './native-signin-error'
 
 let clientPromise: Promise<SupabaseClient> | undefined
@@ -354,6 +355,8 @@ export async function signOutNativeSession() {
   verifiedAccessToken = null
   session = null
   setMobileApplicationUserId(null)
+  // An open upload attempt belongs to the account that allocated it.
+  forgetAllUploadAttempts()
   emit()
   // Hooks start with the captured credential, but durable sign-out never waits on them:
   // a hook stalled on a provider (for example the OS push token) cannot leave the

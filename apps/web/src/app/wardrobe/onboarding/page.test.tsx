@@ -416,7 +416,9 @@ describe('WardrobeOnboardingPage', () => {
 
     await captureAndCommitGarment(user)
 
-    await screen.findByText('GUARDIAN_CONSENT_REQUIRED')
+    // The modal shows the catalog copy for the code, never the code itself.
+    await screen.findByText('Guardian consent is required for wardrobe uploads.')
+    expect(screen.queryByText('GUARDIAN_CONSENT_REQUIRED')).not.toBeInTheDocument()
   })
 
   it('restores focus to the invoking button after the capture modal closes', async () => {

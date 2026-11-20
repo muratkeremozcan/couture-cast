@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4: color palette & beauty/accessory advisor.
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -250,8 +252,29 @@ describe('palette advisor schema', () => {
   })
 
   describe('grants and policies', () => {
+    // PaletteProfile holds the selfie storage path the API's service role acts on, so since the
+    // 2026-11-19 follow-up (migration 20261119120000_revoke_member_wardrobe_upload_writes) the
+    // owner reads it and only the API writes it. AdvisorRecommendationState keeps all four.
+    const ownerAccess = {
+      PaletteProfile: {
+        verbs: ['SELECT'],
+        policies: ['authenticated_read_own_user_data'],
+      },
+      AdvisorRecommendationState: {
+        verbs: ['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
+        policies: [
+          'authenticated_delete_own_user_data',
+          'authenticated_insert_own_user_data',
+          'authenticated_read_own_user_data',
+          'authenticated_update_own_user_data',
+        ],
+      },
+    } as const
+
     for (const table of ['PaletteProfile', 'AdvisorRecommendationState'] as const) {
-      it(`5.4-DB-025 grants authenticated exactly the four owner verbs on ${table}, and anon none`, async () => {
+      const expected = ownerAccess[table]
+
+      it(`5.4-DB-025 grants authenticated exactly the owner verbs on ${table} (${expected.verbs.join(', ')}), and anon none`, async () => {
         await inRolledBackTransaction(async (client) => {
           const grants = await client.query<{
             grantee: string
@@ -268,14 +291,14 @@ describe('palette advisor schema', () => {
             .filter((row) => row.grantee === 'authenticated')
             .map((row) => row.privilege_type)
             .sort()
-          expect(authenticated).toEqual(['DELETE', 'INSERT', 'SELECT', 'UPDATE'])
-          expect(authenticated).toHaveLength(4)
+          expect(authenticated).toEqual(expected.verbs)
+          expect(authenticated).toHaveLength(expected.verbs.length)
 
           expect(grants.rows.filter((row) => row.grantee === 'anon')).toHaveLength(0)
         })
       })
 
-      it(`5.4-DB-026 enables row level security and carries the four owner policies on ${table}`, async () => {
+      it(`5.4-DB-026 enables row level security and carries exactly the owner policies on ${table}`, async () => {
         await inRolledBackTransaction(async (client) => {
           const rls = await client.query<{ relrowsecurity: boolean }>(
             `SELECT "relrowsecurity" FROM pg_class
@@ -291,18 +314,10 @@ describe('palette advisor schema', () => {
                AND "tablename" = $1`,
             [table]
           )
-          expect(policies.rows.map((row) => row.cmd).sort()).toEqual([
-            'DELETE',
-            'INSERT',
-            'SELECT',
-            'UPDATE',
-          ])
-          expect(policies.rows.map((row) => row.policyname).sort()).toEqual([
-            'authenticated_delete_own_user_data',
-            'authenticated_insert_own_user_data',
-            'authenticated_read_own_user_data',
-            'authenticated_update_own_user_data',
-          ])
+          expect(policies.rows.map((row) => row.cmd).sort()).toEqual(expected.verbs)
+          expect(policies.rows.map((row) => row.policyname).sort()).toEqual(
+            expected.policies
+          )
         })
       })
     }

@@ -6,9 +6,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
-import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client/contracts/http'
+import {
+  GARMENT_TAGGING_ANALYSIS_VERSION,
+  UploadSessionChangedError,
+} from '@couture/api-client/contracts/http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   WEB_ACCESS_TOKEN_STORAGE_KEY,
@@ -26,6 +31,8 @@ import {
   updateCapsuleFromWeb,
   updateGarmentTagsFromWeb,
   uploadGarmentImageFromWeb,
+  preparedImageEncoding,
+  prepareGarmentImage,
   getOnboardingStateFromWeb,
   advanceOnboardingStepFromWeb,
   getSilhouetteProfileFromWeb,
@@ -35,8 +42,17 @@ import {
   onboardingETag,
   silhouetteETag,
 } from './wardrobe'
+import {
+  currentUploadSession,
+  forgetAllUploadAttempts,
+  setUploadAttemptAccount,
+} from './upload-attempts'
 
 afterEach(() => {
+  // Open upload attempts live for the whole tab and are keyed by the prepared photo, which is
+  // the same in every test here; each test starts signed out of the store with none open.
+  setUploadAttemptAccount(null)
+  forgetAllUploadAttempts()
   window.sessionStorage.clear()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
@@ -73,31 +89,34 @@ function installImagePrepMocks(overrides: ImagePrepOverrides = {}) {
     }
   }
   vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
-  const getContext = vi
-    .spyOn(HTMLCanvasElement.prototype, 'getContext')
-    .mockReturnValue(
-      overrides.context === undefined
-        ? ({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D)
-        : overrides.context
-    )
-  vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
-    this: HTMLCanvasElement,
-    callback: BlobCallback,
-    type?: string
-  ) {
-    if (overrides.encoded !== undefined) {
-      callback(overrides.encoded)
-      return
-    }
-    // jsdom's own `Blob` lacks `arrayBuffer()`, which `prepareGarmentImage`
-    // needs to compute the sha256 digest; Node's `Blob` implements it.
-    callback(
-      new NodeBlob(['fixture-image-bytes'], {
-        type: type ?? 'image/png',
-      }) as unknown as Blob
-    )
-  })
-  return { getContext }
+  const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    overrides.context === undefined
+      ? ({
+          drawImage: vi.fn(),
+          fillRect: vi.fn(),
+        } as unknown as CanvasRenderingContext2D)
+      : overrides.context
+  )
+  const toBlob = vi
+    .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+    .mockImplementation(function (
+      this: HTMLCanvasElement,
+      callback: BlobCallback,
+      type?: string
+    ) {
+      if (overrides.encoded !== undefined) {
+        callback(overrides.encoded)
+        return
+      }
+      // jsdom's own `Blob` lacks `arrayBuffer()`, which `prepareGarmentImage`
+      // needs to compute the sha256 digest; Node's `Blob` implements it.
+      callback(
+        new NodeBlob(['fixture-image-bytes'], {
+          type: type ?? 'image/png',
+        }) as unknown as Blob
+      )
+    })
+  return { getContext, toBlob }
 }
 
 describe('uploadGarmentImageFromWeb & listGarmentsFromWeb', () => {
@@ -108,6 +127,7 @@ describe('uploadGarmentImageFromWeb & listGarmentsFromWeb', () => {
     await expect(
       uploadGarmentImageFromWeb({
         imagePreview: 'data:image/png;base64,sample',
+        uploadSession: currentUploadSession(),
         aspectRatio: '1:1',
         useBgCleanup: false,
       })
@@ -278,7 +298,7 @@ describe('silhouette profile', () => {
     await expect(
       uploadMyFormPhotoFromWeb({
         imagePreview: 'data:image/png;base64,sample',
-        idempotencyKey: 'key-1',
+        uploadSession: currentUploadSession(),
         confirmsBasewearGuidance: true,
       })
     ).rejects.toThrow('Your session expired.')
@@ -347,6 +367,59 @@ describe('silhouette profile', () => {
   })
 })
 
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+//
+// Production follow-up 2026-11-19 (review round 6, Codex C5-1): the My Form panel removes for
+// the account its profile was read under; the remover resolves the bearer for that session and
+// refuses once another account is signed in.
+describe('deleteMyFormPhotoFromWeb for the session the profile was read under', () => {
+  const removedProfile = {
+    mode: 'default_mannequin',
+    heightSlider: 50,
+    buildSlider: 50,
+    myForm: null,
+    revision: 10,
+    updatedAt: '2026-08-09T09:00:00.000Z',
+  }
+
+  it('removes with the bearer resolved for a session that is still current', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'member-b-token')
+    setUploadAttemptAccount('member-b')
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: removedProfile }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await deleteMyFormPhotoFromWeb(
+      silhouetteETag('member-b', 9),
+      undefined,
+      currentUploadSession()
+    )
+
+    expect(fetchMock).toHaveBeenCalledOnce()
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(new Headers(init.headers).get('authorization')).toBe('Bearer member-b-token')
+  })
+
+  it('refuses without a request once another account is signed in', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'member-b-token')
+    setUploadAttemptAccount('member-a')
+    const memberASession = currentUploadSession()
+    setUploadAttemptAccount('member-b')
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(
+      deleteMyFormPhotoFromWeb(silhouetteETag('member-a', 4), undefined, memberASession)
+    ).rejects.toBeInstanceOf(UploadSessionChangedError)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
 /** `input.toString()` on a `Request` yields `"[object Request]"`, not its URL. */
 function requestUrl(input: RequestInfo | URL): string {
   if (typeof input === 'string') return input
@@ -383,7 +456,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     })
   }
 
-  /** Routes each leg (source-blob fetch, allocate, upload PUT, commit) to its own canned response. */
+  /** Routes each leg (allocate, upload PUT, commit) to its own canned response. */
   function installTransportFetchMock(
     overrides: {
       allocation?: unknown
@@ -397,13 +470,6 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
       _init?: RequestInit
     ): Promise<Response> => {
       const url = requestUrl(input)
-      if (url.startsWith('data:')) {
-        return Promise.resolve(
-          new Response(new Blob(['source-bytes'], { type: 'image/png' }), {
-            headers: { 'Content-Type': 'image/png' },
-          })
-        )
-      }
       if (url.includes('/silhouette/my-form/upload-url')) {
         return Promise.resolve(
           jsonResponse({ data: overrides.allocation ?? mockAllocation })
@@ -439,7 +505,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
 
     const result = await uploadMyFormPhotoFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
-      idempotencyKey: 'idempotency-key-1',
+      uploadSession: currentUploadSession(),
       confirmsBasewearGuidance: true,
     })
 
@@ -455,14 +521,61 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     )
   })
 
-  it('reuses one idempotency key across the allocate and commit requests', async () => {
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('refuses a photo picked under another account before preparing or sending anything', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'member-b-access-token')
+    const { toBlob } = installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+    setUploadAttemptAccount('member-a')
+    const pickedUnderA = currentUploadSession()
+    setUploadAttemptAccount('member-b')
+
+    await expect(
+      uploadMyFormPhotoFromWeb({
+        imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: pickedUnderA,
+        confirmsBasewearGuidance: true,
+      })
+    ).rejects.toBeInstanceOf(UploadSessionChangedError)
+
+    expect(toBlob).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  /** A full-body photo has no transparency; as PNG it was several megabytes. */
+  it('prepares the My Form photo as JPEG and declares it so', async () => {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    const { toBlob } = installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+
+    await uploadMyFormPhotoFromWeb({
+      imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      confirmsBasewearGuidance: true,
+    })
+
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9)
+    const allocateCall = fetchMock.mock.calls.find(([input]) =>
+      requestUrl(input).includes('/silhouette/my-form/upload-url')
+    )
+    expect(
+      (
+        JSON.parse((allocateCall?.[1] as RequestInit).body as string) as {
+          mimeType: string
+        }
+      ).mimeType
+    ).toBe('image/jpeg')
+  })
+
+  it('sends a UUID idempotency key on the allocate request and its own on the commit', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
     installImagePrepMocks()
     const fetchMock = installTransportFetchMock()
 
     await uploadMyFormPhotoFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
-      idempotencyKey: 'idempotency-key-reused',
+      uploadSession: currentUploadSession(),
       confirmsBasewearGuidance: true,
     })
 
@@ -480,8 +593,10 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
       string,
       string
     >
-    expect(allocateHeaders['idempotency-key']).toBe('idempotency-key-reused')
-    expect(commitHeaders['idempotency-key']).toBe('idempotency-key-reused')
+    const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    expect(allocateHeaders['idempotency-key']).toMatch(uuidV4)
+    expect(commitHeaders['idempotency-key']).toMatch(uuidV4)
+    expect(commitHeaders['idempotency-key']).not.toBe(allocateHeaders['idempotency-key'])
   })
 
   it('sends the confirmed basewear guidance flag in the commit payload', async () => {
@@ -491,7 +606,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
 
     await uploadMyFormPhotoFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
-      idempotencyKey: 'idempotency-key-1',
+      uploadSession: currentUploadSession(),
       confirmsBasewearGuidance: true,
     })
 
@@ -517,7 +632,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     await expect(
       uploadMyFormPhotoFromWeb({
         imagePreview: 'data:image/png;base64,c2FtcGxl',
-        idempotencyKey: 'idempotency-key-1',
+        uploadSession: currentUploadSession(),
         confirmsBasewearGuidance: true,
       })
     ).rejects.toThrow()
@@ -535,7 +650,7 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     await expect(
       uploadMyFormPhotoFromWeb({
         imagePreview: 'data:image/png;base64,c2FtcGxl',
-        idempotencyKey: 'idempotency-key-1',
+        uploadSession: currentUploadSession(),
         confirmsBasewearGuidance: true,
       })
     ).rejects.toThrow('Upload failed with HTTP 500')
@@ -558,10 +673,345 @@ describe('uploadMyFormPhotoFromWeb transport sequence', () => {
     await expect(
       uploadMyFormPhotoFromWeb({
         imagePreview: 'data:image/png;base64,c2FtcGxl',
-        idempotencyKey: 'idempotency-key-1',
+        uploadSession: currentUploadSession(),
         confirmsBasewearGuidance: true,
       })
     ).rejects.toThrow('Photo did not pass the basewear check')
+  })
+})
+
+/**
+ * Production follow-up 2026-11-19, review round 2 (C2-6): one upload attempt keeps its session
+ * and both idempotency keys across the member's retries. A retry commits first, because the
+ * bytes or the commit itself may already have landed with only the answer lost, and re-sends the
+ * bytes only when commit answers UPLOAD_BYTES_MISSING.
+ */
+describe('upload attempts across retries', () => {
+  type Leg = 'allocate' | 'upload' | 'commit'
+  type Answer = () => Promise<Response>
+
+  const ok =
+    (body: unknown): Answer =>
+    () =>
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+  const fails =
+    (status: number, message: string): Answer =>
+    () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ statusCode: status, message, error: 'Conflict' }), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      )
+  const stored: Answer = () => Promise.resolve(new Response(null, { status: 200 }))
+  const networkDown: Answer = () => Promise.reject(new TypeError('Failed to fetch'))
+
+  /** Answers each leg from its own queue, in order, and records every call per leg. */
+  function installLegs(
+    routes: { allocate: string; upload: string; commit: string },
+    queues: Record<Leg, Answer[]>
+  ) {
+    const calls: Record<Leg, RequestInit[]> = { allocate: [], upload: [], commit: [] }
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input)
+      const leg: Leg | null = url.includes(routes.allocate)
+        ? 'allocate'
+        : url === routes.upload
+          ? 'upload'
+          : url.includes(routes.commit)
+            ? 'commit'
+            : null
+      if (!leg) return Promise.reject(new Error(`Unhandled fetch in test: ${url}`))
+      calls[leg].push(init ?? {})
+      const answer = queues[leg].shift()
+      if (!answer) return Promise.reject(new Error(`No answer left for ${leg}`))
+      return answer()
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    return calls
+  }
+
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  function keyOf(init: RequestInit | undefined): string | undefined {
+    return (init?.headers as Record<string, string> | undefined)?.['idempotency-key']
+  }
+
+  describe('My Form', () => {
+    const routes = {
+      allocate: '/silhouette/my-form/upload-url',
+      upload: 'https://storage.test/staging/my-form-session',
+      commit: '/silhouette/my-form/commit',
+    }
+    const allocation = {
+      data: {
+        uploadSessionId: 'my-form-session',
+        uploadUrl: routes.upload,
+        uploadToken: 'upload-token',
+        requiredHeaders: { 'content-type': 'image/jpeg' },
+        expiresAt: '2026-11-19T10:15:00.000Z',
+      },
+    }
+    const committed = {
+      data: {
+        mode: 'default_mannequin',
+        heightSlider: null,
+        buildSlider: null,
+        myForm: {
+          status: 'processing',
+          failureReason: null,
+          committedAt: '2026-11-19T10:01:00.000Z',
+          imageAccess: null,
+        },
+        revision: 2,
+        updatedAt: '2026-11-19T10:01:00.000Z',
+      },
+    }
+    const upload = () =>
+      uploadMyFormPhotoFromWeb({
+        imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: currentUploadSession(),
+        confirmsBasewearGuidance: true,
+      })
+
+    it('replays a commit whose answer was lost with the same key, without allocating or uploading again', async () => {
+      authenticate()
+      installImagePrepMocks()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation)],
+        upload: [stored],
+        commit: [networkDown, ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow()
+      const profile = await upload()
+
+      expect(profile.myForm?.status).toBe('processing')
+      expect(calls.allocate).toHaveLength(1)
+      expect(calls.upload).toHaveLength(1)
+      expect(calls.commit).toHaveLength(2)
+      expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
+    })
+
+    it('re-sends the bytes on a retry only after commit answers UPLOAD_BYTES_MISSING', async () => {
+      authenticate()
+      installImagePrepMocks()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation)],
+        upload: [() => Promise.resolve(new Response(null, { status: 503 })), stored],
+        commit: [fails(409, 'UPLOAD_BYTES_MISSING'), ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow('Upload failed with HTTP 503')
+      await upload()
+
+      expect(calls.allocate).toHaveLength(1)
+      expect(calls.upload).toHaveLength(2)
+      expect(calls.commit).toHaveLength(2)
+      expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
+    })
+
+    it('starts one fresh attempt in the same retry when its commit answers UPLOAD_SESSION_EXPIRED', async () => {
+      authenticate()
+      installImagePrepMocks()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation), ok(allocation)],
+        upload: [stored, stored],
+        commit: [networkDown, fails(409, 'UPLOAD_SESSION_EXPIRED'), ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow(
+        'The request failed and the interceptors did not return an alternative response'
+      )
+      // The retry commits the open attempt first; the server ended it, so the same retry
+      // allocates, uploads and commits once more with fresh keys.
+      const profile = await upload()
+
+      expect(profile.myForm?.status).toBe('processing')
+      expect(calls.allocate).toHaveLength(2)
+      expect(calls.upload).toHaveLength(2)
+      expect(calls.commit).toHaveLength(3)
+      expect(keyOf(calls.allocate[1])).toMatch(UUID_V4)
+      expect(keyOf(calls.allocate[1])).not.toBe(keyOf(calls.allocate[0]))
+      expect(keyOf(calls.commit[0])).toMatch(UUID_V4)
+      expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
+      expect(keyOf(calls.commit[2])).toMatch(UUID_V4)
+      expect(keyOf(calls.commit[2])).not.toBe(keyOf(calls.commit[0]))
+    })
+
+    it('keeps the attempt after UPLOAD_IN_PROGRESS, so the retry commits again with the same key', async () => {
+      authenticate()
+      installImagePrepMocks()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation)],
+        upload: [stored],
+        commit: [fails(409, 'UPLOAD_IN_PROGRESS'), ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow(
+        'This photo is still being saved. Try again in a moment.'
+      )
+      const profile = await upload()
+
+      expect(profile.myForm?.status).toBe('processing')
+      expect(calls.allocate).toHaveLength(1)
+      expect(calls.upload).toHaveLength(1)
+      expect(calls.commit).toHaveLength(2)
+      expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
+    })
+
+    it('forgets a committed attempt, so the same photo uploads again from allocation', async () => {
+      authenticate()
+      installImagePrepMocks()
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation), ok(allocation)],
+        upload: [stored, stored],
+        commit: [ok(committed), ok(committed)],
+      })
+
+      await upload()
+      await upload()
+
+      expect(calls.allocate).toHaveLength(2)
+      expect(calls.upload).toHaveLength(2)
+      expect(calls.commit).toHaveLength(2)
+    })
+  })
+
+  describe('garment', () => {
+    const routes = {
+      allocate: '/api/v1/wardrobe/upload-url',
+      upload: 'https://storage.test/staging/garment-session',
+      commit: '/api/v1/wardrobe/garments',
+    }
+    const allocation = {
+      data: {
+        garmentId: 'garment-1',
+        uploadSessionId: 'garment-session',
+        uploadUrl: routes.upload,
+        uploadToken: 'upload-token',
+        requiredHeaders: { 'content-type': 'image/jpeg' },
+        expiresAt: '2026-11-19T10:15:00.000Z',
+      },
+    }
+    const committed = { data: { ...garmentFixture, status: 'processing' } }
+    const upload = () =>
+      uploadGarmentImageFromWeb({
+        imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: currentUploadSession(),
+        aspectRatio: '1:1',
+        useBgCleanup: false,
+      })
+
+    // Each test prepares a differently sized image, so no attempt one test leaves open is a
+    // retry of another test's upload.
+    it('keeps both keys for a retry of the same prepared image and commits first', async () => {
+      authenticate()
+      installImagePrepMocks({ naturalWidth: 1001, naturalHeight: 1001 })
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation)],
+        upload: [stored],
+        commit: [networkDown, ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow()
+      const garment = await upload()
+
+      expect(garment.status).toBe('processing')
+      expect(calls.allocate).toHaveLength(1)
+      expect(calls.upload).toHaveLength(1)
+      expect(calls.commit).toHaveLength(2)
+      expect(keyOf(calls.commit[1])).toBe(keyOf(calls.commit[0]))
+      expect(keyOf(calls.commit[0])).not.toBe(keyOf(calls.allocate[0]))
+    })
+
+    it('re-sends the bytes only after commit answers UPLOAD_BYTES_MISSING', async () => {
+      authenticate()
+      installImagePrepMocks({ naturalWidth: 1002, naturalHeight: 1002 })
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation)],
+        upload: [networkDown, stored],
+        commit: [fails(409, 'UPLOAD_BYTES_MISSING'), ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow('Failed to fetch')
+      await upload()
+
+      expect(calls.allocate).toHaveLength(1)
+      expect(calls.upload).toHaveLength(2)
+      expect(calls.commit).toHaveLength(2)
+    })
+
+    it('starts a new garment after a terminal commit failure and after a success', async () => {
+      authenticate()
+      installImagePrepMocks({ naturalWidth: 1003, naturalHeight: 1003 })
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation), ok(allocation), ok(allocation)],
+        upload: [stored, stored, stored],
+        commit: [fails(422, 'IMAGE_CHECKSUM_MISMATCH'), ok(committed), ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow('IMAGE_CHECKSUM_MISMATCH')
+      await upload()
+      await upload()
+
+      expect(calls.allocate).toHaveLength(3)
+      const allocateKeys = calls.allocate.map(keyOf)
+      expect(new Set(allocateKeys).size).toBe(3)
+    })
+
+    /** Review round 4 (C3-9): attempts belong to the account that opened them. */
+    it("never commits another account's open session when the next account picks the same photo", async () => {
+      authenticate()
+      installImagePrepMocks({ naturalWidth: 1004, naturalHeight: 1004 })
+      setUploadAttemptAccount('account-a')
+      const calls = installLegs(routes, {
+        allocate: [ok(allocation), ok(allocation)],
+        upload: [networkDown, stored],
+        commit: [ok(committed)],
+      })
+
+      await expect(upload()).rejects.toThrow('Failed to fetch')
+      setUploadAttemptAccount('account-b')
+      await upload()
+
+      expect(calls.allocate).toHaveLength(2)
+      expect(keyOf(calls.allocate[1])).not.toBe(keyOf(calls.allocate[0]))
+      expect(calls.commit).toHaveLength(1)
+    })
+
+    it('fences an allocation that answers after the account changed and keeps nothing from it', async () => {
+      authenticate()
+      installImagePrepMocks({ naturalWidth: 1005, naturalHeight: 1005 })
+      setUploadAttemptAccount('account-a')
+      let answerAllocation: () => void = () => undefined
+      const lateAllocation: () => Promise<Response> = () =>
+        new Promise((resolve) => {
+          answerAllocation = () => void ok(allocation)().then(resolve)
+        })
+      const calls = installLegs(routes, {
+        allocate: [lateAllocation, ok(allocation)],
+        upload: [stored],
+        commit: [ok(committed)],
+      })
+
+      const first = upload()
+      await vi.waitFor(() => expect(calls.allocate).toHaveLength(1))
+      setUploadAttemptAccount('account-b')
+      answerAllocation()
+
+      await expect(first).rejects.toBeInstanceOf(UploadSessionChangedError)
+      expect(calls.upload).toHaveLength(0)
+      await upload()
+      expect(calls.allocate).toHaveLength(2)
+      expect(keyOf(calls.allocate[1])).not.toBe(keyOf(calls.allocate[0]))
+      expect(calls.upload).toHaveLength(1)
+    })
   })
 })
 
@@ -1120,21 +1570,10 @@ describe('generateIdempotencyKey', () => {
 })
 
 describe('prepareGarmentImage guards', () => {
-  function stubSourceBlobFetch() {
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
-        new Response(new Blob(['source-bytes'], { type: 'image/png' }), {
-          headers: { 'Content-Type': 'image/png' },
-        })
-      )
-    )
-    vi.stubGlobal('fetch', fetchMock)
-    return fetchMock
-  }
-
   async function upload() {
     return uploadGarmentImageFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
       aspectRatio: '1:1',
       useBgCleanup: false,
     })
@@ -1143,7 +1582,6 @@ describe('prepareGarmentImage guards', () => {
   it('rejects an image that cannot be decoded', async () => {
     authenticate()
     installImagePrepMocks({ failsToDecode: true })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow('The selected image could not be decoded.')
   })
@@ -1152,7 +1590,6 @@ describe('prepareGarmentImage guards', () => {
   it('rejects an image smaller than the 256px minimum', async () => {
     authenticate()
     installImagePrepMocks({ naturalWidth: 120, naturalHeight: 160 })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow(
       'Choose an image at least 256 pixels wide and tall.'
@@ -1162,7 +1599,6 @@ describe('prepareGarmentImage guards', () => {
   it('rejects a browser that cannot provide a 2D canvas context', async () => {
     authenticate()
     installImagePrepMocks({ context: null })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow(
       'Image preparation is unavailable in this browser.'
@@ -1172,7 +1608,6 @@ describe('prepareGarmentImage guards', () => {
   it('rejects when the canvas cannot encode the image at all', async () => {
     authenticate()
     installImagePrepMocks({ encoded: null })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow('The selected image could not be prepared.')
   })
@@ -1183,7 +1618,6 @@ describe('prepareGarmentImage guards', () => {
     installImagePrepMocks({
       encoded: new NodeBlob(['gif-bytes'], { type: 'image/gif' }) as unknown as Blob,
     })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow('The prepared image format is unsupported.')
   })
@@ -1193,7 +1627,6 @@ describe('prepareGarmentImage guards', () => {
     const oversized = new NodeBlob(['png-bytes'], { type: 'image/png' })
     Object.defineProperty(oversized, 'size', { value: 10 * 1024 * 1024 + 1 })
     installImagePrepMocks({ encoded: oversized as unknown as Blob })
-    stubSourceBlobFetch()
 
     await expect(upload()).rejects.toThrow('The prepared image exceeds the 10 MiB limit.')
   })
@@ -1203,7 +1636,8 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
   const allocation = {
     garmentId: 'garment-1',
     uploadSessionId: 'upload-session-1',
-    uploadUrl: 'https://storage.test/garments/upload-session-1',
+    uploadUrl:
+      'https://project.supabase.test/storage/v1/object/upload/sign/wardrobe-images/users/user-1/garments/garment-1.jpg?token=signed-upload-token',
     uploadToken: 'upload-token-1',
     requiredHeaders: { 'content-type': 'image/png' },
     expiresAt: '2026-08-09T10:00:00.000Z',
@@ -1220,13 +1654,6 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     const fetchMock = vi.fn(
       (input: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
         const url = requestUrl(input)
-        if (url.startsWith('data:')) {
-          return Promise.resolve(
-            new Response(new Blob(['source-bytes'], { type: 'image/png' }), {
-              headers: { 'Content-Type': 'image/png' },
-            })
-          )
-        }
         if (url.includes('/wardrobe/upload-url')) {
           return Promise.resolve(
             jsonResponse(
@@ -1253,6 +1680,29 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     return fetchMock
   }
 
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('refuses a garment photo picked under another account before preparing or sending anything', async () => {
+    authenticate()
+    const { toBlob } = installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+    setUploadAttemptAccount('member-a')
+    const pickedUnderA = currentUploadSession()
+    setUploadAttemptAccount('member-b')
+
+    await expect(
+      uploadGarmentImageFromWeb({
+        imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: pickedUnderA,
+        aspectRatio: '1:1',
+        useBgCleanup: false,
+      })
+    ).rejects.toBeInstanceOf(UploadSessionChangedError)
+
+    expect(toBlob).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   /** The three legs must run in order; a commit before the bytes land orphans the garment. */
   it('allocates, uploads the bytes, then commits, reporting progress along the way', async () => {
     authenticate()
@@ -1263,6 +1713,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
 
     const result = await uploadGarmentImageFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
       aspectRatio: '1:1',
       useBgCleanup: false,
       onStateChange: (state) => states.push(state),
@@ -1298,6 +1749,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
 
     await uploadGarmentImageFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
       aspectRatio: '1:1',
       useBgCleanup: false,
     })
@@ -1326,6 +1778,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     await expect(
       uploadGarmentImageFromWeb({
         imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: currentUploadSession(),
         aspectRatio: '1:1',
         useBgCleanup: false,
       })
@@ -1371,6 +1824,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
 
     await uploadGarmentImageFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
       aspectRatio: '1:1',
       useBgCleanup: true,
     })
@@ -1398,6 +1852,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
 
     await uploadGarmentImageFromWeb({
       imagePreview: 'data:image/png;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
       aspectRatio: '4:3',
       useBgCleanup: false,
     })
@@ -1428,10 +1883,141 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     await expect(
       uploadGarmentImageFromWeb({
         imagePreview: 'data:image/png;base64,c2FtcGxl',
+        uploadSession: currentUploadSession(),
         aspectRatio: '1:1',
         useBgCleanup: false,
       })
     ).rejects.toThrow('Upload session already committed')
+  })
+
+  function declaredMimeType(fetchMock: ReturnType<typeof installTransportFetchMock>) {
+    const allocateCall = fetchMock.mock.calls.find(([input]) =>
+      requestUrl(input).includes('/wardrobe/upload-url')
+    )
+    return (
+      JSON.parse((allocateCall?.[1] as RequestInit).body as string) as {
+        mimeType: string
+      }
+    ).mimeType
+  }
+
+  function uploadedContentType(fetchMock: ReturnType<typeof installTransportFetchMock>) {
+    const putCall = fetchMock.mock.calls.find(
+      ([input]) => requestUrl(input) === allocation.uploadUrl
+    )
+    return ((putCall?.[1] as RequestInit).headers as Record<string, string>)[
+      'Content-Type'
+    ]
+  }
+
+  /**
+   * Production follow-up 2026-11-19: a 12 MP phone photo prepared as PNG came to 5 MB or more.
+   * Without cleanup nothing is transparent, so it is JPEG, painted on white first because
+   * JPEG has no alpha.
+   */
+  it('encodes JPEG at 0.9 on a white ground when cleanup is off', async () => {
+    authenticate()
+    const fillRect = vi.fn()
+    const drawImage = vi.fn()
+    const context = { drawImage, fillRect } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    const fetchMock = installTransportFetchMock()
+
+    await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: false,
+    })
+
+    expect(toBlob).toHaveBeenCalledTimes(1)
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9)
+    expect(context.fillStyle).toBe('#ffffff')
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 900, 900)
+    expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(
+      drawImage.mock.invocationCallOrder[0]!
+    )
+    expect(declaredMimeType(fetchMock)).toBe('image/jpeg')
+    expect(uploadedContentType(fetchMock)).toBe('image/jpeg')
+  })
+
+  /** Cleanup cuts the garment out, and JPEG would lose the cut; WebP keeps the alpha. */
+  it('encodes WebP at 0.9 with no white ground when cleanup is on', async () => {
+    authenticate()
+    const fillRect = vi.fn()
+    const pixels = new Uint8ClampedArray(4 * 4).fill(255)
+    const context = {
+      canvas: { width: 2, height: 2 },
+      drawImage: vi.fn(),
+      fillRect,
+      getImageData: vi.fn().mockReturnValue({ data: pixels, width: 2, height: 2 }),
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    const fetchMock = installTransportFetchMock()
+
+    await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: true,
+    })
+
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp', 0.9)
+    expect(fillRect).not.toHaveBeenCalled()
+    expect(declaredMimeType(fetchMock)).toBe('image/webp')
+    expect(uploadedContentType(fetchMock)).toBe('image/webp')
+  })
+
+  /** A browser that cannot encode WebP hands back PNG, and the upload declares what it got. */
+  it('declares PNG when the browser falls back from WebP', async () => {
+    authenticate()
+    const context = {
+      canvas: { width: 1, height: 1 },
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      getImageData: vi.fn().mockReturnValue({
+        data: new Uint8ClampedArray(4).fill(255),
+        width: 1,
+        height: 1,
+      }),
+      putImageData: vi.fn(),
+    } as unknown as CanvasRenderingContext2D
+    installImagePrepMocks({
+      context,
+      encoded: new NodeBlob(['png-bytes'], { type: 'image/png' }) as unknown as Blob,
+    })
+    const fetchMock = installTransportFetchMock()
+
+    await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: true,
+    })
+
+    expect(declaredMimeType(fetchMock)).toBe('image/png')
+    expect(uploadedContentType(fetchMock)).toBe('image/png')
+  })
+
+  /**
+   * The bytes go straight to storage: a Vercel Function refuses a body over about 4.5 MB.
+   * The signed URL is used exactly as the API gave it, never moved onto the API's base.
+   */
+  it('PUTs the bytes to the storage signed URL as given, never through /api/v1', async () => {
+    authenticate()
+    installImagePrepMocks()
+    const fetchMock = installTransportFetchMock()
+
+    await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: false,
+    })
+
+    const puts = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')
+    expect(puts.map(([input]) => requestUrl(input))).toEqual([allocation.uploadUrl])
   })
 })
 
@@ -1486,5 +2072,115 @@ describe('onboarding and silhouette failure paths', () => {
     await expect(getOnboardingStateFromWeb()).rejects.toThrow(
       'Wardrobe request failed with status 500'
     )
+  })
+})
+
+describe('preparedImageEncoding', () => {
+  it('chooses JPEG without cleanup and WebP with it, both at quality 0.9', () => {
+    expect(preparedImageEncoding(false)).toEqual({ mimeType: 'image/jpeg', quality: 0.9 })
+    expect(preparedImageEncoding(true)).toEqual({ mimeType: 'image/webp', quality: 0.9 })
+  })
+})
+
+describe('prepareGarmentImage source encoding', () => {
+  /**
+   * Community posts keep the picked file's own format (review round 1, 2026-11-19): the
+   * community pipeline re-encodes them itself, and flattening a transparent PNG to JPEG would
+   * paint its background white.
+   */
+  it('keeps a PNG source as PNG at 0.92 with no white ground', async () => {
+    const fillRect = vi.fn()
+    const context = {
+      drawImage: vi.fn(),
+      fillRect,
+    } as unknown as CanvasRenderingContext2D
+    const { toBlob } = installImagePrepMocks({ context })
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(new Blob(['png'], { type: 'image/png' }), {
+          headers: { 'Content-Type': 'image/png' },
+        })
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const prepared = await prepareGarmentImage(
+      'data:image/png;base64,c2FtcGxl',
+      '4:3',
+      false,
+      'source'
+    )
+
+    expect(fetchMock).toHaveBeenCalledWith('data:image/png;base64,c2FtcGxl')
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/png', 0.92)
+    expect(fillRect).not.toHaveBeenCalled()
+    expect(prepared.mimeType).toBe('image/png')
+  })
+
+  it('compact never reads the source back', async () => {
+    const { toBlob } = installImagePrepMocks()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    await prepareGarmentImage('data:image/png;base64,c2FtcGxl', '4:3', false, 'compact')
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/jpeg', 0.9)
+  })
+})
+
+describe('wardrobe uploads to storage', () => {
+  /**
+   * Review round 1, 2026-11-19: the removed server upload set `private, max-age=0` on the
+   * object; the client PUT carries it now. A retry after a lost PUT answer finds the object
+   * already there and must go on to commit, which verifies the sha256.
+   */
+  it('sends private cache-control and accepts an object a lost answer left', async () => {
+    authenticate()
+    installImagePrepMocks()
+    const uploadUrl =
+      'https://project.supabase.test/storage/v1/object/upload/sign/wardrobe-images/staging/session-1.jpg?token=t'
+    let putHeaders: Record<string, string> = {}
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input)
+      if (url.includes('/wardrobe/upload-url')) {
+        return Promise.resolve(
+          jsonResponse(
+            {
+              data: {
+                garmentId: 'garment-1',
+                uploadSessionId: 'session-1',
+                uploadUrl,
+                uploadToken: 't',
+                requiredHeaders: { 'content-type': 'image/jpeg' },
+                expiresAt: '2026-08-09T10:00:00.000Z',
+              },
+            },
+            201
+          )
+        )
+      }
+      if (url === uploadUrl) {
+        putHeaders = init?.headers as Record<string, string>
+        return Promise.resolve(
+          jsonResponse({ statusCode: '409', error: 'Duplicate', message: 'exists' }, 400)
+        )
+      }
+      if (url.includes('/wardrobe/garments')) {
+        return Promise.resolve(jsonResponse({ data: garmentFixture }, 201))
+      }
+      return Promise.reject(new Error(`Unhandled fetch in test: ${url}`))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const garment = await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: false,
+    })
+
+    expect(garment.id).toBe(garmentFixture.id)
+    expect(putHeaders['Cache-Control']).toBe('private, max-age=0')
   })
 })

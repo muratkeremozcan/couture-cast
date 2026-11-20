@@ -1,7 +1,7 @@
 // Story 5.4 Task 6 step 2 owner: own the terminal branches, the purge and the telemetry in `apps/api/src/modules/commerce/palette-analysis.processor.ts`, enqueued through `apps/api/src/modules/commerce/palette-analysis-processing.queue.ts` and registered in `apps/api/src/config/queues.ts` and `apps/api/src/workers/wardrobe.bootstrap.ts`
 // Story 5.4 Task 6: BullMQ processor for palette analysis (both sources),
 // mirroring silhouette-photo.processor.ts's shape.
-import { type PaletteProfile, type PrismaClient } from '@prisma/client'
+import { type PaletteProfile, type Prisma, type PrismaClient } from '@prisma/client'
 import { z } from 'zod'
 import {
   chroma,
@@ -27,6 +27,10 @@ import type {
   SelfieAnalysisOutcome,
 } from './palette-analysis.engine.js'
 import type { WardrobeStorage } from '../wardrobe/wardrobe-storage.adapter.js'
+import { WardrobeObjectDeletionOutbox } from '../wardrobe/wardrobe-object-deletion.outbox.js'
+import { isOwnSessionObject } from '../wardrobe/wardrobe-upload-paths.js'
+import { ambiguousPublicationHorizon } from '../wardrobe/wardrobe-publication.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
 type ProcessablePaletteProfile = PaletteProfile & { status: 'processing' }
 
@@ -34,6 +38,37 @@ function isProcessableProfile(
   profile: PaletteProfile | null
 ): profile is ProcessablePaletteProfile {
   return profile?.status === 'processing'
+}
+
+/**
+ * The attempt the 2026-11-19 migration gave every wardrobe analysis that was already processing
+ * at deploy: such an analysis has no recoverable attempt, and the hourly handoff enqueues it as
+ * `<profileId>__legacy-wardrobe-analysis`.
+ */
+export const LEGACY_WARDROBE_ANALYSIS_ATTEMPT_ID = 'legacy-wardrobe-analysis'
+
+/**
+ * True when the profile is processing the analysis `attemptId` names (the job's own, read from
+ * its job id). The profile's recorded attempt must match exactly; a job that names no attempt
+ * counts as the legacy wardrobe attempt, so it can only finish or fail a profile the migration
+ * gave that attempt. A profile with no recorded attempt is matched only on its selfie session.
+ * Anything else is another attempt the job must not touch, including an older wardrobe job for
+ * the same profile.
+ */
+function isJobAttempt(
+  profile: ProcessablePaletteProfile,
+  attemptId: string | null
+): boolean {
+  if (profile.analysis_attempt_id) {
+    return (
+      profile.analysis_attempt_id === (attemptId ?? LEGACY_WARDROBE_ANALYSIS_ATTEMPT_ID)
+    )
+  }
+  return (
+    attemptId !== null &&
+    profile.source === 'selfie' &&
+    profile.selfie_upload_session_id === attemptId
+  )
 }
 
 /**
@@ -121,12 +156,32 @@ export class PaletteAnalysisProcessor {
     feature: 'palette-analysis-processing',
   })
 
+  private readonly deletions: WardrobeObjectDeletionOutbox
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly storage: WardrobeStorage,
     private readonly engine: PaletteAnalysisEngine,
     private readonly telemetry: TelemetryService
-  ) {}
+  ) {
+    this.deletions = new WardrobeObjectDeletionOutbox(prisma, storage)
+  }
+
+  /**
+   * Every terminal write is fenced on the attempt the job belongs to: the processing status, the
+   * source, the analysis attempt and the selfie session, as read once the job matched them. A job
+   * that finishes after the member replaced the selfie or started another analysis cannot apply
+   * its result to, fail, or purge the newer attempt.
+   */
+  private attemptGuard(profile: ProcessablePaletteProfile) {
+    return {
+      id: profile.id,
+      status: 'processing' as const,
+      source: profile.source,
+      analysis_attempt_id: profile.analysis_attempt_id,
+      selfie_upload_session_id: profile.selfie_upload_session_id,
+    }
+  }
 
   /**
    * Decision 3's wardrobe aggregation, precisely: reads the acting user's
@@ -191,8 +246,27 @@ export class PaletteAnalysisProcessor {
     return { outcome: 'ready', undertone, depth: null, confidence }
   }
 
-  private async analyzeSelfie(objectPath: string | null): Promise<AnalysisResult> {
+  private async analyzeSelfie(profile: {
+    id: string
+    user_id: string
+    selfie_object_path: string | null
+    selfie_upload_session_id: string | null
+  }): Promise<AnalysisResult> {
+    const objectPath = profile.selfie_object_path
     if (!objectPath) {
+      return { outcome: 'storage_error' }
+    }
+    // The path column was member-writable before the 2026-11-19 revoke migration: never read
+    // an object that is not this member's own selfie for this very session.
+    if (
+      !isOwnSessionObject(
+        objectPath,
+        profile.user_id,
+        'palette',
+        profile.selfie_upload_session_id
+      )
+    ) {
+      this.logger.error({ profileId: profile.id }, 'palette_selfie_path_not_own')
       return { outcome: 'storage_error' }
     }
     // A genuine storage/timeout fault propagates here so BullMQ's existing
@@ -241,30 +315,70 @@ export class PaletteAnalysisProcessor {
   }
 
   /**
-   * Storage removal failure must not strand the profile: log it, leave
-   * `selfie_purged_at` null, and let the retention sweep pattern catch it
-   * (Decision 8). The status commit is the durable fact; this purge follows
-   * it and is best-effort, never the reverse order.
+   * The selfie object this attempt must purge, or null: only for a selfie analysis, and only when
+   * the path is this member's own selfie for this very session (the path column was
+   * member-writable before the 2026-11-19 revoke migration).
    */
-  private async purgeSelfie(profileId: string, objectPath: string | null): Promise<void> {
-    if (!objectPath) {
-      return
-    }
-    try {
-      await this.storage.remove([objectPath])
-    } catch (error) {
-      this.logger.warn(
-        { error, profileId },
-        'Failed to purge palette selfie object; retention sweep will retry'
+  private selfieToPurge(profile: ProcessablePaletteProfile): string | null {
+    const objectPath = profile.selfie_object_path
+    if (!objectPath) return null
+    if (
+      !isOwnSessionObject(
+        objectPath,
+        profile.user_id,
+        'palette',
+        profile.selfie_upload_session_id
       )
-      return
+    ) {
+      this.logger.error(
+        { profileId: profile.id },
+        'palette_selfie_path_not_own_purge_skipped'
+      )
+      return null
     }
-    await this.prisma.paletteProfile
-      .updateMany({
-        where: { id: profileId },
-        data: { selfie_purged_at: new Date() },
+    return objectPath
+  }
+
+  /**
+   * The terminal write and the selfie's deletion obligation, in one transaction (Decision 8): the
+   * guarded status update, the outbox row for the selfie key and `selfie_purged_at`, which now
+   * means the deletion is durably scheduled. An outbox failure fails the transaction, so the
+   * status never turns terminal with the obligation lost, and BullMQ's retry finds the profile
+   * still processing. The object itself is removed after the commit, and the hourly maintenance
+   * job retries that removal if it fails or the worker stops first.
+   */
+  private async applyTerminal(
+    profile: ProcessablePaletteProfile,
+    data: Prisma.PaletteProfileUpdateManyMutationInput
+  ): Promise<boolean> {
+    const selfiePath = this.selfieToPurge(profile)
+    const applied = await interactiveTransaction(this.prisma, async (tx) => {
+      const result = await tx.paletteProfile.updateMany({
+        where: this.attemptGuard(profile),
+        data: selfiePath ? { ...data, selfie_purged_at: new Date() } : data,
       })
-      .catch(() => undefined)
+      if (result.count === 1 && selfiePath) {
+        // A commit attempt whose claim was taken over (or whose lease ran out before the
+        // successful one) may still write this key after the purge: repeat the removal until
+        // the horizon the session's claims recorded.
+        const horizon = ambiguousPublicationHorizon({
+          attemptId: profile.selfie_publish_attempt_id,
+          startedAt: profile.selfie_publish_started_at,
+          committable: false,
+          cleanupUntil: profile.selfie_publish_cleanup_until,
+        })
+        if (horizon) {
+          await this.deletions.recordRepeating(tx, [selfiePath], 'selfie_purged', horizon)
+        } else {
+          await this.deletions.record(tx, [selfiePath], 'selfie_purged')
+        }
+      }
+      return result.count === 1
+    })
+    if (applied && selfiePath) {
+      await this.deletions.removeNow([selfiePath])
+    }
+    return applied
   }
 
   private async emitCompletion(
@@ -286,7 +400,12 @@ export class PaletteAnalysisProcessor {
     }
   }
 
-  async process(paletteProfileId: string): Promise<void> {
+  /**
+   * `attemptId` is the analysis the job was enqueued for, read from its deterministic job id
+   * (`paletteAttemptFromJobId`). A job whose attempt is not the one the profile is processing
+   * exits without writing anything.
+   */
+  async process(paletteProfileId: string, attemptId: string | null): Promise<void> {
     const startedAt = Date.now()
     const profile = await this.prisma.paletteProfile.findUnique({
       where: { id: paletteProfileId },
@@ -294,40 +413,41 @@ export class PaletteAnalysisProcessor {
     if (!isProcessableProfile(profile)) {
       return
     }
+    if (!isJobAttempt(profile, attemptId)) {
+      // The member replaced the selfie or started another analysis since this job was
+      // enqueued; that attempt's own job handles it.
+      this.logCompletion(profile.id, startedAt, 'superseded', false)
+      return
+    }
 
     const result: AnalysisResult =
       profile.source === 'wardrobe'
         ? await this.analyzeWardrobe(profile.user_id)
-        : await this.analyzeSelfie(profile.selfie_object_path)
+        : await this.analyzeSelfie(profile)
 
-    // Status commit FIRST, purge SECOND (Decision 8): a crash between them
-    // must leave the row in a terminal state with bytes still present,
+    // Status and the purge obligation commit together, the removal follows (Decision 8): a
+    // crash in between leaves a terminal row whose selfie the deletion outbox still owes,
     // never `processing` with the bytes already gone.
-    const applied =
+    const applied = await this.applyTerminal(
+      profile,
       result.outcome === 'ready'
-        ? await this.prisma.paletteProfile.updateMany({
-            where: { id: profile.id, status: 'processing' },
-            data: {
-              status: 'ready',
-              failure_reason: null,
-              undertone: result.undertone,
-              depth: result.depth,
-              confidence: result.confidence,
-              analysis_version: ADVISOR_RULES_VERSION,
-              analyzed_at: new Date(),
-            },
-          })
-        : await this.prisma.paletteProfile.updateMany({
-            where: { id: profile.id, status: 'processing' },
-            data: { status: 'failed', failure_reason: result.outcome },
-          })
+        ? {
+            status: 'ready',
+            failure_reason: null,
+            undertone: result.undertone,
+            depth: result.depth,
+            confidence: result.confidence,
+            analysis_version: ADVISOR_RULES_VERSION,
+            analyzed_at: new Date(),
+          }
+        : { status: 'failed', failure_reason: result.outcome }
+    )
 
-    if (applied.count === 1) {
-      await this.purgeSelfie(profile.id, profile.selfie_object_path)
+    if (applied) {
       await this.emitCompletion(profile, result)
     }
 
-    this.logCompletion(profile.id, startedAt, result.outcome, applied.count === 1)
+    this.logCompletion(profile.id, startedAt, result.outcome, applied)
   }
 
   /**
@@ -339,7 +459,8 @@ export class PaletteAnalysisProcessor {
    */
   async markFailed(
     paletteProfileId: string,
-    reason: Extract<PaletteAnalysisFailureReason, 'timeout' | 'storage_error'>
+    reason: Extract<PaletteAnalysisFailureReason, 'timeout' | 'storage_error'>,
+    attemptId: string | null
   ): Promise<void> {
     const profile = await this.prisma.paletteProfile.findUnique({
       where: { id: paletteProfileId },
@@ -347,14 +468,17 @@ export class PaletteAnalysisProcessor {
     if (!isProcessableProfile(profile)) {
       return
     }
+    if (!isJobAttempt(profile, attemptId)) {
+      // Retry exhaustion of another attempt: the current one is not this job's to fail.
+      return
+    }
 
-    const applied = await this.prisma.paletteProfile.updateMany({
-      where: { id: paletteProfileId, status: 'processing' },
-      data: { status: 'failed', failure_reason: reason },
+    const applied = await this.applyTerminal(profile, {
+      status: 'failed',
+      failure_reason: reason,
     })
 
-    if (applied.count === 1) {
-      await this.purgeSelfie(profile.id, profile.selfie_object_path)
+    if (applied) {
       await this.emitCompletion(profile, { outcome: reason })
     }
   }

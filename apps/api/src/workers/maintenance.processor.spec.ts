@@ -15,6 +15,7 @@ import {
   GUARDIAN_EMANCIPATION_JOB_NAME,
   ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
+  WARDROBE_DELETION_DRAIN_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
 
@@ -40,6 +41,7 @@ function build() {
     telemetry: { pruneOldTelemetryEvents: vi.fn().mockResolvedValue(undefined) },
     wardrobeRetention: {
       purgeExpiredAndDeletedGarments: vi.fn().mockResolvedValue(undefined),
+      drainDeletions: vi.fn().mockResolvedValue(3),
     },
     community: {
       sweepExpiredBanHolds: vi
@@ -173,6 +175,21 @@ describe('createMaintenanceProcessor: routing', () => {
     expect(
       harness.deps.wardrobeRetention.purgeExpiredAndDeletedGarments
     ).toHaveBeenCalledOnce()
+  })
+
+  // Learning path Step 58, round 6 (Codex C5-8): the outbox drain has its own 15-minute job.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('runs the wardrobe deletion drain on its own job, not the hourly purge', async () => {
+    await harness.process({ name: WARDROBE_DELETION_DRAIN_JOB_NAME })
+
+    expect(harness.deps.wardrobeRetention.drainDeletions).toHaveBeenCalledOnce()
+    expect(
+      harness.deps.wardrobeRetention.purgeExpiredAndDeletedGarments
+    ).not.toHaveBeenCalled()
+    expect(harness.deps.logger.info).toHaveBeenCalledWith(
+      { job: WARDROBE_DELETION_DRAIN_JOB_NAME, result: 3 },
+      'wardrobe_deletion_drain_completed'
+    )
   })
 
   it('runs the telemetry event prune', async () => {

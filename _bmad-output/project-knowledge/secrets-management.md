@@ -154,7 +154,7 @@ reserved by RFC 2606 so it can never resolve publicly) and four wildcard offers,
 and `seeds/feature-flags.ts` seeds `commerce_affiliate_enabled: true`. Both are
 guarded so they are a no-op unless `NODE_ENV=test` or `TEST_ENV=local`. The
 matching secret resolves through the same `allowsTestOnlySecrets()` fallback as
-`WARDROBE_UPLOAD_TOKEN_SECRET`. None of this can exist in production.
+`COMMERCE_CLICK_TOKEN_SECRET`. None of this can exist in production.
 
 ## Premium billing secrets (story 5.2)
 

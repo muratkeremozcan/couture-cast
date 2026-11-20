@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4 Task 7 owner: the web palette advisor client.
 //
 // The panel's tests cover what each state renders. These cover the one thing the panel
@@ -13,10 +15,16 @@ import {
   PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
+  UploadSessionChangedError,
 } from '@couture/api-client/contracts/http'
 import type * as WardrobeModule from './wardrobe'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import {
+  currentUploadSession,
+  forgetAllUploadAttempts,
+  setUploadAttemptAccount,
+} from './upload-attempts'
 import {
   analyzeWardrobePaletteFromWeb,
   erasePaletteAdvisorFromWeb,
@@ -27,10 +35,11 @@ import {
 } from './palette-advisor'
 
 const PALETTE_PATH = '/api/v1/commerce/premium/palette'
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 // Canvas is not implemented in jsdom, so the one genuinely browser-only step of the
 // upload is replaced. Everything downstream of it (the allocate call, the header the
-// bytes go up with, the commit body and the idempotency key shared by both requests)
+// bytes go up with, the commit body and the idempotency keys of both requests)
 // is the real code path.
 vi.mock('./wardrobe', async (importOriginal) => {
   const actual = await importOriginal<typeof WardrobeModule>()
@@ -70,6 +79,9 @@ const profileBody = {
 describe('web palette advisor client (Story 5.4)', () => {
   beforeEach(() => {
     window.sessionStorage.clear()
+    // Every selfie here prepares to the same bytes, and open attempts live for the whole tab.
+    setUploadAttemptAccount(null)
+    forgetAllUploadAttempts()
   })
 
   it('5.4-WEB-001 classifies a call with no session as signed_out without a request', async () => {
@@ -179,11 +191,13 @@ describe('web palette advisor client (Story 5.4)', () => {
   })
 
   /**
-   * AC 3, and the bug story 4.3's review found: one idempotency key covers the whole
-   * upload attempt. A fresh key per request would allocate a second upload session on
-   * every retry instead of replaying the first.
+   * AC 3, and the bug story 4.3's review found: the attempt's keys cover the whole upload, and
+   * a retry reuses them and replays the first session (see 5.4-WEB-010).
    */
-  it('5.4-WEB-008 reuses one idempotency key across allocate and commit', async () => {
+  const SIGNED_SELFIE_UPLOAD_URL =
+    'http://127.0.0.1:54321/storage/v1/object/upload/sign/wardrobe-images/users/user-1/palette/session-1.jpg'
+
+  it('5.4-WEB-008 sends UUID idempotency keys on allocate and commit', async () => {
     signIn()
     const seen: Record<string, string | null> = {}
     let bytesHeaders: Record<string, string> = {}
@@ -193,17 +207,16 @@ describe('web palette advisor client (Story 5.4)', () => {
         return HttpResponse.json({
           data: {
             uploadSessionId: 'session-1',
-            // The host production once named (tester report 2026-11-17); the bytes still go
-            // to this app's own API base.
-            uploadUrl:
-              'http://localhost:3001/api/v1/commerce/premium/palette/selfie/uploads/session-1',
+            // A storage signed upload URL: the bytes go straight there, as given, and never
+            // through an API function (production follow-up 2026-11-19).
+            uploadUrl: `${SIGNED_SELFIE_UPLOAD_URL}?token=signed-upload-token`,
             uploadToken: 'upload-token',
             requiredHeaders: { 'content-type': 'image/jpeg' },
             expiresAt: '2026-08-25T10:15:00.000Z',
           },
         })
       }),
-      http.put(`${PALETTE_PATH}/selfie/uploads/session-1`, ({ request }) => {
+      http.put(SIGNED_SELFIE_UPLOAD_URL, ({ request }) => {
         bytesHeaders = Object.fromEntries(request.headers.entries())
         return new HttpResponse(null, { status: 204 })
       }),
@@ -217,16 +230,210 @@ describe('web palette advisor client (Story 5.4)', () => {
     const states: string[] = []
     await uploadPaletteSelfieFromWeb({
       imagePreview: 'blob:selfie',
-      idempotencyKey: '11111111-1111-4111-8111-111111111111',
+      uploadSession: currentUploadSession(),
       onStateChange: (state) => states.push(state),
     })
 
-    expect(seen.allocate).toBe('11111111-1111-4111-8111-111111111111')
-    expect(seen.commit).toBe(seen.allocate)
+    expect(seen.allocate).toMatch(UUID_V4)
+    expect(seen.commit).toMatch(UUID_V4)
     expect(seen.body).toBe(JSON.stringify({ uploadSessionId: 'session-1' }))
     expect(bytesHeaders['x-upload-token']).toBe('upload-token')
     expect(bytesHeaders['content-type']).toBe('image/jpeg')
     expect(states).toEqual(['preparing', 'requesting_upload', 'uploading', 'committing'])
+  })
+
+  /**
+   * Review round 2 (C2-6): one selfie attempt keeps its session and key across retries. A retry
+   * commits first and re-sends the bytes only after commit answers UPLOAD_BYTES_MISSING.
+   */
+  function useSelfieLegHandlers(
+    commitAnswers: (() => Response)[],
+    putAnswers: (() => Response)[]
+  ) {
+    const counts = { allocate: 0, put: 0, commit: 0 }
+    const allocateKeys: (string | null)[] = []
+    const commitKeys: (string | null)[] = []
+    useMswHandlers(
+      http.post(`${PALETTE_PATH}/selfie/upload-url`, ({ request }) => {
+        counts.allocate += 1
+        allocateKeys.push(request.headers.get('idempotency-key'))
+        return HttpResponse.json({
+          data: {
+            uploadSessionId: 'session-retry',
+            uploadUrl: `${SIGNED_SELFIE_UPLOAD_URL}?token=signed-upload-token`,
+            uploadToken: 'upload-token',
+            requiredHeaders: { 'content-type': 'image/jpeg' },
+            expiresAt: '2026-08-25T10:15:00.000Z',
+          },
+        })
+      }),
+      http.put(SIGNED_SELFIE_UPLOAD_URL, () => {
+        counts.put += 1
+        const answer = putAnswers.shift()
+        if (!answer) throw new Error('No PUT answer left')
+        return answer()
+      }),
+      http.post(`${PALETTE_PATH}/selfie/commit`, ({ request }) => {
+        counts.commit += 1
+        commitKeys.push(request.headers.get('idempotency-key'))
+        const answer = commitAnswers.shift()
+        if (!answer) throw new Error('No commit answer left')
+        return answer()
+      })
+    )
+    return { counts, allocateKeys, commitKeys }
+  }
+
+  it('5.4-WEB-010 replays a lost commit answer with the same key and no second allocation or PUT', async () => {
+    signIn()
+    const { counts, commitKeys } = useSelfieLegHandlers(
+      [() => HttpResponse.error(), () => HttpResponse.json(profileBody)],
+      [() => new HttpResponse(null, { status: 204 })]
+    )
+
+    await expect(
+      uploadPaletteSelfieFromWeb({
+        imagePreview: 'blob:selfie',
+        uploadSession: currentUploadSession(),
+      })
+    ).rejects.toThrow()
+    await uploadPaletteSelfieFromWeb({
+      imagePreview: 'blob:selfie',
+      uploadSession: currentUploadSession(),
+    })
+
+    expect(counts).toEqual({ allocate: 1, put: 1, commit: 2 })
+    expect(commitKeys).toEqual([commitKeys[0], commitKeys[0]])
+  })
+
+  it('5.4-WEB-011 re-sends the bytes on a retry only after commit answers UPLOAD_BYTES_MISSING', async () => {
+    signIn()
+    const { counts } = useSelfieLegHandlers(
+      [
+        () => errorBody(409, 'UPLOAD_BYTES_MISSING', 'Conflict'),
+        () => HttpResponse.json(profileBody),
+      ],
+      [
+        () => new HttpResponse(null, { status: 503 }),
+        () => new HttpResponse(null, { status: 204 }),
+      ]
+    )
+
+    await expect(
+      uploadPaletteSelfieFromWeb({
+        imagePreview: 'blob:selfie',
+        uploadSession: currentUploadSession(),
+      })
+    ).rejects.toThrow()
+    await uploadPaletteSelfieFromWeb({
+      imagePreview: 'blob:selfie',
+      uploadSession: currentUploadSession(),
+    })
+
+    expect(counts).toEqual({ allocate: 1, put: 2, commit: 2 })
+  })
+
+  /**
+   * The server ended the attempt (its session expired), so the same call starts one fresh
+   * attempt at once: a new allocation and new keys, the bytes again, and a commit that succeeds.
+   * The member never has to pick the photo a second time.
+   */
+  it('5.4-WEB-012 starts one fresh attempt in the same call after the server ended the first', async () => {
+    signIn()
+    const { counts, allocateKeys, commitKeys } = useSelfieLegHandlers(
+      [
+        () => errorBody(409, 'UPLOAD_SESSION_EXPIRED', 'Conflict'),
+        () => HttpResponse.json(profileBody),
+      ],
+      [
+        () => new HttpResponse(null, { status: 204 }),
+        () => new HttpResponse(null, { status: 204 }),
+      ]
+    )
+
+    await expect(
+      uploadPaletteSelfieFromWeb({
+        imagePreview: 'blob:selfie',
+        uploadSession: currentUploadSession(),
+      })
+    ).resolves.toEqual(profileBody.data)
+
+    expect(counts).toEqual({ allocate: 2, put: 2, commit: 2 })
+    expect(allocateKeys[0]).toMatch(UUID_V4)
+    expect(allocateKeys[1]).toMatch(UUID_V4)
+    expect(allocateKeys[1]).not.toBe(allocateKeys[0])
+    expect(commitKeys[1]).toMatch(UUID_V4)
+    expect(commitKeys[1]).not.toBe(commitKeys[0])
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it.each(['IMAGE_CHECKSUM_MISMATCH', 'IMAGE_DIMENSIONS_INVALID', 'IMAGE_DECODE_FAILED'])(
+    'restarts a resumed attempt in the same call when commit rejects the staged bytes with 400 %s',
+    async (code) => {
+      signIn()
+      const { counts, allocateKeys, commitKeys } = useSelfieLegHandlers(
+        [
+          () => HttpResponse.error(),
+          () => errorBody(400, code, 'Bad Request'),
+          () => HttpResponse.json(profileBody),
+        ],
+        [
+          () => new HttpResponse(null, { status: 204 }),
+          () => new HttpResponse(null, { status: 204 }),
+        ]
+      )
+      const pick = () =>
+        uploadPaletteSelfieFromWeb({
+          imagePreview: 'blob:selfie',
+          uploadSession: currentUploadSession(),
+        })
+
+      await expect(pick()).rejects.toThrow()
+      // The selfie commit ended the session on 400; this same pick restarts with fresh keys.
+      await expect(pick()).resolves.toEqual(profileBody.data)
+
+      expect(counts).toEqual({ allocate: 2, put: 2, commit: 3 })
+      expect(allocateKeys[1]).not.toBe(allocateKeys[0])
+      expect(commitKeys[1]).toBe(commitKeys[0])
+      expect(commitKeys[2]).not.toBe(commitKeys[0])
+    }
+  )
+
+  it('shows a 400 IMAGE_CHECKSUM_MISMATCH of the bytes the same call uploaded, with no restart', async () => {
+    signIn()
+    const { counts } = useSelfieLegHandlers(
+      [() => errorBody(400, 'IMAGE_CHECKSUM_MISMATCH', 'Bad Request')],
+      [() => new HttpResponse(null, { status: 204 })]
+    )
+
+    await expect(
+      uploadPaletteSelfieFromWeb({
+        imagePreview: 'blob:selfie',
+        uploadSession: currentUploadSession(),
+      })
+    ).rejects.toSatisfy(
+      (error: unknown) => paletteAdvisorFailureReason(error) === 'unknown'
+    )
+
+    expect(counts).toEqual({ allocate: 1, put: 1, commit: 1 })
+  })
+
+  it('refuses a selfie picked under another account before any request', async () => {
+    signIn()
+    const { counts } = useSelfieLegHandlers([], [])
+    setUploadAttemptAccount('member-a')
+    const pickedUnderA = currentUploadSession()
+    setUploadAttemptAccount('member-b')
+
+    await expect(
+      uploadPaletteSelfieFromWeb({
+        imagePreview: 'blob:selfie',
+        uploadSession: pickedUnderA,
+      })
+    ).rejects.toBeInstanceOf(UploadSessionChangedError)
+
+    expect(counts).toEqual({ allocate: 0, put: 0, commit: 0 })
   })
 
   it('5.4-WEB-009 classifies an upload rejection rather than surfacing its text', async () => {
@@ -240,7 +447,7 @@ describe('web palette advisor client (Story 5.4)', () => {
     await expect(
       uploadPaletteSelfieFromWeb({
         imagePreview: 'blob:selfie',
-        idempotencyKey: '22222222-2222-4222-8222-222222222222',
+        uploadSession: currentUploadSession(),
       })
     ).rejects.toSatisfy(
       (error: unknown) => paletteAdvisorFailureReason(error) === 'no_consent'

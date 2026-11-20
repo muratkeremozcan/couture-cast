@@ -1,3 +1,5 @@
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 // Story 5.5: premium 7-day outfit planner.
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
@@ -351,6 +353,68 @@ describe('PlannerService', () => {
       ])
       expect(result.data.days.every((d) => d.status === 'ready')).toBe(true)
       expect(result.data.daysReady).toBe(7)
+    })
+
+    /**
+     * Review round 2, 2026-11-19: `object_path` was member-writable before the revoke
+     * migration, so a garment image is signed only from the garment's own object.
+     */
+    it('shows a garment whose path names another member object without an image', async () => {
+      garmentItemFindMany.mockResolvedValue([
+        buildGarment({
+          id: 'top-1',
+          category: 'top',
+          object_path: 'wardrobe/user-1/top-1.jpg',
+        }),
+        buildGarment({
+          id: 'bottom-1',
+          category: 'bottom',
+          object_path: 'wardrobe/user-2/bottom-9.jpg',
+        }),
+        buildGarment({
+          id: 'shoes-1',
+          category: 'shoes',
+          object_path: 'wardrobe/user-1/shoes-1.jpg',
+        }),
+      ])
+
+      const result = await service.getPlannerWindow(
+        'user-1',
+        undefined,
+        undefined,
+        undefined,
+        'web'
+      )
+
+      const displayed = result.data.days.flatMap((day) =>
+        day.status === 'ready'
+          ? day.outfits.flatMap((outfit) => outfit.displayGarments)
+          : []
+      )
+      expect(
+        displayed.filter((garment) => garment.id === 'bottom-1').length
+      ).toBeGreaterThan(0)
+      expect(
+        displayed
+          .filter((garment) => garment.id === 'bottom-1')
+          .every((g) => g.imageAccess === null)
+      ).toBe(true)
+      expect(
+        displayed.filter((garment) => garment.id === 'top-1').length
+      ).toBeGreaterThan(0)
+      expect(
+        displayed
+          .filter((garment) => garment.id === 'top-1')
+          .every((g) => g.imageAccess !== null)
+      ).toBe(true)
+      expect(signReadUrlMock).not.toHaveBeenCalledWith(
+        'wardrobe/user-2/bottom-9.jpg',
+        expect.anything()
+      )
+      expect(signReadUrlMock).toHaveBeenCalledWith(
+        'wardrobe/user-1/top-1.jpg',
+        expect.anything()
+      )
     })
 
     it('uses hourly-exact confidence for the date with matching segments', async () => {
