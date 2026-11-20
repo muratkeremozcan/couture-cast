@@ -31,6 +31,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
 Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
 Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
 Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
@@ -12901,3 +12902,41 @@ Web E2E, Playwright:
   proves a signed-in member opening `/settings` in a new tab or after a reload sees Shopping and
   partners, Premium and Interface palettes signed in through real GoTrue, with no sign-in hint
   painted at any point and one read per section (PS-1, PS-2).
+
+#### The production run signs in as a synthetic member
+
+User/business impact:
+
+Jade's three reports on 2026-11-19 (no Profile, no location permission, "City search
+unavailable") all sat on member-only paths, and the daily production run had no member: production
+rejects test tokens and has no test identity, so every check there ran signed out. A production
+break on a member path could not turn the status badge red.
+
+The run now signs in as one persistent synthetic member, `synthetic-prod-member@example.com`.
+An operator creates it once with `scripts/ops/provision-prod-synthetic-member.mjs`; the run holds
+only its password.
+
+Key takeaways:
+
+1. **Give CI the least credential that works.**
+   The Supabase admin key stays on the operator's machine (the repository is public). The run holds
+   the member's password (a GitHub secret) and three public variables, and signs in through the
+   password grant, which opens a session for that one member. A stored refresh token needs
+   write-back after every rotation, and a signed session route would add a production surface
+   that exists only for tests.
+2. **The production run reads; the preview run writes.**
+   Anything that creates a post or an upload runs on the Vercel preview, where test data is fine.
+   As a read-only member the production run has nothing to clean up, and sign-out at the end of
+   the worker revokes the session it opened.
+3. **A secret in a trace is public.**
+   Artifacts of a public repository are public, so the member specs turn traces off, the browser
+   gets a session without its refresh token, and the artifact scan also looks for the password.
+
+Tests:
+
+- [`prod-synthetic-member.spec.ts`](../../playwright/tests/prod-synthetic-member.spec.ts):
+  the canary. Production accepts the member's session, and the web app signs it in from its
+  stored session and shows the profile. It goes red when the password rotates, the account goes
+  or production stops accepting the session.
+- [`prod-synthetic-member.spec.ts` (helper)](../../playwright/support/helpers/prod-synthetic-member.spec.ts):
+  the sign-in, the missing-input failure that names the input, and the sign-out.

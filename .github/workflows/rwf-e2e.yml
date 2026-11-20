@@ -60,6 +60,8 @@ on:
         required: false
       DATABASE_URL_PROD:
         required: false
+      PROD_SYNTHETIC_MEMBER_PASSWORD:
+        required: false
 
 # A caller's env does not reach a reusable workflow. On a pull request or a push the
 # playwright-unit job of pr-checks.yml runs the Playwright helper unit tests, so the test
@@ -198,6 +200,14 @@ jobs:
           TEST_ENV: ${{ inputs.test_env }}
           # Prod only: preview runs execute PR code and must not hold the prod credential.
           DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
+          # Prod only, the same scoping: the one synthetic member the run signs in as. Its password
+          # opens a session for that member alone (Supabase password grant); the Supabase admin key
+          # is not a GitHub secret. The rest is public: its address, the project URL and the
+          # publishable key. See playwright/support/helpers/prod-synthetic-member.ts.
+          PROD_SYNTHETIC_MEMBER_PASSWORD: ${{ inputs.test_env == 'prod' && secrets.PROD_SYNTHETIC_MEMBER_PASSWORD || '' }}
+          PROD_SYNTHETIC_MEMBER_EMAIL: ${{ inputs.test_env == 'prod' && vars.PROD_SYNTHETIC_MEMBER_EMAIL || '' }}
+          PROD_SUPABASE_URL: ${{ inputs.test_env == 'prod' && vars.PROD_SUPABASE_URL || '' }}
+          PROD_SUPABASE_PUBLISHABLE_KEY: ${{ inputs.test_env == 'prod' && vars.PROD_SUPABASE_PUBLISHABLE_KEY || '' }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           EXPECTED_WEB_SHA: ${{ inputs.expected_web_sha || steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
@@ -303,10 +313,11 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           # Same scoping as the run step: preview never holds the prod credential.
           DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
+          PROD_SYNTHETIC_MEMBER_PASSWORD: ${{ inputs.test_env == 'prod' && secrets.PROD_SYNTHETIC_MEMBER_PASSWORD || '' }}
           GH_TOKEN: ${{ github.token }}
         run: >-
           node scripts/check-artifact-secrets.mjs
-          --names VERCEL_AUTOMATION_BYPASS_SECRET,VERCEL_TOKEN,DATABASE_URL_PROD,GH_TOKEN
+          --names VERCEL_AUTOMATION_BYPASS_SECRET,VERCEL_TOKEN,DATABASE_URL_PROD,PROD_SYNTHETIC_MEMBER_PASSWORD,GH_TOKEN
           --storage-state playwright/.auth/vercel-bypass.json
           playwright/artifacts playwright/playwright-report
 
