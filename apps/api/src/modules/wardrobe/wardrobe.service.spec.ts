@@ -147,11 +147,17 @@ describe('WardrobeService Smart Tagging Operations', () => {
 
     const res = await service.suggestGarmentTags('user_1', 'teen', 'g_1')
     expect(res.data).toMatchObject({
-      mode: 'suggested',
       garmentId: 'g_1',
       analysisVersion: validSnapshot.analysisVersion,
       suggestions: { category: { value: 'top' } },
     })
+    // The original wire shape (R4): a client from before manual mode rejects an unknown key.
+    expect(res.data).not.toHaveProperty('mode')
+    expect(Object.keys(res.data).toSorted()).toEqual([
+      'analysisVersion',
+      'garmentId',
+      'suggestions',
+    ])
   })
 
   it('answers manual mode, with no suggestions, for a garment a model-less worker processed', async () => {

@@ -5,6 +5,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import * as hostedConfig from '../src/workers/hosted-wardrobe-config'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const read = (relative: string) => fs.readFileSync(path.join(repoRoot, relative), 'utf8')
@@ -12,11 +13,10 @@ const read = (relative: string) => fs.readFileSync(path.join(repoRoot, relative)
 interface LauncherModule {
   startRefusal: (
     env: Record<string, string | undefined>,
-    options?: { drillChild?: boolean }
+    options?: { drillChild?: boolean; config?: typeof hostedConfig }
   ) => string | null
   loadedModelRuntimes: (paths: string[]) => string[]
   SHUTDOWN_DEADLINE_MS: number
-  DRILL_ENV: Record<string, string>
   DRILL_CHILD_ARGUMENT: string
 }
 interface PruneModule {
@@ -101,38 +101,79 @@ describe('Dockerfile.wardrobe-worker', () => {
 })
 
 describe('start-wardrobe-worker-production.mjs', () => {
+  /**
+   * The launcher imports the compiled `workers/hosted-wardrobe-config.js` at start; here the same
+   * module's source is handed in, so the glue and the real rules run without a build.
+   */
+  const launcher = () =>
+    load<LauncherModule>('scripts/start-wardrobe-worker-production.mjs')
+  const ok: Record<string, string | undefined> = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://user:pw@db.example.com:5432/postgres',
+    REDIS_URL: 'rediss://default:pw@redis.example.com:6379',
+    SUPABASE_URL: 'https://project.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'service-role-key',
+    GARMENT_TAGGING_ENGINE: 'manual',
+    WARDROBE_MAINTENANCE_ENABLED: 'true',
+  }
+
   it('starts only on the manual engine with maintenance on', async () => {
-    const { startRefusal } = await load<LauncherModule>(
-      'scripts/start-wardrobe-worker-production.mjs'
-    )
-    const ok = { GARMENT_TAGGING_ENGINE: 'manual', WARDROBE_MAINTENANCE_ENABLED: 'true' }
-    expect(startRefusal(ok)).toBeNull()
-    for (const engine of [undefined, '', 'fashion-clip', 'fixture', 'gpt-vision']) {
-      expect(startRefusal({ ...ok, GARMENT_TAGGING_ENGINE: engine })).toMatch(
+    const { startRefusal } = await launcher()
+    const config = hostedConfig
+    expect(startRefusal(ok, { config })).toBeNull()
+    for (const engine of ['fashion-clip', 'fixture', 'gpt-vision']) {
+      expect(startRefusal({ ...ok, GARMENT_TAGGING_ENGINE: engine }, { config })).toMatch(
         /GARMENT_TAGGING_ENGINE=.* is refused/
       )
     }
-    for (const maintenance of [undefined, '', 'false', '1']) {
-      expect(startRefusal({ ...ok, WARDROBE_MAINTENANCE_ENABLED: maintenance })).toMatch(
-        /WARDROBE_MAINTENANCE_ENABLED is not true/
+    for (const engine of [undefined, '']) {
+      expect(startRefusal({ ...ok, GARMENT_TAGGING_ENGINE: engine }, { config })).toMatch(
+        /GARMENT_TAGGING_ENGINE is required/
       )
+    }
+    for (const maintenance of [undefined, '', 'false', '1']) {
+      expect(
+        startRefusal({ ...ok, WARDROBE_MAINTENANCE_ENABLED: maintenance }, { config })
+      ).toMatch(/WARDROBE_MAINTENANCE_ENABLED is not true/)
     }
   })
 
-  it('lets only the drill child run with maintenance off, never with another engine', async () => {
-    const { startRefusal, DRILL_ENV, DRILL_CHILD_ARGUMENT } = await load<LauncherModule>(
-      'scripts/start-wardrobe-worker-production.mjs'
+  it('TEA: refuses production with TEST_ENV=local and a fixture selector before any queue starts', async () => {
+    const { startRefusal } = await launcher()
+    const refusal = startRefusal(
+      {
+        ...ok,
+        TEST_ENV: 'local',
+        SILHOUETTE_MODERATION_ENGINE: 'fixture',
+        PALETTE_ANALYSIS_ENGINE: 'fixture',
+      },
+      { config: hostedConfig }
     )
+    expect(refusal).toMatch(/^TEST_ENV=local is refused/)
+    expect(refusal).toMatch(/SILHOUETTE_MODERATION_ENGINE=fixture is refused/)
+    expect(refusal).toMatch(/PALETTE_ANALYSIS_ENGINE=fixture is refused/)
+    expect(() => startRefusal(ok)).toThrow(/configuration is not loaded/)
+  })
+
+  it('lets only the drill child, in the isolated drill configuration, run with maintenance off', async () => {
+    const { startRefusal, DRILL_CHILD_ARGUMENT } = await launcher()
+    const config = hostedConfig
+    const drill = { ...hostedConfig.ISOLATED_DRILL_ENV, GARMENT_TAGGING_ENGINE: 'manual' }
     expect(DRILL_CHILD_ARGUMENT).toBe('--drill-child')
-    expect(DRILL_ENV.WARDROBE_MAINTENANCE_ENABLED).toBe('false')
+    expect(hostedConfig.ISOLATED_DRILL_ENV.WARDROBE_MAINTENANCE_ENABLED).toBe('false')
+    expect(startRefusal(drill, { drillChild: true, config })).toBeNull()
+    // The same flag against a real configuration exempts nothing, and never another engine.
     expect(
       startRefusal(
-        { GARMENT_TAGGING_ENGINE: 'manual', WARDROBE_MAINTENANCE_ENABLED: 'false' },
-        { drillChild: true }
+        { ...ok, WARDROBE_MAINTENANCE_ENABLED: 'false' },
+        { drillChild: true, config }
       )
-    ).toBeNull()
+    ).toMatch(/WARDROBE_MAINTENANCE_ENABLED is not true/)
     expect(
-      startRefusal({ GARMENT_TAGGING_ENGINE: 'fashion-clip' }, { drillChild: true })
+      startRefusal(
+        { ...drill, GARMENT_TAGGING_ENGINE: 'fashion-clip' },
+        { drillChild: true, config }
+      )
     ).not.toBeNull()
   })
 
@@ -153,6 +194,13 @@ describe('start-wardrobe-worker-production.mjs', () => {
       '/app/apps/api/dist/src/modules/wardrobe/fashion-clip-tagging.engine.js',
     ])
     expect(loadedModelRuntimes(['/app/node_modules/bullmq/dist/index.js'])).toEqual([])
+  })
+
+  it('starts the bootstrap in hosted mode with the compiled configuration check', () => {
+    const launcher = read('scripts/start-wardrobe-worker-production.mjs')
+    expect(launcher).toContain("importCompiled('workers/hosted-wardrobe-config.js')")
+    expect(launcher).toContain('startWardrobeWorker({ hosted: true, drillChild })')
+    expect(launcher).toContain('config.ISOLATED_DRILL_ENV')
   })
 
   it('shuts down before the host grace period and reuses the community TLS refusal', () => {

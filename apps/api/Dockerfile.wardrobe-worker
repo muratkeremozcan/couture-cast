@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 #
 # Hosted wardrobe worker: the garment colour and tagging, My Form photo and palette consumers plus
-# the wardrobe-only maintenance worker (retention purge, job handoff, deletion drain).
+# the wardrobe-only maintenance loop (retention purge, job handoff, deletion drain).
 #
 # Build from the repository root:
 #   docker build -f apps/api/Dockerfile.wardrobe-worker -t couture-cast-wardrobe-worker .
@@ -103,10 +103,15 @@ COPY --chown=root:root apps/api/certs/supabase-root-2021-ca.pem apps/api/certs/
 # The image is read-only to the user it runs as: the worker writes nothing to disk.
 USER node
 
-# Proves, at build time and against the pruned tree, that the compiled consumer graph loads, the
-# manual engine loads no model runtime, sharp decodes an image, and the launcher starts and shuts
-# down as the CMD runs it. A dependency the prune trace missed fails here rather than on the first
-# job.
+# A load, start and shutdown proof against the pruned tree, at build time: the compiled consumer
+# graph loads, the compiled hosted configuration check refuses TEST_ENV=local with fixture
+# selectors, the manual engine loads no model runtime, sharp decodes a 64x64 image, and the
+# launcher starts and shuts down as the CMD runs it. A dependency the prune trace missed fails
+# here rather than on the first job. It is not a capacity measurement: its drill child runs with
+# nothing reachable (no Redis, database or storage, so no readiness checks and no maintenance
+# loop) and it never overlaps job types. Whether 512 MB is enough is measured on a constrained
+# Linux build under a representative simultaneous workload, and on Northflank's memory metrics
+# (deployment guide, hosted wardrobe worker).
 RUN GARMENT_TAGGING_ENGINE=manual WARDROBE_MAINTENANCE_ENABLED=true \
     node scripts/start-wardrobe-worker-production.mjs --self-test
 

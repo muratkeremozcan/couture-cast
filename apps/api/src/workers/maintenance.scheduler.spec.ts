@@ -13,8 +13,6 @@ import {
   MODERATION_SLA_SWEEP_JOB_NAME,
   registerMaintenanceSchedulers,
   registerModerationSlaScheduler,
-  registerWardrobeMaintenanceSchedulers,
-  WARDROBE_MAINTENANCE_JOB_NAMES,
   ORPHAN_AUTH_USER_SWEEP_CRON_PATTERN,
   ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
   ORPHAN_AUTH_USER_SWEEP_TIMEZONE,
@@ -205,57 +203,5 @@ describe('U-W-SCHEDULER', () => {
     expect(MODERATION_SLA_SWEEP_JOB_NAME).toBe('moderation-sla-sweep')
     expect(MODERATION_SLA_SWEEP_CRON_PATTERN).toBe('* * * * *')
     expect(MODERATION_SLA_SWEEP_INTERVAL_MS).toBe(60_000)
-  })
-})
-
-// Learning path Step 58: Hosted wardrobe workers and manual tagging.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
-describe('registerWardrobeMaintenanceSchedulers', () => {
-  it('registers only the retention purge and the deletion drain, with the general worker patterns', async () => {
-    const { queue, calls } = createQueue()
-    await registerWardrobeMaintenanceSchedulers(queue)
-
-    expect(calls().map((call) => call[0])).toEqual([
-      WARDROBE_RETENTION_PURGE_JOB_NAME,
-      WARDROBE_DELETION_DRAIN_JOB_NAME,
-    ])
-    expect(WARDROBE_MAINTENANCE_JOB_NAMES).toEqual([
-      'wardrobe-retention-purge',
-      'wardrobe-deletion-drain',
-    ])
-    expect(schedulerCall(calls(), WARDROBE_RETENTION_PURGE_JOB_NAME)).toEqual([
-      WARDROBE_RETENTION_PURGE_JOB_NAME,
-      { pattern: '0 * * * *' },
-      { name: 'wardrobe-retention-purge', data: {} },
-    ])
-    expect(schedulerCall(calls(), WARDROBE_DELETION_DRAIN_JOB_NAME)).toEqual([
-      WARDROBE_DELETION_DRAIN_JOB_NAME,
-      { pattern: '7,22,37,52 * * * *' },
-      { name: 'wardrobe-deletion-drain', data: {} },
-    ])
-  })
-
-  it('uses the ids and patterns registerMaintenanceSchedulers uses, so a restart or a general worker updates the same two', async () => {
-    const wardrobe = createQueue()
-    const general = createQueue()
-    await registerWardrobeMaintenanceSchedulers(wardrobe.queue)
-    await registerMaintenanceSchedulers(general.queue)
-
-    for (const call of wardrobe.calls()) {
-      expect(schedulerCall(general.calls(), call[0])).toEqual(call)
-    }
-    for (const name of WARDROBE_MAINTENANCE_JOB_NAMES) {
-      expect(MAINTENANCE_JOB_NAMES).toContain(name)
-    }
-  })
-
-  it('stays idempotent across worker restarts', async () => {
-    const { queue, calls } = createQueue()
-    await registerWardrobeMaintenanceSchedulers(queue)
-    await registerWardrobeMaintenanceSchedulers(queue)
-    // A restart upserts the same two schedulers by id with the same patterns: four calls, the
-    // second pair identical to the first, so nothing accumulates.
-    expect(calls()).toHaveLength(4)
-    expect(calls().slice(2)).toEqual(calls().slice(0, 2))
   })
 })

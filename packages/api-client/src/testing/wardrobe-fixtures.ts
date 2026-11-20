@@ -63,6 +63,18 @@ export function createSuggestGarmentTagsDataFixture(
   }
 }
 
+/**
+ * What the API sends for a suggested answer: the original wire shape, with no `mode`. A client's
+ * schema normalizes it to `createSuggestGarmentTagsDataFixture`'s shape.
+ */
+export function createSuggestGarmentTagsWireFixture(
+  overrides: SuggestionOverrides & { garmentId?: string } = {}
+): Omit<SuggestGarmentTagsSuggestedData, 'mode'> {
+  const { mode: _mode, ...wire } = createSuggestGarmentTagsDataFixture(overrides)
+  void _mode
+  return wire
+}
+
 export function createManualSuggestGarmentTagsDataFixture(
   overrides: { garmentId?: string } = {}
 ): SuggestGarmentTagsManualData {

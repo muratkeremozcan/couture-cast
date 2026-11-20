@@ -18902,80 +18902,123 @@ export interface SuggestGarmentTagsResponse {
   data: SuggestGarmentTagsResponseData
 }
 /**
- * @type SuggestGarmentTagsResponseData
  *
  * @export
+ * @interface SuggestGarmentTagsResponseData
  */
-export type SuggestGarmentTagsResponseData =
-  | SuggestGarmentTagsResponseDataOneOf
-  | SuggestGarmentTagsResponseDataOneOf1
-/**
- *
- * @export
- * @interface SuggestGarmentTagsResponseDataOneOf
- */
-export interface SuggestGarmentTagsResponseDataOneOf {
+export interface SuggestGarmentTagsResponseData {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfModeEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOf
+   * @type {SuggestGarmentTagsResponseDataModeEnum}
+   * @memberof SuggestGarmentTagsResponseData
    */
-  mode: SuggestGarmentTagsResponseDataOneOfModeEnum
+  mode: SuggestGarmentTagsResponseDataModeEnum
   /**
    *
    * @type {string}
-   * @memberof SuggestGarmentTagsResponseDataOneOf
+   * @memberof SuggestGarmentTagsResponseData
    */
   garmentId: string
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOf
+   * @type {SuggestGarmentTagsResponseDataAnalysisVersionEnum}
+   * @memberof SuggestGarmentTagsResponseData
    */
-  analysisVersion: SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum
+  analysisVersion: SuggestGarmentTagsResponseDataAnalysisVersionEnum
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestions}
-   * @memberof SuggestGarmentTagsResponseDataOneOf
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestions}
+   * @memberof SuggestGarmentTagsResponseData
    */
-  suggestions: SuggestGarmentTagsResponseDataOneOfSuggestions
+  suggestions: SuggestGarmentTagsResponseDataAnyOfSuggestions
 }
 
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOfModeEnum = {
-  suggested: 'suggested',
+export const SuggestGarmentTagsResponseDataModeEnum = {
+  manual: 'manual',
 } as const
-export type SuggestGarmentTagsResponseDataOneOfModeEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOfModeEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOfModeEnum]
+export type SuggestGarmentTagsResponseDataModeEnum =
+  (typeof SuggestGarmentTagsResponseDataModeEnum)[keyof typeof SuggestGarmentTagsResponseDataModeEnum]
 
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum = {
+export const SuggestGarmentTagsResponseDataAnalysisVersionEnum = {
   fashion_clip_7e3ba62ce16b379a1ab479346b66f192e76f51b7_prompts_v1:
     'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1',
 } as const
-export type SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOfAnalysisVersionEnum]
+export type SuggestGarmentTagsResponseDataAnalysisVersionEnum =
+  (typeof SuggestGarmentTagsResponseDataAnalysisVersionEnum)[keyof typeof SuggestGarmentTagsResponseDataAnalysisVersionEnum]
 
 /**
  *
  * @export
- * @interface SuggestGarmentTagsResponseDataOneOf1
+ * @interface SuggestGarmentTagsResponseDataAnyOf
  */
-export interface SuggestGarmentTagsResponseDataOneOf1 {
+export interface SuggestGarmentTagsResponseDataAnyOf {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOf1ModeEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOf1
+   * @type {SuggestGarmentTagsResponseDataAnyOfModeEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOf
    */
-  mode: SuggestGarmentTagsResponseDataOneOf1ModeEnum
+  mode?: SuggestGarmentTagsResponseDataAnyOfModeEnum
   /**
    *
    * @type {string}
-   * @memberof SuggestGarmentTagsResponseDataOneOf1
+   * @memberof SuggestGarmentTagsResponseDataAnyOf
+   */
+  garmentId: string
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOf
+   */
+  analysisVersion: SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestions}
+   * @memberof SuggestGarmentTagsResponseDataAnyOf
+   */
+  suggestions: SuggestGarmentTagsResponseDataAnyOfSuggestions
+}
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataAnyOfModeEnum = {
+  suggested: 'suggested',
+} as const
+export type SuggestGarmentTagsResponseDataAnyOfModeEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfModeEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfModeEnum]
+
+/**
+ * @export
+ */
+export const SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum = {
+  fashion_clip_7e3ba62ce16b379a1ab479346b66f192e76f51b7_prompts_v1:
+    'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1',
+} as const
+export type SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfAnalysisVersionEnum]
+
+/**
+ *
+ * @export
+ * @interface SuggestGarmentTagsResponseDataAnyOf1
+ */
+export interface SuggestGarmentTagsResponseDataAnyOf1 {
+  /**
+   *
+   * @type {SuggestGarmentTagsResponseDataAnyOf1ModeEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOf1
+   */
+  mode: SuggestGarmentTagsResponseDataAnyOf1ModeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SuggestGarmentTagsResponseDataAnyOf1
    */
   garmentId: string
 }
@@ -18983,59 +19026,59 @@ export interface SuggestGarmentTagsResponseDataOneOf1 {
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOf1ModeEnum = {
+export const SuggestGarmentTagsResponseDataAnyOf1ModeEnum = {
   manual: 'manual',
 } as const
-export type SuggestGarmentTagsResponseDataOneOf1ModeEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOf1ModeEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOf1ModeEnum]
+export type SuggestGarmentTagsResponseDataAnyOf1ModeEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOf1ModeEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOf1ModeEnum]
 
 /**
  *
  * @export
- * @interface SuggestGarmentTagsResponseDataOneOfSuggestions
+ * @interface SuggestGarmentTagsResponseDataAnyOfSuggestions
  */
-export interface SuggestGarmentTagsResponseDataOneOfSuggestions {
+export interface SuggestGarmentTagsResponseDataAnyOfSuggestions {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsCategory}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestions
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestions
    */
-  category: SuggestGarmentTagsResponseDataOneOfSuggestionsCategory
+  category: SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestions
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestions
    */
-  material: SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial
+  material: SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestions
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestions
    */
-  comfortRange: SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange
+  comfortRange: SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
 }
 /**
  *
  * @export
- * @interface SuggestGarmentTagsResponseDataOneOfSuggestionsCategory
+ * @interface SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
  */
-export interface SuggestGarmentTagsResponseDataOneOfSuggestionsCategory {
+export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsCategory
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
    */
-  value: SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum | null
   /**
    *
    * @type {number}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsCategory
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
    */
   confidence: number
   /**
    *
    * @type {boolean}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsCategory
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
    */
   isConfident: boolean
 }
@@ -19043,7 +19086,7 @@ export interface SuggestGarmentTagsResponseDataOneOfSuggestionsCategory {
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum = {
+export const SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum = {
   top: 'top',
   bottom: 'bottom',
   outerwear: 'outerwear',
@@ -19051,31 +19094,31 @@ export const SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum = {
   shoes: 'shoes',
   accessory: 'accessory',
 } as const
-export type SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOfSuggestionsCategoryValueEnum]
+export type SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum]
 
 /**
  *
  * @export
- * @interface SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange
+ * @interface SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
  */
-export interface SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange {
+export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
    */
-  value: SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum | null
   /**
    *
    * @type {number}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
    */
   confidence: number
   /**
    *
    * @type {boolean}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
    */
   isConfident: boolean
 }
@@ -19083,38 +19126,38 @@ export interface SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRange {
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum = {
+export const SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum = {
   cold: 'cold',
   cool: 'cool',
   mild: 'mild',
   warm: 'warm',
   hot: 'hot',
 } as const
-export type SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOfSuggestionsComfortRangeValueEnum]
+export type SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum]
 
 /**
  *
  * @export
- * @interface SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial
+ * @interface SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
  */
-export interface SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial {
+export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial {
   /**
    *
-   * @type {SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial
+   * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum}
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
    */
-  value: SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum | null
   /**
    *
    * @type {number}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
    */
   confidence: number
   /**
    *
    * @type {boolean}
-   * @memberof SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial
+   * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
    */
   isConfident: boolean
 }
@@ -19122,7 +19165,7 @@ export interface SuggestGarmentTagsResponseDataOneOfSuggestionsMaterial {
 /**
  * @export
  */
-export const SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum = {
+export const SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum = {
   cotton: 'cotton',
   wool: 'wool',
   linen: 'linen',
@@ -19133,8 +19176,8 @@ export const SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum = {
   down: 'down',
   silk: 'silk',
 } as const
-export type SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum =
-  (typeof SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum)[keyof typeof SuggestGarmentTagsResponseDataOneOfSuggestionsMaterialValueEnum]
+export type SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum =
+  (typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum)[keyof typeof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum]
 
 /**
  *

@@ -464,6 +464,7 @@
     },
     "tagging": {
       "loading": "Parçan yükleniyor...",
+      "pending_desc": "Bu parçayı bir kategori ve konfor aralığı ile tanımla.",
       "manual_desc": "Bu parçaya uyan kategoriyi ve konfor aralığını seç. Malzeme isteğe bağlıdır."
     }
   },

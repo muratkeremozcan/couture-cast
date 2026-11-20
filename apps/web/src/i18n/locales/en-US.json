@@ -464,6 +464,7 @@
     },
     "tagging": {
       "loading": "Loading your garment...",
+      "pending_desc": "Describe this garment with a category and a comfort range.",
       "manual_desc": "Choose the category and comfort range that fit this garment. Material is optional."
     }
   },

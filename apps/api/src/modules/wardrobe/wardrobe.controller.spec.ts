@@ -159,16 +159,25 @@ describe('WardrobeController', () => {
   it('rejects a service response that violates the public smart-tagging contract', async () => {
     mockSuggestGarmentTags.mockResolvedValueOnce({
       data: {
-        mode: 'suggested',
         garmentId: 'garment_99',
         analysisVersion: 'untrusted-version',
         suggestions: {},
       },
     })
 
-    await expect(controller.suggestGarmentTags(mockAuth, 'garment_99')).rejects.toThrow(
-      'Invalid literal value'
-    )
+    // The response contract is a union (suggested or manual); neither branch accepts this answer,
+    // and the suggested branch rejects it on the pinned analysis version.
+    const error = (await controller
+      .suggestGarmentTags(mockAuth, 'garment_99')
+      .catch((caught: unknown) => caught)) as {
+      name: string
+      issues: { code: string; unionErrors: { issues: unknown[] }[] }[]
+    }
+    expect(error.name).toBe('ZodError')
+    expect(error.issues[0]?.code).toBe('invalid_union')
+    expect(
+      JSON.stringify(error.issues[0]?.unionErrors.map((union) => union.issues))
+    ).toContain('Invalid literal value')
   })
 
   describe('createUploadUrl', () => {
@@ -308,7 +317,6 @@ describe('WardrobeController', () => {
       const snapshot = createGarmentTagSuggestionSnapshotFixture()
       mockSuggestGarmentTags.mockResolvedValueOnce({
         data: {
-          mode: 'suggested',
           garmentId: 'garment_99',
           analysisVersion: snapshot.analysisVersion,
           suggestions: {
@@ -322,10 +330,11 @@ describe('WardrobeController', () => {
       const result = await controller.suggestGarmentTags(mockAuth, 'garment_99')
 
       expect(result.data).toMatchObject({
-        mode: 'suggested',
         garmentId: 'garment_99',
         suggestions: { category: { value: snapshot.category.value } },
       })
+      // The original wire shape, so a client from before manual mode keeps parsing it.
+      expect(result.data).not.toHaveProperty('mode')
       expect(mockSuggestGarmentTags).toHaveBeenCalledWith(
         'user_123',
         'teen',
@@ -352,8 +361,8 @@ describe('WardrobeController', () => {
         },
       })
 
-      // The response contract is a discriminated union: manual carries no suggestions, so the
-      // answer fails validation instead of reaching a client that would show both.
+      // The response contract is a union: manual carries no suggestions, so the answer fails
+      // validation instead of reaching a client that would show both.
       await expect(
         controller.suggestGarmentTags(mockAuth, 'garment_99')
       ).rejects.toMatchObject({ name: 'ZodError' })

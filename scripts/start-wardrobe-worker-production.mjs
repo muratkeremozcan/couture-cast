@@ -2,15 +2,19 @@
  * Production entrypoint for the hosted wardrobe worker container (the second free Northflank
  * service). The container's CMD, run under tini as PID 1. Before the BullMQ consumers exist it:
  *
- *   1. refuses a `GARMENT_TAGGING_ENGINE` other than `manual`, because this image carries no
- *      model and a hosted worker must never come up pretending to suggest tags, and refuses to
- *      start without `WARDROBE_MAINTENANCE_ENABLED=true`, because the retention purge, the job
- *      handoff and the deletion drain run only here and a forgotten variable would stop them
- *      without a sign;
+ *   1. refuses a configuration the hosted service may not run (`hostedWardrobeConfigProblems`,
+ *      the compiled `workers/hosted-wardrobe-config.js`, which the bootstrap asserts again): a
+ *      `TEST_ENV` (it opens the fixture engines even under NODE_ENV=production), any fixture
+ *      selector, a `GARMENT_TAGGING_ENGINE` other than `manual` (this image carries no model),
+ *      missing database, Redis, Supabase or engine configuration, and a missing
+ *      `WARDROBE_MAINTENANCE_ENABLED=true` (the retention purge, the job handoff and the
+ *      deletion drain run only here, and a forgotten variable would stop them without a sign);
  *   2. refuses, under NODE_ENV=production, a DATABASE_URL to a non-local host that would not
  *      verify the database's certificate (the community worker's own check, imported from
  *      `start-community-worker-production.mjs` so the two cannot drift);
- *   3. starts the compiled wardrobe bootstrap in this process (one Node runtime, not two);
+ *   3. starts the compiled wardrobe bootstrap in this process (one Node runtime, not two), in
+ *      hosted mode: it checks the database, Redis and storage before it consumes and logs
+ *      `wardrobe_worker_ready`, apart from the `started` line;
  *   4. turns SIGTERM and SIGINT into the bootstrap's graceful shutdown, with a hard deadline so
  *      a wedged close cannot outlive the host's grace period silently.
  *
@@ -31,7 +35,6 @@ const projectRoot = path.resolve(__dirname, '..')
 const apiDist = path.join(projectRoot, 'apps/api/dist/src')
 
 export const ENGINE_ENV = 'GARMENT_TAGGING_ENGINE'
-export const MAINTENANCE_ENV = 'WARDROBE_MAINTENANCE_ENABLED'
 /**
  * Above the bootstrap's own 20-second resource shutdown and below Northflank's default 30-second
  * grace period between SIGTERM and SIGKILL, so the log says which one gave up. A job still
@@ -67,20 +70,30 @@ function fail(event, message, fields = {}) {
   process.exit(1)
 }
 
-/** Why this environment may not start the hosted worker, or null when it may. */
-export function startRefusal(env = process.env, { drillChild = false } = {}) {
-  const engine = (env[ENGINE_ENV] ?? '').trim()
-  if (engine !== 'manual') {
-    return `${ENGINE_ENV}=${engine || '(unset)'} is refused. The hosted wardrobe image carries no tagging model; set ${ENGINE_ENV}=manual.`
-  }
-  if (!drillChild && (env[MAINTENANCE_ENV] ?? '').trim() !== 'true') {
-    return `${MAINTENANCE_ENV} is not true. The hosted worker is the only runner of the wardrobe retention purge, the job handoff and the deletion drain; set ${MAINTENANCE_ENV}=true.`
-  }
-  return null
-}
-
 async function importCompiled(relativePath) {
   return import(pathToFileURL(path.join(apiDist, relativePath)).href)
+}
+
+let loadedHostedConfig = null
+
+/** The compiled `workers/hosted-wardrobe-config.js`: the one definition the bootstrap asserts too. */
+export async function loadHostedConfig() {
+  loadedHostedConfig ??= await importCompiled('workers/hosted-wardrobe-config.js')
+  return loadedHostedConfig
+}
+
+/**
+ * Why this environment may not start the hosted worker, or null when it may. `config` is the
+ * hosted configuration module (the compiled one by default once loaded); the drill flag exempts
+ * maintenance and the dependency checks only for the isolated drill configuration.
+ */
+export function startRefusal(
+  env = process.env,
+  { drillChild = false, config = loadedHostedConfig } = {}
+) {
+  if (!config) throw new Error('The hosted wardrobe configuration is not loaded.')
+  const problems = config.hostedWardrobeConfigProblems(env, { drillChild })
+  return problems.length > 0 ? problems.join(' ') : null
 }
 
 async function loadBootstrap() {
@@ -158,31 +171,27 @@ async function selfTest() {
 }
 
 /**
- * The drill's child reaches no service: Redis and Postgres point at a refused loopback port and
- * the storage and analytics settings are local placeholders. The worker starts degraded, as it
- * does when its services are down, which is all the drill needs: the same start and shutdown
- * calls the CMD makes, with the same compiled bootstrap. Maintenance stays off in the child,
- * because registering its schedulers needs a reachable Redis.
+ * The drill's child reaches no service: Redis, Postgres and Supabase point at a refused loopback
+ * address (`ISOLATED_DRILL_ENV`, defined beside the configuration check, which exempts only that
+ * exact configuration from the maintenance flag and the dependency checks). The worker starts
+ * degraded, as it does when its services are down, which is all the drill needs: the same start
+ * and shutdown calls the CMD makes, with the same compiled bootstrap.
  */
 export const DRILL_READY_DEADLINE_MS = 120_000
-export const DRILL_ENV = {
-  REDIS_URL: 'redis://127.0.0.1:1',
-  DATABASE_URL: 'postgresql://drill:drill@127.0.0.1:1/drill',
-  SUPABASE_URL: 'http://127.0.0.1:1',
-  SUPABASE_SERVICE_ROLE_KEY: 'wardrobe-worker-drill-placeholder',
-  ANALYTICS_ID_SECRET: 'wardrobe-worker-drill-placeholder-0123456789',
-  [MAINTENANCE_ENV]: 'false',
-  LOG_LEVEL: 'info',
-}
+const MAINTENANCE_ENV = 'WARDROBE_MAINTENANCE_ENABLED'
 const STARTED_LINE = 'Dedicated wardrobe worker started'
 const SHUTDOWN_LINE = 'Shutting down dedicated wardrobe worker'
 
-export function drillStartAndShutdown(env = process.env) {
+export function drillStartAndShutdown(env = process.env, config = loadedHostedConfig) {
+  if (!config) throw new Error('The hosted wardrobe configuration is not loaded.')
   return new Promise((resolve, reject) => {
     const child = spawn(
       process.execPath,
       [fileURLToPath(import.meta.url), DRILL_CHILD_ARGUMENT],
-      { env: { ...env, ...DRILL_ENV }, stdio: ['ignore', 'pipe', 'pipe'] }
+      {
+        env: { ...env, ...config.ISOLATED_DRILL_ENV, [ENGINE_ENV]: 'manual' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
     )
     let output = ''
     let signaled = false
@@ -211,7 +220,7 @@ export function drillStartAndShutdown(env = process.env) {
   })
 }
 
-async function start() {
+async function start(drillChild) {
   const { startWardrobeWorker, shutdownWardrobeWorker } = await loadBootstrap()
 
   let shuttingDown = false
@@ -238,18 +247,37 @@ async function start() {
     maintenance: process.env[MAINTENANCE_ENV],
     node: process.version,
   })
-  await startWardrobeWorker()
+  // Hosted mode: the bootstrap asserts the same configuration and checks its dependencies.
+  await startWardrobeWorker({ hosted: true, drillChild })
 }
 
 async function main() {
   const drillChild = process.argv.includes(DRILL_CHILD_ARGUMENT)
-  const refusal = startRefusal(process.env, { drillChild })
-  if (refusal) fail('wardrobe_worker_start_refused', refusal)
+  const config = await loadHostedConfig()
 
   if (process.argv.includes('--self-test')) {
+    // The build has no database, Redis or Supabase to start against; it proves the compiled
+    // configuration check refuses a test profile with fixtures, then the consumer graph, then
+    // the launcher's own start and shutdown through the drill.
+    const bypass = config.hostedWardrobeConfigProblems({
+      NODE_ENV: 'production',
+      TEST_ENV: 'local',
+      SILHOUETTE_MODERATION_ENGINE: 'fixture',
+      PALETTE_ANALYSIS_ENGINE: 'fixture',
+      GARMENT_TAGGING_ENGINE: 'fixture',
+    })
+    if (!bypass.some((problem) => problem.startsWith('TEST_ENV=local is refused'))) {
+      fail(
+        'wardrobe_worker_self_test_failed',
+        'The compiled hosted configuration check did not refuse TEST_ENV=local.'
+      )
+    }
     await selfTest()
     try {
-      log('wardrobe_worker_drill_passed', await drillStartAndShutdown())
+      log(
+        'wardrobe_worker_drill_passed',
+        await drillStartAndShutdown(process.env, config)
+      )
     } catch (error) {
       fail(
         'wardrobe_worker_drill_failed',
@@ -259,9 +287,12 @@ async function main() {
     }
     process.exit(0)
   }
+
+  const refusal = startRefusal(process.env, { drillChild, config })
+  if (refusal) fail('wardrobe_worker_start_refused', refusal)
   const tlsRefusal = databaseTlsRefusal()
   if (tlsRefusal) fail('wardrobe_worker_database_tls_refused', tlsRefusal)
-  await start()
+  await start(drillChild)
 }
 
 const invokedDirectly =

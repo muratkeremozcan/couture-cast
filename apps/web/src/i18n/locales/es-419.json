@@ -464,6 +464,7 @@
     },
     "tagging": {
       "loading": "Cargando tu prenda...",
+      "pending_desc": "Describe esta prenda con una categoría y un rango de confort.",
       "manual_desc": "Elige la categoría y el rango de confort que mejor le queden a esta prenda. El material es opcional."
     }
   },

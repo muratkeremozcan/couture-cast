@@ -228,15 +228,18 @@ const garmentTagSuggestionGroupsSchema = z
   .strict()
 
 /**
- * `mode` tells the client how this garment's tags are chosen. `suggested`: a model proposed the
- * tags below. `manual`: the wardrobe worker runs without a model (`GARMENT_TAGGING_ENGINE=manual`),
- * there are no suggestions, and the member chooses every tag. A garment whose model run failed has
- * no suggestions either but answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, as before.
+ * What the API sends. A `suggested` answer is the original wire shape, byte for byte: it carries
+ * no `mode`, so a browser tab or client built before manual mode keeps parsing it (an older
+ * client's strict schema rejects an unknown key, and an open tab outlives a deploy). `mode` is
+ * accepted on it only so a future server may send it. A `manual` answer (the wardrobe worker
+ * runs without a model, `GARMENT_TAGGING_ENGINE=manual`, so there are no suggestions and the
+ * member chooses every tag) is the one that adds `mode: 'manual'`. A garment whose model run
+ * failed has no suggestions either but answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, as before.
  */
-export const suggestGarmentTagsDataSchema = z.discriminatedUnion('mode', [
+export const suggestGarmentTagsWireDataSchema = z.union([
   z
     .object({
-      mode: z.literal('suggested'),
+      mode: z.literal('suggested').optional(),
       garmentId: nonEmptyStringSchema.max(128),
       analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
       suggestions: garmentTagSuggestionGroupsSchema,
@@ -249,6 +252,30 @@ export const suggestGarmentTagsDataSchema = z.discriminatedUnion('mode', [
     })
     .strict(),
 ])
+
+export const suggestGarmentTagsWireResponseSchema = z
+  .object({
+    data: suggestGarmentTagsWireDataSchema,
+  })
+  .strict()
+
+type SuggestGarmentTagsWireData = z.infer<typeof suggestGarmentTagsWireDataSchema>
+
+/**
+ * What a client works with: the wire union with `mode` always present. An answer with no `mode`
+ * (every `suggested` answer a server sends, and every answer of a server from before manual mode)
+ * is `suggested`.
+ */
+export const suggestGarmentTagsDataSchema = suggestGarmentTagsWireDataSchema.transform(
+  (
+    data: SuggestGarmentTagsWireData
+  ):
+    | (Extract<SuggestGarmentTagsWireData, { analysisVersion: unknown }> & {
+        mode: 'suggested'
+      })
+    | Extract<SuggestGarmentTagsWireData, { mode: 'manual' }> =>
+    data.mode === 'manual' ? data : { ...data, mode: 'suggested' }
+)
 
 export const suggestGarmentTagsResponseSchema = z
   .object({
@@ -638,7 +665,10 @@ export type SuggestGarmentTagsManualData = Extract<
   SuggestGarmentTagsData,
   { mode: 'manual' }
 >
-export type SuggestGarmentTagsResponse = z.infer<typeof suggestGarmentTagsResponseSchema>
+/** The service's answer, as sent on the wire. */
+export type SuggestGarmentTagsResponse = z.infer<
+  typeof suggestGarmentTagsWireResponseSchema
+>
 export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
 export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>
 export type CreateOutfitCapsuleInput = z.infer<typeof createOutfitCapsuleInputSchema>
@@ -1130,7 +1160,7 @@ export function registerWardrobeContracts(
   )
   const registeredSuggestGarmentTagsResponse = registry.register(
     'SuggestGarmentTagsResponse',
-    suggestGarmentTagsResponseSchema
+    suggestGarmentTagsWireResponseSchema
   )
   const registeredUpdateGarmentTagsInput = registry.register(
     'UpdateGarmentTagsInput',

@@ -464,6 +464,7 @@
     },
     "tagging": {
       "loading": "A carregar a sua peça...",
+      "pending_desc": "Descreva esta peça com uma categoria e um nível de conforto.",
       "manual_desc": "Escolha a categoria e o nível de conforto que servem a esta peça. O material é opcional."
     }
   },

@@ -333,9 +333,13 @@ export function GarmentTaggingModal({
       title="Organize Garment Tags"
       descriptionId="garment-tagging-desc"
       description={
-        isManualMode
-          ? t('wardrobe.tagging.manual_desc')
-          : 'Review or customize AI suggestions to personalize your daily outfit recommendations.'
+        // Suggestion wording only once suggestions are in hand. Manual mode says the member
+        // chooses; until the answer names the mode (and when it failed) the copy is neutral.
+        suggestions
+          ? 'Review or customize AI suggestions to personalize your daily outfit recommendations.'
+          : isManualMode
+            ? t('wardrobe.tagging.manual_desc')
+            : t('wardrobe.tagging.pending_desc')
       }
       invokingElementRef={invokingElementRef}
       initialFocusRef={categoryGroupRef as React.RefObject<HTMLElement | null>}

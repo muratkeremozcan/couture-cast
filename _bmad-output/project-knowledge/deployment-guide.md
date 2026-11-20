@@ -669,18 +669,19 @@ The dedicated [wardrobe bootstrap](../../apps/api/src/workers/wardrobe.bootstrap
 engine selection (`fashion-clip`, `manual` or, in test environments only, `fixture`), rejects fixture
 mode outside test environments, loads the pinned model only for `fashion-clip`, and consumes
 `color-extraction`, `moderation-review` and `palette-analysis`, each at concurrency one and with the
-community worker's idle Redis backoff. With `WARDROBE_MAINTENANCE_ENABLED=true` it also consumes
-`maintenance` for the wardrobe retention purge and deletion drain alone (next section). It logs
-`Dedicated wardrobe worker started, consuming <queues> at concurrency 1`.
+community worker's idle Redis backoff. With `WARDROBE_MAINTENANCE_ENABLED=true` it also runs the
+wardrobe maintenance loop (next section), which consumes no queue. It logs
+`Dedicated wardrobe worker started, consuming <queues> at concurrency 1`. The hosted launcher starts
+it in hosted mode, which adds the configuration refusals and readiness checks below.
 
 #### Hosted wardrobe worker (second Northflank service)
 
-The hosted wardrobe worker runs the three upload consumers and the wardrobe-only maintenance worker
-from [`apps/api/Dockerfile.wardrobe-worker`](../../apps/api/Dockerfile.wardrobe-worker). Before it,
-nothing hosted consumed `color-extraction`, `moderation-review`, `palette-analysis` or the wardrobe
-jobs on `maintenance`: a committed upload stayed in `processing`, and the deletion outbox, the staging
-sweep and the job handoff never ran. The free Northflank project (0.2 vCPU, 512 MB) cannot hold the
-605 MB FashionCLIP model, so the image carries none.
+The hosted wardrobe worker runs the three upload consumers and the wardrobe maintenance loop from
+[`apps/api/Dockerfile.wardrobe-worker`](../../apps/api/Dockerfile.wardrobe-worker). Before it,
+nothing hosted consumed `color-extraction`, `moderation-review` or `palette-analysis`, and nothing
+hosted ran the wardrobe retention jobs: a committed upload stayed in `processing`, and the deletion
+outbox, the staging sweep and the job handoff never ran. The free Northflank project (0.2 vCPU,
+512 MB) cannot hold the 605 MB FashionCLIP model, so the image carries none.
 
 Create it by duplicating the `community-worker` service, which carries the runtime secrets already:
 
@@ -689,58 +690,96 @@ Create it by duplicating the `community-worker` service, which carries the runti
 2. Change the Dockerfile path to `/apps/api/Dockerfile.wardrobe-worker`, keep build context `/`
    and branch `main`. Northflank injects `NF_GIT_SHA`, which the image records as
    `WARDROBE_WORKER_COMMIT_SHA`. Leave ports empty.
-3. Set `GARMENT_TAGGING_ENGINE=manual` and `WARDROBE_MAINTENANCE_ENABLED=true`. The launcher refuses
-   any other engine and refuses to start without the maintenance flag. Leave `PALETTE_ANALYSIS_ENGINE`
-   and `SILHOUETTE_MODERATION_ENGINE` unset (heuristic) or `heuristic`; `fixture` is refused outside
-   test environments.
+3. Set `GARMENT_TAGGING_ENGINE=manual` and `WARDROBE_MAINTENANCE_ENABLED=true`, and leave
+   `PALETTE_ANALYSIS_ENGINE` and `SILHOUETTE_MODERATION_ENGINE` unset or `heuristic`. Remove
+   `TEST_ENV` if the duplicate carries it: `TEST_ENV=local` opens the fixture engines even under
+   `NODE_ENV=production`, so the launcher refuses any `TEST_ENV`, any `fixture` selector, any
+   engine but `manual`, missing `DATABASE_URL`, `REDIS_URL`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` or engine selector, and a maintenance flag that is not `true`. The
+   bootstrap asserts the same check (`assertHostedWardrobeConfig`) again before it connects.
 4. Remove every `COMMUNITY_*` variable. The service must not start the community moderation
    consumer; `community-worker` owns it.
-5. Deploy and require `Dedicated wardrobe worker started, consuming color-extraction,
-moderation-review, palette-analysis, maintenance at concurrency 1` in the runtime log.
+5. **Replicas and rollout.** Run exactly one instance: set the minimum and maximum instance count
+   to 1 and leave autoscaling off. Set the deployment rollout to `Recreate`, so the running
+   instance stops before the new one starts. Northflank's default rolling replacement starts the new
+   instance first, and for that overlap two copies of all three consumers and the maintenance loop
+   run against one Redis. The Redis lock below keeps the loop from double-running, but concurrency
+   one per consumer is the plan's limit, so the overlap is removed instead of tolerated. Confirm
+   after each deploy that the service shows one instance and the log shows one `started` line.
+6. Deploy. The runtime log must show, in order, `wardrobe_worker_ready` (the database answered
+   `SELECT 1`, Redis answered `PING` and the `wardrobe-images` bucket listed, each within ten
+   seconds) and then `Dedicated wardrobe worker started, consuming color-extraction,
+moderation-review, palette-analysis at concurrency 1, with the wardrobe maintenance loop`. A
+   failed check stops the worker with `WardrobeWorkerNotReadyError` naming the failing check, so a
+   bad credential or a missing key fails the deploy instead of spending job retries.
+7. Run the hosted canary: upload a garment from a test member against production, and require it
+   to leave `processing` for `awaiting_tags` within a minute (the colour job ran against real
+   storage and database), then confirm tags to `ready`. This is what the readiness checks cannot
+   prove; do it after every change to the service's configuration.
 
 What it runs:
 
-| Consumer                    | Queue                                                                                         | Concurrency |
-| --------------------------- | --------------------------------------------------------------------------------------------- | ----------- |
-| Garment colour and tagging  | `color-extraction`                                                                            | 1           |
-| My Form photo               | `moderation-review`                                                                           | 1           |
-| Selfie and wardrobe palette | `palette-analysis`                                                                            | 1           |
-| Wardrobe maintenance        | `maintenance` (`wardrobe-retention-purge` hourly, `wardrobe-deletion-drain` every 15 minutes) | 1           |
+| Consumer                    | Queue                                                                                        | Concurrency        |
+| --------------------------- | -------------------------------------------------------------------------------------------- | ------------------ |
+| Garment colour and tagging  | `color-extraction`                                                                           | 1                  |
+| My Form photo               | `moderation-review`                                                                          | 1                  |
+| Selfie and wardrobe palette | `palette-analysis`                                                                           | 1                  |
+| Wardrobe maintenance loop   | none: process timers, `wardrobe-retention-purge` hourly and `wardrobe-deletion-drain` 15 min | one tick at a time |
 
-The retention purge also holds the job handoff: it re-enqueues garments and photos stranded in
-`processing`. A failed step does not skip the others, and the first failure is raised so the job
-records it. The scheduler registers only those two job names, under the ids and patterns the general
-worker uses.
+**Maintenance loop, not a queue.** The purge (held capture, held copy release, staging sweep and
+the job handoff re-enqueue, each step isolated inside the service) and the deletion drain run from
+timers in this process. Each tick first takes `SET wardrobe-maintenance:<task> <holder> NX PX
+<interval minus a margin>` on Redis, so a second copy (a rollout overlap, a replica, a general
+worker in development, whose wardrobe jobs take the same lock) skips the tick. Ticks have jitter
+and run one at a time. A failing task logs `wardrobe_retention_purge_failed` or
+`wardrobe_deletion_drain_failed` and the loop goes on. The first drain runs 30 to 90 seconds and
+the first purge 60 to 180 seconds after start, so a rollout does not push a purge an hour out. No BullMQ scheduler exists for
+these jobs on the hosted worker: a delayed job keeps a BullMQ worker waking about every ten seconds
+on an idle queue, which is far above the community worker's idle rate, and a consumer of the shared
+`maintenance` queue would acknowledge, and so lose, any other job a general worker's schedulers left
+there. On start the hosted worker removes the two wardrobe schedulers from the shared `maintenance`
+queue, and it consumes that queue never.
 
-**One consumer per queue per Redis.** The hosted worker does not start weather, alert fan-out,
+**One owner per queue and task.** The hosted worker does not start weather, alert fan-out,
 billing, community moderation or the general maintenance jobs. A general worker
-(`start:workers:prod`) pointed at the same Redis must not run: the general bootstrap refuses to
-start where `WARDROBE_MAINTENANCE_ENABLED=true`, and a local `start:workers` or E2E stack must not
-point at production Redis. A foreign job that reaches the wardrobe maintenance consumer is dropped
-and logged as `wardrobe_maintenance_foreign_job_dropped`.
+(`start:workers:prod`) must not run against production Redis. Where `WARDROBE_MAINTENANCE_ENABLED=true`
+is set the general bootstrap refuses to start, which catches a shared environment file; a general
+worker without the flag is stopped by the single-instance and `Recreate` settings above, and by the
+rule that a local `start:workers` or E2E stack never points at production Redis. If it does run, its
+two wardrobe jobs run behind the same Redis lock.
 
 **Manual mode.** With `GARMENT_TAGGING_ENGINE=manual` no model loads, and the worker's import graph
 reaches no onnxruntime or transformers (the image build fails if it does). A committed garment gets
 its colours and moves to `awaiting_tags` with no suggestions, recorded as
 `tagging_failure_code = TAGGING_MANUAL_MODE` (a choice, not a fault, logged as outcome
-`manual_mode` at info). The suggest-tags endpoint answers it with `mode: 'manual'`; the web and mobile
-tag step then says the member chooses the tags, with no spinner and no suggestion text. An engine
-failure under `fashion-clip` still answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, as before.
-FashionCLIP suggestions return with a larger plan or a quantized model by changing
-`GARMENT_TAGGING_ENGINE` on a model-capable image; the follow-up is in
-[deferred work](../implementation-artifacts/deferred-work.md).
+`manual_mode` at info). The suggest-tags endpoint answers it with `{ mode: 'manual', garmentId }`;
+the web and mobile tag step then says the member chooses the tags, with no spinner and no
+suggestion text. A suggested answer keeps the response it had before manual mode, with no `mode`
+key, so a browser tab open across a deploy and a client built before it keep parsing it, and a new
+client reads an answer with no `mode` as suggested. (A tab from before manual mode meeting a manual
+answer shows its load error and the manual choices, as it does for an unavailable model.) An engine
+failure under `fashion-clip` still answers 503 `TAGGING_INFERENCE_UNAVAILABLE`. Until the answer
+arrives both clients show neutral copy and move no focus. FashionCLIP suggestions return with a
+larger plan or a quantized model by changing `GARMENT_TAGGING_ENGINE` on a model-capable image; the
+follow-up is in [deferred work](../implementation-artifacts/deferred-work.md).
 
 **Sizing and egress.** Every consumer uses `drainDelay` 300 seconds, `stalledInterval` 120000 ms,
-`lockDuration` 30000 ms and `maxStalledCount` 1, the community worker's measured values, so an idle
-service spends about as few Redis commands as it does. A new job wakes a blocked consumer at once.
-A crashed worker's job is requeued within two stalled checks, and the hourly purge re-enqueues
-anything stranded. The service adds no idle database loop: the database is touched by a job, the
-hourly purge and the 15-minute drain only. The pruned `node_modules` is about 66 MB on macOS
-arm64 (budget 150 MB); the self-test at image build measured 139 MiB resident after loading the
-whole consumer graph. Re-measure inside the hosted container after the first deploy.
+`lockDuration` 30000 ms and `maxStalledCount` 1, the community worker's values, and the loop adds
+only a Redis `SET` and a database read per tick (about 5 ticks an hour), so the idle Redis rate
+should sit near the community worker's. That is a design expectation, not a measurement: measure
+the whole service with all three consumers and the loop installed (the method of
+`community:screening:measure:redis`) before the hosted service is called inside the idle budget.
 
-Run the same checks as the community image: `npm run wardrobe:worker:image:build` builds it, and
-the build runs `scripts/start-wardrobe-worker-production.mjs --self-test` against the pruned tree.
+**What was and was not measured.** The pruned `node_modules` was 66.1 MB and the build-time
+self-test showed 147 MiB resident after loading the consumer graph, both on a macOS arm64 tree
+assembled outside Docker. Neither is a Linux image figure: the Docker build and the Linux image
+have not been run. The self-test decodes a 64x64 image and its drill child runs with nothing
+reachable, so it says nothing about peak memory with garment, My Form and palette jobs overlapping.
+Before the 512 MB limit is signed off: build the image on Linux
+(`npm run wardrobe:worker:image:build`), run it under `docker run --memory=512m --cpus=0.2` with a
+representative simultaneous workload (full-size 10 MiB photos on all three queues at once, with a
+purge tick running), and read Northflank's memory and restart metrics for the first days in
+production.
 
 ### Community content screening (ADR-013)
 

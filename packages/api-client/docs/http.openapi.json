@@ -4902,7 +4902,7 @@
         "type": "object",
         "properties": {
           "data": {
-            "oneOf": [
+            "anyOf": [
               {
                 "type": "object",
                 "properties": {
@@ -5031,7 +5031,6 @@
                   }
                 },
                 "required": [
-                  "mode",
                   "garmentId",
                   "analysisVersion",
                   "suggestions"

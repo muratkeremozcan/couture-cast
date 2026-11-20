@@ -1141,8 +1141,8 @@ describe('resolveCurrentUserId', () => {
 })
 
 describe('garment tagging wrappers', () => {
+  // The wire shape the API sends for a suggested answer: no `mode`.
   const suggestionsFixture = {
-    mode: 'suggested' as const,
     garmentId: 'garment-1',
     analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
     suggestions: {
@@ -1190,13 +1190,23 @@ describe('garment tagging wrappers', () => {
     })
   })
 
-  it('rejects an answer that has no mode', async () => {
+  it('normalizes an answer with no mode to suggested (every suggested answer on the wire)', async () => {
     authenticate()
-    const { mode: _mode, ...withoutMode } = suggestionsFixture
-    void _mode
-    stubFetchOnce(jsonResponse({ data: withoutMode }))
+    stubFetchOnce(jsonResponse({ data: suggestionsFixture }))
 
-    // The response contract requires a mode; the schema error surfaces, not a half-read answer.
+    await expect(suggestGarmentTagsFromWeb('garment-1')).resolves.toEqual({
+      ...suggestionsFixture,
+      mode: 'suggested',
+    })
+  })
+
+  it('still rejects a no-mode answer that is not a complete suggestion', async () => {
+    authenticate()
+    const { suggestions: _suggestions, ...withoutSuggestions } = suggestionsFixture
+    void _suggestions
+    stubFetchOnce(jsonResponse({ data: withoutSuggestions }))
+
+    // The schema error surfaces, not a half-read answer.
     await expect(suggestGarmentTagsFromWeb('garment-1')).rejects.toMatchObject({
       name: 'ZodError',
     })

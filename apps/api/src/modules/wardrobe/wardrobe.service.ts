@@ -660,8 +660,8 @@ export class WardrobeService {
     }
 
     return {
+      // The original wire shape: no `mode`, so clients from before manual mode keep parsing it.
       data: {
-        mode: 'suggested',
         garmentId: garment.id,
         analysisVersion: parsed.data.analysisVersion,
         suggestions: {

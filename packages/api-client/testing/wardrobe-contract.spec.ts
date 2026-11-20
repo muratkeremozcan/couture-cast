@@ -5,7 +5,7 @@
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { describe, expect, it, vi } from 'vitest'
-import type { z } from 'zod'
+import { z } from 'zod'
 import {
   createGarmentItemInputSchema,
   createGarmentItemResponseSchema,
@@ -15,6 +15,7 @@ import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   generateHttpOpenApiDocument,
   suggestGarmentTagsResponseSchema,
+  suggestGarmentTagsWireResponseSchema,
   uploadGarmentBytes,
   resolveApiUploadUrl,
   WARDROBE_UPLOAD_CACHE_CONTROL,
@@ -623,5 +624,93 @@ describe('Wardrobe HTTP Contracts', () => {
       // No timeout and no caller signal means no composed AbortSignal at all.
       expect(successfulFetch.mock.calls[0]?.[1]?.signal).toBeUndefined()
     })
+  })
+})
+
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+describe('suggest-tags wire compatibility (mixed deployments)', () => {
+  const group = { value: 'top', confidence: 0.9, isConfident: true }
+  const suggestedWire = {
+    data: {
+      garmentId: 'garment-1',
+      analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
+      suggestions: {
+        category: group,
+        material: { value: 'cotton', confidence: 0.8, isConfident: true },
+        comfortRange: { value: 'mild', confidence: 0.8, isConfident: true },
+      },
+    },
+  }
+  const manualWire = { data: { mode: 'manual', garmentId: 'garment-1' } }
+
+  /** The client schema as it shipped before manual mode: strict, no `mode` key. */
+  const legacyGroup = z
+    .object({
+      value: z.string(),
+      confidence: z.number().min(0).max(1),
+      isConfident: z.boolean(),
+    })
+    .strict()
+  const legacyClientSchema = z
+    .object({
+      data: z
+        .object({
+          garmentId: z.string().min(1).max(128),
+          analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
+          suggestions: z
+            .object({
+              category: legacyGroup,
+              material: legacyGroup,
+              comfortRange: legacyGroup,
+            })
+            .strict(),
+        })
+        .strict(),
+    })
+    .strict()
+
+  it('keeps the suggested answer byte-compatible: it carries no mode key', () => {
+    const wire = suggestGarmentTagsWireResponseSchema.parse(suggestedWire)
+    expect(wire).toEqual(suggestedWire)
+    expect(wire.data).not.toHaveProperty('mode')
+  })
+
+  it('lets a client from before manual mode parse a suggested answer (new API, old client)', () => {
+    expect(legacyClientSchema.safeParse(suggestedWire).success).toBe(true)
+    // The new mode key is what a legacy strict schema rejects, so only manual answers carry it.
+    expect(
+      legacyClientSchema.safeParse({ data: { ...suggestedWire.data, mode: 'manual' } })
+        .success
+    ).toBe(false)
+  })
+
+  it('normalizes an answer with no mode to suggested (old API, new client)', () => {
+    expect(suggestGarmentTagsResponseSchema.parse(suggestedWire)).toEqual({
+      data: { ...suggestedWire.data, mode: 'suggested' },
+    })
+  })
+
+  it('passes a manual answer through unchanged and refuses one that carries suggestions', () => {
+    expect(suggestGarmentTagsResponseSchema.parse(manualWire)).toEqual(manualWire)
+    expect(suggestGarmentTagsWireResponseSchema.parse(manualWire)).toEqual(manualWire)
+    expect(
+      suggestGarmentTagsResponseSchema.safeParse({
+        data: { ...manualWire.data, suggestions: suggestedWire.data.suggestions },
+      }).success
+    ).toBe(false)
+  })
+
+  it('still refuses a no-mode answer that is not a complete suggestion', () => {
+    const { suggestions: _suggestions, ...withoutSuggestions } = suggestedWire.data
+    void _suggestions
+    expect(
+      suggestGarmentTagsResponseSchema.safeParse({ data: withoutSuggestions }).success
+    ).toBe(false)
+    expect(
+      suggestGarmentTagsResponseSchema.safeParse({
+        data: { ...suggestedWire.data, analysisVersion: 'fashion-clip:untrusted' },
+      }).success
+    ).toBe(false)
   })
 })

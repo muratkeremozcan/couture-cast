@@ -142,15 +142,20 @@ export function MobileGarmentTaggingModal({
   onCloseRef.current = onClose
   invokingNodeHandleRef.current = invokingNodeHandle
 
+  // The reader's focus moves to the title only once the answer names the mode (suggested or
+  // manual) or the request settled, so it never announces a title that the answer then
+  // contradicts. With no garment there is no request to wait for.
+  useEffect(() => {
+    if (!visible || isLoading || Platform.OS === 'web') return
+    const focusTimer = setTimeout(() => {
+      const node = safeFindNodeHandle(titleRef.current)
+      if (node) AccessibilityInfo.setAccessibilityFocus(node)
+    }, 150)
+    return () => clearTimeout(focusTimer)
+  }, [visible, isLoading])
+
   useEffect(() => {
     if (!visible) return
-    const focusTimer =
-      Platform.OS === 'web'
-        ? null
-        : setTimeout(() => {
-            const node = safeFindNodeHandle(titleRef.current)
-            if (node) AccessibilityInfo.setAccessibilityFocus(node)
-          }, 150)
     // react-native-web's BackHandler is a stub that warns on every call; a browser has no
     // hardware Back for the sheet to answer.
     const backSubscription =
@@ -161,7 +166,6 @@ export function MobileGarmentTaggingModal({
             return true
           })
     return () => {
-      if (focusTimer !== null) clearTimeout(focusTimer)
       backSubscription?.remove()
       const invoker = invokingNodeHandleRef.current
       if (Platform.OS !== 'web' && invoker) {
@@ -297,9 +301,18 @@ export function MobileGarmentTaggingModal({
     }
   }
 
-  const tagHint = isManualMode
-    ? t('wardrobe.tagging.manual_desc')
-    : t('wardrobe.tagging.desc')
+  // Suggestion wording only once suggestions are in hand; manual mode says the member chooses;
+  // until the answer names the mode (and when it failed) the copy is neutral.
+  const titleKey = suggestions
+    ? 'wardrobe.tagging.title'
+    : isManualMode
+      ? 'wardrobe.tagging.manual_title'
+      : 'wardrobe.tagging.pending_title'
+  const tagHint = suggestions
+    ? t('wardrobe.tagging.desc')
+    : isManualMode
+      ? t('wardrobe.tagging.manual_desc')
+      : t('wardrobe.tagging.pending_desc')
 
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
@@ -325,9 +338,7 @@ export function MobileGarmentTaggingModal({
               accessible={true}
               accessibilityRole="header"
             >
-              {isManualMode
-                ? t('wardrobe.tagging.manual_title')
-                : t('wardrobe.tagging.title')}
+              {t(titleKey)}
             </Text>
             <TouchableOpacity
               onPress={onClose}

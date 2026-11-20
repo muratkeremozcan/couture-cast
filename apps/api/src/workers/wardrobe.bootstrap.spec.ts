@@ -156,15 +156,26 @@ describe('U-W-QUEUES: which bootstrap consumes which queue', () => {
     }
   )
 
-  it('registers maintenance in the general bootstrap and, behind its own flag, the wardrobe bootstrap', () => {
-    expect(registrations('maintenance')).toEqual([
-      'bootstrap.ts',
-      'wardrobe.bootstrap.ts',
-    ])
+  it('registers maintenance in the general bootstrap only: the wardrobe bootstrap consumes no maintenance queue', () => {
+    expect(registrations('maintenance')).toEqual(['bootstrap.ts'])
     const wardrobe = readFileSync(path.join(workersDir, 'wardrobe.bootstrap.ts'), 'utf8')
+    // Its maintenance is an in-process Redis-locked loop, behind its own flag (Review 23, R1/R2/R6).
     expect(wardrobe).toMatch(
       /if \(wardrobeMaintenanceEnabled\(\)\) \{\s+await startWardrobeMaintenance\(/
     )
+    expect(wardrobe).toContain('new WardrobeMaintenanceLoop(')
+    expect(wardrobe).not.toMatch(
+      /upsertJobScheduler|registerWardrobeMaintenanceSchedulers|createWardrobeMaintenanceProcessor|new Worker\(/
+    )
+  })
+
+  it('removes the two wardrobe schedulers from the shared queue before its loop starts', () => {
+    const wardrobe = readFileSync(path.join(workersDir, 'wardrobe.bootstrap.ts'), 'utf8')
+    const removal = wardrobe.indexOf(
+      'await removeWardrobeMaintenanceSchedulers(maintenanceQueue)'
+    )
+    expect(removal).toBeGreaterThan(-1)
+    expect(removal).toBeLessThan(wardrobe.indexOf('maintenanceLoop.start()'))
   })
 
   it('starts no weather, alert, billing or community consumer in the wardrobe bootstrap', () => {
@@ -184,7 +195,8 @@ describe('U-W-QUEUES: which bootstrap consumes which queue', () => {
 
   it('gives every wardrobe consumer the hosted options and none its own concurrency', () => {
     const wardrobe = readFileSync(path.join(workersDir, 'wardrobe.bootstrap.ts'), 'utf8')
-    expect(wardrobe.match(/hostedWorkerOptions\(\)/g)).toHaveLength(4)
+    // Three BullMQ consumers: color-extraction, moderation-review and palette-analysis.
+    expect(wardrobe.match(/hostedWorkerOptions\(\)/g)).toHaveLength(3)
     expect(wardrobe).not.toMatch(/defaultWorkerOptions|limiter:/)
   })
 

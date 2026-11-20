@@ -88,7 +88,10 @@ import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
 import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
-import { assertGeneralWorkerMayConsumeMaintenance } from './wardrobe-maintenance'
+import {
+  assertGeneralWorkerMayRunWardrobeMaintenance,
+  lockedWardrobeRetention,
+} from './wardrobe-maintenance'
 
 const logger = createBaseLogger().child({ feature: 'workers' })
 
@@ -140,9 +143,9 @@ export function createStandaloneWeatherFanout(
 export async function startWorkers(state: WorkerProcessState) {
   const { workers, queues, closeables, redisClients } = state
   try {
-    // The general worker consumes `maintenance` with every sweep; where the dedicated wardrobe
-    // worker owns that queue it must not also be consumed here.
-    assertGeneralWorkerMayConsumeMaintenance()
+    // The general worker runs the wardrobe retention purge and deletion drain from `maintenance`;
+    // where the hosted wardrobe worker owns them it must not start.
+    assertGeneralWorkerMayRunWardrobeMaintenance()
     // Refuse to start on a guardian consent policy this deployment may not run, as the API's
     // AppModule does (TEA sign-off F-4).
     resolveGuardianConsentPolicy()
@@ -407,18 +410,24 @@ export async function startWorkers(state: WorkerProcessState) {
         new UserSessionService()
       ),
       telemetry: telemetryService,
-      wardrobeRetention: new WardrobeRetentionService(
-        prisma,
-        new SupabaseWardrobeStorageAdapter(),
-        {
-          invalidateUserCache: (userId: string) =>
-            invalidateRitualCacheForUser(maintenanceRedis, userId),
-        },
-        {
-          garment: garmentHandoff,
-          silhouette: silhouetteHandoff,
-          palette: paletteHandoff,
-        }
+      // Behind the same Redis lock the hosted worker's loop takes, so a hosted worker and this
+      // one pointed at the same Redis never run a wardrobe sweep at once.
+      wardrobeRetention: lockedWardrobeRetention(
+        new WardrobeRetentionService(
+          prisma,
+          new SupabaseWardrobeStorageAdapter(),
+          {
+            invalidateUserCache: (userId: string) =>
+              invalidateRitualCacheForUser(maintenanceRedis, userId),
+          },
+          {
+            garment: garmentHandoff,
+            silhouette: silhouetteHandoff,
+            palette: paletteHandoff,
+          }
+        ),
+        maintenanceRedis,
+        logger.child({ feature: 'wardrobe-maintenance' })
       ),
       community: community.sweeps,
       orphanAuthUsers: { run: community.sweeps.sweepOrphanAuthUsers },
