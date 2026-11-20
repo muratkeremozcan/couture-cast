@@ -80,6 +80,10 @@ jobs:
     # about twice one pr-pw-e2e-local shard's 9.1 min peak. Preview runs start
     # nothing locally and keep their budgets.
     timeout-minutes: ${{ inputs.test_env == 'local' && 40 || inputs.realtime_probe && 30 || 20 }}
+    # The production synthetic member's password lives in this environment, which only runs on
+    # `main` may use: a branch workflow, even a same-repository one, cannot read it, and a manual
+    # production run from another branch stops here. Every other run has no environment.
+    environment: ${{ inputs.test_env == 'prod' && 'prod-synthetic-member' || '' }}
     # LOCAL_DATABASE_URL comes from configure-ci-supabase-ports, the first step after checkout.
     permissions:
       actions: read
@@ -318,6 +322,7 @@ jobs:
         run: >-
           node scripts/check-artifact-secrets.mjs
           --names VERCEL_AUTOMATION_BYPASS_SECRET,VERCEL_TOKEN,DATABASE_URL_PROD,PROD_SYNTHETIC_MEMBER_PASSWORD,GH_TOKEN
+          ${{ inputs.test_env == 'prod' && '--reject-jwt' || '' }}
           --storage-state playwright/.auth/vercel-bypass.json
           playwright/artifacts playwright/playwright-report
 

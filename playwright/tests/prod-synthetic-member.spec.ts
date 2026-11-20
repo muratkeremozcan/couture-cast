@@ -6,52 +6,61 @@
 // signs in as (scripts/ops/provision-prod-synthetic-member.mjs): if the password rotates, the
 // account goes, or production stops accepting its session, the daily status run goes red here
 // before any member-only check pretends to run. Read-only: it reads the member's own profile.
-import { projectMetadata, resolveApiBaseUrl } from '../support/helpers/api-test'
+//
+// The bearer reaches only the production origins pinned in the helper. A manual run with another
+// base URL fails here instead of sending the token to it.
 import {
-  seedProdMemberBrowserSession,
-  prodMemberHeaders,
+  assertTrustedProdOrigins,
+  prodMemberApiGet,
+  prodMemberStorageState,
 } from '../support/helpers/prod-synthetic-member'
+import { projectMetadata } from '../support/helpers/api-test'
 import { expect, test } from '../support/fixtures/prod-member-fixture'
-
-// A trace records the member's bearer, and the artifacts of a public repository are public.
-test.use({ trace: 'off' })
 
 test.describe('The production synthetic member', () => {
   test('[P0] production accepts its session and names the member', async ({
-    apiRequest,
     prodMember,
   }, testInfo) => {
-    test.skip(!prodMember, 'The synthetic member exists only in the production run.')
-    const baseUrl = resolveApiBaseUrl(testInfo)
+    test.skip(!prodMember, 'The synthetic member exists only in the production project.')
+    const { baseUrl: webBaseUrl, apiBaseUrl } = projectMetadata(testInfo)
+    assertTrustedProdOrigins(webBaseUrl!, apiBaseUrl!)
 
-    const response = await apiRequest<{ user: { email: string; role: string } }>({
-      method: 'GET',
-      path: '/api/v1/user/profile',
-      baseUrl,
-      headers: prodMemberHeaders(prodMember!),
-    })
+    const response = await prodMemberApiGet(
+      prodMember!,
+      apiBaseUrl!,
+      '/api/v1/user/profile'
+    )
 
     expect(response.status).toBe(200)
-    expect(response.body.user.email.toLowerCase()).toBe(prodMember!.email)
-    expect(response.body.user.role).toBe('guardian')
+    const { user } = response.body as { user: { email: string; role: string } }
+    expect(user.email.toLowerCase()).toBe(prodMember!.email)
+    expect(user.role).toBe('guardian')
   })
 
   test('[P0] the web app signs the member in from its stored session and shows the profile', async ({
-    context,
-    page,
+    browser,
     prodMember,
   }, testInfo) => {
-    test.skip(!prodMember, 'The synthetic member exists only in the production run.')
-    expect(projectMetadata(testInfo).environment).toBe('prod')
-    await seedProdMemberBrowserSession(context, prodMember!)
+    test.skip(!prodMember, 'The synthetic member exists only in the production project.')
+    const { baseUrl: webBaseUrl, apiBaseUrl } = projectMetadata(testInfo)
+    assertTrustedProdOrigins(webBaseUrl!, apiBaseUrl!)
+    // The session is stored for the one production web origin, in memory.
+    const context = await browser.newContext({
+      baseURL: webBaseUrl,
+      storageState: prodMemberStorageState(prodMember!, webBaseUrl!),
+    })
+    try {
+      const page = await context.newPage()
+      await page.goto('/settings')
 
-    await page.goto('/settings')
-
-    // The page verifies the stored session against production, then names the member.
-    await expect(page.getByTestId('profile-account')).toContainText(prodMember!.email)
-    await expect(page.getByTestId('locations-section')).toHaveAttribute(
-      'data-state',
-      'ready'
-    )
+      // The page verifies the stored session against production, then names the member.
+      await expect(page.getByTestId('profile-account')).toContainText(prodMember!.email)
+      await expect(page.getByTestId('locations-section')).toHaveAttribute(
+        'data-state',
+        'ready'
+      )
+    } finally {
+      await context.close()
+    }
   })
 })

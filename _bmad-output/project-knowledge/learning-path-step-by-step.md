@@ -12920,17 +12920,27 @@ Key takeaways:
 
 1. **Give CI the least credential that works.**
    The Supabase admin key stays on the operator's machine (the repository is public). The run holds
-   the member's password (a GitHub secret) and three public variables, and signs in through the
-   password grant, which opens a session for that one member. A stored refresh token needs
-   write-back after every rotation, and a signed session route would add a production surface
-   that exists only for tests.
-2. **The production run reads; the preview run writes.**
+   the member's password and three public variables, and signs in through the password grant,
+   which opens a session for that one member. A stored refresh token needs write-back after every
+   rotation, and a signed session route would add a production surface that exists only for tests.
+2. **A secret belongs to the code that may read it.**
+   The password lives in the GitHub environment `prod-synthetic-member`, restricted to `main`, not
+   in a repository secret: a workflow on a branch, even a same-repository one, inherits repository
+   secrets and could print them. The reusable e2e job names the environment only for production.
+3. **The production run reads; the preview run writes.**
    Anything that creates a post or an upload runs on the Vercel preview, where test data is fine.
    As a read-only member the production run has nothing to clean up, and sign-out at the end of
    the worker revokes the session it opened.
-3. **A secret in a trace is public.**
-   Artifacts of a public repository are public, so the member specs turn traces off, the browser
-   gets a session without its refresh token, and the artifact scan also looks for the password.
+4. **A bearer in a public repository's artifacts is public.**
+   Playwright's API fixture prints a failed request's headers into its error, so the member's
+   reads use a plain request that reports a status or a category. A browser gets the session as
+   in-memory storage state for the one production web origin (an init script would write it into
+   any origin a page reaches), without its real refresh token. The token is masked in the runner
+   log, member specs keep traces, video and screenshots off, and the artifact scan rejects any
+   JWT and the password.
+5. **A manual run cannot aim the token elsewhere.**
+   The workflow lets a dispatch override the base URLs. The member's session reaches only the
+   production web and API origins pinned in the helper, so an override fails the run.
 
 Tests:
 
