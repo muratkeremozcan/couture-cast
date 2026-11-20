@@ -36,7 +36,7 @@ export function GuestPreviewEntry() {
           data-ph-cta-label="Start signup"
           data-ph-cta-type="secondary"
         >
-          Start signup
+          {strings.chrome.createAccount}
         </Link>
         <Link
           href="/signin"

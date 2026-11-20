@@ -7,12 +7,17 @@ import { GuestPreviewEntry, MemberWardrobeActions } from './guest-preview-entry'
 import { SampleGarmentArt } from './sample-garment-art'
 
 describe('guest preview entry', () => {
-  it('links to the preview and to sign-in in the active locale', async () => {
+  it('localizes the guest links and keeps the signup analytics label stable', async () => {
     await getI18n().changeLanguage('tr-TR')
     render(<GuestPreviewEntry />)
     const entry = screen.getByTestId('guest-preview-entry')
     expect(entry.getAttribute('href')).toBe('/preview')
     expect(entry.textContent).toBe(GUEST_PREVIEW_STRINGS['tr-TR'].chrome.entry)
+    const signup = screen.getByRole('link', {
+      name: GUEST_PREVIEW_STRINGS['tr-TR'].chrome.createAccount,
+    })
+    expect(signup).toHaveAttribute('href', '/signup')
+    expect(signup).toHaveAttribute('data-ph-cta-label', 'Start signup')
     expect(screen.getByTestId('landing-sign-in').getAttribute('href')).toBe('/signin')
     await getI18n().changeLanguage('en-US')
   })
