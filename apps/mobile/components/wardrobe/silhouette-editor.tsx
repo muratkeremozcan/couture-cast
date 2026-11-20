@@ -5,7 +5,6 @@
 // (wardrobe-onboarding.tsx) so the two surfaces never diverge.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import * as Crypto from 'expo-crypto'
 import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
@@ -22,9 +21,12 @@ import {
 import { Text, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import {
   uploadGarmentBytes,
+  UploadSessionChangedError,
+  WARDROBE_UPLOAD_CACHE_CONTROL,
   type SilhouetteMode,
   type SilhouetteProfileContract,
   type SilhouettePhotoFailureReason,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -39,6 +41,16 @@ import {
   silhouetteETag,
   updateSilhouetteSlidersFromMobile,
 } from '@/src/lib/wardrobe'
+import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  createUploadAttempts,
+  currentUploadSession,
+  isUploadSessionCurrent,
+  preparedImageFingerprint,
+  resolveUploadBearer,
+  runTrackedUpload,
+  useUploadSessionChange,
+} from '@/src/lib/upload-attempts'
 
 const SLIDER_MIN = 0
 const SLIDER_MAX = 100
@@ -48,6 +60,22 @@ const POLL_MAX_ATTEMPTS = 15
 const GUARDIAN_CONSENT_CODE = 'GUARDIAN_CONSENT_REQUIRED'
 
 type MyFormPhase = 'idle' | 'uploading' | 'processing' | 'ready' | 'failed'
+
+/** The account a loaded profile belongs to, with the verified bearer resolved for it. */
+interface ProfileBinding {
+  session: UploadAttemptSession
+  bearer: string
+}
+
+/** Copy for a reload that finds nobody signed in, matching `resolveOwnerUserId`'s own. */
+const SESSION_UNVERIFIED_MESSAGE = 'Your session could not be verified. Sign in again.'
+
+/** Open My Form upload attempts in this app session, keyed by the prepared photo and account. */
+const myFormUploadAttempts = createUploadAttempts<{
+  uploadSessionId: string
+  uploadUrl: string
+  uploadToken: string
+}>()
 
 function failureReasonKey(reason: SilhouettePhotoFailureReason | null): string {
   switch (reason) {
@@ -64,8 +92,13 @@ function failureReasonKey(reason: SilhouettePhotoFailureReason | null): string {
   }
 }
 
+/**
+ * The editor takes no bearer from its host (final review F-3): a host's token can still be the
+ * previous account's after a sign-out (the onboarding screen stores its token before it mounts
+ * the editor). Every read, slider save and removal runs on the bearer the app's resolver
+ * verifies for the account signed in now (`resolveUploadBearer`).
+ */
 export interface SilhouetteEditorProps {
-  accessToken: string
   /** Fires on every successful profile read/write, for a host screen that cares. */
   onProfileChange?: (profile: SilhouetteProfileContract) => void
   /** Test-only override for the My Form processing poll cadence. */
@@ -142,7 +175,6 @@ function SliderRow({
 
 // eslint-disable-next-line complexity
 export function SilhouetteEditor({
-  accessToken,
   onProfileChange,
   pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 }: SilhouetteEditorProps) {
@@ -168,17 +200,39 @@ export function SilhouetteEditor({
 
   const revisionRef = useRef(0)
   const userIdRef = useRef('')
-  const attemptIdempotencyKeyRef = useRef<string | null>(null)
   const pollAbortRef = useRef<AbortController | null>(null)
   const lastChangedFieldRef = useRef<'height' | 'build'>('height')
+  /**
+   * Round 6: the account the shown profile was read under and the bearer verified for it. Null
+   * until a read for the signed-in account lands, and cleared on every account change, so the
+   * revision, the photo and Remove never outlive the account they belong to.
+   */
+  const bindingRef = useRef<ProfileBinding | null>(null)
+  /** Advances on every load and on unmount, so only the newest load may apply its answer. */
+  const loadGenerationRef = useRef(0)
+  /**
+   * The verified bearer for `session`, refused once the account changed. With no verified
+   * bearer (signed out) nothing is read or removed.
+   */
+  const bearerForSession = useCallback(
+    async (session: UploadAttemptSession): Promise<string> => {
+      const bearer = await resolveUploadBearer(session, resolveMobileAccessToken)
+      if (!bearer) throw new Error(SESSION_UNVERIFIED_MESSAGE)
+      return bearer
+    },
+    []
+  )
 
   const applyProfile = useCallback(
-    (next: SilhouetteProfileContract) => {
+    (
+      next: SilhouetteProfileContract,
+      { keepTab = false }: { keepTab?: boolean } = {}
+    ) => {
       setProfile(next)
       revisionRef.current = next.revision
       setHeightSlider(next.heightSlider ?? SLIDER_MAX / 2)
       setBuildSlider(next.buildSlider ?? SLIDER_MAX / 2)
-      setActiveTab(next.mode)
+      if (!keepTab) setActiveTab(next.mode)
       if (next.myForm) {
         if (next.myForm.status === 'ready') setMyFormPhase('ready')
         else if (next.myForm.status === 'failed') {
@@ -199,15 +253,22 @@ export function SilhouetteEditor({
   )
 
   const pollMyForm = useCallback(() => {
-    if (pollAbortRef.current) return
+    // Polls on the bearer of the account the processing photo belongs to; an account change
+    // aborts the loop, and a read that was already on the wire is dropped when it lands.
+    const binding = bindingRef.current
+    if (pollAbortRef.current || !binding) return
     const controller = new AbortController()
     pollAbortRef.current = controller
     void (async () => {
       try {
         for (let attempt = 0; attempt < POLL_MAX_ATTEMPTS; attempt += 1) {
           await waitForPoll(pollIntervalMs, controller.signal)
-          const next = await getSilhouetteProfileFromMobile(accessToken)
-          if (controller.signal.aborted) return
+          const next = await getSilhouetteProfileFromMobile(
+            binding.bearer,
+            controller.signal
+          )
+          if (controller.signal.aborted || !isUploadSessionCurrent(binding.session))
+            return
           applyProfile(next)
           if (next.myForm?.status === 'ready') {
             announce('feedback', t('wardrobe.silhouette.ready'))
@@ -231,53 +292,103 @@ export function SilhouetteEditor({
         }
       }
     })()
-  }, [accessToken, announce, applyProfile, pollIntervalMs, t])
+  }, [announce, applyProfile, pollIntervalMs, t])
 
-  const load = useCallback(async () => {
-    setIsLoading(true)
-    setLoadError(null)
-    try {
-      userIdRef.current = await resolveOwnerUserId(accessToken)
-      const next = await getSilhouetteProfileFromMobile(accessToken)
-      applyProfile(next)
-      // A fresh mount (e.g. reopening this screen after the app was closed
-      // mid-processing) must resume polling itself; runMyFormUpload only
-      // starts it for an upload that happened in *this* mount.
-      if (
-        next.myForm?.status === 'processing' ||
-        next.myForm?.status === 'bytes_uploaded'
-      ) {
-        pollMyForm()
+  /**
+   * Reads the profile of the account signed in now, on the bearer resolved for it. A reload
+   * after an account change keeps the editor on screen (`keepTab`) with nothing of the previous
+   * account left in it while the read runs. An answer that lands after the account changed
+   * again, or after a newer load started, is dropped.
+   */
+  const load = useCallback(
+    async ({ keepTab = false }: { keepTab?: boolean } = {}) => {
+      const generation = ++loadGenerationRef.current
+      const session = currentUploadSession()
+      const isStale = () =>
+        generation !== loadGenerationRef.current || !isUploadSessionCurrent(session)
+      if (!keepTab) setIsLoading(true)
+      setLoadError(null)
+      try {
+        const bearer = await bearerForSession(session)
+        const ownerUserId = await resolveOwnerUserId(bearer)
+        const next = await getSilhouetteProfileFromMobile(bearer)
+        if (isStale()) return
+        bindingRef.current = { session, bearer }
+        userIdRef.current = ownerUserId
+        applyProfile(next, { keepTab })
+        // A fresh mount (e.g. reopening this screen after the app was closed
+        // mid-processing) must resume polling itself; runMyFormUpload only
+        // starts it for an upload that happened in *this* mount.
+        if (
+          next.myForm?.status === 'processing' ||
+          next.myForm?.status === 'bytes_uploaded'
+        ) {
+          pollMyForm()
+        }
+      } catch (error) {
+        if (isStale() || error instanceof UploadSessionChangedError) return
+        setLoadError(
+          error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
+            ? t('wardrobe.error.consent_required')
+            : error instanceof Error
+              ? error.message
+              : t('wardrobe.silhouette.errors.storage_error')
+        )
+      } finally {
+        if (generation === loadGenerationRef.current) setIsLoading(false)
       }
-    } catch (error) {
-      setLoadError(
-        error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
-          ? t('wardrobe.error.consent_required')
-          : error instanceof Error
-            ? error.message
-            : t('wardrobe.silhouette.errors.storage_error')
-      )
-    } finally {
-      setIsLoading(false)
-    }
-  }, [accessToken, applyProfile, pollMyForm, t])
+    },
+    [applyProfile, bearerForSession, pollMyForm, t]
+  )
 
   useEffect(() => {
     void load()
-    return () => pollAbortRef.current?.abort()
+    return () => {
+      loadGenerationRef.current += 1
+      pollAbortRef.current?.abort()
+    }
   }, [load])
+
+  /**
+   * Round 5 account epoch, extended in round 6: the basewear confirmation, a failed photo, and
+   * everything read for the previous account (profile, revision, signed photo URL, the bearer,
+   * a running poll) belong to that account. Any account change (sign-out, or an auth state change
+   * to another account) drops them and reads the profile again for the account signed in now,
+   * so Remove and Retry only come back once that account's own verified read has landed.
+   */
+  const resetForAccountChange = useCallback(() => {
+    bindingRef.current = null
+    pollAbortRef.current?.abort()
+    pollAbortRef.current = null
+    revisionRef.current = 0
+    userIdRef.current = ''
+    setProfile(null)
+    setHeightSlider(SLIDER_MAX / 2)
+    setBuildSlider(SLIDER_MAX / 2)
+    setSliderError(null)
+    setGuidanceConfirmed(false)
+    setMyFormError(null)
+    setMyFormErrorKey(null)
+    setMyFormPhase('idle')
+    void load({ keepTab: true })
+  }, [load])
+  useUploadSessionChange(resetForAccountChange)
 
   const saveSliders = useCallback(
     async (nextHeight: number, nextBuild: number, changedField: 'height' | 'build') => {
+      // Saves for the account the shown profile was read under, with its bearer and revision.
+      const binding = bindingRef.current
+      if (!binding) return
       lastChangedFieldRef.current = changedField
       setIsSavingSliders(true)
       setSliderError(null)
       try {
         const next = await updateSilhouetteSlidersFromMobile(
-          accessToken,
+          binding.bearer,
           { heightSlider: nextHeight, buildSlider: nextBuild },
           silhouetteETag(userIdRef.current, revisionRef.current)
         )
+        if (!isUploadSessionCurrent(binding.session)) return
         applyProfile(next)
         const changedLabel = t(
           changedField === 'height'
@@ -288,6 +399,7 @@ export function SilhouetteEditor({
           changedField === 'height' ? next.heightSlider : next.buildSlider
         announce('feedback', `${changedLabel}: ${changedValue}`)
       } catch (error) {
+        if (!isUploadSessionCurrent(binding.session)) return
         const message =
           error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
             ? t('wardrobe.error.consent_required')
@@ -300,7 +412,7 @@ export function SilhouetteEditor({
         setIsSavingSliders(false)
       }
     },
-    [accessToken, announce, applyProfile, t]
+    [announce, applyProfile, t]
   )
 
   const adjustHeight = (direction: 1 | -1) => {
@@ -322,13 +434,15 @@ export function SilhouetteEditor({
   }
 
   const runMyFormUpload = async (
-    asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'width' | 'height'>
+    asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'width' | 'height'>,
+    uploadSession: UploadAttemptSession
   ) => {
+    // The account changed while the camera or picker was open: the photo and the confirmation
+    // were given under the previous account, so the photo is dropped.
+    if (!isUploadSessionCurrent(uploadSession)) return
     setMyFormPhase('uploading')
     setMyFormError(null)
     setMyFormErrorKey(null)
-    attemptIdempotencyKeyRef.current ??= Crypto.randomUUID()
-    const idempotencyKey = attemptIdempotencyKeyRef.current
 
     try {
       const maxDimension = Math.max(asset.width, asset.height)
@@ -336,9 +450,10 @@ export function SilhouetteEditor({
       // Always re-encode, even when scale is 1 (no resize needed): the source
       // asset can be a JPEG or WebP (camera/library both hand back whatever
       // format the OS captured), and the allocation/upload/commit calls below
-      // unconditionally declare `mimeType: 'image/png'`. Skipping this step
+      // unconditionally declare `mimeType: 'image/jpeg'`. Skipping this step
       // for an already-small photo previously uploaded the original bytes
-      // under a false mimeType.
+      // under a false mimeType. JPEG because a full-body photo has no
+      // transparency, and as PNG it came to several megabytes.
       const prepared = await manipulateAsync(
         asset.uri,
         [
@@ -349,48 +464,83 @@ export function SilhouetteEditor({
             },
           },
         ],
-        { compress: 0.92, format: SaveFormat.PNG }
+        { compress: 0.9, format: SaveFormat.JPEG }
       )
 
       const file = new File(prepared.uri)
       const bytes = await file.bytes()
       const sha256 = await sha256Hex(bytes)
+      // The bearer of the account the photo was picked under, resolved now and refused once the
+      // account changed; an account change from here on fences the run.
+      const bearer = await resolveUploadBearer(uploadSession, resolveMobileAccessToken)
+      if (!bearer) throw new UploadSessionChangedError()
 
-      const allocation = await createSilhouetteUploadUrlFromMobile(
-        accessToken,
-        {
-          fileSizeBytes: bytes.byteLength,
-          mimeType: 'image/png',
+      // The prepared bytes name the attempt. Picking the same photo again after a failure
+      // resumes it with the same keys while its outcome is ambiguous: commit first (a lost
+      // answer replays), re-send the bytes only when the server reports them missing. A
+      // different photo, or the same one after the server ended its attempt, gets fresh keys,
+      // so a key never carries two declarations.
+      const committed = await runTrackedUpload(
+        myFormUploadAttempts,
+        uploadSession,
+        preparedImageFingerprint({
           sha256,
+          fileSizeBytes: bytes.byteLength,
+          mimeType: 'image/jpeg',
           widthPx: prepared.width,
           heightPx: prepared.height,
-        },
-        idempotencyKey
+        }),
+        {
+          allocate: (allocateKey) =>
+            createSilhouetteUploadUrlFromMobile(
+              bearer,
+              {
+                fileSizeBytes: bytes.byteLength,
+                mimeType: 'image/jpeg',
+                sha256,
+                widthPx: prepared.width,
+                heightPx: prepared.height,
+              },
+              allocateKey
+            ),
+          upload: (allocation) =>
+            uploadGarmentBytes({
+              cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
+              // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
+              acceptExistingObject: true,
+              uploadUrl: allocation.uploadUrl,
+              uploadToken: allocation.uploadToken,
+              bearerToken: bearer,
+              mimeType: 'image/jpeg',
+              body: bytes.buffer,
+            }),
+          commit: (allocation, commitKey) =>
+            commitSilhouettePhotoFromMobile(
+              bearer,
+              {
+                uploadSessionId: allocation.uploadSessionId,
+                confirmsBasewearGuidance: true,
+              },
+              commitKey
+            ),
+        }
       )
-      await uploadGarmentBytes({
-        uploadUrl: allocation.uploadUrl,
-        uploadToken: allocation.uploadToken,
-        bearerToken: accessToken,
-        mimeType: 'image/png',
-        body: bytes.buffer,
-      })
-      const committed = await commitSilhouettePhotoFromMobile(
-        accessToken,
-        { uploadSessionId: allocation.uploadSessionId, confirmsBasewearGuidance: true },
-        idempotencyKey
-      )
-      attemptIdempotencyKeyRef.current = null
+      // An account change after the commit answered: the photo is the previous account's.
+      if (!isUploadSessionCurrent(uploadSession)) return
+      bindingRef.current = { session: uploadSession, bearer }
       applyProfile(committed)
       setMyFormPhase('processing')
       announce('feedback', t('wardrobe.silhouette.processing'))
       pollMyForm()
     } catch (error) {
       const message =
-        error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
-          ? t('wardrobe.error.consent_required')
-          : error instanceof Error
-            ? error.message
-            : t('wardrobe.silhouette.errors.storage_error')
+        error instanceof UploadSessionChangedError
+          ? t('wardrobe.silhouette.errors.session_changed')
+          : error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
+            ? t('wardrobe.error.consent_required')
+            : error instanceof Error
+              ? error.message
+              : t('wardrobe.silhouette.errors.storage_error')
       setMyFormPhase('failed')
       setMyFormError(message)
       announce('error', message)
@@ -413,17 +563,21 @@ export function SilhouetteEditor({
     const fixtureImage =
       require('../../assets/images/silhouette-my-form-fixture.png') as number
     const source = Image.resolveAssetSource(fixtureImage)
+    const uploadSession = currentUploadSession()
     try {
       const fixtureFile = await File.downloadFileAsync(
         source.uri,
         new File(Paths.cache, 'silhouette-my-form-fixture.png'),
         { idempotent: true }
       )
-      await runMyFormUpload({
-        uri: fixtureFile.uri,
-        width: source.width,
-        height: source.height,
-      })
+      await runMyFormUpload(
+        {
+          uri: fixtureFile.uri,
+          width: source.width,
+          height: source.height,
+        },
+        uploadSession
+      )
     } catch {
       setMyFormPhase('failed')
       setMyFormError(t('wardrobe.silhouette.errors.storage_error'))
@@ -431,6 +585,8 @@ export function SilhouetteEditor({
   }
 
   const openMyFormCamera = async () => {
+    // Captured before the camera opens: the photo it returns belongs to this account.
+    const uploadSession = currentUploadSession()
     const permission = await ImagePicker.requestCameraPermissionsAsync()
     if (!permission.granted) {
       setMyFormError(t('wardrobe.permission.camera_denied'))
@@ -441,11 +597,13 @@ export function SilhouetteEditor({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
-      void runMyFormUpload(result.assets[0])
+      void runMyFormUpload(result.assets[0], uploadSession)
     }
   }
 
   const openMyFormLibrary = async () => {
+    // Captured before the picker opens: the photo it returns belongs to this account.
+    const uploadSession = currentUploadSession()
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
       setMyFormError(t('wardrobe.permission.library_denied'))
@@ -456,21 +614,27 @@ export function SilhouetteEditor({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
-      void runMyFormUpload(result.assets[0])
+      void runMyFormUpload(result.assets[0], uploadSession)
     }
   }
 
   const removeMyForm = async () => {
+    // Removes for the account signed in now only: its verified bearer and the revision its own
+    // read returned. Nothing is sent while that read has not landed.
+    const binding = bindingRef.current
+    if (!binding || !isUploadSessionCurrent(binding.session)) return
     try {
       const next = await deleteSilhouettePhotoFromMobile(
-        accessToken,
+        binding.bearer,
         silhouetteETag(userIdRef.current, revisionRef.current)
       )
+      if (!isUploadSessionCurrent(binding.session)) return
       applyProfile(next)
       setMyFormPhase('idle')
       setGuidanceConfirmed(false)
       announce('feedback', t('wardrobe.silhouette.mode_default'))
     } catch (error) {
+      if (!isUploadSessionCurrent(binding.session)) return
       const message =
         error instanceof Error && error.message === GUARDIAN_CONSENT_CODE
           ? t('wardrobe.error.consent_required')
@@ -483,12 +647,9 @@ export function SilhouetteEditor({
   }
 
   const retryMyForm = () => {
-    // Retry sends the user back to source selection, not back to the exact
-    // failed request — a photo picked from here on is a new logical attempt
-    // and must get a fresh idempotency key. Reusing the failed attempt's key
-    // here previously risked a spurious 409 IDEMPOTENCY_KEY_REUSED once the
-    // user picked a different photo (different hash/size under the old key).
-    attemptIdempotencyKeyRef.current = null
+    // Retry sends the user back to source selection. Picking the same photo resumes the failed
+    // attempt with its keys; a different photo is a new attempt with a fresh key, so a key never
+    // carries a second declaration (that once surfaced as 409 IDEMPOTENCY_KEY_REUSED).
     setMyFormPhase('idle')
     setMyFormError(null)
     setMyFormErrorKey(null)
@@ -532,9 +693,8 @@ export function SilhouetteEditor({
     )
   }
 
-  if (!profile) return null
-
-  const myFormImageUrl = profile.myForm?.imageAccess?.url ?? null
+  // A reload after an account change keeps the editor on screen with no profile yet.
+  const myFormImageUrl = profile?.myForm?.imageAccess?.url ?? null
 
   return (
     <View testID="silhouette-editor" style={styles.container}>

@@ -139,7 +139,8 @@
       "network_timeout": "Il caricamento è scaduto.",
       "storage_forbidden": "Accesso allo spazio di archiviazione negato.",
       "consent_required": "Per caricare capi serve il consenso di un tutore.",
-      "upload_expired": "La sessione di caricamento è scaduta."
+      "upload_expired": "La sessione di caricamento è scaduta.",
+      "upload_session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto."
     },
     "crop": {
       "title": "Ritaglia e posiziona",
@@ -316,7 +317,8 @@
         "privacy_violation": "Questa foto non può essere usata. Scegli un'altra foto.",
         "timeout": "L'elaborazione ha richiesto troppo tempo. Riprova.",
         "storage_error": "Non siamo riusciti a salvare questa foto. Riprova.",
-        "confirm_required": "Conferma le indicazioni sull'abbigliamento di base prima di caricare."
+        "confirm_required": "Conferma le indicazioni sull'abbigliamento di base prima di caricare.",
+        "session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto."
       }
     }
   },

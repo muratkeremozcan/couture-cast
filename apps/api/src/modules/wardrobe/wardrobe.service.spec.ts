@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import {
   ConflictException,
   NotFoundException,
@@ -156,6 +158,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
       material: 'cotton',
       comfort_range: 'mild',
       object_path: 'wardrobe/user_1/g_ready.png',
+      mime_type: 'image/png',
       file_size_bytes: 1024,
       tagging_telemetry_emitted_at: null,
       created_at: fixedNow,
@@ -188,6 +191,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
       material: null,
       comfort_range: null,
       object_path: 'wardrobe/user_1/g_awaiting.png',
+      mime_type: 'image/png',
       file_size_bytes: 2048,
       tagging_telemetry_emitted_at: null,
       created_at: fixedNow,
@@ -204,6 +208,7 @@ describe('WardrobeService Smart Tagging Operations', () => {
       comfort_range: 'warm', // overridden
       tags_confirmed_at: fixedNow,
       object_path: 'wardrobe/user_1/g_awaiting.png',
+      mime_type: 'image/png',
       file_size_bytes: 2048,
       created_at: fixedNow,
     })

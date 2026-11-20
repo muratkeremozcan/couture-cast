@@ -33,7 +33,7 @@ describe('affiliate webhook signature protocol', () => {
     })
 
     it('rejects a configured secret under the length floor even under test', () => {
-      // The divergence from `requireUploadTokenSecret` that makes this guard
+      // The divergence from `requireClickTokenSecret` that makes this guard
       // observable: falling back to the test-only value here would mean no
       // environment ever exercises the length check.
       vi.stubEnv(VALID_REF, 'too-short')

@@ -1,7 +1,7 @@
 // Story 5.1 Task 5: the signing protocol for the inbound conversion webhook.
 //
 // The endpoint is new; the crypto is not. This module deliberately mirrors the
-// structure of `wardrobe-upload-token.ts`: a secret resolver with a
+// structure of `commerce-click-token.ts`: a secret resolver with a
 // >=32-character guard and an `allowsTestOnlySecrets()` fallback,
 // `createHmac('sha256', ...)`, and a byte-length check before `timingSafeEqual`.
 // `guardian.service.ts` verifies its invitation tokens the same way. Keeping the
@@ -17,7 +17,7 @@ import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
  */
 export const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300
 
-/** Matches `requireUploadTokenSecret`, so every signing secret in this API has one floor. */
+/** Matches `requireClickTokenSecret`, so every signing secret in this API has one floor. */
 export const WEBHOOK_SECRET_MIN_LENGTH = 32
 
 /**
@@ -58,7 +58,7 @@ export function resolvePartnerWebhookSecret(secretRef: string): string | null {
   const configured = process.env[secretRef]?.trim()
   if (configured !== undefined && configured.length > 0) {
     // A configured-but-too-short secret is rejected outright, where
-    // `requireUploadTokenSecret` would fall through to its test-only value. That
+    // `requireClickTokenSecret` would fall through to its test-only value. That
     // divergence is deliberate: falling back here would make the length guard
     // unobservable in the only environment that exercises it, and it would let a
     // preview deployment happily sign traffic with a value an operator already

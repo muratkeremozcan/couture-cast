@@ -4,9 +4,17 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
-import { buildClaims, scenarioTest, useRlsDatabase, withRole } from './harness.js'
+import {
+  buildClaims,
+  expectPermissionDenied,
+  scenarioTest,
+  useRlsDatabase,
+  withRole,
+} from './harness.js'
 
 describe.concurrent('guardian-aware RLS policies', () => {
   useRlsDatabase()
@@ -16,7 +24,7 @@ describe.concurrent('guardian-aware RLS policies', () => {
   // They return with private.has_active_guardian_consent when consent is turned back on.
 
   scenarioTest(
-    'allows teens to read and update their own wardrobe-scoped rows',
+    'allows teens to read their own wardrobe-scoped rows and update the ones members may write',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -36,7 +44,10 @@ describe.concurrent('guardian-aware RLS policies', () => {
             },
           ])
 
-          await client.query(
+          // Production follow-up 2026-11-19: garment rows hold storage paths the API's service
+          // role acts on, so the owner reads them and only the API writes them.
+          await expectPermissionDenied(
+            client,
             'UPDATE public."GarmentItem" SET "category" = $1, "updated_at" = NOW() WHERE "id" = $2',
             ['outerwear', seeded.garmentId]
           )

@@ -61,7 +61,6 @@ export default defineConfig(
       // here published the whole CI environment, secrets included.
       env: {
         API_BASE_URL: environment.apiBaseUrl,
-        PUBLIC_API_URL: environment.apiBaseUrl,
         REUSE_EXISTING_WEB_SERVER: process.env.CI ? 'false' : 'true',
         WEB_E2E_BASE_URL: environment.webBaseUrl,
         POSTHOG_API_KEY: '',

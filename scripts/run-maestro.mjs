@@ -1449,23 +1449,21 @@ const seedMobileE2EGarments = async (apiBaseUrl, identity) => {
       }),
     })
 
-    const { garmentId, uploadSessionId, uploadToken } = session?.data ?? {}
-    if (!garmentId || !uploadSessionId || !uploadToken) {
+    const { garmentId, uploadSessionId, uploadUrl, uploadToken } = session?.data ?? {}
+    if (!garmentId || !uploadSessionId || !uploadUrl || !uploadToken) {
       throw new Error('Mobile E2E upload session response was missing fields')
     }
 
-    const uploadResponse = await fetch(
-      `${apiBaseUrl}/api/v1/wardrobe/uploads/${uploadSessionId}`,
-      {
-        method: 'PUT',
-        headers: {
-          authorization,
-          'content-type': 'image/png',
-          'x-upload-token': uploadToken,
-        },
-        body: bytes,
-      }
-    )
+    // The storage signed upload URL, used as given, with the headers the apps send.
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        authorization,
+        'content-type': 'image/png',
+        'x-upload-token': uploadToken,
+      },
+      body: bytes,
+    })
     if (!uploadResponse.ok) {
       throw new Error(
         `Mobile E2E garment upload failed (${uploadResponse.status} ${await uploadResponse.text()})`
@@ -3366,13 +3364,10 @@ const resolveAndroidHostRoute = async (metroPort) => {
  * throw, and the caller still has to be able to stop whatever was started.
  *
  * @param {{ apiProcess?: import('node:child_process').ChildProcess, workerProcess?: import('node:child_process').ChildProcess }} children
- * @param {{ apiHealthUrl: string, mobileApiBaseUrl: string, deterministicFlagEnv: Record<string, string> }} config
+ * @param {{ apiHealthUrl: string, deterministicFlagEnv: Record<string, string> }} config
  * @returns {Promise<void>}
  */
-const startOrReuseLocalApi = async (
-  children,
-  { apiHealthUrl, mobileApiBaseUrl, deterministicFlagEnv }
-) => {
+const startOrReuseLocalApi = async (children, { apiHealthUrl, deterministicFlagEnv }) => {
   let apiAlreadyRunning = false
   try {
     await waitForHealth(apiHealthUrl, 2_000, 250)
@@ -3421,7 +3416,6 @@ const startOrReuseLocalApi = async (
         GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
         GARMENT_TAGGING_ENGINE: 'fixture',
         ...deterministicFlagEnv,
-        PUBLIC_API_URL: process.env.MOBILE_E2E_PUBLIC_API_URL || mobileApiBaseUrl,
         TEST_ENV: 'local',
       },
     })
@@ -5191,7 +5185,6 @@ const run = async () => {
     if (process.env.MOBILE_E2E_SKIP_API !== '1') {
       await startOrReuseLocalApi(children, {
         apiHealthUrl,
-        mobileApiBaseUrl,
         deterministicFlagEnv,
       })
       mobileIdentity = await provisionMobileFixture(

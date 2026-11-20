@@ -91,7 +91,6 @@ const owned = {
   PORT: '4079',
   API_BASE_URL: API,
   API_LISTEN_HOST: '127.0.0.1',
-  PUBLIC_API_URL: API,
   WEB_E2E_BASE_URL: WEB,
   HTTP_CORS_ORIGIN: WEB,
   WEB_NEXT_DIST_DIR: '.next-complimentary',

@@ -1,13 +1,33 @@
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 4.1 Task 8 step 3 owner: unit-test web garment capture behavior
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { Blob as NodeBlob } from 'node:buffer'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render as renderUnwrapped,
+  screen,
+  waitFor,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import { I18nextProvider } from 'react-i18next'
+import {
+  UploadSessionChangedError,
+  type GarmentItemContract,
+} from '@couture/api-client/contracts/http'
 import { GarmentCaptureModal } from './garment-capture-modal'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY, WardrobeRequestError } from '../../lib/wardrobe'
+import { getI18n } from '../../i18n'
+import {
+  forgetAllUploadAttempts,
+  setUploadAttemptAccount,
+} from '../../lib/upload-attempts'
 
 const mockCommittedGarment: GarmentItemContract = {
   id: 'garment-committed-1',
@@ -29,11 +49,27 @@ const mockCommittedGarment: GarmentItemContract = {
 
 const globalRestorers: (() => void)[] = []
 
-afterEach(() => {
+/**
+ * The modal renders inside the app's i18n provider, as the wardrobe page mounts it; every
+ * string it shows comes from the web catalog (en-US unless a test switches the language).
+ */
+function render(ui: React.ReactElement) {
+  return renderUnwrapped(ui, {
+    wrapper: ({ children }) => (
+      <I18nextProvider i18n={getI18n()}>{children}</I18nextProvider>
+    ),
+  })
+}
+
+/** The en-US catalog's generic upload failure copy (wardrobe.capture.errors.failed). */
+const GENERIC_UPLOAD_FAILURE = 'Upload failed. Please try again.'
+
+afterEach(async () => {
   for (const restore of globalRestorers.splice(0).reverse()) {
     restore()
   }
   cleanup()
+  if (getI18n().language !== 'en-US') await getI18n().changeLanguage('en-US')
   vi.restoreAllMocks()
 })
 
@@ -102,9 +138,9 @@ describe('GarmentCaptureModal Component', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       drawImage: vi.fn(),
     } as unknown as CanvasRenderingContext2D)
-    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
-      'data:image/png;base64,sample'
-    )
+    const toDataURL = vi
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/jpeg;base64,sample')
 
     render(
       <GarmentCaptureModal
@@ -124,6 +160,9 @@ describe('GarmentCaptureModal Component', () => {
     await user.click(screen.getByRole('button', { name: 'Take Photo' }))
     await screen.findByRole('button', { name: 'Snap Photo' })
     await user.click(screen.getByRole('button', { name: 'Snap Photo' }))
+    // A camera frame has no transparency, and as PNG it carried its grain at several times
+    // the size (production follow-up 2026-11-19).
+    expect(toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9)
 
     await user.click(await screen.findByRole('button', { name: 'Use This Image' }))
 
@@ -302,7 +341,7 @@ describe('GarmentCaptureModal crop controls', () => {
     expect(phases).toEqual(['requesting_upload', 'uploading', 'verifying', 'processing'])
   })
 
-  it('returns to the crop step with the reason when the upload fails', async () => {
+  it('returns to the crop step with localized copy, never the raw error text, when the upload fails', async () => {
     const user = userEvent.setup()
     const uploadGarment = vi.fn().mockRejectedValue(new Error('storage unavailable'))
     render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
@@ -310,7 +349,9 @@ describe('GarmentCaptureModal crop controls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use This Image' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('storage unavailable')
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(GENERIC_UPLOAD_FAILURE)
+    expect(alert).not.toHaveTextContent('storage unavailable')
     // The chosen image survives, so a retry does not mean re-picking the file.
     expect(screen.getByRole('button', { name: 'Use This Image' })).toBeInTheDocument()
   })
@@ -326,6 +367,66 @@ describe('GarmentCaptureModal crop controls', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Upload failed. Please try again.'
     )
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  // Round 5 follow-up: every failure maps to a catalog key; raw error text never reaches the member.
+  it.each([
+    [
+      'an upload fenced by an account change',
+      new UploadSessionChangedError(),
+      'You signed out or switched accounts during this upload. Choose the photo again.',
+    ],
+    [
+      'a sign-in that lapsed before the upload',
+      new WardrobeRequestError('raw sign-in text', 'SIGNED_OUT'),
+      'Your session expired. Sign in again before adding a garment.',
+    ],
+    [
+      'a photo too small to prepare',
+      new WardrobeRequestError('raw size text', 'IMAGE_TOO_SMALL'),
+      'Choose an image at least 256 pixels wide and tall.',
+    ],
+    [
+      'a request that timed out',
+      new WardrobeRequestError('raw timeout text', 'REQUEST_TIMEOUT'),
+      'The upload timed out. Please try again.',
+    ],
+  ])('shows the catalog copy for %s', async (_case, failure, copy) => {
+    const user = userEvent.setup()
+    const uploadGarment = vi.fn().mockRejectedValue(failure)
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+    await chooseValidImage(user)
+
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(copy)
+    expect(alert).not.toHaveTextContent('raw')
+  })
+
+  it('renders every step and failure in the member language', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      await getI18n().changeLanguage('de-DE')
+    })
+    const uploadGarment = vi.fn().mockRejectedValue(new Error('storage unavailable'))
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+
+    expect(screen.getByText('Kleidungsstück erfassen')).toBeInTheDocument()
+    await user.upload(
+      screen.getByLabelText('Bilddatei des Kleidungsstücks'),
+      new File(['fixture-image'], 'garment.png', { type: 'image/png' })
+    )
+    await user.click(await screen.findByRole('button', { name: 'Dieses Bild verwenden' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Der Upload ist fehlgeschlagen. Versuche es erneut.'
+    )
+    expect(
+      screen.getByRole('switch', { name: 'Automatische Hintergrundbereinigung' })
+    ).toBeInTheDocument()
   })
 
   it('discards an upload failure that lands after the modal was closed', async () => {
@@ -444,5 +545,305 @@ describe('GarmentCaptureModal source step edge cases', () => {
     expect(
       screen.queryByRole('button', { name: 'Use This Image' })
     ).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * Production follow-up 2026-11-19: Use This Image drives the real upload lib here, with only the
+ * network and jsdom's missing image decoder and canvas stood in for. Tapping it again after a
+ * failure is the member's retry of the same attempt: it resumes the attempt while the outcome is
+ * ambiguous, and when the server has ended it, that same tap starts one fresh attempt.
+ */
+/**
+ * Production follow-up 2026-11-19, review round 5 (C4-1): the photo, its preview and its upload
+ * belong to the account signed in when the camera or picker opened. An account change drops
+ * them, so nothing one account picked ever uploads under the next.
+ */
+describe('GarmentCaptureModal account epoch', () => {
+  afterEach(() => {
+    setUploadAttemptAccount(null)
+    forgetAllUploadAttempts()
+  })
+
+  /** FileReader loads held until the test finishes them, so a switch can land mid-read. */
+  function holdFileReads() {
+    const pending: (() => void)[] = []
+    class HeldFileReader {
+      onload: ((event: { target: { result: unknown } }) => void) | null = null
+      readAsDataURL() {
+        pending.push(() =>
+          this.onload?.({ target: { result: 'data:image/png;base64,ZmFrZQ==' } })
+        )
+      }
+    }
+    vi.stubGlobal('FileReader', HeldFileReader)
+    globalRestorers.push(() => vi.unstubAllGlobals())
+    return {
+      started: () => pending.length,
+      finish: () =>
+        act(() => {
+          for (const load of pending.splice(0)) load()
+        }),
+    }
+  }
+
+  const garmentFile = () =>
+    new File(['fixture-image'], 'garment.png', { type: 'image/png' })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('drops a file the picker returns after the account changed', async () => {
+    const user = userEvent.setup()
+    const reads = holdFileReads()
+    const uploadGarment = vi.fn()
+    setUploadAttemptAccount('member-a')
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+
+    await user.click(screen.getByRole('button', { name: 'Choose File' }))
+    act(() => setUploadAttemptAccount('member-b'))
+    fireEvent.change(screen.getByLabelText('Garment image file'), {
+      target: { files: [garmentFile()] },
+    })
+    reads.finish()
+
+    expect(reads.started()).toBe(0)
+    expect(
+      screen.queryByRole('button', { name: 'Use This Image' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose File' })).toBeInTheDocument()
+    expect(uploadGarment).not.toHaveBeenCalled()
+  })
+
+  it('drops a file read that finishes after the account changed', async () => {
+    const user = userEvent.setup()
+    const reads = holdFileReads()
+    const uploadGarment = vi.fn()
+    setUploadAttemptAccount('member-a')
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+
+    await user.upload(screen.getByLabelText('Garment image file'), garmentFile())
+    expect(reads.started()).toBe(1)
+    act(() => setUploadAttemptAccount('member-b'))
+    reads.finish()
+
+    expect(
+      screen.queryByRole('button', { name: 'Use This Image' })
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose File' })).toBeInTheDocument()
+    expect(uploadGarment).not.toHaveBeenCalled()
+  })
+
+  it("clears A's photo waiting on Use This Image, so a retry cannot upload it under B", async () => {
+    const user = userEvent.setup()
+    const uploadGarment = vi.fn().mockRejectedValue(new Error('storage unavailable'))
+    setUploadAttemptAccount('member-a')
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+    await chooseValidImage(user)
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(GENERIC_UPLOAD_FAILURE)
+
+    act(() => setUploadAttemptAccount('member-b'))
+
+    expect(
+      screen.queryByRole('button', { name: 'Use This Image' })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByAltText('Garment preview')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(uploadGarment).toHaveBeenCalledOnce()
+    expect(uploadGarment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uploadSession: expect.objectContaining({ account: 'member-a' }) as unknown,
+      })
+    )
+  })
+})
+
+describe('GarmentCaptureModal Use This Image retry through the real upload', () => {
+  type Leg = 'allocate' | 'upload' | 'commit'
+  const STAGING_URL = 'https://storage.test/staging/garment-session'
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  const json = (status: number, body: unknown) => () =>
+    Promise.resolve(
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    )
+  const allocated = json(200, {
+    data: {
+      garmentId: mockCommittedGarment.id,
+      uploadSessionId: 'garment-session',
+      uploadUrl: STAGING_URL,
+      uploadToken: 'upload-token',
+      requiredHeaders: { 'content-type': 'image/jpeg' },
+      expiresAt: '2026-11-19T10:15:00.000Z',
+    },
+  })
+  const stored = () => Promise.resolve(new Response(null, { status: 200 }))
+  const networkDown = () => Promise.reject(new TypeError('Failed to fetch'))
+  const committed = json(200, { data: mockCommittedGarment })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    window.sessionStorage.clear()
+    forgetAllUploadAttempts()
+  })
+
+  /**
+   * Every prepared image encodes to the same bytes, as a re-encode of one photo does. The 2D
+   * context carries its canvas and pixel access, which the default background cleanup reads.
+   */
+  function standInForImagePreparation() {
+    class DecodedImage {
+      naturalWidth = 640
+      naturalHeight = 640
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.())
+      }
+    }
+    vi.stubGlobal('Image', DecodedImage as unknown as typeof Image)
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
+      this: HTMLCanvasElement
+    ) {
+      return {
+        canvas: this,
+        drawImage: vi.fn(),
+        fillRect: vi.fn(),
+        getImageData: (_x: number, _y: number, width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+        }),
+        putImageData: vi.fn(),
+      } as unknown as CanvasRenderingContext2D
+    } as unknown as HTMLCanvasElement['getContext'])
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(
+      (callback: BlobCallback, type?: string) => {
+        callback(
+          new NodeBlob(['same-garment-photo'], {
+            type: type ?? 'image/jpeg',
+          }) as unknown as Blob
+        )
+      }
+    )
+  }
+
+  /** Answers each leg from its own queue and records the idempotency key of every call. */
+  function installLegs(queues: Record<Leg, (() => Promise<Response>)[]>) {
+    const keys: Record<Leg, (string | undefined)[]> = {
+      allocate: [],
+      upload: [],
+      commit: [],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input)
+        const leg: Leg | null = url.includes('/api/v1/wardrobe/upload-url')
+          ? 'allocate'
+          : url === STAGING_URL
+            ? 'upload'
+            : url.includes('/api/v1/wardrobe/garments')
+              ? 'commit'
+              : null
+        if (!leg) return Promise.reject(new Error(`Unhandled fetch in test: ${url}`))
+        keys[leg].push(
+          (init?.headers as Record<string, string> | undefined)?.['idempotency-key']
+        )
+        const answer = queues[leg].shift()
+        if (!answer) return Promise.reject(new Error(`No answer left for ${leg}`))
+        return answer()
+      })
+    )
+    return keys
+  }
+
+  async function renderWithRealUpload(user: ReturnType<typeof userEvent.setup>) {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    standInForImagePreparation()
+    const onGarmentCommitted = vi.fn()
+    render(
+      <GarmentCaptureModal
+        isOpen
+        onClose={vi.fn()}
+        onGarmentCommitted={onGarmentCommitted}
+      />
+    )
+    await chooseValidImage(user)
+    return onGarmentCommitted
+  }
+
+  it('starts one fresh attempt in the same tap once the commit it resumed answers UPLOAD_SESSION_EXPIRED', async () => {
+    const user = userEvent.setup()
+    const keys = installLegs({
+      allocate: [allocated, allocated],
+      upload: [stored, stored],
+      commit: [
+        networkDown,
+        json(409, {
+          statusCode: 409,
+          message: 'UPLOAD_SESSION_EXPIRED',
+          error: 'Conflict',
+        }),
+        committed,
+      ],
+    })
+    const onGarmentCommitted = await renderWithRealUpload(user)
+
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+    // A network fault reads as the generic retry copy, never the fetch layer's own text.
+    const networkAlert = await screen.findByRole('alert')
+    expect(networkAlert).toHaveTextContent(GENERIC_UPLOAD_FAILURE)
+    expect(networkAlert).not.toHaveTextContent('interceptors')
+    expect(keys.commit).toHaveLength(1)
+
+    // One tap: it commits the open attempt again with its key, the server says the session
+    // expired, and the same tap allocates, uploads and commits with fresh keys.
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+
+    expect(await screen.findByText('Garment Upload Complete!')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(onGarmentCommitted).toHaveBeenCalledOnce()
+    expect(onGarmentCommitted).toHaveBeenCalledWith(
+      expect.objectContaining({ id: mockCommittedGarment.id })
+    )
+    expect(keys.allocate).toHaveLength(2)
+    expect(keys.allocate[1]).toMatch(UUID_V4)
+    expect(keys.allocate[1]).not.toBe(keys.allocate[0])
+    expect(keys.upload).toHaveLength(2)
+    expect(keys.commit).toHaveLength(3)
+    expect(keys.commit[0]).toMatch(UUID_V4)
+    expect(keys.commit[1]).toBe(keys.commit[0])
+    expect(keys.commit[2]).toMatch(UUID_V4)
+    expect(keys.commit[2]).not.toBe(keys.commit[0])
+  })
+
+  it('keeps the attempt on the next tap after UPLOAD_IN_PROGRESS and commits it again with its key', async () => {
+    const user = userEvent.setup()
+    const keys = installLegs({
+      allocate: [allocated],
+      upload: [stored],
+      commit: [
+        json(409, { statusCode: 409, message: 'UPLOAD_IN_PROGRESS', error: 'Conflict' }),
+        committed,
+      ],
+    })
+    const onGarmentCommitted = await renderWithRealUpload(user)
+
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This photo is still being saved. Try again in a moment.'
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Use This Image' }))
+
+    expect(await screen.findByText('Garment Upload Complete!')).toBeInTheDocument()
+    expect(onGarmentCommitted).toHaveBeenCalledOnce()
+    expect(keys.allocate).toHaveLength(1)
+    expect(keys.upload).toHaveLength(1)
+    expect(keys.commit).toHaveLength(2)
+    expect(keys.commit[0]).toMatch(UUID_V4)
+    expect(keys.commit[1]).toBe(keys.commit[0])
   })
 })

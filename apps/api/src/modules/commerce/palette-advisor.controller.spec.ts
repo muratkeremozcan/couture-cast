@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4 Task 5/6: the palette advisor routes over real HTTP through a
 // Nest `TestingModule`, mirroring premium-theme.controller.spec.ts's shape.
 // RequestAuthGuard is stubbed (real Supabase token validation is proven in
@@ -55,6 +57,8 @@ function createPrismaStub() {
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
     $executeRaw: vi.fn().mockResolvedValue(undefined),
+    // Round 4: erasure also locks the profile row (SELECT ... FOR UPDATE).
+    $queryRaw: vi.fn().mockResolvedValue([]),
     // Every transaction is interactive; the stub is its own transaction client.
     $transaction: vi.fn((work: (tx: unknown) => unknown) => work(prisma)),
   }
@@ -82,7 +86,11 @@ describe('PaletteAdvisorController', () => {
   let telemetry: { captureEvent: ReturnType<typeof vi.fn> }
   let affiliateOffers: { resolveAdvisorOffers: ReturnType<typeof vi.fn> }
   let queue: { enqueue: ReturnType<typeof vi.fn> }
-  let storage: { upload: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> }
+  let storage: {
+    createUploadSession: ReturnType<typeof vi.fn>
+    downloadIfPresent: ReturnType<typeof vi.fn>
+    remove: ReturnType<typeof vi.fn>
+  }
 
   async function boot(
     options: { entitled?: boolean; flag?: boolean; guardianAllowed?: boolean } = {}
@@ -102,7 +110,13 @@ describe('PaletteAdvisorController', () => {
     affiliateOffers = { resolveAdvisorOffers: vi.fn().mockResolvedValue(new Map()) }
     queue = { enqueue: vi.fn().mockResolvedValue(undefined) }
     storage = {
-      upload: vi.fn().mockResolvedValue(undefined),
+      createUploadSession: vi.fn().mockResolvedValue({
+        uploadUrl:
+          'https://storage.test/storage/v1/object/upload/sign/wardrobe-images/palette/user-1/selfie/s.png?token=signed',
+        uploadToken: 'signed',
+        tokenExpiresAt: new Date('2099-06-01T00:00:00.000Z'),
+      }),
+      downloadIfPresent: vi.fn().mockResolvedValue(null),
       remove: vi.fn().mockResolvedValue(undefined),
     }
 
@@ -325,25 +339,21 @@ describe('PaletteAdvisorController', () => {
     })
   })
 
-  describe('PUT /selfie/uploads/:uploadSessionId: RequestAuthGuard only', () => {
-    it('rejects an unauthenticated request with 401', async () => {
-      await boot()
-
-      const response = await request(server()).put(`${ROUTE}/selfie/uploads/session-1`)
-
-      expect(response.status).toBe(401)
-    })
-
-    it('rejects a request with no upload token header with 400', async () => {
+  describe('selfie bytes go straight to storage', () => {
+    /**
+     * The byte relay through this API is gone: a Vercel Function refuses a body over about
+     * 4.5 MB, so clients PUT to the storage signed URL from upload-url instead.
+     */
+    it('serves no PUT route for selfie bytes', async () => {
       await boot()
 
       const response = await authed.put(
         `${ROUTE}/selfie/uploads/session-1`,
         Buffer.from('bytes'),
-        { 'content-type': 'image/png' }
+        { 'content-type': 'image/png', 'x-upload-token': 'token' }
       )
 
-      expect(response.status).toBe(400)
+      expect(response.status).toBe(404)
     })
   })
 

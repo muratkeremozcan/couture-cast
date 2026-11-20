@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerShutdownResources } from './shutdown-resources'
 import type * as WeatherConfigModule from '../modules/weather/providers/weather.config'
 import { createWorkerProcessState, performShutdown, startWorkers } from './bootstrap.js'
+import type * as ProcessingQueueModule from '../modules/wardrobe/wardrobe-processing.queue'
 
 const harness = vi.hoisted(() => ({
   registerModerationSlaScheduler: vi.fn().mockResolvedValue(undefined),
@@ -27,6 +28,10 @@ const harness = vi.hoisted(() => ({
   communityClose: vi.fn().mockResolvedValue(undefined),
   createCommunityWorkerRuntime: vi.fn(),
   shutdownWorkerResources: vi.fn().mockResolvedValue(undefined),
+  /** Round 4: the hourly wardrobe job's producers for stranded processing photos. */
+  silhouetteHandoffClose: vi.fn().mockResolvedValue(undefined),
+  paletteHandoffClose: vi.fn().mockResolvedValue(undefined),
+  garmentHandoffClose: vi.fn().mockResolvedValue(undefined),
   queueNames: [
     'weather-ingestion',
     'alert-fanout',
@@ -117,6 +122,29 @@ vi.mock('../modules/commerce/billing-reconciliation.scheduler', () => ({
 
 vi.mock('../modules/community/community-worker-runtime', () => ({
   createCommunityWorkerRuntime: harness.createCommunityWorkerRuntime,
+}))
+
+vi.mock('../modules/wardrobe/silhouette-photo-processing.queue', () => ({
+  SilhouettePhotoProcessingQueue: class {
+    enqueue = vi.fn()
+    onModuleDestroy = harness.silhouetteHandoffClose
+  },
+}))
+
+// Round 6 (Codex C5-7): the hourly job also re-enqueues held-then-released garments.
+vi.mock('../modules/wardrobe/wardrobe-processing.queue', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProcessingQueueModule>()),
+  WardrobeProcessingQueue: class {
+    enqueue = vi.fn()
+    onModuleDestroy = harness.garmentHandoffClose
+  },
+}))
+
+vi.mock('../modules/commerce/palette-analysis-processing.queue', () => ({
+  PaletteAnalysisProcessingQueue: class {
+    enqueue = vi.fn()
+    onModuleDestroy = harness.paletteHandoffClose
+  },
 }))
 
 vi.mock('./shutdown-resources', () => ({
@@ -334,8 +362,21 @@ describe('general worker bootstrap', () => {
     await bootstrap.startWorkers()
     await bootstrap.performShutdown()
 
-    // Six queues plus the engagement and screening closeables. A regression that dropped the
-    // closeable again would leave exactly six.
-    expect(shutdownResources().queues).toHaveLength(harness.queueNames.length + 2)
+    // Six queues plus the engagement and screening closeables and the three wardrobe handoff
+    // producers (round 4, garment in round 6). A regression that dropped a closeable again
+    // would leave fewer.
+    expect(shutdownResources().queues).toHaveLength(harness.queueNames.length + 5)
+  })
+
+  it('closes the wardrobe processing handoff producers it opened for the hourly job', async () => {
+    const bootstrap = freshProcess()
+
+    await bootstrap.startWorkers()
+    await bootstrap.performShutdown()
+    await Promise.all(shutdownResources().queues.map((queue) => queue.close()))
+
+    expect(harness.garmentHandoffClose).toHaveBeenCalled()
+    expect(harness.silhouetteHandoffClose).toHaveBeenCalled()
+    expect(harness.paletteHandoffClose).toHaveBeenCalled()
   })
 })

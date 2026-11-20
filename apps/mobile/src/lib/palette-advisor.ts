@@ -17,16 +17,25 @@ import {
   setPaletteConsentResponseSchema,
   updateAdvisorRecommendationResponseSchema,
   uploadGarmentBytes,
+  WARDROBE_UPLOAD_CACHE_CONTROL,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
   PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   type PaletteAdvisorProfile,
   type UpdateAdvisorRecommendationInput,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createMobileApiClient, resolveMobileApiBaseUrl } from './api-client'
 import { withRequestTimeout } from './commerce'
 import { resolveMobileAccessToken } from './mobile-auth'
+import {
+  createUploadAttempts,
+  preparedImageFingerprint,
+  resolveUploadBearer,
+  runTrackedUpload,
+  throwUploadStepError,
+} from './upload-attempts'
 
 /**
  * Why a call failed, in terms the screen can act on without reading English prose.
@@ -252,6 +261,13 @@ export async function erasePaletteAdvisorFromMobile(
  */
 const SELFIE_UPLOAD_TIMEOUT_MS = 30_000
 
+/** Open selfie upload attempts in this app session, keyed by the prepared photo and account. */
+const selfieUploadAttempts = createUploadAttempts<{
+  uploadSessionId: string
+  uploadUrl: string
+  uploadToken: string
+}>()
+
 /** Coarse progress states for the three-step selfie upload, for the screen's status line. */
 export type PaletteSelfieUploadState = 'requesting_upload' | 'uploading' | 'committing'
 
@@ -265,11 +281,11 @@ export interface UploadPaletteSelfieInput {
   /** Lowercase hex SHA-256 of `bytes`, which the server re-computes and compares. */
   sha256: string
   /**
-   * Reused across the allocate and commit requests of one upload attempt, and across
-   * any retry of that attempt, so a retry replays the first session rather than
-   * allocating a second.
+   * The session captured before the picker that produced the photo opened
+   * (`currentUploadSession`). The upload resolves its bearer for that account and refuses once
+   * the signed-in account changed.
    */
-  idempotencyKey: string
+  uploadSession: UploadAttemptSession
   signal?: AbortSignal
   onStateChange?: (state: PaletteSelfieUploadState) => void
 }
@@ -292,67 +308,98 @@ export async function uploadPaletteSelfieFromMobile({
   widthPx,
   heightPx,
   sha256,
-  idempotencyKey,
   signal,
   onStateChange,
+  uploadSession,
 }: UploadPaletteSelfieInput): Promise<PaletteAdvisorProfile> {
-  const accessToken = await readAccessToken()
+  // The bearer of the account the photo was picked under, resolved now: an account change from
+  // the pick on refuses here, and during the upload it fences this run.
+  const accessToken = await resolveUploadBearer(uploadSession, readAccessToken)
   const client = advisorClient(accessToken)
 
-  onStateChange?.('requesting_upload')
-  let allocation
-  try {
-    allocation = createPaletteSelfieUploadUrlResponseSchema.parse(
-      await withRequestTimeout(signal, (requestSignal) =>
-        client.apiV1CommercePremiumPaletteSelfieUploadUrlPost(
-          {
-            idempotencyKey,
-            createPaletteSelfieUploadUrlInput: {
-              fileSizeBytes: bytes.byteLength,
-              mimeType,
-              sha256,
-              widthPx,
-              heightPx,
-            },
-          },
-          { signal: requestSignal }
-        )
-      )
-    ).data
-  } catch (error: unknown) {
-    throw await advisorError(error, 'Unable to allocate a selfie upload.')
-  }
-
-  onStateChange?.('uploading')
-  try {
-    await uploadGarmentBytes({
-      uploadUrl: allocation.uploadUrl,
-      apiBaseUrl: resolveMobileApiBaseUrl(),
-      uploadToken: allocation.uploadToken,
-      bearerToken: accessToken,
+  // The prepared bytes name the attempt. Choosing the same photo again after a failure resumes
+  // it with that attempt's keys while its outcome is ambiguous: commit first (a lost answer
+  // replays), re-send the bytes only when the server reports them missing. A different photo,
+  // or the same one after the server ended its attempt, starts a new attempt with fresh keys.
+  return runTrackedUpload(
+    selfieUploadAttempts,
+    uploadSession,
+    preparedImageFingerprint({
+      sha256,
+      fileSizeBytes: bytes.byteLength,
       mimeType,
-      body: bytes.buffer,
-      signal,
-      timeoutMs: SELFIE_UPLOAD_TIMEOUT_MS,
-    })
-  } catch (error: unknown) {
-    throw await advisorError(error, 'Unable to upload the photo. Try again.')
-  }
-
-  onStateChange?.('committing')
-  try {
-    return commitPaletteSelfieResponseSchema.parse(
-      await withRequestTimeout(signal, (requestSignal) =>
-        client.apiV1CommercePremiumPaletteSelfieCommitPost(
-          {
-            idempotencyKey,
-            commitPaletteSelfieInput: { uploadSessionId: allocation.uploadSessionId },
-          },
-          { signal: requestSignal }
-        )
-      )
-    ).data
-  } catch (error: unknown) {
-    throw await advisorError(error, 'Unable to start the palette analysis.')
-  }
+      widthPx,
+      heightPx,
+    }),
+    {
+      allocate: async (allocateKey) => {
+        onStateChange?.('requesting_upload')
+        try {
+          return createPaletteSelfieUploadUrlResponseSchema.parse(
+            await withRequestTimeout(signal, (requestSignal) =>
+              client.apiV1CommercePremiumPaletteSelfieUploadUrlPost(
+                {
+                  idempotencyKey: allocateKey,
+                  createPaletteSelfieUploadUrlInput: {
+                    fileSizeBytes: bytes.byteLength,
+                    mimeType,
+                    sha256,
+                    widthPx,
+                    heightPx,
+                  },
+                },
+                { signal: requestSignal }
+              )
+            )
+          ).data
+        } catch (error: unknown) {
+          return throwUploadStepError(error, (raw) =>
+            advisorError(raw, 'Unable to allocate a selfie upload.')
+          )
+        }
+      },
+      upload: async (allocation) => {
+        onStateChange?.('uploading')
+        try {
+          await uploadGarmentBytes({
+            cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
+            // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
+            acceptExistingObject: true,
+            uploadUrl: allocation.uploadUrl,
+            apiBaseUrl: resolveMobileApiBaseUrl(),
+            uploadToken: allocation.uploadToken,
+            bearerToken: accessToken,
+            mimeType,
+            body: bytes.buffer,
+            signal,
+            timeoutMs: SELFIE_UPLOAD_TIMEOUT_MS,
+          })
+        } catch (error: unknown) {
+          throw await advisorError(error, 'Unable to upload the photo. Try again.')
+        }
+      },
+      commit: async (allocation, commitKey) => {
+        onStateChange?.('committing')
+        try {
+          return commitPaletteSelfieResponseSchema.parse(
+            await withRequestTimeout(signal, (requestSignal) =>
+              client.apiV1CommercePremiumPaletteSelfieCommitPost(
+                {
+                  idempotencyKey: commitKey,
+                  commitPaletteSelfieInput: {
+                    uploadSessionId: allocation.uploadSessionId,
+                  },
+                },
+                { signal: requestSignal }
+              )
+            )
+          ).data
+        } catch (error: unknown) {
+          return throwUploadStepError(error, (raw) =>
+            advisorError(raw, 'Unable to start the palette analysis.')
+          )
+        }
+      },
+    }
+  )
 }

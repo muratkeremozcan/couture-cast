@@ -110,13 +110,6 @@ export interface ApiV1WardrobeSilhouetteMyFormUploadUrlPostRequest {
   createSilhouetteUploadUrlInput: CreateSilhouetteUploadUrlInput
 }
 
-export interface ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest {
-  uploadSessionId: string
-  xUploadToken: string
-  contentType: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum
-  body: Blob
-}
-
 export interface ApiV1WardrobeSilhouettePutRequest {
   ifMatch: string
   updateSilhouetteSlidersInput: UpdateSilhouetteSlidersInput
@@ -125,13 +118,6 @@ export interface ApiV1WardrobeSilhouettePutRequest {
 export interface ApiV1WardrobeUploadUrlPostRequest {
   idempotencyKey: string
   createGarmentUploadUrlInput: CreateGarmentUploadUrlInput
-}
-
-export interface ApiV1WardrobeUploadsUploadSessionIdPutRequest {
-  uploadSessionId: string
-  xUploadToken: string
-  contentType: ApiV1WardrobeUploadsUploadSessionIdPutContentTypeEnum
-  body: Blob
 }
 
 /**
@@ -1368,107 +1354,6 @@ export class WardrobeApi extends runtime.BaseAPI {
   }
 
   /**
-   * Creates request options for apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut without sending the request
-   */
-  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequestOpts(
-    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest
-  ): Promise<runtime.RequestOpts> {
-    if (requestParameters['uploadSessionId'] == null) {
-      throw new runtime.RequiredError(
-        'uploadSessionId',
-        'Required parameter "uploadSessionId" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['xUploadToken'] == null) {
-      throw new runtime.RequiredError(
-        'xUploadToken',
-        'Required parameter "xUploadToken" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['contentType'] == null) {
-      throw new runtime.RequiredError(
-        'contentType',
-        'Required parameter "contentType" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['body'] == null) {
-      throw new runtime.RequiredError(
-        'body',
-        'Required parameter "body" was null or undefined when calling apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut().'
-      )
-    }
-
-    const queryParameters: any = {}
-
-    const headerParameters: runtime.HTTPHeaders = {}
-
-    headerParameters['Content-Type'] = 'image/jpeg'
-
-    if (requestParameters['xUploadToken'] != null) {
-      headerParameters['x-upload-token'] = String(requestParameters['xUploadToken'])
-    }
-
-    if (requestParameters['contentType'] != null) {
-      headerParameters['content-type'] = String(requestParameters['contentType'])
-    }
-
-    if (this.configuration && this.configuration.accessToken) {
-      const token = this.configuration.accessToken
-      const tokenString = await token('bearerAuth', [])
-
-      if (tokenString) {
-        headerParameters['Authorization'] = `Bearer ${tokenString}`
-      }
-    }
-
-    let urlPath = `/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}`
-    urlPath = urlPath.replace(
-      `{${'uploadSessionId'}}`,
-      encodeURIComponent(String(requestParameters['uploadSessionId']))
-    )
-
-    return {
-      path: urlPath,
-      method: 'PUT',
-      headers: headerParameters,
-      query: queryParameters,
-      body: requestParameters['body'] as any,
-    }
-  }
-
-  /**
-   * Upload My Form photo bytes to a previously allocated session
-   */
-  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRaw(
-    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest,
-    initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<void>> {
-    const requestOptions =
-      await this.apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequestOpts(
-        requestParameters
-      )
-    const response = await this.request(requestOptions, initOverrides)
-
-    return new runtime.VoidApiResponse(response)
-  }
-
-  /**
-   * Upload My Form photo bytes to a previously allocated session
-   */
-  async apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPut(
-    requestParameters: ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRequest,
-    initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<void> {
-    await this.apiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutRaw(
-      requestParameters,
-      initOverrides
-    )
-  }
-
-  /**
    * Creates request options for apiV1WardrobeSilhouettePut without sending the request
    */
   async apiV1WardrobeSilhouettePutRequestOpts(
@@ -1623,102 +1508,6 @@ export class WardrobeApi extends runtime.BaseAPI {
     )
     return await response.value()
   }
-
-  /**
-   * Creates request options for apiV1WardrobeUploadsUploadSessionIdPut without sending the request
-   */
-  async apiV1WardrobeUploadsUploadSessionIdPutRequestOpts(
-    requestParameters: ApiV1WardrobeUploadsUploadSessionIdPutRequest
-  ): Promise<runtime.RequestOpts> {
-    if (requestParameters['uploadSessionId'] == null) {
-      throw new runtime.RequiredError(
-        'uploadSessionId',
-        'Required parameter "uploadSessionId" was null or undefined when calling apiV1WardrobeUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['xUploadToken'] == null) {
-      throw new runtime.RequiredError(
-        'xUploadToken',
-        'Required parameter "xUploadToken" was null or undefined when calling apiV1WardrobeUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['contentType'] == null) {
-      throw new runtime.RequiredError(
-        'contentType',
-        'Required parameter "contentType" was null or undefined when calling apiV1WardrobeUploadsUploadSessionIdPut().'
-      )
-    }
-
-    if (requestParameters['body'] == null) {
-      throw new runtime.RequiredError(
-        'body',
-        'Required parameter "body" was null or undefined when calling apiV1WardrobeUploadsUploadSessionIdPut().'
-      )
-    }
-
-    const queryParameters: any = {}
-
-    const headerParameters: runtime.HTTPHeaders = {}
-
-    headerParameters['Content-Type'] = 'image/jpeg'
-
-    if (requestParameters['xUploadToken'] != null) {
-      headerParameters['x-upload-token'] = String(requestParameters['xUploadToken'])
-    }
-
-    if (requestParameters['contentType'] != null) {
-      headerParameters['content-type'] = String(requestParameters['contentType'])
-    }
-
-    if (this.configuration && this.configuration.accessToken) {
-      const token = this.configuration.accessToken
-      const tokenString = await token('bearerAuth', [])
-
-      if (tokenString) {
-        headerParameters['Authorization'] = `Bearer ${tokenString}`
-      }
-    }
-
-    let urlPath = `/api/v1/wardrobe/uploads/{uploadSessionId}`
-    urlPath = urlPath.replace(
-      `{${'uploadSessionId'}}`,
-      encodeURIComponent(String(requestParameters['uploadSessionId']))
-    )
-
-    return {
-      path: urlPath,
-      method: 'PUT',
-      headers: headerParameters,
-      query: queryParameters,
-      body: requestParameters['body'] as any,
-    }
-  }
-
-  /**
-   * Upload binary image bytes for a pending upload session
-   */
-  async apiV1WardrobeUploadsUploadSessionIdPutRaw(
-    requestParameters: ApiV1WardrobeUploadsUploadSessionIdPutRequest,
-    initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<void>> {
-    const requestOptions =
-      await this.apiV1WardrobeUploadsUploadSessionIdPutRequestOpts(requestParameters)
-    const response = await this.request(requestOptions, initOverrides)
-
-    return new runtime.VoidApiResponse(response)
-  }
-
-  /**
-   * Upload binary image bytes for a pending upload session
-   */
-  async apiV1WardrobeUploadsUploadSessionIdPut(
-    requestParameters: ApiV1WardrobeUploadsUploadSessionIdPutRequest,
-    initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<void> {
-    await this.apiV1WardrobeUploadsUploadSessionIdPutRaw(requestParameters, initOverrides)
-  }
 }
 
 /**
@@ -1748,23 +1537,3 @@ export const ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum = {
 } as const
 export type ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum =
   (typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum)[keyof typeof ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum]
-/**
- * @export
- */
-export const ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum = {
-  image_jpeg: 'image/jpeg',
-  image_png: 'image/png',
-  image_webp: 'image/webp',
-} as const
-export type ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum =
-  (typeof ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum)[keyof typeof ApiV1WardrobeSilhouetteMyFormUploadsUploadSessionIdPutContentTypeEnum]
-/**
- * @export
- */
-export const ApiV1WardrobeUploadsUploadSessionIdPutContentTypeEnum = {
-  image_jpeg: 'image/jpeg',
-  image_png: 'image/png',
-  image_webp: 'image/webp',
-} as const
-export type ApiV1WardrobeUploadsUploadSessionIdPutContentTypeEnum =
-  (typeof ApiV1WardrobeUploadsUploadSessionIdPutContentTypeEnum)[keyof typeof ApiV1WardrobeUploadsUploadSessionIdPutContentTypeEnum]

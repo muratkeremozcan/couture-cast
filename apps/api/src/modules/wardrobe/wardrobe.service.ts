@@ -25,7 +25,11 @@ import {
   type SuggestGarmentTagsResponse,
   type UpdateGarmentTagsInput,
 } from '@couture/api-client/contracts/http'
-import { buildGarmentObjectPath } from '@couture/utils'
+import {
+  buildGarmentObjectPath,
+  buildWardrobeStagingObjectPath,
+  isWardrobePathSegment,
+} from '@couture/utils'
 
 import { createBaseLogger } from '../../logger/pino.config'
 import type { ApiRole } from '../auth/security.types'
@@ -37,19 +41,35 @@ import {
 } from '../telemetry/telemetry.service'
 import {
   GarmentImageValidationError,
+  MAX_GARMENT_IMAGE_BYTES,
   type GarmentImageDeclaration,
   type GarmentMimeType,
   verifyGarmentImage,
 } from './wardrobe-image-validation'
-import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
-import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import {
-  generateUploadToken,
-  requireUploadTokenSecret,
-  verifyUploadToken,
-} from './wardrobe-upload-token'
+  WardrobeObjectDeletionOutbox,
+  type WardrobeDeletionReason,
+} from './wardrobe-object-deletion.outbox'
+import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
+import { handOffGarmentProcessing } from './wardrobe-processing-handoff'
+import {
+  SupabaseWardrobeStorageAdapter,
+  type WardrobeUploadSession,
+} from './wardrobe-storage.adapter'
+import {
+  isOwnGarmentObject,
+  logUntrustedUploadSession,
+  objectExtensionFor,
+  uploadPathInvalid,
+  uploadSessionKeys,
+  type UploadSessionKeys,
+} from './wardrobe-upload-paths'
+import {
+  nextCleanupHorizon,
+  unfinishedPublicationDeadline,
+  uploadInProgress,
+} from './wardrobe-publication'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
-import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -74,10 +94,26 @@ type CommitResult = {
   response: GarmentItemResponse
 }
 
-function deriveObjectExtension(mimeType: GarmentMimeType): 'jpg' | 'png' | 'webp' {
-  if (mimeType === 'image/jpeg') return 'jpg'
-  if (mimeType === 'image/png') return 'png'
-  return 'webp'
+/**
+ * The session's staging and final keys, derived from the row's own ids and checked against the
+ * stored path (see `uploadSessionKeys`). A row that fails is answered as an expired session
+ * before any storage call: the id and path columns were member-writable before the 2026-11-19
+ * revoke migration, and the service role would otherwise act on whatever they named.
+ */
+function garmentKeys(garment: GarmentItem, operation: string): UploadSessionKeys {
+  const keys = uploadSessionKeys({
+    kind: 'garment',
+    userId: garment.user_id,
+    objectId: garment.id,
+    uploadSessionId: garment.upload_session_id,
+    mimeType: garment.mime_type,
+    storedObjectPath: garment.object_path,
+  })
+  if (!keys) {
+    logUntrustedUploadSession({ operation, kind: 'garment', rowId: garment.id })
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
+  return keys
 }
 
 function allocationMatches(
@@ -91,6 +127,25 @@ function allocationMatches(
     garment.width_px === input.widthPx &&
     garment.height_px === input.heightPx
   )
+}
+
+/** A same-key allocation replays only for the same declaration and a session still open. */
+function assertReplayableAllocation(
+  garment: GarmentItem,
+  input: CreateGarmentUploadUrlInput
+): void {
+  if (!allocationMatches(garment, input)) {
+    throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+  }
+  if (
+    garment.retention_status !== 'active' ||
+    garment.upload_status !== 'pending_upload' ||
+    garment.upload_ended_at !== null ||
+    !garment.upload_expires_at ||
+    garment.upload_expires_at <= new Date()
+  ) {
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
 }
 
 function commitPayloadHash(input: CreateGarmentItemInput): string {
@@ -126,6 +181,9 @@ function declarationFromGarment(garment: GarmentItem): GarmentImageDeclaration {
 }
 
 function mapImageValidationError(error: GarmentImageValidationError): never {
+  if (error.code === 'IMAGE_SIZE_MISMATCH') {
+    throw new UnprocessableEntityException(error.code)
+  }
   if (error.code === 'IMAGE_CHECKSUM_MISMATCH') {
     throw new UnprocessableEntityException(error.code)
   }
@@ -154,6 +212,16 @@ type ParsedTagSuggestion = {
   suggestion: GarmentTagSuggestionSnapshot | null
   hasMalformedSuggestion: boolean
 }
+
+/**
+ * The states a commit can claim. Clients now PUT bytes straight to storage, so a session stays
+ * `pending_upload` until commit finds and verifies the object; `bytes_uploaded` is a row whose
+ * bytes went through the retired API relay before this deploy.
+ */
+const COMMITTABLE_UPLOAD_STATUSES: GarmentItem['upload_status'][] = [
+  'pending_upload',
+  'bytes_uploaded',
+]
 
 const COMMITTED_UPLOAD_STATUSES: ReadonlySet<GarmentItem['upload_status']> = new Set([
   'processing',
@@ -269,22 +337,6 @@ function isPrismaSerializationFailure(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
 }
 
-function assertCommitCandidate(
-  garment: GarmentItem | null,
-  userId: string,
-  input: CreateGarmentItemInput
-): asserts garment is GarmentItem {
-  if (!garment || garment.user_id !== userId) {
-    throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
-  }
-  if (garment.upload_session_id !== input.uploadSessionId) {
-    throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
-  }
-  if (garment.retention_status !== 'active') {
-    throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
-  }
-}
-
 function assertCommitReplayMatches(
   garment: GarmentItem,
   idempotencyKey: string,
@@ -295,6 +347,63 @@ function assertCommitReplayMatches(
     garment.commit_payload_hash !== payloadHash
   ) {
     throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+  }
+}
+
+type GarmentCommitRequest = {
+  userId: string
+  input: CreateGarmentItemInput
+  idempotencyKey: string
+  payloadHash: string
+}
+
+/** A commit of a session already past commit, answered with a read signed under the lock. */
+type GarmentCommitReplay = {
+  kind: 'replay'
+  garment: GarmentItem
+  response: GarmentItemResponse
+}
+
+/** What one locked read of the garment decided; see `classifyGarmentCommit`. */
+type GarmentCommitDecision =
+  | GarmentCommitReplay
+  | { kind: 'claimable' | 'claimed'; garment: GarmentItem; keys: UploadSessionKeys }
+
+/**
+ * Locks the garment row and reads it in the caller's transaction, so a legal hold, a rejection
+ * or a competing commit either landed before the read or waits for the transaction.
+ */
+async function lockGarmentRow(
+  tx: Prisma.TransactionClient,
+  garmentId: string
+): Promise<GarmentItem | null> {
+  await tx.$queryRaw`SELECT 1 FROM "GarmentItem" WHERE id = ${garmentId} FOR UPDATE`
+  return tx.garmentItem.findUnique({ where: { id: garmentId } })
+}
+
+/**
+ * A committable session that a new claim may take: not ended, not owned by another attempt's
+ * live claim (409 UPLOAD_IN_PROGRESS), and, while pending, not expired. A claim released before
+ * its owner wrote anything leaves the session open.
+ */
+function assertGarmentSessionOpen(garment: GarmentItem, now: Date): void {
+  if (garment.upload_ended_at) {
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
+  const liveClaim = unfinishedPublicationDeadline(
+    {
+      attemptId: garment.publish_attempt_id,
+      startedAt: garment.publish_started_at,
+      committable: true,
+    },
+    now
+  )
+  if (liveClaim) throw uploadInProgress()
+  if (
+    garment.upload_status === 'pending_upload' &&
+    (!garment.upload_expires_at || garment.upload_expires_at <= now)
+  ) {
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
   }
 }
 
@@ -321,8 +430,8 @@ function garmentData(
 
 @Injectable()
 export class WardrobeService {
-  private readonly uploadTokenSecret: string
   private readonly logger = createBaseLogger().child({ feature: 'wardrobe' })
+  private readonly deletions: WardrobeObjectDeletionOutbox
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -335,31 +444,37 @@ export class WardrobeService {
     @Inject(RitualService)
     private readonly ritualService: RitualService
   ) {
-    this.uploadTokenSecret = requireUploadTokenSecret()
+    this.deletions = new WardrobeObjectDeletionOutbox(prisma, storage)
   }
 
-  private uploadResponse(
+  /**
+   * A storage signed upload URL for the session's staging key. A replayed allocation signs
+   * afresh for the same key, unless the caller already signed it. The window the client is
+   * told is the shorter of the session and the token.
+   */
+  private async uploadResponse(
     garment: GarmentItem,
-    apiBase: string
-  ): UploadUrlResult['response'] {
+    signed: WardrobeUploadSession | null = null
+  ): Promise<UploadUrlResult['response']> {
     if (!garment.upload_session_id || !garment.upload_expires_at || !garment.mime_type) {
       throw new ConflictException('UPLOAD_SESSION_EXPIRED')
     }
+    const keys = garmentKeys(garment, 'allocate')
+    const session = signed ?? (await this.storage.createUploadSession(keys.stagingPath))
+    const expiresAt = Math.min(
+      garment.upload_expires_at.getTime(),
+      session.tokenExpiresAt.getTime()
+    )
     return {
       data: {
         garmentId: garment.id,
         uploadSessionId: garment.upload_session_id,
-        uploadUrl: `${apiBase}/api/v1/wardrobe/uploads/${garment.upload_session_id}`,
-        uploadToken: generateUploadToken(
-          garment.upload_session_id,
-          garment.user_id,
-          garment.upload_expires_at.toISOString(),
-          this.uploadTokenSecret
-        ),
+        uploadUrl: session.uploadUrl,
+        uploadToken: session.uploadToken,
         requiredHeaders: {
           'content-type': garment.mime_type as GarmentMimeType,
         },
-        expiresAt: garment.upload_expires_at.toISOString(),
+        expiresAt: new Date(expiresAt).toISOString(),
       },
     }
   }
@@ -371,8 +486,6 @@ export class WardrobeService {
     idempotencyKey: string
   ): Promise<UploadUrlResult> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
-    // Resolved before allocation: a missing base must fail before a session row is written.
-    const apiBase = publicApiUrl()
 
     const existing = await this.prisma.garmentItem.findUnique({
       where: {
@@ -383,26 +496,20 @@ export class WardrobeService {
       },
     })
     if (existing) {
-      if (!allocationMatches(existing, input)) {
-        throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
-      }
-      if (
-        existing.retention_status !== 'active' ||
-        existing.upload_status !== 'pending_upload' ||
-        !existing.upload_expires_at ||
-        existing.upload_expires_at <= new Date()
-      ) {
-        throw new ConflictException('UPLOAD_SESSION_EXPIRED')
-      }
-      return { replayed: true, response: this.uploadResponse(existing, apiBase) }
+      assertReplayableAllocation(existing, input)
+      return { replayed: true, response: await this.uploadResponse(existing) }
     }
 
+    if (!isWardrobePathSegment(userId)) {
+      throw uploadPathInvalid({ operation: 'allocate', kind: 'garment', rowId: userId })
+    }
     const garmentId = randomUUID()
     const uploadSessionId = randomUUID()
-    const objectPath = buildGarmentObjectPath(
-      userId,
-      garmentId,
-      deriveObjectExtension(input.mimeType)
+    const extension = objectExtensionFor(input.mimeType)
+    const objectPath = buildGarmentObjectPath(userId, garmentId, extension)
+    // Signed before the row is written, so a storage outage leaves no session behind.
+    const signed = await this.storage.createUploadSession(
+      buildWardrobeStagingObjectPath(userId, 'garment', uploadSessionId, extension)
     )
     const expiresAt = new Date(Date.now() + UPLOAD_EXPIRY_SECONDS * 1000)
 
@@ -425,7 +532,7 @@ export class WardrobeService {
           consent_checked_at: new Date(),
         },
       })
-      return { replayed: false, response: this.uploadResponse(created, apiBase) }
+      return { replayed: false, response: await this.uploadResponse(created, signed) }
     } catch (error) {
       if (!isUniqueConstraintError(error)) {
         throw error
@@ -438,99 +545,27 @@ export class WardrobeService {
           },
         },
       })
-      if (!raced || !allocationMatches(raced, input)) {
+      if (!raced) {
         throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
       }
-      if (
-        raced.retention_status !== 'active' ||
-        raced.upload_status !== 'pending_upload' ||
-        !raced.upload_expires_at ||
-        raced.upload_expires_at <= new Date()
-      ) {
-        throw new ConflictException('UPLOAD_SESSION_EXPIRED')
-      }
-      return { replayed: true, response: this.uploadResponse(raced, apiBase) }
-    }
-  }
-
-  async uploadBytes(
-    uploadSessionId: string,
-    uploadToken: string,
-    userId: string,
-    role: ApiRole,
-    mimeType: GarmentMimeType,
-    contentLength: number | undefined,
-    body: Buffer
-  ): Promise<void> {
-    const garment = await this.prisma.garmentItem.findUnique({
-      where: { upload_session_id: uploadSessionId },
-    })
-    if (!garment) {
-      throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
-    }
-    if (garment.user_id !== userId) {
-      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
-    }
-    if (garment.retention_status !== 'active') {
-      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
-    }
-    if (garment.upload_status !== 'pending_upload') {
-      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
-    }
-    if (!garment.upload_expires_at || garment.upload_expires_at <= new Date()) {
-      throw new ConflictException('UPLOAD_SESSION_EXPIRED')
-    }
-    if (
-      !verifyUploadToken(
-        uploadToken,
-        uploadSessionId,
-        userId,
-        garment.upload_expires_at.toISOString(),
-        this.uploadTokenSecret
-      )
-    ) {
-      throw new ForbiddenException('INVALID_UPLOAD_TOKEN')
-    }
-    if (contentLength === undefined || contentLength !== body.length) {
-      throw new BadRequestException('INVALID_UPLOAD_BODY')
-    }
-
-    const declaration = declarationFromGarment(garment)
-    if (mimeType !== declaration.mimeType) {
-      throw new BadRequestException('INVALID_UPLOAD_BODY')
-    }
-    try {
-      await verifyGarmentImage(body, declaration)
-    } catch (error) {
-      if (error instanceof GarmentImageValidationError) {
-        mapImageValidationError(error)
-      }
-      throw error
-    }
-
-    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
-    await this.storage.upload(garment.object_path!, body, declaration.mimeType)
-
-    const updated = await this.prisma.garmentItem.updateMany({
-      where: {
-        id: garment.id,
-        upload_status: 'pending_upload',
-        retention_status: 'active',
-      },
-      data: {
-        upload_status: 'bytes_uploaded',
-        consent_checked_at: new Date(),
-      },
-    })
-    if (updated.count !== 1) {
-      await this.storage.remove([garment.object_path!])
-      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
+      assertReplayableAllocation(raced, input)
+      return { replayed: true, response: await this.uploadResponse(raced) }
     }
   }
 
   private async toResponse(garment: GarmentItem): Promise<GarmentItemResponse> {
     if (!garment.object_path) {
       throw new ServiceUnavailableException('STORAGE_UNAVAILABLE')
+    }
+    // Parse-and-compare: this member's folder, the garment kind and this garment's own id, in any
+    // extension the bucket takes. No MIME is needed, so seeded ready rows (no MIME) keep their
+    // image.
+    if (!isOwnGarmentObject(garment)) {
+      throw uploadPathInvalid({
+        operation: 'sign_read',
+        kind: 'garment',
+        rowId: garment.id,
+      })
     }
     const readUrl = await this.storage.signReadUrl(
       garment.object_path,
@@ -781,20 +816,54 @@ export class WardrobeService {
     idempotencyKey: string
   ): Promise<CommitResult> {
     const payloadHash = commitPayloadHash(input)
-    const initial = await this.prisma.garmentItem.findUnique({
-      where: { id: input.garmentId },
-    })
-    assertCommitCandidate(initial, userId, input)
+    const request = { userId, input, idempotencyKey, payloadHash }
 
-    if (COMMITTED_UPLOAD_STATUSES.has(initial.upload_status)) {
-      return this.replayCommittedGarment(initial, idempotencyKey, payloadHash)
-    }
-    if (initial.upload_status !== 'bytes_uploaded') {
-      throw new BadRequestException('INVALID_GARMENT_COMMIT')
-    }
-
+    // Every decision comes from one locked read of the row (see classifyGarmentCommit): a replay
+    // is answered from it, and so is everything that ends or blocks the session.
+    const preflight = await this.classifyGarmentCommit(request, null)
+    if (preflight.kind === 'replay') return this.finishReplay(preflight)
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
-    await this.verifyStoredGarment(initial)
+
+    // Publication ownership comes before any storage I/O: only the attempt that claims it reads
+    // staging, verifies, publishes and moves the row on. A concurrent commit of the same session
+    // replays the owner's outcome or answers UPLOAD_IN_PROGRESS without touching storage, so no
+    // second write of the final key can land after the owner's purge, erasure or replacement.
+    const publishAttemptId = randomUUID()
+    const decision = await this.classifyGarmentCommit(request, publishAttemptId)
+    if (decision.kind === 'replay') return this.finishReplay(decision)
+    const { garment: initial, keys } = decision
+
+    // The client wrote staging; commit verifies those bytes and writes exactly the verified
+    // buffer to the final key itself, with server-owned type and cache policy. Staging keys take
+    // one write, so the verified bytes are the only ones a staging key ever holds. Staging stays
+    // until the claim succeeds: a crash anywhere before it leaves a retry, once this claim's
+    // lease runs out, able to verify and publish again. A legacy row's bytes went through the
+    // retired relay and already sit at the final path.
+    const fromStaging = initial.upload_status === 'pending_upload'
+    let publishStarted = false
+    try {
+      if (fromStaging) {
+        const bytes = await this.verifyStoredGarment(
+          initial,
+          keys.stagingPath,
+          publishAttemptId
+        )
+        publishStarted = true
+        await this.storage.publish(
+          keys.finalPath,
+          bytes,
+          initial.mime_type as GarmentMimeType
+        )
+      } else {
+        await this.verifyStoredGarment(initial, keys.finalPath, publishAttemptId)
+      }
+    } catch (error) {
+      // Released only when no write of the final key was started: a publish that failed may
+      // still land, so its claim stays until the lease runs out and a deletion meeting it waits.
+      if (!publishStarted)
+        await this.releaseGarmentPublication(initial.id, publishAttemptId)
+      throw error
+    }
 
     let committed: GarmentItem
     try {
@@ -803,50 +872,266 @@ export class WardrobeService {
         userId,
         input,
         idempotencyKey,
-        payloadHash
+        payloadHash,
+        publishAttemptId
       )
     } catch (error) {
-      const replay = await this.reconcileConcurrentCommit(
-        initial.id,
-        idempotencyKey,
-        payloadHash
-      )
-      if (replay) return replay
+      const replay = await this.replayIfCommitted(request)
+      if (replay) return this.finishReplay(replay)
+      // The publish returned, so the write has landed; nothing of this attempt is in flight.
+      await this.releaseGarmentPublication(initial.id, publishAttemptId)
+      if (fromStaging) await this.releaseUnclaimedFinal(initial, keys.finalPath)
       throw error
     }
 
     await this.ensureProcessingHandoff(committed)
+    if (fromStaging) {
+      await this.deletions.recordAndRemove([keys.stagingPath], 'commit_staging_released')
+    }
     await this.emitUploadCompletionTelemetry(userId, committed)
 
-    const refreshed = await this.prisma.garmentItem.findUniqueOrThrow({
-      where: { id: committed.id },
+    return { replayed: false, response: await this.committedResponse(committed.id) }
+  }
+
+  /**
+   * Classifies a commit from one fresh read of the garment, taken under its row lock, so no
+   * transition (a winning commit, a legal hold, a rejection, a released claim) can fall between
+   * two reads and be misread. In order: ownership, retention (before any read is signed or any
+   * job enqueued), session identity, a replay of a commit that already moved the row on, the
+   * ended state, a live claim of another attempt, and expiry. A session with no live claim,
+   * including one whose owner released a claim before writing, is claimable and never answered
+   * as expired while it is open. With `claimAttemptId`, a claimable session is claimed for it in
+   * the same transaction.
+   */
+  private async classifyGarmentCommit(
+    request: GarmentCommitRequest,
+    claimAttemptId: string | null
+  ): Promise<GarmentCommitDecision> {
+    const { userId, input, idempotencyKey, payloadHash } = request
+    return interactiveTransaction(this.prisma, async (tx) => {
+      const garment = await lockGarmentRow(tx, input.garmentId)
+      if (!garment || garment.user_id !== userId) {
+        throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
+      }
+      if (garment.retention_status !== 'active') {
+        throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
+      }
+      if (
+        garment.upload_session_id === null &&
+        garment.upload_status === 'pending_upload'
+      ) {
+        // A session a rejection cleared before upload_ended_at existed.
+        throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+      }
+      if (garment.upload_session_id !== input.uploadSessionId) {
+        throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+      }
+      if (COMMITTED_UPLOAD_STATUSES.has(garment.upload_status)) {
+        assertCommitReplayMatches(garment, idempotencyKey, payloadHash)
+        return { kind: 'replay', garment, response: await this.toResponse(garment) }
+      }
+      if (!COMMITTABLE_UPLOAD_STATUSES.includes(garment.upload_status)) {
+        throw new BadRequestException('INVALID_GARMENT_COMMIT')
+      }
+      const now = new Date()
+      assertGarmentSessionOpen(garment, now)
+      const keys = garmentKeys(garment, 'commit')
+      if (!claimAttemptId) return { kind: 'claimable', garment, keys }
+      // Compare-and-set on the claim as read; the row lock already keeps it from moving. The
+      // cleanup horizon is recorded with the claim, before any storage I/O, and survives the
+      // lease, a takeover and success: purge and deletion repeat their removal until then.
+      const cleanupUntil = nextCleanupHorizon(garment.publish_cleanup_until, now)
+      const claimed = await tx.garmentItem.updateMany({
+        where: {
+          id: garment.id,
+          upload_session_id: garment.upload_session_id,
+          publish_attempt_id: garment.publish_attempt_id,
+        },
+        data: {
+          publish_attempt_id: claimAttemptId,
+          publish_started_at: now,
+          publish_cleanup_until: cleanupUntil,
+        },
+      })
+      if (claimed.count !== 1) throw uploadInProgress()
+      return {
+        kind: 'claimed',
+        garment: {
+          ...garment,
+          publish_attempt_id: claimAttemptId,
+          publish_started_at: now,
+          publish_cleanup_until: cleanupUntil,
+        },
+        keys,
+      }
     })
-    return { replayed: false, response: await this.toResponse(refreshed) }
   }
 
-  private async replayCommittedGarment(
-    garment: GarmentItem,
-    idempotencyKey: string,
-    payloadHash: string
-  ): Promise<CommitResult> {
-    assertCommitReplayMatches(garment, idempotencyKey, payloadHash)
-    if (garment.upload_status === 'processing') {
-      await this.ensureProcessingHandoff(garment)
+  /**
+   * After a failed claim of the row, the commit that won it, when it already moved the row on:
+   * classified from one locked read like {@link classifyGarmentCommit}, so a garment that left
+   * `active` is refused before anything is signed. Null when no commit moved the row on.
+   */
+  private async replayIfCommitted(
+    request: GarmentCommitRequest
+  ): Promise<GarmentCommitReplay | null> {
+    const { userId, input, idempotencyKey, payloadHash } = request
+    return interactiveTransaction(this.prisma, async (tx) => {
+      const garment = await lockGarmentRow(tx, input.garmentId)
+      if (
+        !garment ||
+        garment.user_id !== userId ||
+        garment.upload_session_id !== input.uploadSessionId ||
+        !COMMITTED_UPLOAD_STATUSES.has(garment.upload_status)
+      ) {
+        return null
+      }
+      if (garment.retention_status !== 'active') {
+        throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
+      }
+      assertCommitReplayMatches(garment, idempotencyKey, payloadHash)
+      return { kind: 'replay', garment, response: await this.toResponse(garment) }
+    })
+  }
+
+  /** A replay's read was signed under the row lock; a processing row still needs its job. */
+  private async finishReplay(replay: GarmentCommitReplay): Promise<CommitResult> {
+    if (replay.garment.upload_status === 'processing') {
+      await this.ensureProcessingHandoff(replay.garment)
     }
-    return { replayed: true, response: await this.toResponse(garment) }
+    return { replayed: true, response: replay.response }
   }
 
-  private async verifyStoredGarment(garment: GarmentItem): Promise<void> {
-    const storedBytes = await this.storage.download(garment.object_path!)
+  /**
+   * The response of a commit that just moved the row on, read and signed under the row lock: a
+   * garment that left `active` meanwhile is answered without image access.
+   */
+  private async committedResponse(garmentId: string): Promise<GarmentItemResponse> {
+    return interactiveTransaction(this.prisma, async (tx) => {
+      const garment = await lockGarmentRow(tx, garmentId)
+      if (!garment) throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
+      if (garment.retention_status !== 'active') {
+        return { data: garmentData(garment, null) }
+      }
+      return this.toResponse(garment)
+    })
+  }
+
+  /** Gives the publication back when this attempt never started writing the final key. */
+  private async releaseGarmentPublication(
+    garmentId: string,
+    attemptId: string
+  ): Promise<void> {
+    await this.prisma.garmentItem
+      .updateMany({
+        where: { id: garmentId, publish_attempt_id: attemptId },
+        data: { publish_attempt_id: null, publish_started_at: null },
+      })
+      .catch(() => undefined)
+  }
+
+  /**
+   * A published final object nothing will claim: the session was replaced or ended, or the
+   * garment left `active`. A claim that failed while the row still holds this session leaves the
+   * object for the member's retry, which publishes the same bytes again; the staging sweep
+   * removes it if no retry comes.
+   */
+  private async releaseUnclaimedFinal(
+    initial: GarmentItem,
+    finalPath: string
+  ): Promise<void> {
+    const current = await this.prisma.garmentItem.findUnique({
+      where: { id: initial.id },
+    })
+    if (
+      current &&
+      current.upload_session_id === initial.upload_session_id &&
+      current.upload_ended_at === null &&
+      current.retention_status === 'active'
+    ) {
+      return
+    }
+    await this.deletions.recordAndRemove([finalPath], 'commit_compensation')
+  }
+
+  /**
+   * The server never sees the bytes in flight, so this is where they are checked: the uploaded
+   * object must match the declared size, sniffed type, sha256 and dimensions. It is read through
+   * a hard ceiling, so an oversized object never sits in memory whole. A mismatch is removed and
+   * the session ends, so a corrected upload needs a fresh allocation and a fresh key; a validator
+   * still running for this session can then only touch a dead session's key. Returns the
+   * verified bytes.
+   */
+  private async verifyStoredGarment(
+    garment: GarmentItem,
+    objectPath: string,
+    publishAttemptId: string
+  ): Promise<Buffer> {
+    const declaration = declarationFromGarment(garment)
+    const stored = await this.storage.downloadBounded(objectPath, MAX_GARMENT_IMAGE_BYTES)
+    if (stored.status === 'missing') {
+      throw new ConflictException('UPLOAD_BYTES_MISSING')
+    }
     try {
-      await verifyGarmentImage(storedBytes, declarationFromGarment(garment))
+      if (stored.status === 'too_large') {
+        throw new GarmentImageValidationError('IMAGE_SIZE_MISMATCH')
+      }
+      await verifyGarmentImage(stored.bytes, declaration)
+      return stored.bytes
     } catch (error) {
       if (error instanceof GarmentImageValidationError) {
-        await this.storage.remove([garment.object_path!]).catch(() => undefined)
+        await this.rejectGarmentUpload(garment, objectPath, publishAttemptId)
         mapImageValidationError(error)
       }
       throw error
     }
+  }
+
+  /**
+   * Ends the session explicitly with `upload_ended_at`, so no commit, replay or claim can take it
+   * again, while the row keeps its session id: the outbox and the staging sweep still find the
+   * garment a staging key belongs to, and keep it while the garment is under legal hold. The
+   * update is guarded on active retention, this attempt's publication claim (the only attempt
+   * that verifies the session) and the session itself, and the rejected object is recorded for
+   * removal in the same transaction only when that update changed the row. A hold that landed
+   * after the claim leaves the session and its staged bytes exactly as they are. The retention
+   * sweep later removes the row.
+   */
+  private async rejectGarmentUpload(
+    garment: GarmentItem,
+    objectPath: string,
+    publishAttemptId: string
+  ): Promise<void> {
+    const reason: WardrobeDeletionReason = 'upload_rejected'
+    const ended = await interactiveTransaction(this.prisma, async (tx) => {
+      const now = new Date()
+      const changed = await tx.garmentItem.updateMany({
+        where: {
+          id: garment.id,
+          user_id: garment.user_id,
+          upload_session_id: garment.upload_session_id,
+          publish_attempt_id: publishAttemptId,
+          retention_status: 'active',
+          upload_ended_at: null,
+          upload_status: { in: COMMITTABLE_UPLOAD_STATUSES },
+        },
+        data: {
+          upload_status: 'pending_upload',
+          upload_ended_at: now,
+          upload_expires_at: now,
+          publish_attempt_id: null,
+          publish_started_at: null,
+        },
+      })
+      if (changed.count !== 1) return false
+      await this.deletions.record(tx, [objectPath], reason)
+      return true
+    })
+    if (!ended) {
+      this.logger.warn({ garmentId: garment.id }, 'garment_rejection_left_session_open')
+      return
+    }
+    await this.deletions.removeNow([objectPath])
   }
 
   private async transitionGarmentToProcessing(
@@ -854,7 +1139,8 @@ export class WardrobeService {
     userId: string,
     input: CreateGarmentItemInput,
     idempotencyKey: string,
-    payloadHash: string
+    payloadHash: string,
+    publishAttemptId: string
   ): Promise<GarmentItem> {
     for (
       let attempt = 1;
@@ -882,11 +1168,15 @@ export class WardrobeService {
                 id: initial.id,
                 user_id: userId,
                 upload_session_id: input.uploadSessionId,
-                upload_status: 'bytes_uploaded',
+                upload_status: { in: COMMITTABLE_UPLOAD_STATUSES },
                 retention_status: 'active',
+                // Only the attempt that owns the publication moves the row on.
+                publish_attempt_id: publishAttemptId,
               },
               data: {
                 upload_status: 'processing',
+                publish_attempt_id: null,
+                publish_started_at: null,
                 committed_at: new Date(),
                 commit_idempotency_key: idempotencyKey,
                 commit_payload_hash: payloadHash,
@@ -943,41 +1233,9 @@ export class WardrobeService {
     }
   }
 
-  private async reconcileConcurrentCommit(
-    garmentId: string,
-    idempotencyKey: string,
-    payloadHash: string
-  ): Promise<CommitResult | null> {
-    const raced = await this.prisma.garmentItem.findUnique({
-      where: { id: garmentId },
-    })
-    if (
-      raced?.upload_status !== 'processing' &&
-      raced?.upload_status !== 'awaiting_tags' &&
-      raced?.upload_status !== 'ready'
-    ) {
-      return null
-    }
-    if (
-      raced.commit_idempotency_key !== idempotencyKey ||
-      raced.commit_payload_hash !== payloadHash
-    ) {
-      throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
-    }
-    if (raced.upload_status === 'processing') {
-      await this.ensureProcessingHandoff(raced)
-    }
-    return { replayed: true, response: await this.toResponse(raced) }
-  }
-
   private async ensureProcessingHandoff(garment: GarmentItem): Promise<void> {
-    if (garment.processing_job_enqueued_at) {
-      return
-    }
-    await this.processingQueue.enqueue(garment.id)
-    await this.prisma.garmentItem.updateMany({
-      where: { id: garment.id, processing_job_enqueued_at: null },
-      data: { processing_job_enqueued_at: new Date() },
-    })
+    // Under the job id the row derives, so a garment a legal hold deferred is queued again
+    // after its release instead of hitting the first job's retained id.
+    await handOffGarmentProcessing(this.prisma, this.processingQueue, garment)
   }
 }

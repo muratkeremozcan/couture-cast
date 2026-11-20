@@ -1,5 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 4.4 Task 7 step 1 owner: prove the silhouette-slider and "My Form"
 // Zod schemas parse and reject correctly.
 import { beforeAll, describe, expect, it } from 'vitest'
@@ -305,14 +307,9 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
           statuses: ['200', '201', '400', '401', '403', '409'],
         },
         {
-          method: 'put',
-          path: '/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}',
-          statuses: ['204', '400', '401', '403', '404'],
-        },
-        {
           method: 'post',
           path: '/api/v1/wardrobe/silhouette/my-form/commit',
-          statuses: ['200', '201', '400', '401', '403', '404', '409'],
+          statuses: ['200', '201', '400', '401', '403', '404', '409', '415', '422'],
         },
         {
           method: 'delete',
@@ -383,27 +380,37 @@ describe('Wardrobe Silhouette HTTP Contracts', () => {
       )
     })
 
-    it('declares the raw My Form upload token/content-type headers and binary body (HIGH 4, bmad-code-review)', () => {
-      const uploadBytesPut =
-        spec.paths?.['/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}']?.put
-      expect(uploadBytesPut?.parameters).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'x-upload-token',
-            in: 'header',
-            required: true,
-          }),
-          expect.objectContaining({ name: 'content-type', in: 'header', required: true }),
-        ])
+    // The My Form bytes go straight to the storage signed URL that upload-url returns, so the
+    // relay PUT this once documented (HIGH 4, bmad-code-review) is gone with its route.
+    // Review round 1, 2026-11-19: the My Form conflict schema could not parse the refusals
+    // commit answers now that it is the only byte check.
+    it('documents every conflict the My Form commit answers', () => {
+      const conflict = spec.components?.schemas?.['SilhouetteCommitConflictError'] as
+        | { properties?: { message?: { enum?: string[] } } }
+        | undefined
+      expect(conflict?.properties?.message?.enum).toEqual([
+        'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
+        'IDEMPOTENCY_KEY_REUSED',
+        'UPLOAD_ALREADY_CLAIMED',
+        'UPLOAD_BYTES_MISSING',
+        'UPLOAD_SESSION_EXPIRED',
+        // Round 4: another commit of the session owns its publication right now.
+        'UPLOAD_IN_PROGRESS',
+      ])
+      expect(
+        spec.paths?.['/api/v1/wardrobe/silhouette/my-form/commit']?.post?.responses?.[
+          '409'
+        ]
+      ).toHaveProperty(
+        'content.application/json.schema.$ref',
+        '#/components/schemas/SilhouetteCommitConflictError'
       )
-      expect(uploadBytesPut?.requestBody).toMatchObject({
-        required: true,
-        content: {
-          'image/jpeg': { schema: { type: 'string', format: 'binary' } },
-          'image/png': { schema: { type: 'string', format: 'binary' } },
-          'image/webp': { schema: { type: 'string', format: 'binary' } },
-        },
-      })
+    })
+
+    it('documents no My Form byte relay', () => {
+      expect(
+        spec.paths?.['/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}']
+      ).toBeUndefined()
     })
 
     it('does not require `error` on the 428 precondition-required envelope', () => {

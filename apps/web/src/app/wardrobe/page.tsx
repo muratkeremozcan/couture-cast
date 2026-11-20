@@ -23,6 +23,7 @@ import {
   getOnboardingStateFromWeb,
   resolveCurrentUserId,
 } from '../../lib/wardrobe'
+import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 
 export default function WardrobePage() {
   return (
@@ -58,6 +59,12 @@ function WardrobeHubView() {
   const isCaptureOpenRef = useRef(false)
   const pollingControllerRef = useRef<AbortController | null>(null)
   const silhouetteButtonRef = useRef<HTMLButtonElement | null>(null)
+  /**
+   * The account, setup progress and closet reads below run once at mount. One that ran before
+   * this tab held a verified bearer (a new tab, a mount while verification still runs) reads
+   * again when the verified identity is published, instead of leaving "Your session expired".
+   */
+  const { attempt: sessionAttempt, missed: missedSession } = useRetryOnVerifiedSession()
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureModalOpen
@@ -74,12 +81,15 @@ function WardrobeHubView() {
    */
   useEffect(() => {
     const controller = new AbortController()
+    setUserIdError(false)
     void resolveCurrentUserId()
       .then((id) => {
         if (!controller.signal.aborted) setUserId(id)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setUserIdError(true)
+        if (controller.signal.aborted) return
+        setUserIdError(true)
+        missedSession()
       })
     void getOnboardingStateFromWeb(controller.signal)
       .then((state) => {
@@ -89,10 +99,12 @@ function WardrobeHubView() {
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setOnboardingStatusError(true)
+        if (controller.signal.aborted) return
+        setOnboardingStatusError(true)
+        missedSession()
       })
     return () => controller.abort()
-  }, [])
+  }, [sessionAttempt, missedSession])
 
   const retryOnboardingStatus = () => {
     setOnboardingStatusError(false)
@@ -113,6 +125,7 @@ function WardrobeHubView() {
           setLoadError(
             error instanceof Error ? error.message : 'Unable to load your wardrobe.'
           )
+          missedSession()
         }
       })
       .finally(() => {
@@ -120,11 +133,10 @@ function WardrobeHubView() {
           setIsLoading(false)
         }
       })
-    return () => {
-      controller.abort()
-      pollingControllerRef.current?.abort()
-    }
-  }, [])
+    return () => controller.abort()
+  }, [sessionAttempt, missedSession])
+
+  useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -391,8 +403,16 @@ function WardrobeHubView() {
                       </div>
                     )}
                     <div className="flex flex-col gap-2 p-3">
-                      <span className="block truncate font-mono text-xs text-zinc-500">
-                        {garment.id}
+                      <span
+                        data-testid="garment-card-label"
+                        className="block truncate text-sm font-medium capitalize text-zinc-700 dark:text-zinc-200"
+                      >
+                        {garment.category
+                          ? [garment.category, garment.material]
+                              .filter(Boolean)
+                              .join(' · ')
+                              .replace(/_/g, ' ')
+                          : 'Untagged'}
                       </span>
                       <div className="flex items-center justify-between">
                         <span

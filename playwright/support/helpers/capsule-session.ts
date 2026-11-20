@@ -55,7 +55,15 @@ const SEEDED_GARMENT_CATEGORIES = ['top', 'bottom', 'shoes'] as const
  * The capsule list and the garment list are fetched together, so an unstubbed
  * second page fails the whole refresh rather than just the images.
  */
-export function stubGarmentLibrary(page: Page): void {
+export type LibraryGarment = { id: string; category: string }
+
+export function stubGarmentLibrary(
+  page: Page,
+  garments: readonly LibraryGarment[] = SEEDED_GARMENT_IDS.map((id, index) => ({
+    id,
+    category: SEEDED_GARMENT_CATEGORIES[index] ?? 'top',
+  }))
+): void {
   void interceptNetworkCall({
     page,
     method: 'GET',
@@ -63,10 +71,10 @@ export function stubGarmentLibrary(page: Page): void {
     fulfillResponse: {
       status: 200,
       body: {
-        data: SEEDED_GARMENT_IDS.map((id, index) => ({
+        data: garments.map(({ id, category }) => ({
           id,
           status: 'ready',
-          category: SEEDED_GARMENT_CATEGORIES[index] ?? 'top',
+          category,
           material: 'cotton',
           comfortRange: 'mild',
           tagsConfirmedAt: '2026-08-07T10:00:00.000Z',

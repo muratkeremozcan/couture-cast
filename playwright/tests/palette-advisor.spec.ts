@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Covers `/palette`, `palette-advisor-panel.tsx` and
 // `apps/web/src/lib/palette-advisor.ts`.
 //
@@ -31,6 +33,13 @@ import {
   type PremiumSession,
 } from '../support/helpers/premium-session'
 import { test as anonymousTest } from '../support/fixtures/merged-fixtures'
+import { writePhonePhoto } from '../support/helpers/phone-camera-photo'
+import {
+  VERCEL_FUNCTION_MAX_BODY_BYTES,
+  vercelFunctionBodyLimit,
+  watchPuts,
+} from '../support/helpers/vercel-function-body-limit'
+import { expectSignedStorageUpload } from '../support/helpers/storage-upload-url'
 
 const PALETTE_PATH = '/api/v1/commerce/premium/palette'
 const PALETTE_URL = `**${PALETTE_PATH}`
@@ -411,6 +420,62 @@ premiumSeededTest.describe(
         await expect(
           page.getByTestId(`palette-advisor-saved-${SEEDED_FOUNDATION_ITEM_KEY}`)
         ).toBeVisible()
+      }
+    )
+
+    // Production follow-up 2026-11-19: upload bytes went through a Vercel Function, which
+    // refuses a body over about 4.5 MB before the API sees it. A phone selfie saved as PNG is
+    // over that, so production refuses it while the uncapped local API passes it.
+    premiumSeededTest(
+      '[P0] 5.4-E2E-015 commits a phone-size PNG selfie larger than a function body can carry',
+      async (
+        { premiumSession: _premiumSession, page, interceptNetworkCall },
+        testInfo
+      ) => {
+        const photoPath = testInfo.outputPath('selfie-phone-photo.png')
+        const photoBytes = await writePhonePhoto(photoPath, {
+          width: 1536,
+          height: 2048,
+          format: 'png',
+        })
+        // The picker takes it (10 MiB cap), and a function body cannot carry it.
+        expect(photoBytes).toBeGreaterThan(VERCEL_FUNCTION_MAX_BODY_BYTES)
+        expect(photoBytes).toBeLessThan(10 * 1024 * 1024)
+
+        void interceptNetworkCall({
+          method: 'PUT',
+          url: '**/api/v1/**',
+          handler: vercelFunctionBodyLimit(),
+        })
+        const allocation = interceptNetworkCall({
+          method: 'POST',
+          url: '**/api/v1/commerce/premium/palette/selfie/upload-url',
+        })
+        const uploads = watchPuts(page)
+
+        await log.step('Grant consent so the selfie source shows')
+        await openPalette(page, interceptNetworkCall)
+        const consent = watchPaletteCall(
+          interceptNetworkCall,
+          'POST',
+          `**${PALETTE_PATH}/consent`
+        )
+        await page.getByTestId('palette-advisor-consent-grant').click()
+        expect((await consent).status).toBe(200)
+
+        await log.step('Choose the selfie and assert the commit lands')
+        const commit = watchPaletteCall(
+          interceptNetworkCall,
+          'POST',
+          `**${PALETTE_PATH}/selfie/commit`
+        )
+        await page.getByTestId('palette-advisor-selfie-input').setInputFiles(photoPath)
+        expect((await commit).status).toBe(201)
+        // The photo went to the signed storage URL and nowhere else.
+        const { responseJson } = await allocation
+        const { uploadUrl } = (responseJson as { data: { uploadUrl: string } }).data
+        expectSignedStorageUpload(uploadUrl)
+        expect(uploads).toEqual([uploadUrl])
       }
     )
   }

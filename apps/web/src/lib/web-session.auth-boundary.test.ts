@@ -292,6 +292,122 @@ describe('Story 6.5 R16 V1: session publication across real authenticated HTTP',
     expect(events).toEqual(['Bearer bearer-a', 'Bearer bearer-b'])
   })
 
+  /**
+   * Production follow-up 2026-11-19, review round 4 (C3-9): upload attempts belong to the
+   * verified account. A token refresh keeps them; an auth state change to another account
+   * forgets them and fences an upload still under way, with no explicit sign-out involved.
+   */
+  it('keeps open upload attempts across a token refresh and forgets and fences them on an SDK account switch', async () => {
+    sdk.session = session('principal-a', 'bearer-a')
+    const switchVerified = gate()
+    installHandlers(
+      http.get(profilePath, async ({ request }) => {
+        const header = request.headers.get('authorization')
+        if (header === 'Bearer bearer-b') await switchVerified.promise
+        return HttpResponse.json(
+          profile(header === 'Bearer bearer-b' ? 'app-b' : 'app-a')
+        )
+      })
+    )
+    const { auth } = await modules()
+    const uploads = await import('./upload-attempts')
+    cleanups.push(await auth.startWebSession())
+    expect(uploads.currentUploadSession().account).toBe('app-a')
+
+    let counter = 0
+    const store = uploads.createUploadAttempts<{ uploadSessionId: string }>(
+      () => `key-${(counter += 1)}`
+    )
+    await expect(
+      uploads.runTrackedUpload(store, uploads.currentUploadSession(), 'photo', {
+        allocate: (key) => Promise.resolve({ uploadSessionId: `session-${key}` }),
+        upload: () => Promise.reject(new TypeError('Failed to fetch')),
+        commit: () => Promise.resolve('unreached'),
+      })
+    ).rejects.toThrow('Failed to fetch')
+
+    sdk.session = session('principal-a', 'bearer-a-refreshed')
+    await expect(auth.resolveWebSessionToken()).resolves.toBe('bearer-a-refreshed')
+    expect(store.size).toBe(1)
+
+    let answerLateAllocation: (allocation: { uploadSessionId: string }) => void = () =>
+      undefined
+    const lateUpload = vi.fn(() => Promise.resolve())
+    const underWay = uploads.runTrackedUpload(
+      store,
+      uploads.currentUploadSession(),
+      'other-photo',
+      {
+        allocate: () =>
+          new Promise((resolve) => {
+            answerLateAllocation = resolve
+          }),
+        upload: lateUpload,
+        commit: () => Promise.resolve('unreached'),
+      }
+    )
+
+    sdk.session = session('principal-b', 'bearer-b')
+    sdk.listener!('SIGNED_IN', sdk.session)
+    try {
+      await vi.waitFor(() => expect(auth.webSessionIdentity()).toBeNull())
+      expect(store.size).toBe(0)
+      answerLateAllocation({ uploadSessionId: 'late-session-of-a' })
+      await expect(underWay).rejects.toMatchObject({ name: 'UploadSessionChangedError' })
+      expect(lateUpload).not.toHaveBeenCalled()
+      expect(store.size).toBe(0)
+    } finally {
+      switchVerified.release()
+    }
+    await vi.waitFor(() => expect(auth.webSessionIdentity()).toBe('app-b'))
+    expect(uploads.currentUploadSession().account).toBe('app-b')
+  })
+
+  /**
+   * Learning path Step 58: Image uploads straight to storage.
+   * See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+   *
+   * Final review F-1: a subscriber that reads the moment it hears of an account change (the My
+   * Form panel reloads its profile there) must find the bearer of the account it was told
+   * about: no bearer once A is gone, B's bearer once B is the account, none after sign-out.
+   */
+  it('publishes each account change together with its bearer, so a listener never reads the previous bearer', async () => {
+    sdk.session = session('principal-a', 'bearer-a')
+    installHandlers(
+      http.get(profilePath, ({ request }) =>
+        HttpResponse.json(
+          profile(
+            request.headers.get('authorization') === 'Bearer bearer-b' ? 'app-b' : 'app-a'
+          )
+        )
+      )
+    )
+    const { auth } = await modules()
+    const uploads = await import('./upload-attempts')
+    cleanups.push(await auth.startWebSession())
+    const heard: { account: string | null; bearer: string | null }[] = []
+    cleanups.push(
+      uploads.onUploadSessionChange(() =>
+        heard.push({
+          account: uploads.currentUploadSession().account,
+          bearer: sessionStorage.getItem(bearerKey),
+        })
+      )
+    )
+
+    sdk.session = session('principal-b', 'bearer-b')
+    sdk.listener!('SIGNED_IN', sdk.session)
+    await vi.waitFor(() => expect(auth.webSessionIdentity()).toBe('app-b'))
+    await auth.signOutWebSession()
+
+    expect(heard).toEqual([
+      { account: null, bearer: null },
+      { account: 'app-b', bearer: 'bearer-b' },
+      { account: null, bearer: null },
+      { account: null, bearer: null },
+    ])
+  })
+
   it('refreshes a same-owner SDK token and sends the fresh bearer while keeping canonical identity', async () => {
     sdk.session = session('principal-a', 'initial-token')
     const profiles: (string | null)[] = []

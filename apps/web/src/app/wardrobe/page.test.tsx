@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
 import React from 'react'
 import { render, screen, waitFor, within } from '@testing-library/react'
@@ -240,15 +242,48 @@ describe('WardrobePage persistence', () => {
 
     await screen.findByText('Garment Upload Complete!')
     expect(uploadGarmentImageFromWeb).toHaveBeenCalledOnce()
-    expect(screen.getByText(persistedGarment.id)).toBeInTheDocument()
+    expectPersistedGarmentCard(screen.getByTestId(`garment-card-${persistedGarment.id}`))
 
     firstRender.unmount()
     render(<WardrobePage />)
 
     await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText(persistedGarment.id)).toBeInTheDocument()
+    expectPersistedGarmentCard(
+      await screen.findByTestId(`garment-card-${persistedGarment.id}`)
+    )
   })
 })
+
+describe('WardrobePage garment card label', () => {
+  beforeEach(() => {
+    getOnboardingStateFromWeb.mockReset().mockResolvedValue(onboardingState())
+    resolveCurrentUserId.mockReset().mockResolvedValue('user-hub-1')
+    getSilhouetteProfileFromWeb.mockReset().mockResolvedValue(silhouetteProfile())
+  })
+
+  it('names a tagged garment by category and material, never by its id', async () => {
+    const tagged = garmentFixture('tagged-garment-1', 'ready', {
+      category: 'top',
+      material: 'cotton',
+    })
+    listGarmentsFromWeb.mockReset().mockResolvedValue([tagged])
+
+    render(<WardrobePage />)
+
+    const card = await screen.findByTestId(`garment-card-${tagged.id}`)
+    expect(within(card).getByTestId('garment-card-label')).toHaveTextContent(
+      'top · cotton'
+    )
+    expect(card).not.toHaveTextContent(tagged.id)
+  })
+})
+
+// The card names the garment by its tags (Untagged before tagging) and never prints its id:
+// Jade saw raw garment UUIDs on every card on 2026-11-19.
+function expectPersistedGarmentCard(card: HTMLElement) {
+  expect(within(card).getByTestId('garment-card-label')).toHaveTextContent('Untagged')
+  expect(card).not.toHaveTextContent(persistedGarment.id)
+}
 
 describe('WardrobePage onboarding entry card', () => {
   beforeEach(() => {
