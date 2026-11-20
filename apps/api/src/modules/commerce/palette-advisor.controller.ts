@@ -11,17 +11,13 @@ import {
   Headers,
   HttpCode,
   Inject,
-  Param,
-  PayloadTooLargeException,
   Post,
   Put,
   Query,
-  Req,
   Res,
-  UnsupportedMediaTypeException,
   UseGuards,
 } from '@nestjs/common'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { z } from 'zod'
 import {
   analyzePaletteInputSchema,
@@ -30,7 +26,6 @@ import {
   createPaletteSelfieUploadUrlInputSchema,
   deletePaletteAdvisorResponseSchema,
   paletteAdvisorProfileResponseSchema,
-  paletteSelfieUploadSessionPathParamsSchema,
   setPaletteConsentInputSchema,
   setPaletteConsentResponseSchema,
   updateAdvisorRecommendationInputSchema,
@@ -41,9 +36,6 @@ import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeUploadGuard } from '../wardrobe/wardrobe.guard.js'
 import { PremiumEntitlementGuard } from './premium-entitlement.guard.js'
 import { PaletteAdvisorService } from './palette-advisor.service.js'
-
-const MAX_SELFIE_BYTES = 10_485_760
-const selfieMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp'])
 
 function validationMessage(prefix: string, error: z.ZodError): string {
   const details = error.issues
@@ -138,49 +130,6 @@ export class PaletteAdvisorController {
     )
     res.status(result.replayed ? 200 : 201)
     return result.response
-  }
-
-  @Put('selfie/uploads/:uploadSessionId')
-  @HttpCode(204)
-  @UseGuards(RequestAuthGuard)
-  async uploadSelfieBytes(
-    @AuthContext() auth: RequestAuthContext,
-    @Param('uploadSessionId') uploadSessionIdParam: string,
-    @Headers('x-upload-token') uploadToken: string,
-    @Headers('content-type') mimeType: string,
-    @Headers('content-length') contentLengthHeader: string | undefined,
-    @Req() request: Request
-  ) {
-    const { uploadSessionId } = paletteSelfieUploadSessionPathParamsSchema.parse({
-      uploadSessionId: uploadSessionIdParam,
-    })
-
-    if (!uploadToken) {
-      throw new BadRequestException('Missing upload token header')
-    }
-    const parsedMimeType = selfieMimeTypeSchema.safeParse(mimeType)
-    if (!parsedMimeType.success) {
-      throw new UnsupportedMediaTypeException('UNSUPPORTED_IMAGE_TYPE')
-    }
-
-    const rawBody = (request as unknown as { body?: unknown }).body
-    const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.alloc(0)
-    const contentLength = contentLengthHeader
-      ? Number.parseInt(contentLengthHeader, 10)
-      : undefined
-    if (contentLength !== undefined && contentLength > MAX_SELFIE_BYTES) {
-      throw new PayloadTooLargeException('IMAGE_TOO_LARGE')
-    }
-
-    await this.advisorService.uploadSelfieBytes(
-      uploadSessionId,
-      uploadToken,
-      auth.userId,
-      auth.role,
-      parsedMimeType.data,
-      Number.isSafeInteger(contentLength) ? contentLength : undefined,
-      bodyBuffer
-    )
   }
 
   @Post('selfie/commit')

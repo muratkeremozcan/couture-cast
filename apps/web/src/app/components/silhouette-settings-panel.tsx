@@ -5,9 +5,11 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type {
-  SilhouetteProfileContract,
-  SilhouettePhotoFailureReason,
+import {
+  UploadSessionChangedError,
+  type SilhouetteProfileContract,
+  type SilhouettePhotoFailureReason,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import {
   getSilhouetteProfileFromWeb,
@@ -16,9 +18,13 @@ import {
   deleteMyFormPhotoFromWeb,
   silhouetteETag,
   isStaleRevisionError,
-  generateIdempotencyKey,
   type UploadMyFormPhotoInput,
 } from '../../lib/wardrobe'
+import {
+  currentUploadSession,
+  isUploadSessionCurrent,
+  useUploadSessionChange,
+} from '../../lib/upload-attempts'
 
 export interface SilhouetteSettingsPanelProps {
   /** The signed-in user's id; the strong entity tag is `"silhouette:<userId>:<revision>"`. */
@@ -32,9 +38,14 @@ export interface SilhouetteSettingsPanelProps {
   uploadMyFormPhoto?: (
     input: UploadMyFormPhotoInput
   ) => Promise<SilhouetteProfileContract>
+  /**
+   * Removes for the account `uploadSession` names: the default resolves the bearer for that
+   * account and refuses once another account is signed in.
+   */
   removeMyFormPhoto?: (
     ifMatch: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    uploadSession?: UploadAttemptSession
   ) => Promise<SilhouetteProfileContract>
   /** Notified after every successful load or mutation, for parent orchestration. */
   onProfileChange?: (profile: SilhouetteProfileContract) => void
@@ -142,6 +153,7 @@ interface MyFormPanelProps {
   canRetry: boolean
   onConfirmChange: (checked: boolean) => void
   onUploadButtonClick: () => void
+  onFilePickerOpen: () => void
   onFileSelected: (event: React.ChangeEvent<HTMLInputElement>) => void
   onRetryUpload: () => void
   onRemoveMyForm: () => void
@@ -168,6 +180,7 @@ function MyFormPanel({
   canRetry,
   onConfirmChange,
   onUploadButtonClick,
+  onFilePickerOpen,
   onFileSelected,
   onRetryUpload,
   onRemoveMyForm,
@@ -207,6 +220,7 @@ function MyFormPanel({
         aria-label={t('wardrobe.silhouette.myFormFileLabel')}
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
+        onClick={onFilePickerOpen}
         onChange={onFileSelected}
       />
 
@@ -301,8 +315,14 @@ export function SilhouetteSettingsPanel({
 
   const [confirmChecked, setConfirmChecked] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null)
-  const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null)
+  /**
+   * The photo kept for Retry, bound to the session captured when its picker opened. An account
+   * change drops it together with the confirmation (see `useUploadSessionChange` below).
+   */
+  const [uploadPreview, setUploadPreview] = useState<{
+    dataUrl: string
+    session: UploadAttemptSession
+  } | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -313,6 +333,8 @@ export function SilhouetteSettingsPanel({
   const [isRevisionStale, setIsRevisionStale] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  /** The session captured when the file picker last opened; the photo it returns belongs to it. */
+  const pickerSessionRef = useRef<UploadAttemptSession | null>(null)
   const confirmCheckboxRef = useRef<HTMLInputElement | null>(null)
   const sliderSaveTimerRef = useRef<number | null>(null)
   /** The most recent not-yet-sent slider values, so an unmount mid-debounce can flush them (see #3). */
@@ -329,6 +351,13 @@ export function SilhouetteSettingsPanel({
   const sliderMutationAbortRef = useRef<AbortController | null>(null)
   const removeMutationAbortRef = useRef<AbortController | null>(null)
   const revisionRef = useRef(0)
+  /**
+   * Round 6: the account the shown profile was read under. Null until a read for the signed-in
+   * account lands, and cleared on every account change, so the revision, the signed photo URL
+   * and Remove never outlive the account they belong to.
+   */
+  const profileSessionRef = useRef<UploadAttemptSession | null>(null)
+  const loadAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     onBusyChange?.(isUploading || isPolling || isSliderDirty || isRemoving)
@@ -360,16 +389,11 @@ export function SilhouetteSettingsPanel({
    * way Story 4.3 established) rather than leaving every subsequent retry
    * doomed to repeat the same stale-ETag rejection. User-triggered, not
    * automatic, so a still-unsaved local edit is never silently discarded.
+   *
+   * Final review F-2: the read goes through the account-bound loader, so an account change
+   * while it is on the wire aborts it and its late answer never lands in the next account's
+   * panel. Declared below the loader it calls.
    */
-  const reloadProfile = useCallback(() => {
-    setSliderError(null)
-    setUploadError(null)
-    getProfile()
-      .then((fresh) => applyProfile(fresh))
-      .catch((error: unknown) => {
-        setLoadError(error instanceof Error ? error.message : String(error))
-      })
-  }, [applyProfile, getProfile])
 
   const persistSliders = useCallback(
     (nextHeight: number, nextBuild: number) => {
@@ -379,7 +403,7 @@ export function SilhouetteSettingsPanel({
       sliderMutationAbortRef.current = controller
       saveSliders(
         { heightSlider: nextHeight, buildSlider: nextBuild },
-        silhouetteETag(userId, revisionRef.current),
+        silhouetteETag(profileSessionRef.current?.account ?? userId, revisionRef.current),
         controller.signal
       )
         .then((saved) => {
@@ -433,6 +457,9 @@ export function SilhouetteSettingsPanel({
     pollAbortRef.current?.abort()
     const controller = new AbortController()
     pollAbortRef.current = controller
+    // The account the processing photo belongs to: an account change aborts this loop, and a
+    // read already on the wire is dropped when it lands.
+    const session = profileSessionRef.current
     setIsPolling(true)
 
     void (async () => {
@@ -450,7 +477,8 @@ export function SilhouetteSettingsPanel({
             )
           })
           const latest = await getProfile(controller.signal)
-          if (controller.signal.aborted) return
+          if (controller.signal.aborted || !session || !isUploadSessionCurrent(session))
+            return
           /**
            * Status alone decides whether to keep polling. An unrelated
            * concurrent mutation (a slider save) bumps `revision` without
@@ -483,30 +511,55 @@ export function SilhouetteSettingsPanel({
     })()
   }, [applyProfile, getProfile, pollIntervalsMs, t])
 
+  /**
+   * Reads the profile of the account signed in now. The first read shows the loading state; a
+   * read after an account change keeps the panel on screen, with nothing of the previous
+   * account left in it, until it lands. An answer that lands after the account changed again
+   * is dropped.
+   */
+  const loadProfileForCurrentAccount = useCallback(
+    ({ initial }: { initial: boolean }) => {
+      loadAbortRef.current?.abort()
+      const controller = new AbortController()
+      loadAbortRef.current = controller
+      const session = currentUploadSession()
+      const isStale = () => controller.signal.aborted || !isUploadSessionCurrent(session)
+      if (initial) setIsLoading(true)
+      setLoadError(null)
+      getProfile(controller.signal)
+        .then((loaded) => {
+          if (isStale()) return
+          profileSessionRef.current = session
+          applyProfile(loaded)
+          // Resume polling a photo left "processing" by a prior session
+          // (e.g. the page was reloaded mid-processing); otherwise the panel
+          // renders nothing at all for this state.
+          if (loaded.myForm?.status === 'processing') {
+            pollUntilSettled()
+          }
+        })
+        .catch((error: unknown) => {
+          if (isStale()) return
+          setLoadError(error instanceof Error ? error.message : String(error))
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsLoading(false)
+        })
+    },
+    [applyProfile, getProfile, pollUntilSettled]
+  )
+
+  const reloadProfile = useCallback(() => {
+    setSliderError(null)
+    setUploadError(null)
+    loadProfileForCurrentAccount({ initial: false })
+  }, [loadProfileForCurrentAccount])
+
   useEffect(() => {
-    const controller = new AbortController()
-    setIsLoading(true)
-    setLoadError(null)
-    getProfile(controller.signal)
-      .then((loaded) => {
-        if (controller.signal.aborted) return
-        applyProfile(loaded)
-        // Resume polling a photo left "processing" by a prior session
-        // (e.g. the page was reloaded mid-processing); otherwise the panel
-        // renders nothing at all for this state.
-        if (loaded.myForm?.status === 'processing') {
-          pollUntilSettled()
-        }
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        setLoadError(error instanceof Error ? error.message : String(error))
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
-      })
-    return () => controller.abort()
-    // Only ever loads once per mount; `getProfile`/`pollUntilSettled` are
+    loadProfileForCurrentAccount({ initial: true })
+    return () => loadAbortRef.current?.abort()
+    // Only ever loads once per mount; an account change reloads through
+    // `resetForAccountChange` below. `getProfile`/`pollUntilSettled` are
     // effectively stable DI defaults in practice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -534,17 +587,25 @@ export function SilhouetteSettingsPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /**
+   * The upload lib owns the attempt and its keys, keyed by the prepared photo: Retry resumes the
+   * same attempt while its outcome is ambiguous, and starts over with fresh keys once the server
+   * has ended it (an expired session, say), so a Retry never sends a key the server rejected.
+   */
   const startUpload = useCallback(
-    (imagePreview: string, key: string) => {
+    (preview: { dataUrl: string; session: UploadAttemptSession }) => {
       setIsUploading(true)
       setUploadError(null)
       uploadMyFormPhoto({
-        imagePreview,
-        idempotencyKey: key,
+        imagePreview: preview.dataUrl,
         confirmsBasewearGuidance: true,
+        uploadSession: preview.session,
       })
         .then((saved) => {
           setIsUploading(false)
+          // The commit answered after an account change: that profile is the previous account's.
+          if (!isUploadSessionCurrent(preview.session)) return
+          profileSessionRef.current = preview.session
           applyProfile(saved)
           if (saved.myForm?.status === 'processing') {
             pollUntilSettled()
@@ -552,11 +613,71 @@ export function SilhouetteSettingsPanel({
         })
         .catch((error: unknown) => {
           setIsUploading(false)
-          setUploadError(error instanceof Error ? error.message : String(error))
+          setUploadError(
+            error instanceof UploadSessionChangedError
+              ? t('wardrobe.silhouette.errors.sessionChanged')
+              : error instanceof Error
+                ? error.message
+                : String(error)
+          )
         })
     },
-    [applyProfile, pollUntilSettled, uploadMyFormPhoto]
+    [applyProfile, pollUntilSettled, t, uploadMyFormPhoto]
   )
+
+  /**
+   * Round 5 account epoch: the picked photo, its Retry and the basewear confirmation belong to
+   * the account signed in when the picker opened. Any account change (sign-out, or an auth
+   * state change to another account) drops them, so Retry can never send one account's photo
+   * under the next account, and the next account confirms the guidance for itself.
+   */
+  const dropPickedPhoto = useCallback(() => {
+    setUploadPreview(null)
+    setConfirmChecked(false)
+    setConfirmError(null)
+    setUploadError(null)
+  }, [])
+
+  /**
+   * Round 6: everything read for the previous account goes with it too: the profile, its
+   * revision and signed photo URL, a running poll, a pending or in-flight slider save and a
+   * removal. The profile is read again for the account signed in now, so Remove only comes back
+   * once that account's own read landed, and then sends its revision with its own bearer.
+   */
+  const resetForAccountChange = useCallback(() => {
+    dropPickedPhoto()
+    profileSessionRef.current = null
+    pollAbortRef.current?.abort()
+    pollAbortRef.current = null
+    sliderMutationAbortRef.current?.abort()
+    removeMutationAbortRef.current?.abort()
+    if (sliderSaveTimerRef.current !== null) {
+      window.clearTimeout(sliderSaveTimerRef.current)
+      sliderSaveTimerRef.current = null
+    }
+    pendingSliderEditRef.current = null
+    revisionRef.current = 0
+    setProfile(null)
+    setHeightSlider(50)
+    setBuildSlider(50)
+    setSliderError(null)
+    setIsRevisionStale(false)
+    setIsPolling(false)
+    setIsRemoving(false)
+    setIsSliderDirty(false)
+    // Final review F-1: after a sign-out there is no account to read for, so nothing is read
+    // (a read now could only carry a bearer that is no longer this panel's). A switch reports
+    // the sign-out of A first and then B, and B's own report reads B's profile.
+    if (currentUploadSession().account === null) {
+      loadAbortRef.current?.abort()
+      loadAbortRef.current = null
+      setLoadError(null)
+      setIsLoading(false)
+      return
+    }
+    loadProfileForCurrentAccount({ initial: false })
+  }, [dropPickedPhoto, loadProfileForCurrentAccount])
+  useUploadSessionChange(resetForAccountChange)
 
   const handleConfirmChange = (checked: boolean) => {
     setConfirmChecked(checked)
@@ -574,27 +695,40 @@ export function SilhouetteSettingsPanel({
     fileInputRef.current?.click()
   }
 
+  const handleFilePickerOpen = () => {
+    pickerSessionRef.current = currentUploadSession()
+  }
+
   const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
+    // A file that arrives without the picker opening (a drop) belongs to the session now.
+    const session = pickerSessionRef.current ?? currentUploadSession()
+    pickerSessionRef.current = null
     if (!file) return
     try {
-      const preview = await fileToDataUrl(
+      const dataUrl = await fileToDataUrl(
         file,
         t('wardrobe.silhouette.errors.fileReadFailed')
       )
-      /** One key per logical attempt: minted here, reused by every retry below. */
-      const key = generateIdempotencyKey()
+      // The account changed while the picker was open or the file was read: the photo and the
+      // confirmation were given under the previous account, so the photo is dropped.
+      if (!isUploadSessionCurrent(session)) return
+      const preview = { dataUrl, session }
       setUploadPreview(preview)
-      setIdempotencyKey(key)
-      startUpload(preview, key)
+      startUpload(preview)
     } catch (error) {
+      if (!isUploadSessionCurrent(session)) return
       setUploadError(error instanceof Error ? error.message : String(error))
     }
   }
 
   const handleRetryUpload = () => {
-    if (!uploadPreview || !idempotencyKey) return
+    if (!uploadPreview) return
+    if (!isUploadSessionCurrent(uploadPreview.session)) {
+      dropPickedPhoto()
+      return
+    }
     /**
      * Retry bypasses the file picker, so it also bypasses the confirmation
      * gate `handleUploadButtonClick` normally enforces. Re-check it here: a
@@ -608,20 +742,27 @@ export function SilhouetteSettingsPanel({
       return
     }
     setConfirmError(null)
-    startUpload(uploadPreview, idempotencyKey)
+    startUpload(uploadPreview)
   }
 
   const handleRemoveMyForm = () => {
+    // Removes for the account the shown profile was read under, and only while it is still the
+    // signed-in one: its own revision, and a bearer resolved for it.
+    const session = profileSessionRef.current
+    if (!session || !isUploadSessionCurrent(session)) return
     setIsRemoving(true)
     setUploadError(null)
     removeMutationAbortRef.current?.abort()
     const controller = new AbortController()
     removeMutationAbortRef.current = controller
-    removeMyFormPhoto(silhouetteETag(userId, revisionRef.current), controller.signal)
+    removeMyFormPhoto(
+      silhouetteETag(session.account ?? userId, revisionRef.current),
+      controller.signal,
+      session
+    )
       .then((saved) => {
         if (controller.signal.aborted) return
         setUploadPreview(null)
-        setIdempotencyKey(null)
         applyProfile(saved)
       })
       .catch((error: unknown) => {
@@ -674,7 +815,7 @@ export function SilhouetteSettingsPanel({
   /**
    * A retry is offered for both a server-reported `failed` status and a
    * network-level rejection (the upload never reached the server at all).
-   * Either way, `uploadPreview`/`idempotencyKey` are still around to reuse.
+   * Either way, `uploadPreview` is still around to reuse.
    *
    * `contrast` and `privacy_violation` are excluded: decision 8 defines them
    * as terminal business outcomes about this specific photo's content, not
@@ -685,9 +826,7 @@ export function SilhouetteSettingsPanel({
   const isTerminalContentFailure =
     myForm?.failureReason === 'contrast' || myForm?.failureReason === 'privacy_violation'
   const displayError = failureMessage ?? uploadError
-  const canRetry = Boolean(
-    displayError && uploadPreview && idempotencyKey && !isTerminalContentFailure
-  )
+  const canRetry = Boolean(displayError && uploadPreview && !isTerminalContentFailure)
 
   return (
     <div className="flex flex-col gap-6" data-testid="silhouette-settings-panel">
@@ -764,6 +903,7 @@ export function SilhouetteSettingsPanel({
         canRetry={canRetry}
         onConfirmChange={handleConfirmChange}
         onUploadButtonClick={handleUploadButtonClick}
+        onFilePickerOpen={handleFilePickerOpen}
         onFileSelected={(event) => {
           void handleFileSelected(event)
         }}

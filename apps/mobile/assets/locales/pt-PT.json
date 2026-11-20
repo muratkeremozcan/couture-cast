@@ -139,7 +139,8 @@
       "network_timeout": "O envio excedeu o tempo limite.",
       "storage_forbidden": "Acesso ao armazenamento recusado.",
       "consent_required": "É necessário o consentimento de um responsável para enviar peças.",
-      "upload_expired": "A sessão de envio expirou."
+      "upload_expired": "A sessão de envio expirou.",
+      "upload_session_changed": "Terminou sessão ou mudou de conta durante este envio. Escolha a fotografia novamente."
     },
     "crop": {
       "title": "Recortar e posicionar",
@@ -316,7 +317,8 @@
         "privacy_violation": "Esta fotografia não pode ser utilizada. Escolha outra fotografia.",
         "timeout": "O processamento demorou demasiado tempo. Tente novamente.",
         "storage_error": "Não foi possível guardar esta fotografia. Tente novamente.",
-        "confirm_required": "Confirme a indicação sobre a roupa base antes de enviar."
+        "confirm_required": "Confirme a indicação sobre a roupa base antes de enviar.",
+        "session_changed": "Terminou sessão ou mudou de conta durante este envio. Escolha a fotografia novamente."
       }
     }
   },

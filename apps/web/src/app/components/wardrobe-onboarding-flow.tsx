@@ -31,6 +31,7 @@ import {
   onboardingETag,
   isStaleRevisionError,
 } from '../../lib/wardrobe'
+import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 
 /**
  * `garmentPollIntervalsMs` exists only so tests can replace the real
@@ -149,6 +150,12 @@ function OnboardingFlow({
    */
   const garmentPositionsRef = useRef(new Map<string, number>())
   const nextGarmentPositionRef = useRef(1)
+  /**
+   * The bootstrap below reads once at mount; one that ran before this tab held a verified bearer
+   * (a new tab, a mount while verification still runs) reads again when the verified identity
+   * is published, instead of leaving "Your session expired".
+   */
+  const { attempt: sessionAttempt, missed: missedSession } = useRetryOnVerifiedSession()
 
   const assignGarmentPositions = useCallback((items: readonly GarmentItemContract[]) => {
     for (const item of items) {
@@ -165,6 +172,8 @@ function OnboardingFlow({
 
   useEffect(() => {
     let cancelled = false
+    setIsLoading(true)
+    setLoadError(null)
     void (async () => {
       try {
         const [uid, loaded] = await Promise.all([
@@ -196,6 +205,7 @@ function OnboardingFlow({
               ? error.message
               : t('wardrobe.onboarding.errors.loadFailed')
           )
+          missedSession()
         }
       } finally {
         if (!cancelled) setIsLoading(false)
@@ -204,9 +214,10 @@ function OnboardingFlow({
     return () => {
       cancelled = true
     }
-    // Runs once on mount; `t`/`router`/`assignGarmentPositions` are stable in practice.
+    // Runs on mount, and again only after a failed read once a verified identity arrives;
+    // `t`/`router`/`assignGarmentPositions` are stable in practice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [sessionAttempt])
 
   useEffect(() => {
     const garmentPollControllers = garmentPollControllersRef.current

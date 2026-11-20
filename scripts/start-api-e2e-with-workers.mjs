@@ -86,7 +86,6 @@ const env = {
   PORT: process.env.PORT || '4000',
   API_BASE_URL: apiBaseUrl,
   HTTP_CORS_ORIGIN: process.env.HTTP_CORS_ORIGIN || webBaseUrl,
-  PUBLIC_API_URL: process.env.PUBLIC_API_URL || apiBaseUrl,
 }
 
 // Load the same root env files apps/api's own `load-env.ts` loads, into this

@@ -23,6 +23,7 @@ Added Steps 40 to 58:
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
   - Production follow-ups after the project close: Jade's profile and location fix, on `fix/profile-location`.
+  - Production follow-up after the project close, in review: image uploads straight to storage, on `fix/garment-upload`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -34,6 +35,7 @@ Added the community lookbook fix to Step 58's production follow-ups: the real `/
 Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
 Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
 Added Step 57's production follow-ups, PRs #237 to #255.
+Added Step 58's first production follow-up, image uploads straight to storage, while its PR is in review.
 Moved Step 57 to completed after PR #238 merged as `5bd54123`, and added the pending-teen sign-in loop to its takeaways and tests.
 Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
 Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -141,6 +143,7 @@ Read it before changing or adding a numbered step.
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery is done: `6-15b-expo-sdk-55-58-upgrade` stays `backlog`, so `epic-6` stays `in-progress`.
 - Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
+  In review under Step 58: production follow-up, image uploads straight to storage, on `fix/garment-upload`; its plan is `_bmad-output/plan-upload-direct-storage.md`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -12300,3 +12303,533 @@ Tests:
   and
   [`ShareCardFallbackTalkBackTest.kt`](../../apps/mobile/modules/accessibility-focus/android/src/androidTest/java/expo/modules/accessibilityfocus/ShareCardFallbackTalkBackTest.kt)
   assert the renamed heading never returns as a content heading.
+
+#### Image uploads straight to storage
+
+User/business impact:
+
+On 2026-11-19 a tester on Android Chrome added a garment with the default settings and got
+"Upload fail".
+The mechanism was reproduced: bisecting PUTs against the production API found that 4,492,812
+bytes reached the app and 4,494,359 bytes got 413 FUNCTION_PAYLOAD_TOO_LARGE, and the same
+default-settings photo prepared locally came to over 5 MB.
+No saved response was correlated to the tester's own attempt, so the 413 is the reproduced
+cause of that failure, not one read from the tester's request.
+Every garment, My Form and palette selfie upload sent its image bytes through the API's Vercel
+Function, and a Vercel Function refuses a request body over about 4.49 MB with
+413 FUNCTION_PAYLOAD_TOO_LARGE before the app sees it.
+A 12 MP phone photo prepared as PNG came to 5 MB or more, so real photos failed in production
+while the uncapped local API passed them.
+Uploads now go straight to Supabase Storage on a signed URL, and clients encode smaller files.
+
+Key takeaways:
+
+1. **The client's PUT never passes through a function.**
+   Upload-url signs a Supabase Storage upload URL (`createSignedUploadUrl`), the way community
+   posts already did, and the client PUTs the bytes straight to storage.
+   Commit still runs in the API function, but it reads the bytes from storage as an outbound
+   download, which the 4.5 MB request-body cap does not limit.
+   The PUT relay routes, their raw-body middleware and the HMAC upload token are gone.
+2. **A signed URL only ever names a staging key, and only the server reads it.**
+   Storage tokens live 2 hours, longer than the row they were issued for, so a signed URL to a
+   final path could rewrite a photo after it was deleted, replaced or purged.
+   Every signed URL names `staging/<userId>/<kind>/<uploadSessionId>.<ext>` in `wardrobe-images`.
+   Migration `20261119130000_wardrobe_staging_reads_and_deletion_outbox` limits the bucket's read
+   policy to keys under `wardrobe/`, so no member, guardian, admin or moderator reads staging.
+   Staging keys take one write: URLs are signed without upsert, so the first PUT wins and a held
+   pending garment's source can never change. The client treats storage's duplicate answer as
+   uploaded (commit verifies the sha256), and an allocation replay that finds bytes already
+   stored answers 409 `UPLOAD_BYTES_PRESENT`.
+3. **Commit verifies, then publishes the verified buffer itself.**
+   Before any storage I/O, commit claims the session's publication (`publish_attempt_id` and
+   `publish_started_at` on the row, migration `20261119140000_wardrobe_publication_claims`), on an
+   unexpired pending session only. Only that attempt downloads, verifies, publishes and moves the
+   row to processing; a concurrent commit replays the owner's outcome or answers 409
+   `UPLOAD_IN_PROGRESS` without touching storage, and a claim older than the function's
+   maximum duration plus five minutes may be taken over.
+   Commit downloads the staged object through a 10 MiB ceiling, verifies its size, sniffed type,
+   sha256 and dimensions (and portrait framing for My Form), and then the server uploads exactly
+   that buffer to the final key, with the verified content type and
+   `cache-control: private, max-age=0`.
+   A write that lands in staging after verification never reaches the final key, and the
+   uploader's own headers never reach it either.
+   Staging is removed only after the claim succeeds, so a crash anywhere before the claim leaves a
+   retry able to verify and publish again; the final key is server-only and the bytes match the
+   declared sha256, so a repeated publish writes the same bytes.
+   A claim lost to a replaced or deleted session removes the published object; a claim lost to a
+   concurrent commit of the same session replays it.
+   Every garment commit decision comes from one read of the row under its row lock: ownership,
+   retention (before any read is signed or job enqueued), session identity, replay, the ended
+   state, a live claim and expiry. A session whose owner released its claim before writing is
+   claimable, never answered as expired.
+   A mismatch removes the staged object and ends the session explicitly (a garment gets
+   `upload_ended_at` and keeps its session id, migration
+   `20261119150000_wardrobe_upload_endings_and_held_sources`), so a correction needs a fresh
+   allocation and key. The garment rejection is guarded on active retention, so a hold that
+   lands meanwhile keeps the staged source.
+   Every claim also records a cleanup horizon, claim start plus 24 hours (`publish_cleanup_until`
+   and its My Form and selfie twins, migration
+   `20261119160000_wardrobe_cleanup_horizons_and_held_capture`). The lease running out, a retry
+   taking the claim over and a successful publication all leave it in place, and a later claim
+   only moves it later. Erasure, purge, replacement, deletion, a rejection after a takeover, the
+   selfie analysis purge and a wardrobe analysis that supersedes a pending selfie remove the
+   session's keys at once and keep a removal (`repeat_until`) that runs again every 15 minutes
+   until that horizon. The outbox applies the same horizon to any one-time removal of a final
+   key whose session recorded one. The lease bounds who owns the session; it does not bound
+   when storage finishes a write it had already received, so a publish that lands late is
+   removed whenever it lands, even after the lease ended or another attempt succeeded. The cost
+   is up to 96 removal calls for a key removed within 24 hours of its claim.
+4. **Storage calls trust only ids and paths the service can vouch for.**
+   Session ids and API-allocated garment ids must be UUIDs and owner ids a single key segment
+   before they enter a key, and the stored path must equal the one derived from them; a row that
+   fails is answered as an expired session (409 `UPLOAD_SESSION_EXPIRED`) before any storage call.
+   Reads, purges and the workers parse the stored path and compare owner, kind and the row's own
+   object id, in any allowed extension, so seeded ready rows with no MIME type keep their image.
+   Migration `20261119120000_revoke_member_wardrobe_upload_writes` takes every member write off
+   `GarmentItem`, `SilhouetteProfile` and `PaletteProfile`, so a member cannot set those columns.
+5. **Every deletion is durable.**
+   `WardrobeObjectDeletion` records each object to remove (garment purge, My Form and selfie
+   replacement, deletion, erasure and purge, commit compensation, rejected and swept staging) in
+   the same transaction as the state change. The request removes it at once; the
+   `wardrobe-deletion-drain` job retries what failed with backoff and logs an error past five
+   attempts.
+   Each removal runs in one transaction that parses the key for its table, owner and object id,
+   locks that one authoritative row, judges the key against it and removes the object while
+   still holding the lock: a committed object or anything of a held garment stays, a session
+   still being published waits for the lease, and no other table's or member's row can keep a
+   key whatever path text it stores. A hold applied meanwhile waits for the removal or is seen.
+   The hourly job copies a held pending garment's staged source, when its sha256 matches the
+   declaration, once and without upsert to `held/<userId>/<garmentId>.<ext>`: storage can admit
+   two first transfers to one staging key, and the held copy keeps the declared bytes whatever
+   lands on staging later. Under the garment row lock that purge and any operator update of the
+   row also take, it records the held key in `held_source_object_path` before writing, and it
+   writes and records the digest under that lock only while the hold still stands. With the key
+   it records `held_source_cleanup_until`, its start plus 24 hours (migration
+   `20261119170000_wardrobe_held_copy_cleanup_horizon`): the write runs inside a 30-second
+   transaction, and one that timed out while storage was still applying it can land after a
+   release removed the key, so the outbox repeats a held key's removal until that horizon. A
+   purge removes the held key whether or not the digest was recorded and clears the digest with
+   `content_sha256`; the hourly `held_copy_release` step removes the copy of any garment whose
+   hold has ended. The held key stays on the garment until the outbox settles its removal, so a
+   hold reapplied before then (the outbox drops its row and keeps the copy) leaves the next
+   release a key to remove. Capture takes the garments checked least recently first, so held allocations
+   with no bytes cannot starve a capturable one.
+   **Operator runbook:** `GarmentItem.held_source_capture_outcome` holds the last capture result
+   (`captured`, `missing`, `digest_mismatch`, `copy_mismatch`, `invalid`, `failed`) and
+   `held_source_checked_at` its time; the log event `held_source_digest_mismatch` carries the
+   garment id. `digest_mismatch` means the staged bytes no longer match the declaration: when
+   two first transfers overlap on hosted storage, the generation present at hold start cannot
+   be pinned. That is accepted residual risk (C5-3, deferred-work), so treat such a hold's
+   source as unpreserved and record it in the hold's case file.
+   A wardrobe palette analysis claims the profile under the same `palette_profile` lock and
+   rechecks consent there, so it never starts on an erased profile or over a selfie commit that
+   reached processing. It supersedes any selfie session the row still carries, a finished one
+   included: the selfie's keys are recorded under its own identity, repeating until its horizon,
+   before the session is cleared. The outbox keeps a selfie only for its own processing analysis
+   (source `selfie`, attempt equal to the session), never for a wardrobe analysis.
+   Selfie erasure and replacement take the member's `palette_profile` lock before reading paths,
+   and allocation re-checks consent under it, so an erasure cannot miss a replacement's selfie.
+6. **The hourly retention job sweeps staging by owner, kind and session.**
+   Staged objects older than the token lifetime plus 15 minutes are parsed: a held garment keeps
+   its staged bytes, and everything else is recorded for removal with its derived final key,
+   which covers a commit that published and never claimed.
+   The listing continues across runs from a cursor kept in `WardrobeMaintenanceState`, so held
+   keys cannot spend every run's page budget, and capture, release, the sweep and the job
+   re-enqueue run as independent steps, so a listing failure holds back nothing else.
+   Recorded deletions drain on their own `wardrobe-deletion-drain` scheduler every 15 minutes
+   (minutes 7, 22, 37 and 52, off the hourly jobs' minute 0) on the serial maintenance worker.
+   A row is eligible once `not_before` has passed; each drain takes the 100 oldest due rows, and
+   a repeating row is due again 15 minutes after each removal until its horizon. With a backlog
+   under 100, a late write lands at most about 30 minutes before a drain removes it; a larger
+   backlog or a long hourly job on the same worker delays that. The 24-hour horizon is a chosen
+   bound: no measurement shows when hosted storage finishes a write a stopped function started.
+7. **Workers are fenced on their own attempt, and no processing row goes without a job.**
+   A job's identity is its deterministic job id (`<profileId>__<session or analysis attempt>`),
+   so jobs from before the payload carried it still name their own, and producers send only the
+   profile id every deployed consumer accepts. A job whose attempt is not the profile's current
+   one exits without writing. The palette worker writes its terminal status, the selfie's outbox
+   row and `selfie_purged_at` (deletion durably scheduled) in one transaction.
+   Both profiles carry a job handoff marker like garments: commit enqueues right after the
+   claim and sets it; a same-key replay or the hourly job re-enqueues a processing row whose
+   marker is missing. The wardrobe analysis rollback names its own `analysis_attempt_id`.
+   Rows already processing when the claims migration ran keep a null marker, so the handoff
+   recovers them, and a historical wardrobe analysis gets the attempt
+   `legacy-wardrobe-analysis`, which only its own job may finish.
+   An API instance from before the attempt column can still start a wardrobe analysis during
+   the rollout; the hourly handoff gives such a row a fresh attempt under a guarded update and
+   then enqueues it, and the old job still exits without writing.
+   The color worker declines a processing garment under legal hold, records
+   `processing_deferred_at` and clears the handoff marker. Once the hold is released, the hourly
+   handoff (or a commit replay) enqueues it under `<garmentId>__deferred-<ms>`: BullMQ keeps the
+   first job's id as completed for seven days, so a plain re-enqueue would be a no-op. The
+   deferral classifies the garment under its row lock, which an operator's release also takes:
+   a hold released between the job's read and its deferral sends the job back to process the
+   garment, so the marker is never left set with nothing queued.
+8. **One upload attempt survives its retries.**
+   Web and mobile keep an attempt's allocation and both idempotency keys across retries; a retry
+   commits first and re-sends the bytes only when commit answers `UPLOAD_BYTES_MISSING`, and a
+   lost commit answer replays with the same key.
+   Attempts live in one bounded store per flow, keyed by the signed-in account and the prepared
+   photo's fingerprint, and `DirectUploadAttemptRegistry` clears every store and fences runs in
+   flight whenever the account changes (sign-out or any auth state change). Keys stay
+   while the outcome is ambiguous (`UPLOAD_IN_PROGRESS` included). Once the server ends the
+   attempt (expired, rejected, `UPLOAD_BYTES_PRESENT`), that same Retry or pick starts one fresh
+   attempt at once, so the palette picker reuses a pending attempt for the same photo and a My
+   Form Retry after expiry uploads again without a second tap. The selfie's 400 image codes end
+   a resumed attempt the same way.
+   The signed-in account and an epoch are captured before a picker or camera opens; previews,
+   the My Form confirmation and late picker or FileReader callbacks from another epoch are
+   dropped, and allocation resolves the bearer for the captured account, so one member's photo
+   never uploads under another account.
+   Web stores or removes the bearer before it reports an account change, so a listener reading at
+   once never pairs the new account with the previous token; the My Form panel reads nothing
+   after a sign-out, and its conflict Reload runs through the same account-bound loader as every
+   other read. The mobile My Form editor takes no bearer from its host: it loads and removes
+   only with the bearer the app's resolver verifies for the account signed in now.
+9. **The bucket is the size and type gate.**
+   `wardrobe-images` already enforces 10 MiB and jpeg/png/webp, so storage refuses an oversized
+   or mistyped PUT before commit runs.
+10. **Installed apps keep working with no release.**
+    Web and mobile already PUT to `uploadUrl` exactly as given, with Bearer, X-Upload-Token and
+    Content-Type headers; storage ignores the extra headers, so the server change alone fixes
+    the field.
+    New builds also send `cache-control: private, max-age=0`, which the removed server upload
+    set, and treat storage's "already exists" as uploaded, since commit verifies the sha256.
+11. **The client is told the shorter window.**
+    `expiresAt` is the earlier of the session expiry and the expiry inside the storage token,
+    read by `apps/api/src/common/signed-upload-expiry.ts`, which the community adapter now shares.
+12. **Encode for the content.**
+    JPEG at 0.9 wherever nothing is transparent (garments without cleanup, Snap Photo, My Form,
+    selfies), painted on white first; WebP at 0.9 when web background cleanup cuts the garment
+    out, with PNG only where a browser cannot encode WebP.
+    Community posts keep their source format (`prepareGarmentImage(..., 'source')`).
+13. **The garment card names the garment.**
+    The wardrobe card shows its category and material, or Untagged before tagging, and never
+    the raw garment id the tester saw on the same screen.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- The local API has no body cap, so every local and CI run passed uploads production refused.
+  The Playwright route `playwright/support/helpers/vercel-function-body-limit.ts` now answers
+  every PUT on `/api/v1` the way production does.
+- The palette selfie relay never had a raw-body parser, so its PUT handler could only ever see
+  an empty body; removing the relay removed that latent fault too.
+- The mobile selfie was PNG on the claim that JPEG's 4:2:0 subsampling discards the Cb/Cr the
+  classifier reads. The engine shrinks the frame to 256 px before it reads chroma, far coarser
+  than the subsampling, so JPEG should cost the classifier little; no paired evaluation of the
+  same selfies as PNG and JPEG has measured it.
+- Review round 1 found the first direct-upload design signed final paths: a re-PUT after removal
+  succeeded (upload-tea S-2 showed it), a mismatch removed by path while the session stayed open
+  for a stale validator, unverified bytes sat in the member-readable folder, and the service
+  role trusted member-writable path columns. Staging keys, the commit move, canonical path
+  checks and the revoke migration replaced it.
+- The enqueue-failure rollback released any `processing` claim on the profile; it now names the
+  original session id and commit key, so it cannot clear a newer session.
+- The shared preparation helper changed community posts to JPEG as a side effect; community now
+  asks for its source format explicitly.
+- `IMAGE_SIZE_MISMATCH` answered as `IMAGE_DECODE_FAILED`; commit is the only byte check now, so
+  every mapper answers 422 `IMAGE_SIZE_MISMATCH`.
+- `publicApiUrl` lost its last caller with the relay and was removed with the
+  `PUBLIC_API_URL` values the E2E runners set only for it.
+- Review round 2 found the commit move unsafe: storage picks a move's source by name, so a
+  write landing between verification and the move could publish unverified bytes with the
+  uploader's cache headers, and a crash after the move stranded the upload with staging gone.
+  Publishing the verified buffer and keeping staging until the claim replaced it.
+- Round 2 also found the staging sweep deleted a held garment's only image, selfie erasure read
+  its paths outside the per-member lock and dropped failed removals, old workers stamped newer
+  sessions, malformed historical ids could reach storage keys, seeded ready rows lost their
+  image for want of a MIME type, admin and moderator claims could read staging, and a My Form
+  retry re-allocated before it could recover a lost answer.
+- Review round 3 found publication had no owner: a duplicate commit could publish after the
+  first one's analysis purged the selfie, and a publish in flight could land after erasure. The
+  selfie worker could stop between its terminal update and its outbox row, upsert staging let a
+  held source be overwritten, liveness matched path text across tables, a committed profile
+  could sit in processing with no job, legacy jobs adopted replacements, a rejected garment
+  session could still win its claim, a missing bucket read as missing bytes, and held keys
+  starved the sweep. Publication claims, row-locked judging, write-once staging, job handoff
+  markers and job-id identity replaced those paths.
+- The enqueue-failure rollback on My Form and selfie commits is gone: the handoff marker plus
+  replay and maintenance re-enqueue under the same job id recover a lost enqueue without
+  clearing the session.
+- Review round 4 found a picked photo and its confirmation survived an account switch, a
+  garment rejection after a new hold deleted the held source, a wardrobe analysis could start
+  after erasure or supersede a selfie publication, reconciliation signed reads before checking
+  retention and could report a false expiry, erasure left a published final readable and settled
+  an ambiguous publisher's cleanup once, overlapping first transfers could replace held staging
+  bytes, the claims migration marked historical rows delivered, and one-tap restart missed the
+  selfie's 400 image codes. Account epochs, `upload_ended_at`, locked classification and
+  analysis claims, repeating removals, held source copies and a recoverable migration replaced
+  those paths.
+- Review round 5 found the My Form editor kept account A's ready photo, revision and bearer
+  after a switch to B, so B could remove A's photo; the cleanup horizon vanished once the
+  325-second lease expired or a retry took over and succeeded, so a write landing at minute
+  seven restored an erased or purged selfie; capture wrote the held copy before recording it,
+  so a purge or a crash between them left it behind; the oldest twenty uncapturable holds
+  starved later captures; old API instances could start analyses no recovery covered; a held
+  garment's color job completed while declined and stayed in processing after release; the
+  deletion drain ran hourly; and an adult's held garment showed guardian-consent copy. Identity
+  fencing in the editors, recorded cleanup horizons, the held copy obligation, least recently
+  checked capture, attempt reconciliation, deferred color jobs, a 15-minute drain and neutral
+  restriction copy replaced those paths. A hold that meets two overlapping first transfers still
+  cannot pin the generation present at hold start (accepted residual, C5-3).
+- The real-session AS-0 found a pre-existing bug (on `main` too): a reload of `/wardrobe` after
+  a real sign-in showed "Your session expired", because the fresh document's verification
+  removed the bearer until the profile check answered. `apps/web/src/lib/web-session.ts` now
+  stores the verified principal beside the bearer (`couturecast.access-principal`) and keeps
+  both for the same Supabase user, and the hub and guided onboarding read again when the
+  verified identity arrives (`apps/web/src/lib/session-retry.ts`). Tests:
+  [`web-session.fresh-document.test.ts`](../../apps/web/src/lib/web-session.fresh-document.test.ts)
+  and [`page.session-recovery.test.tsx`](../../apps/web/src/app/wardrobe/page.session-recovery.test.tsx).
+
+Story/Task mapping:
+
+- Task 1 (wardrobe storage adapter and the shared signed-upload expiry helper)
+- Task 2 (garment, My Form and selfie allocation and commit verification)
+- Task 3 (controllers, contracts, OpenAPI, generated client and the Maestro seed)
+- Task 4 (web and mobile encoders), Task 5 (this step)
+
+Story reference:
+
+- `_bmad-output/plan-upload-direct-storage.md`, the intent, the I/O matrix and the acceptance
+  criteria
+
+Cross-links:
+
+- Step 29 built the garment upload this step moves off the relay.
+- Step 32 built the My Form upload, and Step 36 the palette selfie upload.
+- Step 38 built the community upload that already went straight to storage.
+
+Sequence to follow:
+
+1. `apps/api/src/common/signed-upload-expiry.ts` and `packages/utils/src/wardrobe-object-path.ts`
+   (`buildWardrobeStagingObjectPath`, `parseWardrobeStagingObjectPath`, `isWardrobeUuid`).
+2. `apps/api/src/modules/wardrobe/wardrobe-storage.adapter.ts` (`createUploadSession`,
+   `downloadBounded`, `publish`, `listStagedUploads`) and `wardrobe-upload-paths.ts`
+   (`uploadSessionKeys`, `isOwnSessionObject`, `ownSessionObjectsToRemove`).
+3. `apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.ts`.
+4. `apps/api/src/modules/wardrobe/wardrobe.service.ts`, `wardrobe-silhouette.service.ts` and
+   `apps/api/src/modules/commerce/palette-advisor.service.ts`.
+5. `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts` (`purgeStaleStagedUploads`),
+   `packages/db/prisma/migrations/20261119120000_revoke_member_wardrobe_upload_writes/migration.sql`,
+   `20261119130000_wardrobe_staging_reads_and_deletion_outbox/migration.sql` and
+   `20261119140000_wardrobe_publication_claims/migration.sql`,
+   `20261119150000_wardrobe_upload_endings_and_held_sources/migration.sql` and
+   `20261119160000_wardrobe_cleanup_horizons_and_held_capture/migration.sql`
+   (`captureHeldSources`, `releaseUnheldCopies`, `drainDeletions`).
+6. `apps/api/src/modules/wardrobe/wardrobe-publication.ts` (claim lease),
+   `wardrobe-processing-handoff.ts` (job handoff markers),
+   `apps/api/src/modules/commerce/palette-analysis.processor.ts` and
+   `apps/api/src/modules/wardrobe/silhouette-photo.processor.ts` (attempt-fenced writes).
+7. `packages/api-client/src/contracts/http/wardrobe.ts` (`uploadGarmentBytes`,
+   `runDirectUploadAttempt`, `DirectUploadAttempts`, commit errors).
+8. `apps/web/src/lib/wardrobe.ts` (`preparedImageEncoding`, `prepareGarmentImage`) and
+   `apps/web/src/lib/upload-attempts.ts`.
+9. `apps/mobile/components/wardrobe/garment-capture-modal.tsx`, `silhouette-editor.tsx`,
+   `apps/mobile/src/features/premium/palette-advisor-screen.tsx` and
+   `apps/mobile/src/lib/upload-attempts.ts`.
+
+Task owner map:
+
+- Production follow-up Task 2 owner: sign the upload and verify the stored object at commit in `apps/api/src/modules/wardrobe/wardrobe.service.ts`, `apps/api/src/modules/wardrobe/wardrobe-silhouette.service.ts` and `apps/api/src/modules/commerce/palette-advisor.service.ts`, through `apps/api/src/modules/wardrobe/wardrobe-storage.adapter.ts`.
+- Production follow-up round 2 owner: sweep staged uploads in `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts`, check stored paths in `apps/api/src/modules/wardrobe/wardrobe-upload-paths.ts`, and take member writes off the three upload tables in `packages/db/prisma/migrations/20261119120000_revoke_member_wardrobe_upload_writes/migration.sql`.
+- Production follow-up round 3 owner: publish the verified buffer and record every deletion in `apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.ts`, fence workers on their session in `apps/api/src/modules/commerce/palette-analysis.processor.ts` and `apps/api/src/modules/wardrobe/silhouette-photo.processor.ts`, and keep one upload attempt across retries in `apps/web/src/lib/upload-attempts.ts` and `apps/mobile/src/lib/upload-attempts.ts`.
+- Production follow-up round 4 owner: claim each session's publication before storage I/O in `apps/api/src/modules/wardrobe/wardrobe-publication.ts`, judge each deletion against its locked row in `apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.ts`, and hand processing jobs off durably in `apps/api/src/modules/wardrobe/wardrobe-processing-handoff.ts`.
+- Production follow-up round 5 owner: classify each garment commit from one locked row and end rejected sessions with `upload_ended_at` in `apps/api/src/modules/wardrobe/wardrobe.service.ts`, repeat removals that meet an ambiguous publisher in `apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.ts`, copy held sources in `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts`, claim wardrobe analyses under the member lock in `apps/api/src/modules/commerce/palette-advisor.service.ts`, and bind uploads to the account epoch in `apps/web/src/lib/upload-attempts.ts` and `apps/mobile/src/lib/upload-attempts.ts`.
+- Production follow-up round 6 owner: record each claim's cleanup horizon in `apps/api/src/modules/wardrobe/wardrobe-publication.ts` and apply it in `apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.ts`, record the held copy obligation and capture outcome in `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts`, recover deferred garments and attemptless analyses in `apps/api/src/modules/wardrobe/wardrobe-processing-handoff.ts`, schedule the deletion drain in `apps/api/src/workers/maintenance.scheduler.ts`, and fence the My Form editor on account changes in `apps/web/src/app/components/silhouette-settings-panel.tsx` and `apps/mobile/components/wardrobe/silhouette-editor.tsx`.
+- Production follow-up Task 4 owner: choose the upload encoding in `apps/web/src/lib/wardrobe.ts`, `apps/web/src/app/components/garment-capture-modal.tsx`, `apps/mobile/components/wardrobe/garment-capture-modal.tsx`, `apps/mobile/components/wardrobe/silhouette-editor.tsx` and `apps/mobile/src/features/premium/palette-advisor-screen.tsx`.
+
+Tests that cover this step:
+
+API, Vitest:
+
+- [`apps/api/src/common/signed-upload-expiry.spec.ts`](../../apps/api/src/common/signed-upload-expiry.spec.ts):
+  proves the token expiry is read, and that unreadable, expired and over-long tokens fail closed.
+- [`apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-storage.adapter.spec.ts):
+  proves staging URLs are signed without upsert, a publish with server-owned type and cache
+  policy, a write-once held copy, a download that stops past its ceiling, and that only a
+  missing object reads as absent.
+- [`apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-object-deletion.outbox.spec.ts):
+  proves a failed removal stays recorded and is retried with backoff, that committed and held
+  objects (a rejected garment's staging and the held copy included) are never removed, and that
+  a repeating removal runs at once, again on each repeat, and settles only after its horizon,
+  and (round 6) that a one-time removal of a final key repeats until the horizon its session's
+  claims recorded while a staging key settles at once.
+- [`apps/api/src/modules/wardrobe/wardrobe-publication.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-publication.spec.ts):
+  proves the claim lease, and (round 6) that the recorded cleanup horizon still counts after
+  the lease ran out and after success, and that a takeover never moves it earlier.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.regression.spec.ts):
+  proves the signed allocation, a fresh URL on replay, and commit of bytes PUT to storage:
+  missing bytes, an expired session, a legacy `bytes_uploaded` row and the guardian check; and
+  (round 5) that a hold landing after the claim keeps a rejected source, that a held winner is
+  refused before any read is signed, and that a released pre-write claim is claimable.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.failure-paths.spec.ts):
+  proves each verification failure at commit removes the object, and a storage fault does not.
+- [`apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts):
+  proves the garment API exposes no route that accepts upload bytes.
+- [`apps/api/src/logger/request-logger.middleware.spec.ts`](../../apps/api/src/logger/request-logger.middleware.spec.ts):
+  proves logged paths still drop their query values.
+- [`apps/api/src/modules/wardrobe/wardrobe-upload-paths.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-upload-paths.spec.ts):
+  proves only a member's own final object of the right kind and id passes the path check, and
+  that malformed ids or a mismatched stored path yield no upload keys.
+- [`apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-retention.service.spec.ts):
+  proves the staging sweep's window, paging and batch limit inside the hourly job, and that a
+  purge removes only the garment's own object, its staging key and its held copy, and that a
+  held pending garment's verified source is copied once and survives a later staging write;
+  and (round 6) that the held key is recorded under the row lock before the write, that a copy
+  whose digest was never recorded goes with the purge after release, that every capture
+  outcome is stored for the operator, that a page of uncapturable holds cannot starve a
+  capturable one, and that the hourly job leaves deletions to the 15-minute drain.
+- [`apps/api/src/modules/wardrobe/wardrobe-processing-handoff.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-processing-handoff.spec.ts):
+  proves processing rows with no marker are handed off, and (round 6) that a garment a hold
+  deferred is re-enqueued under a fresh job id and that an analysis an old API instance started
+  gets an attempt under a guarded update before it is enqueued.
+- [`apps/api/src/workers/maintenance.scheduler.spec.ts`](../../apps/api/src/workers/maintenance.scheduler.spec.ts)
+  and [`apps/api/src/workers/maintenance.processor.spec.ts`](../../apps/api/src/workers/maintenance.processor.spec.ts):
+  prove the deletion drain runs every 15 minutes on its own job.
+- [`apps/api/src/modules/wardrobe/wardrobe-capsule.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-capsule.service.spec.ts)
+  and [`apps/api/src/modules/personalization/planner.service.spec.ts`](../../apps/api/src/modules/personalization/planner.service.spec.ts):
+  prove capsules and the planner serve a garment whose path names another member's object
+  without an image, and never sign that path.
+- [`apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts),
+  [`apps/api/src/modules/wardrobe/silhouette-photo.processor.spec.ts`](../../apps/api/src/modules/wardrobe/silhouette-photo.processor.spec.ts)
+  and [`apps/api/src/modules/commerce/palette-analysis.processor.spec.ts`](../../apps/api/src/modules/commerce/palette-analysis.processor.spec.ts):
+  prove a processor fails a row whose path names another member's object without reading it,
+  a selfie purge never removes one, an old job never touches a newer session, and (round 6) the
+  color worker defers a garment under legal hold and clears its handoff marker.
+- [`apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service.spec.ts):
+  proves My Form signs before the current photo is replaced, and that commit verifies type,
+  framing, checksum and size, removes a mismatch, claims only its own session, and (round 6)
+  repeats the removal of a rejected session's keys until an earlier claim's horizon.
+- [`apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller.spec.ts):
+  proves the My Form byte PUT answers 404.
+- [`apps/api/src/modules/commerce/palette-advisor.service.spec.ts`](../../apps/api/src/modules/commerce/palette-advisor.service.spec.ts):
+  proves the same allocation and commit verification for the selfie, and that a wardrobe
+  analysis claims the profile under the member lock, refusing an erased profile and removing a
+  superseded selfie's keys at once and repeatedly.
+- [`apps/api/src/modules/commerce/palette-advisor.controller.spec.ts`](../../apps/api/src/modules/commerce/palette-advisor.controller.spec.ts):
+  proves the selfie byte PUT answers 404.
+
+API, integration (Vitest on a real database):
+
+- [`apps/api/integration/wardrobe-silhouette.integration.spec.ts`](../../apps/api/integration/wardrobe-silhouette.integration.spec.ts):
+  proves allocate, client PUT and commit end to end, 409 before the bytes then a commit once
+  they land (INT-20), removal of a tampered staged object that ends the session (INT-21), and
+  a late PUT after replace or delete that stays in staging until the sweep removes it (INT-22).
+- [`apps/api/integration/palette-advisor.integration.spec.ts`](../../apps/api/integration/palette-advisor.integration.spec.ts):
+  proves the selfie routes over HTTP: a storage URL from upload-url, 409 before the bytes,
+  404 on the relay path, removal of a tampered selfie (5.4-INT-038, 5.4-INT-039), and a late
+  PUT after a purge that stays in staging until the sweep removes it (5.4-INT-040), repeating
+  removals at erasure (5.4-INT-045, 5.4-INT-046), and wardrobe analyses that meet an erasure, a
+  processing selfie or a selfie mid-publication (5.4-INT-047 to 5.4-INT-049); and (round 6)
+  that an erasure after the lease ran out (5.4-INT-050) and the analysis purge after a takeover
+  and a successful retry (5.4-INT-051) keep removing a write that lands afterwards.
+- [`apps/api/integration/wardrobe-maintenance.integration.spec.ts`](../../apps/api/integration/wardrobe-maintenance.integration.spec.ts):
+  proves (round 6) that capture reaches a held source behind a page of holds with no bytes,
+  that a copy whose write acknowledgement was lost goes with the purge after release, that a
+  digest mismatch is stored for the operator, that an analysis an old API instance started is
+  recovered, and, on a real BullMQ queue, that a garment a hold deferred finishes after release.
+
+Database, Vitest (row-level security on a real database):
+
+- [`packages/db/test/rls/wardrobe-upload-paths.spec.ts`](../../packages/db/test/rls/wardrobe-upload-paths.spec.ts):
+  proves an owner still reads their garment, My Form and selfie rows but cannot insert, delete
+  or point a path column at another member's object, and neither can an admin claim or anon.
+- [`packages/db/test/rls/policy-matrix.spec.ts`](../../packages/db/test/rls/policy-matrix.spec.ts):
+  proves the three tables keep only their read policy and grant members no write.
+- [`packages/db/test/rls/onboarding-silhouette.spec.ts`](../../packages/db/test/rls/onboarding-silhouette.spec.ts),
+  [`packages/db/test/rls/palette-advisor.spec.ts`](../../packages/db/test/rls/palette-advisor.spec.ts),
+  [`packages/db/test/rls/guardian-wardrobe.spec.ts`](../../packages/db/test/rls/guardian-wardrobe.spec.ts),
+  [`packages/db/test/rls/guardian-consent-off.spec.ts`](../../packages/db/test/rls/guardian-consent-off.spec.ts)
+  and [`packages/db/test/rls/identity-and-admin.spec.ts`](../../packages/db/test/rls/identity-and-admin.spec.ts):
+  prove member writes on the three tables answer 42501 while the other shared tables keep
+  their row-level rules.
+- [`packages/db/test/palette-advisor-schema.spec.ts`](../../packages/db/test/palette-advisor-schema.spec.ts)
+  and [`packages/db/test/wardrobe-onboarding-schema.spec.ts`](../../packages/db/test/wardrobe-onboarding-schema.spec.ts):
+  prove `PaletteProfile` and `SilhouetteProfile` grant members SELECT only.
+
+Shared, Vitest:
+
+- [`packages/api-client/testing/wardrobe-contract.spec.ts`](../../packages/api-client/testing/wardrobe-contract.spec.ts):
+  proves OpenAPI documents no upload byte relay.
+- [`packages/api-client/testing/wardrobe-silhouette-contract.spec.ts`](../../packages/api-client/testing/wardrobe-silhouette-contract.spec.ts):
+  proves the My Form relay is gone from OpenAPI and its commit documents every conflict.
+- [`packages/api-client/testing/palette-advisor-contract.spec.ts`](../../packages/api-client/testing/palette-advisor-contract.spec.ts):
+  proves the selfie commit documents 409, 415 and 422.
+- [`packages/utils/src/wardrobe-object-path.spec.ts`](../../packages/utils/src/wardrobe-object-path.spec.ts):
+  proves staging keys carry owner, kind and a UUID session, that malformed ids never build a
+  key, and that only real final paths parse as a member's object.
+- [`packages/api-client/testing/direct-upload-attempt.spec.ts`](../../packages/api-client/testing/direct-upload-attempt.spec.ts):
+  proves a retry commits first and re-uploads only when the bytes are missing.
+
+Web, Vitest:
+
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves JPEG on white without cleanup, WebP with it, PNG when a browser falls back, a JPEG
+  My Form photo, and a PUT to the storage URL exactly as given.
+- [`apps/web/src/app/components/garment-capture-modal.test.tsx`](../../apps/web/src/app/components/garment-capture-modal.test.tsx):
+  proves Snap Photo captures the frame as JPEG, and that every step and failure shows catalog
+  copy in the member's language, never raw error text.
+- [`apps/web/src/lib/garment-upload-errors.test.ts`](../../apps/web/src/lib/garment-upload-errors.test.ts):
+  proves each client-side code and API answer of a garment upload maps to its
+  `wardrobe.capture.errors` key, and anything else to the generic retry copy; and (round 6)
+  that only an explicit consent denial shows guardian copy, while `WARDROBE_UPLOAD_FORBIDDEN`
+  and other 403s show neutral restriction copy in every locale.
+- [`apps/web/src/lib/palette-advisor.test.ts`](../../apps/web/src/lib/palette-advisor.test.ts):
+  proves the selfie bytes go to the storage URL as given, and a retry keeps its keys.
+- [`apps/web/src/app/components/silhouette-settings-panel.test.tsx`](../../apps/web/src/app/components/silhouette-settings-panel.test.tsx):
+  proves (round 6) that an account switch drops A's ready photo and a late A poll, and Remove
+  waits for B's profile and sends B's revision and session.
+- [`apps/web/src/lib/upload-attempts.test.ts`](../../apps/web/src/lib/upload-attempts.test.ts):
+  proves sign-out forgets an open upload attempt.
+- [`apps/web/src/lib/community.prepare.test.ts`](../../apps/web/src/lib/community.prepare.test.ts):
+  proves a community post is prepared in its source format.
+- [`apps/web/src/app/wardrobe/page.test.tsx`](../../apps/web/src/app/wardrobe/page.test.tsx):
+  proves the garment card names a garment by category and material, Untagged before tagging,
+  never by its id.
+
+Mobile, Vitest:
+
+- [`apps/mobile/components/wardrobe/garment-capture-modal.test.tsx`](../../apps/mobile/components/wardrobe/garment-capture-modal.test.tsx):
+  proves the garment is encoded and declared as JPEG.
+- [`apps/mobile/components/wardrobe/silhouette-editor.test.tsx`](../../apps/mobile/components/wardrobe/silhouette-editor.test.tsx):
+  proves the My Form photo is encoded and declared as JPEG, and a retry that finds the object
+  already stored still commits; and (round 6) that an account switch drops A's ready photo and
+  a late A poll, and Remove waits for B's profile and sends B's bearer and revision.
+- [`apps/mobile/src/screens/palette-advisor-screen.test.tsx`](../../apps/mobile/src/screens/palette-advisor-screen.test.tsx):
+  proves the selfie is encoded, declared and uploaded as JPEG.
+- [`apps/mobile/src/lib/palette-advisor.test.ts`](../../apps/mobile/src/lib/palette-advisor.test.ts):
+  proves the selfie upload runs against a storage URL, and a retry commits first.
+- [`apps/mobile/src/lib/upload-attempts.test.ts`](../../apps/mobile/src/lib/upload-attempts.test.ts):
+  proves which answers end an attempt and which keep it for a retry.
+
+E2E, Playwright:
+
+- [`playwright/tests/wardrobe-garment-capture-phone.spec.ts`](../../playwright/tests/wardrobe-garment-capture-phone.spec.ts):
+  G-1 proves Use This Image puts the bytes at the signed storage URL; G-4 proves a full-size
+  phone photo uploads with the default crop and cleanup and no upload PUT goes through
+  `/api/v1`; G-5 proves Snap Photo with cleanup off stores a JPEG in storage.
+- [`playwright/tests/wardrobe-upload-storage-api.spec.ts`](../../playwright/tests/wardrobe-upload-storage-api.spec.ts):
+  S-1 proves commit before the bytes is refused and the session stays open; S-2 proves
+  mismatched bytes are refused, removed and end the session; S-3 proves a signed URL writes only
+  its own key and refuses a second write; S-4 proves the bucket refuses 10 MiB plus one byte and a
+  non-image type.
+- [`playwright/tests/palette-advisor.spec.ts`](../../playwright/tests/palette-advisor.spec.ts):
+  5.4-E2E-015 proves a phone-size PNG selfie over the function cap commits.
+- [`playwright/tests/wardrobe-onboarding-my-form.spec.ts`](../../playwright/tests/wardrobe-onboarding-my-form.spec.ts):
+  4.4-E2E-006 proves a phone-size PNG My Form photo over the function cap uploads.
+- [`playwright/tests/wardrobe-capsule-repair.spec.ts`](../../playwright/tests/wardrobe-capsule-repair.spec.ts):
+  4.3-E2E-05 proves a capsule that lost a garment can be repaired in the UI; it now arranges its
+  own repair state instead of skipping when no seeded capsule needed repair.
+
+Evidence boundaries:
+
+- The test architect ran the final set on `28afa000`, on an isolated database and Redis: the
+  upload set plus planner and capsule specs 48/48, packages/db alone 474 passed with one existing
+  skip, and the real-session lane 52/52, including AS-0 to AS-6. The account-switch spec passed
+  five lane runs; the fresh-document, session-recovery, panel and outbox specs passed ten runs
+  each. Baseline red was proven for G-4, G-5, 4.4-E2E-006, 5.4-E2E-015, S-1 to S-4 and AS-0.
+- Rollout gap: an allocation made in the 15 minutes before the deploy hands out a relay URL the
+  deployed API no longer serves, so that one upload fails with 404 and succeeds on retry.
+  Uploads started after the deploy are unaffected.
+- Prod storage CORS was checked on 2026-11-19 to allow the headers installed apps send, and
+  again for `cache-control`, which new builds add (preflight answered all four).

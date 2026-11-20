@@ -1,15 +1,23 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4: color palette & beauty/accessory advisor.
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
-import { buildClaims, scenarioTest, useRlsDatabase, withRole } from './harness.js'
+import {
+  buildClaims,
+  expectPermissionDenied,
+  scenarioTest,
+  useRlsDatabase,
+  withRole,
+} from './harness.js'
 
 describe.concurrent('guardian-aware RLS policies', () => {
   useRlsDatabase()
 
   scenarioTest(
-    '5.4-DB-001 lets the owner read and update their own palette profile and recommendation state',
+    '5.4-DB-001 lets the owner read their palette profile and read and update their recommendation state',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -31,14 +39,16 @@ describe.concurrent('guardian-aware RLS policies', () => {
             { id: seeded.advisorRecommendationStateId, action: 'saved' },
           ])
 
-          const updated = await client.query(
+          // Production follow-up 2026-11-19: the palette profile holds the selfie storage path
+          // the API's service role acts on, so the owner reads it and only the API writes it
+          // (migration 20261119120000_revoke_member_wardrobe_upload_writes).
+          await expectPermissionDenied(
+            client,
             `UPDATE public."PaletteProfile"
                SET "consent_revoked_at" = NOW(), "updated_at" = NOW()
-             WHERE "id" = $1
-             RETURNING "consent_revoked_at" IS NOT NULL AS revoked`,
+             WHERE "id" = $1`,
             [seeded.paletteProfileId]
           )
-          expect(updated.rows).toEqual([{ revoked: true }])
 
           const updatedRecommendation = await client.query(
             `UPDATE public."AdvisorRecommendationState"
@@ -54,7 +64,7 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
-    '5.4-DB-002 lets the owner insert and delete their own rows through the authenticated role',
+    '5.4-DB-002 lets the owner insert and delete their own recommendation state, and no palette profile',
     async ({ scenario: seeded }) => {
       // The positive half of the INSERT policy. Every seed insert in this file
       // goes through the superuser admin pool, which bypasses RLS entirely, so
@@ -65,22 +75,20 @@ describe.concurrent('guardian-aware RLS policies', () => {
         'authenticated',
         buildClaims(seeded.teenEmail, 'teen'),
         async (client) => {
-          const deletedProfile = await client.query(
-            'DELETE FROM public."PaletteProfile" WHERE "id" = $1 RETURNING "id"',
+          // The palette profile is member read-only since the 2026-11-19 follow-up.
+          await expectPermissionDenied(
+            client,
+            'DELETE FROM public."PaletteProfile" WHERE "id" = $1',
             [seeded.paletteProfileId]
           )
-          expect(deletedProfile.rows).toEqual([{ id: seeded.paletteProfileId }])
 
-          const insertedProfile = await client.query(
+          await expectPermissionDenied(
+            client,
             `INSERT INTO public."PaletteProfile"
               ("id", "user_id", "consent_granted_at", "source", "undertone", "updated_at")
-             VALUES ($1, $2, NOW(), 'wardrobe', 'warm', NOW())
-             RETURNING "id", "undertone"`,
-            [seeded.paletteProfileId, seeded.teenId]
+             VALUES ($1, $2, NOW(), 'wardrobe', 'warm', NOW())`,
+            [`owner-palette-${randomUUID()}`, seeded.teenId]
           )
-          expect(insertedProfile.rows).toEqual([
-            { id: seeded.paletteProfileId, undertone: 'warm' },
-          ])
 
           const deletedRecommendation = await client.query(
             'DELETE FROM public."AdvisorRecommendationState" WHERE "id" = $1 RETURNING "id"',
@@ -132,13 +140,22 @@ describe.concurrent('guardian-aware RLS policies', () => {
             )
             expect(recommendations.rows).toHaveLength(0)
 
-            const attemptedUpdate = await client.query(
+            const attemptedRecommendationUpdate = await client.query(
+              `UPDATE public."AdvisorRecommendationState"
+                 SET "action" = 'dismissed', "updated_at" = NOW()
+               WHERE "user_id" = $1`,
+              [seeded.teenId]
+            )
+            expect(attemptedRecommendationUpdate.rowCount).toBe(0)
+
+            // The palette profile refuses every client write (2026-11-19 follow-up).
+            await expectPermissionDenied(
+              client,
               `UPDATE public."PaletteProfile"
                  SET "consent_revoked_at" = NOW(), "updated_at" = NOW()
                WHERE "user_id" = $1`,
               [seeded.teenId]
             )
-            expect(attemptedUpdate.rowCount).toBe(0)
           }
         )
       }
@@ -266,7 +283,9 @@ describe.concurrent('guardian-aware RLS policies', () => {
       // owner-only read test cannot reach: without it, any authenticated caller
       // could mint a row keyed to somebody else's user_id. The target is the
       // outsider guardian precisely because they have no row yet, so a
-      // rejection can only come from RLS and never from the unique index.
+      // rejection never comes from the unique index. Since the 2026-11-19
+      // follow-up the PaletteProfile insert is refused by privilege before RLS
+      // runs; the AdvisorRecommendationState insert is still refused by RLS.
       // Each rejecting insert gets its own transaction, for the same reason
       // the anon-role assertions above do.
       await withRole(

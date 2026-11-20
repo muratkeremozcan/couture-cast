@@ -81,14 +81,17 @@ async function seedGrantedGuardian() {
 }
 
 async function flaggedPhoto() {
+  // Round 4: the worker acts only on the session its job names, read from the job id.
+  const sessionId = randomUUID()
   const profile = await prisma.silhouetteProfile.create({
     data: {
       user_id: teenId,
-      my_form_object_path: `wardrobe/${teenId}/silhouette/${randomUUID()}.png`,
+      my_form_object_path: `wardrobe/${teenId}/silhouette/${sessionId}.png`,
+      my_form_upload_session_id: sessionId,
       my_form_status: 'processing',
     },
   })
-  await processor.process(profile.id)
+  await processor.process(profile.id, sessionId)
   return {
     profile: await prisma.silhouetteProfile.findUniqueOrThrow({
       where: { id: profile.id },

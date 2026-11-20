@@ -1,5 +1,7 @@
 // Learning path Step 4: Environment setup and Supabase operations.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-4-environment-setup-and-supabase-operations
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // The negative half of the guardian model: every way a caller might try to become
 // someone else. Spoofed claims, unverified email, revoked consent, direct helper
 // invocation, and the one legitimate cross-account actor, the admin.
@@ -8,6 +10,7 @@ import { describe, expect } from 'vitest'
 import {
   adminPool,
   buildClaims,
+  expectPermissionDenied,
   scenarioTest,
   useRlsDatabase,
   withRole,
@@ -189,15 +192,26 @@ describe.concurrent('guardian-aware RLS policies', () => {
 
           expect(garmentRows.rows).toHaveLength(0)
 
+          // The policy, not a missing privilege, refuses this write: OutfitCapsule is a shared
+          // table members may write, and the revoked teen's own row is out of reach.
           const updateResult = await guardedClient.query(
-            `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
+            `UPDATE public."OutfitCapsule"
+           SET "name" = $1, "updated_at" = NOW()
            WHERE "id" = $2
            RETURNING "id"`,
-            ['accessory', seeded.garmentId]
+            ['Revoked rename', seeded.capsuleId]
           )
 
           expect(updateResult.rowCount).toBe(0)
+
+          // GarmentItem is member read-only (production follow-up 2026-11-19).
+          await expectPermissionDenied(
+            guardedClient,
+            `UPDATE public."GarmentItem"
+           SET "category" = $1, "updated_at" = NOW()
+           WHERE "id" = $2`,
+            ['accessory', seeded.garmentId]
+          )
         }
       )
     }
@@ -223,7 +237,7 @@ describe.concurrent('guardian-aware RLS policies', () => {
   )
 
   scenarioTest(
-    'allows admin claims to inspect and update teen wardrobe rows without service role bypass',
+    'allows admin claims to inspect teen wardrobe rows and update the ones members may write, without service role bypass',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -237,14 +251,24 @@ describe.concurrent('guardian-aware RLS policies', () => {
           expect(garmentRows.rows).toHaveLength(1)
 
           const updateResult = await client.query(
-            `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
+            `UPDATE public."OutfitCapsule"
+           SET "name" = $1, "updated_at" = NOW()
            WHERE "id" = $2
-           RETURNING "category"`,
-            ['accessory', seeded.garmentId]
+           RETURNING "name"`,
+            ['Admin rename', seeded.capsuleId]
           )
 
-          expect(updateResult.rows).toEqual([{ category: 'accessory' }])
+          expect(updateResult.rows).toEqual([{ name: 'Admin rename' }])
+
+          // GarmentItem holds storage paths; only the API writes it (production follow-up
+          // 2026-11-19), and an admin claim is still a client role.
+          await expectPermissionDenied(
+            client,
+            `UPDATE public."GarmentItem"
+           SET "category" = $1, "updated_at" = NOW()
+           WHERE "id" = $2`,
+            ['accessory', seeded.garmentId]
+          )
         }
       )
     }

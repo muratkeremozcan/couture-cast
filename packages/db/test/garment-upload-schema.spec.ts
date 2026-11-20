@@ -84,4 +84,148 @@ describe('garment upload lifecycle migration', () => {
     expect(schema).toContain('GarmentItem_ritual_candidates_idx')
     expect(smartTaggingMigration).toContain('GarmentItem_ritual_candidates_idx')
   })
+
+  /**
+   * Production follow-up 2026-11-19 (review round 2, Codex 4 and 11): staged uploads are
+   * service-only, and every wardrobe-images deletion is recorded durably.
+   */
+  it('limits wardrobe reads to the wardrobe/ prefix and adds an API-only deletion outbox', () => {
+    const round3 = readFileSync(
+      new URL(
+        '../prisma/migrations/20261119130000_wardrobe_staging_reads_and_deletion_outbox/migration.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    expect(round3).toContain("(storage.foldername(name))[1] = 'wardrobe'")
+    expect(round3).toContain(
+      'private.can_read_shared_user_row((storage.foldername(name))[2])'
+    )
+    expect(round3).not.toMatch(/FOR\s+(INSERT|UPDATE|DELETE)/)
+    expect(round3).toContain(
+      'CREATE UNIQUE INDEX "WardrobeObjectDeletion_object_path_key"'
+    )
+    expect(round3).toContain(
+      'REVOKE ALL ON TABLE public."WardrobeObjectDeletion" FROM anon, authenticated;'
+    )
+    expect(round3).toContain(
+      'ALTER TABLE public."WardrobeObjectDeletion" ENABLE ROW LEVEL SECURITY;'
+    )
+    expect(schema).toContain('model WardrobeObjectDeletion {')
+  })
+
+  /**
+   * Production follow-up 2026-11-19 (review round 3, Codex 1, 5, 6 and 11): publication claims
+   * on the three upload rows, job handoff markers and the analysis attempt on the profiles, and
+   * an API-only maintenance state table for the staging sweep's continuation.
+   */
+  it('adds publication claims, profile job handoff markers and API-only maintenance state', () => {
+    const round4 = readFileSync(
+      new URL(
+        '../prisma/migrations/20261119140000_wardrobe_publication_claims/migration.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    for (const [table, columns] of [
+      ['GarmentItem', ['publish_attempt_id', 'publish_started_at']],
+      [
+        'SilhouetteProfile',
+        [
+          'my_form_publish_attempt_id',
+          'my_form_publish_started_at',
+          'my_form_processing_job_enqueued_at',
+        ],
+      ],
+      [
+        'PaletteProfile',
+        [
+          'selfie_publish_attempt_id',
+          'selfie_publish_started_at',
+          'analysis_attempt_id',
+          'processing_job_enqueued_at',
+        ],
+      ],
+    ] as const) {
+      expect(round4).toContain(`ALTER TABLE public."${table}"`)
+      for (const column of columns) {
+        expect(schema).toContain(column)
+        expect(round4).toContain(`ADD COLUMN "${column}"`)
+      }
+    }
+    // Round 5 (Codex C4-7): nothing records whether a row already processing at deploy had its
+    // job delivered, so the handoff markers stay null for replay and the hourly handoff to
+    // recover. A historical wardrobe analysis gets the known legacy attempt, which only a job
+    // for that attempt may finish.
+    expect(round4).not.toMatch(/SET "my_form_processing_job_enqueued_at" =/)
+    expect(round4).not.toMatch(/"processing_job_enqueued_at" = CURRENT_TIMESTAMP/)
+    expect(round4).toMatch(
+      /"analysis_attempt_id" = CASE\s+WHEN "source" = 'selfie' THEN "selfie_upload_session_id"\s+ELSE 'legacy-wardrobe-analysis'\s+END/
+    )
+    expect(round4).toContain(
+      'REVOKE ALL ON TABLE public."WardrobeMaintenanceState" FROM anon, authenticated;'
+    )
+    expect(round4).toContain(
+      'ALTER TABLE public."WardrobeMaintenanceState" ENABLE ROW LEVEL SECURITY;'
+    )
+    expect(schema).toContain('model WardrobeMaintenanceState {')
+  })
+
+  /**
+   * Production follow-up 2026-11-19 (review round 4, Codex C4-2, C4-5 and C4-6): an explicit
+   * ended state for rejected garment sessions, the held source digest, and repeating removals.
+   */
+  it('adds the garment upload end, the held source record and repeating removals', () => {
+    const round5 = readFileSync(
+      new URL(
+        '../prisma/migrations/20261119150000_wardrobe_upload_endings_and_held_sources/migration.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    for (const column of [
+      'upload_ended_at',
+      'held_source_sha256',
+      'held_source_captured_at',
+      'repeat_until',
+    ]) {
+      expect(schema).toContain(column)
+      expect(round5).toContain(`ADD COLUMN "${column}"`)
+    }
+    expect(round5).toContain('ALTER TABLE public."GarmentItem"')
+    expect(round5).toContain('ALTER TABLE public."WardrobeObjectDeletion"')
+    expect(round5).not.toMatch(/GRANT|CREATE POLICY/)
+  })
+
+  /**
+   * Production follow-up 2026-11-19 (review round 6, Codex C5-2 to C5-7): cleanup horizons that
+   * outlive a claim, the held copy's obligation and operator-visible capture state, and the
+   * color worker's hold deferral.
+   */
+  it('adds cleanup horizons, the held copy obligation and capture state, and the hold deferral', () => {
+    const round6 = readFileSync(
+      new URL(
+        '../prisma/migrations/20261119160000_wardrobe_cleanup_horizons_and_held_capture/migration.sql',
+        import.meta.url
+      ),
+      'utf8'
+    )
+    for (const column of [
+      'publish_cleanup_until',
+      'held_source_object_path',
+      'held_source_capture_outcome',
+      'held_source_checked_at',
+      'processing_deferred_at',
+      'my_form_publish_cleanup_until',
+      'selfie_publish_cleanup_until',
+    ]) {
+      expect(schema).toContain(column)
+      expect(round6).toContain(`ADD COLUMN "${column}"`)
+    }
+    // A claim taken before the deploy keeps the horizon its start implies.
+    expect(round6).toContain(
+      'SET "publish_cleanup_until" = "publish_started_at" + INTERVAL \'24 hours\''
+    )
+    expect(round6).not.toMatch(/GRANT|CREATE POLICY/)
+  })
 })

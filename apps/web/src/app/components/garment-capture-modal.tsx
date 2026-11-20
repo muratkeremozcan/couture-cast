@@ -2,11 +2,24 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import { useTranslation } from 'react-i18next'
+import type {
+  GarmentItemContract,
+  UploadAttemptSession,
+} from '@couture/api-client/contracts/http'
 import {
   uploadGarmentImageFromWeb,
   type UploadGarmentImageInput,
 } from '../../lib/wardrobe'
+import {
+  garmentUploadErrorKey,
+  type GarmentUploadErrorKey,
+} from '../../lib/garment-upload-errors'
+import {
+  currentUploadSession,
+  isUploadSessionCurrent,
+  useUploadSessionChange,
+} from '../../lib/upload-attempts'
 import { AccessibleModal } from './accessible-modal'
 
 export interface GarmentCaptureModalProps {
@@ -19,19 +32,40 @@ export interface GarmentCaptureModalProps {
 
 export type CaptureStep = 'source' | 'camera' | 'crop' | 'uploading' | 'complete'
 
+/** Every `wardrobe.capture.errors` key the modal can show; the member never reads raw error text. */
+type CaptureErrorKey =
+  | GarmentUploadErrorKey
+  | 'cameraUnavailable'
+  | 'cameraDenied'
+  | 'unsupportedType'
+  | 'fileTooLarge'
+  | 'noImage'
+
+/** The catalog key of each upload phase `uploadGarmentImageFromWeb` reports. */
+const UPLOAD_STATUS_KEYS: Record<string, string> = {
+  preparing: 'wardrobe.capture.status.preparing',
+  requesting_upload: 'wardrobe.capture.status.requestingUpload',
+  uploading: 'wardrobe.capture.status.uploading',
+  verifying: 'wardrobe.capture.status.verifying',
+  processing: 'wardrobe.capture.status.processing',
+}
+
 function SourceStep({
   onStartCamera,
+  onFilePickerOpen,
   onFileSelect,
 }: {
   onStartCamera: () => void
+  onFilePickerOpen: () => void
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void
 }) {
+  const { t } = useTranslation()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   return (
     <div className="mt-6 flex flex-col gap-4">
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Photograph or import a garment photo to add to your private CoutureCast wardrobe.
+        {t('wardrobe.capture.intro')}
       </p>
       <div className="grid grid-cols-2 gap-4">
         <button
@@ -43,7 +77,7 @@ function SourceStep({
           <span aria-hidden="true" className="text-2xl">
             📷
           </span>
-          <span className="mt-2">Take Photo</span>
+          <span className="mt-2">{t('wardrobe.capture.takePhoto')}</span>
         </button>
 
         <button
@@ -53,14 +87,15 @@ function SourceStep({
           <span aria-hidden="true" className="text-2xl">
             📁
           </span>
-          <span className="mt-2">Choose File</span>
+          <span className="mt-2">{t('wardrobe.capture.chooseFile')}</span>
         </button>
         <input
           ref={fileInputRef}
           type="file"
-          aria-label="Garment image file"
+          aria-label={t('wardrobe.capture.fileLabel')}
           accept="image/jpeg,image/png,image/webp"
           className="hidden"
+          onClick={onFilePickerOpen}
           onChange={onFileSelect}
         />
       </div>
@@ -77,6 +112,7 @@ function CameraStep({
   onCancel: () => void
   onCapture: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="mt-4 flex flex-col items-center gap-4">
       {/* Tester report 2026-11-17: a phone camera streams a portrait frame, and a 16:9 box with
@@ -96,13 +132,13 @@ function CameraStep({
           onClick={onCancel}
           className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
         >
-          Cancel
+          {t('wardrobe.capture.cancel')}
         </button>
         <button
           onClick={onCapture}
           className="rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          Snap Photo
+          {t('wardrobe.capture.snapPhoto')}
         </button>
       </div>
     </div>
@@ -126,11 +162,12 @@ function CropStep({
   onReset: () => void
   onConfirm: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Aspect Ratio:
+          {t('wardrobe.capture.aspectRatio')}
         </span>
         <div className="flex gap-2">
           <button
@@ -141,7 +178,7 @@ function CropStep({
                 : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
             }`}
           >
-            1:1 Square
+            {t('wardrobe.capture.aspectSquare')}
           </button>
           <button
             onClick={() => setAspectRatio('4:3')}
@@ -151,7 +188,7 @@ function CropStep({
                 : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
             }`}
           >
-            4:3 Portrait
+            {t('wardrobe.capture.aspectPortrait')}
           </button>
         </div>
       </div>
@@ -164,7 +201,7 @@ function CropStep({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imagePreview}
-          alt="Garment preview"
+          alt={t('wardrobe.capture.previewAlt')}
           className={`h-full w-full object-contain ${
             useBgCleanup ? 'brightness-105 contrast-105' : ''
           }`}
@@ -174,16 +211,16 @@ function CropStep({
       <div className="flex items-center justify-between rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
         <div>
           <span className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Auto Background Cleanup
+            {t('wardrobe.capture.cleanupLabel')}
           </span>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Preview matting & transparent backdrop
+            {t('wardrobe.capture.cleanupHint')}
           </span>
         </div>
         <button
           type="button"
           role="switch"
-          aria-label="Auto Background Cleanup"
+          aria-label={t('wardrobe.capture.cleanupLabel')}
           aria-checked={useBgCleanup}
           onClick={() => setUseBgCleanup(!useBgCleanup)}
           // The global 44 px touch target sized the 24 px track itself into a disc; the button
@@ -212,7 +249,7 @@ function CropStep({
           onClick={onReset}
           className="whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
         >
-          Retake / Choose Another
+          {t('wardrobe.capture.retake')}
         </button>
         <button
           onClick={() => {
@@ -220,7 +257,7 @@ function CropStep({
           }}
           className="whitespace-nowrap rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
         >
-          Use This Image
+          {t('wardrobe.capture.useImage')}
         </button>
       </div>
     </div>
@@ -234,6 +271,8 @@ function UploadingStep({
   uploadState: string
   uploadProgress: number
 }) {
+  const { t } = useTranslation()
+  const statusKey = UPLOAD_STATUS_KEYS[uploadState]
   return (
     <div className="mt-8 flex flex-col items-center gap-4 py-6">
       <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
@@ -243,34 +282,30 @@ function UploadingStep({
         />
       </div>
       <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-        {uploadState === 'preparing' && 'Preparing asset validation...'}
-        {uploadState === 'requesting_upload' && 'Allocating upload session...'}
-        {uploadState === 'uploading' && `Uploading image bytes (${uploadProgress}%)...`}
-        {uploadState === 'verifying' && 'Verifying private storage payload...'}
-        {uploadState === 'processing' && 'Garment uploaded! Processing color analysis...'}
+        {statusKey ? t(statusKey, { progress: uploadProgress }) : null}
       </p>
     </div>
   )
 }
 
 function CompleteStep({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="mt-6 flex flex-col items-center gap-4 text-center py-4">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300">
         ✓
       </div>
       <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
-        Garment Upload Complete!
+        {t('wardrobe.capture.completeTitle')}
       </h3>
       <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        Your clothing item has been securely uploaded to your private wardrobe and is
-        queued for personalized outfit matching.
+        {t('wardrobe.capture.completeBody')}
       </p>
       <button
         onClick={onDone}
         className="mt-2 min-h-[44px] rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        Done
+        {t('wardrobe.capture.done')}
       </button>
     </div>
   )
@@ -283,18 +318,25 @@ export function GarmentCaptureModal({
   uploadGarment = uploadGarmentImageFromWeb,
   invokingElementRef,
 }: GarmentCaptureModalProps) {
+  const { t } = useTranslation()
   const [step, setStep] = useState<CaptureStep>('source')
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  /** The photo to upload, bound to the session captured when its camera or picker opened. */
+  const [imagePreview, setImagePreview] = useState<{
+    dataUrl: string
+    session: UploadAttemptSession
+  } | null>(null)
   const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:3'>('1:1')
   const [useBgCleanup, setUseBgCleanup] = useState<boolean>(true)
   const [uploadState, setUploadState] = useState<string>('')
   const [uploadProgress, setUploadProgress] = useState<number>(0)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [errorKey, setErrorKey] = useState<CaptureErrorKey | null>(null)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
   const isOpenRef = useRef(isOpen)
+  /** The session captured when the camera or file picker last opened. */
+  const pickerSessionRef = useRef<UploadAttemptSession | null>(null)
 
   isOpenRef.current = isOpen
 
@@ -319,67 +361,99 @@ export function GarmentCaptureModal({
     }
   }, [stopCamera])
 
+  const resetCapture = useCallback(() => {
+    uploadAbortRef.current?.abort()
+    uploadAbortRef.current = null
+    stopCamera()
+    setStep('source')
+    setImagePreview(null)
+    setErrorKey(null)
+    setUploadProgress(0)
+    setUploadState('')
+  }, [stopCamera])
+  // Round 5 account epoch: the camera, the picked photo and its upload belong to the account
+  // signed in when the camera or picker opened; any account change drops them.
+  useUploadSessionChange(resetCapture)
+
   if (!isOpen) {
     return null
   }
 
   const handleStartCamera = async () => {
-    setErrorMessage(null)
+    setErrorKey(null)
+    const session = currentUploadSession()
+    pickerSessionRef.current = session
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setErrorMessage('Camera access is unavailable on this device or context.')
+        setErrorKey('cameraUnavailable')
         return
       }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       })
-      if (!isOpenRef.current) {
+      if (!isOpenRef.current || !isUploadSessionCurrent(session)) {
         stream.getTracks().forEach((track) => track.stop())
         return
       }
       streamRef.current = stream
       setStep('camera')
     } catch {
-      setErrorMessage(
-        'Camera permission denied or camera unavailable. Please select a photo file.'
-      )
+      setErrorKey('cameraDenied')
     }
   }
 
   const handleCapturePhoto = () => {
     if (!videoRef.current) return
+    const session = pickerSessionRef.current
+    if (!session || !isUploadSessionCurrent(session)) {
+      resetCapture()
+      return
+    }
     const canvas = document.createElement('canvas')
     canvas.width = videoRef.current.videoWidth || 640
     canvas.height = videoRef.current.videoHeight || 480
     const ctx = canvas.getContext('2d')
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
-      const dataUrl = canvas.toDataURL('image/png')
-      setImagePreview(dataUrl)
+      // JPEG: a camera frame has no transparency, and PNG would carry its sensor grain at
+      // several times the size. Preparation re-encodes it for upload anyway.
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+      setImagePreview({ dataUrl, session })
       setStep('crop')
     }
     stopCamera()
   }
 
+  const handleFilePickerOpen = () => {
+    pickerSessionRef.current = currentUploadSession()
+  }
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setErrorMessage(null)
+    setErrorKey(null)
     const file = e.target.files?.[0]
+    // A file that arrives without the picker opening (a drop) belongs to the session now.
+    const session = pickerSessionRef.current ?? currentUploadSession()
+    pickerSessionRef.current = null
     if (!file) return
+    // The account changed while the picker was open: the photo was picked for the previous one.
+    if (!isUploadSessionCurrent(session)) return
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setErrorMessage('Unsupported file type. Please upload a JPEG, PNG, or WebP image.')
+      setErrorKey('unsupportedType')
       return
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage('File size exceeds 10 MiB limit.')
+      setErrorKey('fileTooLarge')
       return
     }
 
     const reader = new FileReader()
     reader.onload = (event) => {
+      // A read that finishes after an account change is dropped with the rest of the capture.
+      if (!isUploadSessionCurrent(session)) return
       if (typeof event.target?.result === 'string') {
-        setImagePreview(event.target.result)
+        setImagePreview({ dataUrl: event.target.result, session })
         setStep('crop')
       }
     }
@@ -388,19 +462,20 @@ export function GarmentCaptureModal({
 
   const handleConfirmAndUpload = async () => {
     if (!imagePreview) {
-      setErrorMessage('Choose an image before uploading.')
+      setErrorKey('noImage')
       return
     }
     setStep('uploading')
     setUploadState('preparing')
     setUploadProgress(10)
-    setErrorMessage(null)
+    setErrorKey(null)
     const abortController = new AbortController()
     uploadAbortRef.current = abortController
 
     try {
       const garment = await uploadGarment({
-        imagePreview,
+        imagePreview: imagePreview.dataUrl,
+        uploadSession: imagePreview.session,
         aspectRatio,
         useBgCleanup,
         signal: abortController.signal,
@@ -411,9 +486,7 @@ export function GarmentCaptureModal({
       setStep('complete')
     } catch (error) {
       if (!abortController.signal.aborted && isOpenRef.current) {
-        setErrorMessage(
-          error instanceof Error ? error.message : 'Upload failed. Please try again.'
-        )
+        setErrorKey(garmentUploadErrorKey(error))
         setStep('crop')
       }
     } finally {
@@ -423,16 +496,7 @@ export function GarmentCaptureModal({
     }
   }
 
-  const handleResetModal = () => {
-    uploadAbortRef.current?.abort()
-    uploadAbortRef.current = null
-    stopCamera()
-    setStep('source')
-    setImagePreview(null)
-    setErrorMessage(null)
-    setUploadProgress(0)
-    setUploadState('')
-  }
+  const handleResetModal = resetCapture
 
   const handleClose = () => {
     handleResetModal()
@@ -444,17 +508,24 @@ export function GarmentCaptureModal({
       isOpen={isOpen}
       onClose={handleClose}
       titleId="garment-capture-title"
-      title="Garment Capture Flow"
+      title={t('wardrobe.capture.title')}
       invokingElementRef={invokingElementRef}
-      closeLabel="Close capture modal"
-      ariaLiveMessage={uploadState ? `Upload status: ${uploadState}` : null}
-      errorMessage={errorMessage}
+      closeLabel={t('wardrobe.capture.close')}
+      ariaLiveMessage={
+        UPLOAD_STATUS_KEYS[uploadState]
+          ? t('wardrobe.capture.statusAnnouncement', {
+              status: t(UPLOAD_STATUS_KEYS[uploadState], { progress: uploadProgress }),
+            })
+          : null
+      }
+      errorMessage={errorKey ? t(`wardrobe.capture.errors.${errorKey}`) : null}
     >
       {step === 'source' && (
         <SourceStep
           onStartCamera={() => {
             void handleStartCamera()
           }}
+          onFilePickerOpen={handleFilePickerOpen}
           onFileSelect={handleFileSelect}
         />
       )}
@@ -472,7 +543,7 @@ export function GarmentCaptureModal({
 
       {step === 'crop' && imagePreview && (
         <CropStep
-          imagePreview={imagePreview}
+          imagePreview={imagePreview.dataUrl}
           aspectRatio={aspectRatio}
           setAspectRatio={setAspectRatio}
           useBgCleanup={useBgCleanup}

@@ -4,9 +4,8 @@
 // This lets the new wardrobe-onboarding screen reuse the exact same capture/crop/upload
 // state machine instead of duplicating it (project-context.md: avoid duplicate utility
 // implementations across apps).
-import { useEffect, useRef, useState, type ElementRef } from 'react'
+import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import * as Crypto from 'expo-crypto'
 import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
@@ -30,18 +29,44 @@ import {
   createGarmentItemResponseSchema,
   createGarmentUploadUrlResponseSchema,
   uploadGarmentBytes,
+  UploadSessionChangedError,
+  WARDROBE_UPLOAD_CACHE_CONTROL,
   type GarmentItemContract,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import {
+  createUploadAttempts,
+  currentUploadSession,
+  isUploadSessionCurrent,
+  preparedImageFingerprint,
+  resolveUploadBearer,
+  runTrackedUpload,
+  throwUploadStepError,
+  useUploadSessionChange,
+} from '@/src/lib/upload-attempts'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
+
+/**
+ * Open garment upload attempts in this app session, keyed by the prepared image and scoped to
+ * the signed-in account; see `runTrackedUpload`. Each attempt gets fresh UUID v4 keys.
+ */
+const garmentUploadAttempts = createUploadAttempts<{
+  garmentId: string
+  uploadSessionId: string
+  uploadUrl: string
+  uploadToken: string
+}>()
 type AspectRatio = '1:1' | '4:3'
 type SelectedImage = { uri: string; width: number; height: number }
+/** A picked photo, bound to the session captured before its camera or picker opened. */
+type PickedImage = SelectedImage & { session: UploadAttemptSession }
 
 async function responseError(response: Response): Promise<Error> {
   try {
@@ -91,7 +116,7 @@ export function MobileGarmentCaptureModal({
   const themed = useThemedStyles()
   const insets = useModalInsets()
   const [step, setStep] = useState<CaptureStep>('source')
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
+  const [selectedImage, setSelectedImage] = useState<PickedImage | null>(null)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
   const [useBgCleanup, setUseBgCleanup] = useState(true)
   const [uploadStatus, setUploadStatus] = useState('')
@@ -121,21 +146,30 @@ export function MobileGarmentCaptureModal({
     }
   }, [visible])
 
-  const resetCapture = () => {
+  const resetCapture = useCallback(() => {
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     setStep('source')
     setSelectedImage(null)
     setUploadStatus('')
     setErrorMessage(null)
-  }
+  }, [])
+  // Round 5 account epoch: the picked photo and its upload belong to the account signed in when
+  // the camera or picker opened; any account change drops them.
+  useUploadSessionChange(resetCapture)
 
   const handleClose = () => {
     resetCapture()
     onClose()
   }
 
-  const selectAsset = (asset: ImagePicker.ImagePickerAsset) => {
+  const selectAsset = (
+    asset: ImagePicker.ImagePickerAsset,
+    session: UploadAttemptSession
+  ) => {
+    // The account changed while the camera or picker was open: the photo belongs to the
+    // previous account and is dropped.
+    if (!isUploadSessionCurrent(session)) return
     if (asset.width < 256 || asset.height < 256) {
       setErrorMessage(t('wardrobe.error.invalid_image'))
       return
@@ -144,12 +178,18 @@ export function MobileGarmentCaptureModal({
       setErrorMessage(t('wardrobe.error.image_too_large'))
       return
     }
-    setSelectedImage({ uri: asset.uri, width: asset.width, height: asset.height })
+    setSelectedImage({
+      uri: asset.uri,
+      width: asset.width,
+      height: asset.height,
+      session,
+    })
     setErrorMessage(null)
     setStep('crop')
   }
 
   const openCamera = async () => {
+    const session = currentUploadSession()
     const permission = await ImagePicker.requestCameraPermissionsAsync()
     if (!permission.granted) {
       setErrorMessage(
@@ -164,11 +204,12 @@ export function MobileGarmentCaptureModal({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
-      selectAsset(result.assets[0])
+      selectAsset(result.assets[0], session)
     }
   }
 
   const openLibrary = async () => {
+    const session = currentUploadSession()
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
     if (!permission.granted) {
       setErrorMessage(t('wardrobe.permission.library_denied'))
@@ -179,7 +220,7 @@ export function MobileGarmentCaptureModal({
       quality: 1,
     })
     if (!result.canceled && result.assets[0]) {
-      selectAsset(result.assets[0])
+      selectAsset(result.assets[0], session)
     }
   }
 
@@ -189,16 +230,19 @@ export function MobileGarmentCaptureModal({
     // throw; only pressing the __DEV__-only fixture button below ever runs it.
     const fixtureImage = require('../../assets/images/icon.png') as number
     const source = Image.resolveAssetSource(fixtureImage)
+    const session = currentUploadSession()
     try {
       const fixtureFile = await File.downloadFileAsync(
         source.uri,
         new File(Paths.cache, 'garment-capture-fixture.png'),
         { idempotent: true }
       )
+      if (!isUploadSessionCurrent(session)) return
       setSelectedImage({
         uri: fixtureFile.uri,
         width: source.width,
         height: source.height,
+        session,
       })
       setErrorMessage(null)
       setStep('crop')
@@ -230,87 +274,122 @@ export function MobileGarmentCaptureModal({
             },
           },
         ],
-        { compress: 0.92, format: SaveFormat.PNG }
+        // JPEG: nothing here is transparent, and a 12 MP photo saved as PNG came to 5 MB or more.
+        { compress: 0.9, format: SaveFormat.JPEG }
       )
       const file = new File(prepared.uri)
       const bytes = await file.bytes()
       if (bytes.byteLength > 10 * 1024 * 1024) {
         throw new Error(t('wardrobe.error.image_too_large'))
       }
-      const accessToken = await resolveMobileAccessToken()
+      // The session captured when the photo was picked: its account's bearer is resolved now
+      // (refused once the account changed), and an account change from here on fences this run,
+      // so its answers never reach the next account's attempts.
+      const uploadSession = selectedImage.session
+      const accessToken = await resolveUploadBearer(
+        uploadSession,
+        resolveMobileAccessToken
+      )
       if (!accessToken) {
         throw new Error('AUTHENTICATION_REQUIRED')
       }
 
-      setUploadStatus(t('wardrobe.upload.requesting'))
-      const allocationResponse = await fetch(
-        `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/upload-url`,
+      const sha256 = await sha256Hex(bytes)
+      // Tapping upload again after a failure with the same prepared image is the same attempt:
+      // same garment session, same commit key. A retry commits first and re-sends the bytes only
+      // when the server reports them missing.
+      const attemptId = `${preparedImageFingerprint({
+        sha256,
+        fileSizeBytes: bytes.byteLength,
+        mimeType: 'image/jpeg',
+        widthPx: prepared.width,
+        heightPx: prepared.height,
+      })}:${useBgCleanup ? 'cleanup' : 'original'}`
+      const garment = await runTrackedUpload(
+        garmentUploadAttempts,
+        uploadSession,
+        attemptId,
         {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Idempotency-Key': Crypto.randomUUID(),
+          allocate: async (idempotencyKey) => {
+            setUploadStatus(t('wardrobe.upload.requesting'))
+            const allocationResponse = await fetch(
+              `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/upload-url`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'Idempotency-Key': idempotencyKey,
+                },
+                body: JSON.stringify({
+                  fileSizeBytes: bytes.byteLength,
+                  mimeType: 'image/jpeg',
+                  sha256,
+                  widthPx: prepared.width,
+                  heightPx: prepared.height,
+                }),
+                signal: controller.signal,
+              }
+            )
+            if (!allocationResponse.ok) {
+              return throwUploadStepError(allocationResponse, responseError)
+            }
+            return createGarmentUploadUrlResponseSchema.parse(
+              await allocationResponse.json()
+            ).data
           },
-          body: JSON.stringify({
-            fileSizeBytes: bytes.byteLength,
-            mimeType: 'image/png',
-            sha256: await sha256Hex(bytes),
-            widthPx: prepared.width,
-            heightPx: prepared.height,
-          }),
-          signal: controller.signal,
+          upload: async (allocation) => {
+            setUploadStatus(t('wardrobe.upload.uploading'))
+            await uploadGarmentBytes({
+              cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
+              // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
+              acceptExistingObject: true,
+              uploadUrl: allocation.uploadUrl,
+              uploadToken: allocation.uploadToken,
+              bearerToken: accessToken,
+              mimeType: 'image/jpeg',
+              body: bytes.buffer,
+              signal: controller.signal,
+            })
+          },
+          commit: async (allocation, idempotencyKey) => {
+            setUploadStatus(t('wardrobe.upload.verifying'))
+            const commitResponse = await fetch(
+              `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/garments`,
+              {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json',
+                  'Idempotency-Key': idempotencyKey,
+                },
+                body: JSON.stringify({
+                  garmentId: allocation.garmentId,
+                  uploadSessionId: allocation.uploadSessionId,
+                  hasCropping: true,
+                  hasBgCleanup: useBgCleanup,
+                }),
+                signal: controller.signal,
+              }
+            )
+            if (!commitResponse.ok) {
+              return throwUploadStepError(commitResponse, responseError)
+            }
+            return createGarmentItemResponseSchema.parse(await commitResponse.json()).data
+          },
         }
       )
-      if (!allocationResponse.ok) {
-        throw await responseError(allocationResponse)
-      }
-      const allocation = createGarmentUploadUrlResponseSchema.parse(
-        await allocationResponse.json()
-      ).data
-
-      setUploadStatus(t('wardrobe.upload.uploading'))
-      await uploadGarmentBytes({
-        uploadUrl: allocation.uploadUrl,
-        uploadToken: allocation.uploadToken,
-        bearerToken: accessToken,
-        mimeType: 'image/png',
-        body: bytes.buffer,
-        signal: controller.signal,
-      })
-
-      setUploadStatus(t('wardrobe.upload.verifying'))
-      const commitResponse = await fetch(
-        `${resolveMobileApiBaseUrl()}/api/v1/wardrobe/garments`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-            'Idempotency-Key': Crypto.randomUUID(),
-          },
-          body: JSON.stringify({
-            garmentId: allocation.garmentId,
-            uploadSessionId: allocation.uploadSessionId,
-            hasCropping: true,
-            hasBgCleanup: useBgCleanup,
-          }),
-          signal: controller.signal,
-        }
-      )
-      if (!commitResponse.ok) {
-        throw await responseError(commitResponse)
-      }
-      const garment = createGarmentItemResponseSchema.parse(
-        await commitResponse.json()
-      ).data
       onGarmentCommitted?.(garment, accessToken)
       setUploadStatus(t('wardrobe.upload.processing'))
       setStep('complete')
     } catch (error) {
       if (!controller.signal.aborted) {
         setErrorMessage(
-          error instanceof Error ? error.message : t('wardrobe.upload.failed')
+          error instanceof UploadSessionChangedError
+            ? t('wardrobe.error.upload_session_changed')
+            : error instanceof Error
+              ? error.message
+              : t('wardrobe.upload.failed')
         )
         setStep('crop')
       }

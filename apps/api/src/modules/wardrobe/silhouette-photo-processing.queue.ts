@@ -42,9 +42,16 @@ function productionBinding(): SilhouettePhotoProcessingQueueBinding {
   return found
 }
 
-export const silhouettePhotoProcessingJobSchema = z
-  .object({ silhouetteProfileId: z.string().trim().min(1).max(128) })
-  .strict()
+/**
+ * The job payload. Unknown fields are accepted and dropped, so a payload from a newer producer
+ * never fails an older consumer, and the producer sends only the profile id every deployed
+ * consumer accepts. The upload session the job belongs to is its job id's suffix (see
+ * {@link silhouetteSessionFromJobId}); `uploadSessionId` is still read when a payload carries it.
+ */
+export const silhouettePhotoProcessingJobSchema = z.object({
+  silhouetteProfileId: z.string().trim().min(1).max(128),
+  uploadSessionId: z.string().uuid().optional(),
+})
 
 export type SilhouettePhotoProcessingJob = z.infer<
   typeof silhouettePhotoProcessingJobSchema
@@ -74,6 +81,22 @@ export function buildSilhouettePhotoJobId(
   uploadSessionId: string
 ): string {
   return `${silhouetteProfileId}__${uploadSessionId}`
+}
+
+/**
+ * The upload session a job was enqueued for: the payload's own field when present, otherwise
+ * the suffix of its deterministic job id. Null when neither names a session, and the processor
+ * then writes nothing.
+ */
+export function silhouetteSessionFromJobId(job: {
+  id?: string | null
+  data: SilhouettePhotoProcessingJob
+}): string | null {
+  if (job.data.uploadSessionId) return job.data.uploadSessionId
+  const prefix = `${job.data.silhouetteProfileId}__`
+  if (!job.id?.startsWith(prefix)) return null
+  const sessionId = job.id.slice(prefix.length)
+  return z.string().uuid().safeParse(sessionId).success ? sessionId : null
 }
 
 /**
@@ -113,6 +136,8 @@ export class SilhouettePhotoProcessingQueue
   }
 
   async enqueue(silhouetteProfileId: string, uploadSessionId: string): Promise<void> {
+    // The session rides in the job id only, so a consumer deployed before this field existed
+    // (strict payload schema) still accepts the job.
     const data = silhouettePhotoProcessingJobSchema.parse({ silhouetteProfileId })
     await this.getQueue().add(SILHOUETTE_PHOTO_PROCESSING_JOB, data, {
       jobId: buildSilhouettePhotoJobId(silhouetteProfileId, uploadSessionId),

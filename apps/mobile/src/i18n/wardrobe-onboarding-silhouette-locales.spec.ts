@@ -87,8 +87,9 @@ function placeholders(value: string): string[] {
 const reference = flatten(onboardingSilhouetteTree(enUS as Catalog))
 
 describe('4.4 mobile wardrobe onboarding/silhouette locale parity', () => {
-  it('4.4-I18N-MOB-01 ships 32 onboarding + silhouette keys in the reference catalog', () => {
-    expect(reference.size).toBe(32)
+  // Step 58 round 5 adds wardrobe.silhouette.errors.session_changed (32 to 33).
+  it('4.4-I18N-MOB-01 ships 33 onboarding + silhouette keys in the reference catalog', () => {
+    expect(reference.size).toBe(33)
   })
 
   it('4.4-I18N-MOB-02 uses an identical key tree in every locale', () => {

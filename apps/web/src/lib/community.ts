@@ -651,7 +651,8 @@ export async function allocateCommunityLookFromWeb({
   onStateChange?.('preparing')
   let image
   try {
-    image = await prepareGarmentImage(imagePreview, '4:3', false)
+    // `source`: a community post keeps its own format, PNG transparency included.
+    image = await prepareGarmentImage(imagePreview, '4:3', false, 'source')
   } catch (error: unknown) {
     // `prepareGarmentImage` enforces the same 256px floor the contract's
     // `allocateCommunityPostInputSchema` declares, and it is the only failure

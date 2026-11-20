@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4 Task 2/3: every ADVISOR_RULES swatchHex passes meetsWcagAA()
 // against the surface it renders on, exactly as 5.3's Decision 2/3 required
 // for the premium theme accents, where two of three failed the small-text
@@ -10,6 +12,7 @@ import {
   ADVISOR_RULES,
   ADVISOR_RULES_VERSION,
   ADVISOR_SWATCH_CARD_BACKGROUND,
+  generateHttpOpenApiDocument,
   listAdvisorRuleEntries,
   resolveAdvisorRuleEntry,
 } from '../src/contracts/http'
@@ -61,5 +64,27 @@ describe('ADVISOR_RULES', () => {
     const first = ADVISOR_RULES.warm.foundation.withDepth.medium
     const second = ADVISOR_RULES.warm.foundation.withDepth.medium
     expect(first).toEqual(second)
+  })
+})
+
+describe('selfie commit errors', () => {
+  // Review round 1, 2026-11-19: commit is the only byte check, so its refusals are documented.
+  it('documents 409, 415 and 422 on the selfie commit', () => {
+    const responses =
+      generateHttpOpenApiDocument().paths?.[
+        '/api/v1/commerce/premium/palette/selfie/commit'
+      ]?.post?.responses
+    expect(responses?.['409']).toHaveProperty(
+      'content.application/json.schema.$ref',
+      '#/components/schemas/UploadCommitConflictError'
+    )
+    expect(responses?.['415']).toHaveProperty(
+      'content.application/json.schema.$ref',
+      '#/components/schemas/UploadCommitUnsupportedMediaTypeError'
+    )
+    expect(responses?.['422']).toHaveProperty(
+      'content.application/json.schema.$ref',
+      '#/components/schemas/UploadCommitUnprocessableError'
+    )
   })
 })

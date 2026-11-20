@@ -11,9 +11,10 @@
 // sponsored-CTA handoff cases live in palette-advisor-panel.sponsored.test.tsx.
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { Blob as NodeBlob } from 'node:buffer'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ADVISOR_RULES,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
@@ -21,6 +22,10 @@ import {
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
 } from '@couture/api-client/contracts/http'
+import {
+  forgetAllUploadAttempts,
+  setUploadAttemptAccount,
+} from '../../lib/upload-attempts'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { stubPartnerTab } from '../../test-utils/partner-tab'
 import {
@@ -42,6 +47,10 @@ const JEWELRY_WARM = ADVISOR_RULES.warm.jewelry
 describe('PaletteAdvisorPanel (Story 5.4)', () => {
   beforeEach(() => {
     window.sessionStorage.clear()
+    // Open selfie attempts live in the lib for the whole tab; each test starts signed out of
+    // the attempt registry with none open.
+    setUploadAttemptAccount(null)
+    forgetAllUploadAttempts()
   })
 
   describe('locked and unavailable states', () => {
@@ -797,6 +806,34 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
         revoked.push(url)
       } as typeof URL.revokeObjectURL
 
+      // jsdom decodes no image and has no canvas. The preparation used to fail on its own
+      // when it read the blob URL back; it no longer reads it (2026-11-19), so the image
+      // decode and the canvas encode are stood in for, and the upload reaches the refusal
+      // this test is about.
+      class DecodedImage {
+        naturalWidth = 900
+        naturalHeight = 1200
+        onload: (() => void) | null = null
+        onerror: (() => void) | null = null
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.())
+        }
+      }
+      vi.stubGlobal('Image', DecodedImage as unknown as typeof Image)
+      const getContext = vi
+        .spyOn(HTMLCanvasElement.prototype, 'getContext')
+        .mockReturnValue({
+          drawImage: vi.fn(),
+          fillRect: vi.fn(),
+        } as unknown as CanvasRenderingContext2D)
+      const toBlob = vi
+        .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+        .mockImplementation((callback: BlobCallback, type?: string) => {
+          callback(
+            new NodeBlob(['selfie'], { type: type ?? 'image/jpeg' }) as unknown as Blob
+          )
+        })
+
       try {
         useMswHandlers(
           getHandler({ hasConsent: true }),
@@ -824,6 +861,9 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       } finally {
         URL.createObjectURL = originalCreate
         URL.revokeObjectURL = originalRevoke
+        getContext.mockRestore()
+        toBlob.mockRestore()
+        vi.unstubAllGlobals()
       }
     })
 
@@ -844,6 +884,295 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
       expect(allocateCount).toBe(0)
       expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+    })
+  })
+
+  /**
+   * Production follow-up 2026-11-19, review round 4 (C3-8): the file picker is the selfie's
+   * retry entry point. Picking the same photo again resumes the pending attempt with its
+   * session and keys while the outcome is ambiguous; when the server has ended the attempt,
+   * that same pick starts one fresh attempt with fresh keys.
+   */
+  describe('selfie retries through the picker', () => {
+    const STAGING_URL = 'https://storage.test/staging/selfie-session'
+    const UUID_V4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    const processingProfile = profile({
+      hasConsent: true,
+      analysis: {
+        status: 'processing',
+        failureReason: null,
+        source: 'selfie',
+        undertone: null,
+        depth: null,
+        confidence: null,
+        analysisVersion: null,
+        analyzedAt: null,
+      },
+    })
+
+    /** jsdom decodes no image and has no canvas; every pick prepares the same bytes. */
+    function standInForImagePreparation() {
+      class DecodedImage {
+        naturalWidth = 900
+        naturalHeight = 1200
+        onload: (() => void) | null = null
+        onerror: (() => void) | null = null
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.())
+        }
+      }
+      vi.stubGlobal('Image', DecodedImage as unknown as typeof Image)
+      const getContext = vi
+        .spyOn(HTMLCanvasElement.prototype, 'getContext')
+        .mockReturnValue({
+          drawImage: vi.fn(),
+          fillRect: vi.fn(),
+        } as unknown as CanvasRenderingContext2D)
+      const toBlob = vi
+        .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+        .mockImplementation((callback: BlobCallback, type?: string) => {
+          callback(
+            new NodeBlob(['same-selfie'], {
+              type: type ?? 'image/jpeg',
+            }) as unknown as Blob
+          )
+        })
+      const createObjectURL = vi
+        .spyOn(URL, 'createObjectURL')
+        .mockReturnValue('blob:selfie')
+      const revokeObjectURL = vi
+        .spyOn(URL, 'revokeObjectURL')
+        .mockImplementation(() => undefined)
+      return () => {
+        getContext.mockRestore()
+        toBlob.mockRestore()
+        createObjectURL.mockRestore()
+        revokeObjectURL.mockRestore()
+        vi.unstubAllGlobals()
+      }
+    }
+
+    /** Answers each leg from its own queue and records every idempotency key it was sent. */
+    function useSelfieLegs(commitAnswers: (() => Response)[]) {
+      const sent = { allocate: [] as (string | null)[], commit: [] as (string | null)[] }
+      let puts = 0
+      useMswHandlers(
+        getHandler({ hasConsent: true }),
+        http.post(`${PALETTE_PATH}/selfie/upload-url`, ({ request }) => {
+          sent.allocate.push(request.headers.get('idempotency-key'))
+          return HttpResponse.json({
+            data: {
+              uploadSessionId: `selfie-session-${sent.allocate.length}`,
+              uploadUrl: STAGING_URL,
+              uploadToken: 'upload-token',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-11-19T10:15:00.000Z',
+            },
+          })
+        }),
+        http.put(STAGING_URL, () => {
+          puts += 1
+          return new HttpResponse(null, { status: 200 })
+        }),
+        http.post(`${PALETTE_PATH}/selfie/commit`, ({ request }) => {
+          sent.commit.push(request.headers.get('idempotency-key'))
+          const answer = commitAnswers.shift()
+          if (!answer) throw new Error('No commit answer left')
+          return answer()
+        })
+      )
+      return { sent, puts: () => puts }
+    }
+
+    /**
+     * The pick has finished and started the analysis. The status line reads the same while the
+     * commit is under way, so the settled state is the picker enabled again with no error.
+     */
+    async function expectAnalysisStarted() {
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-advisor-selfie-input')).toBeEnabled()
+        expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+        expect(screen.getByTestId('palette-advisor-status')).toHaveTextContent(
+          'Analyzing your palette'
+        )
+      })
+    }
+
+    async function pickSelfie() {
+      await userEvent.upload(
+        await screen.findByTestId('palette-advisor-selfie-input'),
+        new File(['selfie-bytes'], 'selfie.jpg', { type: 'image/jpeg' })
+      )
+    }
+
+    it('5.4-WEB-045 picking the same photo after a lost commit answer commits the pending attempt again', async () => {
+      signIn()
+      const restore = standInForImagePreparation()
+      try {
+        const legs = useSelfieLegs([
+          () => HttpResponse.error(),
+          () => HttpResponse.json({ data: processingProfile }),
+        ])
+        renderPanel()
+
+        await pickSelfie()
+        await screen.findByTestId('palette-advisor-error')
+        await pickSelfie()
+
+        await expectAnalysisStarted()
+        expect(legs.sent.allocate).toHaveLength(1)
+        expect(legs.puts()).toBe(1)
+        expect(legs.sent.commit).toHaveLength(2)
+        expect(legs.sent.commit[1]).toBe(legs.sent.commit[0])
+      } finally {
+        restore()
+      }
+    })
+
+    it('5.4-WEB-046 one pick after a lost commit answer starts over at once when the server ended the attempt', async () => {
+      signIn()
+      const restore = standInForImagePreparation()
+      try {
+        const legs = useSelfieLegs([
+          () => HttpResponse.error(),
+          () => errorBody(409, 'UPLOAD_SESSION_EXPIRED', 'Conflict'),
+          () => HttpResponse.json({ data: processingProfile }),
+        ])
+        renderPanel()
+
+        await pickSelfie()
+        await screen.findByTestId('palette-advisor-error')
+        // One pick: it commits the open attempt again with its key, the server says the session
+        // expired, and the same pick allocates, uploads and commits with fresh keys.
+        await pickSelfie()
+
+        await expectAnalysisStarted()
+        expect(legs.sent.allocate).toHaveLength(2)
+        expect(legs.sent.allocate[1]).toMatch(UUID_V4)
+        expect(legs.sent.allocate[1]).not.toBe(legs.sent.allocate[0])
+        expect(legs.puts()).toBe(2)
+        expect(legs.sent.commit).toHaveLength(3)
+        expect(legs.sent.commit[0]).toMatch(UUID_V4)
+        expect(legs.sent.commit[1]).toBe(legs.sent.commit[0])
+        expect(legs.sent.commit[2]).toMatch(UUID_V4)
+        expect(legs.sent.commit[2]).not.toBe(legs.sent.commit[0])
+      } finally {
+        restore()
+      }
+    })
+
+    it('5.4-WEB-047 picking the same photo after UPLOAD_IN_PROGRESS commits the same attempt again', async () => {
+      signIn()
+      const restore = standInForImagePreparation()
+      try {
+        const legs = useSelfieLegs([
+          () => errorBody(409, 'UPLOAD_IN_PROGRESS', 'Conflict'),
+          () => HttpResponse.json({ data: processingProfile }),
+        ])
+        renderPanel()
+
+        await pickSelfie()
+        await screen.findByTestId('palette-advisor-error')
+        await pickSelfie()
+
+        await expectAnalysisStarted()
+        expect(legs.sent.allocate).toHaveLength(1)
+        expect(legs.puts()).toBe(1)
+        expect(legs.sent.commit).toHaveLength(2)
+        expect(legs.sent.commit[0]).toMatch(UUID_V4)
+        expect(legs.sent.commit[1]).toBe(legs.sent.commit[0])
+      } finally {
+        restore()
+      }
+    })
+
+    // Learning path Step 58: Image uploads straight to storage.
+    // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+    it.each([
+      'IMAGE_CHECKSUM_MISMATCH',
+      'IMAGE_DIMENSIONS_INVALID',
+      'IMAGE_DECODE_FAILED',
+    ])(
+      '5.4-WEB-048 one pick after a lost commit answer starts over at once when commit rejects the staged bytes with 400 %s',
+      async (code) => {
+        signIn()
+        const restore = standInForImagePreparation()
+        try {
+          const legs = useSelfieLegs([
+            () => HttpResponse.error(),
+            () => errorBody(400, code, 'Bad Request'),
+            () => HttpResponse.json({ data: processingProfile }),
+          ])
+          renderPanel()
+
+          await pickSelfie()
+          await screen.findByTestId('palette-advisor-error')
+          // The selfie commit ended the session on 400; the same pick restarts with fresh keys.
+          await pickSelfie()
+
+          await expectAnalysisStarted()
+          expect(legs.sent.allocate).toHaveLength(2)
+          expect(legs.sent.allocate[1]).not.toBe(legs.sent.allocate[0])
+          expect(legs.puts()).toBe(2)
+          expect(legs.sent.commit).toHaveLength(3)
+          expect(legs.sent.commit[1]).toBe(legs.sent.commit[0])
+          expect(legs.sent.commit[2]).not.toBe(legs.sent.commit[0])
+        } finally {
+          restore()
+        }
+      }
+    )
+
+    it('5.4-WEB-049 shows a first-run 400 IMAGE_CHECKSUM_MISMATCH without starting over', async () => {
+      signIn()
+      const restore = standInForImagePreparation()
+      try {
+        const legs = useSelfieLegs([
+          () => errorBody(400, 'IMAGE_CHECKSUM_MISMATCH', 'Bad Request'),
+        ])
+        renderPanel()
+
+        await pickSelfie()
+
+        expect(await screen.findByTestId('palette-advisor-error')).toBeInTheDocument()
+        expect(legs.sent.allocate).toHaveLength(1)
+        expect(legs.puts()).toBe(1)
+        expect(legs.sent.commit).toHaveLength(1)
+      } finally {
+        restore()
+      }
+    })
+
+    it('5.4-WEB-050 drops a selfie the picker returns after the account changed, and uploads nothing', async () => {
+      signIn()
+      setUploadAttemptAccount('member-a')
+      const restore = standInForImagePreparation()
+      try {
+        const legs = useSelfieLegs([])
+        // The stand-in's spy: the change handler makes the object URL before any upload.
+        const objectUrls = vi.spyOn(URL, 'createObjectURL')
+        renderPanel()
+        const input = await screen.findByTestId('palette-advisor-selfie-input')
+
+        // The member opens the picker under A; the tab switches to B while it is open.
+        await userEvent.click(input)
+        act(() => setUploadAttemptAccount('member-b'))
+        fireEvent.change(input, {
+          target: {
+            files: [new File(['selfie-bytes'], 'selfie.jpg', { type: 'image/jpeg' })],
+          },
+        })
+        // Any upload would start synchronously from the change handler (busy state first).
+        expect(input).toBeEnabled()
+
+        expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
+        expect(objectUrls).not.toHaveBeenCalled()
+        expect(legs.sent.allocate).toHaveLength(0)
+        expect(legs.puts()).toBe(0)
+      } finally {
+        restore()
+      }
     })
   })
 

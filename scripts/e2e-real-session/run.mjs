@@ -370,7 +370,6 @@ async function main() {
       // every interface.
       API_LISTEN_HOST: '127.0.0.1',
       API_BASE_URL,
-      PUBLIC_API_URL: API_BASE_URL,
       WEB_E2E_BASE_URL: WEB_BASE_URL,
       HTTP_CORS_ORIGIN: WEB_BASE_URL,
       E2E_WEATHER_DOUBLE_PORT: String(WEATHER_DOUBLE_PORT),

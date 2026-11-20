@@ -2,17 +2,15 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
-import {
-  BadRequestException,
-  PayloadTooLargeException,
-  UnsupportedMediaTypeException,
-} from '@nestjs/common'
+import { BadRequestException, RequestMethod } from '@nestjs/common'
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeController } from './wardrobe.controller'
-import { MAX_GARMENT_IMAGE_BYTES } from './wardrobe-image-validation'
 import type { WardrobeRetentionService } from './wardrobe-retention.service'
 import type { WardrobeService } from './wardrobe.service'
 
@@ -65,7 +63,6 @@ function garmentItemResponse(overrides: Record<string, unknown> = {}) {
 
 const mockListGarments = vi.fn()
 const mockCreateUploadUrl = vi.fn()
-const mockUploadBytes = vi.fn()
 const mockCommitGarment = vi.fn()
 const mockRequestDeletion = vi.fn()
 const mockSuggestGarmentTags = vi.fn()
@@ -74,7 +71,6 @@ const mockUpdateGarmentTags = vi.fn()
 const mockWardrobeService = {
   listGarments: mockListGarments,
   createUploadUrl: mockCreateUploadUrl,
-  uploadBytes: mockUploadBytes,
   commitGarment: mockCommitGarment,
   suggestGarmentTags: mockSuggestGarmentTags,
   updateGarmentTags: mockUpdateGarmentTags,
@@ -128,18 +124,29 @@ describe('WardrobeController', () => {
     ).rejects.toThrow('INVALID_IDEMPOTENCY_KEY')
   })
 
-  it('rejects uploadBytes with unsupported mime type or missing token', async () => {
-    const reqMock = { body: Buffer.from('test') } as unknown as Parameters<
-      typeof controller.uploadBytes
-    >[5]
+  /**
+   * Image bytes go straight to storage on a signed upload URL. A Vercel Function refuses a
+   * body over about 4.5 MB, so no route here may accept them (tester report 2026-11-19).
+   */
+  it('exposes no route that accepts upload bytes', () => {
+    const prototype = WardrobeController.prototype as unknown as Record<string, unknown>
+    const routes = Object.getOwnPropertyNames(prototype)
+      .map((name) => prototype[name])
+      .filter((handler): handler is object => typeof handler === 'function')
+      .filter((handler) => Reflect.getMetadata(PATH_METADATA, handler) !== undefined)
+      .map((handler) => ({
+        method: Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod,
+        path: Reflect.getMetadata(PATH_METADATA, handler) as string,
+      }))
 
-    await expect(
-      controller.uploadBytes(mockAuth, 'session_1', '', 'image/png', '4', reqMock)
-    ).rejects.toThrow('Missing upload token header')
-
-    await expect(
-      controller.uploadBytes(mockAuth, 'session_1', 'token_1', 'image/gif', '4', reqMock)
-    ).rejects.toThrow(UnsupportedMediaTypeException)
+    expect(routes).toEqual(
+      expect.arrayContaining([
+        { method: RequestMethod.POST, path: 'upload-url' },
+        { method: RequestMethod.POST, path: 'garments' },
+      ])
+    )
+    expect(routes.filter((route) => route.method === RequestMethod.PUT)).toEqual([])
+    expect(routes.filter((route) => route.path.includes('uploads'))).toEqual([])
   })
 
   it('delegates deletion to retention service', async () => {
@@ -226,152 +233,6 @@ describe('WardrobeController', () => {
         )
       ).rejects.toThrow(/Invalid upload declaration: widthPx/)
       expect(mockCreateUploadUrl).not.toHaveBeenCalled()
-    })
-  })
-
-  describe('uploadBytes', () => {
-    const validExpiry = 'token_1'
-
-    it('forwards the declared content length and body to the service', async () => {
-      const body = Buffer.from('binary-image-bytes')
-      const reqMock = { body } as unknown as Parameters<typeof controller.uploadBytes>[5]
-
-      await controller.uploadBytes(
-        mockAuth,
-        'session_1',
-        validExpiry,
-        'image/png',
-        String(body.length),
-        reqMock
-      )
-
-      expect(mockUploadBytes).toHaveBeenCalledWith(
-        'session_1',
-        validExpiry,
-        'user_123',
-        'teen',
-        'image/png',
-        body.length,
-        body
-      )
-    })
-
-    /**
-     * Express only populates `req.body` with a Buffer when the raw-body parser
-     * matched. Anything else must reach the service as empty bytes so the
-     * declared-length check rejects it, rather than as a non-Buffer value that
-     * would crash the image verifier.
-     */
-    it('substitutes empty bytes when the raw body is not a Buffer', async () => {
-      const reqMock = { body: { parsed: 'json' } } as unknown as Parameters<
-        typeof controller.uploadBytes
-      >[5]
-
-      await controller.uploadBytes(
-        mockAuth,
-        'session_1',
-        validExpiry,
-        'image/jpeg',
-        '0',
-        reqMock
-      )
-
-      const [, , , , , , forwardedBody] = mockUploadBytes.mock.calls[0] as unknown[]
-      expect(Buffer.isBuffer(forwardedBody)).toBe(true)
-      expect(forwardedBody).toHaveLength(0)
-    })
-
-    /** A missing Content-Length is undefined, not 0, so the service can reject it. */
-    it('forwards an absent content-length header as undefined', async () => {
-      const reqMock = { body: Buffer.alloc(4) } as unknown as Parameters<
-        typeof controller.uploadBytes
-      >[5]
-
-      await controller.uploadBytes(
-        mockAuth,
-        'session_1',
-        validExpiry,
-        'image/webp',
-        undefined,
-        reqMock
-      )
-
-      expect(mockUploadBytes).toHaveBeenCalledWith(
-        'session_1',
-        validExpiry,
-        'user_123',
-        'teen',
-        'image/webp',
-        undefined,
-        expect.any(Buffer)
-      )
-    })
-
-    /**
-     * A non-numeric Content-Length parses to NaN. Passing NaN through would make
-     * the service's `contentLength !== body.length` check pass by accident, so
-     * the controller must normalize it away.
-     */
-    it('drops an unparseable content-length rather than forwarding NaN', async () => {
-      const reqMock = { body: Buffer.alloc(4) } as unknown as Parameters<
-        typeof controller.uploadBytes
-      >[5]
-
-      await controller.uploadBytes(
-        mockAuth,
-        'session_1',
-        validExpiry,
-        'image/png',
-        'not-a-number',
-        reqMock
-      )
-
-      const [, , , , , forwardedLength] = mockUploadBytes.mock.calls[0] as unknown[]
-      expect(forwardedLength).toBeUndefined()
-    })
-
-    /** The size limit is enforced before any bytes are read or stored. */
-    it('rejects a declared length above the garment image ceiling', async () => {
-      const reqMock = { body: Buffer.alloc(4) } as unknown as Parameters<
-        typeof controller.uploadBytes
-      >[5]
-
-      await expect(
-        controller.uploadBytes(
-          mockAuth,
-          'session_1',
-          validExpiry,
-          'image/png',
-          String(MAX_GARMENT_IMAGE_BYTES + 1),
-          reqMock
-        )
-      ).rejects.toThrow(PayloadTooLargeException)
-      expect(mockUploadBytes).not.toHaveBeenCalled()
-    })
-
-    it('accepts a declared length exactly at the ceiling', async () => {
-      const reqMock = { body: Buffer.alloc(4) } as unknown as Parameters<
-        typeof controller.uploadBytes
-      >[5]
-
-      await controller.uploadBytes(
-        mockAuth,
-        'session_1',
-        validExpiry,
-        'image/png',
-        String(MAX_GARMENT_IMAGE_BYTES),
-        reqMock
-      )
-
-      expect(mockUploadBytes).toHaveBeenCalledWith(
-        'session_1',
-        validExpiry,
-        'user_123',
-        'teen',
-        'image/png',
-        MAX_GARMENT_IMAGE_BYTES,
-        expect.any(Buffer)
-      )
     })
   })
 

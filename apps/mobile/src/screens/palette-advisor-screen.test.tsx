@@ -1,5 +1,7 @@
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 5.4 Task 8 owner: the mobile colour palette & beauty/accessory advisor screen.
 //
 // The mobile counterpart of `apps/web/src/app/components/palette-advisor-panel.test.tsx`.
@@ -22,6 +24,7 @@ import { http, HttpResponse } from 'msw'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
 import {
   ADVISOR_RULES,
   ADVISOR_RULES_VERSION,
@@ -53,7 +56,7 @@ const imageManipulator = vi.hoisted(() => ({
 }))
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: imageManipulator.manipulateAsync,
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 
 vi.mock('expo-file-system', () => ({
@@ -95,7 +98,10 @@ vi.mock('expo-crypto', () => ({
 import i18n, { initI18n } from '../lib/i18n'
 import { server } from '../test-utils/msw/server'
 import { press } from '../test-utils/press'
-import { setMobileAccessTokenResolver } from '../lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '../lib/mobile-auth'
 import { PaletteAdvisorScreen } from '../features/premium/palette-advisor-screen'
 
 const PALETTE_ROUTE = '*/api/v1/commerce/premium/palette'
@@ -176,6 +182,9 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
   })
 
   afterEach(() => {
+    // Upload attempts live for the app session; each test starts signed out with none open.
+    setMobileApplicationUserId(null)
+    forgetAllUploadAttempts()
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
   })
@@ -289,10 +298,10 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
 
   /**
    * AC 3. The whole selfie lifecycle, with only the native picker replaced: the
-   * allocate declaration, the raw-byte PUT, and the commit that shares one idempotency
-   * key with the allocate.
+   * allocate declaration, the raw-byte PUT, and the commit, each request carrying the
+   * attempt's own UUID v4 idempotency key.
    */
-  it('5.4-MOB-016 uploads a selfie through allocate, bytes and commit on one key', async () => {
+  it('5.4-MOB-016 uploads a selfie through allocate, bytes and commit with the attempt keys', async () => {
     servePalette({ hasConsent: true })
     const seen: Record<string, unknown> = {}
     server.use(
@@ -312,16 +321,17 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
         return HttpResponse.json({
           data: {
             uploadSessionId: 'session-1',
-            uploadUrl: `${window.location.origin}/api/v1/commerce/premium/palette/selfie/uploads/session-1`,
+            uploadUrl: `${window.location.origin}/mock-storage/selfie-session-1`,
             uploadToken: 'upload-token',
-            requiredHeaders: { 'content-type': 'image/png' },
+            requiredHeaders: { 'content-type': 'image/jpeg' },
             expiresAt: '2026-08-25T10:15:00.000Z',
           },
         })
       }),
-      http.put(`${PALETTE_ROUTE}/selfie/uploads/session-1`, ({ request }) => {
+      http.put('*/mock-storage/selfie-session-1', ({ request }) => {
         seen.bytesToken = request.headers.get('x-upload-token')
         seen.bytesType = request.headers.get('content-type')
+        seen.bytesCacheControl = request.headers.get('cache-control')
         return new HttpResponse(null, { status: 204 })
       }),
       http.post(`${PALETTE_ROUTE}/selfie/commit`, async ({ request }) => {
@@ -349,14 +359,22 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     await press(await screen.findByTestId('palette-advisor-source-selfie'))
 
     await waitFor(() => expect(seen.commitKey).toBeTruthy())
-    expect(seen.allocateKey).toBe(seen.commitKey)
+    const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    expect(seen.allocateKey).toMatch(uuidV4)
+    expect(seen.commitKey).toMatch(uuidV4)
     expect(seen.commitBody).toEqual({ uploadSessionId: 'session-1' })
     expect(seen.bytesToken).toBe('upload-token')
-    // PNG, not JPEG: JPEG's 4:2:0 chroma subsampling discards exactly the Cb/Cr
-    // channels the server's skin-chroma gate reads.
-    expect(seen.bytesType).toBe('image/png')
+    // JPEG: the server shrinks the frame to 256 px before reading Cb/Cr, far
+    // coarser than 4:2:0 subsampling, and a PNG selfie came to several megabytes.
+    expect(imageManipulator.manipulateAsync).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      { compress: 0.9, format: 'jpeg' }
+    )
+    expect(seen.bytesType).toBe('image/jpeg')
+    expect(seen.bytesCacheControl).toBe('private, max-age=0')
     expect(seen.declaration).toMatchObject({
-      mimeType: 'image/png',
+      mimeType: 'image/jpeg',
       widthPx: 1152,
       heightPx: 1536,
     })
@@ -378,6 +396,203 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     )
     expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
     expect(screen.queryByTestId('palette-advisor-error')).toBeNull()
+  })
+
+  /**
+   * Production follow-up 2026-11-19: the picker is the selfie's retry entry point. Picking the
+   * same photo again resumes the pending attempt with its session and keys while the outcome is
+   * ambiguous; when the server has ended the attempt, that same pick starts one fresh attempt.
+   */
+  describe('selfie retries through the picker', () => {
+    const UUID_V4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    const processingProfile = () =>
+      profile({
+        hasConsent: true,
+        analysis: {
+          status: 'processing',
+          failureReason: null,
+          source: 'selfie',
+          undertone: null,
+          depth: null,
+          confidence: null,
+          analysisVersion: null,
+          analyzedAt: null,
+        },
+      })
+
+    /** Answers each leg from its own queue and records every idempotency key it was sent. */
+    function selfieRetryRoutes(commitAnswers: (() => Response)[]) {
+      const seen = { allocateKeys: [] as string[], puts: 0, commitKeys: [] as string[] }
+      servePalette({ hasConsent: true })
+      server.use(
+        http.post(`${PALETTE_ROUTE}/selfie/upload-url`, ({ request }) => {
+          seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+          return HttpResponse.json({
+            data: {
+              uploadSessionId: `selfie-session-${seen.allocateKeys.length}`,
+              uploadUrl: `${window.location.origin}/mock-storage/selfie-retry`,
+              uploadToken: 'upload-token',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-11-19T10:15:00.000Z',
+            },
+          })
+        }),
+        http.put('*/mock-storage/selfie-retry', () => {
+          seen.puts += 1
+          return new HttpResponse(null, { status: 204 })
+        }),
+        http.post(`${PALETTE_ROUTE}/selfie/commit`, ({ request }) => {
+          seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+          const answer = commitAnswers.shift()
+          if (!answer) throw new Error('No commit answer left')
+          return answer()
+        })
+      )
+      return seen
+    }
+
+    async function pickSelfie() {
+      await press(await screen.findByTestId('palette-advisor-source-selfie'))
+    }
+
+    /**
+     * The pick has finished and started the analysis. The status line reads the same while the
+     * commit is under way, so the settled state is the picker enabled again with no error.
+     */
+    async function expectAnalyzing() {
+      await waitFor(() => {
+        expect(screen.getByTestId('palette-advisor-source-selfie')).not.toHaveAttribute(
+          'aria-disabled',
+          'true'
+        )
+        expect(screen.queryByTestId('palette-advisor-error')).toBeNull()
+        expect(screen.getByTestId('palette-advisor-status').textContent).toContain(
+          'Analyzing your palette'
+        )
+      })
+    }
+
+    it('5.4-MOB-032 one pick after a lost commit answer starts over at once when the server ended the attempt', async () => {
+      const seen = selfieRetryRoutes([
+        () => HttpResponse.error(),
+        () => errorEnvelope(409, 'UPLOAD_SESSION_EXPIRED'),
+        () => HttpResponse.json({ data: processingProfile() }),
+      ])
+      await render(<PaletteAdvisorScreen />)
+
+      await pickSelfie()
+      await screen.findByTestId('palette-advisor-error')
+      // One pick: it commits the open attempt again with its key, the server says the session
+      // expired, and the same pick allocates, uploads and commits with fresh keys.
+      await pickSelfie()
+      await expectAnalyzing()
+
+      expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledTimes(2)
+      expect(seen.allocateKeys).toHaveLength(2)
+      expect(seen.allocateKeys[1]).toMatch(UUID_V4)
+      expect(seen.allocateKeys[1]).not.toBe(seen.allocateKeys[0])
+      expect(seen.puts).toBe(2)
+      expect(seen.commitKeys).toHaveLength(3)
+      expect(seen.commitKeys[0]).toMatch(UUID_V4)
+      expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+      expect(seen.commitKeys[2]).toMatch(UUID_V4)
+      expect(seen.commitKeys[2]).not.toBe(seen.commitKeys[0])
+    })
+
+    it('5.4-MOB-033 picking the same photo after UPLOAD_IN_PROGRESS commits the same attempt again', async () => {
+      const seen = selfieRetryRoutes([
+        () => errorEnvelope(409, 'UPLOAD_IN_PROGRESS'),
+        () => HttpResponse.json({ data: processingProfile() }),
+      ])
+      await render(<PaletteAdvisorScreen />)
+
+      await pickSelfie()
+      await screen.findByTestId('palette-advisor-error')
+      await pickSelfie()
+      await expectAnalyzing()
+
+      expect(seen.allocateKeys).toHaveLength(1)
+      expect(seen.puts).toBe(1)
+      expect(seen.commitKeys).toHaveLength(2)
+      expect(seen.commitKeys[0]).toMatch(UUID_V4)
+      expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+    })
+
+    /** The selfie commit's real refusal of stored bytes: Nest's 400 with the image code. */
+    const badRequestImage = (code: string) =>
+      HttpResponse.json(
+        { statusCode: 400, message: code, error: 'Bad Request' },
+        { status: 400 }
+      )
+
+    // Learning path Step 58: Image uploads straight to storage.
+    // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+    it('5.4-MOB-034 one pick after a lost commit answer starts over at once when commit rejects the staged bytes with 400 IMAGE_CHECKSUM_MISMATCH', async () => {
+      const seen = selfieRetryRoutes([
+        () => HttpResponse.error(),
+        () => badRequestImage('IMAGE_CHECKSUM_MISMATCH'),
+        () => HttpResponse.json({ data: processingProfile() }),
+      ])
+      await render(<PaletteAdvisorScreen />)
+
+      await pickSelfie()
+      await screen.findByTestId('palette-advisor-error')
+      await pickSelfie()
+      await expectAnalyzing()
+
+      expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalledTimes(2)
+      expect(seen.allocateKeys).toHaveLength(2)
+      expect(seen.allocateKeys[1]).not.toBe(seen.allocateKeys[0])
+      expect(seen.puts).toBe(2)
+      expect(seen.commitKeys).toHaveLength(3)
+      expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+      expect(seen.commitKeys[2]).not.toBe(seen.commitKeys[0])
+    })
+
+    it('5.4-MOB-035 shows a first-run 400 IMAGE_CHECKSUM_MISMATCH without starting over', async () => {
+      const seen = selfieRetryRoutes([() => badRequestImage('IMAGE_CHECKSUM_MISMATCH')])
+      await render(<PaletteAdvisorScreen />)
+
+      await pickSelfie()
+
+      expect(await screen.findByTestId('palette-advisor-error')).toBeInTheDocument()
+      expect(seen.allocateKeys).toHaveLength(1)
+      expect(seen.puts).toBe(1)
+      expect(seen.commitKeys).toHaveLength(1)
+    })
+
+    it('5.4-MOB-036 drops a selfie the picker returns after the account changed, and uploads nothing', async () => {
+      const seen = selfieRetryRoutes([])
+      let returnPick: (result: unknown) => void = () => undefined
+      imagePicker.launchImageLibraryAsync.mockReturnValueOnce(
+        new Promise((resolve) => {
+          returnPick = resolve
+        })
+      )
+      setMobileApplicationUserId('member-a')
+      await render(<PaletteAdvisorScreen />)
+
+      await pickSelfie()
+      await waitFor(() => expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalled())
+      setMobileApplicationUserId('member-b')
+      returnPick({
+        canceled: false,
+        assets: [{ uri: 'file:///selfie.jpg', width: 3024, height: 4032 }],
+      })
+      // The pick handler resumes on microtasks only (no request precedes preparation), so one
+      // macrotask turn lets it finish whatever it would do with the returned photo.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      expect(screen.getByTestId('palette-advisor-source-selfie')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+      expect(screen.queryByTestId('palette-advisor-error')).toBeNull()
+      expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
+      expect(seen.allocateKeys).toHaveLength(0)
+      expect(seen.puts).toBe(0)
+    })
   })
 
   it('5.4-MOB-018 labels a depth-less palette and explains the degraded foundation', async () => {

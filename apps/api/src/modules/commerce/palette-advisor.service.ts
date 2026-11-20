@@ -12,6 +12,7 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  UnprocessableEntityException,
   UnsupportedMediaTypeException,
 } from '@nestjs/common'
 import { PrismaClient, type PaletteProfile } from '@prisma/client'
@@ -33,7 +34,11 @@ import {
   type SkinUndertone,
   type UpdateAdvisorRecommendationInput,
 } from '../../contracts/http.js'
-import { buildPaletteSelfieObjectPath } from '@couture/utils'
+import {
+  buildPaletteSelfieObjectPath,
+  buildWardrobeStagingObjectPath,
+  isWardrobePathSegment,
+} from '@couture/utils'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { ApiRole } from '../auth/security.types.js'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
@@ -41,20 +46,36 @@ import { GuardianService } from '../guardian/guardian.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 import {
   GarmentImageValidationError,
+  MAX_GARMENT_IMAGE_BYTES,
   verifyGarmentImage,
   type GarmentMimeType,
 } from '../wardrobe/wardrobe-image-validation.js'
-import { SupabaseWardrobeStorageAdapter } from '../wardrobe/wardrobe-storage.adapter.js'
+import { WardrobeObjectDeletionOutbox } from '../wardrobe/wardrobe-object-deletion.outbox.js'
 import {
-  generateUploadToken,
-  requireUploadTokenSecret,
-  verifyUploadToken,
-} from '../wardrobe/wardrobe-upload-token.js'
+  SupabaseWardrobeStorageAdapter,
+  type WardrobeUploadSession,
+} from '../wardrobe/wardrobe-storage.adapter.js'
+import {
+  logUntrustedUploadSession,
+  objectExtensionFor,
+  ownSessionObjectsToRemove,
+  uploadPathInvalid,
+  uploadSessionKeys,
+  type UploadSessionKeys,
+} from '../wardrobe/wardrobe-upload-paths.js'
+import {
+  ambiguousPublicationHorizon,
+  nextCleanupHorizon,
+  staleClaimCutoff,
+  unfinishedPublicationDeadline,
+  uploadInProgress,
+  type PublicationClaim,
+} from '../wardrobe/wardrobe-publication.js'
+import { handOffPaletteAnalysis } from '../wardrobe/wardrobe-processing-handoff.js'
 import { AffiliateOfferService } from './affiliate-offer.service.js'
 import { PaletteAnalysisProcessingQueue } from './palette-analysis-processing.queue.js'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
-import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 
@@ -83,13 +104,126 @@ function consentAuditState(
   return hasCurrentConsent(profile) ? 'granted' : 'revoked'
 }
 
-function deriveObjectExtension(mimeType: GarmentMimeType): 'jpg' | 'png' | 'webp' {
-  if (mimeType === 'image/jpeg') return 'jpg'
-  if (mimeType === 'image/png') return 'png'
-  return 'webp'
+/**
+ * The session's staging and final keys, derived from the row's own ids and checked against the
+ * stored path; a row that fails is answered as an expired session before any storage call.
+ */
+function selfieKeys(profile: PaletteProfile, operation: string): UploadSessionKeys {
+  const keys = uploadSessionKeys({
+    kind: 'palette',
+    userId: profile.user_id,
+    objectId: profile.selfie_upload_session_id,
+    uploadSessionId: profile.selfie_upload_session_id,
+    mimeType: profile.selfie_mime_type,
+    storedObjectPath: profile.selfie_object_path,
+  })
+  if (!keys) {
+    logUntrustedUploadSession({ operation, kind: 'palette', rowId: profile.id })
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
+  return keys
+}
+
+/**
+ * Every object a replaced or erased selfie can leave: the member's own final selfie and the
+ * session's staging key, each only when the row's ids can vouch for it.
+ */
+function selfieObjectsToRemove(profile: PaletteProfile | null): string[] {
+  if (!profile) return []
+  return ownSessionObjectsToRemove({
+    kind: 'palette',
+    rowId: profile.id,
+    userId: profile.user_id,
+    uploadSessionId: profile.selfie_upload_session_id,
+    mimeType: profile.selfie_mime_type,
+    storedObjectPath: profile.selfie_object_path,
+  })
+}
+
+/**
+ * Serializes every selfie lifecycle change of one member: allocation, replacement and erasure.
+ * The profile row is locked too: a commit claims its publication with a row update, so that
+ * claim either landed before the caller reads the row (and is seen) or waits until the caller's
+ * transaction ends.
+ */
+async function lockPaletteProfile(
+  tx: Parameters<Parameters<typeof interactiveTransaction>[1]>[0],
+  userId: string
+): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('palette_profile:' || ${userId}))`
+  await tx.$queryRaw`SELECT 1 FROM "PaletteProfile" WHERE user_id = ${userId} FOR UPDATE`
+}
+
+/**
+ * When a commit of the profile's current selfie session still owns its publication: the moment
+ * its lease runs out, or null. Replacement and erasure that meet one record the session's keys
+ * for then, so a publish that lands late is removed after it lands.
+ */
+function selfiePublishDeadline(profile: PaletteProfile | null): Date | null {
+  if (!profile) return null
+  return unfinishedPublicationDeadline(selfiePublicationClaim(profile))
+}
+
+function selfiePublicationClaim(profile: PaletteProfile): PublicationClaim {
+  return {
+    attemptId: profile.selfie_publish_attempt_id,
+    startedAt: profile.selfie_publish_started_at,
+    cleanupUntil: profile.selfie_publish_cleanup_until,
+    committable:
+      profile.status === 'pending_upload' || profile.status === 'bytes_uploaded',
+  }
+}
+
+/**
+ * Until when the keys of a selfie session that a commit may still be publishing must be removed
+ * again and again (see `ambiguousPublicationHorizon`), or null when no publication is in flight.
+ */
+function selfieRemovalHorizon(profile: PaletteProfile | null): Date | null {
+  if (!profile) return null
+  return ambiguousPublicationHorizon(selfiePublicationClaim(profile))
+}
+
+/** The selfie columns a cleared upload session holds. */
+const CLEARED_SELFIE_SESSION = {
+  selfie_object_path: null,
+  selfie_upload_session_id: null,
+  selfie_upload_idempotency_key: null,
+  selfie_commit_idempotency_key: null,
+  selfie_commit_payload_hash: null,
+  selfie_file_size_bytes: null,
+  selfie_mime_type: null,
+  selfie_content_sha256: null,
+  selfie_width_px: null,
+  selfie_height_px: null,
+  selfie_upload_expires_at: null,
+  selfie_committed_at: null,
+  selfie_purged_at: null,
+  selfie_publish_attempt_id: null,
+  selfie_publish_started_at: null,
+  // Reset with the session: whoever clears it recorded the old keys' repeating removal first.
+  selfie_publish_cleanup_until: null,
+}
+
+/**
+ * `pending_upload` until commit finds the bytes the client PUT to storage; `bytes_uploaded` is a
+ * session whose bytes went through the retired API relay before this deploy.
+ */
+function assertCommittableSelfie(profile: PaletteProfile): void {
+  if (profile.status !== 'pending_upload' && profile.status !== 'bytes_uploaded') {
+    throw new BadRequestException('INVALID_UPLOAD_DECLARATION')
+  }
+  if (
+    profile.status === 'pending_upload' &&
+    (!profile.selfie_upload_expires_at || profile.selfie_upload_expires_at <= new Date())
+  ) {
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
 }
 
 function mapImageValidationError(error: GarmentImageValidationError): never {
+  if (error.code === 'IMAGE_SIZE_MISMATCH') {
+    throw new UnprocessableEntityException(error.code)
+  }
   if (
     error.code === 'IMAGE_CHECKSUM_MISMATCH' ||
     error.code === 'IMAGE_DIMENSIONS_INVALID'
@@ -111,7 +245,7 @@ type CommitResult = { replayed: boolean; response: { data: PaletteAdvisorProfile
 @Injectable()
 export class PaletteAdvisorService {
   private readonly logger = createBaseLogger().child({ feature: 'palette-advisor' })
-  private readonly uploadTokenSecret: string
+  private readonly deletions: WardrobeObjectDeletionOutbox
 
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
@@ -130,7 +264,7 @@ export class PaletteAdvisorService {
     @Inject(SupabaseWardrobeStorageAdapter)
     private readonly storage: SupabaseWardrobeStorageAdapter
   ) {
-    this.uploadTokenSecret = requireUploadTokenSecret()
+    this.deletions = new WardrobeObjectDeletionOutbox(prisma, storage)
   }
 
   // --- Reads -----------------------------------------------------------
@@ -313,40 +447,97 @@ export class PaletteAdvisorService {
   // --- Wardrobe analysis ---------------------------------------------------
 
   async analyzeWardrobe(userId: string): Promise<PaletteAdvisorProfile> {
-    const profile = await this.assertConsent(userId)
+    // Early answers for the common refusals; both are checked again under the lock below.
+    await this.assertConsent(userId)
     await this.assertAnalysisEnabled(userId)
 
-    if (profile.status === 'processing') {
-      throw new ConflictException(PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE)
-    }
+    // This analysis's own attempt: its job id is `<profileId>__<attempt>`, its worker writes are
+    // fenced on it, and the rollback below releases only it.
+    const analysisAttemptId = randomUUID()
+    // Claimed under the per-member lock erasure and selfie allocation take, from the row as it
+    // stands then: an erasure that finished during the feature check has revoked consent, and a
+    // selfie commit that reached processing meanwhile owns the profile. A selfie session that
+    // has not reached processing is superseded, and its keys are recorded for removal under that
+    // session's own identity, repeating while its publication may still write.
+    const claim = await interactiveTransaction(this.prisma, async (tx) => {
+      await lockPaletteProfile(tx, userId)
+      const current = await tx.paletteProfile.findUnique({ where: { user_id: userId } })
+      if (!current || !hasCurrentConsent(current)) {
+        throw new ForbiddenException(PALETTE_CONSENT_REQUIRED_MESSAGE)
+      }
+      if (current.status === 'processing') {
+        throw new ConflictException(PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE)
+      }
+      // Final review F-6: any selfie session the row still carries is superseded, a finished
+      // one included (its purge may still be repeating until the session's horizon). Its keys'
+      // removal is recorded under its own identity here, before the session is cleared, so the
+      // obligation never depends on the profile staying a selfie analysis, and an enqueue
+      // failure that rolls this analysis back cannot lose it.
+      const supersedesSelfie =
+        current.status === 'pending_upload' ||
+        current.status === 'bytes_uploaded' ||
+        current.selfie_upload_session_id !== null ||
+        current.selfie_object_path !== null
+      const selfieObjectPaths = supersedesSelfie ? selfieObjectsToRemove(current) : []
+      const removalHorizon = supersedesSelfie ? selfieRemovalHorizon(current) : null
 
-    await this.prisma.paletteProfile.update({
-      where: { user_id: userId },
-      data: {
-        source: 'wardrobe',
-        status: 'processing',
-        failure_reason: null,
-        undertone: null,
-        depth: null,
-        confidence: null,
-        analysis_version: null,
-        analyzed_at: null,
-        revision: { increment: 1 },
-      },
+      const claimed = await tx.paletteProfile.updateMany({
+        where: { id: current.id, status: current.status, revision: current.revision },
+        data: {
+          ...(supersedesSelfie ? CLEARED_SELFIE_SESSION : {}),
+          source: 'wardrobe',
+          status: 'processing',
+          analysis_attempt_id: analysisAttemptId,
+          processing_job_enqueued_at: null,
+          failure_reason: null,
+          undertone: null,
+          depth: null,
+          confidence: null,
+          analysis_version: null,
+          analyzed_at: null,
+          revision: { increment: 1 },
+        },
+      })
+      if (claimed.count !== 1) {
+        throw new ConflictException(PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE)
+      }
+      await this.recordSelfieRemoval(
+        tx,
+        selfieObjectPaths,
+        'selfie_superseded',
+        removalHorizon
+      )
+      return { profileId: current.id, selfieObjectPaths }
     })
+    await this.deletions.removeNow(claim.selfieObjectPaths)
+    const profile = { id: claim.profileId }
 
-    const correlationId = randomUUID()
     try {
-      await this.processingQueue.enqueue(profile.id, correlationId)
+      await this.processingQueue.enqueue(profile.id, analysisAttemptId)
     } catch (error) {
       await this.prisma.paletteProfile
         .updateMany({
-          where: { id: profile.id, status: 'processing' },
-          data: { status: null, source: null },
+          // This analysis only: a selfie commit or another analysis since then owns the row.
+          where: {
+            id: profile.id,
+            status: 'processing',
+            source: 'wardrobe',
+            analysis_attempt_id: analysisAttemptId,
+          },
+          data: { status: null, source: null, analysis_attempt_id: null },
         })
         .catch(() => undefined)
       throw error
     }
+    await this.prisma.paletteProfile.updateMany({
+      where: {
+        id: profile.id,
+        status: 'processing',
+        analysis_attempt_id: analysisAttemptId,
+        processing_job_enqueued_at: null,
+      },
+      data: { processing_job_enqueued_at: new Date() },
+    })
 
     return this.getProfile(userId)
   }
@@ -362,14 +553,28 @@ export class PaletteAdvisorService {
     await this.assertConsent(userId)
     await this.assertAnalysisEnabled(userId)
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
-    // Resolved before the transaction: a missing base must fail before the current selfie is
-    // replaced and removed.
-    const apiBase = publicApiUrl()
+
+    // Signed before the transaction: a storage failure must fail before the current selfie is
+    // replaced and removed. A replay leaves this one unused and signs its own key below.
+    if (!isWardrobePathSegment(userId)) {
+      throw uploadPathInvalid({ operation: 'allocate', kind: 'palette', rowId: userId })
+    }
+    const uploadSessionId = randomUUID()
+    const extension = objectExtensionFor(input.mimeType)
+    const objectPath = buildPaletteSelfieObjectPath(userId, uploadSessionId, extension)
+    const freshSession = await this.storage.createUploadSession(
+      buildWardrobeStagingObjectPath(userId, 'palette', uploadSessionId, extension)
+    )
 
     const outcome = await interactiveTransaction(this.prisma, async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('palette_profile:' || ${userId}))`
+      await lockPaletteProfile(tx, userId)
 
       const existing = await tx.paletteProfile.findUnique({ where: { user_id: userId } })
+      // Re-checked under the lock erasure takes: an erasure that ran since the check above has
+      // revoked consent, and a session written now would outlive it.
+      if (!hasCurrentConsent(existing)) {
+        throw new ForbiddenException(PALETTE_CONSENT_REQUIRED_MESSAGE)
+      }
 
       if (
         existing?.selfie_upload_idempotency_key === idempotencyKey &&
@@ -384,24 +589,16 @@ export class PaletteAdvisorService {
         return {
           replayed: true,
           profile: existing,
-          staleObjectPath: null as string | null,
+          staleObjectPaths: [] as string[],
         }
       }
       if (existing?.selfie_upload_idempotency_key === idempotencyKey) {
         throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
       }
 
-      const uploadSessionId = randomUUID()
-      const objectPath = buildPaletteSelfieObjectPath(
-        userId,
-        uploadSessionId,
-        deriveObjectExtension(input.mimeType)
-      )
       const expiresAt = new Date(Date.now() + UPLOAD_EXPIRY_SECONDS * 1000)
-      const staleObjectPath =
-        existing?.selfie_object_path && existing.selfie_object_path !== objectPath
-          ? existing.selfie_object_path
-          : null
+      const staleObjectPaths = selfieObjectsToRemove(existing)
+      const removalHorizon = selfieRemovalHorizon(existing)
 
       const updated = await tx.paletteProfile.update({
         where: { user_id: userId },
@@ -419,28 +616,48 @@ export class PaletteAdvisorService {
           selfie_upload_expires_at: expiresAt,
           selfie_committed_at: null,
           selfie_purged_at: null,
+          selfie_publish_attempt_id: null,
+          selfie_publish_started_at: null,
+          // A new session starts with no horizon; the replaced session's keys repeat below.
+          selfie_publish_cleanup_until: null,
           status: 'pending_upload',
           failure_reason: null,
         },
       })
 
-      return { replayed: false, profile: updated, staleObjectPath }
+      // Recorded with the replacement, so a failed removal is retried instead of forgotten. A
+      // publication still in flight for the replaced session may land later: its keys are
+      // removed now and again until the horizon.
+      await this.recordSelfieRemoval(
+        tx,
+        staleObjectPaths,
+        'selfie_replaced',
+        removalHorizon
+      )
+
+      return { replayed: false, profile: updated, staleObjectPaths }
     })
 
-    if (outcome.staleObjectPath) {
-      await this.storage.remove([outcome.staleObjectPath]).catch(() => undefined)
-    }
+    await this.deletions.removeNow(outcome.staleObjectPaths)
 
     return {
       replayed: outcome.replayed,
-      response: this.uploadUrlResponse(outcome.profile, apiBase),
+      response: await this.uploadUrlResponse(
+        outcome.profile,
+        outcome.replayed ? null : freshSession
+      ),
     }
   }
 
-  private uploadUrlResponse(
+  /**
+   * A storage signed upload URL for the session's staging key. A replayed allocation is signed
+   * afresh, so it gets a live URL for the same key. The client is told the shorter of the
+   * session and the token.
+   */
+  private async uploadUrlResponse(
     profile: PaletteProfile,
-    apiBase: string
-  ): CreatePaletteSelfieUploadUrlResponse {
+    signed: WardrobeUploadSession | null
+  ): Promise<CreatePaletteSelfieUploadUrlResponse> {
     if (
       !profile.selfie_upload_session_id ||
       !profile.selfie_upload_expires_at ||
@@ -448,60 +665,24 @@ export class PaletteAdvisorService {
     ) {
       throw new ConflictException('UPLOAD_SESSION_EXPIRED')
     }
+    const keys = selfieKeys(profile, 'allocate')
+    const session = signed ?? (await this.storage.createUploadSession(keys.stagingPath))
+    const expiresAt = Math.min(
+      profile.selfie_upload_expires_at.getTime(),
+      session.tokenExpiresAt.getTime()
+    )
     return {
       data: {
         uploadSessionId: profile.selfie_upload_session_id,
-        uploadUrl: `${apiBase}/api/v1/commerce/premium/palette/selfie/uploads/${profile.selfie_upload_session_id}`,
-        uploadToken: generateUploadToken(
-          profile.selfie_upload_session_id,
-          profile.user_id,
-          profile.selfie_upload_expires_at.toISOString(),
-          this.uploadTokenSecret
-        ),
+        uploadUrl: session.uploadUrl,
+        uploadToken: session.uploadToken,
         requiredHeaders: { 'content-type': profile.selfie_mime_type as GarmentMimeType },
-        expiresAt: profile.selfie_upload_expires_at.toISOString(),
+        expiresAt: new Date(expiresAt).toISOString(),
       },
     }
   }
 
-  private assertUploadableSession(
-    profile: PaletteProfile | null,
-    userId: string,
-    uploadSessionId: string,
-    uploadToken: string
-  ): asserts profile is PaletteProfile {
-    if (!profile) {
-      throw new NotFoundException('UPLOAD_SESSION_NOT_FOUND')
-    }
-    if (profile.user_id !== userId) {
-      throw new ForbiddenException('WARDROBE_UPLOAD_FORBIDDEN')
-    }
-    if (profile.status !== 'pending_upload') {
-      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
-    }
-    if (
-      !profile.selfie_upload_expires_at ||
-      profile.selfie_upload_expires_at <= new Date()
-    ) {
-      throw new ConflictException('UPLOAD_SESSION_EXPIRED')
-    }
-    if (
-      !verifyUploadToken(
-        uploadToken,
-        uploadSessionId,
-        userId,
-        profile.selfie_upload_expires_at.toISOString(),
-        this.uploadTokenSecret
-      )
-    ) {
-      throw new ForbiddenException('INVALID_UPLOAD_TOKEN')
-    }
-  }
-
-  private resolveDeclaration(
-    profile: PaletteProfile,
-    mimeType: GarmentMimeType
-  ): {
+  private resolveDeclaration(profile: PaletteProfile): {
     fileSizeBytes: number
     mimeType: GarmentMimeType
     sha256: string
@@ -509,6 +690,7 @@ export class PaletteAdvisorService {
     heightPx: number
   } {
     if (
+      !profile.selfie_object_path ||
       !profile.selfie_file_size_bytes ||
       !profile.selfie_mime_type ||
       !profile.selfie_content_sha256 ||
@@ -517,63 +699,216 @@ export class PaletteAdvisorService {
     ) {
       throw new BadRequestException('INVALID_UPLOAD_DECLARATION')
     }
-    if (mimeType !== profile.selfie_mime_type) {
-      throw new BadRequestException('INVALID_UPLOAD_BODY')
-    }
     return {
       fileSizeBytes: profile.selfie_file_size_bytes,
-      mimeType,
+      mimeType: profile.selfie_mime_type as GarmentMimeType,
       sha256: profile.selfie_content_sha256,
       widthPx: profile.selfie_width_px,
       heightPx: profile.selfie_height_px,
     }
   }
 
-  async uploadSelfieBytes(
-    uploadSessionId: string,
-    uploadToken: string,
-    userId: string,
-    role: ApiRole,
-    mimeType: GarmentMimeType,
-    contentLength: number | undefined,
-    body: Buffer
-  ): Promise<void> {
-    await this.assertAnalysisEnabled(userId)
-
-    const profile = await this.prisma.paletteProfile.findUnique({
-      where: { selfie_upload_session_id: uploadSessionId },
-    })
-    this.assertUploadableSession(profile, userId, uploadSessionId, uploadToken)
-
-    if (contentLength === undefined || contentLength !== body.length) {
-      throw new BadRequestException('INVALID_UPLOAD_BODY')
+  /**
+   * Clients PUT the bytes straight to storage, so commit is where they are checked: the uploaded
+   * object must match the declared size, sniffed type, sha256 and dimensions. It is read through
+   * a hard ceiling. A mismatch is removed and the session ends, so a correction needs a fresh
+   * allocation and a fresh key. Returns the verified bytes.
+   */
+  private async verifyStoredSelfie(
+    profile: PaletteProfile,
+    objectPath: string,
+    publishAttemptId: string
+  ): Promise<Buffer> {
+    const declaration = this.resolveDeclaration(profile)
+    const stored = await this.storage.downloadBounded(objectPath, MAX_GARMENT_IMAGE_BYTES)
+    if (stored.status === 'missing') {
+      throw new ConflictException('UPLOAD_BYTES_MISSING')
     }
-    const declaration = this.resolveDeclaration(profile, mimeType)
-
     try {
-      await verifyGarmentImage(body, declaration)
+      if (stored.status === 'too_large') {
+        throw new GarmentImageValidationError('IMAGE_SIZE_MISMATCH')
+      }
+      await verifyGarmentImage(stored.bytes, declaration)
+      return stored.bytes
     } catch (error) {
       if (error instanceof GarmentImageValidationError) {
+        // A claim this attempt took over may have started a write of the final key that can
+        // still land; the cleared session takes its horizon with it, so its keys repeat here.
+        const earlierHorizon = selfieRemovalHorizon(profile)
+        const repeatingPaths = earlierHorizon ? selfieObjectsToRemove(profile) : []
+        await interactiveTransaction(this.prisma, async (tx) => {
+          const rejected = await tx.paletteProfile.updateMany({
+            where: {
+              id: profile.id,
+              selfie_upload_session_id: profile.selfie_upload_session_id,
+              selfie_publish_attempt_id: publishAttemptId,
+              status: { in: ['pending_upload', 'bytes_uploaded'] },
+            },
+            data: { ...CLEARED_SELFIE_SESSION, status: null, failure_reason: null },
+          })
+          await this.deletions.record(tx, [objectPath], 'upload_rejected')
+          if (rejected.count === 1 && earlierHorizon) {
+            await this.deletions.recordRepeating(
+              tx,
+              repeatingPaths,
+              'upload_rejected',
+              earlierHorizon
+            )
+          }
+        })
+        await this.deletions.removeNow([objectPath, ...repeatingPaths])
         mapImageValidationError(error)
       }
       throw error
     }
+  }
 
-    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
-    await this.storage.upload(profile.selfie_object_path!, body, declaration.mimeType)
+  /** See WardrobeSilhouetteService.placeVerifiedMyForm. */
+  private async placeVerifiedSelfie(
+    profile: PaletteProfile,
+    keys: UploadSessionKeys,
+    fromStaging: boolean,
+    publishAttemptId: string
+  ): Promise<void> {
+    let publishStarted = false
+    try {
+      if (!fromStaging) {
+        await this.verifyStoredSelfie(profile, keys.finalPath, publishAttemptId)
+        return
+      }
+      const bytes = await this.verifyStoredSelfie(
+        profile,
+        keys.stagingPath,
+        publishAttemptId
+      )
+      publishStarted = true
+      await this.storage.publish(
+        keys.finalPath,
+        bytes,
+        profile.selfie_mime_type as GarmentMimeType
+      )
+    } catch (error) {
+      // Released only when no write of the final key was started; see placeVerifiedMyForm.
+      if (!publishStarted)
+        await this.releaseSelfiePublication(profile.id, publishAttemptId)
+      throw error
+    }
+  }
 
-    const updated = await this.prisma.paletteProfile.updateMany({
+  /** See WardrobeSilhouetteService.claimMyFormPublication. */
+  private async claimSelfiePublication(
+    profile: PaletteProfile,
+    attemptId: string
+  ): Promise<boolean> {
+    const now = new Date()
+    const claimed = await this.prisma.paletteProfile.updateMany({
       where: {
         id: profile.id,
-        selfie_upload_session_id: uploadSessionId,
-        status: 'pending_upload',
+        selfie_upload_session_id: profile.selfie_upload_session_id,
+        OR: [
+          { status: 'pending_upload', selfie_upload_expires_at: { gt: now } },
+          { status: 'bytes_uploaded' },
+        ],
+        AND: [
+          {
+            OR: [
+              { selfie_publish_attempt_id: null },
+              { selfie_publish_started_at: null },
+              { selfie_publish_started_at: { lt: staleClaimCutoff(now) } },
+            ],
+          },
+        ],
       },
-      data: { status: 'bytes_uploaded' },
+      // The cleanup horizon is recorded with the claim, before any storage I/O, and outlives
+      // the lease, a takeover and success; see `ambiguousPublicationHorizon`.
+      data: {
+        selfie_publish_attempt_id: attemptId,
+        selfie_publish_started_at: now,
+        selfie_publish_cleanup_until: nextCleanupHorizon(
+          profile.selfie_publish_cleanup_until,
+          now
+        ),
+      },
     })
-    if (updated.count !== 1) {
-      await this.storage.remove([profile.selfie_object_path!]).catch(() => undefined)
-      throw new ConflictException('UPLOAD_TOKEN_CONSUMED')
+    return claimed.count === 1
+  }
+
+  private async releaseSelfiePublication(
+    profileId: string,
+    attemptId: string
+  ): Promise<void> {
+    await this.prisma.paletteProfile
+      .updateMany({
+        where: { id: profileId, selfie_publish_attempt_id: attemptId },
+        data: { selfie_publish_attempt_id: null, selfie_publish_started_at: null },
+      })
+      .catch(() => undefined)
+  }
+
+  /** See WardrobeSilhouetteService.resolveUnclaimedMyForm. */
+  private async resolveUnclaimedSelfie(
+    profileId: string,
+    userId: string,
+    input: CommitPaletteSelfieInput,
+    idempotencyKey: string
+  ): Promise<CommitResult> {
+    const current = await this.prisma.paletteProfile.findUnique({
+      where: { id: profileId },
+    })
+    if (current?.selfie_upload_session_id === input.uploadSessionId) {
+      if (
+        current.status === 'processing' ||
+        current.status === 'ready' ||
+        current.status === 'failed'
+      ) {
+        return this.replayCommittedSelfie(current, userId, idempotencyKey)
+      }
+      if (selfiePublishDeadline(current)) throw uploadInProgress()
     }
+    throw new ConflictException('UPLOAD_SESSION_EXPIRED')
+  }
+
+  /** A commit of a session already past commit: same key replays, any other is refused. */
+  private async replayCommittedSelfie(
+    profile: PaletteProfile,
+    userId: string,
+    idempotencyKey: string
+  ): Promise<CommitResult> {
+    if (profile.selfie_commit_idempotency_key !== idempotencyKey) {
+      throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+    }
+    if (profile.status === 'processing') {
+      await handOffPaletteAnalysis(this.prisma, this.processingQueue, profile)
+    }
+    return { replayed: true, response: { data: await this.getProfile(userId) } }
+  }
+
+  /** See WardrobeSilhouetteService.resolveLostMyFormClaim. */
+  private async resolveLostSelfieClaim(
+    profile: PaletteProfile,
+    userId: string,
+    input: CommitPaletteSelfieInput,
+    idempotencyKey: string,
+    keys: UploadSessionKeys,
+    fromStaging: boolean
+  ): Promise<CommitResult> {
+    const raced = await this.prisma.paletteProfile.findUnique({
+      where: { id: profile.id },
+    })
+    if (raced?.selfie_upload_session_id === input.uploadSessionId) {
+      if (
+        raced.selfie_commit_idempotency_key === idempotencyKey &&
+        raced.status !== 'pending_upload' &&
+        raced.status !== 'bytes_uploaded'
+      ) {
+        return { replayed: true, response: { data: await this.getProfile(userId) } }
+      }
+    } else if (fromStaging) {
+      // Replaced or erased meanwhile, and the publish returned, so it has landed: nothing will
+      // claim the published object.
+      await this.deletions.recordAndRemove([keys.finalPath], 'commit_compensation')
+    }
+    throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
   }
 
   async commitSelfie(
@@ -597,53 +932,65 @@ export class PaletteAdvisorService {
       profile.status === 'ready' ||
       profile.status === 'failed'
     ) {
-      if (profile.selfie_commit_idempotency_key === idempotencyKey) {
-        return { replayed: true, response: { data: await this.getProfile(userId) } }
-      }
-      throw new ConflictException('IDEMPOTENCY_KEY_REUSED')
+      return this.replayCommittedSelfie(profile, userId, idempotencyKey)
     }
-    if (profile.status !== 'bytes_uploaded') {
-      throw new BadRequestException('INVALID_UPLOAD_DECLARATION')
-    }
+    assertCommittableSelfie(profile)
 
+    const keys = selfieKeys(profile, 'commit')
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
 
+    // Publication ownership before any storage I/O; see WardrobeService.commitGarment. Only the
+    // owning attempt verifies the staged bytes and writes exactly that buffer to the final key
+    // with server-owned type and cache policy. Staging stays until the claim.
+    const publishAttemptId = randomUUID()
+    if (!(await this.claimSelfiePublication(profile, publishAttemptId))) {
+      return this.resolveUnclaimedSelfie(profile.id, userId, input, idempotencyKey)
+    }
+    const fromStaging = profile.status === 'pending_upload'
+    await this.placeVerifiedSelfie(profile, keys, fromStaging, publishAttemptId)
+
     const updated = await this.prisma.paletteProfile.updateMany({
-      where: { id: profile.id, status: 'bytes_uploaded' },
+      // Guarded on this attempt's publication claim as well as the session and status: a
+      // reallocation replaces the session in place on this one-row-per-user profile.
+      where: {
+        id: profile.id,
+        selfie_upload_session_id: input.uploadSessionId,
+        selfie_publish_attempt_id: publishAttemptId,
+        status: { in: ['pending_upload', 'bytes_uploaded'] },
+      },
       data: {
         status: 'processing',
         source: 'selfie',
         selfie_committed_at: new Date(),
         selfie_commit_idempotency_key: idempotencyKey,
+        selfie_publish_attempt_id: null,
+        selfie_publish_started_at: null,
+        // A selfie analysis's attempt is its session, so its job id is the one every selfie
+        // job has carried.
+        analysis_attempt_id: input.uploadSessionId,
+        processing_job_enqueued_at: null,
         revision: { increment: 1 },
       },
     })
     if (updated.count !== 1) {
-      throw new ConflictException('UPLOAD_ALREADY_CLAIMED')
+      await this.releaseSelfiePublication(profile.id, publishAttemptId)
+      return this.resolveLostSelfieClaim(
+        profile,
+        userId,
+        input,
+        idempotencyKey,
+        keys,
+        fromStaging
+      )
     }
 
-    // See wardrobe-silhouette.service.ts's commitMyForm for why the upload
-    // session identity is cleared on a compensating release, not only the
-    // status/commit fields: it forces a retry to reallocate a genuinely
-    // fresh session (and job id) rather than recomputing an identical one
-    // that BullMQ would silently no-op on.
-    try {
-      await this.processingQueue.enqueue(profile.id, input.uploadSessionId)
-    } catch (error) {
-      await this.prisma.paletteProfile
-        .updateMany({
-          where: { id: profile.id, status: 'processing' },
-          data: {
-            status: 'bytes_uploaded',
-            source: null,
-            selfie_committed_at: null,
-            selfie_commit_idempotency_key: null,
-            selfie_upload_session_id: null,
-            selfie_upload_idempotency_key: null,
-          },
-        })
-        .catch(() => undefined)
-      throw error
+    // Job handoff first, cleanup after; see WardrobeSilhouetteService.commitMyForm.
+    const committed = await this.prisma.paletteProfile.findUniqueOrThrow({
+      where: { id: profile.id },
+    })
+    await handOffPaletteAnalysis(this.prisma, this.processingQueue, committed)
+    if (fromStaging) {
+      await this.deletions.recordAndRemove([keys.stagingPath], 'commit_staging_released')
     }
 
     return { replayed: false, response: { data: await this.getProfile(userId) } }
@@ -700,6 +1047,23 @@ export class PaletteAdvisorService {
     }
   }
 
+  /**
+   * Records a replaced, erased or superseded selfie session's keys for removal in the caller's
+   * transaction: once, or repeating until `removalHorizon` when a publication may still write.
+   */
+  private async recordSelfieRemoval(
+    tx: Parameters<Parameters<typeof interactiveTransaction>[1]>[0],
+    objectPaths: readonly string[],
+    reason: 'selfie_replaced' | 'selfie_erased' | 'selfie_superseded',
+    removalHorizon: Date | null
+  ): Promise<void> {
+    if (removalHorizon) {
+      await this.deletions.recordRepeating(tx, objectPaths, reason, removalHorizon)
+    } else {
+      await this.deletions.record(tx, objectPaths, reason)
+    }
+  }
+
   // --- Erasure ---------------------------------------------------------
 
   /**
@@ -713,13 +1077,17 @@ export class PaletteAdvisorService {
    * `PremiumEntitlementGuard` on this route).
    */
   async erase(userId: string): Promise<PaletteAdvisorProfile> {
-    const existing = await this.prisma.paletteProfile.findUnique({
-      where: { user_id: userId },
-    })
-    const from = consentAuditState(existing)
-    const selfieObjectPath = existing?.selfie_object_path ?? null
+    // Under the per-member lock allocation takes, so a replacement cannot slip between reading
+    // the paths and revoking consent: either it committed first and its keys are read here, or
+    // it waits and then finds consent revoked. The keys are recorded in the same transaction, so
+    // a failed storage removal is retried instead of forgotten.
+    const selfieObjectPaths = await interactiveTransaction(this.prisma, async (tx) => {
+      await lockPaletteProfile(tx, userId)
+      const existing = await tx.paletteProfile.findUnique({ where: { user_id: userId } })
+      const from = consentAuditState(existing)
+      const objectPaths = selfieObjectsToRemove(existing)
+      const removalHorizon = selfieRemovalHorizon(existing)
 
-    await interactiveTransaction(this.prisma, async (tx) => {
       await tx.advisorRecommendationState.deleteMany({ where: { user_id: userId } })
       await tx.paletteProfile.upsert({
         where: { user_id: userId },
@@ -734,22 +1102,16 @@ export class PaletteAdvisorService {
           analyzed_at: null,
           status: null,
           failure_reason: null,
-          selfie_object_path: null,
-          selfie_upload_session_id: null,
-          selfie_upload_idempotency_key: null,
-          selfie_commit_idempotency_key: null,
-          selfie_commit_payload_hash: null,
-          selfie_file_size_bytes: null,
-          selfie_mime_type: null,
-          selfie_content_sha256: null,
-          selfie_width_px: null,
-          selfie_height_px: null,
-          selfie_upload_expires_at: null,
-          selfie_committed_at: null,
-          selfie_purged_at: null,
+          analysis_attempt_id: null,
+          processing_job_enqueued_at: null,
+          ...CLEARED_SELFIE_SESSION,
           revision: { increment: 1 },
         },
       })
+      // The current final and staging keys go now. A publication still in flight for this
+      // session may write the selfie after this erasure, so its keys are removed again every
+      // 15 minutes until the horizon, whenever that write lands.
+      await this.recordSelfieRemoval(tx, objectPaths, 'selfie_erased', removalHorizon)
       await tx.auditLog.create({
         data: {
           user_id: userId,
@@ -758,11 +1120,10 @@ export class PaletteAdvisorService {
           ip_address: null,
         },
       })
+      return objectPaths
     })
 
-    if (selfieObjectPath) {
-      await this.storage.remove([selfieObjectPath]).catch(() => undefined)
-    }
+    await this.deletions.removeNow(selfieObjectPaths)
 
     return this.getProfile(userId)
   }
