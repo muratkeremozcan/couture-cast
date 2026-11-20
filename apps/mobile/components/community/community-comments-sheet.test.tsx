@@ -563,8 +563,7 @@ describe('Story 6.4 native comments sheet through real wrappers', () => {
       )
     )
     renderSheet()
-    await screen.findByText('Unavailable.')
-    press(screen.getByRole('button', { name: 'Delete: Unavailable.' }))
+    press(await screen.findByRole('button', { name: 'Delete: Unavailable.' }))
     await waitFor(() =>
       expect(announceForAccessibility).toHaveBeenCalledWith('Comment deleted.')
     )
