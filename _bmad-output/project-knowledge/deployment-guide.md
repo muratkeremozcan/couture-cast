@@ -781,6 +781,15 @@ representative simultaneous workload (full-size 10 MiB photos on all three queue
 purge tick running), and read Northflank's memory and restart metrics for the first days in
 production.
 
+**Hosted observations (2026-11-19, Northflank `nf-compute-20`, commit 5244a39).** The service
+logged `wardrobe_worker_ready` (database 1094 ms, Redis 562 ms, storage 820 ms) and the started
+line, and the first deletion drain and retention purge ran by themselves. A synthetic member
+uploaded a 5 MB, 3024x4032 phone photo straight to storage; the worker finished it as
+`manual_mode` in 4.7 s, the garment showed `awaiting_tags` 11 s after commit, and confirming tags
+made it `ready`. Resident memory was 175 MB idle and peaked near 290 MB for that one job. This is
+one job, not the simultaneous workload above, and the idle Redis rate is still unmeasured, so both
+checks stay open.
+
 ### Community content screening (ADR-013)
 
 Two processes can consume `community-moderation`, and both compose it through the one
