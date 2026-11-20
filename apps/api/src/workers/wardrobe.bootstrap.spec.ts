@@ -195,10 +195,11 @@ describe('U-W-QUEUES: which bootstrap consumes which queue', () => {
     )
   })
 
-  it('gives every wardrobe consumer the hosted options and none its own concurrency', () => {
+  it('gives every wardrobe consumer the entry point options and none its own concurrency', () => {
     const wardrobe = readFileSync(path.join(workersDir, 'wardrobe.bootstrap.ts'), 'utf8')
-    // Three BullMQ consumers: color-extraction, moderation-review and palette-analysis.
-    expect(wardrobe.match(/hostedWorkerOptions\(\)/g)).toHaveLength(3)
+    // Three BullMQ consumers: color-extraction, moderation-review and palette-analysis, each
+    // taking the slow idle settings only when the hosted entry point started the worker.
+    expect(wardrobe.match(/wardrobeWorkerOptions\(hosted\)/g)).toHaveLength(3)
     expect(wardrobe).not.toMatch(/defaultWorkerOptions|limiter:/)
   })
 

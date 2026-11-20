@@ -763,27 +763,36 @@ arrives both clients show neutral copy and move no focus. FashionCLIP suggestion
 larger plan or a quantized model by changing `GARMENT_TAGGING_ENGINE` on a model-capable image; the
 follow-up is in [deferred work](../implementation-artifacts/deferred-work.md).
 
-**Sizing and egress.** Production Redis bills per command, so the hosted consumers idle slowly. Every
-consumer uses `drainDelay` 1800 seconds, `stalledInterval` 900000 ms, `lockDuration` 30000 ms and
-`maxStalledCount` 1 (`workers/idle-worker-options.ts`), and the connection sends TCP keepalive
-probes every 60 seconds so a NAT or load balancer cannot silently forget the 30 minute blocking
-wait. A new job still wakes the wait at once. The loop adds a Redis `SET` and a database read per
-tick (about 5 ticks an hour).
+**Sizing and egress.** Production Redis bills per command, so the hosted consumers idle slowly. Only
+the hosted entry point (`startWardrobeWorker({ hosted: true })`, the launcher) uses the slow
+settings; a developer's or separately deployed wardrobe worker keeps 300 s and 120 s
+(`wardrobeWorkerOptions`). Every hosted consumer uses `drainDelay` 1800 seconds, `stalledInterval`
+900000 ms, `lockDuration` 30000 ms and `maxStalledCount` 1 (`workers/idle-worker-options.ts`), and
+the connection sets TCP keepalive with a 60 second first probe delay. On a healthy socket a new
+job still wakes the blocking wait at once; keepalive helps preserve an idle flow through a NAT or
+load balancer and reveals a dead peer, while probe retry timing and the network's idle policy are
+separate. The loop adds a Redis `SET` and a database read per tick (about 5 ticks an hour).
 
-The cost model is measured: one idle consumer spends 7 commands per stalled check and 8 per empty
-blocking wait (counted on a local Redis, script commands included, and it reproduces the community
-worker's recorded 138 and 306 commands an hour). The first hosted settings (300 s and 120 s, the
-community worker's) cost the live service about 950 commands an hour for three consumers, 23.4 a
-minute with the worker running against 7.6 with it paused. At 1800 s and 900 s the model gives
-about 137 an hour, and `idle-worker-options.spec.ts` pins that it stays at least 5x under the 950.
-Measured on the live service after the change: the whole Redis idled at 9.1 commands a minute over
-41 minutes without uploads (23.4 before, 7.6 with the worker paused), so the worker's share fell
-from about 16 a minute to about 2. A photo uploaded after 21 minutes, and another after 28 minutes,
-of one blocked wait reached `awaiting_tags` in 4 to 5 seconds, so the keepalive holds the wait.
-The price is crash recovery: a job whose worker died is requeued at the second stalled check
-after the crash, 30 minutes at most (the hourly retention purge also re-enqueues stranded
-processing work). The community worker keeps its 300 s and 120 s settings, because its moderation
-SLA needs the fast recovery.
+The cost model covers an empty, warmed queue: one idle consumer spends 7 commands per stalled
+check and 8 per empty blocking wait (counted on a local Redis, script commands included; it
+reproduces the community worker's recorded 138 and 306 commands an hour). It leaves out reconnects,
+delayed retries and maintenance that finds work. At 300 s and 120 s the model gives 923 an hour for
+three consumers and the live service read about 950 (23.4 commands a minute with the worker
+running against 7.6 with it paused). At 1800 s and 900 s the model projects about 137 an hour with
+the five maintenance locks, and `idle-worker-options.spec.ts` pins that projection at least 5x
+under the old reading. Observed on the live service after the change: the whole Redis idled at 9.1
+commands a minute over 41 minutes without uploads against 23.4 before, a 2.6-fold drop in the
+total. Subtracting the paused baseline puts the worker's own share near 2 a minute (about 90 an
+hour), but that inference holds only while the baseline of everything else is unchanged. The
+sampling used `INFO`, which Upstash does not bill. Two uploads, one after 21 and one after 28
+minutes of a single blocked wait, reached `awaiting_tags` in 4 to 5 seconds.
+
+The price is crash recovery. A job whose worker died is requeued by up to two successful stalled
+checks once a consumer is running again and Redis is reachable (about 30 minutes), plus the time
+to restart and reconnect; a scan can also exit early while Redis still holds the previous check's
+key, so a replacement that starts late can take longer. The hourly retention purge only repairs a
+photo whose first enqueue never happened. The community worker keeps its 300 s and 120 s settings,
+because its moderation SLA needs the fast recovery.
 
 **What was and was not measured.** The pruned `node_modules` was 66.1 MB and the build-time
 self-test showed 147 MiB resident after loading the consumer graph, both on a macOS arm64 tree

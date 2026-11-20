@@ -14,13 +14,20 @@ import {
   IDLE_LOCK_DURATION_MS,
   IDLE_MAX_STALLED_COUNT,
   IDLE_STALLED_INTERVAL_MS,
+  STANDALONE_DRAIN_DELAY_SECONDS,
+  STANDALONE_STALLED_INTERVAL_MS,
   hostedWorkerOptions,
+  standaloneWorkerOptions,
+  wardrobeWorkerOptions,
 } from './idle-worker-options'
 import { WARDROBE_MAINTENANCE_TASKS } from './wardrobe-maintenance'
 
 /** The consumers the hosted wardrobe worker starts: colour extraction, My Form, palette. */
 const HOSTED_CONSUMERS = 3
-/** Measured on the live service before the cut: 23.4 minus 7.6 commands a minute, rounded up. */
+/**
+ * The cost model's figure for the old settings on an empty queue is 923 an hour; the live service
+ * read about 950 (23.4 minus 7.6 commands a minute, with the worker paused as the baseline).
+ */
 const BASELINE_COMMANDS_PER_HOUR = 950
 
 function idleCommandsPerHour(): number {
@@ -58,10 +65,26 @@ describe('hosted wardrobe worker idle backoff', () => {
     expect(options.stalledInterval).toBeGreaterThanOrEqual(options.lockDuration ?? 0)
   })
 
-  it('keeps the whole idle service at least 5x under the measured 950 commands an hour', () => {
+  it('projects the empty-queue idle service at least 5x under the 950 an hour the old settings read', () => {
     expect(idleCommandsPerHour()).toBeLessThanOrEqual(BASELINE_COMMANDS_PER_HOUR / 5)
-    // The arithmetic behind it: 3 x (4 x 7 + 2 x 8) plus 5 maintenance locks.
+    // An empty, warmed queue model: 3 x (4 x 7 + 2 x 8) plus 5 maintenance locks. It leaves out
+    // reconnects, delayed retries and maintenance that finds work; the live totals are in the guide.
     expect(Math.round(idleCommandsPerHour())).toBe(137)
+  })
+
+  it('gives a standalone wardrobe worker the previous settings, only the hosted entry the slow ones', () => {
+    expect(wardrobeWorkerOptions(true)).toEqual(hostedWorkerOptions())
+    expect(wardrobeWorkerOptions(false)).toEqual(standaloneWorkerOptions())
+    expect(standaloneWorkerOptions()).toMatchObject({
+      concurrency: 1,
+      drainDelay: 300,
+      lockDuration: 30_000,
+      stalledInterval: 120_000,
+      maxStalledCount: 1,
+    })
+    expect(standaloneWorkerOptions().connection).not.toHaveProperty('keepAlive')
+    expect(STANDALONE_DRAIN_DELAY_SECONDS).toBe(COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS)
+    expect(STANDALONE_STALLED_INTERVAL_MS).toBe(COMMUNITY_MODERATION_STALLED_INTERVAL_MS)
   })
 
   it('leaves the community worker on its own, faster recovery settings', () => {

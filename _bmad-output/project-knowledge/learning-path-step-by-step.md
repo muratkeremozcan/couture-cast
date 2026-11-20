@@ -20690,8 +20690,9 @@ API, Vitest:
   two-process case.
 - [`apps/api/src/workers/idle-worker-options.spec.ts`](../../apps/api/src/workers/idle-worker-options.spec.ts):
   proves the hosted intervals (a 30 minute block, a 15 minute stalled check, keepalive probes), that
-  the idle service stays at least 5x under the measured 950 commands an hour, and that the
-  community worker keeps its own settings.
+  the empty-queue model projects the idle service at least 5x under the 950 commands an hour the
+  old settings read, that a standalone wardrobe worker keeps the previous settings, and that the
+  community worker keeps its own.
 - [`apps/api/integration/wardrobe-worker-image.spec.ts`](../../apps/api/integration/wardrobe-worker-image.spec.ts):
   proves the Dockerfile text, the launcher's refusals (including `TEST_ENV=local`) and the prune
   script's guards.
@@ -20733,11 +20734,12 @@ Evidence boundaries:
   (`--memory=512m --cpus=0.2`) run under a representative simultaneous workload, Northflank's
   memory metrics and the hosted canary are required before the 512 MB limit is signed off.
 - Idle Redis cost: the first settings (the community worker's 300 s block and 120 s stalled
-  check) measured about 950 commands an hour for the whole service, so the hosted consumers now
-  block 1800 s and check for stalled jobs every 900 s, with TCP keepalive on the connection. The
-  trade is crash recovery of up to 30 minutes; the community worker keeps its own settings. Live
-  result: the whole Redis idles at 9.1 commands a minute instead of 23.4, and a photo uploaded after
-  21 and after 28 minutes of idle reached `awaiting_tags` in 4 to 5 seconds.
+  check) read about 950 commands an hour for the service, so the hosted entry point now blocks
+  1800 s and checks for stalled jobs every 900 s, with TCP keepalive on the connection; a
+  standalone wardrobe worker and the community worker keep their own settings. The trade is crash
+  recovery of about 30 minutes once a consumer runs again, plus restart time. Live result: the whole
+  Redis idled at 9.1 commands a minute instead of 23.4, and two photos uploaded after 21 and 28
+  minutes of one blocked wait reached `awaiting_tags` in 4 to 5 seconds.
 - The ten-locale strings for the manual and pending copy are translated without a native review.
 
 #### Advisor erase and planner week races
