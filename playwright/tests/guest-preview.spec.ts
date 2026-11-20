@@ -123,9 +123,9 @@ test.describe('Guest preview (signed out)', () => {
     await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeInViewport({
       ratio: 1,
     })
-    await expect(outfit.getByText('Mild and dry', { exact: true })).toBeInViewport({
-      ratio: 1,
-    })
+    const weather = outfit.getByTestId('guest-preview-weather-chip')
+    await expect(weather).toHaveText('Mild and dry')
+    await expect(weather).toBeInViewport({ ratio: 1 })
     await expect(nextLook).toBeInViewport({ ratio: 1 })
 
     const explanation = outfit.getByTestId('guest-preview-explanation')
@@ -144,6 +144,7 @@ test.describe('Guest preview (signed out)', () => {
     await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
     await expect(outfit.getByText('Midi skirt', { exact: true })).toBeVisible()
     await expect(outfit.getByText('Loafers', { exact: true })).toHaveCount(0)
+    await expect(explanation).toContainText('It is mild enough to skip an outer layer.')
   })
 
   test('[P0] [UX-FIRST-002] adding a garment from the preview asks the guest to create an account', async ({
@@ -151,12 +152,15 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await page.goto('/preview')
     await passGate(page)
+    await page.getByRole('button', { name: 'Try another look' }).click()
+    const editedOutfit = page.getByRole('heading', { name: 'Silk midi' })
+    await expect(editedOutfit).toBeVisible()
     const add = page.getByRole('region', { name: 'Add your own garment' })
     await expect(add).toContainText('Create an account to add your clothes')
     await add.getByRole('link', { name: 'Create account' }).click()
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     await page.getByRole('link', { name: 'Back to preview' }).click()
-    await expect(page.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
+    await expect(editedOutfit).toBeVisible()
   })
 
   test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({

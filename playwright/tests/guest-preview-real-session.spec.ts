@@ -140,7 +140,12 @@ test('[P1] [UX-FIRST-003] a verified member can review a garment file after came
 
   await page.goto('/wardrobe/onboarding')
   const step = page.getByTestId('onboarding-step-region')
-  await step.getByRole('button', { name: 'Allow camera and photo access' }).click()
+  const requestCamera = step.getByRole('button', {
+    name: 'Allow camera and photo access',
+  })
+  await expect(requestCamera).toBeVisible()
+  expect(await cameraRequests(page)).toBe(0)
+  await requestCamera.click()
   await expect(step.getByRole('alert')).toContainText('You can still import files')
   expect(await cameraRequests(page)).toBe(1)
 
