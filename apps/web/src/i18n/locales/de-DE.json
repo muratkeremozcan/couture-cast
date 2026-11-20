@@ -930,7 +930,7 @@
       "resolved": "Erledigt",
       "dashboardLink": "SLA-Übersicht",
       "title": "SLA-Überwachung",
-      "subtitle": "Offene Fälle im Vergleich zum 24-Stunden-Prüfziel und die dazu gesendeten Warnungen.",
+      "subtitle": "Offene Fälle im Vergleich zu ihren Prüfzielen (30 Minuten bei vom Screening zurückgehaltenen Beiträgen, 24 Stunden bei Meldungen) und die dazu gesendeten Warnungen.",
       "disabled": "Die SLA-Überwachung ist ausgeschaltet.",
       "unavailable": "Die SLA-Überwachung ist nicht verfügbar. Versuchen Sie es erneut.",
       "monitorTitle": "Zustand der Überwachung",

@@ -3,7 +3,7 @@
 Updated: 2026-11-05 - created for Story 6.12, staffing sign-off recorded by Story 6.13.
 
 This runbook covers the at-risk, breach and escalation alerts for moderation cases.
-Every report carries a 24-hour review target.
+A member report carries a 24-hour review target, and a screening hold is due 30 minutes after it is flagged.
 A case is at risk with 6 hours left and breached at its due time.
 The definition lives in `deriveSlaState` in `@couture/api-client`.
 

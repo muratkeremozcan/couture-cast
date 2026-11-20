@@ -930,7 +930,7 @@
       "resolved": "Résolu",
       "dashboardLink": "Tableau de bord SLA",
       "title": "Suivi du SLA",
-      "subtitle": "Les cas ouverts par rapport à l’objectif d’examen de 24 heures, et les alertes envoyées à leur sujet.",
+      "subtitle": "Les cas ouverts par rapport à leurs objectifs d’examen (30 minutes pour les publications retenues par le filtre, 24 heures pour les signalements de membres), et les alertes envoyées à leur sujet.",
       "disabled": "Le suivi du SLA est désactivé.",
       "unavailable": "Le suivi du SLA n’est pas disponible. Réessayez.",
       "monitorTitle": "État du moniteur",

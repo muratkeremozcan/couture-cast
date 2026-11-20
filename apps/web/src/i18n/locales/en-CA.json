@@ -930,7 +930,7 @@
       "resolved": "Resolved",
       "dashboardLink": "SLA dashboard",
       "title": "SLA monitoring",
-      "subtitle": "Open cases against the 24-hour review target, and the alerts sent about them.",
+      "subtitle": "Open cases against their review targets (30 minutes for screening holds, 24 hours for member reports), and the alerts sent about them.",
       "disabled": "SLA monitoring is turned off.",
       "unavailable": "SLA monitoring is unavailable. Try again.",
       "monitorTitle": "Monitor health",
