@@ -45,16 +45,11 @@ async function garmentOnSheet(width: number, height: number): Promise<Buffer> {
     .toBuffer()
 }
 
-/**
- * Writes an image shaped like a photo straight off a phone, at a phone's pixel size, with
- * sensor grain. The grain matters: a phone photo carries noise that PNG cannot compress, and
- * a smooth upscale would understate the prepared upload several times over. The output is
- * deterministic, so every run uploads the same bytes. Returns the file's size in bytes.
- */
-export async function writePhonePhoto(
-  outputPath: string,
-  { width, height, format, subjectPath, grain = 8 }: PhonePhotoOptions
-): Promise<number> {
+/** The frame's pixels with sensor grain applied; deterministic, so every run sees the same. */
+async function grainedPixels(
+  options: Pick<PhonePhotoOptions, 'width' | 'height' | 'subjectPath' | 'grain'>
+) {
+  const { width, height, subjectPath, grain = 8 } = options
   const subject = subjectPath
     ? await sharp(subjectPath).resize(width, height, { fit: 'fill' }).toBuffer()
     : await garmentOnSheet(width, height)
@@ -74,6 +69,20 @@ export async function writePhonePhoto(
     const shift = Math.floor(random * levels) - grain
     data[index] = Math.max(0, Math.min(255, data[index]! + shift))
   }
+  return { data, info }
+}
+
+/**
+ * Writes an image shaped like a photo straight off a phone, at a phone's pixel size, with
+ * sensor grain. The grain matters: a phone photo carries noise that PNG cannot compress, and
+ * a smooth upscale would understate the prepared upload several times over. The output is
+ * deterministic, so every run uploads the same bytes. Returns the file's size in bytes.
+ */
+export async function writePhonePhoto(
+  outputPath: string,
+  { width, height, format, subjectPath, grain = 8 }: PhonePhotoOptions
+): Promise<number> {
+  const { data, info } = await grainedPixels({ width, height, subjectPath, grain })
   const encoded = sharp(data, { raw: info })
   const bytes =
     format === 'jpeg'
@@ -81,6 +90,45 @@ export async function writePhonePhoto(
       : await encoded.png().toBuffer()
   await writeFile(outputPath, bytes)
   return bytes.length
+}
+
+/**
+ * A phone photo as a JPEG whose size lies in `[minBytes, maxBytes]`, found by searching the
+ * encoder quality over one grained frame. A test that must prove a request body is over a
+ * platform cap, without sending more than it needs to, asks for a size and gets it, whatever
+ * the encoder's output size does between versions. Throws when no quality lands in the window,
+ * so a drifted encoder fails the test that depends on the size instead of weakening it.
+ * Returns the file's size in bytes.
+ */
+export async function writePhoneJpegWithin(
+  outputPath: string,
+  options: {
+    width: number
+    height: number
+    minBytes: number
+    maxBytes: number
+    grain?: number
+  }
+): Promise<number> {
+  const { width, height, minBytes, maxBytes, grain } = options
+  const { data, info } = await grainedPixels({ width, height, grain })
+  let low = 40
+  let high = 100
+  const tried: string[] = []
+  while (low <= high) {
+    const quality = Math.floor((low + high) / 2)
+    const bytes = await sharp(data, { raw: info }).jpeg({ quality }).toBuffer()
+    tried.push(`q${quality}=${bytes.length}`)
+    if (bytes.length >= minBytes && bytes.length <= maxBytes) {
+      await writeFile(outputPath, bytes)
+      return bytes.length
+    }
+    if (bytes.length < minBytes) low = quality + 1
+    else high = quality - 1
+  }
+  throw new Error(
+    `No JPEG quality gives ${minBytes} to ${maxBytes} bytes at ${width}x${height} (${tried.join(', ')}).`
+  )
 }
 
 /** A 12 MP garment photo as the phone's camera app saves it: JPEG, light grain. */

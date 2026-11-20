@@ -12813,6 +12813,14 @@ E2E, Playwright:
   mismatched bytes are refused, removed and end the session; S-3 proves a signed URL writes only
   its own key and refuses a second write; S-4 proves the bucket refuses 10 MiB plus one byte and a
   non-image type.
+- [`playwright/tests/wardrobe-upload-deployed.spec.ts`](../../playwright/tests/wardrobe-upload-deployed.spec.ts):
+  DEPLOYED-UP-01 proves, on every deployment and in the daily production status run, that the
+  direct-upload allocation route exists and answers a signed-out call with the API's own 401;
+  DEPLOYED-UP-02 proves, on the Vercel preview lane, that a JPEG of about 5 MB (over the 4.5 MB
+  function cap) is allocated, put at the signed storage host and committed without its bytes
+  reaching the API. The wardrobe worker's processing step and the browser half on a deployed
+  phone viewport need a worker and a signed-in deployed browser, so they stay with the worker
+  drill in the image build and the local specs above.
 - [`playwright/tests/palette-advisor.spec.ts`](../../playwright/tests/palette-advisor.spec.ts):
   5.4-E2E-015 proves a phone-size PNG selfie over the function cap commits.
 - [`playwright/tests/wardrobe-onboarding-my-form.spec.ts`](../../playwright/tests/wardrobe-onboarding-my-form.spec.ts):
