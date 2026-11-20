@@ -669,7 +669,7 @@ The dedicated [wardrobe bootstrap](../../apps/api/src/workers/wardrobe.bootstrap
 engine selection (`fashion-clip`, `manual` or, in test environments only, `fixture`), rejects fixture
 mode outside test environments, loads the pinned model only for `fashion-clip`, and consumes
 `color-extraction`, `moderation-review` and `palette-analysis`, each at concurrency one and with the
-community worker's idle Redis backoff. With `WARDROBE_MAINTENANCE_ENABLED=true` it also runs the
+hosted idle Redis backoff (below). With `WARDROBE_MAINTENANCE_ENABLED=true` it also runs the
 wardrobe maintenance loop (next section), which consumes no queue. It logs
 `Dedicated wardrobe worker started, consuming <queues> at concurrency 1`. The hosted launcher starts
 it in hosted mode, which adds the configuration refusals and readiness checks below.
@@ -763,12 +763,36 @@ arrives both clients show neutral copy and move no focus. FashionCLIP suggestion
 larger plan or a quantized model by changing `GARMENT_TAGGING_ENGINE` on a model-capable image; the
 follow-up is in [deferred work](../implementation-artifacts/deferred-work.md).
 
-**Sizing and egress.** Every consumer uses `drainDelay` 300 seconds, `stalledInterval` 120000 ms,
-`lockDuration` 30000 ms and `maxStalledCount` 1, the community worker's values, and the loop adds
-only a Redis `SET` and a database read per tick (about 5 ticks an hour), so the idle Redis rate
-should sit near the community worker's. That is a design expectation, not a measurement: measure
-the whole service with all three consumers and the loop installed (the method of
-`community:screening:measure:redis`) before the hosted service is called inside the idle budget.
+**Sizing and egress.** Production Redis bills per command, so the hosted consumers idle slowly. Only
+the hosted entry point (`startWardrobeWorker({ hosted: true })`, the launcher) uses the slow
+settings; a developer's or separately deployed wardrobe worker keeps 300 s and 120 s
+(`wardrobeWorkerOptions`). Every hosted consumer uses `drainDelay` 1800 seconds, `stalledInterval`
+900000 ms, `lockDuration` 30000 ms and `maxStalledCount` 1 (`workers/idle-worker-options.ts`), and
+the connection sets TCP keepalive with a 60 second first probe delay. On a healthy socket a new
+job still wakes the blocking wait at once; keepalive helps preserve an idle flow through a NAT or
+load balancer and reveals a dead peer, while probe retry timing and the network's idle policy are
+separate. The loop adds a Redis `SET` and a database read per tick (about 5 ticks an hour).
+
+The cost model covers an empty, warmed queue: one idle consumer spends 7 commands per stalled
+check and 8 per empty blocking wait (counted on a local Redis, script commands included; it
+reproduces the community worker's recorded 138 and 306 commands an hour). It leaves out reconnects,
+delayed retries and maintenance that finds work. At 300 s and 120 s the model gives 923 an hour for
+three consumers and the live service read about 950 (23.4 commands a minute with the worker
+running against 7.6 with it paused). At 1800 s and 900 s the model projects about 137 an hour with
+the five maintenance locks, and `idle-worker-options.spec.ts` pins that projection at least 5x
+under the old reading. Observed on the live service after the change: the whole Redis idled at 9.1
+commands a minute over 41 minutes without uploads against 23.4 before, a 2.6-fold drop in the
+total. Subtracting the paused baseline puts the worker's own share near 2 a minute (about 90 an
+hour), but that inference holds only while the baseline of everything else is unchanged. The
+sampling used `INFO`, which Upstash does not bill. Two uploads, one after 21 and one after 28
+minutes of a single blocked wait, reached `awaiting_tags` in 4 to 5 seconds.
+
+The price is crash recovery. A job whose worker died is requeued by up to two successful stalled
+checks once a consumer is running again and Redis is reachable (about 30 minutes), plus the time
+to restart and reconnect; a scan can also exit early while Redis still holds the previous check's
+key, so a replacement that starts late can take longer. The hourly retention purge only repairs a
+photo whose first enqueue never happened. The community worker keeps its 300 s and 120 s settings,
+because its moderation SLA needs the fast recovery.
 
 **What was and was not measured.** The pruned `node_modules` was 66.1 MB and the build-time
 self-test showed 147 MiB resident after loading the consumer graph, both on a macOS arm64 tree
@@ -787,8 +811,15 @@ line, and the first deletion drain and retention purge ran by themselves. A synt
 uploaded a 5 MB, 3024x4032 phone photo straight to storage; the worker finished it as
 `manual_mode` in 4.7 s, the garment showed `awaiting_tags` 11 s after commit, and confirming tags
 made it `ready`. Resident memory was 175 MB idle and peaked near 290 MB for that one job. This is
-one job, not the simultaneous workload above, and the idle Redis rate is still unmeasured, so both
-checks stay open.
+one job, not the simultaneous workload above.
+
+**Hosted measurements (2026-11-20).** Three simultaneous 5 MB photos (3024x4032) all reached
+`awaiting_tags` in 6 to 11 seconds and became `ready` once tags were confirmed; the container
+peaked near 308 MiB of 512. The colour-extraction queue runs at concurrency one, so the three
+photos queued behind one another and the peak is one photo's decode plus the Node baseline.
+Overlapping garment, My Form and palette jobs was not exercised (the palette selfie needs
+Premium). The idle Redis rate before and after the backoff change is in
+[deferred work](../implementation-artifacts/deferred-work.md).
 
 ### Community content screening (ADR-013)
 

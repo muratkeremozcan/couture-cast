@@ -20743,7 +20743,10 @@ API, Vitest:
   stop), the removal of the old schedulers, the general worker's guard and locked jobs, and the
   two-process case.
 - [`apps/api/src/workers/idle-worker-options.spec.ts`](../../apps/api/src/workers/idle-worker-options.spec.ts):
-  proves the hosted options equal the community worker's.
+  proves the hosted intervals (a 30 minute block, a 15 minute stalled check, keepalive probes), that
+  the empty-queue model projects the idle service at least 5x under the 950 commands an hour the
+  old settings read, that a standalone wardrobe worker keeps the previous settings, and that the
+  community worker keeps its own.
 - [`apps/api/integration/wardrobe-worker-image.spec.ts`](../../apps/api/integration/wardrobe-worker-image.spec.ts):
   proves the Dockerfile text, the launcher's refusals (including `TEST_ENV=local`) and the prune
   script's guards.
@@ -20784,9 +20787,13 @@ Evidence boundaries:
   memory with the three job types overlapping. The Docker build on Linux, a constrained
   (`--memory=512m --cpus=0.2`) run under a representative simultaneous workload, Northflank's
   memory metrics and the hosted canary are required before the 512 MB limit is signed off.
-- The idle Redis rate of the whole hosted service (three consumers and the loop) is a design
-  expectation, not a measurement. Measure it before calling the service inside the community
-  worker's idle budget.
+- Idle Redis cost: the first settings (the community worker's 300 s block and 120 s stalled
+  check) read about 950 commands an hour for the service, so the hosted entry point now blocks
+  1800 s and checks for stalled jobs every 900 s, with TCP keepalive on the connection; a
+  standalone wardrobe worker and the community worker keep their own settings. The trade is crash
+  recovery of about 30 minutes once a consumer runs again, plus restart time. Live result: the whole
+  Redis idled at 9.1 commands a minute instead of 23.4, and two photos uploaded after 21 and 28
+  minutes of one blocked wait reached `awaiting_tags` in 4 to 5 seconds.
 - The ten-locale strings for the manual and pending copy are translated without a native review.
 
 #### Advisor erase and planner week races

@@ -41,7 +41,7 @@ import { createWorker } from './base.worker'
 import {
   HOSTED_WORKER_CONCURRENCY,
   IDLE_DRAIN_DELAY_SECONDS,
-  hostedWorkerOptions,
+  wardrobeWorkerOptions,
 } from './idle-worker-options'
 import { assertHostedWardrobeConfig, isIsolatedDrillEnv } from './hosted-wardrobe-config'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
@@ -305,7 +305,7 @@ export async function startWardrobeWorker(options: StartWardrobeWorkerOptions = 
             throw error
           }
         },
-        hostedWorkerOptions()
+        wardrobeWorkerOptions(hosted)
       )
     )
 
@@ -345,7 +345,7 @@ export async function startWardrobeWorker(options: StartWardrobeWorkerOptions = 
             throw error
           }
         },
-        hostedWorkerOptions()
+        wardrobeWorkerOptions(hosted)
       )
     )
 
@@ -390,7 +390,7 @@ export async function startWardrobeWorker(options: StartWardrobeWorkerOptions = 
             throw error
           }
         },
-        hostedWorkerOptions()
+        wardrobeWorkerOptions(hosted)
       )
     )
 
