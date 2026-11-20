@@ -15,6 +15,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import {
   communityPostCaptionSchema,
+  communityPostTitleSchema,
+  COMMUNITY_POST_TITLE_MAX_LENGTH,
   defaultSupportedLocale,
   supportedLocaleSchema,
   type CommunityFeedItem,
@@ -287,6 +289,9 @@ export function CommunityPostSheet({
   const [altText, setAltText] = useState('')
   const [altTextConfirmed, setAltTextConfirmed] = useState(false)
   const [caption, setCaption] = useState('')
+  const [title, setTitle] = useState('')
+  const titleInvalid =
+    Boolean(title.trim()) && !communityPostTitleSchema.safeParse(title).success
   const [joinChallenge, setJoinChallenge] = useState(defaultChallengeOptIn)
   const [publishState, setPublishState] = useState<CommunityPublishState | null>(null)
   const [isBusy, setIsBusy] = useState(false)
@@ -316,6 +321,7 @@ export function CommunityPostSheet({
     setAltText('')
     setAltTextConfirmed(false)
     setCaption('')
+    setTitle('')
     setPublishState(null)
     setIsBusy(false)
     setErrorMessage(null)
@@ -467,9 +473,10 @@ export function CommunityPostSheet({
     if (!allocated) return 'community.error.upload'
     if (!altText.trim()) return 'community.validation.altRequired'
     if (!altTextConfirmed) return 'community.validation.altConfirmRequired'
+    if (titleInvalid) return 'community.compose.titleInvalid'
     if (captionErrorKey) return captionErrorKey
     return null
-  }, [allocated, altText, altTextConfirmed, asset, captionErrorKey])
+  }, [allocated, altText, altTextConfirmed, asset, captionErrorKey, titleInvalid])
 
   const isPublishDisabled = publishBlockerKey !== null || isBusy || suspended
 
@@ -498,6 +505,7 @@ export function CommunityPostSheet({
         uploadSessionId: session.uploadSessionId,
         altText: altText.trim(),
         caption: caption.trim() || null,
+        title: title.trim() || null,
         challengeId: challenge && joinChallenge ? challenge.id : null,
         locale,
         idempotencyKey,
@@ -539,6 +547,7 @@ export function CommunityPostSheet({
     publishBlockerKey,
     suspended,
     t,
+    title,
   ])
 
   const busyLabel =
@@ -640,6 +649,30 @@ export function CommunityPostSheet({
                 label={t('community.compose.altConfirm')}
                 onToggle={() => setAltTextConfirmed((prev) => !prev)}
               />
+            </View>
+
+            <View style={styles.section} onLayout={reveal.sectionLayout('title')}>
+              <Text style={[styles.sectionLabel, { color: palette.text }]}>
+                {t('community.compose.titleLabel')}
+              </Text>
+              <TextInput
+                testID="community-title-input"
+                style={[
+                  styles.textInput,
+                  { borderColor: palette.mutedText, color: palette.text },
+                ]}
+                accessibilityLabel={t('community.compose.titleLabel')}
+                {...reveal.fieldFocus('title')}
+                value={title}
+                maxLength={COMMUNITY_POST_TITLE_MAX_LENGTH}
+                onChangeText={setTitle}
+              />
+              {titleInvalid ? (
+                <ComposeErrorPanel
+                  testID="community-title-error"
+                  message={t('community.compose.titleInvalid')}
+                />
+              ) : null}
             </View>
 
             {/* Caption */}

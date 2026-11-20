@@ -16,6 +16,7 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
@@ -106,6 +107,33 @@ describe('TabOneScreen identity change on a shared device', () => {
     expect(ritualRequestsBy.slice(requestsBeforeSwitch)).not.toContain('member-a')
   })
 
+  it.each([
+    {
+      status: 400,
+      message: 'No location preferences found for user',
+      action: 'hero-add-location',
+    },
+    { status: 503, message: 'Unavailable', action: 'hero-retry' },
+  ])(
+    'shows only member B’s recovery action after a $status ritual response',
+    async ({ status, message, action }) => {
+      setMobileApplicationUserId('member-a')
+      await render(<TabOneScreen />)
+      await waitFor(() => {
+        expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
+      })
+      server.use(
+        http.get('*/api/v1/ritual', () => HttpResponse.json({ message }, { status }))
+      )
+
+      act(() => setMobileApplicationUserId('member-b'))
+      expect(screen.queryByTestId('current-temperature')).toBeNull()
+      expect(await screen.findByTestId(action)).toBeVisible()
+      expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+      expect(screen.queryByTestId('weather-header')).toBeNull()
+    }
+  )
+
   it('6.5-MOB-HERO-ID-03 never stores a member ritual under the signed-out owner on a cold start', async () => {
     // R9-1 on Home: the first load starts before the stored session restores, so the
     // render-time owner is signed-out, and the token resolver restores member A mid-load.
@@ -145,5 +173,17 @@ describe('TabOneScreen identity change on a shared device', () => {
       expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
     })
     expect(ritualRequestsBy.length).toBe(requestsBeforeRemount)
+  })
+
+  it('refetches the mounted Home after a garment is confirmed', async () => {
+    setMobileApplicationUserId('member-a')
+    await render(<TabOneScreen />)
+    await waitFor(() => expect(screen.getByTestId('current-temperature')).toBeVisible())
+    const reads = ritualRequestsBy.length
+
+    act(() => notifyWardrobeChanged())
+
+    await waitFor(() => expect(ritualRequestsBy).toHaveLength(reads + 1))
+    await waitFor(() => expect(screen.getByTestId('current-temperature')).toBeVisible())
   })
 })

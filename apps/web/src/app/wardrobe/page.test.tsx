@@ -766,7 +766,7 @@ describe('WardrobePage processing poll', () => {
     expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
   })
 
-  it('flags a garment stuck in processing and keeps a manual tagging route', async () => {
+  it('checks processing again after a timeout and opens tags once analysis completes', async () => {
     const user = userEvent.setup()
     collapsePollSchedule()
     listGarmentsFromWeb
@@ -789,9 +789,13 @@ describe('WardrobePage processing poll', () => {
     expect(
       await screen.findByText(/Smart tagging is taking longer than expected/)
     ).toBeInTheDocument()
-    // A timed-out garment must still expose a manual way into tagging.
-    expect(screen.getByRole('button', { name: 'Needs tags' })).toBeInTheDocument()
     expect(listGarmentsFromWeb).toHaveBeenCalledTimes(5)
+    expect(screen.queryByRole('button', { name: 'Needs tags' })).not.toBeInTheDocument()
+    listGarmentsFromWeb.mockResolvedValue([
+      garmentFixture('garment-poll', 'awaiting_tags'),
+    ])
+    await user.click(screen.getByRole('button', { name: 'Check garment status' }))
+    expect(await screen.findByText('Organize Garment Tags')).toBeInTheDocument()
   })
 
   it('reports the reason when a poll request fails', async () => {

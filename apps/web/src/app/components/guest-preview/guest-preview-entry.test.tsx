@@ -12,7 +12,7 @@ describe('guest preview entry', () => {
     render(<GuestPreviewEntry />)
     const entry = screen.getByTestId('guest-preview-entry')
     expect(entry.getAttribute('href')).toBe('/preview')
-    expect(entry.textContent).toBe(GUEST_PREVIEW_STRINGS['tr-TR'].chrome.entry)
+    expect(entry.textContent).toBe(GUEST_PREVIEW_STRINGS['tr-TR'].firstUse.sampleEntry)
     const signup = screen.getByRole('link', {
       name: GUEST_PREVIEW_STRINGS['tr-TR'].chrome.createAccount,
     })

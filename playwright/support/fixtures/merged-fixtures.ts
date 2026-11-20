@@ -18,6 +18,7 @@ import { test as webhookFixture } from '@seontechnologies/playwright-utils/webho
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
+import { guardExpectedError } from '../helpers/expected-error-guard'
 import {
   createImmutableAssetCache,
   type ImmutableAssetCache,
@@ -61,17 +62,40 @@ const authSession = base.extend<AuthFixtures>({
 // moderation history is off, as it is on deployed environments. Whether a test sees that answer
 // depends on whether the probe lands before the test ends (P-Q-MEDIA on preview, 1 run in 25), so
 // deployed runs exclude it. Locally the feature is on and any 5xx from it still fails the test.
-const networkErrorMonitor = base.extend(
-  createNetworkErrorMonitorFixture(
-    environment.name === 'local'
-      ? undefined
-      : {
-          excludePatterns: [
-            /\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/,
-          ],
-        }
+export const RITUAL_RESPONSE_URL = /^https?:\/\/[^/]+\/api\/v1\/ritual(?:\?|$)/
+const networkErrorMonitor = base
+  .extend(
+    createNetworkErrorMonitorFixture({
+      excludePatterns: [
+        RITUAL_RESPONSE_URL,
+        ...(environment.name === 'local'
+          ? []
+          : [/\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/]),
+      ],
+    })
   )
-)
+  .extend<{ ritualErrorGuard: void }>({
+    ritualErrorGuard: [
+      async ({ context }, use, testInfo) => {
+        // The monitor filters by URL. Preserve monitoring of every ritual failure
+        // except the exact no-city response that Home converts into city setup.
+        const guard = guardExpectedError(context, RITUAL_RESPONSE_URL)
+        await use()
+        if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
+          return
+        const missingCity = 'No location preferences found for user'
+        // Navigation can abort the JSON body after the HTTP status arrives.
+        const unexpected = (await guard.settle()).filter(
+          ({ method, status, code, bodyUnreadable }) =>
+            method !== 'GET' ||
+            status !== 400 ||
+            (code !== missingCity && !bodyUnreadable)
+        )
+        expect(unexpected, 'unexpected ritual HTTP errors').toEqual([])
+      },
+      { auto: true },
+    ],
+  })
 
 // Story 6.13: before the context closes, so a proxied call still in flight cannot leave a report secret.
 const drainedProxyPage = base.extend({

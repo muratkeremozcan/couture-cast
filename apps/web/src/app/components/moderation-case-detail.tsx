@@ -321,6 +321,11 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
               <span>{t('moderation.detail.snapshotUnavailable')}</span>
             ) : (
               <>
+                {snapshot.title ? (
+                  <strong data-testid="moderation-snapshot-title">
+                    <PlainText value={snapshot.title} />
+                  </strong>
+                ) : null}
                 {snapshot.caption ? <PlainText value={snapshot.caption} /> : null}
                 {snapshot.body ? <PlainText value={snapshot.body} /> : null}
                 {snapshot.altText ? (
@@ -331,7 +336,10 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
                     <PlainText value={snapshot.altText} />
                   </span>
                 ) : null}
-                {!snapshot.caption && !snapshot.body && !snapshot.altText ? (
+                {!snapshot.title &&
+                !snapshot.caption &&
+                !snapshot.body &&
+                !snapshot.altText ? (
                   <span>{t('moderation.detail.snapshotEmpty')}</span>
                 ) : null}
                 {snapshot.capturedAt ? (

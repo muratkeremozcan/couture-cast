@@ -4,7 +4,11 @@
 // Story 6.12 imports the SLA half for scheduled alerts, so no second copy of a threshold may exist.
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
-import { communityReportReasonSchema, type CommunityReportReason } from './community'
+import {
+  COMMUNITY_POST_TEXT_HEADER,
+  communityReportReasonSchema,
+  type CommunityReportReason,
+} from './community'
 import {
   moderationAppealStatusSchema,
   moderationSanctionKindSchema,
@@ -310,6 +314,7 @@ export type ModerationCasesPage = z.infer<typeof moderationCasesPageSchema>
 export const moderationSnapshotSchema = z
   .object({
     available: z.boolean(),
+    title: z.string().nullable().optional(),
     caption: z.string().nullable(),
     altText: z.string().nullable(),
     body: z.string().nullable(),
@@ -461,6 +466,15 @@ export function registerModerationQueueContracts(registry: OpenAPIRegistry) {
     description:
       'Moderator and admin only. Read-only except for one audit row per successful read.',
     request: { params: z.object({ caseId: moderationCaseIdSchema }) },
+    parameters: [
+      {
+        name: COMMUNITY_POST_TEXT_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description: 'Opt in to approved post titles in moderation snapshots.',
+      },
+    ],
     responses: {
       200: {
         description: 'The case detail',

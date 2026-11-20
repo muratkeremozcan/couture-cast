@@ -2,23 +2,34 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { withRequestDeadline } from '@couture/api-client'
-import {
-  ritualResponseSchema,
-  resolveSupportedLocale,
-  type ScenarioOutfit,
-} from '@couture/api-client/contracts/http'
+import Link from 'next/link'
+import type { ScenarioOutfit } from '@couture/api-client/contracts/http'
+import { getGuestPreviewStrings } from '@couture/utils'
+import { getRitualFromWeb, ritualFailure, SET_CITY_FROM_HOME } from '../../lib/ritual'
 import { currentI18n } from '../../i18n'
-import { createWebApiClient } from '../../lib/api-client'
 import { resolveWebSessionToken, webSessionIdentity } from '../../lib/web-session'
 import { ShareCardControl } from './share-card-dialog'
 
-export function RitualShareCardLauncher() {
+export function RitualShareCardLauncher({ outfit }: { outfit?: ScenarioOutfit } = {}) {
+  if (outfit) {
+    return (
+      <div data-testid="ritual-share-card-launcher">
+        <ShareCardControl
+          key={outfit.id}
+          source={{ kind: 'outfit', recommendationId: outfit.id }}
+        />
+      </div>
+    )
+  }
+  return <RitualShareCardSourcePicker />
+}
+
+function RitualShareCardSourcePicker() {
   const { t, i18n } = useTranslation(undefined, { i18n: currentI18n() })
   const [outfits, setOutfits] = useState<ScenarioOutfit[]>([])
   const [scenario, setScenario] = useState('morning')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<'missing-city' | 'failed' | null>(null)
   const pending = useRef<AbortController | null>(null)
   useEffect(() => {
     let member = webSessionIdentity()
@@ -27,7 +38,7 @@ export function RitualShareCardLauncher() {
       pending.current = null
       setOutfits([])
       setBusy(false)
-      setError(false)
+      setError(null)
     }
     const sessionChanged = () => {
       const next = webSessionIdentity()
@@ -47,23 +58,18 @@ export function RitualShareCardLauncher() {
     const abort = new AbortController()
     pending.current = abort
     setBusy(true)
-    setError(false)
+    setError(null)
     try {
       if (!navigator.onLine) throw new Error('offline')
       const token = await resolveWebSessionToken()
       if (abort.signal.aborted) return
       if (!token) throw new Error('signed_out')
-      const api = createWebApiClient({ accessToken: token })
-      const result = await withRequestDeadline(16000, [abort.signal], (signal) =>
-        api.apiV1RitualGet(
-          { locale: resolveSupportedLocale(i18n.language) ?? 'en-US' },
-          { signal }
-        )
-      )
+      const result = await getRitualFromWeb(token, i18n.language, abort.signal)
       if (!abort.signal.aborted)
-        setOutfits(ritualResponseSchema.parse(result).data.outfits)
-    } catch {
-      if (!abort.signal.aborted) setError(true)
+        setOutfits(result.outfits.filter((outfit) => outfit.garmentIds.length > 0))
+    } catch (error) {
+      const kind = await ritualFailure(error)
+      if (!abort.signal.aborted) setError(kind)
     } finally {
       if (pending.current === abort) {
         pending.current = null
@@ -85,7 +91,15 @@ export function RitualShareCardLauncher() {
       >
         {t(`shareCard.${busy ? 'preparing' : 'launcher'}`)}
       </button>
-      {error && <p role="alert">{t('shareCard.sourceUnavailable')}</p>}
+      {error === 'failed' && <p role="alert">{t('shareCard.sourceUnavailable')}</p>}
+      {error === 'missing-city' && (
+        <Link
+          className="inline-flex min-h-11 items-center px-2 underline"
+          href={SET_CITY_FROM_HOME}
+        >
+          {getGuestPreviewStrings(i18n.language).firstUse.setCity}
+        </Link>
+      )}
       {outfits.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm">

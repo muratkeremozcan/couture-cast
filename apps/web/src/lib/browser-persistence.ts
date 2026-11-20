@@ -2,6 +2,8 @@
 // browsers) throws on every storage access. A bare read during render or start-up then crashed the
 // whole web app ("Application error"), landing included. Every storage read goes through here and
 // answers null where the browser refuses storage, which every caller already reads as signed out.
+export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
+
 export function readStorage(area: 'local' | 'session', key: string): string | null {
   try {
     return (area === 'local' ? window.localStorage : window.sessionStorage).getItem(key)

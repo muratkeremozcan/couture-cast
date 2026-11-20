@@ -28,7 +28,8 @@ vi.mock('../lib/native-session', () => ({
   },
   signOutNativeSession: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../lib/mobile-auth', () => ({
+vi.mock('../lib/mobile-auth', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   resolveMobileAccessToken: () =>
     Promise.resolve(session.owner ? `verified-${session.owner}` : undefined),
 }))

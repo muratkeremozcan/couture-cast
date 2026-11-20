@@ -3,15 +3,29 @@
 // app/(tabs)/wardrobe.tsx, so it's covered by the component test runner (see
 // wardrobe-silhouette-screen.tsx for why app/ route files stay thin
 // wrappers); apps/mobile/app/(tabs)/wardrobe.tsx now just re-exports this.
-import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ElementRef,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import { getGuestPreviewStrings } from '@couture/utils'
 
 import { Text, View, useSchemeColors } from '@/components/themed'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 
 import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture-modal'
 import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
@@ -22,12 +36,23 @@ import {
 } from '@/src/lib/wardrobe'
 
 export interface WardrobeHubScreenProps {
+  addEntry?: boolean
   /** Test-only override for the still-processing garment poll cadence. */
   pollOffsetsMs?: readonly number[]
 }
 
-export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}) {
-  const { t } = useTranslation()
+export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
+  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  return <MemberWardrobeHub key={epoch} epoch={epoch} {...props} />
+}
+
+function MemberWardrobeHub({
+  pollOffsetsMs,
+  addEntry,
+  epoch,
+}: WardrobeHubScreenProps & { epoch: number }) {
+  const { t, i18n } = useTranslation()
+  const strings = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
   const secondaryButton = [styles.secondaryButton, { borderColor: colors.strongBorder }]
   const secondaryButtonText = [styles.secondaryButtonText, { color: colors.text }]
@@ -37,6 +62,10 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
   }
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [confirmedGarment, setConfirmedGarment] = useState(false)
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
   const [accessToken, setAccessToken] = useState<string>('')
@@ -44,33 +73,55 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
     null
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
-    () => new Set()
-  )
   const [showOnboardingCard, setShowOnboardingCard] = useState(false)
   const pollingAbortRef = useRef<AbortController | null>(null)
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
+  const directEntryConsumed = useRef(false)
+
+  const markGarmentConfirmed = () => {
+    if (epoch !== mobileIdentityEpoch()) return
+    setConfirmedGarment(true)
+    notifyWardrobeChanged()
+  }
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureOpen
   }, [isCaptureOpen])
 
-  const loadGarments = useCallback(async (signal?: AbortSignal) => {
-    const token = await resolveMobileAccessToken()
-    if (!token) {
-      throw new Error('AUTHENTICATION_REQUIRED')
-    }
-    setAccessToken(token)
-    setGarments(await listGarmentsFromMobile(token, signal))
-  }, [])
+  const loadGarments = useCallback(
+    async (signal?: AbortSignal) => {
+      const token = await resolveMobileAccessToken()
+      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return
+      if (!token) {
+        throw new Error('AUTHENTICATION_REQUIRED')
+      }
+      setAccessToken(token)
+      const next = await listGarmentsFromMobile(token, signal)
+      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return
+      setGarments(next)
+      setHasLoaded(true)
+      setLoadFailed(false)
+    },
+    [epoch]
+  )
 
   useEffect(() => {
     const controller = new AbortController()
+    setIsLoading(true)
     void loadGarments(controller.signal)
-      .catch(() => undefined)
-      .finally(() => setIsLoading(false))
+      .catch(() => {
+        if (!controller.signal.aborted) setLoadFailed(true)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
+      })
+    return () => controller.abort()
+  }, [loadAttempt, loadGarments])
+
+  useEffect(() => {
+    const controller = new AbortController()
     // The onboarding entry-point card fetch is independent of, and must never
     // block, the garment list: a stalled/erroring onboarding read shouldn't
     // hide the wardrobe hub's actual contents.
@@ -88,7 +139,31 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
       controller.abort()
       pollingAbortRef.current?.abort()
     }
-  }, [loadGarments])
+  }, [])
+
+  useEffect(() => {
+    if (!addEntry) {
+      directEntryConsumed.current = false
+      return
+    }
+    if (
+      !mobileApplicationUserId() ||
+      isLoading ||
+      loadFailed ||
+      !hasLoaded ||
+      directEntryConsumed.current
+    )
+      return
+    directEntryConsumed.current = true
+    router.setParams({ entry: undefined })
+    const awaitingTags = garments.find((garment) => garment.status === 'awaiting_tags')
+    if (awaitingTags) {
+      setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
+      setTaggingGarmentId(awaitingTags.id)
+    } else if (!garments.some((garment) => garment.status === 'processing')) {
+      setIsCaptureOpen(true)
+    }
+  }, [addEntry, garments, hasLoaded, isLoading, loadFailed])
 
   const closeCapture = () => {
     setIsCaptureOpen(false)
@@ -104,25 +179,25 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
     pollingAbortRef.current?.abort()
     const controller = new AbortController()
     pollingAbortRef.current = controller
+    setErrorMessage(null)
     void (async () => {
       try {
         const settled = await pollGarmentUntilSettled(
           token,
           garmentId,
           controller.signal,
-          setGarments,
+          (next) => {
+            if (!controller.signal.aborted && epoch === mobileIdentityEpoch())
+              setGarments(next)
+          },
           pollOffsetsMs
         )
+        if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
         if (!settled) {
-          setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
           setErrorMessage(t('wardrobe.tagging.poll_timeout'))
           return
         }
-        setTimedOutGarmentIds((ids) => {
-          const next = new Set(ids)
-          next.delete(garmentId)
-          return next
-        })
+        if (settled.status === 'ready') markGarmentConfirmed()
         if (settled.status === 'awaiting_tags') {
           if (isCaptureOpenRef.current) {
             pendingTaggingGarmentIdRef.current = settled.id
@@ -146,6 +221,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
     invokingNodeHandle?: number | null
   ) => {
     const freshToken = await resolveMobileAccessToken()
+    if (epoch !== mobileIdentityEpoch()) return
     if (!freshToken) {
       setErrorMessage('AUTHENTICATION_REQUIRED')
       return
@@ -163,6 +239,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
       garment,
       ...current.filter((item) => item.id !== garment.id),
     ])
+    if (garment.status === 'ready') markGarmentConfirmed()
     if (garment.status === 'awaiting_tags') {
       pendingTaggingGarmentIdRef.current = garment.id
     } else if (garment.status === 'processing') {
@@ -243,13 +320,45 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
               <Text style={{ color: colors.dangerText }}>{errorMessage}</Text>
             </View>
           ) : null}
+          {loadFailed ? (
+            <View
+              style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
+              accessibilityLiveRegion="polite"
+            >
+              <Text style={{ color: colors.dangerText }}>
+                {garments.length > 0
+                  ? strings.firstUse.staleWardrobe
+                  : strings.firstUse.wardrobeFailed}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                testID="wardrobe-list-retry"
+                disabled={isLoading}
+                style={secondaryButton}
+                onPress={() => setLoadAttempt((attempt) => attempt + 1)}
+              >
+                <Text style={secondaryButtonText}>{strings.chrome.retry}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {confirmedGarment ? (
+            <Pressable
+              accessibilityRole="link"
+              style={secondaryButton}
+              onPress={() => router.navigate('/')}
+            >
+              <Text style={secondaryButtonText}>{strings.firstUse.backToOutfit}</Text>
+            </Pressable>
+          ) : null}
 
-          {isLoading ? (
+          {isLoading && garments.length === 0 ? (
             <ActivityIndicator accessibilityLabel="Loading wardrobe" />
           ) : garments.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
-            </View>
+            hasLoaded && !loadFailed ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
+              </View>
+            ) : null
           ) : (
             <View style={styles.grid} testID="wardrobe-garment-list">
               {garments.map((garment) => (
@@ -267,8 +376,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
                   <Text testID={`garment-status-${garment.status}`}>
                     {garment.status}
                   </Text>
-                  {(garment.status === 'awaiting_tags' ||
-                    timedOutGarmentIds.has(garment.id)) && (
+                  {garment.status === 'awaiting_tags' && (
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={t('wardrobe.tagging.needs_tags', {
@@ -287,6 +395,28 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
                       </Text>
                     </Pressable>
                   )}
+                  {garment.status === 'failed' && (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={[styles.needsTagsBtn, notice]}
+                      onPress={() => setIsCaptureOpen(true)}
+                    >
+                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
+                        {strings.firstUse.replaceGarment}
+                      </Text>
+                    </Pressable>
+                  )}
+                  {garment.status === 'processing' && (
+                    <Pressable
+                      accessibilityRole="button"
+                      style={[styles.needsTagsBtn, notice]}
+                      onPress={() => pollCommittedGarment(garment.id, accessToken)}
+                    >
+                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
+                        {strings.firstUse.checkGarment}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               ))}
             </View>
@@ -294,6 +424,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
         </ScrollView>
 
         <MobileGarmentCaptureModal
+          confirmDiscard
           visible={isCaptureOpen}
           onClose={closeCapture}
           onGarmentCommitted={handleGarmentCommitted}
@@ -312,12 +443,8 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
             current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
           )
           setTaggingGarmentId(null)
-          void (async () => {
-            const freshToken = await resolveMobileAccessToken()
-            if (!freshToken) return
-            setAccessToken(freshToken)
-            setGarments(await listGarmentsFromMobile(freshToken))
-          })().catch(() => undefined)
+          markGarmentConfirmed()
+          setLoadAttempt((attempt) => attempt + 1)
         }}
       />
     </>

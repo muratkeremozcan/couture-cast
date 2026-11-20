@@ -23,6 +23,7 @@ import {
 import { seedWebSession } from './commerce-session'
 import { localDatabaseUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
 import { localE2EAccessToken } from './local-e2e-token'
+import { deletePosts } from '../../../apps/api/integration/helpers/privacy-guards'
 
 export const COMMUNITY_FEED_PATH = '/api/v1/community/feed'
 export const COMMUNITY_ALLOCATE_PATH = '/api/v1/community/posts/allocate'
@@ -668,7 +669,7 @@ export async function deleteCommunityRowsForUser(userId: string): Promise<void> 
     }
     // Every community post this account could own, drafts and published alike, so a
     // test that later publishes needs no second cleanup path bolted on.
-    await prisma.lookbookPost.deleteMany({ where: { user_id: userId } })
+    await deletePosts(prisma, { user_id: userId })
 
     if (storageError) throw storageError
   } finally {

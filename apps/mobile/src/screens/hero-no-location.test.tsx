@@ -1,26 +1,21 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Home without a saved location: GET /ritual answers 400 "No location preferences found for
-// user". That is a setup gap, so Home shows a localized hint with no Retry (retrying cannot
-// succeed). Every other failure keeps the generic load error and its Retry.
+// user". Home presents a labeled sample and a localized city setup action. A transient
+// or unexpected failure presents a separate recovery action.
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import {
+  GUEST_PREVIEW_LOCALES,
+  GUEST_PREVIEW_STRINGS,
+  getGuestPreviewStrings,
+} from '@couture/utils'
 import TabOneScreen from '@/app/(tabs)/index'
-import deDE from '@/assets/locales/de-DE.json'
-import enCA from '@/assets/locales/en-CA.json'
-import enUS from '@/assets/locales/en-US.json'
-import es419 from '@/assets/locales/es-419.json'
-import frCA from '@/assets/locales/fr-CA.json'
-import frFR from '@/assets/locales/fr-FR.json'
-import itIT from '@/assets/locales/it-IT.json'
-import ptBR from '@/assets/locales/pt-BR.json'
-import ptPT from '@/assets/locales/pt-PT.json'
-import trTR from '@/assets/locales/tr-TR.json'
 import {
   deleteLocationFromMobile,
   saveLocationFromSearchFromMobile,
@@ -45,6 +40,7 @@ vi.mock('expo-localization', () => ({
 const routerPush = vi.hoisted(() => vi.fn())
 
 vi.mock('expo-router', async () => ({
+  router: { push: routerPush },
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
   useFocusEffect: (
@@ -91,26 +87,26 @@ describe('TabOneScreen without a saved location', () => {
   })
 
   it.each([
-    ['en-US', 'Add your location to get daily outfits'],
-    ['fr-FR', 'Ajoutez votre position pour recevoir vos tenues du jour'],
+    ['en-US', 'Set your city'],
+    ['fr-FR', 'Choisir ta ville'],
   ])(
-    '6.5-MOB-POLISH-04 shows the localized add-location hint without Retry in %s',
-    async (locale, hint) => {
+    '6.5-MOB-POLISH-04 shows a labeled sample and localized city action without Retry in %s',
+    async (locale, cityAction) => {
       await i18n.changeLanguage(locale)
       answerRitualWithNoLocation()
 
       await render(<TabOneScreen />)
 
-      await waitFor(() => {
-        expect(screen.getByTestId('hero-no-location-state')).toBeTruthy()
-      })
-      expect(screen.getByText(hint)).toBeTruthy()
-      expect(screen.queryByTestId('hero-error-state')).toBeNull()
-      expect(screen.queryByRole('button', { name: i18n.t('hero.retry') })).toBeNull()
+      const sample = await screen.findByTestId('member-sample-outfit')
+      const state = await within(sample).findByTestId('hero-no-location-state')
       expect(
-        screen.getByRole('button', { name: i18n.t('locations.guided.add') })
-      ).toBeTruthy()
-      expect(screen.queryByText(i18n.t('hero.load_error'))).toBeNull()
+        within(sample).getByText(getGuestPreviewStrings(locale).chrome.sampleLabel)
+      ).toBeVisible()
+      expect(within(state).getByTestId('hero-add-location')).toHaveAccessibleName(
+        cityAction
+      )
+      expect(screen.queryByTestId('hero-error-state')).toBeNull()
+      expect(screen.queryByTestId('hero-retry')).toBeNull()
     }
   )
 
@@ -122,18 +118,22 @@ describe('TabOneScreen without a saved location', () => {
     await waitFor(() => {
       expect(screen.getByTestId('hero-error-state')).toBeTruthy()
     })
-    expect(screen.getByText('Unable to load daily recommendations')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    const sample = screen.getByTestId('member-sample-outfit')
+    expect(within(sample).getByText("Unable to load today's outfit.")).toBeVisible()
+    expect(within(sample).getByTestId('hero-retry')).toHaveAccessibleName('Try again')
     expect(screen.queryByTestId('hero-no-location-state')).toBeNull()
   })
 
-  it('6.5-MOB-POLISH-06 defines the add-location hint in all 10 catalogs', () => {
-    const catalogs = { deDE, enCA, enUS, es419, frCA, frFR, itIT, ptBR, ptPT, trTR }
-    for (const [name, catalog] of Object.entries(catalogs)) {
+  it('6.5-MOB-POLISH-06 defines the sample disclosure and city action in all 10 catalogs', () => {
+    for (const locale of GUEST_PREVIEW_LOCALES) {
       expect(
-        (catalog.hero as { no_location?: unknown }).no_location,
-        `${name} hero.no_location`
-      ).toEqual(expect.any(String))
+        GUEST_PREVIEW_STRINGS[locale].firstUse.setCity.trim(),
+        `${locale} city action`
+      ).not.toBe('')
+      expect(
+        GUEST_PREVIEW_STRINGS[locale].chrome.sampleLabel.trim(),
+        `${locale} disclosure`
+      ).not.toBe('')
     }
   })
 
@@ -143,7 +143,7 @@ describe('TabOneScreen without a saved location', () => {
     await render(<TabOneScreen />)
 
     const action = await screen.findByTestId('hero-add-location')
-    expect(action.textContent).toBe('Add a location')
+    expect(action).toHaveAccessibleName('Set your city')
     // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
     expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
     await userEvent.click(action)

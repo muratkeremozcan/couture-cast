@@ -17,10 +17,12 @@
 // - a browser receives the session as in-memory storage state for the one trusted web origin
 //   (`prodMemberStorageState`), never an init script that would write it into any origin a page
 //   reaches;
-// - the token is masked in the runner's log, and the artifact scan rejects any JWT.
+// - production global setup masks the token in the runner's log before tests start;
+//   the artifact scan rejects any JWT.
 // Specs sign in through the `prodMember` fixture (fixtures/prod-member-fixture.ts).
 
 export const PROD_SYNTHETIC_MEMBER_EMAIL = 'synthetic-prod-member@example.com'
+export const PROD_MEMBER_SESSION_ENV = 'COUTURE_E2E_PROD_MEMBER_SESSION'
 /** The only origins the member's credential may reach, whatever a manual run overrides. */
 export const TRUSTED_PROD_WEB_ORIGIN = 'https://couture-cast-web.vercel.app'
 export const TRUSTED_PROD_API_ORIGIN = 'https://couture-cast-api.vercel.app'
@@ -139,8 +141,6 @@ export async function signInProdSyntheticMember(
   }
   if (!session.access_token || !session.user?.id)
     throw new Error('The production synthetic member sign-in returned no session.')
-  // The runner replaces this value with *** wherever it later appears in the job log.
-  if (env.GITHUB_ACTIONS === 'true') console.log(`::add-mask::${session.access_token}`)
   return {
     email: config.email,
     authUserId: session.user.id,
@@ -149,6 +149,22 @@ export async function signInProdSyntheticMember(
     supabaseUrl: config.supabaseUrl!,
     publishableKey: config.publishableKey!,
   }
+}
+
+/** The CI runner supplies one masked session to its workers through process memory. */
+export function prodMemberFromRunner(env: Env = process.env): ProdSyntheticMember {
+  const session = env[PROD_MEMBER_SESSION_ENV]
+  if (!session) throw new Error('Production member setup did not supply a CI session.')
+  let member: ProdSyntheticMember | null
+  try {
+    member = JSON.parse(session) as ProdSyntheticMember | null
+  } catch {
+    throw new Error('Production member setup supplied an unreadable CI session.')
+  }
+  if (!member?.authUserId || !member.accessToken || !member.session) {
+    throw new Error('Production member setup supplied an incomplete CI session.')
+  }
+  return member
 }
 
 /**
@@ -175,6 +191,14 @@ export async function signOutProdSyntheticMember(
   } catch {
     return 'unreachable'
   }
+}
+
+export async function closeProdSyntheticMember(
+  member: ProdSyntheticMember
+): Promise<void> {
+  const outcome = await signOutProdSyntheticMember(member)
+  if (outcome !== 'revoked')
+    console.warn(`Synthetic member sign-out: ${outcome}; the token expires on its own.`)
 }
 
 /**

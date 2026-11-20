@@ -15,7 +15,7 @@ import type { Page, Request } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures'
 import { sentinelPlace } from '../../scripts/lib/weather-provider-double-data.mjs'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { expect, RITUAL_RESPONSE_URL, test } from '../support/fixtures/merged-fixtures'
 import {
   classifyGuardedErrors,
   guardExpectedError,
@@ -296,7 +296,11 @@ test('PL-2: a member saves a city from Settings after a reload, and it is still 
  */
 const PROFILE_URL = /\/api\/v1\/user\/profile(\?|$)/
 const deniedTest = test
-  .extend(createNetworkErrorMonitorFixture({ excludePatterns: [PROFILE_URL] }))
+  .extend(
+    createNetworkErrorMonitorFixture({
+      excludePatterns: [PROFILE_URL, RITUAL_RESPONSE_URL],
+    })
+  )
   .extend<{ profileDenials: { sent: number }; profileDenialGuard: void }>({
     profileDenials: async ({}, use) => {
       await use({ sent: 0 })

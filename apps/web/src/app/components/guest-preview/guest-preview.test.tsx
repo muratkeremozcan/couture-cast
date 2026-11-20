@@ -426,7 +426,7 @@ describe('guest preview lifecycle', () => {
       expect(
         (JSON.parse(adapter.value() ?? '{}') as { conversion?: unknown }).conversion
       ).toEqual({
-        intent: 'guest-preview-carryover',
+        intent: 'guest-preview-first-garment',
       })
     )
     expect(window.__capturedAnalyticsEvents?.at(-1)).toEqual({

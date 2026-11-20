@@ -786,3 +786,18 @@ export function registerLocationsContracts(
     },
   })
 }
+
+/** Match a previously submitted search selection to the persisted place on retry. */
+export function findSavedSearchLocation(
+  locations: readonly SavedLocation[],
+  candidate: LocationSearchCandidate,
+  label: string
+): SavedLocation | undefined {
+  return locations.find(
+    (location) =>
+      location.country === candidate.country &&
+      location.latitude === candidate.latitude &&
+      location.longitude === candidate.longitude &&
+      location.label === label
+  )
+}

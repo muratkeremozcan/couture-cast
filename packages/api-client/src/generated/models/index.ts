@@ -1084,6 +1084,12 @@ export interface ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner {
    * @type {string}
    * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
    */
+  title?: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was classified, or null if unclassified.
@@ -1177,6 +1183,18 @@ export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner {
    * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -1469,6 +1487,18 @@ export interface ApiV1CommunityPostsPostIdGet200ResponseAnyOfData {
    * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -3166,6 +3196,12 @@ export interface CommunityAuthorPostState {
    * @type {string}
    * @memberof CommunityAuthorPostState
    */
+  title?: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityAuthorPostState
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was classified, or null if unclassified.
@@ -3994,6 +4030,18 @@ export interface CommunityFeedItem {
    * @type {string}
    * @memberof CommunityFeedItem
    */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityFeedItem
+   */
+  textRevision?: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItem
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was published, or null if unclassified.
@@ -4087,6 +4135,18 @@ export interface CommunityFeedItemsInner {
    * @memberof CommunityFeedItemsInner
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityFeedItemsInner
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityFeedItemsInner
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -4384,6 +4444,18 @@ export interface CommunityReactionFeedItem {
    * @type {string}
    * @memberof CommunityReactionFeedItem
    */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionFeedItem
+   */
+  textRevision?: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was published, or null if unclassified.
@@ -4642,6 +4714,18 @@ export interface CommunityReactionSpotlightItem {
    * @type {string}
    * @memberof CommunityReactionSpotlightItem
    */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  textRevision?: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was published, or null if unclassified.
@@ -4804,6 +4888,18 @@ export interface CommunityReactionSpotlightResponseDataItemsInner {
    * @memberof CommunityReactionSpotlightResponseDataItemsInner
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -5155,6 +5251,18 @@ export interface CommunitySponsoredFeedResponseDataItemsInner {
    * @type {string}
    * @memberof CommunitySponsoredFeedResponseDataItemsInner
    */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  textRevision?: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was published, or null if unclassified.
@@ -5366,6 +5474,18 @@ export interface CommunitySponsoredSpotlightResponseDataItemsInner {
    * @type {string}
    * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
    */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  textRevision?: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
   altText: string | null
   /**
    * The climate band stamped when the post was published, or null if unclassified.
@@ -5508,6 +5628,18 @@ export interface CommunitySpotlightItem {
    * @memberof CommunitySpotlightItem
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunitySpotlightItem
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -5682,6 +5814,18 @@ export interface CommunitySpotlightResponseDataItemsInner {
    * @memberof CommunitySpotlightResponseDataItemsInner
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  textRevision?: number
   /**
    *
    * @type {string}
@@ -6612,6 +6756,69 @@ export const DeleteSavedLocationResponseDataDeletedEnum = {
 export type DeleteSavedLocationResponseDataDeletedEnum =
   (typeof DeleteSavedLocationResponseDataDeletedEnum)[keyof typeof DeleteSavedLocationResponseDataDeletedEnum]
 
+/**
+ *
+ * @export
+ * @interface EditCommunityPostText200Response
+ */
+export interface EditCommunityPostText200Response {
+  /**
+   *
+   * @type {EditCommunityPostText200ResponseData}
+   * @memberof EditCommunityPostText200Response
+   */
+  data: EditCommunityPostText200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface EditCommunityPostText200ResponseData
+ */
+export interface EditCommunityPostText200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof EditCommunityPostText200ResponseData
+   */
+  title: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof EditCommunityPostText200ResponseData
+   */
+  caption: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof EditCommunityPostText200ResponseData
+   */
+  textRevision: number
+}
+/**
+ *
+ * @export
+ * @interface EditCommunityPostTextRequest
+ */
+export interface EditCommunityPostTextRequest {
+  /**
+   *
+   * @type {number}
+   * @memberof EditCommunityPostTextRequest
+   */
+  baseRevision: number
+  /**
+   *
+   * @type {string}
+   * @memberof EditCommunityPostTextRequest
+   */
+  title: string | null
+  /**
+   * Caption of at most 280 characters. Applies a best-effort denylist. Anything carrying an http://, https:// or www. prefix is refused whatever its TLD, and so is anything matching a generic email pattern, again whatever its TLD. The fixed TLD list (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) governs only bare domain-like values carrying no such prefix, so a bare domain outside that list (example.xyz) passes unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control.
+   * @type {string}
+   * @memberof EditCommunityPostTextRequest
+   */
+  caption: string | null
+}
 /**
  *
  * @export
@@ -8433,6 +8640,7 @@ export const GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum = {
   post_published: 'post.published',
   reactions_changed: 'reactions.changed',
   comment_published: 'comment.published',
+  post_text_changed: 'post.text_changed',
 } as const
 export type GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum =
   (typeof GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum]
@@ -9299,6 +9507,12 @@ export interface GetModerationCase200ResponseDataSnapshot {
    * @memberof GetModerationCase200ResponseDataSnapshot
    */
   available: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetModerationCase200ResponseDataSnapshot
+   */
+  title?: string | null
   /**
    *
    * @type {string}
@@ -11852,6 +12066,12 @@ export interface ModerationCaseDetailResponseDataSnapshot {
    * @memberof ModerationCaseDetailResponseDataSnapshot
    */
   available: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof ModerationCaseDetailResponseDataSnapshot
+   */
+  title?: string | null
   /**
    *
    * @type {string}
@@ -16217,6 +16437,12 @@ export interface PublishCommunityPostInput {
   caption?: string | null
   /**
    *
+   * @type {string}
+   * @memberof PublishCommunityPostInput
+   */
+  title?: string | null
+  /**
+   *
    * @type {PublishCommunityPostInputLocaleEnum}
    * @memberof PublishCommunityPostInput
    */
@@ -17127,6 +17353,18 @@ export interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post {
    * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
    */
   caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  title?: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  textRevision?: number
   /**
    *
    * @type {string}

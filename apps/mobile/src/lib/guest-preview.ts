@@ -130,9 +130,9 @@ export function isConsentRejection(error: unknown): boolean {
  * guardian lock refuses never gets here (the profile answers 403), and with guardian consent off
  * (2026-11-16) a teen without a guardian is a member like any other.
  */
-export type MobileNextStep = '/signin' | '/wardrobe-onboarding'
+export type MobileNextStep = '/signin' | '/wardrobe-onboarding' | '/wardrobe?entry=add'
 
-export async function resolveMobileNextStep(): Promise<MobileNextStep> {
+export async function resolveMobileNextStep(addGarment = false): Promise<MobileNextStep> {
   try {
     const token = await resolveMobileAccessToken()
     if (!token) return '/signin'
@@ -141,7 +141,7 @@ export async function resolveMobileNextStep(): Promise<MobileNextStep> {
         createMobileApiClient({ accessToken: token }).apiV1UserProfileGet({ signal })
       )
     )
-    return '/wardrobe-onboarding'
+    return addGarment ? '/wardrobe?entry=add' : '/wardrobe-onboarding'
   } catch {
     return '/wardrobe-onboarding'
   }

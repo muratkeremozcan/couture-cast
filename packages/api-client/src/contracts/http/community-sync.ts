@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import {
+  COMMUNITY_POST_TEXT_HEADER,
   communityCommentSchema,
   communityFeedModeSchema,
   communityReactionFeedItemSchema,
@@ -58,7 +59,12 @@ export const communityStreamEventSchema = z.discriminatedUnion('kind', [
   z
     .object({
       version: z.literal(1),
-      kind: z.enum(['post.published', 'reactions.changed', 'comment.published']),
+      kind: z.enum([
+        'post.published',
+        'reactions.changed',
+        'comment.published',
+        'post.text_changed',
+      ]),
       postId: id,
       commentId: id.optional(),
       parentId: id.optional(),
@@ -325,6 +331,20 @@ export function registerCommunitySyncContracts(
                 },
               },
             },
+          }
+        : {}),
+      ...(['resolveCommunityTargets', 'getCommunityEvents'].includes(route.operationId)
+        ? {
+            parameters: [
+              {
+                in: 'header' as const,
+                name: COMMUNITY_POST_TEXT_HEADER,
+                required: false,
+                schema: { type: 'string', enum: ['1'] },
+                description:
+                  'Opt in to targeted post text events and post title projections.',
+              },
+            ],
           }
         : {}),
       ...(route.path.includes('{registrationId}')

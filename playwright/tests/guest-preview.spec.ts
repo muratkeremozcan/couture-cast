@@ -116,13 +116,16 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
-    const teaser = page.getByRole('region', { name: 'Sample outfit' })
-    const entry = teaser.getByRole('link', { name: 'Try a sample wardrobe' })
-    await expect(teaser.getByRole('heading', { name: 'Sample outfit' })).toBeInViewport({
+    const teaser = page.getByRole('region', { name: 'Outfit idea' })
+    const entry = teaser.getByRole('link', { name: 'Try a sample look' })
+    await expect(teaser.getByRole('heading', { name: 'Outfit idea' })).toBeInViewport({
       ratio: 1,
     })
     await expect(teaser.getByText(LABEL, { exact: true })).toBeInViewport({ ratio: 1 })
     await expect(entry).toBeInViewport({ ratio: 1 })
+    await expect(
+      page.getByText('All personalization services reporting healthy.', { exact: true })
+    ).toHaveCount(0)
     await entry.click()
     await passGate(page)
 
@@ -184,8 +187,8 @@ test.describe('Guest preview (signed out)', () => {
     await page.goto('/')
     await expect(page.locator('html')).toHaveCSS('font-size', '32px')
 
-    const teaser = page.getByRole('region', { name: 'Sample outfit' })
-    const entry = teaser.getByRole('link', { name: 'Try a sample wardrobe' })
+    const teaser = page.getByRole('region', { name: 'Outfit idea' })
+    const entry = teaser.getByRole('link', { name: 'Try a sample look' })
     await expect(teaser.getByText(LABEL, { exact: true })).toBeVisible()
     await entry.scrollIntoViewIfNeeded()
     await expect(entry).toBeInViewport({ ratio: 1 })

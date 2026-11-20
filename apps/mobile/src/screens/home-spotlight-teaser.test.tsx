@@ -305,9 +305,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     const loading = await renderHome()
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
-    expect(follows(screen.getByTestId('outfit-recommendation-card-skeleton'), link)).toBe(
-      true
-    )
+    expect(follows(screen.getByTestId('member-sample-outfit'), link)).toBe(true)
     await loading.unmount()
 
     server.use(

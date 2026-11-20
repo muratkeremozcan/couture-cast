@@ -7,7 +7,7 @@ import { ScrollView, Text, View, Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   formatPreviewString,
-  GUEST_PREVIEW_CONVERSION_INTENT,
+  GUEST_PREVIEW_GARMENT_INTENT,
   getGuestPreviewStrings,
   nextSampleLook,
   SAMPLE_CATALOG,
@@ -224,7 +224,7 @@ export function GuestPreviewScreen() {
   const convert = (action: 'create_account' | 'sign_in') => {
     update((current) => ({
       ...current,
-      conversion: { intent: GUEST_PREVIEW_CONVERSION_INTENT },
+      conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
     }))
     guestPreviewAnalytics.signupClicked(action)
     router.push(
@@ -338,6 +338,7 @@ export function GuestPreviewScreen() {
             }
           }}
           onSwap={setSwapCategory}
+          swapCategory={swapCategory}
           onUndoSwaps={() => {
             if (!lookId) return
             update((current) => {

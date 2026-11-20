@@ -987,12 +987,10 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
   })
   const ritual = interceptNetworkCall({ method: 'GET', url: '**/api/v1/ritual?*' })
   await page.goto('/')
-  await heldProfile
-  await profileGate.started
-  const launcher = page.getByTestId('ritual-share-card-launcher')
   try {
-    await launcher.getByRole('button').first().click()
-    await expect(launcher.getByRole('button').first()).toBeDisabled()
+    await heldProfile
+    await profileGate.started
+    await expect(page.getByTestId('share-card-open')).toHaveCount(0)
   } finally {
     profileGate.release()
   }
@@ -1001,13 +999,13 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
   expect(ritualCall.request?.headers().authorization).toBe(
     `Bearer ${member.access_token}`
   )
-  for (const [scenario, label] of [
-    ['morning', 'Morning'],
-    ['midday', 'Midday'],
-    ['evening', 'Evening'],
-  ] as const) {
-    await launcher.getByRole('combobox').selectOption(scenario)
-    const opener = launcher.getByTestId('share-card-open')
+  const live = page.getByTestId('home-live-outfit')
+  await expect(live).toBeVisible()
+  for (const label of ['Morning', 'Midday', 'Evening']) {
+    const scenario = live.getByRole('button', { name: label, exact: true })
+    await scenario.click()
+    await expect(scenario).toHaveAttribute('aria-pressed', 'true')
+    const opener = live.getByTestId('share-card-open')
     await opener.click()
     const preview = modal(page).getByTestId('share-card-preview')
     await expect(preview).toHaveAttribute('data-loaded', 'true')
@@ -1076,10 +1074,10 @@ test('P-OFFLINE: an outfit card refuses export offline, keeps its preview, and t
   interceptNetworkCall,
 }, info) => {
   await identify(context)
+  const ritual = interceptNetworkCall({ method: 'GET', url: '**/api/v1/ritual?*' })
   await page.goto('/')
-  const launcher = page.getByTestId('ritual-share-card-launcher')
-  await launcher.getByRole('button').first().click()
-  await launcher.getByTestId('share-card-open').click()
+  expect((await ritual).status).toBe(200)
+  await page.getByTestId('home-live-outfit').getByTestId('share-card-open').click()
   const dialog = modal(page)
   const preview = dialog.getByTestId('share-card-preview')
   await expect(preview).toHaveAttribute('data-loaded', 'true')

@@ -1,7 +1,13 @@
 import type { BrowserContext } from '@playwright/test'
 
 /** One HTTP error answer seen on the guarded URL. */
-export type GuardedError = { method: string; status: number; code?: string; url: string }
+export type GuardedError = {
+  method: string
+  status: number
+  code?: string
+  url: string
+  bodyUnreadable?: true
+}
 
 /** The error answer a test expects on the guarded URL; the caller says how many times. */
 export type AllowedError = { method: string; status: number; code: string }
@@ -37,17 +43,26 @@ export function guardExpectedError(
   const pending: Promise<GuardedError>[] = []
   context.on('response', (response) => {
     if (response.status() < 400 || !urlPattern.test(response.url())) return
-    const request = response.request()
+    const metadata = {
+      method: response.request().method(),
+      status: response.status(),
+      url: response.url(),
+    }
     pending.push(
-      response
-        .json()
-        .catch(() => null)
-        .then((body: { message?: unknown } | null) => ({
-          method: request.method(),
-          status: response.status(),
-          url: response.url(),
-          ...(typeof body?.message === 'string' ? { code: body.message } : {}),
-        }))
+      response.body().then(
+        (bytes) => {
+          let body: { message?: unknown } | null
+          try {
+            body = JSON.parse(bytes.toString()) as typeof body
+          } catch {
+            return metadata
+          }
+          return typeof body?.message === 'string'
+            ? { ...metadata, code: body.message }
+            : metadata
+        },
+        () => ({ ...metadata, bodyUnreadable: true as const })
+      )
     )
   })
   return { settle: () => Promise.all(pending) }

@@ -74,6 +74,7 @@ export interface GetSpotlightParams {
   /** Story 6.7: the reading surface; it changes only the viewed event's `surface`. */
   surface: CommunitySpotlightSurface
   reactions?: boolean
+  postText?: boolean
 }
 
 interface ViewerResolution {
@@ -401,7 +402,8 @@ export class CommunitySpotlightService {
     const projected = await this.community.projectFeedItems(
       posts,
       params.userId,
-      params.reactions === true
+      params.reactions === true,
+      ...(params.postText ? ([true] as const) : [])
     )
     const items = projected.map((item) => ({ ...item, rank: ranks.get(item.id)! }))
     const next = index + params.limit

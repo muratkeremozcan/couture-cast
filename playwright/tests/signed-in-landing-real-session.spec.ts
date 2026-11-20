@@ -99,7 +99,7 @@ async function expectPendingLanding(page: Page) {
   await expect(page.getByTestId('cta-primary')).toBeVisible()
   await expect(page.getByTestId('cta-secondary')).toBeVisible()
   await expect(page.getByTestId('track-wardrobe-upload-started')).toBeVisible()
-  for (const name of ['Sign in', 'Create account', 'Try a sample wardrobe', 'Sign out'])
+  for (const name of ['Sign in', 'Create account', 'Try a sample look', 'Sign out'])
     await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('landing-open-wardrobe')).toBeHidden()
@@ -231,7 +231,7 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   await expect(page).toHaveURL(`${WEB}/wardrobe`)
 })
 
-test('L-2: a signed-out visitor sees Create account, Try a sample wardrobe and Sign in', async ({
+test('L-2: a signed-out visitor sees Create account, Try a sample look and Sign in', async ({
   page,
 }) => {
   await recordLandingActions(page)
@@ -395,15 +395,15 @@ for (const order of ['answered at once', 'answered after first paint'] as const)
     }
   )
 
-// TEA H-2: corrupt storage reads as signed out, from the head script on, with no error.
-test('L-9: corrupt or unreadable storage gives the signed-out landing without an error', async ({
-  page,
-}) => {
-  const errors = collectPageErrors(page, { strict: true })
-  for (const stored of [
-    '{"access_token":',
-    JSON.stringify({ access_token: 'eyJ.x', refresh_token: 'r' }),
-  ]) {
+// Each variant starts in a fresh page so its RSC prefetches can finish independently.
+for (const [state, stored] of [
+  ['malformed JSON', '{"access_token":'],
+  ['invalid token', JSON.stringify({ access_token: 'eyJ.x', refresh_token: 'r' })],
+] as const) {
+  test(`L-9: ${state} gives the signed-out landing without an error`, async ({
+    page,
+  }) => {
+    const errors = collectPageErrors(page, { strict: true })
     await page.goto('/privacy')
     await page.evaluate(
       ([key, value]) => {
@@ -417,13 +417,9 @@ test('L-9: corrupt or unreadable storage gives the signed-out landing without an
     await expect(page.locator('html')).toHaveAttribute('data-session', 'none')
     await expectGuestLanding(page)
     expect((await landingActionsSeen(page)).member).toEqual([])
-    await page.evaluate(() => {
-      window.localStorage.clear()
-      window.sessionStorage.clear()
-    })
-  }
-  expect(errors).toEqual([])
-})
+    expect(errors).toEqual([])
+  })
+}
 
 test('L-9b: a browser that refuses storage reads gives the signed-out landing', async ({
   page,

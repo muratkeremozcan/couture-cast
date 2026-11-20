@@ -4,6 +4,7 @@
 'use client'
 
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
@@ -31,7 +32,14 @@ import { SubscriptionSection } from '../components/subscription-section'
 /** Inside the provider, so the heading follows the reader's locale. */
 function SettingsTitle() {
   const { t } = useTranslation()
-  return <h1 className="text-4xl font-semibold">{t('settings.title')}</h1>
+  return (
+    <>
+      <Link href="/" className="hidden min-h-11 items-center underline md:inline-flex">
+        {t('nav.home')}
+      </Link>
+      <h1 className="text-4xl font-semibold">{t('settings.title')}</h1>
+    </>
+  )
 }
 
 export default function SettingsPage() {

@@ -54,6 +54,7 @@ import { GuestPreviewReviewScreen } from './guest-preview-review-screen'
 import { GuestPreviewScreen } from './guest-preview-screen'
 
 const en = GUEST_PREVIEW_STRINGS['en-US']
+const directConversion = { intent: 'guest-preview-first-garment' }
 
 function memoryAdapter(options: { failWrites?: boolean } = {}) {
   let value: string | null = null
@@ -172,15 +173,13 @@ describe('mobile guest preview session check (D1)', () => {
     await screen.findByTestId('guest-preview-outfit')
     await waitFor(() => expect(storedConversion()).toBeUndefined())
     press(screen.getByTestId('guest-preview-create-account'))
-    await waitFor(() =>
-      expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
-    )
+    await waitFor(() => expect(storedConversion()).toEqual(directConversion))
     act(() => screenFocus.set(false))
     session.state = 'member'
     await view.rerender(<GuestPreviewScreen />)
     await new Promise((resolve) => setTimeout(resolve, 50))
     expect(navigation.replace).not.toHaveBeenCalled()
-    expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
+    expect(storedConversion()).toEqual(directConversion)
     // Focused again as a member, it clears guest state and goes Home.
     act(() => screenFocus.set(true))
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
@@ -195,9 +194,7 @@ describe('mobile guest preview session check (D1)', () => {
     press(screen.getByTestId('guest-preview-gate-submit'))
     await screen.findByTestId('guest-preview-outfit')
     press(screen.getByTestId('guest-preview-create-account'))
-    await waitFor(() =>
-      expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
-    )
+    await waitFor(() => expect(storedConversion()).toEqual(directConversion))
     act(() => screenFocus.set(false))
     act(() => screenFocus.set(true))
     await waitFor(() => expect(storedConversion()).toBeUndefined())
@@ -426,7 +423,7 @@ describe('mobile guest preview lifecycle', () => {
   it('stores the intent, reports the click, rotates the id and opens signup', async () => {
     await passGate()
     press(screen.getByTestId('guest-preview-create-account'))
-    await waitFor(() => expect(adapter.value()).toContain('guest-preview-carryover'))
+    await waitFor(() => expect(adapter.value()).toContain(directConversion.intent))
     expect(analytics.capture).toHaveBeenLastCalledWith('guest_preview_signup_clicked', {
       platform: expect.any(String) as string,
       catalog_version: SAMPLE_CATALOG.catalogVersion,

@@ -3,10 +3,13 @@
 // Story 6.16 W-CONV-*, L-APPLY-THEN-SWITCH and L-READBACK-THEN-SWITCH on web: the one
 // review step after a verified sign-in from the preview.
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponseError } from '@couture/api-client'
 import {
   createGuestPreviewStore,
+  GUEST_PREVIEW_CONVERSION_INTENT,
+  GUEST_PREVIEW_GARMENT_INTENT,
   GUEST_PREVIEW_STRINGS,
   SAMPLE_CATALOG,
   type GuestPreviewStore,
@@ -75,7 +78,12 @@ function memoryAdapter() {
 let store: GuestPreviewStore
 let adapter: ReturnType<typeof memoryAdapter>
 
-async function seedProposal(withIntent = true) {
+async function seedProposal(
+  intent:
+    | typeof GUEST_PREVIEW_CONVERSION_INTENT
+    | typeof GUEST_PREVIEW_GARMENT_INTENT
+    | false = GUEST_PREVIEW_CONVERSION_INTENT
+) {
   adapter = memoryAdapter()
   store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
   setWebGuestPreviewStoreForTests(store)
@@ -84,7 +92,7 @@ async function seedProposal(withIntent = true) {
     ...state,
     comfort: PROPOSAL,
     votes: { 'sample:l:city-wool': 'like' },
-    ...(withIntent ? { conversion: { intent: 'guest-preview-carryover' as const } } : {}),
+    ...(intent ? { conversion: { intent } } : {}),
   }))
   await store.flush()
 }
@@ -154,7 +162,7 @@ describe('preview carryover review (D8)', () => {
     await waitFor(() => expect(adapter.value()).toBeNull())
   })
 
-  it('applies only the comfort values, confirms by read-back, then continues', async () => {
+  it('applies only the comfort values, confirms by read-back, and continues to default setup', async () => {
     const client = server()
     render(<GuestPreviewReview />)
     fireEvent.click(await screen.findByTestId('guest-preview-review-use'))
@@ -170,6 +178,21 @@ describe('preview carryover review (D8)', () => {
       expect(navigation.push).toHaveBeenCalledWith('/wardrobe/onboarding')
     )
     expect(api.nextStep).toHaveBeenCalledWith('token-a')
+  })
+
+  it('preserves explicit garment intent after completing the comfort review', async () => {
+    const user = userEvent.setup()
+    await seedProposal(GUEST_PREVIEW_GARMENT_INTENT)
+    server()
+    api.nextStep.mockResolvedValue('/wardrobe?entry=add')
+    render(<GuestPreviewReview />)
+    await user.click(await screen.findByTestId('guest-preview-review-keep'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
+    await user.click(screen.getByTestId('guest-preview-review-continue'))
+    await waitFor(() =>
+      expect(navigation.push).toHaveBeenCalledWith('/wardrobe?entry=add')
+    )
+    expect(api.nextStep).toHaveBeenCalledExactlyOnceWith('token-a', true)
   })
 
   it('issues one application for a double tap', async () => {

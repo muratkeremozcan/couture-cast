@@ -39,7 +39,7 @@ export class CommunityTargetsService {
     @Inject(CommunityService) private readonly community: CommunityService
   ) {}
 
-  async resolve(member: string, input: ResolveCommunityTargetsInput) {
+  async resolve(member: string, input: ResolveCommunityTargetsInput, postText = false) {
     const budget = new CommunityAuthorizationBudget()
     return communityDependency(() =>
       budget.run(async () => {
@@ -49,7 +49,8 @@ export class CommunityTargetsService {
           member,
           input.targets,
           budget,
-          objectPaths
+          objectPaths,
+          postText
         )
         const grant = await this.access.authorize(member, budget)
         const fresh = await this.finalizeTargets(targets, objectPaths)
@@ -70,7 +71,14 @@ export class CommunityTargetsService {
         id: { in: available.map((target) => target.post.id) },
         ...PUBLICLY_VISIBLE_POST_WHERE,
       },
-      select: { id: true, caption: true, alt_text: true, image_object_path: true },
+      select: {
+        id: true,
+        caption: true,
+        title: true,
+        text_revision: true,
+        alt_text: true,
+        image_object_path: true,
+      },
     })
     const ids = available.flatMap((target) =>
       [target.comment?.id, target.parent?.id].filter((id): id is string => Boolean(id))
@@ -91,6 +99,9 @@ export class CommunityTargetsService {
         (post) =>
           post.id === target.post.id &&
           post.caption === target.post.caption &&
+          (target.post.title === undefined || post.title === target.post.title) &&
+          (target.post.textRevision === undefined ||
+            post.text_revision === target.post.textRevision) &&
           post.alt_text === target.post.altText &&
           post.image_object_path === objectPaths.get(target.key)
       )
@@ -125,6 +136,7 @@ export class CommunityTargetsService {
     targets: ResolveCommunityTargetsInput['targets'],
     budget: CommunityAuthorizationBudget,
     objectPaths: Map<string, string | null>,
+    postText: boolean,
     retry = false
   ): Promise<ReturnType<typeof resolvedCommunityTargetSchema.parse>[]> {
     const snapshot = await interactiveTransaction(
@@ -138,7 +150,12 @@ export class CommunityTargetsService {
     )
     const projected = new Map(
       (
-        await this.community.projectSnapshot(snapshot.posts, member, snapshot.summaries)
+        await this.community.projectSnapshot(
+          snapshot.posts,
+          member,
+          snapshot.summaries,
+          ...(postText ? ([true] as const) : [])
+        )
       ).map((post) => [post.id, post])
     )
     const fresh = await this.prisma.lookbookPost.findMany({
@@ -157,7 +174,7 @@ export class CommunityTargetsService {
         })
     const replacements = new Map(
       (revised.length
-        ? await this.resolveBatch(member, revised, budget, objectPaths, true)
+        ? await this.resolveBatch(member, revised, budget, objectPaths, postText, true)
         : []
       ).map((target) => [target.key, target])
     )

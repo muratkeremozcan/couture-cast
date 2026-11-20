@@ -1,7 +1,15 @@
 // Story 6.16: the building blocks of the mobile guest preview. Each reads the shared
 // policy result and strings, so mobile says and shows exactly what web does.
-import { useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useEffect, useRef, useState, type ComponentRef, type Ref } from 'react'
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import {
   evaluateGuestPreviewGate,
@@ -30,6 +38,7 @@ import {
 } from '@couture/utils'
 import { EdgeToEdgeModal } from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export type PreviewPalette = ReturnType<typeof useHeroPalette>
 export type PreviewControl = 'weather' | 'thermal' | 'wind' | 'rain'
@@ -88,6 +97,7 @@ export function PreviewButton({
   primary = false,
   disabled = false,
   accessibilityLabel,
+  buttonRef,
 }: {
   label: string
   onPress: () => void
@@ -96,9 +106,11 @@ export function PreviewButton({
   primary?: boolean
   disabled?: boolean
   accessibilityLabel?: string
+  buttonRef?: Ref<ComponentRef<typeof Pressable>>
 }) {
   return (
     <Pressable
+      ref={buttonRef}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
@@ -250,6 +262,26 @@ export function PreviewGate({
   )
 }
 
+function useSwapButtonFocus(category: SampleGarmentCategory | null) {
+  const previous = useRef(category)
+  const buttons = useRef(new Map<SampleGarmentCategory, ComponentRef<typeof Pressable>>())
+  useEffect(() => {
+    const closed = previous.current
+    previous.current = category
+    if (!closed || category) return
+    const frame = requestAnimationFrame(() => {
+      const button = buttons.current.get(closed)
+      if (Platform.OS === 'web') button?.focus()
+      else {
+        const node = safeFindNodeHandle(button)
+        if (node != null) AccessibilityInfo.setAccessibilityFocus(node)
+      }
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [category])
+  return buttons
+}
+
 export function PreviewOutfit({
   result,
   strings,
@@ -263,6 +295,9 @@ export function PreviewOutfit({
   onBrowseWardrobe,
   onReviewChoices,
   onResetChoices,
+  heading,
+  continuation,
+  swapCategory = null,
 }: {
   result: SampleOutfitResult
   strings: GuestPreviewStrings
@@ -273,10 +308,14 @@ export function PreviewOutfit({
   onTryAnother: () => void
   onSwap: (category: SampleGarmentCategory) => void
   onUndoSwaps: () => void
-  onBrowseWardrobe: () => void
+  onBrowseWardrobe?: () => void
   onReviewChoices: () => void
   onResetChoices: () => void
+  heading?: string
+  continuation?: React.ReactNode
+  swapCategory?: SampleGarmentCategory | null
 }) {
+  const swapButtons = useSwapButtonFocus(swapCategory)
   const look = result.look
   if (!look) {
     return (
@@ -315,7 +354,7 @@ export function PreviewOutfit({
       style={[styles.card, { borderColor: palette.divider }]}
     >
       <Text style={[styles.eyebrow, { color: palette.accentText }]}>
-        {strings.outfit.heading}
+        {heading ?? strings.outfit.heading}
       </Text>
       <Text
         testID="guest-preview-look-name"
@@ -331,6 +370,14 @@ export function PreviewOutfit({
       >
         {strings.values.weather[result.context.weather]}
       </Text>
+      {continuation}
+      <PreviewButton
+        label={strings.outfit.tryAnother}
+        onPress={onTryAnother}
+        testID="guest-preview-try-another"
+        palette={palette}
+        primary
+      />
       <View testID="guest-preview-garments" style={styles.wrap}>
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -338,7 +385,7 @@ export function PreviewOutfit({
           const swapLabel = formatPreviewString(strings.outfit.swap, { category })
           return (
             <View
-              key={garment.id}
+              key={garment.category}
               testID={`guest-preview-garment-${garment.id.slice('sample:g:'.length)}`}
               style={[styles.garment, { borderColor: palette.divider }]}
             >
@@ -347,6 +394,10 @@ export function PreviewOutfit({
                 {text.name}
               </Text>
               <PreviewButton
+                buttonRef={(button) => {
+                  if (button) swapButtons.current.set(garment.category, button)
+                  else swapButtons.current.delete(garment.category)
+                }}
                 label={swapLabel}
                 accessibilityLabel={`${swapLabel}: ${text.name}`}
                 onPress={() => onSwap(garment.category)}
@@ -376,13 +427,6 @@ export function PreviewOutfit({
           {strings.outfit.noAlternative}
         </Text>
       ) : null}
-      <PreviewButton
-        label={strings.outfit.tryAnother}
-        onPress={onTryAnother}
-        testID="guest-preview-try-another"
-        palette={palette}
-        primary
-      />
       {hasSwaps ? (
         <PreviewButton
           label={strings.outfit.undoSwaps}
@@ -391,12 +435,14 @@ export function PreviewOutfit({
           palette={palette}
         />
       ) : null}
-      <PreviewButton
-        label={strings.outfit.browseWardrobe}
-        onPress={onBrowseWardrobe}
-        testID="guest-preview-browse-wardrobe"
-        palette={palette}
-      />
+      {onBrowseWardrobe && (
+        <PreviewButton
+          label={strings.outfit.browseWardrobe}
+          onPress={onBrowseWardrobe}
+          testID="guest-preview-browse-wardrobe"
+          palette={palette}
+        />
+      )}
     </View>
   )
 }
@@ -910,6 +956,12 @@ export function PreviewConversion({
       testID="guest-preview-conversion"
       style={[styles.card, { borderColor: '#C9A14A' }]}
     >
+      <Text
+        accessibilityRole="header"
+        style={[styles.subheading, { color: palette.text }]}
+      >
+        {detail.garmentHeading}
+      </Text>
       <Text style={{ color: palette.text }}>{strings.chrome.conversion}</Text>
       {(
         [

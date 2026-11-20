@@ -25,6 +25,8 @@ export function GuestPreviewOutfit({
   onBrowseWardrobe,
   onReviewChoices,
   onResetChoices,
+  heading,
+  continuation,
 }: {
   result: SampleOutfitResult
   strings: GuestPreviewStrings
@@ -34,9 +36,11 @@ export function GuestPreviewOutfit({
   onTryAnother: () => void
   onSwap: (category: SampleGarmentCategory, invoker: HTMLButtonElement) => void
   onUndoSwaps: () => void
-  onBrowseWardrobe: () => void
+  onBrowseWardrobe?: () => void
   onReviewChoices: () => void
   onResetChoices: () => void
+  heading?: string
+  continuation?: React.ReactNode
 }) {
   const look = result.look
   const explanation = result.explanation.map((item) =>
@@ -91,7 +95,7 @@ export function GuestPreviewOutfit({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="lookbook-metrics text-xs uppercase tracking-[0.12em] text-[#8A691F]">
-            {strings.outfit.heading}
+            {heading ?? strings.outfit.heading}
           </p>
           <h2
             id="guest-preview-outfit-heading"
@@ -111,6 +115,7 @@ export function GuestPreviewOutfit({
       </div>
 
       <div className="space-y-2">
+        {continuation}
         <button
           type="button"
           onClick={onTryAnother}
@@ -139,7 +144,7 @@ export function GuestPreviewOutfit({
           const category = strings.values.category[garment.category]
           return (
             <li
-              key={garment.id}
+              key={garment.category}
               data-testid="guest-preview-garment"
               data-garment-id={garment.id}
               className="flex flex-col items-center gap-2 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-3 text-center"
@@ -190,14 +195,16 @@ export function GuestPreviewOutfit({
             {strings.outfit.undoSwaps}
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={onBrowseWardrobe}
-          data-testid="guest-preview-browse-wardrobe"
-          className="min-h-11 rounded-lg px-2 text-sm font-semibold text-[#8A691F] underline underline-offset-4"
-        >
-          {strings.outfit.browseWardrobe}
-        </button>
+        {onBrowseWardrobe && (
+          <button
+            type="button"
+            onClick={onBrowseWardrobe}
+            data-testid="guest-preview-browse-wardrobe"
+            className="min-h-11 rounded-lg px-2 text-sm font-semibold text-[#8A691F] underline underline-offset-4"
+          >
+            {strings.outfit.browseWardrobe}
+          </button>
+        )}
       </div>
     </section>
   )

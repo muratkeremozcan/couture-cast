@@ -180,7 +180,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
 
     server.use(countingRitualHandler())
     const retriedAt = Date.now() - 1
-    fireEvent.click(screen.getByText('Retry'))
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()

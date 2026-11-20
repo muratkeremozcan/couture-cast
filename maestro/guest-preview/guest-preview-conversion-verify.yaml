@@ -62,5 +62,19 @@ env:
       text: ${SAVED}
     timeout: 20000
     label: 'The proposal was saved to the account'
-- assertVisible:
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-review-continue'
+    direction: DOWN
+    centerElement: true
+- tapOn:
     id: 'guest-preview-review-continue'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-capture-modal'
+    timeout: 20000
+    label: 'The verified guest enters direct garment capture'
+- assertVisible:
+    id: 'garment-source-camera'
+- assertVisible:
+    id: 'garment-source-library'

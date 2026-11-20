@@ -49,6 +49,7 @@ import {
   type OpenCommunityFeedPostInput,
   type OpenCommunityPostResponse,
   type PublishCommunityPostInput,
+  type EditCommunityPostTextInput,
   type ReportCommunityPostInput,
   type ReportCommunityPostResponse,
   type SupportedLocale,
@@ -72,6 +73,7 @@ import {
   classifyClimateBand,
   parseCommunityObjectPath,
 } from '@couture/utils'
+import { postTextFingerprint, screenPostText } from './community-post-text.js'
 import type { LookbookPost, Prisma } from '@prisma/client'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { GuardianService } from '../guardian/guardian.service.js'
@@ -108,6 +110,7 @@ export interface GetFeedParams {
   cursor?: string
   limit?: number
   acceptLanguage?: string
+  postText?: boolean
   reactions?: boolean
 }
 
@@ -152,6 +155,50 @@ function missingReactionSnapshot(
 /** Erasure keeps the path for a while to catch a late write. It is never readable from then on. */
 const readableObjectPath = (post: LookbookPost): string | null =>
   post.erasure_requested_at || post.anonymized_at ? null : post.image_object_path
+
+function projectFeedItem({
+  post,
+  reactions,
+  includePostText,
+  displayName,
+  isSelf,
+  signedUrl,
+  expiresAtIso,
+}: {
+  post: LookbookPost
+  reactions: CommunityReactionSummary | undefined
+  includePostText: boolean
+  displayName: string
+  isSelf: boolean
+  signedUrl: string
+  expiresAtIso: string
+}): CommunityFeedItem {
+  return {
+    ...(reactions ? { reactions } : {}),
+    id: post.id,
+    caption: post.caption ?? null,
+    ...(includePostText ? { title: post.title ?? null } : {}),
+    ...(includePostText && isSelf && isPubliclyVisiblePost(post)
+      ? { textRevision: post.text_revision ?? 0 }
+      : {}),
+    altText: post.alt_text ?? null,
+    climateBand: post.climate_band ?? null,
+    imageAccess: { url: signedUrl, expiresAt: expiresAtIso },
+    publishedAt: post.published_at?.toISOString() ?? null,
+    createdAt: post.created_at.toISOString(),
+    status: post.status,
+    challengeId: post.challenge_id ?? null,
+    author: {
+      // `displayName` is resolved before the push so the guard above proves
+      // it. The previous `?? generateCommunityAuthorAlias()` fallback minted
+      // an UNPERSISTED random name, so an author with no alias row appeared
+      // under a different name on every request and a viewer had no way to
+      // tell that from a real one.
+      displayName,
+      isSelf,
+    },
+  }
+}
 
 @Injectable()
 export class CommunityService {
@@ -271,8 +318,8 @@ export class CommunityService {
     const authorPosts = await this.repository.findAuthorPostStates(userId)
 
     const [items, authorStates] = await Promise.all([
-      this.buildFeedItems(posts, userId, params.reactions),
-      this.buildAuthorStates(authorPosts),
+      this.buildFeedItems(posts, userId, params.reactions, undefined, params.postText),
+      this.buildAuthorStates(authorPosts, params.postText),
     ])
 
     const challengeBandTarget = filterBand ?? band.viewerBand ?? null
@@ -331,24 +378,27 @@ export class CommunityService {
   async projectSnapshot(
     posts: LookbookPost[],
     userId: string,
-    summaries: Map<string, CommunityReactionSummary>
+    summaries: Map<string, CommunityReactionSummary>,
+    postText = false
   ) {
-    return this.buildFeedItems(posts, userId, true, summaries)
+    return this.buildFeedItems(posts, userId, true, summaries, postText)
   }
 
   /** The feed's own public projection, with live reaction summaries when negotiated. */
   projectFeedItems(
     posts: LookbookPost[],
     userId: string,
-    reactions: boolean
+    reactions: boolean,
+    postText = false
   ): Promise<CommunityReactionFeedItem[]> {
-    return this.buildFeedItems(posts, userId, reactions)
+    return this.buildFeedItems(posts, userId, reactions, undefined, postText)
   }
 
   async getPost(params: {
     userId: string
     postId: string
     reactions?: boolean
+    postText?: boolean
   }): Promise<CommunityFeedItem> {
     return this.readAuthorized(params.userId, () => this.getPostSnapshot(params))
   }
@@ -356,6 +406,7 @@ export class CommunityService {
     userId: string
     postId: string
     reactions?: boolean
+    postText?: boolean
   }): Promise<CommunityFeedItem> {
     const { userId, postId } = params
 
@@ -365,7 +416,13 @@ export class CommunityService {
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
     }
 
-    const [item] = await this.buildFeedItems([post], userId, params.reactions)
+    const [item] = await this.buildFeedItems(
+      [post],
+      userId,
+      params.reactions,
+      undefined,
+      params.postText
+    )
     if (!item) {
       // NOT a 404. The row exists and the caller is allowed to see it; what
       // failed is our own storage. Answering "not found" tells a client the post
@@ -622,7 +679,8 @@ export class CommunityService {
     posts: LookbookPost[],
     viewerUserId: string,
     includeReactions = false,
-    snapshotSummaries?: Map<string, CommunityReactionSummary>
+    snapshotSummaries?: Map<string, CommunityReactionSummary>,
+    includePostText = false
   ): Promise<CommunityFeedItem[]> {
     if (posts.length === 0) {
       return []
@@ -702,27 +760,17 @@ export class CommunityService {
 
       const reactions = summaries.get(post.id)
       if (missingReactionSnapshot(includeReactions, post, reactions)) continue
-      items.push({
-        ...(reactions ? { reactions } : {}),
-        id: post.id,
-        caption: post.caption ?? null,
-        altText: post.alt_text ?? null,
-        climateBand: post.climate_band ?? null,
-        imageAccess: { url: signedUrl, expiresAt: expiresAtIso },
-        publishedAt: post.published_at?.toISOString() ?? null,
-        createdAt: post.created_at.toISOString(),
-        status: post.status,
-        challengeId: post.challenge_id ?? null,
-        author: {
-          // `displayName` is resolved before the push so the guard above proves
-          // it. The previous `?? generateCommunityAuthorAlias()` fallback minted
-          // an UNPERSISTED random name, so an author with no alias row appeared
-          // under a different name on every request and a viewer had no way to
-          // tell that from a real one.
+      items.push(
+        projectFeedItem({
+          post,
+          reactions,
+          includePostText,
           displayName,
           isSelf,
-        },
-      })
+          signedUrl,
+          expiresAtIso,
+        })
+      )
     }
 
     return items
@@ -737,7 +785,8 @@ export class CommunityService {
    * instead of a post that simply stopped moving.
    */
   private async buildAuthorStates(
-    posts: LookbookPost[]
+    posts: LookbookPost[],
+    includePostText = false
   ): Promise<CommunityAuthorPostState[]> {
     if (posts.length === 0) {
       return []
@@ -753,6 +802,7 @@ export class CommunityService {
       return {
         id: post.id,
         caption: post.caption ?? null,
+        ...(includePostText ? { title: post.title ?? null } : {}),
         altText: post.alt_text ?? null,
         climateBand: post.climate_band ?? null,
         imageAccess: signedUrl ? { url: signedUrl, expiresAt: expiresAtIso } : null,
@@ -1114,6 +1164,36 @@ export class CommunityService {
     }
   }
 
+  async editPostText(params: {
+    userId: string
+    role?: string
+    postId: string
+    input: EditCommunityPostTextInput
+  }) {
+    const { userId, role, postId, input } = params
+    await this.assertWriteEnabled(userId)
+    await this.assertAgeGateAllows(userId, role)
+    await this.repository.assertNotSanctioned(userId)
+    const post = await this.repository.findPostById(postId)
+    if (!post || post.user_id !== userId || !isPubliclyVisiblePost(post))
+      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+    if (post.text_revision !== input.baseRevision)
+      throw new ConflictException('Community post text has changed.')
+
+    const caption = input.caption?.trim() || null
+    const edited = await this.repository.editPublishedPostText({
+      userId,
+      postId,
+      baseRevision: input.baseRevision,
+      title: input.title,
+      caption,
+      screen: () => screenPostText(input.title, caption, post.locale),
+    })
+    if (!edited)
+      throw new BadRequestException('Community post text could not be approved.')
+    return edited
+  }
+
   async publishPost(params: {
     userId: string
     role?: string
@@ -1156,6 +1236,9 @@ export class CommunityService {
       throw new ConflictException(COMMUNITY_UPLOAD_NOT_COMPLETED_MESSAGE)
     }
 
+    if (input.title && !(await screenPostText(input.title, null, input.locale)).passed) {
+      throw new BadRequestException('Community post text could not be approved.')
+    }
     const challengeId = await this.resolveSubmissionChallenge(input.challengeId)
     const { viewerBand } = await this.resolveViewerBand(userId)
     // Story 6.6: only the normalized coarse components of the author's chosen
@@ -1171,6 +1254,7 @@ export class CommunityService {
       data: {
         altText,
         caption: input.caption?.trim() ?? null,
+        ...(input.title !== undefined ? { title: input.title } : {}),
         climateBand: viewerBand ?? null,
         locale: input.locale,
         challengeId,
@@ -1201,7 +1285,7 @@ export class CommunityService {
       hasChallenge: challengeId !== null,
     })
 
-    return this.requireFeedItem(result.post, userId)
+    return this.requireFeedItem(result.post, userId, input.title !== undefined)
   }
 
   /**
@@ -1253,21 +1337,32 @@ export class CommunityService {
     userId: string
   ): Promise<CommunityFeedItem> {
     const sameAltText = (post.alt_text ?? '') === altText
-    const sameCaption = (post.caption ?? null) === (input.caption?.trim() ?? null)
+    const caption = input.caption?.trim() ?? null
+    const title = input.title ?? null
+    const sameText = post.original_text_fingerprint
+      ? post.original_text_fingerprint === postTextFingerprint(title, caption)
+      : (post.caption ?? null) === caption && (post.title ?? null) === title
     const sameLocale = (post.locale ?? null) === input.locale
 
-    if (!sameAltText || !sameCaption || !sameLocale) {
+    if (!sameAltText || !sameText || !sameLocale) {
       throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
     }
 
-    return this.requireFeedItem(post, userId)
+    return this.requireFeedItem(post, userId, input.title !== undefined)
   }
 
   private async requireFeedItem(
     post: LookbookPost,
-    userId: string
+    userId: string,
+    includePostText = false
   ): Promise<CommunityFeedItem> {
-    const [feedItem] = await this.buildFeedItems([post], userId)
+    const [feedItem] = await this.buildFeedItems(
+      [post],
+      userId,
+      false,
+      undefined,
+      includePostText
+    )
     if (!feedItem) {
       // Reaching here means the object was signable moments ago, during the
       // pre-flight check, and is not now. That is genuinely our outage.

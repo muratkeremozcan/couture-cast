@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
 import {
@@ -10,9 +11,9 @@ import { ProfileNavLink } from './components/profile-nav-link'
 import { StickyBottomNav } from './components/sticky-bottom-nav'
 
 const navLinks = [
-  { href: '#ritual', label: 'Daily ritual', testId: 'nav-ritual' },
-  { href: '#wardrobe', label: 'Wardrobe', testId: 'nav-wardrobe' },
-  { href: '#community', label: 'Community', testId: 'nav-community' },
+  { href: '/', label: 'Home', testId: 'nav-ritual' },
+  { href: '/wardrobe', label: 'Wardrobe', testId: 'nav-wardrobe' },
+  { href: '/community', label: 'Community', testId: 'nav-community' },
 ]
 
 export default function Home() {
@@ -24,7 +25,7 @@ export default function Home() {
       data-focus-surface="dark"
       className="min-h-screen overflow-x-clip bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]"
     >
-      <header className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-6 sm:flex-row sm:items-center">
+      <header className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-4 sm:flex-row sm:items-center md:py-6">
         <div className="flex flex-col gap-2">
           <p
             data-testid="app-badge"
@@ -32,17 +33,17 @@ export default function Home() {
           >
             CoutureCast
           </p>
-          <p className="text-sm text-neutral-400">
+          <p data-landing="guest" className="text-sm text-neutral-400">
             Weather-aware wardrobe plans for every commute
           </p>
         </div>
         <nav
           aria-label="Primary"
           data-testid="primary-nav"
-          className="flex w-full flex-wrap gap-x-4 gap-y-2 pb-1 text-xs uppercase sm:w-auto sm:gap-6 sm:text-sm sm:tracking-wide"
+          className="hidden w-auto flex-wrap gap-x-6 gap-y-2 pb-1 text-sm uppercase tracking-wide md:flex"
         >
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className="whitespace-nowrap hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
@@ -52,7 +53,7 @@ export default function Home() {
               data-ph-href={link.href}
             >
               {link.label}
-            </a>
+            </Link>
           ))}
           {/* 2026-11-19: on a wide screen the bottom nav is hidden, so this is where a member
               finds their profile (Jade looked for one and found nothing). */}
@@ -97,21 +98,6 @@ export default function Home() {
           </div>
         </section>
 
-        <section
-          id="health"
-          aria-live="polite"
-          data-testid="health-indicator"
-          className="border border-white/10 rounded-2xl p-6 flex flex-col gap-2 bg-white/5"
-        >
-          <p className="text-xs uppercase tracking-[0.4em] text-neutral-400">Systems</p>
-          <p className="text-lg font-semibold">
-            All personalization services reporting healthy.
-          </p>
-          <p className="text-sm text-neutral-400">
-            Weather ingestion, outfit recommendations, and wardrobe syncs are monitored
-            24/7 with automated fallbacks.
-          </p>
-        </section>
         <LegalLinks className="text-neutral-300" />
       </main>
       <PostHogClickTracker />

@@ -211,6 +211,24 @@ describe('C-WEB-Q-DETAIL', () => {
     expect(within(items[1]!).getByText('Looks fine')).toBeInTheDocument()
   })
 
+  it('renders the reported title as plain text on a title-only snapshot', async () => {
+    await openCase({
+      snapshot: {
+        available: true,
+        title: '<b>Evening layers</b>',
+        caption: null,
+        altText: null,
+        body: null,
+        climateBand: null,
+        capturedAt: null,
+      },
+    })
+    const title = screen.getByTestId('moderation-snapshot-title')
+    expect(title.textContent).toBe('<b>Evening layers</b>')
+    expect(title.querySelector('b')).toBeNull()
+    expect(screen.queryByText('The report holds no text.')).toBeNull()
+  })
+
   it('handles a snapshot that is unavailable, empty, or a comment with a parent', async () => {
     const unavailable = await openCase({
       snapshot: {

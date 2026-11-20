@@ -176,7 +176,7 @@ function scoredCasesSql(
           r.id AS report_id, r.reporter_id, r.reason::text AS reason, r.created_at AS accepted_at,
           r.sla_due_at, r.resolved_at,
           COALESCE(${validLocale("(r.content_snapshot->>'locale')")}, ${validLocale('p.locale')}) AS locale,
-          NULLIF(r.content_snapshot->>'caption', '') AS excerpt,
+          COALESCE(NULLIF(r.content_snapshot->>'caption', ''), NULLIF(r.content_snapshot->>'title', '')) AS excerpt,
           ${postFindingSql()} AS finding
         FROM "CommunityPostReport" r
         LEFT JOIN "LookbookPost" p ON p.id = r.post_id

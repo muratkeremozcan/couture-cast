@@ -2,6 +2,7 @@
 // Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`
 import type { CommunityReactionState } from '@couture/api-client'
 import type {
+  EditCommunityPostTextResponse,
   CommunityBannedError,
   CommunityReactionFeedItem,
   CommunityReactionSpotlightItem,
@@ -31,6 +32,8 @@ export type SpotlightFocusRequest =
   /** Story 6.7: a Home teaser activation asked for this entry. */
   | { kind: 'targeted'; firstId: string; serial: number }
 
+type SavedCommunityText = EditCommunityPostTextResponse['data']
+
 export interface CommunitySpotlightView {
   status: SpotlightStatus
   level: CommunitySpotlightLevel
@@ -55,6 +58,7 @@ export interface CommunitySpotlightView {
    * sponsorship answer for its post (see `live-sponsorships.ts`).
    */
   applyPost: (post: CommunityReactionFeedItem) => void
+  applyText: (postId: string, text: SavedCommunityText) => void
   /** Removes a post the viewer can no longer see, such as a withdrawn or hidden one. */
   evict: (postId: string) => void
   /**
@@ -333,12 +337,34 @@ export function useCommunitySpotlight({
         if (post.status !== 'published')
           return previous.filter((item) => item.id !== post.id)
         return previous.map((item) =>
-          item.id === post.id ? { ...sponsorships.apply(post), rank: item.rank } : item
+          item.id === post.id
+            ? {
+                ...sponsorships.apply(post),
+                ...((item.textRevision ?? -1) > (post.textRevision ?? -1)
+                  ? {
+                      title: item.title,
+                      caption: item.caption,
+                      textRevision: item.textRevision,
+                    }
+                  : {}),
+                rank: item.rank,
+              }
+            : item
         )
       })
     },
     [sponsorships]
   )
+
+  const applyText = useCallback((postId: string, text: SavedCommunityText) => {
+    setItems((previous) =>
+      previous.map((item) =>
+        item.id === postId && (item.textRevision ?? 0) <= text.textRevision
+          ? { ...item, ...text }
+          : item
+      )
+    )
+  }, [])
 
   // A live read anywhere on the screen (feed, single post, this module) is the
   // latest word on a post's block, for every spotlight copy of it.
@@ -410,6 +436,7 @@ export function useCommunitySpotlight({
     loadMore,
     applyReactionChange,
     applyPost,
+    applyText,
     evict,
     refreshItem,
     focusEntry,

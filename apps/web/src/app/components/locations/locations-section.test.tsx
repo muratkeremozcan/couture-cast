@@ -514,7 +514,15 @@ describe('LocationsSection', () => {
   it('1.2b-WEB-10 focuses search on the guided path and returns to the origin after saving', async () => {
     signIn()
     searchParams = new URLSearchParams('addLocation=1&returnTo=%2F')
-    useMswHandlers(listHandler(), searchHandler(), saveHandler())
+    useMswHandlers(
+      http.get('/api/v1/locations', () =>
+        saved.length
+          ? new HttpResponse(null, { status: 503 })
+          : HttpResponse.json({ data: [] })
+      ),
+      searchHandler(),
+      saveHandler()
+    )
 
     renderSection()
     const input = await searchInput()

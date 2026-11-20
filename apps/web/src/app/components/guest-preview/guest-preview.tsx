@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  GUEST_PREVIEW_CONVERSION_INTENT,
+  GUEST_PREVIEW_GARMENT_INTENT,
   GUEST_PREVIEW_VIEWS,
   getGuestPreviewStrings,
   nextSampleLook,
@@ -297,14 +297,14 @@ export function GuestPreview() {
               onCreateAccount={() => {
                 update((current) => ({
                   ...current,
-                  conversion: { intent: GUEST_PREVIEW_CONVERSION_INTENT },
+                  conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
                 }))
                 guestPreviewAnalytics.signupClicked('create_account')
               }}
               onSignIn={() => {
                 update((current) => ({
                   ...current,
-                  conversion: { intent: GUEST_PREVIEW_CONVERSION_INTENT },
+                  conversion: { intent: GUEST_PREVIEW_GARMENT_INTENT },
                 }))
                 guestPreviewAnalytics.signupClicked('sign_in')
               }}

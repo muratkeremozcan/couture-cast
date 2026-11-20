@@ -257,6 +257,7 @@ export class CommunityModerationProcessor {
 
     const screeningResult = await withModerationTimeout(
       this.moderationEngine.moderatePost({
+        ...(post.title != null ? { title: post.title } : {}),
         caption: post.caption,
         altText: post.alt_text,
         locale: post.locale,

@@ -21,10 +21,16 @@
 // it deliberately does not render `<Stack.Screen>` itself, since that import chain pulls
 // in native-only modules the browser-based runner cannot polyfill. The thin
 // `app/planner.tsx` route sets the nav title instead.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
+import { getGuestPreviewStrings } from '@couture/utils'
+import { onLocationsChanged } from '@/src/lib/locations'
+import {
+  mobileIdentityEpoch,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
@@ -51,6 +57,7 @@ type ScreenState =
   | 'disabled'
   | 'ready'
   | 'load_failed'
+  | 'missing_city'
 
 const SCENARIO_ORDER = ['morning', 'midday', 'evening'] as const
 
@@ -276,7 +283,13 @@ function ReadyDayCard({
 }
 
 export function PlannerScreen() {
+  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  return <MemberPlannerScreen key={epoch} />
+}
+
+function MemberPlannerScreen() {
   const { t, i18n } = useTranslation()
+  const { palette } = useAppTheme()
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
@@ -287,23 +300,27 @@ export function PlannerScreen() {
   const [dayNotices, setDayNotices] = useState<Record<string, DayNotice>>({})
 
   const writeControllerRef = useRef<AbortController | null>(null)
+  const readControllerRef = useRef<AbortController | null>(null)
   useEffect(() => () => writeControllerRef.current?.abort(), [])
 
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
+    async (signal: AbortSignal): Promise<void> => {
       try {
         const data = await getPlannerFromMobile({ locale: activeLocale, signal })
-        if (signal?.aborted) return
+        if (signal.aborted) return
         setWeek(data)
         setScreenState('ready')
       } catch (loadError: unknown) {
-        if (signal?.aborted) return
+        if (signal.aborted) return
         switch (plannerFailureReason(loadError)) {
           case 'signed_out':
             setScreenState('signed_out')
             return
           case 'not_entitled':
             setScreenState('locked')
+            return
+          case 'missing_city':
+            setScreenState('missing_city')
             return
           case 'disabled':
             setScreenState('disabled')
@@ -316,11 +333,27 @@ export function PlannerScreen() {
     [activeLocale]
   )
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
+    readControllerRef.current?.abort()
     const controller = new AbortController()
+    readControllerRef.current = controller
     void load(controller.signal)
-    return () => controller.abort()
   }, [load])
+
+  useEffect(() => {
+    refresh()
+    const unsubscribe = onLocationsChanged(() => {
+      writeControllerRef.current?.abort()
+      setBusyDate(null)
+      setDayNotices({})
+      setScreenState('loading')
+      refresh()
+    })
+    return () => {
+      readControllerRef.current?.abort()
+      unsubscribe()
+    }
+  }, [refresh])
 
   const handleReshuffle = useCallback(
     async (day: PlannerReadyDay): Promise<void> => {
@@ -366,7 +399,7 @@ export function PlannerScreen() {
               isError: false,
             },
           }))
-          void load()
+          refresh()
           return
         }
         if (reason === 'signed_out') {
@@ -397,7 +430,7 @@ export function PlannerScreen() {
         }
       }
     },
-    [activeLocale, busyDate, load, t, week]
+    [activeLocale, busyDate, refresh, t, week]
   )
 
   return (
@@ -426,6 +459,19 @@ export function PlannerScreen() {
         </Text>
       ) : null}
 
+      {screenState === 'missing_city' ? (
+        <Pressable
+          accessibilityRole="button"
+          style={[styles.secondaryButton, { borderColor: palette.cardText }]}
+          testID="planner-set-city"
+          onPress={() => router.push('/locations?guided=1')}
+        >
+          <Text style={[styles.secondaryButtonText, { color: palette.cardText }]}>
+            {getGuestPreviewStrings(activeLocale).firstUse.setCity}
+          </Text>
+        </Pressable>
+      ) : null}
+
       {screenState === 'load_failed' ? (
         <>
           <Text
@@ -441,7 +487,7 @@ export function PlannerScreen() {
             testID="planner-retry"
             onPress={() => {
               setScreenState('loading')
-              void load()
+              refresh()
             }}
           >
             <Text style={styles.secondaryButtonText}>
@@ -467,7 +513,7 @@ export function PlannerScreen() {
               <ErrorDayCard
                 key={day.planDate}
                 onRetry={() => {
-                  void load()
+                  refresh()
                 }}
               />
             )

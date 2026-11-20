@@ -8,6 +8,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { ResponseError } from '@couture/api-client'
 import {
   createGuestPreviewStore,
+  GUEST_PREVIEW_CONVERSION_INTENT,
+  GUEST_PREVIEW_GARMENT_INTENT,
   GUEST_PREVIEW_STRINGS,
   SAMPLE_CATALOG,
   type SampleComfort,
@@ -70,7 +72,12 @@ function memoryAdapter() {
 
 let adapter: ReturnType<typeof memoryAdapter>
 
-async function seed(withIntent = true) {
+async function seed(
+  intent:
+    | typeof GUEST_PREVIEW_CONVERSION_INTENT
+    | typeof GUEST_PREVIEW_GARMENT_INTENT
+    | false = GUEST_PREVIEW_CONVERSION_INTENT
+) {
   adapter = memoryAdapter()
   const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
   setMobileGuestPreviewStoreForTests(store)
@@ -78,7 +85,7 @@ async function seed(withIntent = true) {
   store.update((state) => ({
     ...state,
     comfort: PROPOSAL,
-    ...(withIntent ? { conversion: { intent: 'guest-preview-carryover' as const } } : {}),
+    ...(intent ? { conversion: { intent } } : {}),
   }))
   await store.flush()
 }
@@ -158,7 +165,7 @@ describe('mobile carryover review (D8)', () => {
     await waitFor(() => expect(adapter.value()).toBeNull())
   })
 
-  it('applies only the comfort values after a read-back, then continues', async () => {
+  it('applies only the comfort values after a read-back and continues to default setup', async () => {
     const client = server()
     await render(<GuestPreviewReviewScreen />)
     press(await screen.findByTestId('guest-preview-review-use'))
@@ -171,6 +178,21 @@ describe('mobile carryover review (D8)', () => {
     await waitFor(() =>
       expect(navigation.replace).toHaveBeenCalledWith('/wardrobe-onboarding')
     )
+    expect(api.nextStep).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  it('preserves explicit garment intent after completing the comfort review', async () => {
+    await seed(GUEST_PREVIEW_GARMENT_INTENT)
+    server()
+    api.nextStep.mockResolvedValue('/wardrobe?entry=add')
+    await render(<GuestPreviewReviewScreen />)
+    press(await screen.findByTestId('guest-preview-review-keep'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
+    press(screen.getByTestId('guest-preview-review-continue'))
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/wardrobe?entry=add')
+    )
+    expect(api.nextStep).toHaveBeenCalledExactlyOnceWith(true)
   })
 
   it('keeps the proposal for a retry when the save fails', async () => {

@@ -40,6 +40,7 @@ export type PlannerFailureReason =
   | 'signed_out'
   | 'not_entitled'
   | 'disabled'
+  | 'missing_city'
   | 'version_conflict'
   | 'unknown'
 
@@ -98,6 +99,8 @@ async function readServerMessage(response: Response, fallback: string): Promise<
  * route might one day answer with.
  */
 function reasonForResponse(status: number, message: string): PlannerFailureReason {
+  if (status === 400 && message === 'No location preferences found for user')
+    return 'missing_city'
   if (status === 401) return 'signed_out'
   if (status === 403) return 'not_entitled'
   if (status === 503) {

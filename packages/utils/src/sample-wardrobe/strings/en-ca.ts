@@ -3,6 +3,23 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const enCA: GuestPreviewStrings = {
+  firstUse: {
+    replaceGarment: 'Choose another photo',
+    discardPhoto: 'Discard this photo?',
+    keepEditing: 'Keep editing',
+    discard: 'Discard',
+    today: "Today's outfit",
+    addGarment: 'Add one garment',
+    setCity: 'Set your city',
+    wardrobeFailed: 'Unable to load your wardrobe.',
+    staleWardrobe: 'Showing your saved garments. Refresh failed.',
+    backToOutfit: "Back to today's outfit",
+    checkGarment: 'Check garment status',
+    backToWardrobe: 'Back to Wardrobe',
+    outfitFailed: "Unable to load today's outfit.",
+    sampleEntry: 'Try a sample look',
+    outfitIdea: 'Outfit idea',
+  },
   chrome: {
     entry: 'Try a sample wardrobe',
     exampleLabel: 'Example',

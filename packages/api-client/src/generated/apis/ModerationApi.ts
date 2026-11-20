@@ -44,6 +44,7 @@ export interface ExportModerationEvidenceOperationRequest {
 
 export interface GetModerationCaseRequest {
   caseId: string
+  xCouturePostText?: GetModerationCaseXCouturePostTextEnum
 }
 
 export interface ListModerationCasesRequest {
@@ -294,6 +295,12 @@ export class ModerationApi extends runtime.BaseAPI {
     const queryParameters: any = {}
 
     const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
+      )
+    }
 
     if (this.configuration && this.configuration.accessToken) {
       const token = this.configuration.accessToken
@@ -678,6 +685,14 @@ export class ModerationApi extends runtime.BaseAPI {
   }
 }
 
+/**
+ * @export
+ */
+export const GetModerationCaseXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type GetModerationCaseXCouturePostTextEnum =
+  (typeof GetModerationCaseXCouturePostTextEnum)[keyof typeof GetModerationCaseXCouturePostTextEnum]
 /**
  * @export
  */

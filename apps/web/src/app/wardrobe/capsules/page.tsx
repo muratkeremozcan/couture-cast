@@ -1,6 +1,8 @@
 'use client'
 // Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
+import Link from 'next/link'
+import { getGuestPreviewStrings } from '@couture/utils'
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../../i18n'
@@ -42,7 +44,7 @@ export default function WardrobeCapsulesPage() {
 }
 
 function CapsulesView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
@@ -222,6 +224,12 @@ function CapsulesView() {
         {statusMessage ?? ''}
       </p>
 
+      <Link
+        href="/wardrobe"
+        className="inline-flex min-h-11 items-center text-sm font-semibold underline"
+      >
+        {getGuestPreviewStrings(i18n.language).firstUse.backToWardrobe}
+      </Link>
       <div className="flex items-center justify-between border-b border-zinc-200 pb-6 dark:border-zinc-800">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">

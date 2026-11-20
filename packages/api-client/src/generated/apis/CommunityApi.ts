@@ -24,6 +24,8 @@ import type {
   CommunityReactionResponse,
   CreateCommunityChallengeInput,
   CreateCommunityCommentInput,
+  EditCommunityPostText200Response,
+  EditCommunityPostTextRequest,
   GetCommunitySpotlight200Response,
   OpenCommunityPostInput,
   PublishCommunityPostInput,
@@ -48,6 +50,7 @@ export interface ApiV1CommunityChallengesPostRequest {
 export interface ApiV1CommunityFeedGetRequest {
   xCouturePlatform: ApiV1CommunityFeedGetXCouturePlatformEnum
   xCoutureReactions?: ApiV1CommunityFeedGetXCoutureReactionsEnum
+  xCouturePostText?: ApiV1CommunityFeedGetXCouturePostTextEnum
   xCoutureSponsorship?: ApiV1CommunityFeedGetXCoutureSponsorshipEnum
   mode?: ApiV1CommunityFeedGetModeEnum
   cursor?: string
@@ -64,6 +67,7 @@ export interface ApiV1CommunityPostsPostIdGetRequest {
   postId: string
   xCouturePlatform: ApiV1CommunityPostsPostIdGetXCouturePlatformEnum
   xCoutureReactions?: ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum
+  xCouturePostText?: ApiV1CommunityPostsPostIdGetXCouturePostTextEnum
   xCoutureSponsorship?: ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum
 }
 
@@ -108,6 +112,11 @@ export interface DeleteCommunityCommentRequest {
   xCouturePlatform: DeleteCommunityCommentXCouturePlatformEnum
 }
 
+export interface EditCommunityPostTextOperationRequest {
+  postId: string
+  editCommunityPostTextRequest: EditCommunityPostTextRequest
+}
+
 export interface GetCommunityCommentRepliesRequest {
   postId: string
   commentId: string
@@ -133,6 +142,7 @@ export interface GetCommunityCommentsRequest {
 export interface GetCommunitySpotlightRequest {
   xCouturePlatform: GetCommunitySpotlightXCouturePlatformEnum
   xCoutureReactions?: GetCommunitySpotlightXCoutureReactionsEnum
+  xCouturePostText?: GetCommunitySpotlightXCouturePostTextEnum
   xCoutureSponsorship?: GetCommunitySpotlightXCoutureSponsorshipEnum
   cursor?: string
   limit?: number
@@ -334,6 +344,12 @@ export class CommunityApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
+      )
+    }
+
     if (requestParameters['xCoutureSponsorship'] != null) {
       headerParameters['x-couture-sponsorship'] = String(
         requestParameters['xCoutureSponsorship']
@@ -511,6 +527,12 @@ export class CommunityApi extends runtime.BaseAPI {
     if (requestParameters['xCoutureReactions'] != null) {
       headerParameters['x-couture-reactions'] = String(
         requestParameters['xCoutureReactions']
+      )
+    }
+
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
       )
     }
 
@@ -1214,6 +1236,80 @@ export class CommunityApi extends runtime.BaseAPI {
   }
 
   /**
+   * Creates request options for editCommunityPostText without sending the request
+   */
+  async editCommunityPostTextRequestOpts(
+    requestParameters: EditCommunityPostTextOperationRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling editCommunityPostText().'
+      )
+    }
+
+    if (requestParameters['editCommunityPostTextRequest'] == null) {
+      throw new runtime.RequiredError(
+        'editCommunityPostTextRequest',
+        'Required parameter "editCommunityPostTextRequest" was null or undefined when calling editCommunityPostText().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/text`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PATCH',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['editCommunityPostTextRequest'],
+    }
+  }
+
+  /**
+   * Screen and replace a published post title and description
+   */
+  async editCommunityPostTextRaw(
+    requestParameters: EditCommunityPostTextOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<EditCommunityPostText200Response>> {
+    const requestOptions = await this.editCommunityPostTextRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Screen and replace a published post title and description
+   */
+  async editCommunityPostText(
+    requestParameters: EditCommunityPostTextOperationRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<EditCommunityPostText200Response> {
+    const response = await this.editCommunityPostTextRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
    * Creates request options for getCommunityCommentReplies without sending the request
    */
   async getCommunityCommentRepliesRequestOpts(
@@ -1522,6 +1618,12 @@ export class CommunityApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
+      )
+    }
+
     if (requestParameters['xCoutureSponsorship'] != null) {
       headerParameters['x-couture-sponsorship'] = String(
         requestParameters['xCoutureSponsorship']
@@ -1701,6 +1803,14 @@ export type ApiV1CommunityFeedGetXCoutureReactionsEnum =
 /**
  * @export
  */
+export const ApiV1CommunityFeedGetXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityFeedGetXCouturePostTextEnum =
+  (typeof ApiV1CommunityFeedGetXCouturePostTextEnum)[keyof typeof ApiV1CommunityFeedGetXCouturePostTextEnum]
+/**
+ * @export
+ */
 export const ApiV1CommunityFeedGetXCoutureSponsorshipEnum = {
   _1: '1',
 } as const
@@ -1747,6 +1857,14 @@ export const ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum = {
 } as const
 export type ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum =
   (typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum]
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGetXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityPostsPostIdGetXCouturePostTextEnum =
+  (typeof ApiV1CommunityPostsPostIdGetXCouturePostTextEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCouturePostTextEnum]
 /**
  * @export
  */
@@ -1862,6 +1980,14 @@ export const GetCommunitySpotlightXCoutureReactionsEnum = {
 } as const
 export type GetCommunitySpotlightXCoutureReactionsEnum =
   (typeof GetCommunitySpotlightXCoutureReactionsEnum)[keyof typeof GetCommunitySpotlightXCoutureReactionsEnum]
+/**
+ * @export
+ */
+export const GetCommunitySpotlightXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type GetCommunitySpotlightXCouturePostTextEnum =
+  (typeof GetCommunitySpotlightXCouturePostTextEnum)[keyof typeof GetCommunitySpotlightXCouturePostTextEnum]
 /**
  * @export
  */

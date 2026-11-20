@@ -29,7 +29,7 @@ import {
 } from '@/src/test-utils/edge-to-edge-modal'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
 }))
 
 const openSettingsMock = vi.hoisted(() => vi.fn())

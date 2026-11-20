@@ -4,13 +4,18 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Header,
+  Headers,
   Inject,
   Param,
   Query,
   ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common'
-import { moderationCasesQuerySchema } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_POST_TEXT_HEADER,
+  moderationCasesQuerySchema,
+} from '@couture/api-client/contracts/http'
 import { AuthContext, Roles } from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
 import { ModerationOperatorGuard } from './moderation-operator.guard.js'
@@ -42,12 +47,19 @@ export class ModerationQueueController {
   }
 
   @Get('cases/:caseId')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'x-couture-post-text, Authorization')
   async getCase(
     @AuthContext() auth: RequestAuthContext,
-    @Param('caseId') caseId: string
+    @Param('caseId') caseId: string,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
   ) {
     await this.assertEnabled(auth)
-    return this.queue.getCase(auth, caseId)
+    return this.queue.getCase(
+      auth,
+      caseId,
+      ...(postTextHeader === '1' ? ([true] as const) : [])
+    )
   }
 
   private async assertEnabled(auth: RequestAuthContext): Promise<void> {

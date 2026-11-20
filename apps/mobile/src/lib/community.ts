@@ -45,6 +45,8 @@ import {
   type CommunityReactionSummary,
   openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
+  editCommunityPostTextResponseSchema,
+  type EditCommunityPostTextInput,
   reportCommunityPostResponseSchema,
   uploadGarmentBytes,
   withdrawCommunityPostResponseSchema,
@@ -66,7 +68,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 import { withRequestTimeout } from './commerce'
-import { resolveMobileAccessToken } from './mobile-auth'
+import { mobileIdentityEpoch, resolveMobileAccessToken } from './mobile-auth'
 
 export { randomUuidV4 as generateIdempotencyKey } from './uuid'
 
@@ -320,6 +322,7 @@ export async function getCommunityFeedFromMobile({
               xCouturePlatform: 'mobile',
               xCoutureReactions: '1',
               xCoutureSponsorship: '1',
+              xCouturePostText: '1',
               mode,
               cursor,
               limit,
@@ -362,6 +365,7 @@ export async function getCommunitySpotlightFromMobile({
           xCouturePlatform: 'mobile',
           xCoutureReactions: '1',
           xCoutureSponsorship: '1',
+          xCouturePostText: '1',
           cursor,
           limit,
           ...(surface ? { surface } : {}),
@@ -401,6 +405,7 @@ export async function getCommunityPostFromMobile(
             xCouturePlatform: 'mobile',
             xCoutureReactions: '1',
             xCoutureSponsorship: '1',
+            xCouturePostText: '1',
           },
           { signal: requestSignal }
         ),
@@ -734,6 +739,7 @@ export interface PublishCommunityLookInput {
   uploadSessionId: string
   altText: string
   caption?: string | null
+  title?: string | null
   challengeId?: string | null
   /** Locale the caption and alt text are screened in. */
   locale: SupportedLocale
@@ -746,6 +752,7 @@ export async function publishCommunityLookFromMobile({
   uploadSessionId,
   altText,
   caption,
+  title,
   challengeId,
   locale,
   idempotencyKey,
@@ -764,6 +771,7 @@ export async function publishCommunityLookFromMobile({
             altText,
             altTextConfirmed: true,
             caption: caption?.trim() || null,
+            ...(title?.trim() ? { title: title.trim() } : {}),
             locale,
             ...(challengeId ? { challengeId } : {}),
           },
@@ -774,6 +782,28 @@ export async function publishCommunityLookFromMobile({
     return publishCommunityPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to publish this look.')
+  }
+}
+
+export async function editCommunityPostTextFromMobile(
+  postId: string,
+  input: EditCommunityPostTextInput,
+  signal?: AbortSignal
+) {
+  try {
+    const epoch = mobileIdentityEpoch()
+    const token = await readAccessToken()
+    if (signal?.aborted || epoch !== mobileIdentityEpoch())
+      throw new CommunityRequestError('signed_out', COMMUNITY_SIGNED_OUT_MESSAGE)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      communityClient(token).editCommunityPostText(
+        { postId, editCommunityPostTextRequest: input },
+        { signal: requestSignal }
+      )
+    )
+    return editCommunityPostTextResponseSchema.parse(response).data
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to save this look.')
   }
 }
 
@@ -883,5 +913,8 @@ export const communitySyncFromMobile = (token?: string | (() => Promise<string>)
   communitySyncClient(
     createMobileApiClient({
       accessToken: token ?? (async () => (await resolveMobileAccessToken()) ?? ''),
-    })
+    }),
+    undefined,
+    undefined,
+    true
   )

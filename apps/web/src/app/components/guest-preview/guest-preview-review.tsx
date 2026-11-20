@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   applyComfortCarryover,
+  GUEST_PREVIEW_GARMENT_INTENT,
   getGuestPreviewStrings,
   type GuestPreviewStrings,
   type SampleComfort,
@@ -85,6 +86,7 @@ export function GuestPreviewReview() {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const client = useRef<WebComfortClient | null>(null)
   const inFlight = useRef(false)
+  const garmentIntent = useRef(false)
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -97,7 +99,9 @@ export function GuestPreviewReview() {
     }
     void (async () => {
       const snapshot = await store.load()
-      const proposal = snapshot.state?.conversion ? snapshot.state.comfort : null
+      const conversion = snapshot.state?.conversion
+      const proposal = conversion ? snapshot.state?.comfort : null
+      garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
       if (!proposal) {
         router.replace('/')
         return
@@ -196,7 +200,16 @@ export function GuestPreviewReview() {
 
   async function continueToNextStep() {
     const token = await resolveWebSessionToken().catch(() => undefined)
-    router.push(token ? await resolveWebNextStep(token) : '/signin')
+    if (!token) {
+      if (mounted.current) router.push('/signin')
+      return
+    }
+    const verified = client.current
+    if (!verified || webSessionIdentity() !== verified.memberId) return
+    const next = garmentIntent.current
+      ? await resolveWebNextStep(token, true)
+      : await resolveWebNextStep(token)
+    if (mounted.current && webSessionIdentity() === verified.memberId) router.push(next)
   }
 
   return (

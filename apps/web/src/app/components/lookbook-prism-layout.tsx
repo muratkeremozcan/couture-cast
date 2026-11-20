@@ -2,7 +2,7 @@
 // Story 5.5 Task 7 step 3 owner: own the Plan week control, the closed default and the 1440px variant decision in `apps/web/src/app/components/lookbook-prism-layout.tsx`
 'use client'
 
-import { RitualShareCardLauncher } from './ritual-share-card-launcher'
+import { HomeRitual } from './home-ritual'
 
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
@@ -172,6 +172,13 @@ export function LookbookPrismLayout() {
   // this turns true, so there is no separate entitlement effect in this
   // component any more (Story 5.2's used to live here).
   const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(false)
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('planner') !== '1') return
+    setIsPlannerRailOpen(true)
+    url.searchParams.delete('planner')
+    window.history.replaceState(window.history.state, '', url)
+  }, [])
   // >=1440px renders the rail inline as the third grid column (no focus trap,
   // ordinary page content); narrower renders it as a focus-trapped overlay
   // drawer. `window.innerWidth` matches this file's own existing posthog
@@ -336,11 +343,11 @@ export function LookbookPrismLayout() {
       className={`lookbook-body relative w-full bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
         isMobilePreview
           ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[var(--lookbook-surface)] p-4 shadow-2xl'
-          : 'mx-auto max-w-[1440px] px-4 py-8 sm:px-6'
+          : 'mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-8'
       }`}
     >
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-4 sm:mb-8">
+        <div data-landing="guest">
           <span className="lookbook-metrics text-xs uppercase tracking-[0.3em] text-[color:var(--lookbook-gold-ink)]">
             Lookbook Prism
           </span>
@@ -461,130 +468,134 @@ export function LookbookPrismLayout() {
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <h2
-              tabIndex={-1}
-              data-share-card-focus-fallback="hero"
-              className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--lookbook-gold-ink)]"
-            >
-              Daily Hero Ritual
-            </h2>
-            <span className="lookbook-metrics rounded-full border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 py-1 text-xs text-[color:var(--lookbook-ink)]">
-              08:30 AM • NYC
-            </span>
-          </div>
-
-          <RitualShareCardLauncher />
-
-          {/* Weather Numerical Banner */}
-          <div className="flex items-baseline gap-4">
-            <span className="lookbook-metrics text-5xl font-bold text-[color:var(--lookbook-ink)]">
-              18°C
-            </span>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-[color:var(--lookbook-ink)]">
-                Mild Humidity • 65%
-              </p>
-              <p className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
-                +3°C from yesterday commute
-              </p>
-            </div>
-          </div>
-
-          {/* Outfit Tiles */}
-          <div className="space-y-4">
-            <h3 className="lookbook-display text-xl font-semibold text-[color:var(--lookbook-ink)]">
-              Primary Recommended Look
-              {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
-              <span
-                data-testid="hero-example-label"
-                className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[color:var(--lookbook-gold-ink)]"
-              >
-                {getGuestPreviewStrings(i18n.language).chrome.exampleLabel}
-              </span>
-            </h3>
-
-            <div
-              data-testid="outfit-scroll"
-              className={
-                isMobilePreview
-                  ? ''
-                  : 'min-[768px]:max-[1279px]:overflow-x-auto min-[768px]:max-[1279px]:px-16'
-              }
-            >
-              {!isComparisonMode ? (
-                // Single Primary Card
-                <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
-                  <div className="mb-4 flex items-center justify-between">
-                    <span className="lookbook-metrics text-xs uppercase text-[color:var(--lookbook-gold-ink)]">
-                      {heroRecommendation.eyebrow}
-                    </span>
-                    <span className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
-                      Match Score: {heroRecommendation.score}
-                    </span>
-                  </div>
-                  <h4
-                    data-testid="hero-recommendation-title"
-                    className="lookbook-display mb-2 text-lg font-semibold text-[color:var(--lookbook-ink)]"
+          <HomeRitual
+            demo={
+              <>
+                <div className="flex items-center justify-between">
+                  <h2
+                    tabIndex={-1}
+                    data-share-card-focus-fallback="hero"
+                    className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--lookbook-gold-ink)]"
                   >
-                    {heroRecommendation.title}
-                  </h4>
-                  <p className="mb-4 text-xs leading-relaxed text-[color:var(--lookbook-ink-soft)]">
-                    {heroRecommendation.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                      Onyx Blazer
-                    </span>
-                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                      Merlot Silk Scarf
-                    </span>
-                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                      Leather Loafers
-                    </span>
-                  </div>
+                    Daily Hero Ritual
+                  </h2>
+                  <span className="lookbook-metrics rounded-full border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 py-1 text-xs text-[color:var(--lookbook-ink)]">
+                    08:30 AM • NYC
+                  </span>
                 </div>
-              ) : (
-                // Dual Outfit Cards (Comparison Mode)
-                <div
-                  data-testid="comparison-container"
-                  className={`grid gap-4 ${
-                    isMobilePreview
-                      ? 'grid-cols-1'
-                      : 'grid-cols-1 min-[768px]:max-[1279px]:grid-flow-col min-[768px]:max-[1279px]:auto-cols-[60%] min-[768px]:max-[1279px]:grid-cols-none min-[1280px]:grid-cols-2'
-                  }`}
-                >
-                  {/* Look A */}
-                  <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[var(--lookbook-surface)] p-5">
-                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-gold-ink)]">
-                      <span>LOOK A (Primary)</span>
-                      <span>96%</span>
-                    </div>
-                    <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
-                      Blazer & Silk Knit
-                    </h4>
-                    <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
-                      Warmth level tuned for brisk morning wind.
-                    </p>
-                  </div>
 
-                  {/* Look B */}
-                  <div className="space-y-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-5">
-                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-ink-muted)]">
-                      <span>LOOK B (Alternative)</span>
-                      <span>91%</span>
-                    </div>
-                    <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
-                      Trench & Merino Cardigan
-                    </h4>
-                    <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
-                      Higher wind protection with water-resistant shell.
+                {/* Weather Numerical Banner */}
+                <div className="flex items-baseline gap-4">
+                  <span className="lookbook-metrics text-5xl font-bold text-[color:var(--lookbook-ink)]">
+                    18°C
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-[color:var(--lookbook-ink)]">
+                      Mild Humidity • 65%
+                    </p>
+                    <p className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
+                      +3°C from yesterday commute
                     </p>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
+
+                {/* Outfit Tiles */}
+                <div className="space-y-4">
+                  <h3 className="lookbook-display text-xl font-semibold text-[color:var(--lookbook-ink)]">
+                    Primary Recommended Look
+                    {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
+                    <span
+                      data-testid="hero-example-label"
+                      className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[color:var(--lookbook-gold-ink)]"
+                    >
+                      {getGuestPreviewStrings(i18n.language).chrome.exampleLabel}
+                    </span>
+                  </h3>
+
+                  <div
+                    data-testid="outfit-scroll"
+                    className={
+                      isMobilePreview
+                        ? ''
+                        : 'min-[768px]:max-[1279px]:overflow-x-auto min-[768px]:max-[1279px]:px-16'
+                    }
+                  >
+                    {!isComparisonMode ? (
+                      // Single Primary Card
+                      <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
+                        <div className="mb-4 flex items-center justify-between">
+                          <span className="lookbook-metrics text-xs uppercase text-[color:var(--lookbook-gold-ink)]">
+                            {heroRecommendation.eyebrow}
+                          </span>
+                          <span className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
+                            Match Score: {heroRecommendation.score}
+                          </span>
+                        </div>
+                        <h4
+                          data-testid="hero-recommendation-title"
+                          className="lookbook-display mb-2 text-lg font-semibold text-[color:var(--lookbook-ink)]"
+                        >
+                          {heroRecommendation.title}
+                        </h4>
+                        <p className="mb-4 text-xs leading-relaxed text-[color:var(--lookbook-ink-soft)]">
+                          {heroRecommendation.description}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
+                            Onyx Blazer
+                          </span>
+                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
+                            Merlot Silk Scarf
+                          </span>
+                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
+                            Leather Loafers
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      // Dual Outfit Cards (Comparison Mode)
+                      <div
+                        data-testid="comparison-container"
+                        className={`grid gap-4 ${
+                          isMobilePreview
+                            ? 'grid-cols-1'
+                            : 'grid-cols-1 min-[768px]:max-[1279px]:grid-flow-col min-[768px]:max-[1279px]:auto-cols-[60%] min-[768px]:max-[1279px]:grid-cols-none min-[1280px]:grid-cols-2'
+                        }`}
+                      >
+                        {/* Look A */}
+                        <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[var(--lookbook-surface)] p-5">
+                          <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-gold-ink)]">
+                            <span>LOOK A (Primary)</span>
+                            <span>96%</span>
+                          </div>
+                          <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
+                            Blazer & Silk Knit
+                          </h4>
+                          <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
+                            Warmth level tuned for brisk morning wind.
+                          </p>
+                        </div>
+
+                        {/* Look B */}
+                        <div className="space-y-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-5">
+                          <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-ink-muted)]">
+                            <span>LOOK B (Alternative)</span>
+                            <span>91%</span>
+                          </div>
+                          <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
+                            Trench & Merino Cardigan
+                          </h4>
+                          <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
+                            Higher wind protection with water-resistant shell.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            }
+          />
 
           {/* Story 6.7: only while stacked; the value itself lives above. */}
           <HomeSpotlightTeaserSlot

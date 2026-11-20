@@ -1,4 +1,5 @@
 // Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
+import { WardrobeBackButton } from '@/src/features/wardrobe/wardrobe-back-button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -246,7 +247,12 @@ export default function WardrobeCapsulesScreen() {
 
   return (
     <View style={[styles.screen, themed.screen]}>
-      <Stack.Screen options={{ title: t('wardrobe.capsules.title') }} />
+      <Stack.Screen
+        options={{
+          headerLeft: () => <WardrobeBackButton />,
+          title: t('wardrobe.capsules.title'),
+        }}
+      />
 
       {/* Polite status so success does not interrupt a screen reader mid-sentence. */}
       <Text

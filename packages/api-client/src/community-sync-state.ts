@@ -212,6 +212,12 @@ export class CommunitySyncState {
     if (bootstrap) await this.ownedOperation((signal) => this.callbacks.rebuild(signal))
     if (!this.current(generation)) return
     const filtered = this.newerEvents(page.events)
+    const textOnly = this.targetedTextChanges(bootstrap, filtered)
+    if (textOnly) {
+      await this.applyTextChanges(filtered, textOnly, generation)
+      if (this.current(generation)) this.completePage(page, filtered, bootstrap)
+      return
+    }
     if (filtered.length)
       await this.ownedOperation((signal) => this.callbacks.changed(filtered, signal))
     if (!this.current(generation)) return
@@ -234,6 +240,34 @@ export class CommunitySyncState {
     }
     this.completePage(page, filtered, bootstrap)
   }
+  private async applyTextChanges(
+    events: CommunityStreamEvent[],
+    targets: ReadonlySet<string>,
+    generation: number
+  ) {
+    if (targets.size === 0) return
+    const visibleChanges = events.filter(
+      (event) => 'postId' in event && targets.has(event.postId)
+    )
+    await this.ownedOperation((signal) => this.callbacks.changed(visibleChanges, signal))
+    if (this.current(generation)) await this.validateTargets(targets)
+  }
+
+  private targetedTextChanges(bootstrap: boolean, events: CommunityStreamEvent[]) {
+    if (
+      bootstrap ||
+      this.replayAfterRecovery ||
+      events.length === 0 ||
+      events.some((event) => event.kind !== 'post.text_changed')
+    )
+      return null
+    const rendered = new Set(this.callbacks.rendered())
+    return new Set(
+      events.flatMap((event) =>
+        'postId' in event && rendered.has(event.postId) ? [event.postId] : []
+      )
+    )
+  }
   private completePage(
     page: EventPage,
     filtered: CommunityStreamEvent[],
@@ -249,8 +283,10 @@ export class CommunitySyncState {
     this.callbacks.availability('connected', this.connected)
     this.dirty ||= bootstrap || page.hasMore
   }
-  private async validateTargets() {
-    const ids = [...new Set(this.callbacks.rendered())]
+  private async validateTargets(targets?: ReadonlySet<string>) {
+    const ids = [...new Set(this.callbacks.rendered())].filter(
+      (id) => !targets || targets.has(id)
+    )
     for (let offset = 0; offset < ids.length; offset += 50) {
       const targets = ids
         .slice(offset, offset + 50)

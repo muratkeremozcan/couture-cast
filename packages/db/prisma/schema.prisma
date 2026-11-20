@@ -726,7 +726,10 @@ model LookbookPost {
   user                         User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
   user_id                      String
   status                       CommunityPostStatus        @default(draft)
+  title                        String?
   caption                      String?
+  text_revision                Int                        @default(0)
+  original_text_fingerprint    String?
   alt_text                     String?
   /// Opaque `community/<postId>/<random>.<ext>`. Never contains a user id: the
   /// path travels inside every signed URL, so a user id here deanonymizes the

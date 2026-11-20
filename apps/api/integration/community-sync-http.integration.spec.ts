@@ -409,6 +409,196 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
     }
   })
 
+  it('signals caption edits to legacy clients and text edits outside the active feed band', async () => {
+    const owner = await fixture()
+    const post = await prisma.lookbookPost.create({
+      data: buildLookbookPostCreateInput(
+        createLookbookPost({
+          userId: owner.id,
+          status: 'published',
+          climateBand: 'temperate_dry',
+        })
+      ),
+    })
+    await drainCommunityOutbox(prisma, streams)
+    const legacy = clients(owner.id)
+    const modern = communitySyncClient(
+      createApiClient(url, { accessToken: `test-token:guardian:${owner.id}` }),
+      undefined,
+      undefined,
+      true
+    )
+    const legacyHead = await legacy.events('all')
+    const modernHead = await modern.events('cold_dry')
+    await repository.editPublishedPostText({
+      userId: owner.id,
+      postId: post.id,
+      baseRevision: 0,
+      title: 'Evening layers',
+      caption: 'A fresh caption',
+      screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+    })
+    await drainCommunityOutbox(prisma, streams)
+    const legacyPage = await legacy.events('all', legacyHead.nextCursor)
+    expect(legacyPage.resyncRequired).toBe(false)
+    expect(legacyPage.events).toEqual([
+      { version: 1, kind: 'reactions.changed', postId: post.id, communityRevision: '2' },
+    ])
+    await expect(modern.events('cold_dry', modernHead.nextCursor)).resolves.toMatchObject(
+      {
+        events: [{ ...legacyPage.events[0], kind: 'post.text_changed' }],
+        resyncRequired: false,
+      }
+    )
+  })
+
+  it.each([false, true])(
+    'omits text signals when the post loses public visibility during replay (opted in=%s)',
+    async (includePostText) => {
+      const owner = await fixture()
+      const post = await prisma.lookbookPost.create({
+        data: buildLookbookPostCreateInput(
+          createLookbookPost({
+            userId: owner.id,
+            status: 'published',
+            climateBand: 'temperate_dry',
+          })
+        ),
+      })
+      await drainCommunityOutbox(prisma, streams)
+      const client = communitySyncClient(
+        createApiClient(url, { accessToken: `test-token:guardian:${owner.id}` }),
+        undefined,
+        undefined,
+        includePostText
+      )
+      const { nextCursor } = await client.events('cold_dry')
+      await repository.editPublishedPostText({
+        userId: owner.id,
+        postId: post.id,
+        baseRevision: 0,
+        title: 'Evening layers',
+        caption: null,
+        screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+      })
+      await drainCommunityOutbox(prisma, streams)
+
+      const backend = access.authorize.bind(access) as typeof access.authorize
+      let calls = 0
+      const finalAuth = vi
+        .spyOn(access, 'authorize')
+        .mockImplementation(async (...args) => {
+          if (++calls === 2)
+            await repository.withdrawPostAndRequestErasure(post.id, new Date())
+          return backend(...args)
+        })
+      try {
+        await expect(client.events('cold_dry', nextCursor)).resolves.toMatchObject({
+          events: [],
+          resyncRequired: false,
+        })
+        expect(finalAuth).toHaveBeenCalledTimes(2)
+      } finally {
+        finalAuth.mockRestore()
+      }
+    }
+  )
+
+  it('counts approved and withheld writes across a member’s posts in the same rolling hour', async () => {
+    const owner = await fixture()
+    const createPost = () =>
+      prisma.lookbookPost.create({
+        data: buildLookbookPostCreateInput(
+          createLookbookPost({ userId: owner.id, status: 'published' })
+        ),
+      })
+    const [first, second] = await Promise.all([createPost(), createPost()])
+    await prisma.moderationEvent.create({
+      data: {
+        post_id: first.id,
+        action: 'post_text_withheld',
+        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      },
+    })
+    const attempt = {
+      userId: owner.id,
+      baseRevision: 0,
+      title: 'New title',
+      caption: null,
+    }
+    for (let count = 0; count < 9; count++) {
+      await expect(
+        repository.editPublishedPostText({
+          ...attempt,
+          postId: first.id,
+          screen: () => Promise.resolve({ passed: false, policyVersion: 'fixture' }),
+        })
+      ).resolves.toBeNull()
+    }
+    await expect(
+      repository.editPublishedPostText({
+        ...attempt,
+        postId: second.id,
+        screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+      })
+    ).resolves.toMatchObject({ textRevision: 1 })
+    const screen = vi.fn(() =>
+      Promise.resolve({ passed: true, policyVersion: 'fixture' })
+    )
+    await expect(
+      repository.editPublishedPostText({
+        ...attempt,
+        postId: first.id,
+        screen,
+      })
+    ).rejects.toMatchObject({ status: 429 })
+    expect(screen).not.toHaveBeenCalled()
+    expect(
+      await prisma.lookbookPost.findUnique({ where: { id: first.id } })
+    ).toMatchObject({ title: null, text_revision: 0 })
+  })
+
+  it('refuses to screen or revise a teen-owned post when the consent transaction finds no grant', async () => {
+    const teen = await persistUser(
+      prisma,
+      createUser({
+        role: 'teen',
+        age: 14,
+        birthdate: new Date(Date.UTC(new Date().getUTCFullYear() - 14, 0, 1)),
+        profilePreferences: { compliance: { accountStatus: 'active' } },
+      })
+    )
+    const post = await prisma.lookbookPost.create({
+      data: buildLookbookPostCreateInput(
+        createLookbookPost({ userId: teen.id, status: 'published' })
+      ),
+    })
+    const screen = vi.fn(() =>
+      Promise.resolve({ passed: true, policyVersion: 'fixture' })
+    )
+    const priorPolicy = process.env.GUARDIAN_CONSENT_POLICY
+    process.env.GUARDIAN_CONSENT_POLICY = 'required_13_15'
+    try {
+      await expect(
+        repository.editPublishedPostText({
+          userId: teen.id,
+          postId: post.id,
+          baseRevision: 0,
+          title: 'First look',
+          caption: null,
+          screen,
+        })
+      ).rejects.toMatchObject({ status: 403 })
+      expect(screen).not.toHaveBeenCalled()
+      expect(
+        await prisma.lookbookPost.findUnique({ where: { id: post.id } })
+      ).toMatchObject({ title: null, text_revision: 0 })
+    } finally {
+      if (priorPolicy === undefined) delete process.env.GUARDIAN_CONSENT_POLICY
+      else process.env.GUARDIAN_CONSENT_POLICY = priorPolicy
+    }
+  })
+
   it('A01 final event serialization rechecks parent visibility after final authorization', async () => {
     const owner = await fixture()
     const post = await prisma.lookbookPost.create({

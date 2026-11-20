@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings } from '@couture/utils'
+import { createMemberSampleOutfit, getGuestPreviewStrings } from '@couture/utils'
+import { SampleGarmentArt } from './sample-garment-art'
 import { getI18n } from '../../../i18n'
 import { signOutWebSession } from '../../../lib/web-session'
 
@@ -15,9 +16,16 @@ export function GuestPreviewEntry() {
       className="space-y-3 rounded-lg border border-amber-300/30 bg-neutral-900 p-5"
     >
       <h2 id="home-sample-heading" className="text-2xl font-semibold">
-        {strings.outfit.heading}
+        {strings.firstUse.outfitIdea}
       </h2>
       <p className="max-w-prose text-sm text-neutral-300">{strings.chrome.sampleLabel}</p>
+      <div className="flex flex-wrap gap-2" aria-hidden="true">
+        {createMemberSampleOutfit().garments.map((garment) => (
+          <span key={garment.id} className="rounded-md bg-[#F5F5F7] p-1">
+            <SampleGarmentArt garment={garment} className="h-12 w-12" />
+          </span>
+        ))}
+      </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Link
           href="/preview"
@@ -25,7 +33,7 @@ export function GuestPreviewEntry() {
           data-landing="guest"
           className="inline-flex min-h-11 items-center rounded-full bg-amber-300 px-5 py-2 text-sm font-semibold text-black transition hover:bg-amber-200"
         >
-          {strings.chrome.entry}
+          {strings.firstUse.sampleEntry}
         </Link>
         <Link
           href="/signup"

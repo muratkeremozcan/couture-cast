@@ -297,6 +297,11 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
   async function handleSaved(location: SavedLocation, claimed: LocationClaim) {
     const { current } = claimed
     if (!current()) return
+    const target = safeReturnPath(returnTo, window.location.origin)
+    if (target) {
+      router.push(target)
+      return
+    }
     const loaded = await reload(claimed).catch(() => {
       if (current()) setSectionState('load_failed')
       return false
@@ -304,8 +309,6 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
     if (!loaded || !current()) return
     announce(t('locations.saved', { label: location.label }), current)
     focusLater(location.id, current)
-    const target = safeReturnPath(returnTo, window.location.origin)
-    if (target && current()) router.push(target)
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
@@ -329,6 +332,19 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
       <p className="mt-3 text-sm leading-relaxed text-neutral-200">
         {t('locations.intro')}
       </p>
+
+      {guided && (
+        <button
+          type="button"
+          onClick={() =>
+            router.push(safeReturnPath(returnTo, window.location.origin) ?? '/')
+          }
+          className="inline-flex min-h-11 items-center text-sm font-semibold underline"
+          data-testid="locations-guided-cancel"
+        >
+          {t('locations.cancel')}
+        </button>
+      )}
 
       {sectionState === 'signed_out' && (
         <p className="mt-4 text-sm text-neutral-300" data-testid="locations-signed-out">

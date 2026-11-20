@@ -171,14 +171,17 @@ export function isConsentRejection(error: unknown): boolean {
  * guardian lock refuses never gets here (the profile answers 403), and with guardian consent off
  * (2026-11-16) a teen without a guardian is a member like any other.
  */
-export async function resolveWebNextStep(token: string): Promise<string> {
+export async function resolveWebNextStep(
+  token: string,
+  addGarment = false
+): Promise<string> {
   try {
     userProfileResponseSchema.parse(
       await createWebApiClient({ accessToken: token }).apiV1UserProfileGet({
         signal: AbortSignal.timeout(COMFORT_TIMEOUT_MS),
       })
     )
-    return '/wardrobe/onboarding'
+    return addGarment ? '/wardrobe?entry=add' : '/wardrobe/onboarding'
   } catch {
     return '/wardrobe/onboarding'
   }

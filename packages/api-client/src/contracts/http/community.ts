@@ -384,6 +384,20 @@ export const communityPostCaptionSchema = z
       'Caption of at most 280 characters. Applies a best-effort denylist. Anything carrying an http://, https:// or www. prefix is refused whatever its TLD, and so is anything matching a generic email pattern, again whatever its TLD. The fixed TLD list (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) governs only bare domain-like values carrying no such prefix, so a bare domain outside that list (example.xyz) passes unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control.',
   })
 
+export const COMMUNITY_POST_TITLE_MAX_LENGTH = 80
+export const COMMUNITY_POST_TEXT_HEADER = 'x-couture-post-text'
+export const COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE =
+  'You have reached the hourly post edit limit.'
+
+export const communityPostTitleSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(COMMUNITY_POST_TITLE_MAX_LENGTH)
+  .refine((value) => !URL_REGEX.test(value) && !EMAIL_REGEX.test(value), {
+    message: 'Title must not contain web links or email addresses.',
+  })
+
 export const communityPostAltTextSchema = z
   .string()
   .min(1, 'Alt text must be at least 1 character.')
@@ -550,6 +564,8 @@ export const communityFeedItemSchema = z
   .object({
     id: nonEmptyStringSchema,
     caption: z.string().nullable(),
+    title: z.string().nullable().optional(),
+    textRevision: z.number().int().nonnegative().optional(),
     altText: z.string().nullable(),
     climateBand: nullableClimateBandSchema(
       'The climate band stamped when the post was published, or null if unclassified.'
@@ -574,6 +590,7 @@ export const communityAuthorPostStateSchema = z
   .object({
     id: nonEmptyStringSchema,
     caption: z.string().nullable(),
+    title: z.string().nullable().optional(),
     altText: z.string().nullable(),
     climateBand: nullableClimateBandSchema(
       'The climate band stamped when the post was classified, or null if unclassified.'
@@ -770,6 +787,7 @@ export const publishCommunityPostInputSchema = z
      */
     altTextConfirmed: z.literal(true),
     caption: communityPostCaptionSchema.nullable().optional(),
+    title: communityPostTitleSchema.nullable().optional(),
     /** Locale the caption and alt text are screened in. */
     locale: supportedLocaleSchema,
     /** Optional challenge to associate this submission with. */
@@ -785,6 +803,31 @@ export const publishCommunityPostResponseSchema = z
   .strict()
 export type PublishCommunityPostResponse = z.infer<
   typeof publishCommunityPostResponseSchema
+>
+
+export const editCommunityPostTextInputSchema = z
+  .object({
+    baseRevision: z.number().int().min(0).max(2_147_483_646),
+    title: communityPostTitleSchema.nullable(),
+    caption: communityPostCaptionSchema.nullable(),
+  })
+  .strict()
+
+export const editCommunityPostTextResponseSchema = z
+  .object({
+    data: z
+      .object({
+        title: z.string().nullable(),
+        caption: z.string().nullable(),
+        textRevision: z.number().int().nonnegative(),
+      })
+      .strict(),
+  })
+  .strict()
+
+export type EditCommunityPostTextInput = z.infer<typeof editCommunityPostTextInputSchema>
+export type EditCommunityPostTextResponse = z.infer<
+  typeof editCommunityPostTextResponseSchema
 >
 
 // --- Post Reporting Schemas -------------------------------------------------
@@ -1851,6 +1894,14 @@ export function registerCommunityContracts(
           'Opt in to reaction summaries. Omission preserves the strict legacy response.',
       },
       {
+        name: COMMUNITY_POST_TEXT_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to titles and owner text revisions. Omission preserves the legacy response shape.',
+      },
+      {
         name: COMMUNITY_SPONSORSHIP_HEADER,
         in: 'header',
         required: false,
@@ -1973,6 +2024,14 @@ export function registerCommunityContracts(
         schema: { type: 'string', enum: ['1'] },
         description:
           'Opt in to live reaction summaries on each item, exactly like the feed.',
+      },
+      {
+        name: COMMUNITY_POST_TEXT_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to titles and owner text revisions. Omission preserves the legacy response shape.',
       },
       {
         name: COMMUNITY_SPONSORSHIP_HEADER,
@@ -2190,6 +2249,14 @@ export function registerCommunityContracts(
           'Opt in to reaction summaries. Omission preserves the strict legacy response.',
       },
       {
+        name: COMMUNITY_POST_TEXT_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to titles and owner text revisions. Omission preserves the legacy response shape.',
+      },
+      {
         name: COMMUNITY_SPONSORSHIP_HEADER,
         in: 'header',
         required: false,
@@ -2263,6 +2330,48 @@ export function registerCommunityContracts(
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'patch',
+    path: '/api/v1/community/posts/{postId}/text',
+    tags: ['community'],
+    operationId: 'editCommunityPostText',
+    summary: 'Screen and replace a published post title and description',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: z.object({ postId: nonEmptyStringSchema }),
+      body: {
+        required: true,
+        content: { 'application/json': { schema: editCommunityPostTextInputSchema } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Approved replacement text and its revision.',
+        content: { 'application/json': { schema: editCommunityPostTextResponseSchema } },
+      },
+      400: { description: 'Invalid or withheld text.' },
+      401: { description: 'Authentication required.' },
+      403: { description: 'Community write access is required.' },
+      404: { description: 'No eligible published post owned by this member.' },
+      409: { description: 'The text revision has changed.' },
+      429: {
+        description: 'Ten approved or withheld edits per member per rolling hour.',
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until another edit may be screened.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
+        },
+      },
+      503: {
+        description: 'Screening or Community write access is temporarily unavailable.',
       },
     },
   })
