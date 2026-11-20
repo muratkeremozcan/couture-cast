@@ -176,7 +176,10 @@ describe('PremiumThemeSection follows the web session', () => {
     const memberOnePalette = appliedTheme()
     expect(memberOnePalette).not.toBe('')
 
+    // The palette leaves <html> in the commit that loses the owner, before any next read.
     publish({ identity: null, bearer: null })
+    expect(appliedTheme()).toBe('')
+    expect(gallery()).toBeNull()
     publish({ identity: 'member-2', bearer: 'token-2' })
     await waitFor(() => expect(locked()).toHaveTextContent(SIGNED_IN_LOCKED))
     expect(gallery()).toBeNull()

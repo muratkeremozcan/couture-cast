@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { settle } from '../../test-utils/request-barrier'
+import { requestsStarted, settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import type * as Premium from '../../lib/premium'
 import { redirectToExternalUrl } from '../../lib/premium'
@@ -41,7 +41,15 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
 
 // jsdom's location cannot be assigned, so the external redirect is recorded instead.
 /** Every checkout and portal session the section asked for, kept until it settles. */
-const billing = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+const billing = vi.hoisted(() => ({
+  promises: [] as Promise<unknown>[],
+  /**
+   * When set, a session request answers with this URL once `gate` opens, whatever the caller's
+   * cancellation: a client that ignores the abort, so only the section's own checks stand
+   * between the late answer and a redirect.
+   */
+  late: null as { gate: Promise<void>; url: string } | null,
+}))
 vi.mock('../../lib/premium', async (importOriginal) => {
   const actual = await importOriginal<typeof Premium>()
   return {
@@ -50,14 +58,20 @@ vi.mock('../../lib/premium', async (importOriginal) => {
     createCheckoutSessionFromWeb: (
       ...args: Parameters<typeof actual.createCheckoutSessionFromWeb>
     ) => {
-      const pending = actual.createCheckoutSessionFromWeb(...args)
+      const late = billing.late
+      const pending = late
+        ? late.gate.then(() => late.url)
+        : actual.createCheckoutSessionFromWeb(...args)
       billing.promises.push(pending)
       return pending
     },
     createPortalSessionFromWeb: (
       ...args: Parameters<typeof actual.createPortalSessionFromWeb>
     ) => {
-      const pending = actual.createPortalSessionFromWeb(...args)
+      const late = billing.late
+      const pending = late
+        ? late.gate.then(() => late.url)
+        : actual.createPortalSessionFromWeb(...args)
       billing.promises.push(pending)
       return pending
     },
@@ -90,6 +104,8 @@ async function finishVerification(token: string | undefined) {
 
 /** Every member-owned read's bearer, in order. */
 let bearers: (string | null)[]
+/** The premium access read's bearers: it rides beside the subscription read. */
+let accessBearers: (string | null)[]
 
 function renderSection() {
   return render(
@@ -103,6 +119,7 @@ function renderSection() {
 
 function resetSession() {
   bearers = []
+  accessBearers = []
   session.identity = null
   session.stored = false
   session.verifiers = []
@@ -144,9 +161,10 @@ describe('SubscriptionSection follows the web session', () => {
         return HttpResponse.json({ data: SUBSCRIPTION[bearer ?? ''] ?? NONE })
       }),
       // The access source rides beside the subscription; its failure renders as before.
-      http.get('/api/v1/commerce/premium/access', () =>
-        HttpResponse.json({ statusCode: 500, message: 'down' }, { status: 500 })
-      )
+      http.get('/api/v1/commerce/premium/access', ({ request }) => {
+        accessBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json({ statusCode: 500, message: 'down' }, { status: 500 })
+      })
     )
     await getI18n().changeLanguage('en-US')
   })
@@ -161,7 +179,10 @@ describe('SubscriptionSection follows the web session', () => {
     await settle()
 
     expect(hint()).toBeNull()
+    // Verification is pending: neither read of the section has started.
+    expect(requestsStarted()).toBe(0)
     expect(bearers).toEqual([])
+    expect(accessBearers).toEqual([])
 
     publish({ identity: 'member-2', bearer: 'token-2' })
     expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
@@ -170,6 +191,7 @@ describe('SubscriptionSection follows the web session', () => {
     publish({ identity: 'member-2', bearer: 'token-2' })
     await settle()
     expect(bearers).toEqual(['Bearer token-2'])
+    expect(accessBearers).toEqual(['Bearer token-2'])
     expect(hint()).toBeNull()
   })
 
@@ -179,16 +201,20 @@ describe('SubscriptionSection follows the web session', () => {
     renderSection()
     await settle()
     expect(hint()).toBeNull()
+    expect(requestsStarted()).toBe(0)
     expect(bearers).toEqual([])
+    expect(accessBearers).toEqual([])
 
     publish({ identity: null, bearer: null })
     await settle()
     expect(hint()).toBeNull()
+    expect(requestsStarted()).toBe(0)
 
     publish({ identity: 'member-1', bearer: 'token-1' })
     expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
     await settle()
     expect(bearers).toEqual(['Bearer token-1'])
+    expect(accessBearers).toEqual(['Bearer token-1'])
   })
 
   it('SUBSCRIPTION-SESSION-WEB-03 says sign in only once verification ends without a member', async () => {
@@ -406,6 +432,7 @@ describe('SubscriptionSection follows the web session', () => {
     beforeEach(() => {
       refreshBearers = []
       billing.promises = []
+      billing.late = null
       vi.mocked(redirectToExternalUrl).mockClear()
       useMswHandlers(
         http.post(REFRESH_PATH, ({ request }) => {
@@ -417,6 +444,7 @@ describe('SubscriptionSection follows the web session', () => {
     })
 
     afterEach(() => {
+      billing.late = null
       window.history.replaceState({}, '', '/')
     })
 
@@ -589,6 +617,75 @@ describe('SubscriptionSection follows the web session', () => {
         expect(vi.mocked(redirectToExternalUrl)).not.toHaveBeenCalled()
       }
     )
+
+    // CodeRabbit PR 259 round 2: the cases above answer through a request the abort cancels, so
+    // they cannot tell a section that checks its mount from one that relies on the cancellation.
+    // Here the billing call fulfills anyway, after the page or member is gone.
+    describe('a session request that fulfills despite cancellation', () => {
+      const LATE_URL = {
+        portal: 'https://portal.stripe.test/late',
+        checkout: 'https://checkout.stripe.test/late',
+      } as const
+
+      /** Starts a session request that answers only when `answer.release` runs. */
+      async function startLateBilling(kind: 'portal' | 'checkout') {
+        const answer = hold()
+        billing.late = { gate: answer.gate, url: LATE_URL[kind] }
+        // The portal belongs to an active subscriber, checkout to a member without Premium.
+        const [member, token, other, otherToken] =
+          kind === 'portal'
+            ? ['member-1', 'token-1', 'member-2', 'token-2']
+            : ['member-2', 'token-2', 'member-1', 'token-1']
+        session.stored = true
+        session.identity = member
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
+        const view = renderSection()
+        const control = await screen.findByTestId(
+          kind === 'portal' ? 'premium-manage-button' : 'premium-subscribe-monthly'
+        )
+        await waitFor(() => expect(control).toBeEnabled())
+        control.click()
+        await waitFor(() => expect(billing.promises).toHaveLength(1))
+        return { answer, view, member, token, other, otherToken }
+      }
+
+      it.each([
+        ['portal', 'unmount'],
+        ['portal', 'a-b-a'],
+        ['checkout', 'unmount'],
+        ['checkout', 'a-b-a'],
+      ] as const)(
+        'SUBSCRIPTION-SESSION-WEB-11 a %s answer that arrives after %s is not followed',
+        async (kind, how) => {
+          const { answer, view, member, token, other, otherToken } =
+            await startLateBilling(kind)
+
+          if (how === 'unmount') view.unmount()
+          else {
+            publish({ identity: other, bearer: otherToken })
+            publish({ identity: member, bearer: token })
+            await settle()
+          }
+          act(() => answer.release())
+          await settleBilling()
+
+          expect(vi.mocked(redirectToExternalUrl)).not.toHaveBeenCalled()
+        }
+      )
+
+      it.each(['portal', 'checkout'] as const)(
+        'SUBSCRIPTION-SESSION-WEB-11c control: the same %s answer redirects while the mount is active',
+        async (kind) => {
+          const { answer } = await startLateBilling(kind)
+
+          act(() => answer.release())
+          await settleBilling()
+
+          expect(vi.mocked(redirectToExternalUrl)).toHaveBeenCalledTimes(1)
+          expect(vi.mocked(redirectToExternalUrl)).toHaveBeenCalledWith(LATE_URL[kind])
+        }
+      )
+    })
 
     // Settings Codex review 2, finding 5: the return belongs to the first member scope on the
     // page. Once member-1 leaves, it is spent, so member-1 signing in again loads normally.

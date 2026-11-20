@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { settle } from '../../test-utils/request-barrier'
+import { requestsStarted, settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import { CommercePreferencesSection } from './commerce-preferences-section'
 
@@ -121,10 +121,13 @@ describe('CommercePreferencesSection follows the web session', () => {
     await waitFor(() => expect(toggle()).toBeEnabled())
     expect(toggle()).not.toBeChecked()
 
-    // The verification answers too, and the bridge announces the same member again.
+    // The verification answers too, and the bridge announces the same member again: no request
+    // starts, counted where the client starts it, ahead of any handler.
+    const startedBefore = requestsStarted()
     await finishVerification('token-1')
     publish({ identity: 'member-1', bearer: 'token-1' })
     await settle()
+    expect(requestsStarted()).toBe(startedBefore)
     expect(bearers).toEqual(['Bearer token-1'])
     expect(hint()).toBeNull()
   })
