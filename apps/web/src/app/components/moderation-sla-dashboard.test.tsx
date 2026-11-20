@@ -548,3 +548,32 @@ describe('C-WEB-A11Y', () => {
     expect(await violations(container)).toEqual([])
   })
 })
+
+// Jade (2026-11-19) and the production proof: the page said "24-hour review target" while a
+// screening hold is due in 30 minutes, so a moderator read the wrong deadline for the cases that
+// reach them first. The subtitle names both targets, in every locale.
+describe('C-WEB-TARGETS: the subtitle names both review targets', () => {
+  it('shows the screening-hold and member-report targets on the page', async () => {
+    serve(summary())
+    render(<ModerationSlaDashboard />)
+    await screen.findByRole('region', { name: labels.queueTitle })
+    const subtitle = screen.getByText(labels.subtitle)
+    expect(subtitle).toHaveTextContent('30 minutes')
+    expect(subtitle).toHaveTextContent('24 hours')
+  })
+
+  it('no locale subtitle names only one target', () => {
+    const dir = join(__dirname, '../../i18n/locales')
+    const locales = readdirSync(dir).filter((name) => name.endsWith('.json'))
+    expect(locales.length).toBeGreaterThanOrEqual(10)
+    for (const name of locales) {
+      const subtitle = (
+        JSON.parse(readFileSync(join(dir, name), 'utf8')) as {
+          moderation: { sla: { subtitle: string } }
+        }
+      ).moderation.sla.subtitle
+      expect(subtitle, `${name} names the 30-minute target`).toMatch(/\b30\b/)
+      expect(subtitle, `${name} names the 24-hour target`).toMatch(/\b24\b/)
+    }
+  })
+})

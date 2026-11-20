@@ -12906,8 +12906,8 @@ Web E2E, Playwright:
 
 Jade's community reports (the lookbook was a placeholder, "Cold and wet" had no explanation, the
 title said "Living Community Look book") each had a test, but the member specs seed a member and
-skip outside the local stack, so none of them could turn the daily production run red. Two
-specs close that gap:
+skip outside the local stack, so none of them could turn the daily production run red. Three
+checks close that gap:
 
 - [`playwright/tests/community-jade-signed-out.spec.ts`](../../playwright/tests/community-jade-signed-out.spec.ts):
   needs no member and runs in every environment, the daily production run included. At Android
@@ -12917,3 +12917,6 @@ specs close that gap:
 - [`playwright/tests/community-screening-hold-sla.spec.ts`](../../playwright/tests/community-screening-hold-sla.spec.ts):
   a profane caption is held and appears in the moderator queue due exactly 30 minutes after it
   was accepted (JADE-COMMUNITY-003). Local stack only, because it writes a post.
+- [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
+  the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
+  (C-WEB-TARGETS).
