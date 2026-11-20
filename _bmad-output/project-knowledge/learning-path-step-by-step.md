@@ -20769,3 +20769,22 @@ Web unit, Vitest:
 - [`apps/web/src/app/components/planner-rail-week-race.test.tsx`](../../apps/web/src/app/components/planner-rail-week-race.test.tsx):
   proves a late Retry success shows the disabled panel and not an empty list, and a late Retry
   failure keeps the reshuffled week.
+
+#### Tests that would have caught Jade's community reports
+
+Jade's community reports (the lookbook was a placeholder, "Cold and wet" had no explanation, the
+title said "Living Community Look book") each had a test, but the member specs seed a member and
+skip outside the local stack, so none of them could turn the daily production run red. Three
+checks close that gap:
+
+- [`playwright/tests/community-jade-signed-out.spec.ts`](../../playwright/tests/community-jade-signed-out.spec.ts):
+  needs no member and runs in every environment, the daily production run included. At Android
+  Chrome width the bottom-nav Community tab opens the real lookbook, with the Latest looks
+  heading, the climate explainer beside "Cold and wet", and no sideways scroll (JADE-COMMUNITY-001,
+  -002). A placeholder page, a lost explainer or a dead tab fails it.
+- [`playwright/tests/community-screening-hold-sla.spec.ts`](../../playwright/tests/community-screening-hold-sla.spec.ts):
+  a profane caption is held and appears in the moderator queue due exactly 30 minutes after it
+  was accepted (JADE-COMMUNITY-003). Local stack only, because it writes a post.
+- [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
+  the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
+  (C-WEB-TARGETS).
