@@ -23,11 +23,18 @@ import {
 } from './wardrobe.bootstrap'
 
 /** Counts how often the FashionCLIP engine module is evaluated; manual mode must never do it. */
-const fashionClip = vi.hoisted(() => ({ loads: 0, ready: vi.fn() }))
+const fashionClip = vi.hoisted(() => ({
+  loads: 0,
+  ready: vi.fn(),
+  modelDirs: [] as (string | undefined)[],
+}))
 vi.mock('../modules/wardrobe/fashion-clip-tagging.engine', () => {
   fashionClip.loads += 1
   return {
     FashionClipTaggingEngine: class {
+      constructor(modelDir?: string) {
+        fashionClip.modelDirs.push(modelDir)
+      }
       ensureReady = fashionClip.ready
     },
   }
@@ -276,7 +283,11 @@ describe('createTaggingEngine', () => {
   }
 
   beforeEach(() => {
+    // A fresh module registry per test, so the mocked engine module is evaluated again by each
+    // dynamic import: without it only the first test to import it would ever count a load.
+    vi.resetModules()
     fashionClip.loads = 0
+    fashionClip.modelDirs.length = 0
     fashionClip.ready.mockReset().mockResolvedValue(undefined)
     delete process.env.GARMENT_TAGGING_MODEL_DIR
   })
@@ -302,6 +313,7 @@ describe('createTaggingEngine', () => {
 
     expect(engine).toBeInstanceOf(ManualGarmentTaggingEngine)
     expect(fashionClip.loads).toBe(0)
+    expect(fashionClip.modelDirs).toEqual([])
     await expect(engine.inferTags(Buffer.from('x'))).rejects.toMatchObject({
       code: 'TAGGING_MANUAL_MODE',
     })
@@ -316,6 +328,7 @@ describe('createTaggingEngine', () => {
     await createTaggingEngine()
 
     expect(fashionClip.loads).toBe(1)
+    expect(fashionClip.modelDirs).toEqual(['/models/garment-tagging'])
     expect(fashionClip.ready).toHaveBeenCalledOnce()
   })
 
@@ -326,6 +339,7 @@ describe('createTaggingEngine', () => {
 
     await expect(createTaggingEngine()).rejects.toThrow('GARMENT_TAGGING_MODEL_DIR')
     expect(fashionClip.loads).toBe(0)
+    expect(fashionClip.modelDirs).toEqual([])
   })
 
   it('still refuses the fixture engine outside test environments', async () => {

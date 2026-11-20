@@ -147,7 +147,11 @@ describe('start-wardrobe-worker-production.mjs', () => {
         '/app/node_modules/@huggingface/transformers/src/transformers.js',
         '/app/apps/api/dist/src/modules/wardrobe/fashion-clip-tagging.engine.js',
       ])
-    ).toHaveLength(3)
+    ).toEqual([
+      '/app/node_modules/onnxruntime-node/dist/index.js',
+      '/app/node_modules/@huggingface/transformers/src/transformers.js',
+      '/app/apps/api/dist/src/modules/wardrobe/fashion-clip-tagging.engine.js',
+    ])
     expect(loadedModelRuntimes(['/app/node_modules/bullmq/dist/index.js'])).toEqual([])
   })
 

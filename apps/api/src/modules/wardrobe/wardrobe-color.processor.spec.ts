@@ -173,6 +173,11 @@ describe('WardrobeColorProcessor', () => {
         tagging_failure_code: 'TAGGING_MANUAL_MODE',
       }) as unknown as Record<string, unknown>,
     })
+    // No snapshot is written: the stored suggestions stay empty (null), never a stale or partial one.
+    const written = (
+      mockUpdateMany.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> }
+    ).data
+    expect(written.tag_suggestions ?? null).toBeNull()
     expect(errorLog).not.toHaveBeenCalled()
     expect(warnLog).not.toHaveBeenCalled()
     expect(infoLog).toHaveBeenCalledWith(

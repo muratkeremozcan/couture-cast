@@ -618,7 +618,7 @@ describe('GarmentTaggingModal manual mode', () => {
       expect(screen.queryByText('Loading your garment...')).not.toBeInTheDocument()
     })
     const dialogText = screen.getByRole('dialog').textContent ?? ''
-    expect(dialogText).not.toMatch(/suggest|AI|smart/i)
+    expect(dialogText).not.toMatch(/\bsuggest|\bAI\b|\bsmart\b/i)
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument()
   })

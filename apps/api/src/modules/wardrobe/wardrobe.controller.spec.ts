@@ -352,9 +352,11 @@ describe('WardrobeController', () => {
         },
       })
 
+      // The response contract is a discriminated union: manual carries no suggestions, so the
+      // answer fails validation instead of reaching a client that would show both.
       await expect(
         controller.suggestGarmentTags(mockAuth, 'garment_99')
-      ).rejects.toThrow()
+      ).rejects.toMatchObject({ name: 'ZodError' })
     })
   })
 

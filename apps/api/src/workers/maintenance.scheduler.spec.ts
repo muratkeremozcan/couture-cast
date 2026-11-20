@@ -253,6 +253,9 @@ describe('registerWardrobeMaintenanceSchedulers', () => {
     const { queue, calls } = createQueue()
     await registerWardrobeMaintenanceSchedulers(queue)
     await registerWardrobeMaintenanceSchedulers(queue)
-    expect(new Set(calls().map((call) => call[0])).size).toBe(2)
+    // A restart upserts the same two schedulers by id with the same patterns: four calls, the
+    // second pair identical to the first, so nothing accumulates.
+    expect(calls()).toHaveLength(4)
+    expect(calls().slice(2)).toEqual(calls().slice(0, 2))
   })
 })

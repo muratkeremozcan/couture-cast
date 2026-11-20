@@ -17,6 +17,7 @@ describe('ManualGarmentTaggingEngine', () => {
       GarmentTaggingManualModeError
     )
     await expect(engine.inferTags(Buffer.alloc(0))).rejects.toMatchObject({
+      name: 'GarmentTaggingManualModeError',
       code: TAGGING_MANUAL_MODE_CODE,
     })
     expect(TAGGING_MANUAL_MODE_CODE).toBe('TAGGING_MANUAL_MODE')
@@ -27,7 +28,10 @@ describe('ManualGarmentTaggingEngine', () => {
       path.resolve(__dirname, 'manual-garment-tagging.engine.ts'),
       'utf8'
     )
-    const specifiers = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1])
+    // `from`, side-effect `import '...'`, dynamic `import('...')` and `require('...')` all count.
+    const specifiers = [
+      ...source.matchAll(/\b(?:from|import|require)\s*\(?\s*['"]([^'"]+)['"]/g),
+    ].map((match) => match[1])
     expect(specifiers.toSorted()).toEqual([
       './garment-tagging.engine',
       '@couture/api-client/contracts/http',

@@ -305,6 +305,21 @@ describe('createWardrobeMaintenanceProcessor', () => {
     )
   })
 
+  it('rethrows a failed retention purge under its own event so BullMQ retries it', async () => {
+    const { deps, process } = buildWardrobe()
+    const failure = new Error('database unavailable')
+    deps.wardrobeRetention.purgeExpiredAndDeletedGarments.mockRejectedValueOnce(failure)
+
+    await expect(process({ name: WARDROBE_RETENTION_PURGE_JOB_NAME })).rejects.toBe(
+      failure
+    )
+    expect(deps.logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: failure, job: WARDROBE_RETENTION_PURGE_JOB_NAME }),
+      'wardrobe_retention_purge_failed'
+    )
+    expect(deps.wardrobeRetention.drainDeletions).not.toHaveBeenCalled()
+  })
+
   it('rethrows a failed sweep under its own event so BullMQ retries it', async () => {
     const { deps, process } = buildWardrobe()
     const failure = new Error('storage unavailable')

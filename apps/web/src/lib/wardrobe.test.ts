@@ -1196,7 +1196,10 @@ describe('garment tagging wrappers', () => {
     void _mode
     stubFetchOnce(jsonResponse({ data: withoutMode }))
 
-    await expect(suggestGarmentTagsFromWeb('garment-1')).rejects.toThrow()
+    // The response contract requires a mode; the schema error surfaces, not a half-read answer.
+    await expect(suggestGarmentTagsFromWeb('garment-1')).rejects.toMatchObject({
+      name: 'ZodError',
+    })
   })
 
   /**

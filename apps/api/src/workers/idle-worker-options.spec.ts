@@ -30,6 +30,9 @@ describe('hosted wardrobe worker idle backoff', () => {
   it('builds the same BullMQ options as the community consumer for every hosted consumer', () => {
     const hosted = hostedWorkerOptions()
     const community = communityModerationWorkerOptions()
+    // Every option, not only the five named below, matches the community consumer's, apart from
+    // the worker name only the community consumer sets.
+    expect({ ...hosted, name: undefined }).toEqual({ ...community, name: undefined })
     expect(hosted).toMatchObject({
       concurrency: 1,
       drainDelay: 300,
