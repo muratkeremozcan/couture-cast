@@ -2,13 +2,16 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import type {
   GarmentCategory,
   GarmentMaterial,
   GarmentComfortRange,
   GarmentItemContract,
   SuggestGarmentTagsData,
+  SuggestGarmentTagsSuggestedData,
 } from '@couture/api-client/contracts/http'
+import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import {
   suggestGarmentTagsFromWeb,
@@ -76,15 +79,21 @@ const COMFORT_OPTIONS: { value: GarmentComfortRange; label: string; desc: string
 
 interface SuggestionStatusProps {
   isLoading: boolean
+  loadingLabel: string
   errorMessage: string | null
   onRetry: () => void
 }
 
-function SuggestionStatus({ isLoading, errorMessage, onRetry }: SuggestionStatusProps) {
+function SuggestionStatus({
+  isLoading,
+  loadingLabel,
+  errorMessage,
+  onRetry,
+}: SuggestionStatusProps) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 text-sm text-zinc-500">
-        <span className="animate-spin text-lg">⏳</span> Loading smart suggestions...
+        <span className="animate-spin text-lg">⏳</span> {loadingLabel}
       </div>
     )
   }
@@ -117,6 +126,9 @@ export function GarmentTaggingModal({
   suggestTagsFn = suggestGarmentTagsFromWeb,
   updateTagsFn = updateGarmentTagsFromWeb,
 }: GarmentTaggingModalProps) {
+  // The modal mounts under the wardrobe page's provider and under onboarding; the shared instance
+  // keeps it on the same language without requiring either.
+  const { t } = useTranslation(undefined, { i18n: getI18n() })
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
@@ -125,7 +137,11 @@ export function GarmentTaggingModal({
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isAnalysisPending, setIsAnalysisPending] = useState(false)
-  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsData | null>(null)
+  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsSuggestedData | null>(
+    null
+  )
+  // The API answered `mode: 'manual'`: no model ran, so the member chooses every tag.
+  const [isManualMode, setIsManualMode] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const categoryGroupRef = useRef<HTMLDivElement | null>(null)
   const categoryOptionRefs = useRef<Record<string, HTMLButtonElement | null>>({})
@@ -149,6 +165,7 @@ export function GarmentTaggingModal({
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
+    setIsManualMode(false)
     setSuggestionError(null)
     setSaveError(null)
     setIsAnalysisPending(false)
@@ -167,6 +184,10 @@ export function GarmentTaggingModal({
     suggestTagsFn(garmentId, controller.signal)
       .then((data) => {
         if (!isMounted) return
+        if (data.mode === 'manual') {
+          setIsManualMode(true)
+          return
+        }
         setSuggestions(data)
         if (data.suggestions.category.isConfident && !touchedFieldsRef.current.category) {
           setSelectedCategory(data.suggestions.category.value)
@@ -311,12 +332,20 @@ export function GarmentTaggingModal({
       titleId="garment-tagging-title"
       title="Organize Garment Tags"
       descriptionId="garment-tagging-desc"
-      description="Review or customize AI suggestions to personalize your daily outfit recommendations."
+      description={
+        // Suggestion wording only once suggestions are in hand. Manual mode says the member
+        // chooses; until the answer names the mode (and when it failed) the copy is neutral.
+        suggestions
+          ? 'Review or customize AI suggestions to personalize your daily outfit recommendations.'
+          : isManualMode
+            ? t('wardrobe.tagging.manual_desc')
+            : t('wardrobe.tagging.pending_desc')
+      }
       invokingElementRef={invokingElementRef}
       initialFocusRef={categoryGroupRef as React.RefObject<HTMLElement | null>}
       ariaLiveMessage={
         isLoadingSuggestions
-          ? 'Loading smart suggestions'
+          ? t('wardrobe.tagging.loading')
           : isSaving
             ? 'Saving garment tags'
             : null
@@ -326,6 +355,7 @@ export function GarmentTaggingModal({
       <div className="mt-4 flex flex-col gap-6">
         <SuggestionStatus
           isLoading={isLoadingSuggestions}
+          loadingLabel={t('wardrobe.tagging.loading')}
           errorMessage={suggestionError}
           onRetry={() => setLoadAttempt((current) => current + 1)}
         />

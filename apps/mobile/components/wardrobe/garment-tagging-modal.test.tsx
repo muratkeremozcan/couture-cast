@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -16,6 +18,7 @@ import {
   liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 import {
+  createManualSuggestGarmentTagsDataFixture,
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -201,7 +204,9 @@ describe('MobileGarmentTaggingModal Component', () => {
       />
     )
 
-    expect(screen.getByText('wardrobe.tagging.title')).toBeDefined()
+    // Pending: the title is neutral until suggestions are in hand.
+    expect(screen.getByText('wardrobe.tagging.pending_title')).toBeDefined()
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
 
     await waitFor(() => {
       expect(mockSuggestTagsFn).toHaveBeenCalledWith(
@@ -586,5 +591,186 @@ describe('R52 MobileGarmentTaggingModal over the system bars', () => {
     expect(paddingBottomOf(screen.getByTestId('garment-tagging-modal'))).toBe(
       20 + TEST_SAFE_AREA_INSETS.bottom
     )
+  })
+})
+
+describe('MobileGarmentTaggingModal manual mode', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  type UpdateTagsFn = React.ComponentProps<
+    typeof MobileGarmentTaggingModal
+  >['updateTagsFn']
+
+  function renderManual(overrides: { updateTagsFn?: UpdateTagsFn } = {}) {
+    const suggestTagsFn = vi
+      .fn()
+      .mockResolvedValue(
+        createManualSuggestGarmentTagsDataFixture({ garmentId: 'g_123' })
+      )
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId="g_123"
+        accessToken="test_token"
+        suggestTagsFn={suggestTagsFn}
+        updateTagsFn={
+          overrides.updateTagsFn ??
+          vi.fn().mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
+        }
+      />
+    )
+    return { suggestTagsFn }
+  }
+
+  it('says the member chooses the tags and shows no spinner and no suggestion text once the API answers manual', async () => {
+    renderManual()
+
+    expect(await screen.findByTestId('garment-tagging-manual-notice')).toBeDefined()
+    expect(screen.getByText('wardrobe.tagging.manual_title')).toBeDefined()
+    expect(screen.getAllByText('wardrobe.tagging.manual_desc')).toHaveLength(1)
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
+    expect(screen.queryByLabelText('wardrobe.tagging.loading')).toBeNull()
+    expect(screen.queryByText(/ai_suggested|low_confidence_suggested/)).toBeNull()
+    expect(screen.queryByText('wardrobe.tagging.retry')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('preselects nothing and saves exactly what the member chose', async () => {
+    const updateTagsFn = vi
+      .fn()
+      .mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
+    renderManual({ updateTagsFn })
+    await screen.findByTestId('garment-tagging-manual-notice')
+
+    const save = screen.getByRole('button', { name: 'wardrobe.tagging.save' })
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+
+    fireEvent.click(screen.getByTestId('garment-tag-category-outerwear'))
+    fireEvent.click(screen.getByTestId('garment-tag-comfort-cool'))
+    await waitFor(() => {
+      expect(save.getAttribute('aria-disabled')).not.toBe('true')
+    })
+    fireEvent.click(save)
+
+    await waitFor(() => {
+      expect(updateTagsFn).toHaveBeenCalledWith(
+        'test_token',
+        'g_123',
+        { category: 'outerwear', material: null, comfortRange: 'cool' },
+        expect.any(AbortSignal)
+      )
+    })
+  })
+})
+
+describe('MobileGarmentTaggingModal while the mode is pending (the response is held)', () => {
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  function held() {
+    let resolve: (data: unknown) => void = () => undefined
+    const suggestTagsFn = vi.fn().mockReturnValue(
+      new Promise((settle) => {
+        resolve = settle
+      })
+    )
+    return { suggestTagsFn, resolve: (data: unknown) => resolve(data) }
+  }
+
+  type SuggestTagsFn = React.ComponentProps<
+    typeof MobileGarmentTaggingModal
+  >['suggestTagsFn']
+
+  function renderHeld(suggestTagsFn: SuggestTagsFn) {
+    return render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId="g_123"
+        accessToken="test_token"
+        suggestTagsFn={suggestTagsFn}
+        updateTagsFn={vi.fn()}
+      />
+    )
+  }
+
+  it('shows neutral copy and a labelled spinner until the answer, then the manual copy and no spinner', async () => {
+    const { suggestTagsFn, resolve } = held()
+    renderHeld(suggestTagsFn)
+
+    expect(screen.getByText('wardrobe.tagging.pending_title')).toBeDefined()
+    expect(screen.getByLabelText('wardrobe.tagging.loading')).toBeDefined()
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
+    expect(screen.queryByText('wardrobe.tagging.manual_title')).toBeNull()
+    expect(screen.queryByTestId('garment-tagging-manual-notice')).toBeNull()
+
+    await act(async () => {
+      resolve(createManualSuggestGarmentTagsDataFixture({ garmentId: 'g_123' }))
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('garment-tagging-manual-notice')).toBeDefined()
+    expect(screen.getByText('wardrobe.tagging.manual_title')).toBeDefined()
+    expect(screen.queryByText('wardrobe.tagging.pending_title')).toBeNull()
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
+    expect(screen.queryByLabelText('wardrobe.tagging.loading')).toBeNull()
+  })
+
+  it('takes the suggestion title only when suggestions arrive', async () => {
+    const { suggestTagsFn, resolve } = held()
+    renderHeld(suggestTagsFn)
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
+
+    await act(async () => {
+      resolve(createSuggestGarmentTagsDataFixture({ garmentId: 'g_123' }))
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByText('wardrobe.tagging.title')).toBeDefined()
+    expect(screen.queryByText('wardrobe.tagging.pending_title')).toBeNull()
+  })
+
+  it('does not move accessibility focus to the title until the mode is known', async () => {
+    vi.useFakeTimers()
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    vi.mocked(findNodeHandle).mockReturnValue(42)
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    const { suggestTagsFn, resolve } = held()
+    renderHeld(suggestTagsFn)
+
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolve(createManualSuggestGarmentTagsDataFixture({ garmentId: 'g_123' }))
+      await Promise.resolve()
+    })
+    act(() => {
+      vi.advanceTimersByTime(150)
+    })
+
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledTimes(1)
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(42)
+  })
+
+  it('keeps the close control on the neutral label in every state', async () => {
+    const { suggestTagsFn, resolve } = held()
+    renderHeld(suggestTagsFn)
+    expect(screen.getByLabelText('wardrobe.tagging.close')).toBeDefined()
+
+    await act(async () => {
+      resolve(createManualSuggestGarmentTagsDataFixture({ garmentId: 'g_123' }))
+      await Promise.resolve()
+    })
+    await screen.findByTestId('garment-tagging-manual-notice')
+    expect(screen.getByLabelText('wardrobe.tagging.close')).toBeDefined()
   })
 })

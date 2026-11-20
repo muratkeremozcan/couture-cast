@@ -17,6 +17,7 @@ import type {
   GarmentComfortRange,
   GarmentItemContract,
   SuggestGarmentTagsData,
+  SuggestGarmentTagsSuggestedData,
 } from '@couture/api-client/contracts/http'
 import {
   suggestGarmentTagsFromMobile,
@@ -127,7 +128,11 @@ export function MobileGarmentTaggingModal({
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isAnalysisPending, setIsAnalysisPending] = useState(false)
-  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsData | null>(null)
+  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsSuggestedData | null>(
+    null
+  )
+  // The API answered `mode: 'manual'`: no model ran, so the member chooses every tag.
+  const [isManualMode, setIsManualMode] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const titleRef = useRef<React.ElementRef<typeof Text> | null>(null)
   const saveAbortRef = useRef<AbortController | null>(null)
@@ -137,15 +142,20 @@ export function MobileGarmentTaggingModal({
   onCloseRef.current = onClose
   invokingNodeHandleRef.current = invokingNodeHandle
 
+  // The reader's focus moves to the title only once the answer names the mode (suggested or
+  // manual) or the request settled, so it never announces a title that the answer then
+  // contradicts. With no garment there is no request to wait for.
+  useEffect(() => {
+    if (!visible || isLoading || Platform.OS === 'web') return
+    const focusTimer = setTimeout(() => {
+      const node = safeFindNodeHandle(titleRef.current)
+      if (node) AccessibilityInfo.setAccessibilityFocus(node)
+    }, 150)
+    return () => clearTimeout(focusTimer)
+  }, [visible, isLoading])
+
   useEffect(() => {
     if (!visible) return
-    const focusTimer =
-      Platform.OS === 'web'
-        ? null
-        : setTimeout(() => {
-            const node = safeFindNodeHandle(titleRef.current)
-            if (node) AccessibilityInfo.setAccessibilityFocus(node)
-          }, 150)
     // react-native-web's BackHandler is a stub that warns on every call; a browser has no
     // hardware Back for the sheet to answer.
     const backSubscription =
@@ -156,7 +166,6 @@ export function MobileGarmentTaggingModal({
             return true
           })
     return () => {
-      if (focusTimer !== null) clearTimeout(focusTimer)
       backSubscription?.remove()
       const invoker = invokingNodeHandleRef.current
       if (Platform.OS !== 'web' && invoker) {
@@ -182,6 +191,7 @@ export function MobileGarmentTaggingModal({
       setSelectedMaterial(null)
       setSelectedComfort(null)
       setSuggestions(null)
+      setIsManualMode(false)
       setSuggestionError(null)
       setSaveError(null)
       setIsAnalysisPending(false)
@@ -194,15 +204,20 @@ export function MobileGarmentTaggingModal({
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
+    setIsManualMode(false)
     setIsLoading(true)
     setSuggestionError(null)
     setSaveError(null)
     setIsAnalysisPending(false)
 
-    announce('feedback', t('wardrobe.tagging.loading_suggestions'))
+    announce('feedback', t('wardrobe.tagging.loading'))
     suggestTagsFn(accessToken, garmentId, controller.signal)
       .then((data) => {
         if (!isMounted) return
+        if (data.mode === 'manual') {
+          setIsManualMode(true)
+          return
+        }
         setSuggestions(data)
         if (data.suggestions.category.isConfident) {
           setSelectedCategory(data.suggestions.category.value)
@@ -286,6 +301,19 @@ export function MobileGarmentTaggingModal({
     }
   }
 
+  // Suggestion wording only once suggestions are in hand; manual mode says the member chooses;
+  // until the answer names the mode (and when it failed) the copy is neutral.
+  const titleKey = suggestions
+    ? 'wardrobe.tagging.title'
+    : isManualMode
+      ? 'wardrobe.tagging.manual_title'
+      : 'wardrobe.tagging.pending_title'
+  const tagHint = suggestions
+    ? t('wardrobe.tagging.desc')
+    : isManualMode
+      ? t('wardrobe.tagging.manual_desc')
+      : t('wardrobe.tagging.pending_desc')
+
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
@@ -310,7 +338,7 @@ export function MobileGarmentTaggingModal({
               accessible={true}
               accessibilityRole="header"
             >
-              {t('wardrobe.tagging.title')}
+              {t(titleKey)}
             </Text>
             <TouchableOpacity
               onPress={onClose}
@@ -338,13 +366,21 @@ export function MobileGarmentTaggingModal({
 
           {isLoading ? (
             <ActivityIndicator
-              accessibilityLabel={t('wardrobe.tagging.loading_suggestions')}
+              accessibilityLabel={t('wardrobe.tagging.loading')}
               size="large"
               color={colors.text}
               style={{ marginVertical: 20 }}
             />
           ) : !isAnalysisPending ? (
             <ScrollView keyboardShouldPersistTaps="handled" style={styles.content}>
+              {isManualMode && (
+                <Text
+                  style={styles.suggestionText}
+                  testID="garment-tagging-manual-notice"
+                >
+                  {t('wardrobe.tagging.manual_desc')}
+                </Text>
+              )}
               {/* Category */}
               <Text style={styles.sectionTitle}>
                 {t('wardrobe.tagging.category')} {t('wardrobe.tagging.required')}
@@ -366,7 +402,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.category')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.chipGrid}
               >
                 {CATEGORY_OPTIONS.map((opt) => {
@@ -417,7 +453,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.material')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.chipGrid}
               >
                 <TouchableOpacity
@@ -491,7 +527,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.comfort_range')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.comfortList}
               >
                 {COMFORT_OPTIONS.map((opt) => {

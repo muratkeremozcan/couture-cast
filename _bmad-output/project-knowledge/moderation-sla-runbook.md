@@ -100,7 +100,7 @@ They are written in the same sweep, or a later one if that write fails, even if 
 1. Run the drill to confirm: `npm run moderation:sla:drill -- --env-file .env.prod`.
 2. Fix the webhook or its destination. Alerts still relevant then deliver by themselves, with no operator step.
 3. Work breached cases from `/moderation` meanwhile.
-4. Remove the failure row in the Supabase SQL editor once fixed. Rows stay until removed, because the job that prunes them runs on `maintenance`, which no hosted process consumes:
+4. Remove the failure row in the Supabase SQL editor once fixed. Rows stay until removed, because the job that prunes them runs on `maintenance`, which no hosted process consumes (the hosted wardrobe worker runs its two wardrobe tasks from its own timers and consumes no queue for them):
 
    ```sql
    DELETE FROM "JobFailure" WHERE job_id = 'moderation_sla_delivery__<alertId>';

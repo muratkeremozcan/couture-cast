@@ -1,18 +1,26 @@
 import '../load-env'
 import path from 'node:path'
 import type { Queue, Worker } from 'bullmq'
+import Redis from 'ioredis'
 import { allowsTestOnlySecrets } from '../config/runtime-environment'
 import { createQueues } from '../config/queues'
+import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { createBaseLogger } from '../logger/pino.config.js'
-import { FashionClipTaggingEngine } from '../modules/wardrobe/fashion-clip-tagging.engine'
 import { FixtureGarmentTaggingEngine } from '../modules/wardrobe/fixture-garment-tagging.engine'
 import type { GarmentTaggingEngine } from '../modules/wardrobe/garment-tagging.engine'
-import { garmentColorProcessingJobSchema } from '../modules/wardrobe/wardrobe-processing.queue'
+import { ManualGarmentTaggingEngine } from '../modules/wardrobe/manual-garment-tagging.engine'
+import { invalidateRitualCacheForUser } from '../modules/personalization/ritual-cache'
+import { WardrobeRetentionService } from '../modules/wardrobe/wardrobe-retention.service'
+import {
+  garmentColorProcessingJobSchema,
+  WardrobeProcessingQueue,
+} from '../modules/wardrobe/wardrobe-processing.queue'
 import { WardrobeColorProcessor } from '../modules/wardrobe/wardrobe-color.processor'
 import { FixtureSilhouettePhotoModerationEngine } from '../modules/wardrobe/fixture-silhouette-photo-moderation.engine'
 import { HeuristicSilhouettePhotoModerationEngine } from '../modules/wardrobe/heuristic-silhouette-photo-moderation.engine'
 import type { SilhouettePhotoModerationEngine } from '../modules/wardrobe/silhouette-photo-moderation.engine'
 import {
+  SilhouettePhotoProcessingQueue,
   silhouettePhotoProcessingJobSchema,
   silhouetteSessionFromJobId,
 } from '../modules/wardrobe/silhouette-photo-processing.queue'
@@ -22,23 +30,47 @@ import { FixturePaletteAnalysisEngine } from '../modules/commerce/fixture-palett
 import { HeuristicPaletteAnalysisEngine } from '../modules/commerce/heuristic-palette-analysis.engine'
 import type { PaletteAnalysisEngine } from '../modules/commerce/palette-analysis.engine'
 import {
+  PaletteAnalysisProcessingQueue,
   paletteAnalysisProcessingJobSchema,
   paletteAttemptFromJobId,
 } from '../modules/commerce/palette-analysis-processing.queue'
 import { PaletteAnalysisProcessor } from '../modules/commerce/palette-analysis.processor'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { PostHogService } from '../posthog/posthog.service'
-import { createWorker, defaultWorkerOptions } from './base.worker'
+import { createWorker } from './base.worker'
+import {
+  HOSTED_WORKER_CONCURRENCY,
+  IDLE_DRAIN_DELAY_SECONDS,
+  hostedWorkerOptions,
+} from './idle-worker-options'
+import { assertHostedWardrobeConfig, isIsolatedDrillEnv } from './hosted-wardrobe-config'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
-import { shutdownWorkerResources } from './shutdown-resources'
+import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
+import {
+  WardrobeMaintenanceLoop,
+  removeWardrobeMaintenanceSchedulers,
+  wardrobeMaintenanceEnabled,
+} from './wardrobe-maintenance'
+import { checkWardrobeWorkerReadiness, pingRedisOnce } from './wardrobe-readiness'
 import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
 
 const logger = createBaseLogger().child({ feature: 'wardrobe-worker' })
 const workers: Worker[] = []
-const queues: Queue[] = []
+const queues: ShutdownQueue[] = []
+const redisClients: Redis[] = []
+let maintenanceLoop: WardrobeMaintenanceLoop | undefined
 
 export async function createTaggingEngine(): Promise<GarmentTaggingEngine> {
   const requestedEngine = process.env.GARMENT_TAGGING_ENGINE?.trim() || 'fashion-clip'
+  if (requestedEngine === 'manual') {
+    // No model, no onnxruntime, no transformers: the hosted service cannot hold the model. The
+    // garment reaches `awaiting_tags` with no suggestions and the member chooses the tags.
+    logger.info(
+      { engine: requestedEngine },
+      'Using garment tagging engine: no model is loaded and members choose the tags'
+    )
+    return new ManualGarmentTaggingEngine()
+  }
   if (requestedEngine === 'fixture') {
     if (!allowsTestOnlySecrets()) {
       throw new Error(
@@ -65,6 +97,10 @@ export async function createTaggingEngine(): Promise<GarmentTaggingEngine> {
   logger.info(
     { engine: requestedEngine, modelDir: configuredModelDir },
     'Initializing garment tagging engine'
+  )
+  // Loaded only here, so a worker on `manual` never reads the engine module, let alone the model.
+  const { FashionClipTaggingEngine } = await import(
+    '../modules/wardrobe/fashion-clip-tagging.engine.js'
   )
   const engine = new FashionClipTaggingEngine(configuredModelDir)
   await engine.ensureReady()
@@ -141,11 +177,101 @@ export function createPaletteAnalysisEngine(): PaletteAnalysisEngine {
   return new HeuristicPaletteAnalysisEngine()
 }
 
-async function startWardrobeWorker() {
+/**
+ * The wardrobe maintenance loop (`WARDROBE_MAINTENANCE_ENABLED=true`): the retention purge hourly
+ * and the deletion drain every 15 minutes, in this process, under a Redis lock per tick
+ * ({@link WardrobeMaintenanceLoop}). It consumes no BullMQ queue. Hand-wired like the general
+ * worker (Nest DI does not work under tsx).
+ *
+ * The two schedulers a general worker may have left on the shared `maintenance` queue are removed
+ * first, so no stale job reaches a consumer that does not run it. The retention service
+ * re-enqueues stranded processing garments and photos through the three handoff producers, which
+ * open their Redis connection on the first re-enqueue; the Redis client below (lock and ritual
+ * cache) sends a command only when a tick runs or a garment is purged.
+ */
+async function startWardrobeMaintenance(
+  prisma: ReturnType<typeof getPrismaClient>,
+  startedQueues: Queue[]
+) {
+  const maintenanceQueue = startedQueues.find((queue) => queue.name === 'maintenance')
+  if (!maintenanceQueue) {
+    throw new Error('Required maintenance queue was not created')
+  }
+  await removeWardrobeMaintenanceSchedulers(maintenanceQueue)
+
+  const redisConfig = getRedisConfig()
+  const maintenanceRedis = new Redis(redisConfig.url, {
+    ...redisOptionsFromConfig(redisConfig),
+  })
+  redisClients.push(maintenanceRedis)
+
+  const garmentHandoff = new WardrobeProcessingQueue()
+  const silhouetteHandoff = new SilhouettePhotoProcessingQueue()
+  const paletteHandoff = new PaletteAnalysisProcessingQueue()
+  queues.push(
+    {
+      close: () => garmentHandoff.onModuleDestroy(),
+      disconnect: () => garmentHandoff.onModuleDestroy(),
+    },
+    {
+      close: () => silhouetteHandoff.onModuleDestroy(),
+      disconnect: () => silhouetteHandoff.onModuleDestroy(),
+    },
+    {
+      close: () => paletteHandoff.onModuleDestroy(),
+      disconnect: () => paletteHandoff.onModuleDestroy(),
+    }
+  )
+
+  maintenanceLoop = new WardrobeMaintenanceLoop({
+    retention: new WardrobeRetentionService(
+      prisma,
+      new SupabaseWardrobeStorageAdapter(),
+      {
+        invalidateUserCache: (userId: string) =>
+          invalidateRitualCacheForUser(maintenanceRedis, userId),
+      },
+      { garment: garmentHandoff, silhouette: silhouetteHandoff, palette: paletteHandoff }
+    ),
+    redis: maintenanceRedis,
+    logger: logger.child({ feature: 'wardrobe-maintenance' }),
+  })
+  maintenanceLoop.start()
+}
+
+export type StartWardrobeWorkerOptions = {
+  /**
+   * The hosted service's start (the launcher passes it): refuse a configuration that may not run
+   * there, and check the database, Redis and storage before consuming. A developer's or an
+   * end-to-end stack's start leaves it off and keeps the fixture engines available.
+   */
+  hosted?: boolean
+  /** The launcher's build-time drill child; exempt from the checks only in the drill configuration. */
+  drillChild?: boolean
+}
+
+export async function startWardrobeWorker(options: StartWardrobeWorkerOptions = {}) {
   try {
+    const hosted = options.hosted === true
+    // The same refusals the launcher makes: test profiles, fixture selectors and missing
+    // configuration, before anything connects.
+    if (hosted) {
+      assertHostedWardrobeConfig(process.env, { drillChild: options.drillChild })
+    }
     // Refuse to start on a guardian consent policy this deployment may not run, as the API's
     // AppModule does (TEA sign-off F-4).
     resolveGuardianConsentPolicy()
+    const checkDependencies =
+      hosted && !(options.drillChild && isIsolatedDrillEnv(process.env))
+    if (checkDependencies) {
+      // Process start is not readiness: bounded one-shot checks before any consumer starts.
+      const checked = await checkWardrobeWorkerReadiness({
+        database: () => getPrismaClient().$queryRaw`SELECT 1`,
+        redis: () => pingRedisOnce(),
+        storage: () => new SupabaseWardrobeStorageAdapter().checkReadable(),
+      })
+      logger.info({ checkedMs: checked }, 'wardrobe_worker_ready')
+    }
     const startedQueues = createQueues()
     queues.push(...startedQueues)
     const colorExtractionQueue = startedQueues.find(
@@ -179,9 +305,7 @@ async function startWardrobeWorker() {
             throw error
           }
         },
-        {
-          ...defaultWorkerOptions(1),
-        }
+        hostedWorkerOptions()
       )
     )
 
@@ -199,8 +323,8 @@ async function startWardrobeWorker() {
     )
 
     workers.push(
-      // Moderation pipeline uses explicit throttling to protect downstream systems,
-      // matching the placeholder's rate limit this replaces (workers/bootstrap.ts).
+      // One job at a time on the hosted service (0.2 vCPU, 512 MB), which also bounds the rate
+      // the placeholder's limiter (workers/bootstrap.ts) used to cap.
       createWorker(
         'moderation-review',
         async (job) => {
@@ -221,10 +345,7 @@ async function startWardrobeWorker() {
             throw error
           }
         },
-        {
-          ...defaultWorkerOptions(10),
-          limiter: { max: 10, duration: 1000 },
-        }
+        hostedWorkerOptions()
       )
     )
 
@@ -269,14 +390,25 @@ async function startWardrobeWorker() {
             throw error
           }
         },
-        {
-          ...defaultWorkerOptions(4),
-        }
+        hostedWorkerOptions()
       )
     )
 
+    if (wardrobeMaintenanceEnabled()) {
+      await startWardrobeMaintenance(prisma, startedQueues)
+    }
+
+    // The queues this process consumes, for the operator who is checking that nothing else
+    // consumes them on the same Redis.
     logger.info(
-      'Dedicated wardrobe worker started for color-extraction at concurrency 1, moderation-review at concurrency 10, and palette-analysis at concurrency 4'
+      {
+        consumes: workers.map((worker) => worker.name),
+        concurrency: HOSTED_WORKER_CONCURRENCY,
+        maintenanceLoop: maintenanceLoop !== undefined,
+        taggingEngine: process.env.GARMENT_TAGGING_ENGINE?.trim() || 'fashion-clip',
+        drainDelaySeconds: IDLE_DRAIN_DELAY_SECONDS,
+      },
+      `Dedicated wardrobe worker started, consuming ${workers.map((worker) => worker.name).join(', ')} at concurrency ${HOSTED_WORKER_CONCURRENCY}${maintenanceLoop ? ', with the wardrobe maintenance loop' : ''}`
     )
   } catch (err) {
     logger.error(err, 'Failed to start dedicated wardrobe worker')
@@ -284,16 +416,24 @@ async function startWardrobeWorker() {
   }
 }
 
+/** Under the hosted launcher's 25-second deadline and Northflank's 30-second grace period. */
+export const WARDROBE_SHUTDOWN_TIMEOUT_MS = 20_000
+
 async function performShutdown(requestedExitCode = 0) {
   logger.info('Shutting down dedicated wardrobe worker...')
   let exitCode = requestedExitCode
   try {
-    await shutdownWorkerResources({
-      workers,
-      queues,
-      redisClients: [],
-      disconnectPrisma: disconnectPrismaClient,
-    })
+    // A tick in flight finishes before the connections it uses close.
+    await maintenanceLoop?.stop()
+    await shutdownWorkerResources(
+      {
+        workers,
+        queues,
+        redisClients,
+        disconnectPrisma: disconnectPrismaClient,
+      },
+      { timeoutMs: WARDROBE_SHUTDOWN_TIMEOUT_MS }
+    )
   } catch (err) {
     logger.error(err, 'Error closing wardrobe worker resources')
     exitCode = 1
@@ -307,6 +447,11 @@ let shutdownPromise: Promise<void> | undefined
 function shutdown(exitCode = 0): Promise<void> {
   shutdownPromise ??= performShutdown(exitCode)
   return shutdownPromise
+}
+
+/** The hosted launcher (`scripts/start-wardrobe-worker-production.mjs`) calls this on SIGTERM. */
+export function shutdownWardrobeWorker(): Promise<void> {
+  return shutdown()
 }
 
 if (require.main === module) {

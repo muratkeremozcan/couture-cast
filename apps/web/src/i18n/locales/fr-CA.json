@@ -461,6 +461,11 @@
         "timeout": "Le téléversement a expiré. Réessayez.",
         "serviceUnavailable": "Le stockage est indisponible pour le moment. Réessayez dans un instant."
       }
+    },
+    "tagging": {
+      "loading": "Chargement de votre vêtement...",
+      "pending_desc": "Décrivez ce vêtement avec une catégorie et une plage de confort.",
+      "manual_desc": "Choisissez la catégorie et la plage de confort qui conviennent à ce vêtement. La matière est facultative."
     }
   },
   "community": {

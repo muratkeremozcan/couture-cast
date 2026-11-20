@@ -8,6 +8,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
 import {
@@ -1139,6 +1141,7 @@ describe('resolveCurrentUserId', () => {
 })
 
 describe('garment tagging wrappers', () => {
+  // The wire shape the API sends for a suggested answer: no `mode`.
   const suggestionsFixture = {
     garmentId: 'garment-1',
     analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
@@ -1165,11 +1168,48 @@ describe('garment tagging wrappers', () => {
     const result = await suggestGarmentTagsFromWeb('garment-1')
 
     // The low-confidence flag is what makes the UI ask instead of pre-filling.
-    expect(result.suggestions.material.isConfident).toBe(false)
-    expect(result.suggestions.category.value).toBe('top')
+    expect(result).toMatchObject({
+      mode: 'suggested',
+      suggestions: {
+        material: { isConfident: false },
+        category: { value: 'top' },
+      },
+    })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('/api/v1/wardrobe/garments/garment-1/suggest-tags')
     expect(init.method).toBe('POST')
+  })
+
+  it('returns the manual-mode answer, with no suggestions, as the API sent it', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ data: { mode: 'manual', garmentId: 'garment-1' } }))
+
+    await expect(suggestGarmentTagsFromWeb('garment-1')).resolves.toEqual({
+      mode: 'manual',
+      garmentId: 'garment-1',
+    })
+  })
+
+  it('normalizes an answer with no mode to suggested (every suggested answer on the wire)', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ data: suggestionsFixture }))
+
+    await expect(suggestGarmentTagsFromWeb('garment-1')).resolves.toEqual({
+      ...suggestionsFixture,
+      mode: 'suggested',
+    })
+  })
+
+  it('still rejects a no-mode answer that is not a complete suggestion', async () => {
+    authenticate()
+    const { suggestions: _suggestions, ...withoutSuggestions } = suggestionsFixture
+    void _suggestions
+    stubFetchOnce(jsonResponse({ data: withoutSuggestions }))
+
+    // The schema error surfaces, not a half-read answer.
+    await expect(suggestGarmentTagsFromWeb('garment-1')).rejects.toMatchObject({
+      name: 'ZodError',
+    })
   })
 
   /**
