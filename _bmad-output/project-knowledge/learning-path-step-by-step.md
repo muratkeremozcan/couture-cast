@@ -32,6 +32,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58's production profile and location checks, run in the daily production run as the synthetic member, while its PR is in review.
 Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
 Added Step 58's production follow-up, hosted wardrobe workers and manual tagging, while its change is in progress.
 Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
@@ -20849,3 +20850,30 @@ checks close that gap:
 - [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
   the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
   (C-WEB-TARGETS).
+
+#### Jade's profile and location reports are checked in production
+
+User/business impact:
+
+Jade's reports of 2026-11-19 (no Profile, no location permission, "City search unavailable") were
+each fixed and covered on the local lane, but the daily production run had nothing that could turn
+red for them: its checks were signed out, and a missing weather provider key, the cause of the
+city search failure, only shows to a signed-in member.
+
+The daily production run now checks each report, as the synthetic member from the step above,
+read-only.
+
+Test per report:
+
+- "Profile is missing":
+  [`profile-entry.spec.ts`](../../playwright/tests/profile-entry.spec.ts) (signed out, every
+  environment, desktop and phone: a Profile link on the first page that opens a page called
+  Profile; the desktop header had none), and the member's Profile showing their account in
+  [`profile-location.prod.spec.ts`](../../playwright/tests/profile-location.prod.spec.ts).
+- "City search unavailable": the same prod spec searches Chicago through the API and through the
+  Locations search box as the member. A deployment without its weather provider keys answers 503
+  `provider_unavailable` and the status goes red. Nothing is saved.
+- "The app accesses my location with my approval": the same prod spec taps Use my location with
+  the browser's permission refused, expects the reason and a working city search, and that no
+  coordinates were sent. The allowed path writes a location, so it stays on the local lane
+  (`location-use-my-location.spec.ts` UL-1).
