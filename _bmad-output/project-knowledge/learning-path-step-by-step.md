@@ -32,6 +32,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58's production profile and location checks, run in the daily production run as the synthetic member, while its PR is in review.
 Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
 Added Step 58's production follow-up, hosted wardrobe workers and manual tagging, while its change is in progress.
 Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
@@ -20580,6 +20581,10 @@ Tests:
   or production stops accepting the session.
 - [`prod-synthetic-member.spec.ts` (helper)](../../playwright/support/helpers/prod-synthetic-member.spec.ts):
   the sign-in, the missing-input failure that names the input, and the sign-out.
+- [`wardrobe-session-reload.prod.spec.ts`](../../playwright/tests/wardrobe-session-reload.prod.spec.ts):
+  as the synthetic member on a phone-sized viewport, a fresh tab and a reload of `/wardrobe` both
+  read the closet (200), enable Silhouette and show no "Your session expired". Read-only; it
+  would have gone red on the reload fault Jade's upload investigation found.
 
 #### Hosted wardrobe workers and manual tagging
 
@@ -20743,7 +20748,10 @@ API, Vitest:
   stop), the removal of the old schedulers, the general worker's guard and locked jobs, and the
   two-process case.
 - [`apps/api/src/workers/idle-worker-options.spec.ts`](../../apps/api/src/workers/idle-worker-options.spec.ts):
-  proves the hosted options equal the community worker's.
+  proves the hosted intervals (a 30 minute block, a 15 minute stalled check, keepalive probes), that
+  the empty-queue model projects the idle service at least 5x under the 950 commands an hour the
+  old settings read, that a standalone wardrobe worker keeps the previous settings, and that the
+  community worker keeps its own.
 - [`apps/api/integration/wardrobe-worker-image.spec.ts`](../../apps/api/integration/wardrobe-worker-image.spec.ts):
   proves the Dockerfile text, the launcher's refusals (including `TEST_ENV=local`) and the prune
   script's guards.
@@ -20784,9 +20792,13 @@ Evidence boundaries:
   memory with the three job types overlapping. The Docker build on Linux, a constrained
   (`--memory=512m --cpus=0.2`) run under a representative simultaneous workload, Northflank's
   memory metrics and the hosted canary are required before the 512 MB limit is signed off.
-- The idle Redis rate of the whole hosted service (three consumers and the loop) is a design
-  expectation, not a measurement. Measure it before calling the service inside the community
-  worker's idle budget.
+- Idle Redis cost: the first settings (the community worker's 300 s block and 120 s stalled
+  check) read about 950 commands an hour for the service, so the hosted entry point now blocks
+  1800 s and checks for stalled jobs every 900 s, with TCP keepalive on the connection; a
+  standalone wardrobe worker and the community worker keep their own settings. The trade is crash
+  recovery of about 30 minutes once a consumer runs again, plus restart time. Live result: the whole
+  Redis idled at 9.1 commands a minute instead of 23.4, and two photos uploaded after 21 and 28
+  minutes of one blocked wait reached `awaiting_tags` in 4 to 5 seconds.
 - The ten-locale strings for the manual and pending copy are translated without a native review.
 
 #### Advisor erase and planner week races
@@ -20842,6 +20854,34 @@ checks close that gap:
 - [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
   the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
   (C-WEB-TARGETS).
+
+#### Jade's profile and location reports are checked in production
+
+User/business impact:
+
+Jade's reports of 2026-11-19 (no Profile, no location permission, "City search unavailable") were
+each fixed and covered on the local lane, but the daily production run had nothing that could turn
+red for them: its checks were signed out, and a missing weather provider key, the cause of the
+city search failure, only shows to a signed-in member.
+
+The daily production run now checks each report, as the synthetic member from the step above,
+read-only.
+
+Test per report:
+
+- "Profile is missing":
+  [`profile-entry.spec.ts`](../../playwright/tests/profile-entry.spec.ts) (signed out, every
+  environment, desktop and phone: a Profile link on the first page that opens a page called
+  Profile; the desktop header had none), and the member's Profile showing their account in
+  [`profile-location.prod.spec.ts`](../../playwright/tests/profile-location.prod.spec.ts).
+- "City search unavailable": the same prod spec searches Chicago through the API and through the
+  Locations search box as the member. A deployment without its weather provider keys answers 503
+  `provider_unavailable` and the status goes red. Nothing is saved.
+- "The app accesses my location with my approval": the same prod spec taps Use my location with
+  the browser's permission refused, expects the reason and a working city search, and that no
+  coordinates were sent. The allowed path writes a location, so it stays on the local lane
+  (`location-use-my-location.spec.ts` UL-1).
+
 - [`playwright/tests/community-member.prod.spec.ts`](../../playwright/tests/community-member.prod.spec.ts):
   the daily production run, as the synthetic member (read-only). The community feed answers 200
   with a list, and `/community` at phone width shows the member the real grid with the Latest
