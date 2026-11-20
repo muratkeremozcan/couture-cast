@@ -13,10 +13,14 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import type * as WebSession from './web-session'
 import {
   isLiveOwner,
+  isSessionRecheckError,
   MemberScope,
   memberSessionOf,
+  readAsMember,
+  SessionRecheckError,
   type MemberSession,
   useMountSignal,
+  useSessionRecheck,
 } from './use-web-session'
 
 /** The session bridge's state, driven by hand: who verification named, and each pending check. */
@@ -218,5 +222,78 @@ describe('useMountSignal', () => {
 
     view.rerender(<Arriving />)
     expect(seenByNextScreen).toBe(true)
+  })
+})
+
+// PR #259 review round 2 (CodeRabbit): recovery after a failed recheck.
+describe('recovery after a failed recheck', () => {
+  const denial = Object.assign(new Error('denied'), { denied: true })
+  const isDenial = (error: unknown) => (error as { denied?: boolean }).denied === true
+
+  beforeEach(() => {
+    session.identity = 'member-1'
+    session.stored = true
+    session.pending = []
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+  })
+
+  afterEach(() => {
+    session.identity = null
+    session.stored = false
+    window.sessionStorage.clear()
+  })
+
+  it('MEMBER-SCOPE-08 a publication that lands before recovery is armed still reads again, once', () => {
+    let markFailed!: (error: SessionRecheckError) => void
+    function Section() {
+      const recheck = useSessionRecheck('member-1')
+      markFailed = recheck.markFailed
+      return <p data-testid="attempt">{recheck.attempt}</p>
+    }
+    render(<Section />)
+
+    // The recheck fails, then the bridge verifies member-1 before the section arms recovery.
+    const failure = new SessionRecheckError(denial)
+    act(() => {
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    act(() => markFailed(failure))
+
+    expect(screen.getByTestId('attempt')).toHaveTextContent('1')
+    // A later publication for the same member, with nothing waiting, reads nothing more.
+    act(() => {
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    expect(screen.getByTestId('attempt')).toHaveTextContent('1')
+  })
+
+  it('MEMBER-SCOPE-09 a joined verification superseded by a newer bearer for the same member reads once with it', async () => {
+    const read = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(denial)
+      .mockResolvedValueOnce('answer-for-token-1c')
+
+    const result = readAsMember('member-1', read, isDenial)
+    await vi.waitFor(() => expect(session.pending).toHaveLength(1))
+
+    // The bridge verified and installed token-1c; the token-1b verification it joined is dropped.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1c')
+    session.pending[0]!.reject(new Error('Session verification is unavailable.'))
+
+    await expect(result).resolves.toBe('answer-for-token-1c')
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('MEMBER-SCOPE-10 control: a failed recheck with the bearer unchanged is an outage, not a retry', async () => {
+    const read = vi.fn<() => Promise<string>>().mockRejectedValue(denial)
+
+    const result = readAsMember('member-1', read, isDenial)
+    await vi.waitFor(() => expect(session.pending).toHaveLength(1))
+    session.pending[0]!.reject(new Error('Session verification is unavailable.'))
+
+    const error = await result.catch((caught: unknown) => caught)
+    expect(isSessionRecheckError(error)).toBe(true)
+    expect(read).toHaveBeenCalledTimes(1)
   })
 })

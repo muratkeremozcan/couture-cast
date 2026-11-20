@@ -832,4 +832,57 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
     fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
     await waitFor(() => expect(expectedVersions).toEqual([1, 2]))
   })
+
+  // PR #259 review round 2 (CodeRabbit): a foreground read dropped because a reshuffle landed
+  // first must not leave the rail on its skeleton.
+  it('PLANNER-MEMBER-04 a day retry answered after a reshuffle lands shows the reshuffled week', async () => {
+    signInFixtureMember()
+    const target = SEVEN_DATES[0]!
+    const failed = SEVEN_DATES[1]!
+    let weekReads = 0
+    let releaseRetry!: () => void
+    const retryHeld = new Promise<void>((resolve) => {
+      releaseRetry = resolve
+    })
+    let releaseReshuffle!: () => void
+    const reshuffleHeld = new Promise<void>((resolve) => {
+      releaseReshuffle = resolve
+    })
+    useMswHandlers(
+      http.get(PLANNER_PATH, async () => {
+        weekReads += 1
+        if (weekReads === 2) await retryHeld
+        return HttpResponse.json(
+          buildResponse(
+            SEVEN_DATES.map((d) => (d === failed ? buildErrorDay(d) : buildReadyDay(d)))
+          )
+        )
+      }),
+      http.post(RESHUFFLE_PATH, async () => {
+        await reshuffleHeld
+        return HttpResponse.json({
+          data: { day: buildReadyDay(target, { version: 2 }), unchanged: false },
+        })
+      })
+    )
+    renderRail()
+    fireEvent.click(await screen.findByTestId(`planner-reshuffle-${target}`))
+    fireEvent.click(screen.getByTestId(`planner-retry-${failed}`))
+    await waitFor(() => expect(weekReads).toBe(2))
+    expect(screen.getByTestId('planner-skeleton')).toBeInTheDocument()
+
+    // The reshuffle answers first, then the retried week.
+    await act(async () => {
+      releaseReshuffle()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await act(async () => {
+      releaseRetry()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    expect(screen.queryByTestId('planner-skeleton')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Today: outfit updated.')
+  })
 })

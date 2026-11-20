@@ -595,7 +595,7 @@ function PlannerWeek({
    */
   const weekGenerationRef = useRef(0)
   /** The last read was denied and the bridge could not verify the member again. */
-  const [recheckFailed, setRecheckFailed] = useState(false)
+  const [recheckFailedAt, setRecheckFailedAt] = useState<number | null>(null)
 
   useLayoutEffect(() => {
     onCheckingChange(entitlementState === 'checking')
@@ -622,7 +622,7 @@ function PlannerWeek({
       if (!isLiveOwner(owner)) return
       if (!options.silent) {
         setEntitlementState('checking')
-        setRecheckFailed(false)
+        setRecheckFailedAt(null)
       }
       const generation = weekGenerationRef.current
       const current = () => !signal.aborted && isLiveOwner(owner)
@@ -636,7 +636,11 @@ function PlannerWeek({
         )
         if (!current()) return
         // A reshuffle landed while this read was out: its week is older than the one shown.
-        if (generation !== weekGenerationRef.current) return
+        // A foreground read had put the rail in `checking`; the newer week shows again.
+        if (generation !== weekGenerationRef.current) {
+          if (!options.silent) setEntitlementState('entitled')
+          return
+        }
         setPlannerData(data)
         setEntitlementState('entitled')
         setAnnouncement(t('commerce.premium.planner.announce.ready'))
@@ -648,7 +652,7 @@ function PlannerWeek({
           if (options.silent) return
           setEntitlementState('error')
           setPlannerData(null)
-          setRecheckFailed(true)
+          setRecheckFailedAt(loadError.revision)
           return
         }
         const reason = plannerFailureReason(loadError)
@@ -687,7 +691,7 @@ function PlannerWeek({
   const readAgain = useCallback(() => {
     startRead()
   }, [startRead])
-  useReloadOnSessionRecheck(owner, recheckFailed, readAgain)
+  useReloadOnSessionRecheck(owner, recheckFailedAt, readAgain)
 
   // One fetch per open per member: a session event that names the same member again (a token
   // refresh, the end of a verification already answered) asks nothing, and a stored session

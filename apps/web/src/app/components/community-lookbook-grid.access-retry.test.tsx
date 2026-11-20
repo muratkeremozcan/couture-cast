@@ -199,3 +199,94 @@ describe('the weekly challenge without a verified member', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
 })
+
+// PR #259 review round 2 (CodeRabbit): recovery paths that must exist in the grid itself.
+describe('the grid offers its own recovery', () => {
+  it('COMMUNITY-ACCESS-RETRY-04 a realtime denial whose probe reads the feed offers Retry, which restarts the sync', async () => {
+    signIn()
+    const syncs: CommunitySyncState[] = []
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+      this: CommunitySyncState
+    ) {
+      syncs.push(this)
+    })
+    let realtimeAllowed = false
+    const post = (id: string) => ({ ...item({ id }), reactions })
+    useMswHandlers(
+      http.get(FEED_PATH, () =>
+        HttpResponse.json({ data: feed({ items: [post('post-1')], nextCursor: null }) })
+      ),
+      http.get('/api/v1/community/events', () =>
+        realtimeAllowed
+          ? HttpResponse.json({
+              data: {
+                events: [],
+                nextCursor: 'cursor',
+                hasMore: false,
+                resyncRequired: false,
+              },
+            })
+          : denied()
+      ),
+      http.post('/api/v1/community/targets/resolve', async ({ request }) => {
+        const { targets } = (await request.json()) as {
+          targets: { key: string; postId: string }[]
+        }
+        return HttpResponse.json({
+          data: {
+            targets: targets.map((target) => ({
+              key: target.key,
+              status: 'available',
+              communityRevision: '0',
+              post: post(target.postId),
+              comment: null,
+              parent: null,
+              pageCursor: null,
+              parentPageCursor: null,
+              threadPosition: null,
+            })),
+          },
+        })
+      })
+    )
+    renderGrid()
+    expect(await screen.findByTestId('lookbook-card-post-1')).toBeInTheDocument()
+
+    // The realtime connection is refused; the denial's probe reads the feed fine.
+    await act(async () => {
+      await syncs[0]!.catchUp()
+    })
+    expect(await screen.findByTestId('community-feed-error')).toHaveTextContent(
+      'We could not load the community feed.'
+    )
+
+    realtimeAllowed = true
+    await userEvent.setup().click(screen.getByTestId('community-feed-retry-button'))
+    await waitFor(() => expect(syncs).toHaveLength(2))
+    await act(async () => {
+      await syncs[1]!.catchUp()
+    })
+
+    expect(await screen.findByTestId('lookbook-card-post-1')).toBeInTheDocument()
+    expect(screen.queryByTestId('community-feed-error')).toBeNull()
+  })
+
+  it('COMMUNITY-SESSION-RETRY-01 a failed session check shows the session retry, like the member sections', async () => {
+    // A stored session whose verification fails (no identity service in this test).
+    window.localStorage.setItem('couturecast.auth-session', '{"stored":true}')
+    try {
+      useMswHandlers(feedHandler())
+      renderGrid()
+
+      const retry = await screen.findByTestId('community-session-retry')
+      expect(retry).toHaveTextContent('Try again')
+      expect(screen.queryByTestId('challenge-participate-button')).toBeNull()
+
+      // The retry verifies again; it fails again here, so the control stays.
+      await userEvent.setup().click(retry)
+      expect(await screen.findByTestId('community-session-retry')).toBeInTheDocument()
+    } finally {
+      window.localStorage.removeItem('couturecast.auth-session')
+    }
+  })
+})

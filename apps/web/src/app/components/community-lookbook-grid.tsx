@@ -73,6 +73,7 @@ import {
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { useMemberSession } from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 import {
   LiveSponsorshipLedger,
   type LiveReadStamp,
@@ -3094,14 +3095,22 @@ export function CommunityLookbookGrid({
             // feed read (a Retry) has started since: a newer read speaks for the grid.
             const scope = feedScopeRef.current
             const generation = feedGenerationRef.current
-            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
+            const probeCurrent = () =>
+              active &&
+              scope === feedScopeRef.current &&
+              generation === feedGenerationRef.current
+            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).then(
+              () => {
+                // The feed answers but the realtime connection was refused: the grid stays
+                // cleared until a catch-up verifies access, so the load error offers Retry,
+                // which restarts the sync. (Restarting here could loop on a lasting denial.)
+                if (!probeCurrent()) return
+                const message: Message = { key: 'community.error.load' }
+                setFeedError(message)
+                setAnnouncement(message)
+              },
               (error: unknown) => {
-                if (
-                  !active ||
-                  scope !== feedScopeRef.current ||
-                  generation !== feedGenerationRef.current
-                )
-                  return
+                if (!probeCurrent()) return
                 const sanction = communitySanctionOf(error)
                 if (sanction) {
                   closeForBan(sanction)
@@ -3893,6 +3902,13 @@ export function CommunityLookbookGrid({
         <StandaloneHeaderActions filterNavShown={showFilterNav} banned={banned}>
           {headerActions}
         </StandaloneHeaderActions>
+
+        {/* A failed session check: the grid re-checks the session like every member section. */}
+        <SessionRetryButton
+          session={sessionState}
+          testId="community-session-retry"
+          className="min-h-[44px] self-start rounded-md border border-[color:var(--theme-card-border)] px-4 text-sm font-semibold text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        />
 
         <CommunityNotices
           bandUnresolvedReason={bandNoticeReason}

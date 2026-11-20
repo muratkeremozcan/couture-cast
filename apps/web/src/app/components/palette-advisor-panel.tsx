@@ -758,7 +758,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
           // read once the bridge verifies them again.
           setError(loadErrorMessage)
           setPanelState('load_failed')
-          markRecheckFailed()
+          markRecheckFailed(loadError)
           return
         }
         if (paletteAdvisorFailureReason(loadError) === 'signed_out') {

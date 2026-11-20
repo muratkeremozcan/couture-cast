@@ -254,10 +254,27 @@ export function currentWebSessionBearer(): string | null {
  * (`useReloadOnSessionRecheck`).
  */
 export class SessionRecheckError extends Error {
+  /** The bridge's publication count when the recheck failed (`currentSessionRevision`). */
+  readonly revision = sessionRevision
   constructor(readonly denial: unknown) {
     super('Session verification is unavailable.')
     this.name = 'SessionRecheckError'
   }
+}
+
+/**
+ * How many times the bridge has published (`couture:session`) in this tab. Counted by a
+ * listener registered when this module loads, so it runs before any component's listener: a
+ * section that arms its recovery after a publication still sees that one happened.
+ */
+let sessionRevision = 0
+if (typeof window !== 'undefined')
+  window.addEventListener('couture:session', () => {
+    sessionRevision += 1
+  })
+
+export function currentSessionRevision(): number {
+  return sessionRevision
 }
 
 export function isSessionRecheckError(error: unknown): error is SessionRecheckError {
@@ -265,13 +282,15 @@ export function isSessionRecheckError(error: unknown): error is SessionRecheckEr
 }
 
 /**
- * While `waiting` (a read failed with `SessionRecheckError`), runs `reload` once the bridge
- * publishes again with `owner` still the member: the verification that failed has now
- * succeeded. A section that read successfully never waits, so a token rotation reloads nothing.
+ * While a read waits on a failed recheck (`failedAt`, the `SessionRecheckError`'s revision),
+ * runs `reload` once the bridge has published since then with `owner` still the member: the
+ * verification that failed has now succeeded. A publication that landed before this effect
+ * subscribed counts too. A section that read successfully never waits (`failedAt` null), so a
+ * token rotation reloads nothing.
  */
 export function useReloadOnSessionRecheck(
   owner: string | null,
-  waiting: boolean,
+  failedAt: number | null,
   reload: () => void
 ): void {
   const reloadRef = useRef(reload)
@@ -279,13 +298,17 @@ export function useReloadOnSessionRecheck(
     reloadRef.current = reload
   })
   useEffect(() => {
-    if (!waiting) return
-    const onSession = () => {
-      if (isLiveOwner(owner)) reloadRef.current()
+    if (failedAt === null) return
+    let reloaded = false
+    const check = () => {
+      if (reloaded || sessionRevision === failedAt || !isLiveOwner(owner)) return
+      reloaded = true
+      reloadRef.current()
     }
-    window.addEventListener('couture:session', onSession)
-    return () => window.removeEventListener('couture:session', onSession)
-  }, [owner, waiting])
+    check()
+    window.addEventListener('couture:session', check)
+    return () => window.removeEventListener('couture:session', check)
+  }, [owner, failedAt])
 }
 
 /**
@@ -295,15 +318,18 @@ export function useReloadOnSessionRecheck(
  */
 export function useSessionRecheck(owner: string | null) {
   const [attempt, setAttempt] = useState(0)
-  const [failed, setFailed] = useState(false)
+  const [failedAt, setFailedAt] = useState<number | null>(null)
   const readAgain = useCallback(() => {
-    setFailed(false)
+    setFailedAt(null)
     setAttempt((current) => current + 1)
   }, [])
-  useReloadOnSessionRecheck(owner, failed, readAgain)
-  const markFailed = useCallback(() => setFailed(true), [])
-  const clear = useCallback(() => setFailed(false), [])
-  return { attempt, retry: failed ? readAgain : null, markFailed, clear }
+  useReloadOnSessionRecheck(owner, failedAt, readAgain)
+  const markFailed = useCallback(
+    (error: SessionRecheckError) => setFailedAt(error.revision),
+    []
+  )
+  const clear = useCallback(() => setFailedAt(null), [])
+  return { attempt, retry: failedAt === null ? null : readAgain, markFailed, clear }
 }
 
 /**
@@ -335,10 +361,15 @@ export async function readAsMember<T>(
       try {
         await resolveWebSessionToken()
       } catch (recheck: unknown) {
-        // A refused profile check confirms the denial. Any other failure (a timeout, a 5xx)
-        // leaves the member unknown: an outage the section can retry, never a sign-out.
-        if (isWebSessionDenial(recheck)) throw error
-        throw new SessionRecheckError(error)
+        if (signal?.aborted || !isLiveOwner(owner)) throw error
+        // The joined verification can fail because a newer one superseded it: if the same
+        // member already holds a different bearer, that one is read once below.
+        if (currentWebSessionBearer() === sentWith) {
+          // A refused profile check confirms the denial. Any other failure (a timeout, a 5xx)
+          // leaves the member unknown: an outage the section can retry, never a sign-out.
+          if (isWebSessionDenial(recheck)) throw error
+          throw new SessionRecheckError(error)
+        }
       }
       if (
         signal?.aborted ||

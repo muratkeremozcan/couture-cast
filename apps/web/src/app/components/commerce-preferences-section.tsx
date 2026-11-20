@@ -21,7 +21,9 @@ import {
 import {
   isLiveOwner,
   MemberScope,
+  isSessionRecheckError,
   readAsMember,
+  useSessionRecheck,
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
@@ -54,6 +56,13 @@ export function CommercePreferencesSection() {
 function MemberCommercePreferences({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
   const { status, owner } = session
+  /** A read denied while the bridge could not verify the member again: retryable. */
+  const recheck = useSessionRecheck(owner)
+  const {
+    attempt: loadAttempt,
+    markFailed: markRecheckFailed,
+    clear: clearRecheck,
+  } = recheck
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [enabled, setEnabled] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -82,6 +91,8 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
   // One read per member: a session event that names the same member again (a token refresh,
   // the end of a verification already answered) asks nothing.
   useEffect(() => {
+    // Every run decides afresh whether a failed recheck is still waiting.
+    clearRecheck()
     if (status === 'checking') {
       setError(null)
       setSectionState('checking')
@@ -112,15 +123,30 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         const preference = await readAsMember(
           owner,
           () => getCommercePreferenceFromWeb(controller.signal),
-          isCommerceDenial
+          isCommerceDenial,
+          controller.signal
         )
         if (!current()) {
           return
         }
         setEnabled(preference.affiliateCtasEnabled)
         setSectionState('ready')
-      } catch {
+      } catch (loadError: unknown) {
         if (!current()) {
+          return
+        }
+        if (isSessionRecheckError(loadError)) {
+          // The member is not known to be signed out: the load error with a retry, and a new
+          // read once the bridge verifies them again.
+          setError(loadErrorMessage)
+          setSectionState('load_failed')
+          markRecheckFailed(loadError)
+          return
+        }
+        if (isCommerceDenial(loadError)) {
+          // The API refused the bearer the bridge holds for this member, and no newer one
+          // explains it: signed out, with the localized hint, like every sibling section.
+          setSectionState('signed_out')
           return
         }
         /*
@@ -142,7 +168,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage])
+  }, [status, owner, loadErrorMessage, loadAttempt, clearRecheck, markRecheckFailed])
 
   /**
    * Optimistic, and reverted on failure.
@@ -291,7 +317,11 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         </p>
       )}
 
-      <SessionRetryButton session={session} testId="commerce-session-retry" />
+      <SessionRetryButton
+        session={session}
+        testId="commerce-session-retry"
+        recheck={recheck.retry}
+      />
     </section>
   )
 }

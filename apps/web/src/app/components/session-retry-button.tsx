@@ -15,21 +15,19 @@ export function SessionRetryButton({
   session,
   testId,
   recheck = null,
+  className = 'mt-2 min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-sm text-white',
 }: {
   session: MemberSession
   testId: string
   recheck?: (() => void) | null
+  /** The dark Settings style by default; a light surface passes its own. */
+  className?: string
 }) {
   const { t } = useTranslation()
   const onRetry = session.status === 'unavailable' ? session.retry : recheck
   if (!onRetry) return null
   return (
-    <button
-      type="button"
-      onClick={onRetry}
-      className="mt-2 min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-sm text-white"
-      data-testid={testId}
-    >
+    <button type="button" onClick={onRetry} className={className} data-testid={testId}>
       {t('session.retry')}
     </button>
   )

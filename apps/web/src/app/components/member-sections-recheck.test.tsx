@@ -17,6 +17,8 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
+import type * as Commerce from '../../lib/commerce'
+import { CommerceRequestError, getCommercePreferenceFromWeb } from '../../lib/commerce'
 import { PALETTE_PATH, errorBody, profile } from '../../test-utils/palette-advisor-panel'
 import { CommercePreferencesSection } from './commerce-preferences-section'
 import { PaletteAdvisorPanel } from './palette-advisor-panel'
@@ -41,6 +43,15 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
       session.pending.push({ resolve, reject })
     }),
 }))
+
+// A passthrough spy: the real read runs unless a test hands it an answer of its own.
+vi.mock('../../lib/commerce', async (importOriginal) => {
+  const actual = await importOriginal<typeof Commerce>()
+  return {
+    ...actual,
+    getCommercePreferenceFromWeb: vi.fn(actual.getCommercePreferenceFromWeb),
+  }
+})
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -327,5 +338,81 @@ describe('the planner keeps a failed recheck retryable and closes every read', (
 
     expect(bearers).not.toContain('Bearer token-1b')
     expect(reads).toBe(3)
+  })
+})
+
+// PR #259 review round 2 (CodeRabbit), Shopping and partners: a cancelled read starts no
+// recheck, a failed recheck stays retryable, and a denial the bridge confirms is signed out.
+describe('Shopping and partners after a denial', () => {
+  /** token-1a is denied; token-1b reads member-1's preference. */
+  function useDeniedPreference() {
+    useMswHandlers(
+      http.get('/api/v1/commerce/preferences', ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a')
+          return HttpResponse.json(DENIED, { status: 401 })
+        return HttpResponse.json({ data: { affiliateCtasEnabled: false } })
+      })
+    )
+  }
+
+  it('RECHECK-COMMERCE-WEB-02 a denial whose recheck fails offers a retry and reads once the member verifies', async () => {
+    useDeniedPreference()
+    renderWith(<CommercePreferencesSection />)
+    await waitFor(() => expect(session.pending).toHaveLength(1))
+
+    await failRecheck(0)
+    expect(screen.getByTestId('commerce-error-message')).toHaveTextContent(
+      'Unable to load shopping preferences.'
+    )
+    expect(screen.getByTestId('commerce-session-retry')).toHaveTextContent('Try again')
+    expect(screen.queryByTestId('commerce-signed-out-hint')).toBeNull()
+
+    publish('token-1b')
+    const toggle = screen.getByTestId<HTMLInputElement>('commerce-opt-out-toggle')
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(screen.queryByTestId('commerce-error-message')).toBeNull()
+    expect(screen.queryByTestId('commerce-session-retry')).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('RECHECK-COMMERCE-WEB-03 a denial the bridge confirms for the current bearer shows the sign-in hint', async () => {
+    useDeniedPreference()
+    renderWith(<CommercePreferencesSection />)
+    await waitFor(() => expect(session.pending).toHaveLength(1))
+
+    await act(async () => {
+      session.pending[0]!.resolve('token-1a')
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('commerce-signed-out-hint')).toHaveTextContent(
+      'Sign in to change this'
+    )
+    expect(screen.queryByTestId('commerce-error-message')).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a'])
+  })
+
+  it('RECHECK-COMMERCE-WEB-04 a denial surfacing after the section closed starts no recheck', async () => {
+    let rejectRead!: (error: unknown) => void
+    vi.mocked(getCommercePreferenceFromWeb).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectRead = reject
+        })
+    )
+    const view = renderWith(<CommercePreferencesSection />)
+    await waitFor(() => expect(getCommercePreferenceFromWeb).toHaveBeenCalledTimes(1))
+
+    // Settings closes while the 401's body is still being read; the denial surfaces after.
+    view.unmount()
+    await act(async () => {
+      rejectRead(new CommerceRequestError('Unauthorized', 401))
+      await Promise.resolve()
+    })
+    await settle()
+
+    expect(session.pending).toHaveLength(0)
   })
 })
