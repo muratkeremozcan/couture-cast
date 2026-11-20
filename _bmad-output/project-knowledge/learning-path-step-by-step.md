@@ -20581,6 +20581,10 @@ Tests:
   or production stops accepting the session.
 - [`prod-synthetic-member.spec.ts` (helper)](../../playwright/support/helpers/prod-synthetic-member.spec.ts):
   the sign-in, the missing-input failure that names the input, and the sign-out.
+- [`wardrobe-session-reload.prod.spec.ts`](../../playwright/tests/wardrobe-session-reload.prod.spec.ts):
+  as the synthetic member on a phone-sized viewport, a fresh tab and a reload of `/wardrobe` both
+  read the closet (200), enable Silhouette and show no "Your session expired". Read-only; it
+  would have gone red on the reload fault Jade's upload investigation found.
 
 #### Hosted wardrobe workers and manual tagging
 
