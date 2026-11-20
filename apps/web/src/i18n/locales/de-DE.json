@@ -461,6 +461,11 @@
         "timeout": "Zeitüberschreitung beim Upload. Versuche es erneut.",
         "serviceUnavailable": "Der Speicher ist gerade nicht erreichbar. Versuche es gleich noch einmal."
       }
+    },
+    "tagging": {
+      "loading": "Dein Kleidungsstück wird geladen …",
+      "pending_desc": "Beschreibe dieses Kleidungsstück mit einer Kategorie und einem Komfortbereich.",
+      "manual_desc": "Wähle die Kategorie und den Komfortbereich, die zu diesem Kleidungsstück passen. Das Material ist optional."
     }
   },
   "community": {

@@ -461,6 +461,11 @@
         "timeout": "The upload timed out. Please try again.",
         "serviceUnavailable": "Storage is unavailable right now. Please try again in a moment."
       }
+    },
+    "tagging": {
+      "loading": "Loading your garment...",
+      "pending_desc": "Describe this garment with a category and a comfort range.",
+      "manual_desc": "Choose the category and comfort range that fit this garment. Material is optional."
     }
   },
   "community": {
