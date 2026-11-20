@@ -112,8 +112,10 @@ jobs:
 
           # A real-session spec skips every case outside its own stack, so a burn-in of it alone
           # runs nothing and fails the shard guard (PR 250). The real-session lane runs those
-          # specs on every web pull request.
-          CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' | grep -vE -- '-real-session\.spec\.ts$' || true)
+          # specs on every web pull request. A production-only spec (`*.prod.spec.ts`, signed in
+          # as the production synthetic member) skips every case outside the production run for
+          # the same reason, and the daily production run is where it runs.
+          CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' | grep -vE -- '(-real-session|\.prod)\.spec\.ts$' || true)
 
           if [[ -z "$CHANGED" ]]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

@@ -32,6 +32,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
 Added Step 58's production follow-up, hosted wardrobe workers and manual tagging, while its change is in progress.
 Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
 Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
@@ -20526,6 +20527,59 @@ Web E2E, Playwright:
   proves a signed-in member opening `/settings` in a new tab or after a reload sees Shopping and
   partners, Premium and Interface palettes signed in through real GoTrue, with no sign-in hint
   painted at any point and one read per section (PS-1, PS-2).
+
+#### The production run signs in as a synthetic member
+
+User/business impact:
+
+Jade's three reports on 2026-11-19 (no Profile, no location permission, "City search
+unavailable") all sat on member-only paths, and the daily production run had no member: production
+rejects test tokens and has no test identity, so every check there ran signed out. A production
+break on a member path could not turn the status badge red.
+
+The run now signs in as one persistent synthetic member, `synthetic-prod-member@example.com`.
+An operator creates it once with `scripts/ops/provision-prod-synthetic-member.mjs`; the run holds
+only its password.
+
+Key takeaways:
+
+1. **Give CI the least credential that works.**
+   The Supabase admin key stays on the operator's machine (the repository is public). The run holds
+   the member's password and three public variables, and signs in through the password grant,
+   which opens a session for that one member. A stored refresh token needs write-back after every
+   rotation, and a signed session route would add a production surface that exists only for tests.
+2. **A secret belongs to the code that may read it.**
+   The password lives in the GitHub environment `prod-synthetic-member`, restricted to `main`, not
+   in a repository secret: a workflow on a branch, even a same-repository one, inherits repository
+   secrets and could print them. The reusable e2e job names the environment only for production.
+3. **The production run reads; the preview run writes.**
+   Anything that creates a post or an upload runs on the Vercel preview, where test data is fine.
+   As a read-only member the production run has nothing to clean up, and sign-out at the end of
+   the worker revokes the session it opened.
+4. **A production-only spec is named `*.prod.spec.ts`.**
+   Burn-in repeats the specs a pull request changes under the local config, where the member does
+   not exist and every case skips; a run that proves nothing fails. The burn-in plan leaves
+   `*.prod.spec.ts` out, as it leaves the real-session specs out, and the daily production run is
+   where they run.
+5. **A bearer in a public repository's artifacts is public.**
+   Playwright's API fixture prints a failed request's headers into its error, so the member's
+   reads use a plain request that reports a status or a category. A browser gets the session as
+   in-memory storage state for the one production web origin (an init script would write it into
+   any origin a page reaches), without its real refresh token. The token is masked in the runner
+   log, member specs keep traces, video and screenshots off, and the artifact scan rejects any
+   JWT and the password.
+6. **A manual run cannot aim the token elsewhere.**
+   The workflow lets a dispatch override the base URLs. The member's session reaches only the
+   production web and API origins pinned in the helper, so an override fails the run.
+
+Tests:
+
+- [`prod-synthetic-member.prod.spec.ts`](../../playwright/tests/prod-synthetic-member.prod.spec.ts):
+  the canary. Production accepts the member's session, and the web app signs it in from its
+  stored session and shows the profile. It goes red when the password rotates, the account goes
+  or production stops accepting the session.
+- [`prod-synthetic-member.spec.ts` (helper)](../../playwright/support/helpers/prod-synthetic-member.spec.ts):
+  the sign-in, the missing-input failure that names the input, and the sign-out.
 
 #### Hosted wardrobe workers and manual tagging
 

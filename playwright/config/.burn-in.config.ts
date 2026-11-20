@@ -19,6 +19,9 @@ const config: BurnInConfig = {
     '**/package.json',
     '**/tsconfig.json',
     '**/*.md',
+    // Production-only specs (signed in as the production synthetic member) skip every case
+    // outside the production run, so burning one in proves nothing and fails the run.
+    '**/*.prod.spec.ts',
   ],
   testPatterns: [
     'playwright/tests/**/*.spec.ts',

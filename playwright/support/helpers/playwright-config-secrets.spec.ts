@@ -18,6 +18,7 @@ const DUMMY_SECRETS = {
   VERCEL_TOKEN: 'dummy-vercel-token-for-config-test',
   DATABASE_URL_PROD: 'postgresql://dummy:dummy-password@prod.invalid:5432/db',
   GH_TOKEN: 'dummy-gh-token-for-config-test',
+  PROD_SYNTHETIC_MEMBER_PASSWORD: 'dummy-synthetic-member-password-for-config-test',
   SUPABASE_SERVICE_ROLE_KEY: 'dummy-service-role-key-for-config-test',
   UNRELATED_CI_VARIABLE: 'dummy-unrelated-ci-variable',
 }
