@@ -58,6 +58,8 @@ const ids = new Set([
   'comments-close',
   'signin-email-input',
   'signin-code-input',
+  'signin-submit',
+  'signin-status',
   ...locales.map((locale) => `locale-btn-${locale}`),
 ])
 const commands = new Set([

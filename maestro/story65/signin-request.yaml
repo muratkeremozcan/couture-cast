@@ -1,6 +1,5 @@
 # Story 6.5 owner: real sign-in UI, step 1. Requests a code for ${MAESTRO_EMAIL} through the
 # product's requestNativeOtp. The runner then reads the owned-harness code and runs step 2.
-# The label text and the EditText share one accessible name; index 1 is the input.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: open-signin.yaml
@@ -8,15 +7,54 @@ appId: ${MAESTRO_APP_ID}
 - extendedWaitUntil:
     visible: ${MAESTRO_SEND}
     timeout: 15000
-- tapOn:
-    text: ${MAESTRO_EMAIL_LABEL}
-    index: 1
+# iOS taps the email field by its testID, as signin-verify.yaml taps the code field: the label
+# text and the input share one accessible name, so an index-1 match depends on layout order.
+# Android keeps the label match, where index 1 is the EditText.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'signin-email-input'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: ${MAESTRO_EMAIL_LABEL}
+          index: 1
 - waitForAnimationToEnd
 - inputText: ${MAESTRO_EMAIL}
+# Send stays disabled while the field is empty, so an address that missed the field fails here
+# by name instead of as a missing "code sent" (nightly run 44532964440 shard 3).
+- extendedWaitUntil:
+    visible: ${MAESTRO_EMAIL}
+    timeout: 10000
+    label: 'The whole address is in the email field'
 # iOS reports a failure when the simulator shows no software keyboard.
 - hideKeyboard:
     optional: true
-- tapOn: ${MAESTRO_SEND}
-- extendedWaitUntil:
-    visible: ${MAESTRO_CODE_SENT}
-    timeout: 20000
+# Maestro reports a tap COMPLETED whether or not the product got it (tap-save.yaml). Send is
+# pressed again only while it reads enabled and the screen shows no status: a request in flight
+# disables it, and the code-sent and failure messages both render in signin-status. The flow then
+# asserts the outcome, so a failure message ends the flow and is never pressed through.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'signin-submit'
+              enabled: true
+            notVisible:
+              id: 'signin-status'
+              text: '.+'
+          commands:
+            - tapOn:
+                id: 'signin-submit'
+      - extendedWaitUntil:
+          visible:
+            id: 'signin-status'
+            text: '.+'
+          timeout: 8000
+- assertVisible: ${MAESTRO_CODE_SENT}

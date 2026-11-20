@@ -3,8 +3,9 @@
 // Story 6.5: native sign-in tells denial, a wrong code and a temporary failure apart.
 import { fireEvent, screen } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n, { initI18n } from '../lib/i18n'
+import { installShareCardOpenerTrace } from '../lib/share-card-presentation-trace'
 
 const auth = vi.hoisted(() => ({ request: vi.fn(), verify: vi.fn() }))
 vi.mock('../lib/native-session', () => ({
@@ -65,5 +66,54 @@ describe('native sign-in failures', () => {
     })
     fireEvent.click(screen.getByText(label('sendCode')))
     await screen.findByText(label('signinUnavailable'))
+  })
+})
+
+// Nightly iOS run 44532964440 shard 3 tapped Send and no code request followed, with nothing to
+// say whether the address reached the field or the press reached the screen. The native test
+// build records these closed events; the flow reads Send and the status by their ids.
+describe('native sign-in request trace', () => {
+  const events: [string, number | undefined][] = []
+  beforeEach(() => {
+    events.length = 0
+    installShareCardOpenerTrace((event, length) => events.push([event, length]))
+  })
+  afterEach(() => installShareCardOpenerTrace(null))
+
+  async function requestCode() {
+    await render(<SignInScreen />)
+    const field = screen.getByTestId('signin-email-input')
+    fireEvent.focus(field)
+    expect(screen.getByTestId('signin-submit').getAttribute('aria-disabled')).toBe('true')
+    fireEvent.change(field, { target: { value: 'member@example.test' } })
+    expect(screen.getByTestId('signin-submit').getAttribute('aria-disabled')).not.toBe(
+      'true'
+    )
+    fireEvent.click(screen.getByTestId('signin-submit'))
+  }
+
+  it('records the focus, the press with the address length and the request outcome', async () => {
+    await requestCode()
+    await screen.findByLabelText(label('code'))
+    expect(screen.getByTestId('signin-status').textContent).toBe(label('codeSent'))
+    expect(events).toEqual([
+      ['signin-email-focus', undefined],
+      ['signin-request-press', 'member@example.test'.length],
+      ['signin-request-ok', undefined],
+    ])
+  })
+
+  it('names a request that failed, and never the verify step', async () => {
+    auth.request.mockRejectedValueOnce(new TypeError('Network request failed'))
+    await requestCode()
+    await screen.findByText(label('signinUnavailable'))
+    expect(screen.getByTestId('signin-status').textContent).toBe(
+      label('signinUnavailable')
+    )
+    expect(events.map(([event]) => event)).toEqual([
+      'signin-email-focus',
+      'signin-request-press',
+      'signin-request-unavailable',
+    ])
   })
 })

@@ -413,32 +413,57 @@ export function systemSurfaceSummary(hierarchy) {
 }
 
 const CODE_INPUT_ID = 'signin-code-input'
+const EMAIL_INPUT_ID = 'signin-email-input'
+const SUBMIT_ID = 'signin-submit'
+
+const isTrue = (node, key) => node?.[key] === true || node?.attributes?.[key] === 'true'
+const childrenOf = (node) => (Array.isArray(node?.children) ? node.children : [])
 
 /**
- * What the sign-in code field looked like when a step failed, without its content: whether it is
- * on screen, enabled and focused, and how many characters it held. The step carries the owner's
- * email and one-time code, so only a length and flags leave, never a character.
+ * A sign-in field's flags and length. iOS can put the focus (signin-verify.yaml) and the typed
+ * value on a child of the node that carries the testID, so the subtree counts: focused when any
+ * node in it is, and the longest text in it, capped at 99, as the length.
+ */
+function fieldState(node) {
+  let focused = false
+  let textLength = 0
+  const visit = (current) => {
+    if (isTrue(current, 'focused')) focused = true
+    const text = current?.attributes?.text
+    if (typeof text === 'string')
+      textLength = Math.max(textLength, Math.min(text.length, 99))
+    for (const child of childrenOf(current)) visit(child)
+  }
+  visit(node)
+  return { focused, enabled: isTrue(node, 'enabled'), textLength }
+}
+
+/**
+ * What the sign-in fields and the Send/Verify button looked like when a step failed, without
+ * their content: whether each is on screen, enabled and focused, and how many characters a field
+ * held. The steps carry the owner's email and one-time code, so only lengths and flags leave,
+ * never a character. Nightly run 44532964440 shard 3 tapped Send and no code request followed:
+ * an empty email field says the address missed it, a disabled Send beside a full field says a
+ * request was in flight or the screen's state never took the text, and an enabled Send beside a
+ * full field says the tap never reached the app.
  */
 export function inputSurface(hierarchy) {
   if (!hierarchy || typeof hierarchy !== 'object') return null
   let codeInput = null
+  let emailInput = null
+  let submit = null
   let focusedNodeCount = 0
-  const isTrue = (node, key) => node?.[key] === true || node?.attributes?.[key] === 'true'
   const visit = (node) => {
     if (!node || typeof node !== 'object') return
     if (isTrue(node, 'focused')) focusedNodeCount++
-    if (node.attributes?.['resource-id'] === CODE_INPUT_ID && !codeInput) {
-      const text = node.attributes?.text
-      codeInput = {
-        focused: isTrue(node, 'focused'),
-        enabled: isTrue(node, 'enabled'),
-        textLength: typeof text === 'string' ? Math.min(text.length, 99) : 0,
-      }
-    }
-    for (const child of Array.isArray(node.children) ? node.children : []) visit(child)
+    const id = node.attributes?.['resource-id']
+    if (id === CODE_INPUT_ID && !codeInput) codeInput = fieldState(node)
+    if (id === EMAIL_INPUT_ID && !emailInput) emailInput = fieldState(node)
+    if (id === SUBMIT_ID && !submit) submit = { enabled: isTrue(node, 'enabled') }
+    for (const child of childrenOf(node)) visit(child)
   }
   visit(hierarchy)
-  return { codeInput, focusedNodeCount }
+  return { codeInput, emailInput, submit, focusedNodeCount }
 }
 
 // Screen kinds Expo Go can show once the open prompt is answered, as flags only: no text of the
@@ -556,6 +581,12 @@ export function scrollPath(output, maestroLog = '') {
 }
 
 const OPENER_EVENTS = new Set([
+  'signin-email-focus',
+  'signin-request-press',
+  'signin-request-ok',
+  'signin-request-denied',
+  'signin-request-code_invalid',
+  'signin-request-unavailable',
   'signin-code-focus',
   'signin-code-change',
   'signin-verify-press',

@@ -35,8 +35,15 @@ export type ShareCardOpenerEvent =
   | 'composer-prepare'
   | 'reset-identity'
   | 'reset-blur'
-  // Sign-in input path of the same build: whether the code field took focus, how many characters
-  // its state held after each change (a length, never a character), and how verify ended.
+  // Sign-in input path of the same build: whether the email and code fields took focus, how many
+  // characters the code field held after each change and the address held at the Send press
+  // (lengths, never a character), and how the code request and verify ended.
+  | 'signin-email-focus'
+  | 'signin-request-press'
+  | 'signin-request-ok'
+  | 'signin-request-denied'
+  | 'signin-request-code_invalid'
+  | 'signin-request-unavailable'
   | 'signin-code-focus'
   | 'signin-code-change'
   | 'signin-verify-press'

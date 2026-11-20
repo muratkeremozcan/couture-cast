@@ -85,15 +85,19 @@ export default function SignInScreen() {
         traceShareCardOpener('signin-verify-ok')
         await leaveSignedIn()
       } else {
+        traceShareCardOpener('signin-request-press', email.length)
         await requestNativeOtp(email)
+        traceShareCardOpener('signin-request-ok')
         setSent(true)
         setMessage('community.notifications.codeSent')
       }
     } catch (error) {
       // Anything unclassified is treated as temporary, so the person retries.
       const reason = error instanceof NativeSignInError ? error.reason : 'unavailable'
-      if (sent && reason !== 'awaiting_guardian')
-        traceShareCardOpener(`signin-verify-${reason}`)
+      if (reason !== 'awaiting_guardian')
+        traceShareCardOpener(
+          sent ? `signin-verify-${reason}` : `signin-request-${reason}`
+        )
       // A teen waiting on a guardian goes to the guardian invitation, not a refusal.
       if (reason === 'awaiting_guardian')
         router.replace(
@@ -136,6 +140,7 @@ export default function SignInScreen() {
         keyboardType="email-address"
         autoCapitalize="none"
         value={email}
+        onFocus={() => traceShareCardOpener('signin-email-focus')}
         onChangeText={setEmail}
         editable={!sent && !busy}
         style={styles.input}
@@ -160,6 +165,7 @@ export default function SignInScreen() {
         </>
       )}
       <Pressable
+        testID="signin-submit"
         accessibilityRole="button"
         disabled={!canSubmit}
         onPress={() => {
@@ -173,7 +179,7 @@ export default function SignInScreen() {
           )}
         </Text>
       </Pressable>
-      <Text accessibilityLiveRegion="polite" style={styles.body}>
+      <Text testID="signin-status" accessibilityLiveRegion="polite" style={styles.body}>
         {message ? t(message) : ''}
       </Text>
       {fromPreview ? (

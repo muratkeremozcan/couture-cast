@@ -104,6 +104,21 @@ const saveTapTimeoutMs = Math.ceil(
 )
 
 /**
+ * signin-request.yaml presses Send inside a retry of maxRetries 3 (4 attempts) shaped like
+ * tap-save.yaml: the guard (its two condition checks), the 8 s wait for the sign-in status (the
+ * code-sent or a failure message) and that wait's poll. Before it, nightly run 44532964440 shard 3
+ * waited 20 s for "code sent" after one Send tap that no code request followed. The flow's own
+ * steps keep the default budget; a test reads the flow and keeps these numbers equal to what it
+ * declares.
+ */
+export const SIGNIN_REQUEST_FLOW = 'maestro/story65/signin-request.yaml'
+export const SEND_CODE_TAP_ATTEMPTS = 4
+export const SEND_CODE_TAP_ATTEMPT_MS =
+  2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+export const SEND_CODE_TAP_WORST_CASE_MS =
+  SEND_CODE_TAP_ATTEMPTS * SEND_CODE_TAP_ATTEMPT_MS
+
+/**
  * community-draft-background-ios.yaml taps the photo picker's opener inside a retry of maxRetries 3
  * (4 attempts). An attempt is the guard (its two condition checks), the four commands the guard
  * runs (two swipes to the sheet's top, the animation wait, the tap), the 8 s wait for the picker's
@@ -272,6 +287,9 @@ const flowTimeouts = {
   ),
   ...Object.fromEntries(OUTFIT_OPEN_FLOWS.map((flow) => [flow, outfitOpenTimeoutMs])),
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
+  [SIGNIN_REQUEST_FLOW]: Math.ceil(
+    (DEFAULT_FLOW_TIMEOUT_MS + SEND_CODE_TAP_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+  ),
   ...Object.fromEntries(SHARE_TAP_FLOWS.map((flow) => [flow, shareTapTimeoutMs])),
   [SHARE_SHEET_FLOW]: shareSheetTimeoutMs,
   ...Object.fromEntries(WAIT_SETTINGS_FLOWS.map((flow) => [flow, waitSettingsTimeoutMs])),
