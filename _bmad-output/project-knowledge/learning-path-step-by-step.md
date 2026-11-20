@@ -38,6 +38,7 @@ Added Step 58, production status and nightly health, with the daily production r
 Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
 Added Step 57's production follow-ups, PRs #237 to #255.
 Added Step 58's first production follow-up, image uploads straight to storage, while its PR is in review.
+Added the advisor erase and planner week race fixes to Step 58's production follow-ups, closing two CodeRabbit findings left open on PR #259.
 Moved Step 57 to completed after PR #238 merged as `5bd54123`, and added the pending-teen sign-in loop to its takeaways and tests.
 Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
 Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -147,6 +148,7 @@ Read it before changing or adding a numbered step.
 - Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
   In review under Step 58: production follow-up, image uploads straight to storage, on `fix/garment-upload`; its plan is `_bmad-output/plan-upload-direct-storage.md`.
   In progress under Step 58: production follow-up, hosted wardrobe workers and manual tagging, on `feat/hosted-wardrobe-workers`; its plan is `_bmad-output/plan-hosted-wardrobe-workers.md`.
+  In review under Step 58: production follow-up, advisor erase and planner week races, on `fix/advisor-erase-planner-week`; its plan is `_bmad-output/plan-advisor-erase-planner-week.md`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -20732,3 +20734,38 @@ Evidence boundaries:
   expectation, not a measurement. Measure it before calling the service inside the community
   worker's idle budget.
 - The ten-locale strings for the manual and pending copy are translated without a native review.
+
+#### Advisor erase and planner week races
+
+User/business impact:
+
+A member who erased their palette advisor data could see it come back. After a wardrobe write the
+advisor re-reads the server's status, and that read can retry after the bearer rotates. If the
+member erased their data meanwhile, the delayed answer carried the profile from before the erase
+and put the old consent state and analysis back on screen. In the planner rail, a Retry that
+answered late could show an empty list instead of the disabled panel, and a Retry that failed late
+could replace a freshly reshuffled week with the error panel. Erasure now sticks, and the rail
+shows a week only when it has one.
+
+Lessons:
+
+1. **A read answers for the moment it started.**
+   Every write the advisor accepts advances a write generation, and a recovery read keeps the
+   generation it started under. If a newer write was accepted before it answers, the answer is
+   dropped; with no newer write it is accepted as before.
+2. **A late answer never restores a state it did not own.**
+   The planner rail sets `entitled` after a superseded foreground read only when a usable week is
+   on screen. Otherwise the newer lock or error state stays. A late transient failure is ignored
+   only when a reshuffle produced a newer week; with none, the foreground read still shows its
+   error.
+
+Tests:
+
+Web unit, Vitest:
+
+- [`apps/web/src/app/components/palette-advisor-erase-race.test.tsx`](../../apps/web/src/app/components/palette-advisor-erase-race.test.tsx):
+  proves a recovery read delayed past an erase leaves the panel empty, and one with no newer write
+  still lands.
+- [`apps/web/src/app/components/planner-rail-week-race.test.tsx`](../../apps/web/src/app/components/planner-rail-week-race.test.tsx):
+  proves a late Retry success shows the disabled panel and not an empty list, and a late Retry
+  failure keeps the reshuffled week.
