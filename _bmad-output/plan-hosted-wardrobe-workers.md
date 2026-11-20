@@ -117,7 +117,7 @@ Decisions made while implementing (2026-11-19). Items marked (R) were changed by
    no onnxruntime, transformers, TensorFlow or OpenTelemetry SDK package; `wardrobe.bootstrap.spec.ts`
    asserts that with the TypeScript parser, the prune script fails the build if the closure reaches
    a forbidden package, and the launcher self-test fails if a model runtime is in `require.cache`.
-4. **Idle backoff values.** BullMQ's `drainDelay` is in seconds. The plan's `300000` is the
+4. **Idle backoff values (superseded by Plan Change Log 2: 1800 s and 900000 ms).** BullMQ's `drainDelay` is in seconds. The plan's `300000` is the
    millisecond figure of the community worker's 300 seconds, so the hosted consumers use 300
    (`workers/idle-worker-options.ts`), with `stalledInterval` 120000, `lockDuration` 30000 and
    `maxStalledCount` 1, pinned to the community exports by a spec. The existing consumers dropped
@@ -189,6 +189,7 @@ NX PX <interval minus margin>`; a failing task logs `wardrobe_retention_purge_fa
 ## Plan Change Log
 
 1. Review (upload-codex-review-23.md on bb2627de), the PR's single round; every finding is addressed in this PR and not re-reviewed. Triggering findings: the one-consumer guard is per process only; the wardrobe consumer would acknowledge foreign maintenance jobs on the shared queue; hosted config can enable fixture moderation; the new suggest-tags `mode` field breaks old tabs and mixed deploys; process start is not readiness; BullMQ delayed-job schedulers keep a 10 s Redis poll, so the idle budget is missed; the community input-set hash changes; the runbook attributes macOS measurements to a Linux image; manual-mode screens can show suggestions while the mode is pending. Amended: Design Notes (round design below). Frozen intent kept in effect: the service still purges hourly and drains deletions every 15 minutes with no foreign job, but through an in-process Redis-locked loop instead of BullMQ schedulers, because that is the only way to meet the community worker's idle Redis rate. The community input-set hash deviation is approved by the coordinator (no gate enforces it; the stale readiness evidence is the community owner's to regenerate).
+2. Coordinator, 2026-11-20, after the hosted measurement: production Redis is pay-as-you-go and the service idled at about 950 commands an hour, twice the community worker. The hosted consumers no longer take the community worker's backoff: `drainDelay` 1800 s, `stalledInterval` 900000 ms, TCP keepalive 60 s on the connection, `lockDuration` and `maxStalledCount` unchanged, for about 137 commands an hour (at least 5x lower). The community worker is untouched because its moderation SLA needs the 120 s stalled check. Design note 4 below is superseded.
 
 ## Review Triage Log
 
