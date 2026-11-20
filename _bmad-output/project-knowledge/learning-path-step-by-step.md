@@ -20840,7 +20840,7 @@ Web unit, Vitest:
 
 Jade's community reports (the lookbook was a placeholder, "Cold and wet" had no explanation, the
 title said "Living Community Look book") each had a test, but the member specs seed a member and
-skip outside the local stack, so none of them could turn the daily production run red. Three
+skip outside the local stack, so none of them could turn the daily production run red. Four
 checks close that gap:
 
 - [`playwright/tests/community-jade-signed-out.spec.ts`](../../playwright/tests/community-jade-signed-out.spec.ts):
@@ -20854,6 +20854,11 @@ checks close that gap:
 - [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
   the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
   (C-WEB-TARGETS).
+- [`playwright/tests/community-member.prod.spec.ts`](../../playwright/tests/community-member.prod.spec.ts):
+  the daily production run, as the synthetic member (read-only). The community feed answers 200
+  with a list, and `/community` at phone width shows the member the real grid with the Latest
+  looks heading and the explainer instead of the signed-out prompt (JADE-COMMUNITY-004, -005).
+  A community switched off again, or a stub page, turns the status run red.
 
 #### Jade's profile and location reports are checked in production
 
