@@ -76,9 +76,9 @@ async function expectMemberLanding(page: Page) {
     await expect(page.locator(selector)).toBeHidden()
   // TEA H-4: hidden means gone from the accessibility tree too, not only from the screen.
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveCount(0)
-  await expect(page.getByRole('link', { name: 'Start signup', exact: true })).toHaveCount(
-    0
-  )
+  await expect(
+    page.getByRole('link', { name: 'Create account', exact: true })
+  ).toHaveCount(0)
   // TEA F2: the signed-out set is removed from layout, not only hidden, so the member actions
   // start where the hero text starts, with no empty space before Open your wardrobe.
   for (const selector of GUEST_LANDING_ACTIONS)
@@ -99,7 +99,7 @@ async function expectPendingLanding(page: Page) {
   await expect(page.getByTestId('cta-primary')).toBeVisible()
   await expect(page.getByTestId('cta-secondary')).toBeVisible()
   await expect(page.getByTestId('track-wardrobe-upload-started')).toBeVisible()
-  for (const name of ['Sign in', 'Start signup', 'Try a sample wardrobe', 'Sign out'])
+  for (const name of ['Sign in', 'Create account', 'Try a sample wardrobe', 'Sign out'])
     await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('landing-open-wardrobe')).toBeHidden()
@@ -231,12 +231,15 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   await expect(page).toHaveURL(`${WEB}/wardrobe`)
 })
 
-test('L-2: a signed-out visitor sees exactly Start signup, Try a sample wardrobe and Sign in', async ({
+test('L-2: a signed-out visitor sees Create account, Try a sample wardrobe and Sign in', async ({
   page,
 }) => {
   await recordLandingActions(page)
   await page.goto('/')
   await expectGuestLanding(page)
+  await expect(
+    page.getByRole('link', { name: 'Create account', exact: true })
+  ).toBeVisible()
   await expect(page.getByTestId('landing-sign-in')).toHaveText(/sign in/i)
   const seen = await landingActionsSeen(page)
   expect(seen.member).toEqual([])

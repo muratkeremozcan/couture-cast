@@ -99,6 +99,7 @@ export const ptPT: GuestPreviewStrings = {
     count: 'Artigos de exemplo: {count}',
   },
   conversionDetail: {
+    garmentHeading: 'Adicione uma peça sua',
     canSave: 'Pode ser guardado após iniciar sessão',
     canSaveBody: 'As suas três definições de conforto.',
     previewOnly: 'Apenas na pré-visualização',

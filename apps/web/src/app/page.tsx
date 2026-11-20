@@ -1,7 +1,9 @@
-import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
-import { GuestPreviewEntry } from './components/guest-preview/guest-preview-entry'
+import {
+  GuestPreviewEntry,
+  MemberWardrobeActions,
+} from './components/guest-preview/guest-preview-entry'
 import { LegalLinks } from './components/legal-page'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
 import { ProfileNavLink } from './components/profile-nav-link'
@@ -61,8 +63,9 @@ export default function Home() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="max-w-6xl mx-auto space-y-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
+        className="max-w-6xl mx-auto flex flex-col gap-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
       >
+        <GuestPreviewEntry />
         {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd widths
             and blends the dark page into column 0. */}
         <div className="relative mx-[calc(50%-min(50vw,720px))] w-[min(100vw,1440px)]">
@@ -87,20 +90,8 @@ export default function Home() {
           </p>
           {/* TEA P3: one gap for the whole stack of landing actions, sign-in and analytics alike. */}
           <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <Link
-                href="/signup"
-                data-testid="landing-sign-up"
-                data-landing="guest"
-                // TEA P1: 44 px like its neighbours; the 1 px border comes out of the padding.
-                className="inline-flex min-h-11 items-center rounded-full border border-amber-300 whitespace-nowrap px-5 py-[11px] text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
-                data-ph-event="cta_clicked"
-                data-ph-cta-label="Start signup"
-                data-ph-cta-type="primary"
-              >
-                Start signup
-              </Link>
-              <GuestPreviewEntry />
+            <div className="flex flex-wrap items-center gap-4" data-landing="member">
+              <MemberWardrobeActions />
             </div>
             <AnalyticsEventActions />
           </div>

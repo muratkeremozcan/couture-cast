@@ -101,6 +101,7 @@ export const es419: GuestPreviewStrings = {
     count: '{count} prendas de muestra',
   },
   conversionDetail: {
+    garmentHeading: 'Agrega una prenda tuya',
     canSave: 'Se puede guardar después de iniciar sesión',
     canSaveBody: 'Tus tres ajustes de comodidad.',
     previewOnly: 'Solo en la vista previa',

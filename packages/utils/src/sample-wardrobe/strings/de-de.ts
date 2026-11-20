@@ -99,6 +99,7 @@ export const deDE: GuestPreviewStrings = {
     count: '{count} Beispielteile',
   },
   conversionDetail: {
+    garmentHeading: 'Füge ein eigenes Kleidungsstück hinzu',
     canSave: 'Nach der Anmeldung speicherbar',
     canSaveBody: 'Ihre drei Komforteinstellungen.',
     previewOnly: 'Nur in der Vorschau',

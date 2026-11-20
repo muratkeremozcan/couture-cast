@@ -3,16 +3,21 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { GUEST_PREVIEW_STRINGS } from '@couture/utils'
 import { getI18n } from '../../../i18n'
-import { GuestPreviewEntry } from './guest-preview-entry'
+import { GuestPreviewEntry, MemberWardrobeActions } from './guest-preview-entry'
 import { SampleGarmentArt } from './sample-garment-art'
 
 describe('guest preview entry', () => {
-  it('links to the preview and to sign-in in the active locale', async () => {
+  it('localizes the guest links and keeps the signup analytics label stable', async () => {
     await getI18n().changeLanguage('tr-TR')
     render(<GuestPreviewEntry />)
     const entry = screen.getByTestId('guest-preview-entry')
     expect(entry.getAttribute('href')).toBe('/preview')
     expect(entry.textContent).toBe(GUEST_PREVIEW_STRINGS['tr-TR'].chrome.entry)
+    const signup = screen.getByRole('link', {
+      name: GUEST_PREVIEW_STRINGS['tr-TR'].chrome.createAccount,
+    })
+    expect(signup).toHaveAttribute('href', '/signup')
+    expect(signup).toHaveAttribute('data-ph-cta-label', 'Start signup')
     expect(screen.getByTestId('landing-sign-in').getAttribute('href')).toBe('/signin')
     await getI18n().changeLanguage('en-US')
   })
@@ -21,7 +26,12 @@ describe('guest preview entry', () => {
   // the one that matches <html data-session> (lib/landing-session.ts).
   it('marks each action with the session it belongs to, in the active locale', async () => {
     await getI18n().changeLanguage('de-DE')
-    render(<GuestPreviewEntry />)
+    render(
+      <>
+        <GuestPreviewEntry />
+        <MemberWardrobeActions />
+      </>
+    )
     const chrome = GUEST_PREVIEW_STRINGS['de-DE'].chrome
     const landing = (id: string) => screen.getByTestId(id).getAttribute('data-landing')
     expect(landing('guest-preview-entry')).toBe('guest')

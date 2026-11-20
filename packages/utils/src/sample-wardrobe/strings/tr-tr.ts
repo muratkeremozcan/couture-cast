@@ -97,6 +97,7 @@ export const trTR: GuestPreviewStrings = {
     count: '{count} örnek parça',
   },
   conversionDetail: {
+    garmentHeading: 'Kendi giysinizi ekleyin',
     canSave: 'Giriş yaptıktan sonra kaydedilebilir',
     canSaveBody: 'Üç konfor ayarınız.',
     previewOnly: 'Yalnızca önizlemede',
