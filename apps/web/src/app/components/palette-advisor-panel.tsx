@@ -63,6 +63,14 @@ import {
 import { SessionRetryButton } from './session-retry-button'
 import { currentUploadSession, isUploadSessionCurrent } from '../../lib/upload-attempts'
 
+/** Rejections that rewrite the profile on screen, so older recovery reads must not undo them. */
+const PROFILE_CHANGING_FAILURES: ReadonlySet<string> = new Set([
+  'signed_out',
+  'not_entitled',
+  'no_consent',
+  'analysis_disabled',
+])
+
 /**
  * True when a stored palette was derived under a rule table this build has
  * replaced.
@@ -888,7 +896,15 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
         setPanelState('ready')
       } catch (writeError: unknown) {
         if (controller.signal.aborted || !isLiveOwner(owner)) return
-        writeGenerationRef.current += 1
+        // A rejection that rewrites the profile supersedes older recovery reads; an error-only
+        // one (nothing changed) leaves them valid. An erase that failed may still have
+        // landed, so it stays conservative.
+        if (
+          kind === 'erase' ||
+          PROFILE_CHANGING_FAILURES.has(paletteAdvisorFailureReason(writeError))
+        ) {
+          writeGenerationRef.current += 1
+        }
         applyWriteFailure(writeError, fallbackKey)
       } finally {
         if (writeControllerRef.current === controller) {

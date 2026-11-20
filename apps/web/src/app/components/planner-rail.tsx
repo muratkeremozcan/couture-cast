@@ -67,6 +67,13 @@ export interface PlannerRailProps {
 
 type EntitlementState = 'checking' | 'entitled' | 'locked' | 'error'
 
+interface RailState {
+  entitlementState: EntitlementState
+  plannerData: PlannerResponse['data'] | null
+  /** The last read was denied and the bridge could not verify the member again. */
+  recheckFailedAt: number | null
+}
+
 /**
  * Why the rail is locked, so the copy can distinguish "subscribe" from
  * "temporarily unavailable" without widening {@link EntitlementState} past
@@ -579,9 +586,39 @@ function PlannerWeek({
   const locale = i18n.language
   const { status, owner, retry } = session
 
-  const [entitlementState, setEntitlementState] = useState<EntitlementState>('checking')
+  /*
+   * The entitlement, the week and the failed-recheck marker change together in one state, so
+   * every transition is applied in order to the latest value. A read that settles before React
+   * commits an earlier update (a newer lock, a reshuffle) therefore sees that update, and
+   * `entitled` can never be queued next to a missing week.
+   */
+  const [rail, setRail] = useState<RailState>({
+    entitlementState: 'checking',
+    plannerData: null,
+    recheckFailedAt: null,
+  })
+  const { entitlementState, plannerData, recheckFailedAt } = rail
+  const setEntitlementState = useCallback((next: EntitlementState) => {
+    setRail((rail) => ({ ...rail, entitlementState: next }))
+  }, [])
+  const setPlannerData = useCallback(
+    (
+      next:
+        | PlannerResponse['data']
+        | null
+        | ((current: PlannerResponse['data'] | null) => PlannerResponse['data'] | null)
+    ) => {
+      setRail((rail) => ({
+        ...rail,
+        plannerData: typeof next === 'function' ? next(rail.plannerData) : next,
+      }))
+    },
+    []
+  )
+  const setRecheckFailedAt = useCallback((revision: number | null) => {
+    setRail((rail) => ({ ...rail, recheckFailedAt: revision }))
+  }, [])
   const [lockedReason, setLockedReason] = useState<LockedReason>(null)
-  const [plannerData, setPlannerData] = useState<PlannerResponse['data'] | null>(null)
   const [busyPlanDate, setBusyPlanDate] = useState<string | null>(null)
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const [announcement, setAnnouncement] = useState<string | null>(null)
@@ -594,13 +631,6 @@ function PlannerWeek({
    * older versions of the day, so its answer is dropped rather than undoing the reshuffle.
    */
   const weekGenerationRef = useRef(0)
-  /** The week on screen, readable from a read that settles after the render that started it. */
-  const plannerDataRef = useRef<PlannerResponse['data'] | null>(null)
-  useLayoutEffect(() => {
-    plannerDataRef.current = plannerData
-  }, [plannerData])
-  /** The last read was denied and the bridge could not verify the member again. */
-  const [recheckFailedAt, setRecheckFailedAt] = useState<number | null>(null)
 
   useLayoutEffect(() => {
     onCheckingChange(entitlementState === 'checking')
@@ -621,34 +651,42 @@ function PlannerWeek({
   }, [])
 
   /**
-   * A foreground read was superseded by a reshuffle and left the rail in `checking`. With a
-   * usable week on screen the rail is `entitled` again; with none, whatever newer lock or error
-   * state replaced `checking` stays, and a rail still checking falls to its error panel.
+   * A foreground read superseded by a reshuffle settles against the latest state. Only a rail
+   * that still owns `checking` changes: with a week it is `entitled` again, with none it shows
+   * the error (and, for a failed recheck, waits on the bridge). A newer lock, error or week
+   * set meanwhile takes precedence and stays as it is.
    */
-  const settleSupersededRead = useCallback(() => {
-    setEntitlementState((state) =>
-      plannerDataRef.current !== null
-        ? 'entitled'
-        : state === 'checking'
-          ? 'error'
-          : state
+  const settleSupersededRead = useCallback((recheckRevision?: number) => {
+    setRail((rail) =>
+      rail.entitlementState !== 'checking'
+        ? rail
+        : rail.plannerData !== null
+          ? { ...rail, entitlementState: 'entitled' }
+          : {
+              ...rail,
+              entitlementState: 'error',
+              recheckFailedAt: recheckRevision ?? rail.recheckFailedAt,
+            }
     )
   }, [])
 
   /**
-   * A foreground read that failed for a transient reason after a reshuffle produced a newer week
-   * leaves that week on screen. A lock answer, a silent read, or a failure with no newer week
-   * is not handled here.
+   * A foreground read that failed for a transient reason after a reshuffle advanced the week
+   * generation is settled by `settleSupersededRead`. A lock answer, a silent read, or a read
+   * no reshuffle superseded is not handled here.
    */
   const settleLateFailure = useCallback(
     (failure: unknown, generation: number, silent: boolean | undefined): boolean => {
       if (silent || generation === weekGenerationRef.current) return false
-      if (plannerDataRef.current === null) return false
       const reason = plannerFailureReason(failure)
       const transient =
         isSessionRecheckError(failure) ||
         (reason !== 'signed_out' && reason !== 'not_entitled' && reason !== 'disabled')
-      if (transient) settleSupersededRead()
+      if (transient) {
+        settleSupersededRead(
+          isSessionRecheckError(failure) ? failure.revision : undefined
+        )
+      }
       return transient
     },
     [settleSupersededRead]
@@ -718,7 +756,15 @@ function PlannerWeek({
         }
       }
     },
-    [owner, t, settleSupersededRead, settleLateFailure]
+    [
+      owner,
+      t,
+      settleSupersededRead,
+      settleLateFailure,
+      setEntitlementState,
+      setPlannerData,
+      setRecheckFailedAt,
+    ]
   )
 
   /** Starts one week read, tracked until it settles so closing the rail can abort it. */
@@ -759,7 +805,7 @@ function PlannerWeek({
     }
     const controller = startRead()
     return () => controller.abort()
-  }, [status, owner, startRead])
+  }, [status, owner, startRead, setEntitlementState, setPlannerData])
 
   // The focus listener reads the state of the latest commit. A layout effect updates it
   // inside the commit that renders the week; re-registering the listener in a passive
@@ -853,7 +899,7 @@ function PlannerWeek({
         reshuffleControllersRef.current.delete(day.planDate)
       }
     },
-    [busyPlanDate, startRead, locale, owner, t]
+    [busyPlanDate, startRead, locale, owner, t, setEntitlementState, setPlannerData]
   )
 
   const handleRetry = useCallback(() => {
