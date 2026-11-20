@@ -1687,9 +1687,15 @@ event.
 **Drift check.** The `PostHog flag drift` workflow runs `scripts/ci/posthog-flag-drift.mjs`
 hourly, on every push to main and on any pull request that edits `packages/config/src/flags.ts`.
 Each declared key must pass two checks, and the expected value is its declared default unless
-the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is only
-`color_analysis_enabled` at `true` (owner decision 2026-11-11: color analysis stays on in
-production, and the code default stays `false` so a degraded PostHog fails closed).
+the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today it pins seven keys at
+`true`, and each code default stays `false` so a degraded PostHog fails closed:
+
+- `color_analysis_enabled` (owner decision 2026-11-11): color analysis stays on in production.
+- `community_read_enabled`, `community_write_enabled`, `moderation_console_enabled`,
+  `moderation_decisions_enabled`, `moderation_sla_monitoring_enabled` and
+  `moderation_history_enabled` (owner decision 2026-11-19): the Community Beta is open to every
+  member, with the moderation console, decisions, SLA sweep and history on. The pins landed after
+  the flags went to 100 percent, so the check never read a pinned flag against a closed production.
 
 - Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
   (a personal API key limited to `feature_flag:read` and `project:read` on 329012): the flag

@@ -15,6 +15,7 @@ import {
   INTENTIONAL_OVERRIDES,
   projectPrivacyProblems,
   readProjectPrivacy,
+  pinnedOverrideCount,
   SERVER_USER_AGENT,
 } from './posthog-flag-drift.mjs'
 
@@ -162,8 +163,21 @@ test('a pinned override replaces the declared default and must name a declared f
       ),
     /Overrides for undeclared flags: gone/
   )
-  assert.equal(INTENTIONAL_OVERRIDES.color_analysis_enabled.value, true)
-  assert.ok(INTENTIONAL_OVERRIDES.color_analysis_enabled.reason.length > 0)
+  assert.deepEqual(Object.keys(INTENTIONAL_OVERRIDES).sort(), [
+    'color_analysis_enabled',
+    'community_read_enabled',
+    'community_write_enabled',
+    'moderation_console_enabled',
+    'moderation_decisions_enabled',
+    'moderation_history_enabled',
+    'moderation_sla_monitoring_enabled',
+  ])
+  for (const override of Object.values(INTENTIONAL_OVERRIDES)) {
+    assert.equal(override.value, true)
+    assert.ok(override.reason.length > 0)
+  }
+  assert.equal(pinnedOverrideCount({ a: 1 }), '1 pinned override')
+  assert.equal(pinnedOverrideCount(INTENTIONAL_OVERRIDES), '7 pinned overrides')
 })
 
 test('describes each kind of drift on its own line', () => {
