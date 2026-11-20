@@ -16,7 +16,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { contrastRatio, meetsWcagAA } from '@couture/utils'
 import { getI18n } from '../../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { PremiumThemeSection } from './premium-theme-section'
 
@@ -32,8 +32,9 @@ function getHandler(overrides: ThemeBody = {}) {
   return http.get(THEME_PATH, () => HttpResponse.json(themeBody(overrides)))
 }
 
+/** The fixture member: the bearer the section's session follower counts. */
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 function renderSection() {

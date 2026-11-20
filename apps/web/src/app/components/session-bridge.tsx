@@ -3,6 +3,8 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
 import { applyLandingSession, readLandingSession } from '../../lib/landing-session'
+import { releaseThemeOfDepartedOwner } from '../../lib/premium-theme'
+import { currentWebSessionOwner } from '../../lib/use-web-session'
 import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
 
 // The legal pages stay readable mid-signup: Google's consent screen and the finish step link there.
@@ -54,6 +56,17 @@ export function SessionBridge() {
       window.removeEventListener('pageshow', onPageShow)
     }
   }, [sessionReady])
+  useEffect(() => {
+    // A member's palette lives on <html>, which outlives Settings: it leaves with that member
+    // wherever the session changes (Settings Codex review 1, finding 7).
+    const releaseTheme = () => releaseThemeOfDepartedOwner(currentWebSessionOwner())
+    window.addEventListener('couture:session', releaseTheme)
+    window.addEventListener('storage', releaseTheme)
+    return () => {
+      window.removeEventListener('couture:session', releaseTheme)
+      window.removeEventListener('storage', releaseTheme)
+    }
+  }, [])
   useEffect(() => {
     const stopLanguageSync = syncDocumentLanguage()
     activateBrowserLocale()

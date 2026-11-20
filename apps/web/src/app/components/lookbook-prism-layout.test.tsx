@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 vi.mock('posthog-js', () => ({
@@ -84,7 +84,7 @@ function buildPlannerResponse() {
 const COMMUNITY_POST_ID = 'community-post-1'
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 function communityFeedHandler() {
@@ -304,7 +304,7 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   it('5.2-WEB-RAIL-02 renders the planner shell for an entitled user', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () => HttpResponse.json(buildPlannerResponse()))
     )
@@ -317,7 +317,7 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   it('5.2-WEB-RAIL-03 keeps the locked upsell for a non-entitled caller', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    signInFixtureMember()
     const requested = vi.fn()
     useMswHandlers(
       http.get(PLANNER_PATH, () => {

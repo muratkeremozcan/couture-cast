@@ -235,6 +235,28 @@ export function applyWebThemeAttribute(theme: PremiumThemeKey | null): void {
   document.documentElement.dataset.theme = theme ?? ''
 }
 
+/** The member whose palette is on the document right now, or null for Default. */
+let themeOwner: string | null = null
+
+/**
+ * Applies a member's palette and records whose it is. The document outlives Settings, so the
+ * root session shell (`SessionBridge`) clears it once that member is no longer the one this tab
+ * holds (Settings Codex review 1, finding 7). `null` applies Default and records no one.
+ */
+export function applyMemberTheme(
+  theme: PremiumThemeKey | null,
+  owner: string | null
+): void {
+  applyWebThemeAttribute(theme)
+  themeOwner = theme === null ? null : owner
+}
+
+/** Clears the palette when the member who applied it is not `currentOwner`. */
+export function releaseThemeOfDepartedOwner(currentOwner: string | null): void {
+  if (themeOwner === null || themeOwner === currentOwner) return
+  applyMemberTheme(null, null)
+}
+
 /**
  * Reads the palette the server resolved for this user, together with the entitlement
  * and flag state that produced it. One round trip, so the section never has to combine

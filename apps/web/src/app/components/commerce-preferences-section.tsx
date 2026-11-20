@@ -5,30 +5,64 @@
 // "Shop this look" CTA here: the only surface fed by real `/api/v1/ritual` data
 // is the Mobile outfit card, and building a live Web ritual surface belongs to
 // Epic 3.
+//
+// The section follows the session (`MemberScope`): while a stored session is still being
+// verified it stays `checking`, and it reads once per member. A one-shot check on mount once told
+// a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   getCommercePreferenceFromWeb,
-  hasWebSession,
+  isCommerceDenial,
   updateCommercePreferenceFromWeb,
 } from '../../lib/commerce'
+import {
+  isLiveOwner,
+  MemberScope,
+  isSessionRecheckError,
+  readAsMember,
+  useSessionRecheck,
+  type MemberSession,
+} from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
 const HELP_ID = 'commerce-affiliate-ctas-help'
 const SIGNED_OUT_HINT_ID = 'commerce-affiliate-ctas-signed-out'
 
 /**
- * `checking` is the server render and the first client tick, before
- * `sessionStorage` can be read. It renders the same disabled control as
- * `signed_out` without the hint, so hydration never has to reconcile two
- * different trees.
+ * `checking` is the server render, the first client tick, and every moment a
+ * stored session is still being verified. It renders the same disabled control
+ * as `signed_out` without the hint, so hydration never has to reconcile two
+ * different trees and a signed-in member never sees the hint.
  */
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's
+ * preference, save and messages in the same render.
+ */
 export function CommercePreferencesSection() {
+  return (
+    <MemberScope>
+      {(session) => <MemberCommercePreferences session={session} />}
+    </MemberScope>
+  )
+}
+
+function MemberCommercePreferences({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
+  const { status, owner } = session
+  /** A read denied while the bridge could not verify the member again: retryable. */
+  const recheck = useSessionRecheck(owner)
+  const {
+    attempt: loadAttempt,
+    markFailed: markRecheckFailed,
+    clear: clearRecheck,
+  } = recheck
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [enabled, setEnabled] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -48,29 +82,71 @@ export function CommercePreferencesSection() {
    * same reason. "Unable to update shopping preferences." is what the toggle
    * says when a save fails; telling someone their preferences could not be
    * *updated* when the page merely failed to *read* them points at the wrong
-   * action, and the only action available in `load_failed` is a reload.
+   * action, and the only action available after a failed read is a reload. A
+   * failed session check is the exception: it offers Try again, which verifies
+   * the session again.
    */
   const loadErrorMessage = t('commerce.settings.loadError')
 
+  // One read per member: a session event that names the same member again (a token refresh,
+  // the end of a verification already answered) asks nothing.
   useEffect(() => {
-    if (!hasWebSession()) {
+    // Every run decides afresh whether a failed recheck is still waiting.
+    clearRecheck()
+    if (status === 'checking') {
+      setError(null)
+      setSectionState('checking')
+      return
+    }
+    if (status === 'unavailable') {
+      // Verification failed: an outage the member can retry, never the sign-in hint.
+      setError(loadErrorMessage)
+      setSectionState('load_failed')
+      return
+    }
+    if (owner === null) {
+      setError(null)
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names this member; until then nothing is asked.
+    if (!isLiveOwner(owner)) return
 
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    setError(null)
     setSectionState('loading')
 
     void (async () => {
       try {
-        const preference = await getCommercePreferenceFromWeb(controller.signal)
-        if (controller.signal.aborted) {
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const preference = await readAsMember(
+          owner,
+          () => getCommercePreferenceFromWeb(controller.signal),
+          isCommerceDenial,
+          controller.signal
+        )
+        if (!current()) {
           return
         }
         setEnabled(preference.affiliateCtasEnabled)
         setSectionState('ready')
-      } catch {
-        if (controller.signal.aborted) {
+      } catch (loadError: unknown) {
+        if (!current()) {
+          return
+        }
+        if (isSessionRecheckError(loadError)) {
+          // The member is not known to be signed out: the load error with a retry, and a new
+          // read once the bridge verifies them again.
+          setError(loadErrorMessage)
+          setSectionState('load_failed')
+          markRecheckFailed(loadError)
+          return
+        }
+        if (isCommerceDenial(loadError)) {
+          // The API refused the bearer the bridge holds for this member, and no newer one
+          // explains it: signed out, with the localized hint, like every sibling section.
+          setSectionState('signed_out')
           return
         }
         /*
@@ -92,7 +168,7 @@ export function CommercePreferencesSection() {
     })()
 
     return () => controller.abort()
-  }, [loadErrorMessage])
+  }, [status, owner, loadErrorMessage, loadAttempt, clearRecheck, markRecheckFailed])
 
   /**
    * Optimistic, and reverted on failure.
@@ -110,7 +186,7 @@ export function CommercePreferencesSection() {
      * place in the page entirely. The end-to-end keyboard journey caught that.
      * `aria-busy` announces the pending state without taking the control away.
      */
-    if (isSaving) {
+    if (isSaving || !isLiveOwner(owner)) {
       return
     }
 
@@ -124,14 +200,16 @@ export function CommercePreferencesSection() {
       const saved = await updateCommercePreferenceFromWeb({
         affiliateCtasEnabled: nextEnabled,
       })
+      if (!isLiveOwner(owner)) return
       setEnabled(saved.affiliateCtasEnabled)
       setConfirmation(t('commerce.settings.saved'))
     } catch {
+      if (!isLiveOwner(owner)) return
       setEnabled(previous)
       // Catalog copy, not the server's English. See the read path above.
       setError(genericErrorMessage)
     } finally {
-      setIsSaving(false)
+      if (isLiveOwner(owner)) setIsSaving(false)
     }
   }
 
@@ -238,6 +316,12 @@ export function CommercePreferencesSection() {
           {error}
         </p>
       )}
+
+      <SessionRetryButton
+        session={session}
+        testId="commerce-session-retry"
+        recheck={recheck.retry}
+      />
     </section>
   )
 }

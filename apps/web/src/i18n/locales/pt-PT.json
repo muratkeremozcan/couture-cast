@@ -1280,5 +1280,8 @@
     "community": "Comunidade",
     "profile": "Perfil",
     "navigatedTo": "Separador {{label}} aberto"
+  },
+  "session": {
+    "retry": "Tentar novamente"
   }
 }

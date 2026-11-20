@@ -1280,5 +1280,8 @@
     "community": "Community",
     "profile": "Profil",
     "navigatedTo": "Zum Tab {{label}} gewechselt"
+  },
+  "session": {
+    "retry": "Erneut versuchen"
   }
 }

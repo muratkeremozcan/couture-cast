@@ -37,9 +37,8 @@ import {
 } from './location-format'
 import {
   currentWebSessionOwner,
-  useWebSession,
-  useWebSessionOwner,
-  type WebSessionState,
+  MemberScope,
+  type MemberSession,
 } from '../../../lib/use-web-session'
 import { LocationSearchForm, type LocationClaim } from './location-search-form'
 
@@ -58,13 +57,12 @@ function reasonOf(error: unknown): LocationFailureReason {
  * editors, status, form and every handler they hold in the same render, before any effect runs.
  */
 export function LocationsSection() {
-  const liveOwner = useWebSessionOwner()
-  // Above the key: one session follower, so a member change starts no second verification.
-  const session = useWebSession()
-  return <MemberLocationsSection key={liveOwner ?? 'no-member'} session={session} />
+  return (
+    <MemberScope>{(session) => <MemberLocationsSection session={session} />}</MemberScope>
+  )
 }
 
-function MemberLocationsSection({ session }: { session: WebSessionState }) {
+function MemberLocationsSection({ session }: { session: MemberSession }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -83,7 +81,7 @@ function MemberLocationsSection({ session }: { session: WebSessionState }) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   /** Where focus goes once the change renders, with the ownership check of the work that set it. */
   const pendingFocusRef = useRef<{ target: string; current: () => boolean } | null>(null)
-  const owner = session.status === 'signed_in' ? session.owner : null
+  const owner = session.owner
   const [loadAttempt, setLoadAttempt] = useState(0)
   /*
    * Bumped whenever the member changes (or leaves). Every async completion
