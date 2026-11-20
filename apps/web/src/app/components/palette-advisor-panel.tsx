@@ -63,6 +63,14 @@ import {
 import { SessionRetryButton } from './session-retry-button'
 import { currentUploadSession, isUploadSessionCurrent } from '../../lib/upload-attempts'
 
+/** Rejections that rewrite the profile on screen, so older recovery reads must not undo them. */
+const PROFILE_CHANGING_FAILURES: ReadonlySet<string> = new Set([
+  'signed_out',
+  'not_entitled',
+  'no_consent',
+  'analysis_disabled',
+])
+
 /**
  * True when a stored palette was derived under a rule table this build has
  * replaced.
@@ -698,6 +706,11 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
 
   /** Every in-flight write, so unmounting cancels them. */
   const writeControllerRef = useRef<AbortController | null>(null)
+  /**
+   * Advances each time a write is accepted. A recovery read that started under an older value
+   * may carry a profile from before that write (an erase), so its answer is dropped.
+   */
+  const writeGenerationRef = useRef(0)
   /** This mount's lifetime: a sponsored click answering after it ends navigates nothing. */
   const mountSignal = useMountSignal()
   /** The session captured when the selfie picker last opened; the photo it returns belongs to it. */
@@ -786,6 +799,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
   const refresh = useCallback(async (): Promise<void> => {
     // Checked before the read is sent, and again when it answers.
     if (!isLiveOwner(owner)) return
+    const generation = writeGenerationRef.current
     try {
       // The same bounded retry as the first read: a denial of a rotated token reads again once.
       const next = await readAsMember(
@@ -793,7 +807,8 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
         () => getPaletteAdvisorFromWeb(),
         (error) => paletteAdvisorFailureReason(error) === 'signed_out'
       )
-      if (!isLiveOwner(owner)) return
+      // A write accepted while this read was out supersedes what it read.
+      if (!isLiveOwner(owner) || generation !== writeGenerationRef.current) return
       setProfile(next)
       setPanelState('ready')
     } catch {
@@ -876,10 +891,20 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
       try {
         const next = await write(controller.signal)
         if (controller.signal.aborted || !isLiveOwner(owner)) return
+        writeGenerationRef.current += 1
         setProfile(next)
         setPanelState('ready')
       } catch (writeError: unknown) {
         if (controller.signal.aborted || !isLiveOwner(owner)) return
+        // A rejection that rewrites the profile supersedes older recovery reads; an error-only
+        // one (nothing changed) leaves them valid. An erase that failed may still have
+        // landed, so it stays conservative.
+        if (
+          kind === 'erase' ||
+          PROFILE_CHANGING_FAILURES.has(paletteAdvisorFailureReason(writeError))
+        ) {
+          writeGenerationRef.current += 1
+        }
         applyWriteFailure(writeError, fallbackKey)
       } finally {
         if (writeControllerRef.current === controller) {

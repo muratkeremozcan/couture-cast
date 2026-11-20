@@ -257,6 +257,18 @@ export class SupabaseWardrobeStorageAdapter implements WardrobeStorage {
     return { uploadUrl: data.signedUrl, uploadToken: data.token, tokenExpiresAt }
   }
 
+  /**
+   * One read of the `wardrobe-images` bucket (a one-entry listing), for the hosted worker's
+   * readiness check: proves the Supabase URL and service role key reach the bucket before the
+   * worker consumes a job. Throws the same 503 every storage failure does.
+   */
+  async checkReadable(): Promise<void> {
+    const { error } = await this.storage().list(WARDROBE_STAGING_FOLDER, { limit: 1 })
+    if (error) {
+      throw storageUnavailable('readiness', error)
+    }
+  }
+
   async download(objectPath: string): Promise<Buffer> {
     const { data, error } = await this.storage().download(objectPath)
     if (error || !data) {

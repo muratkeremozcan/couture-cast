@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 import {
   ConflictException,
   NotFoundException,
@@ -144,8 +146,53 @@ describe('WardrobeService Smart Tagging Operations', () => {
     })
 
     const res = await service.suggestGarmentTags('user_1', 'teen', 'g_1')
-    expect(res.data.analysisVersion).toBe(validSnapshot.analysisVersion)
-    expect(res.data.suggestions.category.value).toBe('top')
+    expect(res.data).toMatchObject({
+      garmentId: 'g_1',
+      analysisVersion: validSnapshot.analysisVersion,
+      suggestions: { category: { value: 'top' } },
+    })
+    // The original wire shape (R4): a client from before manual mode rejects an unknown key.
+    expect(res.data).not.toHaveProperty('mode')
+    expect(Object.keys(res.data).toSorted()).toEqual([
+      'analysisVersion',
+      'garmentId',
+      'suggestions',
+    ])
+  })
+
+  it('answers manual mode, with no suggestions, for a garment a model-less worker processed', async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_manual',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: null,
+      tagging_failure_code: 'TAGGING_MANUAL_MODE',
+    })
+
+    const res = await service.suggestGarmentTags('user_1', 'teen', 'g_manual')
+
+    expect(res).toEqual({ data: { mode: 'manual', garmentId: 'g_manual' } })
+  })
+
+  it.each([
+    'TAGGING_INFERENCE_FAILED',
+    'TAGGING_OUTPUT_INVALID',
+    'LEGACY_TAGS_REQUIRED',
+    null,
+  ])('keeps 503 for an empty snapshot with failure code %s', async (code) => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 'g_failed',
+      user_id: 'user_1',
+      upload_status: 'awaiting_tags',
+      retention_status: 'active',
+      tag_suggestions: null,
+      tagging_failure_code: code,
+    })
+
+    await expect(
+      service.suggestGarmentTags('user_1', 'teen', 'g_failed')
+    ).rejects.toThrow(ServiceUnavailableException)
   })
 
   it('returns current response without DB write when ready garment receives identical update', async () => {

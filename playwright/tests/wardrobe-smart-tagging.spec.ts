@@ -7,6 +7,7 @@ import {
   garmentListResponseSchema,
   ritualResponseSchema,
   signupResponseSchema,
+  suggestGarmentTagsResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../config/environments'
@@ -55,7 +56,10 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
 
   wardrobeTest(
     '[P0] [4.2-E2E-001] uploads, resumes, confirms, reloads, and uses the garment in a Ritual',
-    async ({ apiRequest, cleanupState, page, recurse }, testInfo) => {
+    async (
+      { apiRequest, cleanupState, interceptNetworkCall, page, recurse },
+      testInfo
+    ) => {
       const accessToken =
         await test.step('Create an isolated wardrobe user', async () => {
           const signup = await apiRequest({
@@ -154,8 +158,20 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await page.getByRole('button', { name: 'Cancel' }).click()
         const resumeButton = page.getByRole('button', { name: 'Needs tags' })
         await expect(resumeButton).toBeVisible()
+        // Reopening asks the API for the suggestions again. The local stack runs the fixture
+        // tagging engine, so the real answer is `suggested` (Step 58: the response carries a
+        // mode; `manual` is what a hosted worker without a model answers).
+        const resumedSuggestions = interceptNetworkCall({
+          method: 'POST',
+          url: '**/api/v1/wardrobe/garments/*/suggest-tags',
+        })
         await resumeButton.click()
         await expect(dialog).toBeVisible()
+        const suggestCall = await resumedSuggestions
+        expect(suggestCall.status).toBe(200)
+        expect(
+          suggestGarmentTagsResponseSchema.parse(suggestCall.responseJson).data
+        ).toMatchObject({ mode: 'suggested', garmentId: awaitingGarment.id })
       })
 
       await test.step('Override the suggestion with the keyboard and save', async () => {

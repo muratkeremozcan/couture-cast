@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
 import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
@@ -163,9 +165,19 @@ describe('WardrobeController', () => {
       },
     })
 
-    await expect(controller.suggestGarmentTags(mockAuth, 'garment_99')).rejects.toThrow(
-      'Invalid literal value'
-    )
+    // The response contract is a union (suggested or manual); neither branch accepts this answer,
+    // and the suggested branch rejects it on the pinned analysis version.
+    const error = (await controller
+      .suggestGarmentTags(mockAuth, 'garment_99')
+      .catch((caught: unknown) => caught)) as {
+      name: string
+      issues: { code: string; unionErrors: { issues: unknown[] }[] }[]
+    }
+    expect(error.name).toBe('ZodError')
+    expect(error.issues[0]?.code).toBe('invalid_union')
+    expect(
+      JSON.stringify(error.issues[0]?.unionErrors.map((union) => union.issues))
+    ).toContain('Invalid literal value')
   })
 
   describe('createUploadUrl', () => {
@@ -317,13 +329,43 @@ describe('WardrobeController', () => {
 
       const result = await controller.suggestGarmentTags(mockAuth, 'garment_99')
 
-      expect(result.data.garmentId).toBe('garment_99')
-      expect(result.data.suggestions.category.value).toBe(snapshot.category.value)
+      expect(result.data).toMatchObject({
+        garmentId: 'garment_99',
+        suggestions: { category: { value: snapshot.category.value } },
+      })
+      // The original wire shape, so a client from before manual mode keeps parsing it.
+      expect(result.data).not.toHaveProperty('mode')
       expect(mockSuggestGarmentTags).toHaveBeenCalledWith(
         'user_123',
         'teen',
         'garment_99'
       )
+    })
+
+    it('returns the manual-mode answer with no suggestions', async () => {
+      mockSuggestGarmentTags.mockResolvedValueOnce({
+        data: { mode: 'manual', garmentId: 'garment_99' },
+      })
+
+      const result = await controller.suggestGarmentTags(mockAuth, 'garment_99')
+
+      expect(result).toEqual({ data: { mode: 'manual', garmentId: 'garment_99' } })
+    })
+
+    it('rejects a manual-mode answer that carries suggestions', async () => {
+      mockSuggestGarmentTags.mockResolvedValueOnce({
+        data: {
+          mode: 'manual',
+          garmentId: 'garment_99',
+          suggestions: createGarmentTagSuggestionSnapshotFixture(),
+        },
+      })
+
+      // The response contract is a union: manual carries no suggestions, so the answer fails
+      // validation instead of reaching a client that would show both.
+      await expect(
+        controller.suggestGarmentTags(mockAuth, 'garment_99')
+      ).rejects.toMatchObject({ name: 'ZodError' })
     })
   })
 

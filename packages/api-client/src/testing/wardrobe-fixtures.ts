@@ -4,7 +4,8 @@ import {
   type GarmentTagSuggestionSnapshot,
   type OutfitCapsuleContract,
   type SilhouetteProfileContract,
-  type SuggestGarmentTagsData,
+  type SuggestGarmentTagsManualData,
+  type SuggestGarmentTagsSuggestedData,
   type WardrobeOnboardingStateContract,
 } from '../contracts/http/wardrobe'
 
@@ -48,9 +49,10 @@ export function createGarmentTagSuggestionSnapshotFixture(
 
 export function createSuggestGarmentTagsDataFixture(
   overrides: SuggestionOverrides & { garmentId?: string } = {}
-): SuggestGarmentTagsData {
+): SuggestGarmentTagsSuggestedData {
   const snapshot = createGarmentTagSuggestionSnapshotFixture(overrides)
   return {
+    mode: 'suggested',
     garmentId: overrides.garmentId ?? 'garment-1',
     analysisVersion: snapshot.analysisVersion,
     suggestions: {
@@ -59,6 +61,24 @@ export function createSuggestGarmentTagsDataFixture(
       comfortRange: snapshot.comfortRange,
     },
   }
+}
+
+/**
+ * What the API sends for a suggested answer: the original wire shape, with no `mode`. A client's
+ * schema normalizes it to `createSuggestGarmentTagsDataFixture`'s shape.
+ */
+export function createSuggestGarmentTagsWireFixture(
+  overrides: SuggestionOverrides & { garmentId?: string } = {}
+): Omit<SuggestGarmentTagsSuggestedData, 'mode'> {
+  const { mode: _mode, ...wire } = createSuggestGarmentTagsDataFixture(overrides)
+  void _mode
+  return wire
+}
+
+export function createManualSuggestGarmentTagsDataFixture(
+  overrides: { garmentId?: string } = {}
+): SuggestGarmentTagsManualData {
+  return { mode: 'manual', garmentId: overrides.garmentId ?? 'garment-1' }
 }
 
 export function createReadyGarmentFixture(

@@ -22,7 +22,7 @@ import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
   garmentIdPathParamsSchema,
-  suggestGarmentTagsResponseSchema,
+  suggestGarmentTagsWireResponseSchema,
   updateGarmentTagsInputSchema,
   updateGarmentTagsResponseSchema,
 } from '@couture/api-client/contracts/http'
@@ -139,7 +139,8 @@ export class WardrobeController {
       )
     }
 
-    return suggestGarmentTagsResponseSchema.parse(
+    // Validate against the wire shape: a `suggested` answer stays the original, `mode`-free body.
+    return suggestGarmentTagsWireResponseSchema.parse(
       await this.wardrobeService.suggestGarmentTags(
         auth.userId,
         auth.role,

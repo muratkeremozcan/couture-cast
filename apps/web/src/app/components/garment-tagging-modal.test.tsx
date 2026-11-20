@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 // @vitest-environment jsdom
 import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
@@ -7,6 +9,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
+  createManualSuggestGarmentTagsDataFixture,
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -126,7 +129,7 @@ describe('GarmentTaggingModal Component', () => {
     resolveSuggestions(mockSuggestions)
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading smart suggestions...')).toBeNull()
+      expect(screen.queryByText('Loading your garment...')).toBeNull()
     })
     expect(bottom).toHaveAttribute('aria-checked', 'true')
     expect(clearMaterial).toHaveAttribute('aria-checked', 'true')
@@ -588,5 +591,193 @@ describe('GarmentTaggingModal save failures', () => {
     const confirm = screen.getByRole('button', { name: 'Confirm & Save Tags' })
     expect(confirm).toBeEnabled()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('GarmentTaggingModal manual mode', () => {
+  const MANUAL_COPY =
+    'Choose the category and comfort range that fit this garment. Material is optional.'
+
+  it('says the member chooses the tags, with no spinner and no suggestion text, once the API answers manual', async () => {
+    const suggestTagsFn = vi
+      .fn()
+      .mockResolvedValue(
+        createManualSuggestGarmentTagsDataFixture({ garmentId: 'garment-1' })
+      )
+    render(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        suggestTagsFn={suggestTagsFn}
+      />
+    )
+
+    expect(await screen.findByText(MANUAL_COPY)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryAllByText('Loading your garment...')).toHaveLength(0)
+    })
+    const dialogText = screen.getByRole('dialog').textContent ?? ''
+    expect(dialogText).not.toMatch(/\bsuggest|\bAI\b|\bsmart\b/i)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Retry/ })).not.toBeInTheDocument()
+  })
+
+  it('preselects nothing and saves exactly what the member chose', async () => {
+    const user = userEvent.setup()
+    const updateTagsFn = vi.fn().mockResolvedValue(mockUpdatedGarment)
+    const onTagsConfirmed = vi.fn()
+    render(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        onTagsConfirmed={onTagsConfirmed}
+        suggestTagsFn={vi
+          .fn()
+          .mockResolvedValue(createManualSuggestGarmentTagsDataFixture())}
+        updateTagsFn={updateTagsFn}
+      />
+    )
+    await screen.findByText(MANUAL_COPY)
+
+    expect(screen.getByRole('button', { name: 'Confirm & Save Tags' })).toBeDisabled()
+    // Exact name: the Cool comfort option's description also mentions outerwear.
+    await user.click(screen.getByRole('radio', { name: 'Outerwear' }))
+    await user.click(screen.getByRole('radio', { name: /Cool/ }))
+    await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
+
+    await waitFor(() => {
+      expect(updateTagsFn).toHaveBeenCalledWith(
+        'garment-1',
+        { category: 'outerwear', material: null, comfortRange: 'cool' },
+        expect.any(AbortSignal)
+      )
+    })
+    expect(onTagsConfirmed).toHaveBeenCalledWith(mockUpdatedGarment)
+  })
+
+  it('returns to the suggestion copy when the next garment is not manual', async () => {
+    const suggestTagsFn = vi
+      .fn()
+      .mockResolvedValueOnce(createManualSuggestGarmentTagsDataFixture())
+      .mockResolvedValueOnce(mockSuggestions)
+    const { rerender } = render(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-1"
+        suggestTagsFn={suggestTagsFn}
+      />
+    )
+    await screen.findByText(MANUAL_COPY)
+
+    rerender(
+      <GarmentTaggingModal
+        isOpen
+        onClose={vi.fn()}
+        garmentId="garment-2"
+        suggestTagsFn={suggestTagsFn}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(MANUAL_COPY)).not.toBeInTheDocument()
+    })
+    // The suggestion wording arrives with the suggestions, not before them.
+    expect(
+      await screen.findByText(/Review or customize AI suggestions/)
+    ).toBeInTheDocument()
+  })
+
+  describe('while the mode is still pending (the response is held)', () => {
+    const PENDING_COPY = 'Describe this garment with a category and a comfort range.'
+    const SUGGESTION_WORDING = /\bsuggest|\bAI\b|\bsmart\b/i
+
+    function holdResponse() {
+      let resolve: (
+        data: ReturnType<typeof createManualSuggestGarmentTagsDataFixture>
+      ) => void = () => undefined
+      const suggestTagsFn = vi.fn().mockReturnValue(
+        new Promise((settle) => {
+          resolve = settle as typeof resolve
+        })
+      )
+      return {
+        suggestTagsFn,
+        resolve: (data = createManualSuggestGarmentTagsDataFixture()) => resolve(data),
+      }
+    }
+
+    it('offers no suggestion wording before the answer, then the manual copy and no spinner after it', async () => {
+      const { suggestTagsFn, resolve } = holdResponse()
+      render(
+        <GarmentTaggingModal
+          isOpen
+          onClose={vi.fn()}
+          garmentId="garment-1"
+          suggestTagsFn={suggestTagsFn}
+        />
+      )
+
+      // Pending: neutral copy only, with the (neutral) loading line that will end.
+      expect(screen.getByText(PENDING_COPY)).toBeInTheDocument()
+      // The visible line and the screen-reader status both carry it.
+      expect(screen.getAllByText('Loading your garment...').length).toBeGreaterThan(0)
+      expect(screen.getByRole('dialog').textContent ?? '').not.toMatch(SUGGESTION_WORDING)
+
+      await act(async () => {
+        resolve()
+        await Promise.resolve()
+      })
+
+      // Settled as manual: the member chooses, the spinner is gone, still no suggestion wording.
+      expect(await screen.findByText(MANUAL_COPY)).toBeInTheDocument()
+      expect(screen.queryByText(PENDING_COPY)).not.toBeInTheDocument()
+      expect(screen.queryByText('Loading your garment...')).not.toBeInTheDocument()
+      expect(screen.getByRole('dialog').textContent ?? '').not.toMatch(SUGGESTION_WORDING)
+    })
+
+    it('keeps the neutral copy when the answer is an error, and brings the suggestion wording only with suggestions', async () => {
+      const failed = vi
+        .fn()
+        .mockRejectedValue(
+          new WardrobeRequestError('inference down', 'TAGGING_INFERENCE_UNAVAILABLE')
+        )
+      const { unmount } = render(
+        <GarmentTaggingModal
+          isOpen
+          onClose={vi.fn()}
+          garmentId="garment-1"
+          suggestTagsFn={failed}
+        />
+      )
+      expect(await screen.findByText(PENDING_COPY)).toBeInTheDocument()
+      expect(
+        screen.queryByText(/Review or customize AI suggestions/)
+      ).not.toBeInTheDocument()
+      unmount()
+
+      const { suggestTagsFn, resolve } = holdResponse()
+      render(
+        <GarmentTaggingModal
+          isOpen
+          onClose={vi.fn()}
+          garmentId="garment-1"
+          suggestTagsFn={suggestTagsFn}
+        />
+      )
+      expect(
+        screen.queryByText(/Review or customize AI suggestions/)
+      ).not.toBeInTheDocument()
+      await act(async () => {
+        resolve(mockSuggestions as never)
+        await Promise.resolve()
+      })
+      expect(
+        await screen.findByText(/Review or customize AI suggestions/)
+      ).toBeInTheDocument()
+      expect(screen.queryByText(PENDING_COPY)).not.toBeInTheDocument()
+    })
   })
 })
