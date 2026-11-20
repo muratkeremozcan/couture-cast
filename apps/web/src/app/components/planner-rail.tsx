@@ -594,6 +594,11 @@ function PlannerWeek({
    * older versions of the day, so its answer is dropped rather than undoing the reshuffle.
    */
   const weekGenerationRef = useRef(0)
+  /** The week on screen, readable from a read that settles after the render that started it. */
+  const plannerDataRef = useRef<PlannerResponse['data'] | null>(null)
+  useLayoutEffect(() => {
+    plannerDataRef.current = plannerData
+  }, [plannerData])
   /** The last read was denied and the bridge could not verify the member again. */
   const [recheckFailedAt, setRecheckFailedAt] = useState<number | null>(null)
 
@@ -614,6 +619,40 @@ function PlannerWeek({
       reshuffles.clear()
     }
   }, [])
+
+  /**
+   * A foreground read was superseded by a reshuffle and left the rail in `checking`. With a
+   * usable week on screen the rail is `entitled` again; with none, whatever newer lock or error
+   * state replaced `checking` stays, and a rail still checking falls to its error panel.
+   */
+  const settleSupersededRead = useCallback(() => {
+    setEntitlementState((state) =>
+      plannerDataRef.current !== null
+        ? 'entitled'
+        : state === 'checking'
+          ? 'error'
+          : state
+    )
+  }, [])
+
+  /**
+   * A foreground read that failed for a transient reason after a reshuffle produced a newer week
+   * leaves that week on screen. A lock answer, a silent read, or a failure with no newer week
+   * is not handled here.
+   */
+  const settleLateFailure = useCallback(
+    (failure: unknown, generation: number, silent: boolean | undefined): boolean => {
+      if (silent || generation === weekGenerationRef.current) return false
+      if (plannerDataRef.current === null) return false
+      const reason = plannerFailureReason(failure)
+      const transient =
+        isSessionRecheckError(failure) ||
+        (reason !== 'signed_out' && reason !== 'not_entitled' && reason !== 'disabled')
+      if (transient) settleSupersededRead()
+      return transient
+    },
+    [settleSupersededRead]
+  )
 
   /** The member's week, read with their bearer; a late answer for anyone else is dropped. */
   const load = useCallback(
@@ -637,8 +676,10 @@ function PlannerWeek({
         if (!current()) return
         // A reshuffle landed while this read was out: its week is older than the one shown.
         // A foreground read had put the rail in `checking`; the newer week shows again.
+        // `entitled` returns only with a usable week on screen; a newer lock or error state
+        // (a refresh that found the planner disabled, a failed read) stays as it is.
         if (generation !== weekGenerationRef.current) {
-          if (!options.silent) setEntitlementState('entitled')
+          if (!options.silent) settleSupersededRead()
           return
         }
         setPlannerData(data)
@@ -646,6 +687,9 @@ function PlannerWeek({
         setAnnouncement(t('commerce.premium.planner.announce.ready'))
       } catch (loadError: unknown) {
         if (!current()) return
+        // A foreground read that failed after a reshuffle produced a newer week must not
+        // blank it; with no newer week the failure shows its error as before.
+        if (settleLateFailure(loadError, generation, options.silent)) return
         if (isSessionRecheckError(loadError)) {
           // The member is not known to be signed out: the error panel with its retry, and a
           // new read once the bridge verifies them again. A silent refresh keeps the week.
@@ -674,7 +718,7 @@ function PlannerWeek({
         }
       }
     },
-    [owner, t]
+    [owner, t, settleSupersededRead, settleLateFailure]
   )
 
   /** Starts one week read, tracked until it settles so closing the rail can abort it. */
