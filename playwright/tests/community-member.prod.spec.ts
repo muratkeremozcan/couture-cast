@@ -35,7 +35,11 @@ test.describe('Community, as the production synthetic member', () => {
     const { baseUrl: webBaseUrl, apiBaseUrl } = projectMetadata(testInfo)
     assertTrustedProdOrigins(webBaseUrl!, apiBaseUrl!)
 
-    const response = await prodMemberApiGet(prodMember!, apiBaseUrl!, `${FEED_PATH}?limit=3`)
+    const response = await prodMemberApiGet(
+      prodMember!,
+      apiBaseUrl!,
+      `${FEED_PATH}?limit=3`
+    )
 
     // 403 or 404 here is the flag-off state Jade met: the community was closed to members.
     expect(response.status).toBe(200)
