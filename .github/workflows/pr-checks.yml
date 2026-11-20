@@ -126,6 +126,11 @@ jobs:
 
       - name: Lint sources
         run: npm run lint
+        env:
+          # @couture/utils' type-aware lint takes about 110 s and holds close to node's default
+          # 4 GB heap, so a run with a little more to parse ran out of memory (PR 267, twice, at
+          # exit 134). The hosted runner has 16 GB.
+          NODE_OPTIONS: --max-old-space-size=6144
 
   lighthouse:
     name: Lighthouse accessibility gate
