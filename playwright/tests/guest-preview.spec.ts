@@ -100,6 +100,14 @@ const garmentIds = (page: Page) =>
     .getByTestId('guest-preview-garment')
     .evaluateAll((items) => items.map((item) => (item as HTMLElement).dataset.garmentId))
 
+async function expectPageFitsWidth(page: Page, width: number) {
+  const dimensions = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    content: document.documentElement.scrollWidth,
+  }))
+  expect(dimensions).toEqual({ viewport: width, content: width })
+}
+
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
 
@@ -161,6 +169,36 @@ test.describe('Guest preview (signed out)', () => {
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     await page.getByRole('link', { name: 'Back to preview' }).click()
     await expect(editedOutfit).toBeVisible()
+  })
+
+  test('[P1] [UX-FIRST-004] the first outfit actions fit at 320 px with enlarged text', async ({
+    page,
+  }) => {
+    const width = 320
+    await page.setViewportSize({ width, height: 760 })
+    await page.addInitScript(() => {
+      document.addEventListener('DOMContentLoaded', () => {
+        document.documentElement.style.fontSize = '200%'
+      })
+    })
+    await page.goto('/')
+    await expect(page.locator('html')).toHaveCSS('font-size', '32px')
+
+    const teaser = page.getByRole('region', { name: 'Sample outfit' })
+    const entry = teaser.getByRole('link', { name: 'Try a sample wardrobe' })
+    await expect(teaser.getByText(LABEL, { exact: true })).toBeVisible()
+    await entry.scrollIntoViewIfNeeded()
+    await expect(entry).toBeInViewport({ ratio: 1 })
+    await expectPageFitsWidth(page, width)
+    await entry.click()
+    await passGate(page)
+
+    const outfit = page.getByTestId('guest-preview-outfit')
+    const nextLook = outfit.getByRole('button', { name: 'Try another look' })
+    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
+    await nextLook.scrollIntoViewIfNeeded()
+    await expect(nextLook).toBeInViewport({ ratio: 1 })
+    await expectPageFitsWidth(page, width)
   })
 
   test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({

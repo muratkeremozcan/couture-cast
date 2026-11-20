@@ -210,6 +210,35 @@ prioritize **Add one garment** and offer the live alternatives that the product 
   and error messages remain actionable with long translations. Preserve existing Premium, Community
   and moderation controls.
 
+## First mobile web slice
+
+PR #274 implements the guest entry, the existing preview's first outfit actions, and a labeled
+path into existing closet setup. The acceptance criteria above describe the full re-spec.
+
+- **AC1 and AC2.** The phone journey checks the first viewport at 390 x 844, a shoe swap and
+  its explanation, Undo, and another look. A separate layout check covers the narrow Home and
+  preview at 320 px with 200% text scaling.
+- **AC3 and AC7.** Sample labels and the existing age and session gates apply. The guest
+  conversion test reaches the verified member's permission screen with zero camera requests.
+- **AC6 is partial.** A separately provisioned member denies the camera request, chooses a
+  fixture file, and reaches image review. The test stops before upload. Guest-to-saved-garment
+  continuity, confirmed tags, and upload or tagging retry still need implementation or
+  end-to-end evidence for this journey. The guest handoff still uses guided closet setup.
+- **AC4, AC5, AC8 and AC9.** City setup, service recovery, member navigation, and the broader
+  accessibility and native checks remain follow-ups. The Wardrobe list failure below is present
+  on the baseline.
+
+### Open defect in Wardrobe list recovery (AC5)
+
+On an initial garment-list HTTP 503, Wardrobe shows the list error and **No garments added yet**
+together. The separate closet-setup status has its own Retry for an independent request.
+
+**Verify the fix.** In an isolated signed-in session, return HTTP 503 from
+`GET /api/v1/wardrobe/garments` while the closet-setup status request succeeds. Verify Wardrobe
+shows a list error with a garment-list **Retry** and withholds **No garments added yet**. Click
+that Retry, return HTTP 200 with an empty list, and verify that the error clears and the empty
+state appears. [Wardrobe list and status](../../apps/web/src/app/wardrobe/page.tsx).
+
 ## Functional follow-ups from the production walk
 
 Use separate defects and verification results. The walkthrough captured visible outcomes. HTTP

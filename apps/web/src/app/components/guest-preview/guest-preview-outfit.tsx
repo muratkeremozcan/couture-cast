@@ -132,7 +132,7 @@ export function GuestPreviewOutfit({
 
       <ul
         data-testid="guest-preview-garments"
-        className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 sm:grid-cols-3"
       >
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -144,7 +144,11 @@ export function GuestPreviewOutfit({
               data-garment-id={garment.id}
               className="flex flex-col items-center gap-2 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-3 text-center"
             >
-              <SampleGarmentArt garment={garment} label={text.description} />
+              <SampleGarmentArt
+                garment={garment}
+                label={text.description}
+                className="h-auto w-20 max-w-full"
+              />
               <span className="text-sm font-medium text-[#111111]">{text.name}</span>
               <button
                 type="button"
