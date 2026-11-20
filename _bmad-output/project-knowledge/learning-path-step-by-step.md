@@ -12901,3 +12901,19 @@ Web E2E, Playwright:
   proves a signed-in member opening `/settings` in a new tab or after a reload sees Shopping and
   partners, Premium and Interface palettes signed in through real GoTrue, with no sign-in hint
   painted at any point and one read per section (PS-1, PS-2).
+
+#### Tests that would have caught Jade's community reports
+
+Jade's community reports (the lookbook was a placeholder, "Cold and wet" had no explanation, the
+title said "Living Community Look book") each had a test, but the member specs seed a member and
+skip outside the local stack, so none of them could turn the daily production run red. Two
+specs close that gap:
+
+- [`playwright/tests/community-jade-signed-out.spec.ts`](../../playwright/tests/community-jade-signed-out.spec.ts):
+  needs no member and runs in every environment, the daily production run included. At Android
+  Chrome width the bottom-nav Community tab opens the real lookbook, with the Latest looks
+  heading, the climate explainer beside "Cold and wet", and no sideways scroll (JADE-COMMUNITY-001,
+  -002). A placeholder page, a lost explainer or a dead tab fails it.
+- [`playwright/tests/community-screening-hold-sla.spec.ts`](../../playwright/tests/community-screening-hold-sla.spec.ts):
+  a profane caption is held and appears in the moderator queue due exactly 30 minutes after it
+  was accepted (JADE-COMMUNITY-003). Local stack only, because it writes a post.
