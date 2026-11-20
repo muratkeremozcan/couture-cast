@@ -879,7 +879,7 @@
       "resolved": "Resuelto",
       "dashboardLink": "Panel de SLA",
       "title": "Supervisión de SLA",
-      "subtitle": "Casos abiertos frente al objetivo de revisión de 24 horas y las alertas enviadas sobre ellos.",
+      "subtitle": "Casos abiertos frente a sus objetivos de revisión (30 minutos para retenciones del filtro, 24 horas para reportes de miembros) y las alertas enviadas sobre ellos.",
       "disabled": "La supervisión de SLA está desactivada.",
       "unavailable": "La supervisión de SLA no está disponible. Inténtalo de nuevo.",
       "monitorTitle": "Estado del monitor",
