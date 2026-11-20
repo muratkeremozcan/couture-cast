@@ -64,7 +64,6 @@ import {
   generateIdempotencyKey,
   getCommunityFeedFromWeb,
   getCommunityPostFromWeb,
-  hasWebSession,
   openCommunityPostFromWeb,
   openCommunitySpotlightPostFromWeb,
   publishCommunityLookFromWeb,
@@ -73,6 +72,8 @@ import {
   type CommunityFailureReason,
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
+import { useMemberSession } from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 import {
   LiveSponsorshipLedger,
   type LiveReadStamp,
@@ -2088,9 +2089,20 @@ function isMemberSession(
 /** A ban hides the feed, its author states and every action, like lost access does. */
 const feedVisible = (available: boolean, banned: unknown) => available && !banned
 
+/** A stored session still being verified, or whose verification failed. */
+function isSessionPending(status: string): boolean {
+  return status === 'checking' || status === 'unavailable'
+}
+
 function communityPresentation(
   available: boolean,
   hasSession: boolean,
+  /**
+   * A stored session still under verification (or one whose check failed) offers neither the
+   * member's link nor the guest's sign-in link: the reader may well be signed in, and is not
+   * known to be yet (2026-11-19 follow-up).
+   */
+  sessionPending: boolean,
   items: CommunityFeedItem[],
   authorStates: CommunityAuthorPostState[],
   nextCursor: string | null,
@@ -2105,7 +2117,11 @@ function communityPresentation(
     detail: openedItem,
     canAct: available && hasSession,
     settingsSignIn: !hasSession,
-    settingsHref: hasSession ? '/notification-settings' : '/signin',
+    settingsHref: sessionPending
+      ? null
+      : hasSession
+        ? '/notification-settings'
+        : '/signin',
     settingsLabel: hasSession
       ? 'community.notifications.title'
       : 'community.notifications.signin',
@@ -2138,14 +2154,15 @@ function CommunitySettingsLink({
   guestOnly,
 }: {
   banned: boolean
-  href: string
+  /** Null while the session is still being verified: neither the member's link nor the guest's. */
+  href: string | null
   label: string
   /** The link asks the reader to sign in: no session, or one the API refused. */
   signIn: boolean
   /** Hidden by globals.css once the page knows a member is signed in. */
   guestOnly: boolean
 }) {
-  if (banned) return null
+  if (banned || href === null) return null
   if (signIn) {
     return (
       <Link
@@ -2453,7 +2470,12 @@ export function CommunityLookbookGrid({
 
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failedImages, setFailedImages] = useState<FailedImages>(NO_FAILED_IMAGES)
-  const [hasSession, setHasSession] = useState(false)
+  // Follows the verified session: `checking` while a stored session is verified, never signed out.
+  const sessionState = useMemberSession()
+  const hasSession = sessionState.status === 'signed_in'
+  /** The realtime sync was denied and stopped; Retry restarts it (`realtimeEpoch`). */
+  const realtimeDeniedRef = useRef(false)
+  const [realtimeEpoch, setRealtimeEpoch] = useState(0)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
   // A stored session the API answered 401 is signed out for this surface: it gets the Sign in
@@ -2560,10 +2582,6 @@ export function CommunityLookbookGrid({
   useEffect(() => {
     itemsRef.current = items
   }, [items])
-
-  useEffect(() => {
-    setHasSession(hasWebSession())
-  }, [])
 
   useEffect(() => {
     setCurrentMode(activeTab)
@@ -2829,7 +2847,6 @@ export function CommunityLookbookGrid({
       const previous = sessionScopeRef.current
       sessionScopeRef.current = identity
       comments.setSession(identity)
-      setHasSession(hasWebSession())
       setSessionScope(identity)
       if (previous !== undefined && previous !== identity) {
         clearScope()
@@ -3058,6 +3075,7 @@ export function CommunityLookbookGrid({
           setIsLoadingMore(false)
           feedControllerRef.current?.abort()
         }
+        realtimeDeniedRef.current = state === 'denied'
         if (state === 'denied') {
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
@@ -3073,11 +3091,26 @@ export function CommunityLookbookGrid({
           // A denied socket says nothing about why. One read asks, so a member banned while
           // the page was open sees the notice. A member already told needs no second answer.
           if (!bannedRef.current) {
-            // The answer belongs to the session scope it was asked in.
+            // The answer belongs to the session scope it was asked in, and only while no newer
+            // feed read (a Retry) has started since: a newer read speaks for the grid.
             const scope = feedScopeRef.current
-            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
+            const generation = feedGenerationRef.current
+            const probeCurrent = () =>
+              active &&
+              scope === feedScopeRef.current &&
+              generation === feedGenerationRef.current
+            void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).then(
+              () => {
+                // The feed answers but the realtime connection was refused: the grid stays
+                // cleared until a catch-up verifies access, so the load error offers Retry,
+                // which restarts the sync. (Restarting here could loop on a lasting denial.)
+                if (!probeCurrent()) return
+                const message: Message = { key: 'community.error.load' }
+                setFeedError(message)
+                setAnnouncement(message)
+              },
               (error: unknown) => {
-                if (!active || scope !== feedScopeRef.current) return
+                if (!probeCurrent()) return
                 const sanction = communitySanctionOf(error)
                 if (sanction) {
                   closeForBan(sanction)
@@ -3085,8 +3118,20 @@ export function CommunityLookbookGrid({
                 }
                 // A refused session gets the same answer a feed read gives it: the signed-out
                 // note, the Sign in link, and its member actions retired.
-                if (communityFailureReason(error) === 'signed_out')
+                if (communityFailureReason(error) === 'signed_out') {
                   reportFeedFailure(error)
+                  return
+                }
+                // The denial can abort the feed read still in flight, whose own catch then
+                // returns silently. The probe answers the same refusal, so the member ends on
+                // the same copy whichever answer lands first.
+                const message = messageForError(
+                  error,
+                  'community.error.load',
+                  languageRef.current
+                )
+                setFeedError(message)
+                setAnnouncement(message)
               }
             )
           }
@@ -3129,6 +3174,7 @@ export function CommunityLookbookGrid({
     resetSpotlight,
     captureScroll,
     setAnnouncement,
+    realtimeEpoch,
   ])
 
   useEffect(
@@ -3393,6 +3439,13 @@ export function CommunityLookbookGrid({
   }
 
   const handleRetry = () => {
+    // A realtime denial stopped the sync and hid the grid; only a catch-up that reports
+    // 'connected' shows it again. Retry starts a new sync, so a member whose access is back
+    // sees the items the retried read loads.
+    if (realtimeDeniedRef.current) {
+      realtimeDeniedRef.current = false
+      setRealtimeEpoch((epoch) => epoch + 1)
+    }
     void loadFeed(currentMode)
   }
 
@@ -3592,7 +3645,7 @@ export function CommunityLookbookGrid({
   }
 
   const handleSelectPhoto = async (file: File): Promise<void> => {
-    if (!communityAvailable) return
+    if (!communityAvailable || !memberSession) return
     const preview = URL.createObjectURL(file)
     setPhotoPreview((current) => {
       if (current) URL.revokeObjectURL(current)
@@ -3746,6 +3799,7 @@ export function CommunityLookbookGrid({
   const presentation = communityPresentation(
     feedVisible(communityAvailable, bannedSanction),
     memberSession,
+    isSessionPending(sessionState.status),
     displayedItems,
     authorStates,
     nextCursor,
@@ -3848,6 +3902,13 @@ export function CommunityLookbookGrid({
         <StandaloneHeaderActions filterNavShown={showFilterNav} banned={banned}>
           {headerActions}
         </StandaloneHeaderActions>
+
+        {/* A failed session check: the grid re-checks the session like every member section. */}
+        <SessionRetryButton
+          session={sessionState}
+          testId="community-session-retry"
+          className="min-h-[44px] self-start rounded-md border border-[color:var(--theme-card-border)] px-4 text-sm font-semibold text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        />
 
         <CommunityNotices
           bandUnresolvedReason={bandNoticeReason}

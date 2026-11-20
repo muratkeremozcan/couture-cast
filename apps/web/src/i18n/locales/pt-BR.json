@@ -1275,5 +1275,8 @@
     "community": "Comunidade",
     "profile": "Perfil",
     "navigatedTo": "Aba {{label}} aberta"
+  },
+  "session": {
+    "retry": "Tentar novamente"
   }
 }

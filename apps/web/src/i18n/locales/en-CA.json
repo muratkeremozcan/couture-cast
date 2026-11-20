@@ -1275,5 +1275,8 @@
     "community": "Community",
     "profile": "Profile",
     "navigatedTo": "Navigated to {{label}} tab"
+  },
+  "session": {
+    "retry": "Try again"
   }
 }

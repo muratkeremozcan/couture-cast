@@ -14,11 +14,22 @@ import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import {
+  FIXTURE_ACCESS_TOKEN,
+  signInFixtureMember,
+} from '../../test-utils/member-session'
 import { redirectToExternalUrl } from '../../lib/premium'
 import type * as PremiumModule from '../../lib/premium'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { SubscriptionSection } from './subscription-section'
+
+/** The section consumes a Stripe return marker with `router.replace`. */
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => window.location.pathname,
+}))
 
 vi.mock('../../lib/premium', async (importOriginal) => {
   const actual = await importOriginal<typeof PremiumModule>()
@@ -55,8 +66,9 @@ function entitledSubscription(overrides: SubscriptionBody = {}): SubscriptionBod
   }
 }
 
+/** The fixture member: the bearer the section's session follower counts. */
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 function setPath(path: string) {
@@ -106,7 +118,9 @@ describe('SubscriptionSection', () => {
     const monthly = screen.getByTestId('premium-subscribe-monthly')
     expect(monthly).toBeDisabled()
     expect(monthly).toHaveAccessibleDescription(/Sign in to subscribe or manage Premium/)
-    expect(screen.getByTestId('premium-subscribe-annual')).toBeDisabled()
+    const annual = screen.getByTestId('premium-subscribe-annual')
+    expect(annual).toBeDisabled()
+    expect(annual).toHaveAccessibleDescription(/Sign in to subscribe or manage Premium/)
     expect(screen.getByTestId('premium-signed-out-hint')).toBeInTheDocument()
     expect(seen).not.toHaveBeenCalled()
   })
@@ -131,7 +145,7 @@ describe('SubscriptionSection', () => {
     expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
       /You don.t have a Premium subscription yet\./
     )
-    expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
+    expect(authorization).toHaveBeenCalledWith(`Bearer ${FIXTURE_ACCESS_TOKEN}`)
     expect(screen.getByTestId('premium-subscribe-annual')).toBeEnabled()
     expect(screen.queryByTestId('premium-signed-out-hint')).not.toBeInTheDocument()
   })
@@ -658,4 +672,29 @@ describe('SubscriptionSection', () => {
     expect(screen.getByTestId('premium-portal-lag-hint')).toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
+
+  // Settings Codex review 1, finding 3: the return marker is consumed for the member it was
+  // bound to, so a reload or a later member on the page loads normally.
+  it.each([
+    ['checkout', '/settings?checkout=success&tab=premium', '/settings?tab=premium'],
+    ['portal', '/settings?portal=return', '/settings'],
+  ])(
+    '5.2-WEB-SEC-24 a %s return marker leaves the URL once the section takes it',
+    async (_kind, path, consumed) => {
+      router.replace.mockClear()
+      signIn()
+      setPath(path)
+      useMswHandlers(
+        http.post(REFRESH_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION })),
+        http.get(SUBSCRIPTION_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION }))
+      )
+
+      renderSection()
+
+      await waitFor(() =>
+        expect(router.replace).toHaveBeenCalledWith(consumed, { scroll: false })
+      )
+      expect(router.replace).toHaveBeenCalledTimes(1)
+    }
+  )
 })

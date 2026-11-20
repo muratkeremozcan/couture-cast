@@ -25,10 +25,19 @@ import { readStorage } from './browser-persistence'
  * failure apart from a programming error without matching on message text.
  */
 export class CommerceRequestError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    /** The HTTP status the API answered with, when the failure was an API answer. */
+    readonly status?: number
+  ) {
     super(message)
     this.name = 'CommerceRequestError'
   }
+}
+
+/** The API refused the bearer (401): the one commerce failure a replaced bearer can explain. */
+export function isCommerceDenial(error: unknown): boolean {
+  return error instanceof CommerceRequestError && error.status === 401
 }
 
 /**
@@ -88,7 +97,10 @@ async function commerceError(
   fallback: string
 ): Promise<CommerceRequestError> {
   if (error instanceof ResponseError) {
-    return new CommerceRequestError(await readServerMessage(error.response, fallback))
+    return new CommerceRequestError(
+      await readServerMessage(error.response, fallback),
+      error.response.status
+    )
   }
   // Anything else is a transport failure, an abort, or a contract-parse
   // failure; the message those carry is more useful than the generic fallback.

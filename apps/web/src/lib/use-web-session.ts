@@ -13,7 +13,18 @@
 // again. A bearer no verification named counts only as the e2e fixture bearer.
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import {
+  createElement,
+  Fragment,
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
 import { hasWebSession } from './commerce'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
@@ -166,4 +177,232 @@ export function useWebSession(): WebSessionState {
   }, [])
 
   return state
+}
+
+/**
+ * The session as a member-owned section reads it (2026-11-19 follow-up: Shopping and partners,
+ * Premium, Interface palettes, the palette advisor and the planner rail each asked once, on
+ * mount, and told a signed-in member to sign in). One shape for every section:
+ *
+ * - `checking`: render the section's loading state, ask nothing member-owned;
+ * - `signed_in`: `owner` names the verified member, load that member's data once;
+ * - `signed_out`: verification settled with no member, render the signed-out state;
+ * - `unavailable`: verification failed, render the section's load error, and `retry`
+ *   verifies again.
+ */
+export type MemberSession = {
+  status: WebSessionState['status']
+  /** The verified member, set only while `status` is `signed_in`. */
+  owner: string | null
+  /** Verifies the stored session again; does nothing unless `status` is `unavailable`. */
+  retry: () => void
+}
+
+const NO_RETRY = () => undefined
+
+export function memberSessionOf(state: WebSessionState): MemberSession {
+  return {
+    status: state.status,
+    owner: state.status === 'signed_in' ? state.owner : null,
+    retry: state.status === 'unavailable' ? state.retry : NO_RETRY,
+  }
+}
+
+/**
+ * True only while `owner` is the member the session bridge names right now. A section checks it
+ * before it sends member-owned work and again before a late answer touches its state, so an
+ * answer for one member never lands on another's section, or after sign-out.
+ */
+export function isLiveOwner(owner: string | null): owner is string {
+  return owner !== null && currentWebSessionOwner() === owner
+}
+
+/** `useWebSession`, in the shape member-owned sections read. */
+export function useMemberSession(): MemberSession {
+  const state = useWebSession()
+  return useMemo(() => memberSessionOf(state), [state])
+}
+
+/** The scope key of a tab no member holds. */
+export const NO_MEMBER_SCOPE = 'no-member'
+
+/**
+ * Renders member-owned UI keyed by the member the session bridge names right now, so a change of
+ * member (or sign-out) discards the last member's data, busy state and errors in the same render,
+ * before any effect runs. The session follower sits above the key: a member change starts no
+ * second verification.
+ */
+export function MemberScope({
+  children,
+}: {
+  children: (session: MemberSession) => ReactNode
+}) {
+  const liveOwner = useWebSessionOwner()
+  const session = useMemberSession()
+  return createElement(Fragment, { key: liveOwner ?? NO_MEMBER_SCOPE }, children(session))
+}
+
+/** The bearer this tab holds right now, read where a member request reads it. */
+export function currentWebSessionBearer(): string | null {
+  return fixtureBearer()
+}
+
+/**
+ * A read was denied and the bridge could not verify the member's session again (a timeout or a
+ * 5xx from the profile check). Says nothing about the member: the section shows its load error
+ * with a retry, and reads again when the bridge next verifies this member
+ * (`useReloadOnSessionRecheck`).
+ */
+export class SessionRecheckError extends Error {
+  /** The bridge's publication count when the recheck failed (`currentSessionRevision`). */
+  readonly revision = sessionRevision
+  constructor(readonly denial: unknown) {
+    super('Session verification is unavailable.')
+    this.name = 'SessionRecheckError'
+  }
+}
+
+/**
+ * How many times the bridge has published (`couture:session`) in this tab. Counted by a
+ * listener registered when this module loads, so it runs before any component's listener: a
+ * section that arms its recovery after a publication still sees that one happened.
+ */
+let sessionRevision = 0
+if (typeof window !== 'undefined')
+  window.addEventListener('couture:session', () => {
+    sessionRevision += 1
+  })
+
+export function currentSessionRevision(): number {
+  return sessionRevision
+}
+
+export function isSessionRecheckError(error: unknown): error is SessionRecheckError {
+  return error instanceof SessionRecheckError
+}
+
+/**
+ * While a read waits on a failed recheck (`failedAt`, the `SessionRecheckError`'s revision),
+ * runs `reload` once the bridge has published since then with `owner` still the member: the
+ * verification that failed has now succeeded. A publication that landed before this effect
+ * subscribed counts too. A section that read successfully never waits (`failedAt` null), so a
+ * token rotation reloads nothing.
+ */
+export function useReloadOnSessionRecheck(
+  owner: string | null,
+  failedAt: number | null,
+  reload: () => void
+): void {
+  const reloadRef = useRef(reload)
+  useLayoutEffect(() => {
+    reloadRef.current = reload
+  })
+  useEffect(() => {
+    if (failedAt === null) return
+    let reloaded = false
+    const check = () => {
+      if (reloaded || sessionRevision === failedAt || !isLiveOwner(owner)) return
+      reloaded = true
+      reloadRef.current()
+    }
+    check()
+    window.addEventListener('couture:session', check)
+    return () => window.removeEventListener('couture:session', check)
+  }, [owner, failedAt])
+}
+
+/**
+ * A section's failed-recheck state in one place: `markFailed` after a `SessionRecheckError`,
+ * `retry` (non-null only then) for the section's retry control, and `attempt`, bumped by the
+ * retry or by the bridge verifying the member again, for the section's read effect to follow.
+ */
+export function useSessionRecheck(owner: string | null) {
+  const [attempt, setAttempt] = useState(0)
+  const [failedAt, setFailedAt] = useState<number | null>(null)
+  const readAgain = useCallback(() => {
+    setFailedAt(null)
+    setAttempt((current) => current + 1)
+  }, [])
+  useReloadOnSessionRecheck(owner, failedAt, readAgain)
+  const markFailed = useCallback(
+    (error: SessionRecheckError) => setFailedAt(error.revision),
+    []
+  )
+  const clear = useCallback(() => setFailedAt(null), [])
+  return { attempt, retry: failedAt === null ? null : readAgain, markFailed, clear }
+}
+
+/**
+ * One member read, with the bearer read at the moment it is sent. A denial (`isDenial`) of a
+ * bearer the bridge has since replaced for the same member says nothing about that member: the
+ * read is retried once with the current bearer.
+ *
+ * The bridge keeps the old bearer installed while it verifies the member's next one, so a
+ * denial can arrive before the replacement is published. With a stored session, the read then
+ * joins the bridge's verification (`resolveWebSessionToken` joins one in flight, or confirms the
+ * session) and retries once if the same live member now holds a different bearer. Otherwise,
+ * including a denial of the genuinely current bearer, the denial stands.
+ */
+export async function readAsMember<T>(
+  owner: string,
+  read: () => Promise<T>,
+  isDenial: (error: unknown) => boolean,
+  /** The read's own cancellation: a cancelled read neither joins verification nor retries. */
+  signal?: AbortSignal
+): Promise<T> {
+  const sentWith = currentWebSessionBearer()
+  try {
+    return await read()
+  } catch (error: unknown) {
+    if (!isDenial(error) || signal?.aborted || !isLiveOwner(owner)) throw error
+    if (currentWebSessionBearer() === sentWith) {
+      // The e2e fixture bearer has no stored session behind it and nothing to verify.
+      if (!hasStoredWebSession()) throw error
+      try {
+        await resolveWebSessionToken()
+      } catch (recheck: unknown) {
+        if (signal?.aborted || !isLiveOwner(owner)) throw error
+        // The joined verification can fail because a newer one superseded it: if the same
+        // member already holds a different bearer, that one is read once below.
+        if (currentWebSessionBearer() === sentWith) {
+          // A refused profile check confirms the denial. Any other failure (a timeout, a 5xx)
+          // leaves the member unknown: an outage the section can retry, never a sign-out.
+          if (isWebSessionDenial(recheck)) throw error
+          throw new SessionRecheckError(error)
+        }
+      }
+      if (
+        signal?.aborted ||
+        !isLiveOwner(owner) ||
+        currentWebSessionBearer() === sentWith
+      )
+        throw error
+    }
+    return read()
+  }
+}
+
+/**
+ * The signal of the current mount: aborted when the component unmounts (a route change, or a
+ * member change that remounts a `MemberScope`). An operation captures it when it starts and
+ * checks it before every completion, so an answer that arrives after its mount is gone never
+ * navigates, opens a tab or touches state.
+ */
+export function useMountSignal(): () => AbortSignal {
+  const controllerRef = useRef<AbortController | null>(null)
+  // A layout effect, so the signal dies in the commit that removes the component: a passive
+  // cleanup can be deferred past a concurrent route transition, leaving a window in which a
+  // late billing or sponsored answer still sees a live signal (Settings Codex review 2).
+  useLayoutEffect(() => {
+    // A remount (StrictMode re-runs this effect) starts a fresh lifetime.
+    const live = controllerRef.current
+    const controller = live && !live.signal.aborted ? live : new AbortController()
+    controllerRef.current = controller
+    return () => controller.abort()
+  }, [])
+  return useCallback(() => {
+    // Before the first effect (never for a user action) the mount counts as live.
+    controllerRef.current ??= new AbortController()
+    return controllerRef.current.signal
+  }, [])
 }

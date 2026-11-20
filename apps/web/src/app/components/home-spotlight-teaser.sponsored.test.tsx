@@ -14,7 +14,7 @@ import {
 import { CommunitySyncState } from '@couture/api-client'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { stubPartnerTab, type PartnerTabStub } from '../../test-utils/partner-tab'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { CLICKS_PATH, SPONSORSHIP } from '../../test-utils/community-lookbook-grid'
 import { setViewport } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
@@ -98,7 +98,7 @@ function minted() {
 }
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
   window.dispatchEvent(new Event('couture:session'))
 }
 

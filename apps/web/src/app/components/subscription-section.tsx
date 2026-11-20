@@ -14,9 +14,14 @@
 // - `?portal=return` fires exactly one refresh and shows lag copy: RevenueCat
 //   documents Stripe-sourced cancellations taking up to ~2 hours to sync, so
 //   the state is lagging, not wrong, and the copy says so.
+//
+// The section follows the session (`MemberScope`): while a stored session is still being
+// verified it stays `checking`, and it reads once per member. A one-shot check on mount once told
+// a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
@@ -33,12 +38,20 @@ import {
   createPortalSessionFromWeb,
   getPremiumAccessFromWeb,
   getSubscriptionFromWeb,
-  hasWebSession,
   premiumFailureReason,
   type PremiumFailureReason,
   redirectToExternalUrl,
   refreshSubscriptionFromWeb,
 } from '../../lib/premium'
+import {
+  isLiveOwner,
+  MemberScope,
+  readAsMember,
+  useMountSignal,
+  useWebSessionOwner,
+  type MemberSession,
+} from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 
@@ -50,8 +63,9 @@ const ACTIVATION_POLL_MAX_ATTEMPTS = 24
 const ACCESS_READ_TIMEOUT_MS = 5_000
 
 /**
- * `checking` is the server render and the first client tick, before
- * `sessionStorage` can be read, so hydration never reconciles two trees.
+ * `checking` is the server render, the first client tick, and every moment a
+ * stored session is still being verified, so hydration never reconciles two
+ * trees and a signed-in member never sees the sign-in hint.
  */
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -258,7 +272,10 @@ function resolveSectionView(
 
   return {
     showDisclosure: showsDisclosure(sectionState, entitled, complimentary),
-    showStatusLine: isIdle && sectionState !== 'load_failed',
+    // The status line waits for the reads, like the disclosure: until both the subscription and
+    // the access read have settled, "no subscription yet" would be a guess, and an active
+    // subscriber or a complimentary member would see it flash. Signed out it is today's line.
+    showStatusLine: isIdle && (sectionState === 'ready' || sectionState === 'signed_out'),
     showComplimentaryNote: readyBody !== null && entitled && complimentary,
     // The grace banner still warns a paying grantee about their payment method; only the
     // ended note ("subscribe again") is withheld from a member whose grant keeps Premium on.
@@ -295,8 +312,83 @@ const FAILURE_MESSAGE_KEYS: Readonly<Record<PremiumFailureReason, string | null>
   unknown: null,
 }
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's
+ * subscription, access, activation poll, redirect and messages in the same render.
+ */
+/** What a Stripe return marker on this page's URL asks the section to do. */
+type BillingReturn = 'checkout' | 'portal' | null
+
+/** The marker and its query key, read from the URL as the page holds it now. */
+function readBillingReturn(params: URLSearchParams): {
+  kind: BillingReturn
+  key?: string
+} {
+  if (params.get('checkout') === 'success') return { kind: 'checkout', key: 'checkout' }
+  if (params.get('portal') === 'return') return { kind: 'portal', key: 'portal' }
+  return { kind: null }
+}
+
+/**
+ * The page's billing return belongs to the first member the bridge verifies on it: that
+ * member's section runs the activation poll or the portal refresh, the marker leaves the URL,
+ * and any later member on the same page loads normally (Settings Codex review 1, finding 3).
+ */
+function useBillingReturn(): (owner: string) => BillingReturn {
+  const router = useRouter()
+  const routerRef = useRef(router)
+  routerRef.current = router
+  const boundRef = useRef<
+    { kind: BillingReturn; owner: string; spent: boolean } | undefined
+  >(undefined)
+  // The return lives as long as the member scope that took it: once the bridge names anyone
+  // else, it is spent, so that member signing in again on this page loads normally.
+  const liveOwner = useWebSessionOwner()
+  useLayoutEffect(() => {
+    const bound = boundRef.current
+    if (bound && bound.owner !== liveOwner) bound.spent = true
+  }, [liveOwner])
+  return useCallback((owner: string) => {
+    if (boundRef.current === undefined) {
+      const url = new URL(window.location.href)
+      const { kind, key } = readBillingReturn(url.searchParams)
+      boundRef.current = { kind, owner, spent: false }
+      if (key) {
+        url.searchParams.delete(key)
+        routerRef.current.replace(`${url.pathname}${url.search}${url.hash}`, {
+          scroll: false,
+        })
+      }
+    }
+    const bound = boundRef.current
+    return bound.owner === owner && !bound.spent ? bound.kind : null
+  }, [])
+}
+
 export function SubscriptionSection() {
+  const claimBillingReturn = useBillingReturn()
+  return (
+    <MemberScope>
+      {(session) => (
+        <MemberSubscriptionSection
+          session={session}
+          claimBillingReturn={claimBillingReturn}
+        />
+      )}
+    </MemberScope>
+  )
+}
+
+function MemberSubscriptionSection({
+  session,
+  claimBillingReturn,
+}: {
+  session: MemberSession
+  claimBillingReturn: (owner: string) => BillingReturn
+}) {
   const { t } = useTranslation()
+  const { status, owner } = session
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [access, setAccess] = useState<PremiumAccess | null>(null)
@@ -304,6 +396,8 @@ export function SubscriptionSection() {
   const [showPortalLagHint, setShowPortalLagHint] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** This mount's lifetime: a checkout or portal answer after it ends navigates nowhere. */
+  const mountSignal = useMountSignal()
 
   /*
    * Resolved outside the effect and depended on by value, mirroring
@@ -312,17 +406,35 @@ export function SubscriptionSection() {
    */
   const loadErrorMessage = t('commerce.premium.errorLoad')
 
+  // One read (or one activation poll) per member: a session event that names the same member
+  // again (a token refresh, the end of a verification already answered) asks nothing.
   useEffect(() => {
-    if (!hasWebSession()) {
+    if (status === 'checking') {
+      setError(null)
+      setSectionState('checking')
+      return
+    }
+    if (status === 'unavailable') {
+      // Verification failed: an outage the member can retry, never the sign-in hint.
+      setError(loadErrorMessage)
+      setSectionState('load_failed')
+      return
+    }
+    if (owner === null) {
+      setError(null)
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names this member; until then nothing is asked.
+    if (!isLiveOwner(owner)) return
 
-    const params = new URLSearchParams(window.location.search)
+    const billingReturn = claimBillingReturn(owner)
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && isLiveOwner(owner)
     let timer: number | undefined
+    setError(null)
 
-    if (params.get('checkout') === 'success') {
+    if (billingReturn === 'checkout') {
       /*
        * The poll starts with a refresh (beats webhook latency), then reads
        * status. A failed tick is treated as transient and the poll simply
@@ -334,11 +446,13 @@ export function SubscriptionSection() {
       let attempts = 0
 
       const tick = async (viaRefresh: boolean): Promise<void> => {
+        // A timer that fires after the member changed sends nothing.
+        if (!current()) return
         try {
           const next = viaRefresh
             ? await refreshSubscriptionFromWeb(controller.signal)
             : await getSubscriptionFromWeb(controller.signal)
-          if (controller.signal.aborted) {
+          if (!current()) {
             return
           }
           setSubscription(next)
@@ -347,7 +461,7 @@ export function SubscriptionSection() {
             return
           }
         } catch {
-          if (controller.signal.aborted) {
+          if (!current()) {
             return
           }
         }
@@ -370,7 +484,8 @@ export function SubscriptionSection() {
       }
     }
 
-    const isPortalReturn = params.get('portal') === 'return'
+    const isPortalReturn = billingReturn === 'portal'
+    const isDenial = (error: unknown) => premiumFailureReason(error) === 'signed_out'
     setSectionState('loading')
     setShowPortalLagHint(isPortalReturn)
 
@@ -387,26 +502,38 @@ export function SubscriptionSection() {
          * renders the section exactly as before (TEA-14), so it can never break the read.
          */
         const accessRead = Promise.race([
-          getPremiumAccessFromWeb(controller.signal).catch(() => null),
+          // A denial of a superseded token is read again once, before the null fallback.
+          readAsMember(
+            owner,
+            () => getPremiumAccessFromWeb(controller.signal),
+            isDenial
+          ).catch(() => null),
           // A hung access read never holds the section: it renders as it did before 6.14.
           new Promise<null>((resolve) => {
             window.setTimeout(() => resolve(null), ACCESS_READ_TIMEOUT_MS)
           }),
         ])
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const read = () =>
+          readAsMember(owner, () => getSubscriptionFromWeb(controller.signal), isDenial)
+        // The portal refresh runs once; only its fallback read is retried, and that read is
+        // checked before it is sent, like every follow-up request.
+        const fallback = () => {
+          if (!current()) throw new DOMException('Aborted', 'AbortError')
+          return read()
+        }
         const next = isPortalReturn
-          ? await refreshSubscriptionFromWeb(controller.signal).catch(() =>
-              getSubscriptionFromWeb(controller.signal)
-            )
-          : await getSubscriptionFromWeb(controller.signal)
+          ? await refreshSubscriptionFromWeb(controller.signal).catch(fallback)
+          : await read()
         const nextAccess = await accessRead
-        if (controller.signal.aborted) {
+        if (!current()) {
           return
         }
         setAccess(nextAccess)
         setSubscription(next)
         setSectionState('ready')
       } catch (loadError: unknown) {
-        if (controller.signal.aborted) {
+        if (!current()) {
           return
         }
         if (premiumFailureReason(loadError) === 'signed_out') {
@@ -425,7 +552,7 @@ export function SubscriptionSection() {
     })()
 
     return () => controller.abort()
-  }, [loadErrorMessage])
+  }, [status, owner, loadErrorMessage, claimBillingReturn])
 
   /**
    * Turns a rejection into localized copy, or into the signed-out state.
@@ -446,7 +573,7 @@ export function SubscriptionSection() {
   }
 
   async function handleSubscribe(plan: SubscriptionPlan): Promise<void> {
-    if (isRedirecting) {
+    if (isRedirecting || !isLiveOwner(owner)) {
       return
     }
     setIsRedirecting(true)
@@ -464,25 +591,33 @@ export function SubscriptionSection() {
       // Analytics must never stop checkout.
     }
 
+    const signal = mountSignal()
+    const current = () => !signal.aborted && isLiveOwner(owner)
     try {
-      const url = await createCheckoutSessionFromWeb(plan)
+      const url = await createCheckoutSessionFromWeb(plan, signal)
+      if (!current()) return
       redirectToExternalUrl(url)
     } catch (checkoutError: unknown) {
+      if (!current()) return
       applyFailure(checkoutError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
   }
 
   async function handleManage(): Promise<void> {
-    if (isRedirecting) {
+    if (isRedirecting || !isLiveOwner(owner)) {
       return
     }
     setIsRedirecting(true)
     setError(null)
+    const signal = mountSignal()
+    const current = () => !signal.aborted && isLiveOwner(owner)
     try {
-      const url = await createPortalSessionFromWeb()
+      const url = await createPortalSessionFromWeb(signal)
+      if (!current()) return
       redirectToExternalUrl(url)
     } catch (portalError: unknown) {
+      if (!current()) return
       applyFailure(portalError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
@@ -603,6 +738,8 @@ export function SubscriptionSection() {
           {error}
         </p>
       )}
+
+      <SessionRetryButton session={session} testId="premium-session-retry" />
     </section>
   )
 }

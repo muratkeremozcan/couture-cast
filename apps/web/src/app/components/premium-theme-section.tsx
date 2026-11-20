@@ -22,27 +22,41 @@
 // - Selection is never signalled by color alone. The active card states "Selected" in
 //   text and carries `aria-pressed`, so the palette is decoration on top of a state
 //   that is already readable and announced.
+//
+// The section follows the session (`MemberScope`): while a stored session is still being
+// verified it stays `checking`, and it reads once per member. A one-shot check on mount once
+// showed a signed-in member the signed-out "Sign in and subscribe" panel on every direct load of
+// /settings (owner, 2026-11-19). The palette on `<html>` follows the member too: cleared when the
+// member changes or signs out, applied once the verified member's read lands.
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PremiumTheme, PremiumThemeKey } from '@couture/api-client/contracts/http'
 import { formatLocalizedList } from '@couture/utils'
 import {
-  applyWebThemeAttribute,
+  applyMemberTheme,
   DEFAULT_THEME_ATTRIBUTE,
   getThemeFromWeb,
-  hasWebSession,
+  releaseThemeOfDepartedOwner,
   premiumThemeFailureReason,
   PREMIUM_THEME_KEYS,
   setThemeFromWeb,
 } from '../../lib/premium-theme'
+import {
+  isLiveOwner,
+  readAsMember,
+  MemberScope,
+  useWebSessionOwner,
+  type MemberSession,
+} from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 
 const UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
 
 /**
- * `checking` is the server render and the first client tick, before `sessionStorage`
- * can be read, so hydration never reconciles two trees. It renders the heading and the
+ * `checking` is the server render, the first client tick, and every moment a stored
+ * session is still being verified, so hydration never reconciles two trees. It renders the heading and the
  * disclosure and nothing else, which is also what `loading` renders — the section
  * announces itself busy rather than showing a placeholder that would flash into either
  * the gallery or the locked panel a moment later.
@@ -312,8 +326,26 @@ function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
   )
 }
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's palette,
+ * save and messages in the same render. The palette that member applied to `<html>` goes with
+ * them, before the next member's read can apply theirs.
+ */
 export function PremiumThemeSection() {
+  const liveOwner = useWebSessionOwner()
+  // Before the next member's first effect; SessionBridge does the same off Settings.
+  useLayoutEffect(() => {
+    releaseThemeOfDepartedOwner(liveOwner)
+  }, [liveOwner])
+  return (
+    <MemberScope>{(session) => <MemberThemeSection session={session} />}</MemberScope>
+  )
+}
+
+function MemberThemeSection({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
+  const { status, owner } = session
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [theme, setTheme] = useState<PremiumTheme | null>(null)
   /** The `dataTheme` of the card whose save is in flight, or null when idle. */
@@ -338,28 +370,51 @@ export function PremiumThemeSection() {
    */
   const loadErrorMessage = t('commerce.premium.theme.loadError')
 
+  // One read per member: a session event that names the same member again (a token refresh,
+  // the end of a verification already answered) asks nothing.
   useEffect(() => {
-    if (!hasWebSession()) {
+    if (status === 'checking') {
+      setError(null)
+      setSectionState('checking')
+      return
+    }
+    if (status === 'unavailable') {
+      // Verification failed: an outage the member can retry, never the signed-out panel.
+      setError(loadErrorMessage)
+      setSectionState('load_failed')
+      return
+    }
+    if (owner === null) {
       // A signed-out reader gets Default, whatever a previous session left behind.
-      applyWebThemeAttribute(null)
+      applyMemberTheme(null, null)
+      setError(null)
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names this member; until then nothing is asked.
+    if (!isLiveOwner(owner)) return
 
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    setError(null)
     setSectionState('loading')
 
     void (async () => {
       try {
-        const next = await getThemeFromWeb(controller.signal)
-        if (controller.signal.aborted) {
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const next = await readAsMember(
+          owner,
+          () => getThemeFromWeb(controller.signal),
+          (error) => premiumThemeFailureReason(error) === 'signed_out'
+        )
+        if (!current()) {
           return
         }
         setTheme(next)
-        applyWebThemeAttribute(next.theme)
+        applyMemberTheme(next.theme, owner)
         setSectionState('ready')
       } catch (loadError: unknown) {
-        if (controller.signal.aborted) {
+        if (!current()) {
           return
         }
         /*
@@ -367,7 +422,7 @@ export function PremiumThemeSection() {
          * block the rest of the settings page, and it must not leave the surface
          * showing a palette the server no longer confirms.
          */
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         if (premiumThemeFailureReason(loadError) === 'signed_out') {
           // An expired or cleared token is not a broken read. Show the locked panel the
           // signed-out branch already renders instead of an error the reader cannot act
@@ -381,7 +436,7 @@ export function PremiumThemeSection() {
     })()
 
     return () => controller.abort()
-  }, [loadErrorMessage])
+  }, [status, owner, loadErrorMessage])
 
   /**
    * The palette the server last confirmed, which is both what the gallery marks
@@ -408,12 +463,12 @@ export function PremiumThemeSection() {
       return
     }
 
-    // The session is re-read here, not trusted from mount. Signing out in another tab
-    // leaves this section rendered and interactive, and without this check the write
+    // The live owner is re-read here, not trusted from the render. Signing out in another
+    // tab leaves this section rendered and interactive, and without this check the write
     // would fail inside the lib and surface PREMIUM_THEME_SIGNED_OUT_MESSAGE — a
     // developer string with no catalog entry, so English in all ten locales.
-    if (!hasWebSession()) {
-      applyWebThemeAttribute(null)
+    if (!isLiveOwner(owner)) {
+      applyMemberTheme(null, null)
       setTheme(null)
       setError(null)
       setSectionState('signed_out')
@@ -427,13 +482,13 @@ export function PremiumThemeSection() {
 
     try {
       const saved = await setThemeFromWeb(option.key, controller.signal)
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || !isLiveOwner(owner)) {
         return
       }
       setTheme(saved)
-      applyWebThemeAttribute(saved.theme)
+      applyMemberTheme(saved.theme, owner)
     } catch (saveError: unknown) {
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted || !isLiveOwner(owner)) {
         return
       }
       applySaveFailure(saveError)
@@ -464,12 +519,12 @@ export function PremiumThemeSection() {
   function applySaveFailure(saveError: unknown): void {
     switch (premiumThemeFailureReason(saveError)) {
       case 'signed_out':
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         setTheme(null)
         setSectionState('signed_out')
         return
       case 'not_entitled':
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         setTheme((current) =>
           current === null ? null : { ...current, theme: null, isEntitled: false }
         )
@@ -567,6 +622,8 @@ export function PremiumThemeSection() {
           {error}
         </p>
       )}
+
+      <SessionRetryButton session={session} testId="premium-theme-session-retry" />
     </section>
   )
 }

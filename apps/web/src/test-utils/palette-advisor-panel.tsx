@@ -9,7 +9,7 @@ import {
   type PaletteAdvisorProfile,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../lib/wardrobe'
+import { signInFixtureMember } from './member-session'
 import { PaletteAdvisorPanel } from '../app/components/palette-advisor-panel'
 
 export const PALETTE_PATH = '/api/v1/commerce/premium/palette'
@@ -63,8 +63,9 @@ export function getHandler(overrides: ProfileOverrides = {}) {
   return http.get(PALETTE_PATH, () => HttpResponse.json({ data: profile(overrides) }))
 }
 
+/** Signs in as the e2e fixture member, the bearer the panel's session follower counts. */
 export function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 export function renderPanel() {

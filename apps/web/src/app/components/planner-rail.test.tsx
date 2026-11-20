@@ -1,5 +1,5 @@
 // Story 5.5 Task 7 owner: component tests for the live seven-day planner rail.
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import axe from 'axe-core'
@@ -10,7 +10,8 @@ import {
   PLANNER_DAY_CHANGED_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { settle } from '../../test-utils/request-barrier'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import { PlannerRail } from './planner-rail'
@@ -126,7 +127,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows a checking skeleton before the request resolves', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let resolveResponse!: (value: Response) => void
     useMswHandlers(
       http.get(
@@ -149,7 +150,7 @@ describe('PlannerRail', () => {
   })
 
   it('renders a ready week with weather, scenarios, and starter-wardrobe marker', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       buildReadyDay(d, index === 2 ? { isStarterWardrobe: true } : {})
     )
@@ -170,7 +171,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows an unavailable weather note without a precision claim', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       buildReadyDay(
         d,
@@ -194,7 +195,7 @@ describe('PlannerRail', () => {
   })
 
   it('renders an isolated day error beside otherwise-ready days, with retry', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       index === 1 ? buildErrorDay(d) : buildReadyDay(d)
     )
@@ -227,7 +228,7 @@ describe('PlannerRail', () => {
   })
 
   it('locks with the not-entitled upsell on a 403 from PremiumEntitlementGuard', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(errorBody(403, PREMIUM_REQUIRED_MESSAGE), { status: 403 })
@@ -238,7 +239,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows the disabled note (not the upsell) when the flag is off', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(errorBody(503, PREMIUM_PLANNER_DISABLED_MESSAGE), {
@@ -252,7 +253,7 @@ describe('PlannerRail', () => {
   })
 
   it('offers a localized retry on an unclassified failure', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -271,7 +272,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows a per-day reshuffle error on an unclassified reshuffle failure', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -291,7 +292,7 @@ describe('PlannerRail', () => {
   })
 
   it('reshuffles a day and announces the update', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -317,7 +318,7 @@ describe('PlannerRail', () => {
   })
 
   it('announces no alternative when reshuffle reports unchanged', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -341,7 +342,7 @@ describe('PlannerRail', () => {
   })
 
   it('refreshes the date on a reshuffle version conflict', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     let getCount = 0
     useMswHandlers(
@@ -366,7 +367,7 @@ describe('PlannerRail', () => {
   })
 
   it('prevents a second reshuffle while one is in flight', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     const reshuffleCalls = vi.fn()
     let resolveReshuffle!: (value: Response) => void
@@ -401,7 +402,7 @@ describe('PlannerRail', () => {
   })
 
   it('aborts the in-flight request when the rail closes', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let capturedSignal: AbortSignal | undefined
     useMswHandlers(
       http.get(PLANNER_PATH, ({ request }) => {
@@ -424,7 +425,7 @@ describe('PlannerRail', () => {
   })
 
   it('traps focus and closes on Escape only in the overlay variant', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
@@ -507,7 +508,7 @@ describe('PlannerRail', () => {
   })
 
   it('aborts an in-flight reshuffle, not just the week fetch, when the rail closes', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     let reshuffleSignal: AbortSignal | undefined
     useMswHandlers(
@@ -537,7 +538,7 @@ describe('PlannerRail', () => {
   })
 
   it('refreshes silently on window focus while open and entitled', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -561,7 +562,7 @@ describe('PlannerRail', () => {
     // but before React re-registered the focus listener, so the listener that answered
     // still saw the checking state and refreshed nothing. A MutationObserver runs right
     // after the commit, ahead of React's passive effects, which pins that order.
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -588,7 +589,7 @@ describe('PlannerRail', () => {
   })
 
   it('does not refresh on window focus once closed', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -610,7 +611,7 @@ describe('PlannerRail', () => {
   })
 
   it('locks with the not-entitled upsell when a reshuffle discovers entitlement lapsed', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -631,7 +632,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows the disabled note when a reshuffle discovers the flag went off', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -712,7 +713,7 @@ describe('PlannerRail', () => {
     })
 
     it('passes entitled with a full ready week', async () => {
-      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+      signInFixtureMember()
       useMswHandlers(
         http.get(PLANNER_PATH, () =>
           HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
@@ -726,5 +727,162 @@ describe('PlannerRail', () => {
       })
       expect(results.violations).toEqual([])
     })
+  })
+})
+
+// PR #259 review (CodeRabbit): the rail's member-owned week remounts when the member changes,
+// and its reads must never undo a reshuffle the member just made.
+describe('PlannerRail keeps focus and the newest week with the member', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('PLANNER-MEMBER-01 a member change while focus is in the overlay week moves focus to Close', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      )
+    )
+    renderRail({ variant: 'overlay' })
+    const reshuffle = await screen.findByTestId(`planner-reshuffle-${SEVEN_DATES[0]!}`)
+    reshuffle.focus()
+    expect(reshuffle).toHaveFocus()
+
+    // The member signs out in this tab: the week is replaced by the locked panel.
+    act(() => {
+      window.sessionStorage.clear()
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close planner' })).toHaveFocus()
+  })
+
+  it('PLANNER-MEMBER-02 the inline rail leaves focus where the page puts it', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      )
+    )
+    renderRail({ variant: 'rail' })
+    const reshuffle = await screen.findByTestId(`planner-reshuffle-${SEVEN_DATES[0]!}`)
+    reshuffle.focus()
+
+    act(() => {
+      window.sessionStorage.clear()
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close planner' })).not.toHaveFocus()
+  })
+
+  it('PLANNER-MEMBER-03 a week read that started before a reshuffle landed does not undo it', async () => {
+    signInFixtureMember()
+    const target = SEVEN_DATES[0]!
+    let weekReads = 0
+    let releaseStale!: () => void
+    const stale = new Promise<void>((resolve) => {
+      releaseStale = resolve
+    })
+    const expectedVersions: number[] = []
+    let staleAnswered = false
+    useMswHandlers(
+      http.get(PLANNER_PATH, async () => {
+        weekReads += 1
+        // The focus refresh is held until after the reshuffle answers.
+        if (weekReads === 2) {
+          await stale
+          staleAnswered = true
+        }
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      }),
+      http.post(RESHUFFLE_PATH, async ({ request }) => {
+        const body = (await request.json()) as { expectedVersion: number }
+        expectedVersions.push(body.expectedVersion)
+        return HttpResponse.json({
+          data: {
+            day: buildReadyDay(target, { version: body.expectedVersion + 1 }),
+            unchanged: false,
+          },
+        })
+      })
+    )
+    renderRail()
+    const button = await screen.findByTestId(`planner-reshuffle-${target}`)
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(weekReads).toBe(2))
+
+    fireEvent.click(button)
+    await waitFor(() => expect(expectedVersions).toEqual([1]))
+    await waitFor(() => expect(button).not.toBeDisabled())
+
+    // The older week (version 1) answers now.
+    // The click follows the stale answer's delivery, not a timer: the handler has answered it
+    // and the rail has had every round of the request barrier to apply or drop it.
+    act(() => releaseStale())
+    await waitFor(() => expect(staleAnswered).toBe(true))
+    await settle()
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    await waitFor(() => expect(expectedVersions).toEqual([1, 2]))
+  })
+
+  // PR #259 review round 2 (CodeRabbit): a foreground read dropped because a reshuffle landed
+  // first must not leave the rail on its skeleton.
+  it('PLANNER-MEMBER-04 a day retry answered after a reshuffle lands shows the reshuffled week', async () => {
+    signInFixtureMember()
+    const target = SEVEN_DATES[0]!
+    const failed = SEVEN_DATES[1]!
+    let weekReads = 0
+    let releaseRetry!: () => void
+    const retryHeld = new Promise<void>((resolve) => {
+      releaseRetry = resolve
+    })
+    let releaseReshuffle!: () => void
+    const reshuffleHeld = new Promise<void>((resolve) => {
+      releaseReshuffle = resolve
+    })
+    useMswHandlers(
+      http.get(PLANNER_PATH, async () => {
+        weekReads += 1
+        if (weekReads === 2) await retryHeld
+        return HttpResponse.json(
+          buildResponse(
+            SEVEN_DATES.map((d) => (d === failed ? buildErrorDay(d) : buildReadyDay(d)))
+          )
+        )
+      }),
+      http.post(RESHUFFLE_PATH, async () => {
+        await reshuffleHeld
+        return HttpResponse.json({
+          data: { day: buildReadyDay(target, { version: 2 }), unchanged: false },
+        })
+      })
+    )
+    renderRail()
+    fireEvent.click(await screen.findByTestId(`planner-reshuffle-${target}`))
+    fireEvent.click(screen.getByTestId(`planner-retry-${failed}`))
+    await waitFor(() => expect(weekReads).toBe(2))
+    expect(screen.getByTestId('planner-skeleton')).toBeInTheDocument()
+
+    // The reshuffle answers first, then the retried week.
+    await act(async () => {
+      releaseReshuffle()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    await act(async () => {
+      releaseRetry()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    expect(screen.queryByTestId('planner-skeleton')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent('Today: outfit updated.')
   })
 })

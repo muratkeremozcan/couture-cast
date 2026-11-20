@@ -1275,5 +1275,8 @@
     "community": "Comunidad",
     "profile": "Perfil",
     "navigatedTo": "Pestaña {{label}} abierta"
+  },
+  "session": {
+    "retry": "Intentar de nuevo"
   }
 }

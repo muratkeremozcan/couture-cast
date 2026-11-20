@@ -455,7 +455,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         locale_region: 'US',
       })
       expect(JSON.stringify(event.properties)).not.toMatch(
-        /spot-1|Explorer|Spotlight look|test-access-token/
+        /spot-1|Explorer|Spotlight look|test-token-access/
       )
     }
   })

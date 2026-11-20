@@ -1275,5 +1275,8 @@
     "community": "Topluluk",
     "profile": "Profil",
     "navigatedTo": "{{label}} sekmesine geçildi"
+  },
+  "session": {
+    "retry": "Tekrar dene"
   }
 }
