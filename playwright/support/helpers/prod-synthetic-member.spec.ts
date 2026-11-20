@@ -37,8 +37,13 @@ const SESSION = {
   },
 }
 
+// A 204 has no body: the Response constructor refuses one.
 const answering = (status: number, body: unknown = SESSION) =>
-  vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status })))
+  vi.fn(() =>
+    Promise.resolve(
+      new Response(status === 204 ? null : JSON.stringify(body), { status })
+    )
+  )
 
 const callOf = (mock: ReturnType<typeof answering>) =>
   mock.mock.calls[0] as unknown as [string, RequestInit]
