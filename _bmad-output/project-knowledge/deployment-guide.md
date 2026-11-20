@@ -776,6 +776,10 @@ worker's recorded 138 and 306 commands an hour). The first hosted settings (300 
 community worker's) cost the live service about 950 commands an hour for three consumers, 23.4 a
 minute with the worker running against 7.6 with it paused. At 1800 s and 900 s the model gives
 about 137 an hour, and `idle-worker-options.spec.ts` pins that it stays at least 5x under the 950.
+Measured on the live service after the change: the whole Redis idled at 9.1 commands a minute over
+41 minutes without uploads (23.4 before, 7.6 with the worker paused), so the worker's share fell
+from about 16 a minute to about 2. A photo uploaded after 21 minutes, and another after 28 minutes,
+of one blocked wait reached `awaiting_tags` in 4 to 5 seconds, so the keepalive holds the wait.
 The price is crash recovery: a job whose worker died is requeued at the second stalled check
 after the crash, 30 minutes at most (the hourly retention purge also re-enqueues stranded
 processing work). The community worker keeps its 300 s and 120 s settings, because its moderation

@@ -20735,7 +20735,9 @@ Evidence boundaries:
 - Idle Redis cost: the first settings (the community worker's 300 s block and 120 s stalled
   check) measured about 950 commands an hour for the whole service, so the hosted consumers now
   block 1800 s and check for stalled jobs every 900 s, with TCP keepalive on the connection. The
-  trade is crash recovery of up to 30 minutes; the community worker keeps its own settings.
+  trade is crash recovery of up to 30 minutes; the community worker keeps its own settings. Live
+  result: the whole Redis idles at 9.1 commands a minute instead of 23.4, and a photo uploaded after
+  21 and after 28 minutes of idle reached `awaiting_tags` in 4 to 5 seconds.
 - The ten-locale strings for the manual and pending copy are translated without a native review.
 
 #### Advisor erase and planner week races
