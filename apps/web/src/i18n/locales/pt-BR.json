@@ -461,6 +461,11 @@
         "timeout": "O envio excedeu o tempo limite. Tente novamente.",
         "serviceUnavailable": "O armazenamento está indisponível no momento. Tente novamente em instantes."
       }
+    },
+    "tagging": {
+      "loading": "Carregando sua peça...",
+      "pending_desc": "Descreva esta peça com uma categoria e uma faixa de conforto.",
+      "manual_desc": "Escolha a categoria e a faixa de conforto que combinam com esta peça. O material é opcional."
     }
   },
   "community": {
@@ -930,7 +935,7 @@
       "resolved": "Resolvido",
       "dashboardLink": "Painel de SLA",
       "title": "Monitoramento de SLA",
-      "subtitle": "Casos abertos em relação à meta de revisão de 24 horas e os alertas enviados sobre eles.",
+      "subtitle": "Casos abertos em relação às suas metas de revisão (30 minutos para publicações retidas pela triagem, 24 horas para denúncias de membros) e os alertas enviados sobre eles.",
       "disabled": "O monitoramento de SLA está desativado.",
       "unavailable": "O monitoramento de SLA não está disponível. Tente novamente.",
       "monitorTitle": "Estado do monitor",

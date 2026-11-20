@@ -2,12 +2,15 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
-import type { PrismaClient } from '@prisma/client'
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WardrobeColorProcessor } from './wardrobe-color.processor'
 import type { GarmentTaggingEngine } from './garment-tagging.engine'
+import { ManualGarmentTaggingEngine } from './manual-garment-tagging.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
 
 describe('WardrobeColorProcessor', () => {
@@ -131,6 +134,56 @@ describe('WardrobeColorProcessor', () => {
         tagging_failure_code: 'TAGGING_INFERENCE_FAILED',
       }) as unknown as Record<string, unknown>,
     })
+  })
+
+  it('records manual mode, with no suggestions and no logged error, when the engine is manual', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'g_manual',
+      user_id: 'user_1',
+      object_path: 'wardrobe/user_1/g_manual.png',
+      retention_status: 'active',
+      upload_status: 'processing',
+    } as unknown as Awaited<ReturnType<typeof mockPrisma.garmentItem.findUnique>>)
+
+    const manualProcessor = new WardrobeColorProcessor(
+      mockPrisma,
+      mockStorage,
+      new ManualGarmentTaggingEngine()
+    )
+    const logger = (
+      manualProcessor as unknown as {
+        logger: { error: () => void; warn: () => void; info: () => void }
+      }
+    ).logger
+    const errorLog = vi.spyOn(logger, 'error')
+    const warnLog = vi.spyOn(logger, 'warn')
+    const infoLog = vi.spyOn(logger, 'info')
+
+    await manualProcessor.process('g_manual')
+
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: 'g_manual' }) as unknown as Record<
+        string,
+        unknown
+      >,
+      data: expect.objectContaining({
+        upload_status: 'awaiting_tags',
+        tag_suggested_at: null,
+        tagging_model_version: null,
+        tagging_failure_code: 'TAGGING_MANUAL_MODE',
+      }) as unknown as Record<string, unknown>,
+    })
+    // No snapshot is written: the stored suggestions are cleared to a database null, never a stale or partial one.
+    const written = (
+      mockUpdateMany.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> }
+    ).data
+    expect(written.tag_suggestions).toBe(Prisma.DbNull)
+    expect(errorLog).not.toHaveBeenCalled()
+    expect(warnLog).not.toHaveBeenCalled()
+    expect(infoLog).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: 'manual_mode', applied: true }),
+      'Wardrobe processing completed'
+    )
   })
 
   it('reuses a persisted inference checkpoint after a queue retry', async () => {

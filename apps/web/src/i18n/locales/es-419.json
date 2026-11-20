@@ -461,6 +461,11 @@
         "timeout": "Se agotó el tiempo de carga. Inténtalo de nuevo.",
         "serviceUnavailable": "El almacenamiento no está disponible en este momento. Inténtalo de nuevo en un momento."
       }
+    },
+    "tagging": {
+      "loading": "Cargando tu prenda...",
+      "pending_desc": "Describe esta prenda con una categoría y un rango de confort.",
+      "manual_desc": "Elige la categoría y el rango de confort que mejor le queden a esta prenda. El material es opcional."
     }
   },
   "community": {
@@ -930,7 +935,7 @@
       "resolved": "Resuelto",
       "dashboardLink": "Panel de SLA",
       "title": "Supervisión de SLA",
-      "subtitle": "Casos abiertos frente al objetivo de revisión de 24 horas y las alertas enviadas sobre ellos.",
+      "subtitle": "Casos abiertos frente a sus objetivos de revisión (30 minutos para publicaciones retenidas por el filtro, 24 horas para reportes de miembros) y las alertas enviadas sobre ellos.",
       "disabled": "La supervisión de SLA está desactivada.",
       "unavailable": "La supervisión de SLA no está disponible. Inténtalo de nuevo.",
       "monitorTitle": "Estado del monitor",

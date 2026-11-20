@@ -461,6 +461,11 @@
         "timeout": "Il caricamento è scaduto. Riprova.",
         "serviceUnavailable": "L'archivio non è disponibile al momento. Riprova tra un momento."
       }
+    },
+    "tagging": {
+      "loading": "Caricamento del tuo capo...",
+      "pending_desc": "Descrivi questo capo con una categoria e una fascia di comfort.",
+      "manual_desc": "Scegli la categoria e la fascia di comfort adatte a questo capo. Il materiale è facoltativo."
     }
   },
   "community": {
@@ -930,7 +935,7 @@
       "resolved": "Risolto",
       "dashboardLink": "Pannello SLA",
       "title": "Monitoraggio SLA",
-      "subtitle": "Casi aperti rispetto all’obiettivo di revisione di 24 ore e gli avvisi inviati su di essi.",
+      "subtitle": "Casi aperti rispetto ai loro obiettivi di revisione (30 minuti per i contenuti trattenuti dal filtro, 24 ore per le segnalazioni dei membri) e gli avvisi inviati su di essi.",
       "disabled": "Il monitoraggio SLA è disattivato.",
       "unavailable": "Il monitoraggio SLA non è disponibile. Riprova.",
       "monitorTitle": "Stato del monitor",

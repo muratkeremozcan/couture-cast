@@ -6,7 +6,9 @@ import {
 } from '@couture/api-client/contracts/http'
 import { createBaseLogger } from '../../logger/pino.config'
 import {
+  GarmentTaggingManualModeError,
   GarmentTaggingOutputError,
+  TAGGING_MANUAL_MODE_CODE,
   type GarmentTaggingEngine,
 } from './garment-tagging.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
@@ -117,12 +119,16 @@ export class WardrobeColorProcessor {
       return {
         hasInferenceCheckpoint: false,
         tagSnapshot: null,
-        taggingFailureCode:
-          error instanceof GarmentTaggingOutputError
-            ? 'TAGGING_OUTPUT_INVALID'
-            : 'TAGGING_INFERENCE_FAILED',
+        taggingFailureCode: this.taggingFailureCodeFor(error),
       }
     }
+  }
+
+  private taggingFailureCodeFor(error: unknown): string {
+    if (error instanceof GarmentTaggingManualModeError) return TAGGING_MANUAL_MODE_CODE
+    return error instanceof GarmentTaggingOutputError
+      ? 'TAGGING_OUTPUT_INVALID'
+      : 'TAGGING_INFERENCE_FAILED'
   }
 
   private taggingPersistenceData(outcome: TaggingOutcome) {
@@ -208,7 +214,11 @@ export class WardrobeColorProcessor {
       applied,
       durationMs: Date.now() - startedAt,
       garmentId,
-      outcome: outcome.tagSnapshot ? 'suggested' : 'manual_confirmation_required',
+      outcome: outcome.tagSnapshot
+        ? 'suggested'
+        : outcome.taggingFailureCode === TAGGING_MANUAL_MODE_CODE
+          ? 'manual_mode'
+          : 'manual_confirmation_required',
       taggingFailureCode: outcome.taggingFailureCode,
     }
     if (applied) {
