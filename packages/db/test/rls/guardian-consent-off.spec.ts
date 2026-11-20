@@ -7,11 +7,19 @@
 // The granted-access cases this replaces (4.3-DB-003 and 4.4-DB-003 guardian reads and writes,
 // and the guardian-wardrobe grant cases) come back with the helper body in the PR that turns
 // consent on again; see the re-enable checklist in cc617-google-sign-in-test-design.md.
+//
+// GarmentItem and SilhouetteProfile are member read-only since migration
+// 20261119120000_revoke_member_wardrobe_upload_writes, so a write there is refused for lack of
+// privilege before any policy runs; the guardian's empty result is still proven on the shared
+// tables members may write.
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
 import {
   adminPool,
   buildClaims,
+  expectPermissionDenied,
   guardianSharedTables,
   scenarioTest,
   useRlsDatabase,
@@ -76,12 +84,12 @@ describe.concurrent('guardian consent off: a granted row grants nothing', () => 
           'authenticated',
           buildClaims(seeded[emailKey], 'guardian'),
           async (client) => {
-            const updated = await client.query(
+            await expectPermissionDenied(
+              client,
               `UPDATE public."GarmentItem" SET "category" = 'outerwear', "updated_at" = NOW()
              WHERE "id" = $1 RETURNING "id"`,
               [seeded.garmentId]
             )
-            expect(updated.rows).toEqual([])
             const renamed = await client.query(
               `UPDATE public."OutfitCapsule" SET "name" = 'Guardian rename', "updated_at" = NOW()
              WHERE "id" = $1 RETURNING "id"`,
@@ -93,11 +101,11 @@ describe.concurrent('guardian consent off: a granted row grants nothing', () => 
               [seeded.capsuleGarmentId]
             )
             expect(deletedJoin.rows).toEqual([])
-            const deletedSilhouette = await client.query(
+            await expectPermissionDenied(
+              client,
               'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1 RETURNING "id"',
               [seeded.silhouetteProfileId]
             )
-            expect(deletedSilhouette.rows).toEqual([])
           }
         )
 
@@ -131,7 +139,7 @@ describe.concurrent('guardian consent off: a granted row grants nothing', () => 
   }
 
   scenarioTest(
-    'the teen still reads and writes their own shared rows',
+    'the teen still reads their own shared rows and writes the ones members may write',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -144,12 +152,18 @@ describe.concurrent('guardian consent off: a granted row grants nothing', () => 
             )
             expect(own.rows.length, table).toBeGreaterThan(0)
           }
-          const updated = await client.query(
+          const renamed = await client.query(
+            `UPDATE public."OutfitCapsule" SET "name" = 'Teen rename', "updated_at" = NOW()
+         WHERE "id" = $1 RETURNING "name"`,
+            [seeded.capsuleId]
+          )
+          expect(renamed.rows).toEqual([{ name: 'Teen rename' }])
+          await expectPermissionDenied(
+            client,
             `UPDATE public."GarmentItem" SET "category" = 'outerwear', "updated_at" = NOW()
          WHERE "id" = $1 RETURNING "category"`,
             [seeded.garmentId]
           )
-          expect(updated.rows).toEqual([{ category: 'outerwear' }])
         }
       )
     }

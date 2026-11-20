@@ -1,10 +1,13 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
 import {
   adminPool,
   buildClaims,
+  expectPermissionDenied,
   scenarioTest,
   useRlsDatabase,
   withRole,
@@ -18,7 +21,7 @@ describe.concurrent('guardian-aware RLS policies', () => {
   // They return with private.has_active_guardian_consent when consent is turned back on.
 
   scenarioTest(
-    '4.4-DB-003 lets the onboarding-state and silhouette-profile owner read, mutate, delete, and reinsert both rows',
+    '4.4-DB-003 lets the owner read both rows, mutate, delete and reinsert the onboarding state, and write no silhouette profile',
     async ({ scenario: seeded }) => {
       await withRole(
         'authenticated',
@@ -49,14 +52,16 @@ describe.concurrent('guardian-aware RLS policies', () => {
           )
           expect(advanced.rows).toEqual([{ current_step: 'complete', revision: 1 }])
 
-          const slid = await client.query(
+          // Production follow-up 2026-11-19: the silhouette profile holds the My Form storage
+          // path the API's service role acts on, so the owner reads it and only the API writes it
+          // (migration 20261119120000_revoke_member_wardrobe_upload_writes).
+          await expectPermissionDenied(
+            client,
             `UPDATE public."SilhouetteProfile"
              SET "height_slider" = 70, "revision" = "revision" + 1, "updated_at" = NOW()
-             WHERE "id" = $1
-             RETURNING "height_slider", "revision"`,
+             WHERE "id" = $1`,
             [seeded.silhouetteProfileId]
           )
-          expect(slid.rows).toEqual([{ height_slider: 70, revision: 1 }])
 
           // The declared INSERT/DELETE policies are exercised here too, not
           // just SELECT/UPDATE, since a singleton one-row-per-user table
@@ -75,19 +80,18 @@ describe.concurrent('guardian-aware RLS policies', () => {
           )
           expect(reinsertedOnboarding.rows).toHaveLength(1)
 
-          const deletedSilhouette = await client.query(
-            'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1 RETURNING "id"',
+          await expectPermissionDenied(
+            client,
+            'DELETE FROM public."SilhouetteProfile" WHERE "id" = $1',
             [seeded.silhouetteProfileId]
           )
-          expect(deletedSilhouette.rows).toEqual([{ id: seeded.silhouetteProfileId }])
 
-          const reinsertedSilhouette = await client.query(
+          await expectPermissionDenied(
+            client,
             `INSERT INTO public."SilhouetteProfile" ("id", "user_id", "updated_at")
-             VALUES ($1, $2, NOW())
-             RETURNING "id"`,
+             VALUES ($1, $2, NOW())`,
             [`owner-silhouette-${randomUUID()}`, seeded.teenId]
           )
-          expect(reinsertedSilhouette.rows).toHaveLength(1)
         }
       )
     }

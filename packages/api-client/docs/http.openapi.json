@@ -6954,7 +6954,9 @@
             "type": "string",
             "enum": [
               "CONFIRM_BASEWEAR_GUIDANCE_REQUIRED",
-              "IDEMPOTENCY_KEY_REUSED"
+              "IDEMPOTENCY_KEY_REUSED",
+              "UPLOAD_SESSION_EXPIRED",
+              "UPLOAD_BYTES_PRESENT"
             ]
           },
           "error": {
@@ -20525,6 +20527,135 @@
         ],
         "additionalProperties": false
       },
+      "UploadCommitUnsupportedMediaTypeError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              415
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "UNSUPPORTED_IMAGE_TYPE"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Unsupported Media Type"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "UploadCommitUnprocessableError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              422
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "IMAGE_SIZE_MISMATCH",
+              "IMAGE_CHECKSUM_MISMATCH",
+              "IMAGE_DIMENSIONS_INVALID",
+              "IMAGE_NOT_PORTRAIT_FRAMED",
+              "IMAGE_DECODE_FAILED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Unprocessable Entity"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SilhouetteCommitConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "CONFIRM_BASEWEAR_GUIDANCE_REQUIRED",
+              "IDEMPOTENCY_KEY_REUSED",
+              "UPLOAD_ALREADY_CLAIMED",
+              "UPLOAD_BYTES_MISSING",
+              "UPLOAD_SESSION_EXPIRED",
+              "UPLOAD_IN_PROGRESS"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "UploadCommitConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "IDEMPOTENCY_KEY_REUSED",
+              "UPLOAD_ALREADY_CLAIMED",
+              "UPLOAD_BYTES_MISSING",
+              "UPLOAD_SESSION_EXPIRED",
+              "UPLOAD_IN_PROGRESS"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
       "CommunityRolloutDeniedError": {
         "type": "object",
         "properties": {
@@ -22740,11 +22871,31 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused, session expired, or upload claimed.",
+            "description": "Idempotency key reused, session expired, upload claimed, no uploaded bytes yet (UPLOAD_BYTES_MISSING), or another commit of the session is publishing it (UPLOAD_IN_PROGRESS).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The uploaded bytes are not the declared image type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnsupportedMediaTypeError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The uploaded bytes do not match the declared size, checksum or dimensions, or do not decode.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnprocessableError"
                 }
               }
             }
@@ -23034,133 +23185,7 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused or upload session expired.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConflictHttpError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/wardrobe/uploads/{uploadSessionId}": {
-      "put": {
-        "tags": [
-          "wardrobe"
-        ],
-        "summary": "Upload binary image bytes for a pending upload session",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Opaque upload session ID."
-            },
-            "required": true,
-            "description": "Opaque upload session ID.",
-            "name": "uploadSessionId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "x-upload-token",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "image/jpeg",
-                "image/png",
-                "image/webp"
-              ]
-            },
-            "required": true,
-            "name": "content-type",
-            "in": "header"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "image/jpeg": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/png": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Bytes uploaded and verified successfully."
-          },
-          "400": {
-            "description": "Invalid upload body.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequestHttpError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid authentication headers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Guardian consent required or token invalid.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Upload session not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundHttpError"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Upload session expired or token already consumed.",
+            "description": "Idempotency key reused, upload session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT).",
             "content": {
               "application/json": {
                 "schema": {
@@ -24250,127 +24275,11 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused with a different payload.",
+            "description": "Idempotency key reused with a different payload, the session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SilhouetteConflictError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}": {
-      "put": {
-        "tags": [
-          "wardrobe"
-        ],
-        "summary": "Upload My Form photo bytes to a previously allocated session",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Opaque upload session ID."
-            },
-            "required": true,
-            "description": "Opaque upload session ID.",
-            "name": "uploadSessionId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "x-upload-token",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "image/jpeg",
-                "image/png",
-                "image/webp"
-              ]
-            },
-            "required": true,
-            "name": "content-type",
-            "in": "header"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "image/jpeg": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/png": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Bytes accepted."
-          },
-          "400": {
-            "description": "Missing upload token or malformed request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SilhouetteBadRequestError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid authentication headers.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Guardian consent forbidden or upload token mismatch.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SilhouetteForbiddenError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Upload session not found or expired.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SilhouetteNotFoundError"
                 }
               }
             }
@@ -24472,11 +24381,31 @@
             }
           },
           "409": {
-            "description": "Basewear guidance not confirmed, or idempotency key reused.",
+            "description": "Basewear guidance not confirmed, idempotency key reused, upload already claimed, no uploaded bytes yet, or the session expired.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SilhouetteConflictError"
+                  "$ref": "#/components/schemas/SilhouetteCommitConflictError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The uploaded bytes are not the declared image type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnsupportedMediaTypeError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The uploaded bytes do not match the declaration, do not decode, or are not portrait framed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnprocessableError"
                 }
               }
             }
@@ -25719,6 +25648,16 @@
               }
             }
           },
+          "409": {
+            "description": "Idempotency key reused, the session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error occurred",
             "content": {
@@ -25735,133 +25674,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableHttpError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/commerce/premium/palette/selfie/uploads/{uploadSessionId}": {
-      "put": {
-        "tags": [
-          "palette-advisor"
-        ],
-        "summary": "Upload selfie bytes",
-        "description": "Raw bytes for the allocated session. Mirrors the silhouette bytes route and its upload-token, size, and MIME validation.",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "description": "Opaque upload session ID."
-            },
-            "required": true,
-            "description": "Opaque upload session ID.",
-            "name": "uploadSessionId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "x-upload-token",
-            "in": "header"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "enum": [
-                "image/jpeg",
-                "image/png",
-                "image/webp"
-              ]
-            },
-            "required": true,
-            "name": "content-type",
-            "in": "header"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "image/jpeg": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/png": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "type": "string",
-                "format": "binary"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Bytes accepted"
-          },
-          "400": {
-            "description": "Invalid upload body",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BadRequestHttpError"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid authentication headers",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/UnauthorizedHttpError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Invalid or expired upload token",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Unknown upload session",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/NotFoundHttpError"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error occurred",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }
@@ -25959,6 +25771,36 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused, upload already claimed, no uploaded bytes yet, the session expired, or another commit of the session is publishing it (UPLOAD_IN_PROGRESS)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitConflictError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The uploaded bytes are not the declared image type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnsupportedMediaTypeError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The uploaded bytes are not the declared size",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadCommitUnprocessableError"
                 }
               }
             }

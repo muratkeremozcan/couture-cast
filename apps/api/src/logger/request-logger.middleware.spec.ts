@@ -1,5 +1,7 @@
 // Learning path Step 11: API observability with structured logging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-11-api-observability-with-structured-logging
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import express from 'express'
 import request from 'supertest'
 import { Writable } from 'node:stream'
@@ -90,24 +92,23 @@ describe('request-logger middleware', () => {
     expect(logs[1]?.durationMs).toEqual(expect.any(Number))
   })
 
-  it('normalizes upload session identifiers and strips query values from logs', async () => {
+  it('strips query values from logged paths', async () => {
     const stream = new MemoryStream()
     const app = express()
     const env = { LOG_LEVEL: 'info' }
     const logger = createBaseLogger({ destination: stream, env })
 
     app.use(createRequestLoggerMiddleware({ env, logger }))
-    app.put('/api/v1/wardrobe/uploads/:uploadSessionId', (_req, res) => {
-      res.status(204).end()
+    app.get('/api/v1/wardrobe/garments', (_req, res) => {
+      res.status(200).json({ data: [] })
     })
 
-    await request(await serve(app)).put(
-      '/api/v1/wardrobe/uploads/private-session?token=secret'
-    )
+    await request(await serve(app)).get('/api/v1/wardrobe/garments?token=secret')
 
-    for (const log of parseLogs(stream)) {
-      expect(log.path).toBe('/api/v1/wardrobe/uploads/:uploadSessionId')
-      expect(JSON.stringify(log)).not.toContain('private-session')
+    const logs = parseLogs(stream)
+    expect(logs).toHaveLength(2)
+    for (const log of logs) {
+      expect(log.path).toBe('/api/v1/wardrobe/garments')
       expect(JSON.stringify(log)).not.toContain('token=secret')
     }
   })

@@ -33,6 +33,11 @@ import {
   type RegisteredCommonHttpSchemas,
 } from './common'
 import { PREMIUM_REQUIRED_MESSAGE } from './subscription'
+import {
+  uploadCommitConflictErrorSchema,
+  uploadCommitUnprocessableErrorSchema,
+  uploadCommitUnsupportedMediaTypeErrorSchema,
+} from './wardrobe'
 
 // ---------------------------------------------------------------------------
 // Enums, mirroring packages/db/prisma/schema.prisma exactly (Decision 11).
@@ -310,10 +315,6 @@ export const paletteSelfieUploadSessionSchema = z
 
 export const createPaletteSelfieUploadUrlResponseSchema = z.object({
   data: paletteSelfieUploadSessionSchema,
-})
-
-export const paletteSelfieUploadSessionPathParamsSchema = z.object({
-  uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
 })
 
 export const commitPaletteSelfieInputSchema = z
@@ -876,61 +877,17 @@ export function registerPaletteAdvisorContracts(
           'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
         },
       },
+      409: {
+        description:
+          'Idempotency key reused, the session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT)',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
       503: {
         description: `color_analysis_enabled resolved false ("${PALETTE_ANALYSIS_DISABLED_MESSAGE}")`,
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
-        },
-      },
-      ...commonErrorResponses,
-    },
-  })
-
-  registry.registerPath({
-    method: 'put',
-    path: '/api/v1/commerce/premium/palette/selfie/uploads/{uploadSessionId}',
-    tags: ['palette-advisor'],
-    summary: 'Upload selfie bytes',
-    description:
-      'Raw bytes for the allocated session. Mirrors the silhouette bytes route and its upload-token, size, and MIME validation.',
-    // The route mounts `RequestAuthGuard` in addition to the upload token,
-    // exactly as `PUT /api/v1/wardrobe/uploads/{uploadSessionId}` does, so the
-    // bearer requirement is part of the published contract rather than an
-    // undocumented extra.
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: paletteSelfieUploadSessionPathParamsSchema,
-      headers: z.object({
-        'x-upload-token': z.string().min(1),
-        'content-type': z.enum(['image/jpeg', 'image/png', 'image/webp']),
-      }),
-      body: {
-        required: true,
-        content: {
-          'image/jpeg': { schema: z.string().openapi({ format: 'binary' }) },
-          'image/png': { schema: z.string().openapi({ format: 'binary' }) },
-          'image/webp': { schema: z.string().openapi({ format: 'binary' }) },
-        },
-      },
-    },
-    responses: {
-      204: { description: 'Bytes accepted' },
-      400: {
-        description: 'Invalid upload body',
-        content: {
-          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
-        },
-      },
-      403: {
-        description: 'Invalid or expired upload token',
-        content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
-        },
-      },
-      404: {
-        description: 'Unknown upload session',
-        content: {
-          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },
       },
       ...commonErrorResponses,
@@ -979,6 +936,25 @@ export function registerPaletteAdvisorContracts(
         description: 'Unknown upload session',
         content: {
           'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
+        },
+      },
+      409: {
+        description:
+          'Idempotency key reused, upload already claimed, no uploaded bytes yet, the session expired, or another commit of the session is publishing it (UPLOAD_IN_PROGRESS)',
+        content: {
+          'application/json': { schema: uploadCommitConflictErrorSchema },
+        },
+      },
+      415: {
+        description: 'The uploaded bytes are not the declared image type',
+        content: {
+          'application/json': { schema: uploadCommitUnsupportedMediaTypeErrorSchema },
+        },
+      },
+      422: {
+        description: 'The uploaded bytes are not the declared size',
+        content: {
+          'application/json': { schema: uploadCommitUnprocessableErrorSchema },
         },
       },
       503: {

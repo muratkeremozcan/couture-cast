@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { describe, expect, it, vi } from 'vitest'
 import type { z } from 'zod'
 import {
@@ -15,6 +17,9 @@ import {
   suggestGarmentTagsResponseSchema,
   uploadGarmentBytes,
   resolveApiUploadUrl,
+  WARDROBE_UPLOAD_CACHE_CONTROL,
+  uploadCommitConflictErrorSchema,
+  uploadCommitUnprocessableErrorSchema,
 } from '../src/contracts/http'
 
 const VALID_SHA256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
@@ -223,14 +228,9 @@ describe('Wardrobe HTTP Contracts', () => {
           statuses: ['200', '201', '400', '401', '403', '409'],
         },
         {
-          method: 'put',
-          path: '/api/v1/wardrobe/uploads/{uploadSessionId}',
-          statuses: ['204', '400', '401', '403', '404', '409'],
-        },
-        {
           method: 'post',
           path: '/api/v1/wardrobe/garments',
-          statuses: ['200', '201', '400', '401', '403', '404', '409'],
+          statuses: ['200', '201', '400', '401', '403', '404', '409', '415', '422'],
         },
         {
           method: 'post',
@@ -283,15 +283,37 @@ describe('Wardrobe HTTP Contracts', () => {
         expect(Object.keys(operation?.responses ?? {}).sort()).toEqual(route.statuses)
       }
 
-      const uploadRelay = spec.paths?.['/api/v1/wardrobe/uploads/{uploadSessionId}']?.put
-      expect(uploadRelay?.requestBody).toMatchObject({
-        required: true,
-        content: {
-          'image/jpeg': { schema: { type: 'string', format: 'binary' } },
-          'image/png': { schema: { type: 'string', format: 'binary' } },
-          'image/webp': { schema: { type: 'string', format: 'binary' } },
-        },
-      })
+      // Upload bytes go straight to a storage signed URL: a Vercel Function refuses a body over
+      // about 4.5 MB (production follow-up 2026-11-19), so the API documents no byte relay.
+      const relayPaths = Object.keys(spec.paths ?? {}).filter((path) =>
+        /\/uploads\/\{uploadSessionId\}$/.test(path)
+      )
+      expect(relayPaths).toEqual([])
+
+      // Commit is now the only byte check, so every refusal it answers is documented.
+      expect(
+        uploadCommitConflictErrorSchema.parse({
+          statusCode: 409,
+          message: 'UPLOAD_BYTES_MISSING',
+          error: 'Conflict',
+        }).message
+      ).toBe('UPLOAD_BYTES_MISSING')
+      expect(
+        uploadCommitUnprocessableErrorSchema.parse({
+          statusCode: 422,
+          message: 'IMAGE_SIZE_MISMATCH',
+          error: 'Unprocessable Entity',
+        }).message
+      ).toBe('IMAGE_SIZE_MISMATCH')
+      const garmentCommit = spec.paths?.['/api/v1/wardrobe/garments']?.post
+      expect(garmentCommit?.responses?.['415']).toHaveProperty(
+        'content.application/json.schema.$ref',
+        '#/components/schemas/UploadCommitUnsupportedMediaTypeError'
+      )
+      expect(garmentCommit?.responses?.['422']).toHaveProperty(
+        'content.application/json.schema.$ref',
+        '#/components/schemas/UploadCommitUnprocessableError'
+      )
 
       expect(spec.paths?.['/api/v1/wardrobe/garments']?.post?.requestBody).toBeDefined()
       const suggestions =
@@ -361,6 +383,98 @@ describe('Wardrobe HTTP Contracts', () => {
         'https://storage.example.test/object/upload/sign/community/a.jpg?token=t'
       expect(resolveApiUploadUrl(signed, '')).toBe(signed)
       expect(resolveApiUploadUrl('not a url', '')).toBe('not a url')
+    })
+
+    /**
+     * Review round 1, 2026-11-19: wardrobe uploads PUT straight to storage, so the client sends
+     * the cache policy the removed server upload set, and a retry after a lost answer finds
+     * storage's "already exists" (no upsert) and goes on to commit, which verifies the sha256.
+     */
+    it('sends cache-control only when asked', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }))
+      const base = {
+        uploadUrl:
+          'https://storage.example.test/object/upload/sign/w/staging/s.jpg?token=t',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/jpeg' as const,
+        body: new Blob(['x'], { type: 'image/jpeg' }),
+        fetchFn,
+      }
+      await uploadGarmentBytes({ ...base, cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL })
+      await uploadGarmentBytes(base)
+
+      const headersOf = (call: number) =>
+        fetchFn.mock.calls[call]?.[1]?.headers as Record<string, string>
+      expect(headersOf(0)['Cache-Control']).toBe('private, max-age=0')
+      expect(headersOf(1)).not.toHaveProperty('Cache-Control')
+    })
+
+    it.each([
+      ['a 409', new Response(null, { status: 409 })],
+      [
+        'a 400 naming 409',
+        new Response(JSON.stringify({ statusCode: '409', error: 'Duplicate' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ],
+    ])(
+      'treats %s from storage as uploaded when the caller accepts it',
+      async (_, answer) => {
+        const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(answer)
+        await expect(
+          uploadGarmentBytes({
+            uploadUrl:
+              'https://storage.example.test/object/upload/sign/w/staging/s.jpg?token=t',
+            uploadToken: 'upload-token',
+            bearerToken: 'access-token',
+            mimeType: 'image/jpeg',
+            body: new Blob(['x'], { type: 'image/jpeg' }),
+            fetchFn,
+            acceptExistingObject: true,
+          })
+        ).resolves.toBeUndefined()
+      }
+    )
+
+    it('still fails a duplicate the caller did not accept, and any other 400', async () => {
+      const duplicate = () =>
+        new Response(JSON.stringify({ statusCode: '409', error: 'Duplicate' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+      const options = {
+        uploadUrl:
+          'https://storage.example.test/object/upload/sign/w/staging/s.jpg?token=t',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/jpeg' as const,
+        body: new Blob(['x'], { type: 'image/jpeg' }),
+      }
+      await expect(
+        uploadGarmentBytes({
+          ...options,
+          fetchFn: vi.fn<typeof fetch>().mockResolvedValue(duplicate()),
+        })
+      ).rejects.toThrow('Upload failed with HTTP 400')
+      await expect(
+        uploadGarmentBytes({
+          ...options,
+          acceptExistingObject: true,
+          fetchFn: vi.fn<typeof fetch>().mockResolvedValue(
+            new Response(
+              JSON.stringify({ statusCode: '413', error: 'Payload too large' }),
+              {
+                status: 400,
+                headers: { 'content-type': 'application/json' },
+              }
+            )
+          ),
+        })
+      ).rejects.toThrow('Upload failed with HTTP 400')
     })
 
     it('reports completion once for Blob upload bodies', async () => {

@@ -1,16 +1,17 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/unbound-method */
-import { PayloadTooLargeException, type ExecutionContext } from '@nestjs/common'
+import type { ExecutionContext } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import request from 'supertest'
 import { describe, expect, it, vi } from 'vitest'
 import { listenHttpApp } from '../../testing/loopback-http-app.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeUploadGuard } from './wardrobe.guard.js'
-import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validation.js'
 import { WardrobeSilhouetteController } from './wardrobe-silhouette.controller.js'
 import { WardrobeSilhouetteService } from './wardrobe-silhouette.service.js'
 
@@ -33,7 +34,7 @@ describe('WardrobeSilhouetteController', () => {
     data: {
       uploadSessionId: 'session-1',
       uploadUrl:
-        'http://localhost:3001/api/v1/wardrobe/silhouette/my-form/uploads/session-1',
+        'https://storage.test/storage/v1/object/upload/sign/wardrobe-images/user-1/silhouette/session-1.png?token=signed',
       uploadToken: 'token',
       requiredHeaders: { 'content-type': 'image/png' as const },
       expiresAt: '2026-08-09T10:15:00.000Z',
@@ -52,7 +53,6 @@ describe('WardrobeSilhouetteController', () => {
       createMyFormUploadUrl: vi
         .fn()
         .mockResolvedValue({ replayed: false, response: uploadUrlResponse }),
-      uploadMyFormBytes: vi.fn().mockResolvedValue(undefined),
       commitMyForm: vi
         .fn()
         .mockResolvedValue({ replayed: false, response: profileResponse }),
@@ -215,157 +215,41 @@ describe('WardrobeSilhouetteController', () => {
     })
   })
 
-  describe('4.4-UNIT-CTRL-07 uploadMyFormBytes', () => {
-    it('rejects a missing upload token before reaching the service', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const request = { body: Buffer.from('bytes') } as unknown as Request
-
-      await expect(
-        controller.uploadMyFormBytes(auth, 'session-1', '', 'image/png', '5', request)
-      ).rejects.toThrow('Missing upload token header')
-      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
-    })
-
-    it('rejects an unsupported mime type before reaching the service', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const request = { body: Buffer.from('bytes') } as unknown as Request
-
-      await expect(
-        controller.uploadMyFormBytes(
-          auth,
-          'session-1',
-          'token',
-          'application/pdf',
-          '5',
-          request
-        )
-      ).rejects.toThrow()
-      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
-    })
-
-    it('forwards the declared length and body to the service', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const body = Buffer.from('silhouette-bytes')
-      const req = { body } as unknown as Request
-
-      await controller.uploadMyFormBytes(
-        auth,
-        'session-1',
-        'token',
-        'image/png',
-        String(body.length),
-        req
-      )
-
-      expect(service.uploadMyFormBytes).toHaveBeenCalledWith(
-        'session-1',
-        'token',
-        'user-1',
-        'teen',
-        'image/png',
-        body.length,
-        body
-      )
-    })
-
+  describe('4.4-UNIT-CTRL-07 My Form bytes go straight to storage', () => {
     /**
-     * `req.body` is only a Buffer when the raw-body parser matched. Anything else
-     * must arrive as empty bytes so the declared-length check rejects it, rather
-     * than as a value the image verifier would choke on.
+     * The byte relay through this API is gone: a Vercel Function refuses a body over about
+     * 4.5 MB, so clients PUT to the storage signed URL from upload-url instead.
      */
-    it('substitutes empty bytes when the raw body is not a Buffer', async () => {
+    it('serves no PUT route for My Form bytes', async () => {
       const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const req = { body: { parsed: 'json' } } as unknown as Request
+      const moduleFixture: TestingModule = await Test.createTestingModule({
+        controllers: [WardrobeSilhouetteController],
+        providers: [{ provide: WardrobeSilhouetteService, useValue: service }],
+      })
+        .overrideGuard(RequestAuthGuard)
+        .useValue({
+          canActivate: (context: ExecutionContext) => {
+            context.switchToHttp().getRequest<{ auth: RequestAuthContext }>().auth = auth
+            return true
+          },
+        })
+        .overrideGuard(WardrobeUploadGuard)
+        .useValue({ canActivate: () => true })
+        .compile()
+      const app = moduleFixture.createNestApplication()
 
-      await controller.uploadMyFormBytes(
-        auth,
-        'session-1',
-        'token',
-        'image/jpeg',
-        '0',
-        req
-      )
+      try {
+        const baseUrl = await listenHttpApp(app)
+        const response = await request(baseUrl)
+          .put('/api/v1/wardrobe/silhouette/my-form/uploads/session-1')
+          .set('Content-Type', 'image/png')
+          .set('X-Upload-Token', 'token')
+          .send(Buffer.from('silhouette-bytes'))
 
-      const forwarded = (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock
-        .calls[0]?.[6] as unknown
-      expect(Buffer.isBuffer(forwarded)).toBe(true)
-      expect(forwarded).toHaveLength(0)
-    })
-
-    it('forwards an absent content-length header as undefined', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const req = { body: Buffer.alloc(4) } as unknown as Request
-
-      await controller.uploadMyFormBytes(
-        auth,
-        'session-1',
-        'token',
-        'image/webp',
-        undefined,
-        req
-      )
-
-      expect(
-        (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]
-      ).toBeUndefined()
-    })
-
-    /**
-     * A non-numeric Content-Length parses to NaN. Forwarding NaN would make the
-     * service's declared-length comparison pass by accident.
-     */
-    it('drops an unparseable content-length rather than forwarding NaN', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const req = { body: Buffer.alloc(4) } as unknown as Request
-
-      await controller.uploadMyFormBytes(
-        auth,
-        'session-1',
-        'token',
-        'image/png',
-        'not-a-number',
-        req
-      )
-
-      expect(
-        (service.uploadMyFormBytes as ReturnType<typeof vi.fn>).mock.calls[0]?.[5]
-      ).toBeUndefined()
-    })
-
-    /** The ceiling is enforced before any bytes are read or stored. */
-    it('rejects a declared length above the photo ceiling', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const req = { body: Buffer.alloc(4) } as unknown as Request
-
-      await expect(
-        controller.uploadMyFormBytes(
-          auth,
-          'session-1',
-          'token',
-          'image/png',
-          String(MAX_SILHOUETTE_PHOTO_BYTES + 1),
-          req
-        )
-      ).rejects.toThrow(PayloadTooLargeException)
-      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
-    })
-
-    it('rejects an empty upload session path segment', async () => {
-      const service = createMockService()
-      const controller = new WardrobeSilhouetteController(service)
-      const req = { body: Buffer.alloc(4) } as unknown as Request
-
-      await expect(
-        controller.uploadMyFormBytes(auth, '', 'token', 'image/png', '4', req)
-      ).rejects.toThrow()
-      expect(service.uploadMyFormBytes).not.toHaveBeenCalled()
+        expect(response.status).toBe(404)
+      } finally {
+        await app.close()
+      }
     })
   })
 

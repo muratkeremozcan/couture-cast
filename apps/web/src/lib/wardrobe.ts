@@ -2,6 +2,7 @@
 
 import {
   uploadGarmentBytes,
+  WARDROBE_UPLOAD_CACHE_CONTROL,
   garmentListResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
@@ -24,10 +25,18 @@ import {
   type UpdateWardrobeOnboardingStateInput,
   type SilhouetteProfileContract,
   type UpdateSilhouetteSlidersInput,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient, resolveWebApiBaseUrl } from './api-client'
 import { readStorage } from './browser-persistence'
+import {
+  createUploadAttempts,
+  preparedImageFingerprint,
+  resolveUploadBearer,
+  runTrackedUpload,
+  throwUploadStepError,
+} from './upload-attempts'
 
 export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
 
@@ -40,6 +49,12 @@ export type GarmentUploadState =
 
 export interface UploadGarmentImageInput {
   imagePreview: string
+  /**
+   * The session captured when the member opened the camera or file picker that produced
+   * `imagePreview` (`currentUploadSession`). The upload resolves its bearer for that account
+   * and refuses once the signed-in account changed.
+   */
+  uploadSession: UploadAttemptSession
   aspectRatio: '1:1' | '4:3'
   useBgCleanup: boolean
   signal?: AbortSignal
@@ -65,10 +80,37 @@ export class WardrobeRequestError extends Error {
   }
 }
 
+type GarmentUploadAllocation = {
+  garmentId: string
+  uploadSessionId: string
+  uploadUrl: string
+  uploadToken: string
+}
+
+type PhotoUploadAllocation = {
+  uploadSessionId: string
+  uploadUrl: string
+  uploadToken: string
+}
+
+/**
+ * Open garment and My Form upload attempts, kept across the member's retries in this tab and
+ * scoped to the signed-in account; see `runTrackedUpload`. Each attempt gets fresh keys.
+ */
+const garmentUploadAttempts = createUploadAttempts<GarmentUploadAllocation>(() =>
+  generateIdempotencyKey()
+)
+const myFormUploadAttempts = createUploadAttempts<PhotoUploadAllocation>(() =>
+  generateIdempotencyKey()
+)
+
 function readAccessToken(): string {
   const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
   if (!token) {
-    throw new Error('Your session expired. Sign in again before adding a garment.')
+    throw new WardrobeRequestError(
+      'Your session expired. Sign in again before adding a garment.',
+      'SIGNED_OUT'
+    )
   }
   return token
 }
@@ -106,12 +148,61 @@ function loadImage(source: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image()
     image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('The selected image could not be decoded.'))
+    image.onerror = () =>
+      reject(
+        new WardrobeRequestError(
+          'The selected image could not be decoded.',
+          'IMAGE_UNREADABLE'
+        )
+      )
     image.src = source
   })
 }
 
-function toBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
+/** Quality for the lossy encodings below: no visible loss at garment-card sizes. */
+const PREPARED_IMAGE_QUALITY = 0.9
+
+/**
+ * The format a prepared upload is encoded in. JPEG wherever nothing is transparent: a 12 MP
+ * phone photo prepared as PNG came to 5 MB or more. WebP when background cleanup has cut the
+ * garment out, because JPEG has no alpha. A browser that cannot encode WebP hands back PNG,
+ * which the upload contract also accepts.
+ */
+export function preparedImageEncoding(useBgCleanup: boolean): {
+  mimeType: 'image/jpeg' | 'image/webp'
+  quality: number
+} {
+  return {
+    mimeType: useBgCleanup ? 'image/webp' : 'image/jpeg',
+    quality: PREPARED_IMAGE_QUALITY,
+  }
+}
+
+/**
+ * How `prepareGarmentImage` encodes. `compact` is `preparedImageEncoding`, for uploads whose
+ * commit verifies the bytes (garments, My Form, selfies). `source` keeps the picked file's own
+ * format at quality 0.92, as before the 2026-11-19 change: community posts keep a PNG as PNG,
+ * transparency included, because the community pipeline re-encodes them itself.
+ */
+export type PreparedImageEncodingChoice = 'compact' | 'source'
+
+/** The format and quality `prepareGarmentImage` asks the canvas for. */
+async function resolveEncoding(
+  imagePreview: string,
+  useBgCleanup: boolean,
+  choice: PreparedImageEncodingChoice
+): Promise<{ mimeType: string; quality: number }> {
+  if (choice === 'compact') return preparedImageEncoding(useBgCleanup)
+  if (useBgCleanup) return { mimeType: 'image/png', quality: 0.92 }
+  const sourceBlob = await fetch(imagePreview).then((response) => response.blob())
+  return { mimeType: sourceBlob.type, quality: 0.92 }
+}
+
+function toBlob(
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality: number
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => {
@@ -119,10 +210,15 @@ function toBlob(canvas: HTMLCanvasElement, mimeType: string): Promise<Blob> {
           resolve(blob)
           return
         }
-        reject(new Error('The selected image could not be prepared.'))
+        reject(
+          new WardrobeRequestError(
+            'The selected image could not be prepared.',
+            'IMAGE_UNREADABLE'
+          )
+        )
       },
       mimeType,
-      0.92
+      quality
     )
   })
 }
@@ -167,8 +263,9 @@ function removeCornerMatchedBackground(context: CanvasRenderingContext2D): void 
  * Exported because `palette-advisor.ts` uploads a selfie through the same
  * allocate -> PUT bytes -> commit lifecycle and needs the identical
  * client-side preparation: centre crop to a fixed aspect, cap the long edge at
- * 2048px, reject anything under the server's 256px floor, and compute the
- * SHA-256 the allocate call declares. A second copy would be the third
+ * 2048px, reject anything under the server's 256px floor, encode as
+ * `preparedImageEncoding` says, and compute the SHA-256 the allocate call
+ * declares. A second copy would be the third
  * canvas-crop implementation in this app and would drift from the server's
  * `verifyGarmentImage` checks the moment either side moved.
  *
@@ -178,11 +275,12 @@ function removeCornerMatchedBackground(context: CanvasRenderingContext2D): void 
 export async function prepareGarmentImage(
   imagePreview: string,
   aspectRatio: '1:1' | '4:3',
-  useBgCleanup: boolean
+  useBgCleanup: boolean,
+  encodingChoice: PreparedImageEncodingChoice
 ): Promise<PreparedImage> {
-  const [image, sourceBlob] = await Promise.all([
+  const [image, encoding] = await Promise.all([
     loadImage(imagePreview),
-    fetch(imagePreview).then((response) => response.blob()),
+    resolveEncoding(imagePreview, useBgCleanup, encodingChoice),
   ])
   const sourceWidth = image.naturalWidth
   const sourceHeight = image.naturalHeight
@@ -194,7 +292,10 @@ export async function prepareGarmentImage(
   const outputWidth = Math.round(cropWidth * scale)
   const outputHeight = Math.round(cropHeight * scale)
   if (outputWidth < 256 || outputHeight < 256) {
-    throw new Error('Choose an image at least 256 pixels wide and tall.')
+    throw new WardrobeRequestError(
+      'Choose an image at least 256 pixels wide and tall.',
+      'IMAGE_TOO_SMALL'
+    )
   }
 
   const canvas = document.createElement('canvas')
@@ -202,7 +303,15 @@ export async function prepareGarmentImage(
   canvas.height = outputHeight
   const context = canvas.getContext('2d', { willReadFrequently: useBgCleanup })
   if (!context) {
-    throw new Error('Image preparation is unavailable in this browser.')
+    throw new WardrobeRequestError(
+      'Image preparation is unavailable in this browser.',
+      'IMAGE_PREPARATION_UNAVAILABLE'
+    )
+  }
+  if (encodingChoice === 'compact' && encoding.mimeType === 'image/jpeg') {
+    // JPEG has no alpha: a transparent source would otherwise come out black.
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, outputWidth, outputHeight)
   }
   context.drawImage(
     image,
@@ -219,13 +328,18 @@ export async function prepareGarmentImage(
     removeCornerMatchedBackground(context)
   }
 
-  const requestedMimeType = useBgCleanup ? 'image/png' : sourceBlob.type
-  const blob = await toBlob(canvas, requestedMimeType)
+  const blob = await toBlob(canvas, encoding.mimeType, encoding.quality)
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) {
-    throw new Error('The prepared image format is unsupported.')
+    throw new WardrobeRequestError(
+      'The prepared image format is unsupported.',
+      'IMAGE_PREPARATION_UNAVAILABLE'
+    )
   }
   if (blob.size > 10 * 1024 * 1024) {
-    throw new Error('The prepared image exceeds the 10 MiB limit.')
+    throw new WardrobeRequestError(
+      'The prepared image exceeds the 10 MiB limit.',
+      'IMAGE_TOO_LARGE'
+    )
   }
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
   const sha256 = Array.from(new Uint8Array(digest), (byte) =>
@@ -287,7 +401,12 @@ async function withRequestTimeout<T>(
   try {
     return await request(controller.signal)
   } catch (error) {
-    if (timedOut) throw new Error('Wardrobe request timed out. Please try again.')
+    if (timedOut) {
+      throw new WardrobeRequestError(
+        'Wardrobe request timed out. Please try again.',
+        'REQUEST_TIMEOUT'
+      )
+    }
     throw error
   } finally {
     clearTimeout(timeout)
@@ -309,71 +428,104 @@ export async function uploadGarmentImageFromWeb({
   signal,
   onStateChange,
   onProgress,
+  uploadSession,
 }: UploadGarmentImageInput): Promise<GarmentItemContract> {
-  const accessToken = readAccessToken()
+  // The bearer of the account the photo was picked under; an account change from the pick on
+  // refuses here, and while the image is prepared or uploaded it fences this run.
+  const accessToken = await resolveUploadBearer(uploadSession, readAccessToken)
   onStateChange?.('preparing')
   onProgress?.(10)
-  const image = await prepareGarmentImage(imagePreview, aspectRatio, useBgCleanup)
+  const image = await prepareGarmentImage(
+    imagePreview,
+    aspectRatio,
+    useBgCleanup,
+    'compact'
+  )
 
-  onStateChange?.('requesting_upload')
-  onProgress?.(25)
   const api = createWebApiClient({ accessToken })
-  let allocation
-  try {
-    allocation = (
-      await api.apiV1WardrobeUploadUrlPost(
-        {
-          idempotencyKey: crypto.randomUUID(),
-          createGarmentUploadUrlInput: {
-            fileSizeBytes: image.blob.size,
-            mimeType: image.mimeType,
-            sha256: image.sha256,
-            widthPx: image.widthPx,
-            heightPx: image.heightPx,
-          },
-        },
-        { signal }
-      )
-    ).data
-  } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to allocate garment upload.')
-  }
-
-  onStateChange?.('uploading')
-  onProgress?.(35)
-  await uploadGarmentBytes({
-    uploadUrl: allocation.uploadUrl,
-    apiBaseUrl: resolveWebApiBaseUrl(),
-    uploadToken: allocation.uploadToken,
-    bearerToken: accessToken,
+  // A retry of the same prepared image (the member taps Use This Image again after a failure)
+  // is the same attempt: same garment session, same commit key.
+  const attemptId = `${preparedImageFingerprint({
+    sha256: image.sha256,
+    fileSizeBytes: image.blob.size,
     mimeType: image.mimeType,
-    body: image.blob,
-    signal,
-    timeoutMs: 30_000,
-    onProgress: () => onProgress?.(80),
-  })
-
-  onStateChange?.('verifying')
-  onProgress?.(90)
-  let garment
-  try {
-    garment = (
-      await api.apiV1WardrobeGarmentsPost(
-        {
-          idempotencyKey: crypto.randomUUID(),
-          createGarmentItemInput: {
-            garmentId: allocation.garmentId,
-            uploadSessionId: allocation.uploadSessionId,
-            hasCropping: true,
-            hasBgCleanup: useBgCleanup,
-          },
-        },
-        { signal }
-      )
-    ).data
-  } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to commit garment upload.')
-  }
+    widthPx: image.widthPx,
+    heightPx: image.heightPx,
+  })}:${useBgCleanup ? 'cleanup' : 'original'}`
+  const garment = await runTrackedUpload(
+    garmentUploadAttempts,
+    uploadSession,
+    attemptId,
+    {
+      allocate: async (idempotencyKey) => {
+        onStateChange?.('requesting_upload')
+        onProgress?.(25)
+        try {
+          return (
+            await api.apiV1WardrobeUploadUrlPost(
+              {
+                idempotencyKey,
+                createGarmentUploadUrlInput: {
+                  fileSizeBytes: image.blob.size,
+                  mimeType: image.mimeType,
+                  sha256: image.sha256,
+                  widthPx: image.widthPx,
+                  heightPx: image.heightPx,
+                },
+              },
+              { signal }
+            )
+          ).data
+        } catch (error) {
+          return throwUploadStepError(error, (raw) =>
+            actionableWardrobeError(raw, 'Unable to allocate garment upload.')
+          )
+        }
+      },
+      upload: async (allocation) => {
+        onStateChange?.('uploading')
+        onProgress?.(35)
+        await uploadGarmentBytes({
+          cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
+          // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
+          acceptExistingObject: true,
+          uploadUrl: allocation.uploadUrl,
+          apiBaseUrl: resolveWebApiBaseUrl(),
+          uploadToken: allocation.uploadToken,
+          bearerToken: accessToken,
+          mimeType: image.mimeType,
+          body: image.blob,
+          signal,
+          timeoutMs: 30_000,
+          onProgress: () => onProgress?.(80),
+        })
+      },
+      commit: async (allocation, idempotencyKey) => {
+        onStateChange?.('verifying')
+        onProgress?.(90)
+        try {
+          return (
+            await api.apiV1WardrobeGarmentsPost(
+              {
+                idempotencyKey,
+                createGarmentItemInput: {
+                  garmentId: allocation.garmentId,
+                  uploadSessionId: allocation.uploadSessionId,
+                  hasCropping: true,
+                  hasBgCleanup: useBgCleanup,
+                },
+              },
+              { signal }
+            )
+          ).data
+        } catch (error) {
+          return throwUploadStepError(error, (raw) =>
+            actionableWardrobeError(raw, 'Unable to commit garment upload.')
+          )
+        }
+      },
+    }
+  )
   onStateChange?.('processing')
   onProgress?.(100)
   return garment
@@ -679,11 +831,19 @@ export async function updateSilhouetteSlidersFromWeb(
   }
 }
 
+/**
+ * With `uploadSession` (the account the shown profile was read under), the bearer is resolved
+ * for that account and the call refuses with `UploadSessionChangedError` once another account is
+ * signed in, so one account's photo is never removed with the next account's revision or token.
+ */
 export async function deleteMyFormPhotoFromWeb(
   ifMatch: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  uploadSession?: UploadAttemptSession
 ): Promise<SilhouetteProfileContract> {
-  const accessToken = readAccessToken()
+  const accessToken = uploadSession
+    ? await resolveUploadBearer(uploadSession, readAccessToken)
+    : readAccessToken()
   try {
     const response = await createWebApiClient({
       accessToken,
@@ -697,14 +857,6 @@ export async function deleteMyFormPhotoFromWeb(
 export interface UploadMyFormPhotoInput {
   imagePreview: string
   /**
-   * Reused for every request this one upload attempt makes (allocate, then
-   * commit) and across any retry of the same attempt. Minting a fresh key per
-   * call is the exact bug Story 4.3's review found in
-   * `capsule-builder-modal.tsx`: a retry after a timeout would allocate (and
-   * bill) a second upload session instead of safely replaying the first.
-   */
-  idempotencyKey: string
-  /**
    * The literal `true` the server's commit contract requires. Required here
    * (not defaulted) so the safety confirmation decision 8 of the story
    * describes is actually plumbed through from whatever UI checkbox state
@@ -712,6 +864,12 @@ export interface UploadMyFormPhotoInput {
    * confirmation on every caller's behalf.
    */
   confirmsBasewearGuidance: true
+  /**
+   * The session captured when the member opened the file picker that produced `imagePreview`
+   * (`currentUploadSession`); the confirmation above belongs to it as well. The upload resolves
+   * its bearer for that account and refuses once the signed-in account changed.
+   */
+  uploadSession: UploadAttemptSession
   signal?: AbortSignal
   onStateChange?: (state: GarmentUploadState) => void
   onProgress?: (percentage: number) => void
@@ -748,78 +906,103 @@ export function generateIdempotencyKey(): string {
  */
 export async function uploadMyFormPhotoFromWeb({
   imagePreview,
-  idempotencyKey,
   confirmsBasewearGuidance,
   signal,
   onStateChange,
   onProgress,
+  uploadSession,
 }: UploadMyFormPhotoInput): Promise<SilhouetteProfileContract> {
-  const accessToken = readAccessToken()
+  const accessToken = await resolveUploadBearer(uploadSession, readAccessToken)
   onStateChange?.('preparing')
   onProgress?.(10)
-  const image = await prepareGarmentImage(imagePreview, '4:3', false)
+  const image = await prepareGarmentImage(imagePreview, '4:3', false, 'compact')
 
-  onStateChange?.('requesting_upload')
-  onProgress?.(25)
   const api = createWebApiClient({ accessToken })
-  let allocation
-  try {
-    allocation = createSilhouetteUploadUrlResponseSchema.parse(
-      await api.apiV1WardrobeSilhouetteMyFormUploadUrlPost(
-        {
-          idempotencyKey,
-          createSilhouetteUploadUrlInput: {
-            fileSizeBytes: image.blob.size,
-            mimeType: image.mimeType,
-            sha256: image.sha256,
-            widthPx: image.widthPx,
-            heightPx: image.heightPx,
-          },
-        },
-        { signal }
-      )
-    ).data
-  } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to allocate My Form upload.')
-  }
-
-  onStateChange?.('uploading')
-  onProgress?.(35)
-  try {
-    await uploadGarmentBytes({
-      uploadUrl: allocation.uploadUrl,
-      apiBaseUrl: resolveWebApiBaseUrl(),
-      uploadToken: allocation.uploadToken,
-      bearerToken: accessToken,
-      mimeType: image.mimeType,
-      body: image.blob,
-      signal,
-      timeoutMs: 30_000,
-      onProgress: () => onProgress?.(80),
-    })
-  } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to upload the photo. Try again.')
-  }
-
-  onStateChange?.('verifying')
-  onProgress?.(90)
-  let profile
-  try {
-    profile = silhouetteProfileResponseSchema.parse(
-      await api.apiV1WardrobeSilhouetteMyFormCommitPost(
-        {
-          idempotencyKey,
-          commitSilhouettePhotoInput: {
-            uploadSessionId: allocation.uploadSessionId,
-            confirmsBasewearGuidance,
-          },
-        },
-        { signal }
-      )
-    ).data
-  } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to commit My Form upload.')
-  }
+  // The prepared bytes name the attempt, so Retry (or picking the same photo again) resumes it
+  // with its keys while its outcome is ambiguous: commit first, re-send the bytes only when the
+  // server reports them missing. Once the server ends the attempt (expired, rejected), it is
+  // forgotten and the next Retry starts over with fresh keys.
+  const attemptId = preparedImageFingerprint({
+    sha256: image.sha256,
+    fileSizeBytes: image.blob.size,
+    mimeType: image.mimeType,
+    widthPx: image.widthPx,
+    heightPx: image.heightPx,
+  })
+  const profile = await runTrackedUpload(myFormUploadAttempts, uploadSession, attemptId, {
+    allocate: async (allocateKey) => {
+      onStateChange?.('requesting_upload')
+      onProgress?.(25)
+      try {
+        return createSilhouetteUploadUrlResponseSchema.parse(
+          await api.apiV1WardrobeSilhouetteMyFormUploadUrlPost(
+            {
+              idempotencyKey: allocateKey,
+              createSilhouetteUploadUrlInput: {
+                fileSizeBytes: image.blob.size,
+                mimeType: image.mimeType,
+                sha256: image.sha256,
+                widthPx: image.widthPx,
+                heightPx: image.heightPx,
+              },
+            },
+            { signal }
+          )
+        ).data
+      } catch (error) {
+        return throwUploadStepError(error, (raw) =>
+          actionableWardrobeError(raw, 'Unable to allocate My Form upload.')
+        )
+      }
+    },
+    upload: async (allocation) => {
+      onStateChange?.('uploading')
+      onProgress?.(35)
+      try {
+        await uploadGarmentBytes({
+          cacheControl: WARDROBE_UPLOAD_CACHE_CONTROL,
+          // Commit verifies the stored bytes' sha256, so an object a lost answer left is safe.
+          acceptExistingObject: true,
+          uploadUrl: allocation.uploadUrl,
+          apiBaseUrl: resolveWebApiBaseUrl(),
+          uploadToken: allocation.uploadToken,
+          bearerToken: accessToken,
+          mimeType: image.mimeType,
+          body: image.blob,
+          signal,
+          timeoutMs: 30_000,
+          onProgress: () => onProgress?.(80),
+        })
+      } catch (error) {
+        throw await actionableWardrobeError(
+          error,
+          'Unable to upload the photo. Try again.'
+        )
+      }
+    },
+    commit: async (allocation, commitKey) => {
+      onStateChange?.('verifying')
+      onProgress?.(90)
+      try {
+        return silhouetteProfileResponseSchema.parse(
+          await api.apiV1WardrobeSilhouetteMyFormCommitPost(
+            {
+              idempotencyKey: commitKey,
+              commitSilhouettePhotoInput: {
+                uploadSessionId: allocation.uploadSessionId,
+                confirmsBasewearGuidance,
+              },
+            },
+            { signal }
+          )
+        ).data
+      } catch (error) {
+        return throwUploadStepError(error, (raw) =>
+          actionableWardrobeError(raw, 'Unable to commit My Form upload.')
+        )
+      }
+    },
+  })
   onStateChange?.('processing')
   onProgress?.(100)
   return profile

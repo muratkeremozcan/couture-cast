@@ -13,8 +13,13 @@
 // real GoTrue (scripts/e2e-real-session/run.mjs) and opens /settings the ways a member does.
 import type { Page, Request } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
+import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures'
 import { sentinelPlace } from '../../scripts/lib/weather-provider-double-data.mjs'
 import { expect, test } from '../support/fixtures/merged-fixtures'
+import {
+  classifyGuardedErrors,
+  guardExpectedError,
+} from '../support/helpers/expected-error-guard'
 import {
   createRealCommunityAuthAccount,
   readGeneratedCommunityCode,
@@ -102,15 +107,60 @@ async function settledAfterSessionEvent(page: Page, listRequests: Request[]) {
 }
 
 /**
- * Opens /settings while holding the session's profile check, and expects the member's Locations:
- *
- * - while verification is pending the section is `checking`: no Sign in hint, no list request;
- * - once it answers, the section is ready with the city search on screen;
- * - from first paint to the end it never showed signed out or the hint;
- * - exactly one list GET was sent for the load, counted from before navigation through the end of
- *   verification and a same-owner `couture:session` event (a cancelled duplicate still counts).
+ * Counts the `couture:session` publications the app itself makes on this document, from now on.
+ * Arm it before releasing a held profile check, so the app's own announcement of the answer is
+ * what the test waits for, not an event the test dispatches.
  */
-async function expectMemberLocations(page: Page, open: () => Promise<unknown>) {
+async function observeSessionPublications(page: Page) {
+  await page.evaluate(() => {
+    const target = window as unknown as { __sessionPublications: number }
+    target.__sessionPublications = 0
+    window.addEventListener('couture:session', () => {
+      target.__sessionPublications += 1
+    })
+  })
+}
+
+const sessionPublications = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { __sessionPublications: number }).__sessionPublications
+  )
+
+/** The bearer and verified principal a tab keeps in session storage (web-session.ts). */
+const BEARER_KEY = 'couturecast.access-token'
+const PRINCIPAL_KEY = 'couturecast.access-principal'
+
+const storedBearer = (page: Page) =>
+  page.evaluate((key) => window.sessionStorage.getItem(key), BEARER_KEY)
+
+const storedKeys = (page: Page) =>
+  page.evaluate(
+    ([bearer, principal]) => [
+      window.sessionStorage.getItem(bearer),
+      window.sessionStorage.getItem(principal),
+    ],
+    [BEARER_KEY, PRINCIPAL_KEY] as const
+  )
+
+/**
+ * Opens /settings while holding the session's profile check, and expects the member's Locations.
+ * What shows while verification is pending depends on what the tab already holds:
+ *
+ * - `checking` (a new tab: no stored bearer): the section waits, with no Sign in hint and no list
+ *   request, and turns ready once verification answers;
+ * - `ready` (a reload of a tab that holds the verified bearer of the same user, Step 58
+ *   follow-up): the tab restores that bearer at once, so the section is ready and its one list
+ *   request goes out with the stored bearer while verification is still held.
+ *
+ * Either way: from first paint to the end it never showed signed out or the hint, and exactly one
+ * list GET was sent for the load, counted from before navigation through the end of verification
+ * and a same-owner `couture:session` event (a cancelled duplicate still counts).
+ */
+async function expectMemberLocations(
+  page: Page,
+  open: () => Promise<unknown>,
+  whileVerifying: 'checking' | 'ready'
+) {
   const listRequests: Request[] = []
   const recordList = (request: Request) => {
     if (
@@ -131,21 +181,40 @@ async function expectMemberLocations(page: Page, open: () => Promise<unknown>) {
   })
   page.on('request', recordList)
   try {
+    // A new tab is still about:blank here and holds nothing; only a reload has a stored bearer.
+    const bearerBefore = whileVerifying === 'ready' ? await storedBearer(page) : null
     await open()
     const section = page.getByTestId('locations-section')
 
     await expect.poll(() => profileChecks.length).toBeGreaterThan(0)
-    await expect(section).toHaveAttribute('data-state', 'checking')
+    await expect(section).toHaveAttribute('data-state', whileVerifying)
     await expect(section.getByTestId('locations-signed-out')).toHaveCount(0)
-    expect(listRequests).toHaveLength(0)
+    if (whileVerifying === 'checking') {
+      expect(listRequests).toHaveLength(0)
+    } else {
+      // The reload kept this tab's verified bearer: the list goes out with it, unverified yet.
+      expect(bearerBefore, 'stored bearer before the reload').not.toBeNull()
+      await expect.poll(() => listRequests.length).toBe(1)
+      expect(listRequests[0]!.headers()['authorization']).toBe(`Bearer ${bearerBefore}`)
+      expect((await listRequests[0]!.response())?.status()).toBe(200)
+    }
 
+    // The app's own announcement of the verified answer is what ends the wait.
+    await observeSessionPublications(page)
     release()
     await expect(section).toHaveAttribute('data-state', 'ready')
     await expect(
       section.getByRole('combobox', { name: 'Search for a city' })
     ).toBeVisible()
-    // Every profile check has answered, not only been let through.
-    await Promise.all(profileChecks.map((request) => request.response()))
+    // Every profile check answered 200, and the app published the verified member.
+    for (const check of profileChecks)
+      expect((await check.response())?.status(), 'profile check').toBe(200)
+    await expect.poll(() => sessionPublications(page)).toBeGreaterThan(0)
+    // Whatever the app did with the answer has reached the screen and the network.
+    await settledAfterSessionEvent(page, listRequests)
+    expect(listRequests, 'list requests after the verified answer').toHaveLength(1)
+    expect(await sectionStates(page)).not.toContain('signed_out')
+    expect(await sectionStates(page)).not.toContain('hint')
 
     // The bridge announces the same member again (a token refresh does): no second list.
     await page.evaluate(() => window.dispatchEvent(new Event('couture:session')))
@@ -173,7 +242,11 @@ test('PL-1: a signed-in member who opens Settings in a new tab manages Locations
   // A new tab starts with empty session storage: the bearer exists only after verification.
   const tab = await page.context().newPage()
   await watchSectionStates(tab)
-  const section = await expectMemberLocations(tab, () => tab.goto('/settings'))
+  const section = await expectMemberLocations(
+    tab,
+    () => tab.goto('/settings'),
+    'checking'
+  )
   await expect(section.getByTestId('locations-empty')).toBeVisible()
 })
 
@@ -191,7 +264,7 @@ test('PL-2: a member saves a city from Settings after a reload, and it is still 
   )
 
   // Jade's path: reload Settings while signed in, then search for a city and save it.
-  const section = await expectMemberLocations(page, () => page.reload())
+  const section = await expectMemberLocations(page, () => page.reload(), 'ready')
   const nonce = randomUUID()
   const place = sentinelPlace(nonce)
   const search = section.getByRole('combobox', { name: 'Search for a city' })
@@ -208,11 +281,116 @@ test('PL-2: a member saves a city from Settings after a reload, and it is still 
   await expect(section.getByTestId('location-item-label')).toHaveText('Home')
   await expect(section.getByTestId('location-primary-badge')).toBeVisible()
 
-  const reloaded = await expectMemberLocations(page, () => page.reload())
+  const reloaded = await expectMemberLocations(page, () => page.reload(), 'ready')
   await expect(reloaded.getByTestId('location-item')).toHaveCount(1)
   await expect(reloaded.getByTestId('location-item-label')).toHaveText('Home')
   await expect(reloaded.getByTestId('location-item-place')).toContainText(place.name)
 })
+
+/**
+ * For PL-2b, whose held profile checks answer 401 by design. The network-error monitor takes URL
+ * patterns only, so it stands aside for the profile URL alone; a companion guard covers that URL
+ * for the whole test on every page and method. It requires a GET 401 Unauthorized for every
+ * profile check the page sent (the test records how many; a reload sends several, one per
+ * consumer of the session) and no other error there. Every other URL stays under the monitor.
+ */
+const PROFILE_URL = /\/api\/v1\/user\/profile(\?|$)/
+const deniedTest = test
+  .extend(createNetworkErrorMonitorFixture({ excludePatterns: [PROFILE_URL] }))
+  .extend<{ profileDenials: { sent: number }; profileDenialGuard: void }>({
+    profileDenials: async ({}, use) => {
+      await use({ sent: 0 })
+    },
+    profileDenialGuard: [
+      async ({ context, profileDenials }, use, testInfo) => {
+        const guard = guardExpectedError(context, PROFILE_URL)
+        await use()
+        if (testInfo.status === 'skipped') return
+        const outcome = classifyGuardedErrors(await guard.settle(), {
+          method: 'GET',
+          status: 401,
+          code: 'Unauthorized',
+        })
+        expect(profileDenials.sent, 'profile checks the page sent').toBeGreaterThan(0)
+        expect(outcome, 'errors on the profile URL').toEqual({
+          allowedCount: profileDenials.sent,
+          unexpected: [],
+        })
+      },
+      { auto: true },
+    ],
+  })
+
+deniedTest(
+  'PL-2b: when verification of a reloaded tab is denied, Locations ends signed out and the stored bearer is gone',
+  async ({ page, apiRequest, profileDenials }) => {
+    const account = await member(apiRequest)
+    await signIn(page, account)
+    await watchSectionStates(page)
+    await page.goto('/settings')
+    const section = page.getByTestId('locations-section')
+    await expect(section).toHaveAttribute('data-state', 'ready')
+    const bearerBefore = await storedBearer(page)
+    expect(bearerBefore, 'stored bearer before the reload').not.toBeNull()
+
+    // The reload keeps the verified bearer while the profile check is held; the API then
+    // refuses the identity (401), as it does for an account that no longer exists.
+    const profileChecks: Request[] = []
+    let deny!: () => void
+    const denied = new Promise<void>((resolve) => {
+      deny = resolve
+    })
+    await page.route(PROFILE_CHECK, async (route) => {
+      profileChecks.push(route.request())
+      await denied
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ statusCode: 401, message: 'Unauthorized' }),
+      })
+    })
+    const listRequests: Request[] = []
+    page.on('request', (request) => {
+      if (
+        LOCATIONS_LIST.test(new URL(request.url()).pathname) &&
+        request.method() === 'GET'
+      )
+        listRequests.push(request)
+    })
+
+    await page.reload()
+    await expect.poll(() => profileChecks.length).toBeGreaterThan(0)
+    await expect(section).toHaveAttribute('data-state', 'ready')
+    await expect.poll(() => listRequests.length).toBe(1)
+    expect(listRequests[0]!.headers()['authorization']).toBe(`Bearer ${bearerBefore}`)
+    // Before the denial the tab still holds both the bearer and the verified principal.
+    expect(
+      await storedKeys(page),
+      'stored bearer and principal before the denial'
+    ).toEqual([bearerBefore, expect.any(String)])
+
+    await observeSessionPublications(page)
+    deny()
+    // The app's own announcement of the denial, then the screen and the storage it left.
+    await expect.poll(() => sessionPublications(page)).toBeGreaterThan(0)
+    await expect(section).toHaveAttribute('data-state', 'signed_out')
+    await expect(section.getByTestId('locations-signed-out')).toBeVisible()
+    for (const check of profileChecks) {
+      const response = await check.response()
+      expect(response?.status(), 'profile check').toBe(401)
+      expect(await response?.json()).toMatchObject({ message: 'Unauthorized' })
+    }
+    await settledAfterSessionEvent(page, listRequests)
+    profileDenials.sent = profileChecks.length
+    expect(
+      await storedKeys(page),
+      'stored bearer and principal after the denial'
+    ).toEqual([null, null])
+    // Nothing listed again after the denial.
+    expect(listRequests).toHaveLength(1)
+    await page.unroute(PROFILE_CHECK)
+  }
+)
 
 test(
   'PL-3: when the session check fails, a signed-in member sees a retry, never Sign in, and one retry lists once',

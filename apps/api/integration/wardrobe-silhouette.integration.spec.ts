@@ -1,6 +1,8 @@
 // Story 4.4 Task 8 step 1 owner: real-PostgreSQL and real-Redis integration coverage in apps/api/integration/wardrobe-silhouette.integration.spec.ts
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import 'reflect-metadata'
 import { createHash, randomUUID } from 'node:crypto'
 import {
@@ -19,9 +21,11 @@ import {
   ForbiddenException,
   HttpException,
   PreconditionFailedException,
+  UnprocessableEntityException,
 } from '@nestjs/common'
 import { Queue, Worker } from 'bullmq'
 import IORedis from 'ioredis'
+import sharp from 'sharp'
 import { queueConfigs } from '../src/config/queues.js'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import {
@@ -34,11 +38,26 @@ import {
   SILHOUETTE_PHOTO_PROCESSING_QUEUE,
   SilhouettePhotoProcessingQueue,
   silhouettePhotoProcessingJobSchema,
+  silhouetteSessionFromJobId,
 } from '../src/modules/wardrobe/silhouette-photo-processing.queue.js'
 import { SilhouettePhotoProcessor } from '../src/modules/wardrobe/silhouette-photo.processor.js'
-import { buildFixtureSilhouettePhoto } from '../src/modules/wardrobe/fixture-silhouette-photo-moderation.engine.js'
-import type { WardrobeStorage } from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
+import {
+  WARDROBE_OBJECT_CACHE_CONTROL,
+  type BoundedDownload,
+  type StagedUploadPage,
+  type WardrobeStorage,
+  type WardrobeUploadSession,
+} from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
+import {
+  STAGED_UPLOAD_RETENTION_MS,
+  WardrobeRetentionService,
+} from '../src/modules/wardrobe/wardrobe-retention.service.js'
 import type { SilhouettePhotoModerationEngine } from '../src/modules/wardrobe/silhouette-photo-moderation.engine.js'
+import { WardrobeObjectDeletionOutbox } from '../src/modules/wardrobe/wardrobe-object-deletion.outbox.js'
+import {
+  AMBIGUOUS_PUBLICATION_HORIZON_MS,
+  REPEATING_REMOVAL_INTERVAL_MS,
+} from '../src/modules/wardrobe/wardrobe-publication.js'
 import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
@@ -194,7 +213,10 @@ async function drainModerationJob(
     queueName,
     async (job) => {
       const data = silhouettePhotoProcessingJobSchema.parse(job.data)
-      await processor.process(data.silhouetteProfileId)
+      await processor.process(
+        data.silhouetteProfileId,
+        silhouetteSessionFromJobId({ id: job.id, data })
+      )
     },
     { connection: redisOptions, concurrency: 1 }
   )
@@ -254,19 +276,105 @@ class StubGuardianService {
   }
 }
 
+/**
+ * Storage the way Supabase serves a signed upload in round 4: one object per signed URL, signed
+ * without upsert (the first write to a staging key wins, a repeated PUT is refused as a
+ * duplicate, and an occupied key cannot be signed again), and a token that keeps working after
+ * its object is removed. The client PUTs to the URL allocation hands out (`clientPut`), never
+ * through the API; commit reads the staged object back through the byte ceiling, verifies it and
+ * writes the verified buffer to the final path itself (`publish`), with server-owned metadata.
+ *
+ * Round 4 hooks let a test hold a commit inside its storage I/O: `beforeDownload` and
+ * `beforePublish` run first and may block, and `publishAnswerLost` makes a publish that landed
+ * answer with an error, the way a dropped acknowledgement does.
+ */
 class MemoryWardrobeStorage implements WardrobeStorage {
   uploaded = new Map<string, Buffer>()
   removed: string[] = []
+  /** What `publish` wrote: the server-owned type and cache policy of each final object. */
+  readonly published = new Map<string, { contentType: string; cacheControl: string }>()
+  readonly createdAt = new Map<string, Date>()
+  private readonly signedPaths = new Map<string, string>()
+  downloads = 0
+  publishes = 0
+  beforeDownload: (() => Promise<void>) | null = null
+  beforePublish: (() => Promise<void>) | null = null
+  publishAnswerLost = false
 
-  upload(objectPath: string, bytes: Buffer, _mimeType: string): Promise<void> {
-    void _mimeType
+  createUploadSession(objectPath: string): Promise<WardrobeUploadSession> {
+    if (this.uploaded.has(objectPath)) {
+      return Promise.reject(new ConflictException('UPLOAD_BYTES_PRESENT'))
+    }
+    const uploadUrl = `https://storage.test/storage/v1/object/upload/sign/wardrobe-images/${objectPath}?token=${randomUUID()}`
+    this.signedPaths.set(uploadUrl, objectPath)
+    return Promise.resolve({
+      uploadUrl,
+      uploadToken: randomUUID(),
+      tokenExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    })
+  }
+  /** A client PUT of `bytes` to a signed upload URL; a key that holds bytes refuses it. */
+  clientPut(uploadUrl: string, bytes: Buffer): Promise<void> {
+    const objectPath = this.signedPaths.get(uploadUrl)
+    if (!objectPath) return Promise.reject(new Error('upload URL was never signed'))
+    if (this.uploaded.has(objectPath)) return Promise.reject(new Error('Duplicate'))
     this.uploaded.set(objectPath, bytes)
+    this.createdAt.set(objectPath, new Date())
     return Promise.resolve()
+  }
+  async publish(objectPath: string, bytes: Buffer, contentType: string): Promise<void> {
+    this.publishes += 1
+    if (this.beforePublish) await this.beforePublish()
+    this.uploaded.set(objectPath, Buffer.from(bytes))
+    this.createdAt.set(objectPath, new Date())
+    this.published.set(objectPath, {
+      contentType,
+      cacheControl: WARDROBE_OBJECT_CACHE_CONTROL,
+    })
+    if (this.publishAnswerLost) throw new Error('publish acknowledgement lost')
+  }
+  publishOnce(
+    objectPath: string,
+    bytes: Buffer,
+    contentType: string
+  ): Promise<'created' | 'exists'> {
+    if (this.uploaded.has(objectPath)) return Promise.resolve('exists')
+    this.uploaded.set(objectPath, Buffer.from(bytes))
+    this.createdAt.set(objectPath, new Date())
+    this.published.set(objectPath, {
+      contentType,
+      cacheControl: WARDROBE_OBJECT_CACHE_CONTROL,
+    })
+    return Promise.resolve('created')
+  }
+  listStagedUploads(
+    limit: number,
+    cursor: string | null = null
+  ): Promise<StagedUploadPage> {
+    const staged = [...this.uploaded.keys()]
+      .filter((objectPath) => objectPath.startsWith('staging/'))
+      .map((objectPath) => ({ objectPath, createdAt: this.createdAt.get(objectPath)! }))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    const start = cursor ? Number(cursor) : 0
+    const objects = staged.slice(start, start + limit)
+    const next = start + objects.length
+    return Promise.resolve({
+      objects,
+      nextCursor: next < staged.length ? String(next) : null,
+    })
   }
   download(objectPath: string): Promise<Buffer> {
     const bytes = this.uploaded.get(objectPath)
     if (!bytes) return Promise.reject(new Error(`no stored bytes for ${objectPath}`))
     return Promise.resolve(bytes)
+  }
+  async downloadBounded(objectPath: string, maxBytes: number): Promise<BoundedDownload> {
+    this.downloads += 1
+    if (this.beforeDownload) await this.beforeDownload()
+    const bytes = this.uploaded.get(objectPath)
+    if (!bytes) return { status: 'missing' }
+    if (bytes.length > maxBytes) return { status: 'too_large' }
+    return { status: 'present', bytes }
   }
   remove(objectPaths: string[]): Promise<void> {
     this.removed.push(...objectPaths)
@@ -275,6 +383,42 @@ class MemoryWardrobeStorage implements WardrobeStorage {
   }
   signReadUrl(objectPath: string): Promise<string> {
     return Promise.resolve(`https://storage.test/${objectPath}`)
+  }
+}
+
+/**
+ * A real, decodable portrait photo: commit now verifies the stored bytes (size, sniffed type,
+ * sha256, dimensions, portrait framing) before anything is enqueued.
+ */
+async function portraitPhoto(): Promise<{
+  bytes: Buffer
+  declaration: {
+    fileSizeBytes: number
+    mimeType: 'image/png'
+    sha256: string
+    widthPx: number
+    heightPx: number
+  }
+}> {
+  const bytes = await sharp({
+    create: {
+      width: 300,
+      height: 800,
+      channels: 3,
+      background: { r: 200, g: 210, b: 220 },
+    },
+  })
+    .png()
+    .toBuffer()
+  return {
+    bytes,
+    declaration: {
+      fileSizeBytes: bytes.length,
+      mimeType: 'image/png',
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+      widthPx: 300,
+      heightPx: 800,
+    },
   }
 }
 
@@ -294,16 +438,6 @@ async function removeModerationJob(jobId: string): Promise<void> {
 }
 
 describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
-  // Captured so `afterAll` can restore it: `process.env` is a real Node
-  // global, not something vitest's per-file isolation resets on its own for
-  // a plain assignment (unlike `vi.stubEnv`, which this repo's other
-  // `WARDROBE_UPLOAD_TOKEN_SECRET`-mutating specs -- `wardrobe-upload-
-  // token.spec.ts`, `wardrobe.service.regression.spec.ts`,
-  // `wardrobe.service.failure-paths.spec.ts` -- all use for exactly this
-  // reason). Leaving this set would otherwise let this suite's secret leak
-  // into whichever spec file the test runner happens to execute next in the
-  // same worker.
-  const originalUploadTokenSecret = process.env.WARDROBE_UPLOAD_TOKEN_SECRET
   let userId: string
   let guardian: StubGuardianService
   let storage: MemoryWardrobeStorage
@@ -313,7 +447,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
 
   beforeAll(async () => {
     await probeSchema()
-    process.env.WARDROBE_UPLOAD_TOKEN_SECRET = 'a'.repeat(32)
     if (schemaReady) await reapPreviousRunQueues()
   })
 
@@ -348,15 +481,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   })
 
   afterAll(async () => {
-    // Direct assignment, not `= undefined`: that would coerce to the
-    // *string* `"undefined"` rather than deleting the key, leaving a
-    // truthy-but-bogus value behind for whichever spec runs next.
-    if (originalUploadTokenSecret === undefined) {
-      delete process.env.WARDROBE_UPLOAD_TOKEN_SECRET
-    } else {
-      process.env.WARDROBE_UPLOAD_TOKEN_SECRET = originalUploadTokenSecret
-    }
-
     if (!schemaReady) {
       await prismaA.$disconnect()
       await prismaB.$disconnect()
@@ -538,41 +662,20 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   it('4.4-INT-15 runs the full My Form pipeline end to end through a real BullMQ worker', async (context) => {
     if (!requireSchema(context)) return
 
-    const image = buildFixtureSilhouettePhoto('ready')
-    const sha256 = createHash('sha256').update(image).digest('hex')
+    const photo = await portraitPhoto()
 
     const uploadUrlResult = await serviceA.createMyFormUploadUrl(
       userId,
       'guardian',
-      {
-        fileSizeBytes: image.length,
-        mimeType: 'image/png',
-        sha256,
-        widthPx: 300,
-        heightPx: 800,
-      },
+      photo.declaration,
       randomUUID()
     )
     expect(uploadUrlResult.replayed).toBe(false)
 
-    // The image bytes never actually decode as PNG here (they're a fixture
-    // marker), so this test exercises the pipeline at the service/queue/
-    // worker seam using a storage+validation double rather than a real
-    // Sharp-decodable photo; `wardrobe-silhouette-image-validation.spec.ts`
-    // and `silhouette-photo-moderation.engine.spec.ts` already cover real
-    // decode/heuristic behavior in isolation.
-    await prismaA.silhouetteProfile.update({
-      where: { user_id: userId },
-      data: {
-        my_form_status: 'bytes_uploaded',
-      },
-    })
-    await storage.upload(
-      (await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } }))
-        .my_form_object_path!,
-      image,
-      'image/png'
-    )
+    // The client PUTs straight to the signed storage URL; the session stays pending_upload
+    // until commit finds and verifies the object. The moderation engine below is a double:
+    // `silhouette-photo-moderation.engine.spec.ts` covers the real heuristic in isolation.
+    await storage.clientPut(uploadUrlResult.response.data.uploadUrl, photo.bytes)
 
     const commitResult = await serviceA.commitMyForm(
       userId,
@@ -584,10 +687,27 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       randomUUID()
     )
     expect(commitResult.response.data.myForm?.status).toBe('processing')
+    // Round 3 (Codex C2-1, C2-9): the client wrote a staging key; commit published the verified
+    // bytes to the tracked final path with server-owned metadata, then released staging.
+    const committedRow = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(storage.uploaded.get(committedRow.my_form_object_path!)).toEqual(photo.bytes)
+    expect(storage.published.get(committedRow.my_form_object_path!)).toEqual({
+      contentType: 'image/png',
+      cacheControl: 'private, max-age=0',
+    })
+    expect(
+      [...storage.uploaded.keys()].filter((key) => key.startsWith('staging/'))
+    ).toEqual([])
+    // The released staging key's outbox row is gone once storage confirmed the removal.
+    await expect(
+      prismaA.wardrobeObjectDeletion.count({
+        where: { object_path: { startsWith: `staging/${userId}/` } },
+      })
+    ).resolves.toBe(0)
 
-    const profileId = (
-      await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } })
-    ).id
+    const profileId = committedRow.id
 
     const expectedJobId = buildSilhouettePhotoJobId(
       profileId,
@@ -605,7 +725,10 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       async (job) => {
         const data = silhouettePhotoProcessingJobSchema.parse(job.data)
         processedJobIds.push(job.id ?? 'unknown')
-        await processor.process(data.silhouetteProfileId)
+        await processor.process(
+          data.silhouetteProfileId,
+          silhouetteSessionFromJobId({ id: job.id, data })
+        )
       },
       { connection: redisOptions, concurrency: 1 }
     )
@@ -682,23 +805,14 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
 
     try {
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        const image = buildFixtureSilhouettePhoto('ready')
+        const photo = await portraitPhoto()
         const uploadUrlResult = await serviceA.createMyFormUploadUrl(
           userId,
           'guardian',
-          {
-            fileSizeBytes: image.length,
-            mimeType: 'image/png',
-            sha256: createHash('sha256').update(image).digest('hex'),
-            widthPx: 300,
-            heightPx: 800,
-          },
+          photo.declaration,
           randomUUID()
         )
-        await prismaA.silhouetteProfile.update({
-          where: { user_id: userId },
-          data: { my_form_status: 'bytes_uploaded' },
-        })
+        await storage.clientPut(uploadUrlResult.response.data.uploadUrl, photo.bytes)
         await serviceA.commitMyForm(
           userId,
           'guardian',
@@ -748,7 +862,8 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       data: {
         user_id: userId,
         mode: 'my_form',
-        my_form_object_path: `${namespace}/${randomUUID()}.png`,
+        // The member's own My Form path: delete removes nothing a path column names otherwise.
+        my_form_object_path: `wardrobe/${userId}/silhouette/${randomUUID()}.png`,
         my_form_status: 'ready',
         revision: 3,
       },
@@ -769,6 +884,10 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       revision: 4,
     })
     expect(storage.removed).toContain(objectPath)
+    // Recorded with the delete and cleared once storage confirmed it (round 3, Codex C2-4).
+    await expect(
+      prismaA.wardrobeObjectDeletion.count({ where: { object_path: objectPath } })
+    ).resolves.toBe(0)
 
     const row = await prismaA.silhouetteProfile.findUniqueOrThrow({
       where: { user_id: userId },
@@ -786,31 +905,15 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   it('4.4-INT-17 replays an identical commit idempotently and conflicts on a reused key with a different session', async (context) => {
     if (!requireSchema(context)) return
 
-    const image = buildFixtureSilhouettePhoto('ready')
-    const sha256 = createHash('sha256').update(image).digest('hex')
+    const photo = await portraitPhoto()
 
     const uploadUrlResult = await serviceA.createMyFormUploadUrl(
       userId,
       'guardian',
-      {
-        fileSizeBytes: image.length,
-        mimeType: 'image/png',
-        sha256,
-        widthPx: 300,
-        heightPx: 800,
-      },
+      photo.declaration,
       randomUUID()
     )
-    await prismaA.silhouetteProfile.update({
-      where: { user_id: userId },
-      data: { my_form_status: 'bytes_uploaded' },
-    })
-    await storage.upload(
-      (await prismaA.silhouetteProfile.findUniqueOrThrow({ where: { user_id: userId } }))
-        .my_form_object_path!,
-      image,
-      'image/png'
-    )
+    await storage.clientPut(uploadUrlResult.response.data.uploadUrl, photo.bytes)
 
     const commitKey = randomUUID()
     const first = await serviceA.commitMyForm(
@@ -875,4 +978,520 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     expect(reuseError).toBeInstanceOf(ConflictException)
     expect(reuseError).toMatchObject({ message: 'IDEMPOTENCY_KEY_REUSED' })
   }, 15_000)
+
+  /**
+   * Bytes go straight to storage, so commit can arrive before them. The session must stay
+   * open for the retry, and the row must not move until the object is there.
+   */
+  it('4.4-INT-20 keeps a session pending when commit runs before the bytes land, then commits once they do', async (context) => {
+    if (!requireSchema(context)) return
+
+    const photo = await portraitPhoto()
+    const uploadUrlResult = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    const commitInput = {
+      uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+      confirmsBasewearGuidance: true as const,
+    }
+
+    const early = await serviceA
+      .commitMyForm(userId, 'guardian', commitInput, randomUUID())
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+    expect(early).toBeInstanceOf(ConflictException)
+    expect(early).toMatchObject({ message: 'UPLOAD_BYTES_MISSING' })
+    const pendingRow = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(pendingRow.my_form_status).toBe('pending_upload')
+    expect(pendingRow.my_form_commit_idempotency_key).toBeNull()
+
+    await storage.clientPut(uploadUrlResult.response.data.uploadUrl, photo.bytes)
+    const committed = await serviceA.commitMyForm(
+      userId,
+      'guardian',
+      commitInput,
+      randomUUID()
+    )
+    onTestFinished(() => drainModerationJob(prismaA, storage, pendingRow.id))
+
+    expect(committed.response.data.myForm?.status).toBe('processing')
+  }, 15_000)
+
+  it('4.4-INT-21 rejects and removes stored bytes that do not match the declaration', async (context) => {
+    if (!requireSchema(context)) return
+
+    const photo = await portraitPhoto()
+    const uploadUrlResult = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    // Same size and PNG signature as declared, one byte changed: only the sha256 can catch it.
+    const tampered = Buffer.from(photo.bytes)
+    tampered[tampered.length - 20] = (tampered[tampered.length - 20]! + 1) % 256
+    await storage.clientPut(uploadUrlResult.response.data.uploadUrl, tampered)
+    const stagingKey = `staging/${userId}/silhouette/${uploadUrlResult.response.data.uploadSessionId}.png`
+    expect(storage.uploaded.has(stagingKey)).toBe(true)
+
+    const rejected = await serviceA
+      .commitMyForm(
+        userId,
+        'guardian',
+        {
+          uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+          confirmsBasewearGuidance: true,
+        },
+        randomUUID()
+      )
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+
+    expect(rejected).toBeInstanceOf(UnprocessableEntityException)
+    expect(rejected).toMatchObject({ message: 'IMAGE_CHECKSUM_MISMATCH' })
+    expect(storage.removed).toEqual([stagingKey])
+    expect(storage.uploaded.size).toBe(0)
+    // Review round 1, 2026-11-19 (Codex 3): the session ends, so a correction needs a fresh
+    // allocation and key, and a validator still running for this one finds no session to act on.
+    const row = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(row.my_form_status).toBeNull()
+    expect(row.my_form_upload_session_id).toBeNull()
+    expect(row.my_form_object_path).toBeNull()
+    const stale = await serviceA
+      .commitMyForm(
+        userId,
+        'guardian',
+        {
+          uploadSessionId: uploadUrlResult.response.data.uploadSessionId,
+          confirmsBasewearGuidance: true,
+        },
+        randomUUID()
+      )
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+    expect(stale).toMatchObject({ message: 'UPLOAD_SESSION_NOT_FOUND' })
+    expect(storage.removed).toEqual([stagingKey])
+  })
+
+  /**
+   * Review round 1, 2026-11-19 (Codex 2, lens 2): a signed URL keeps working for its 2-hour
+   * token after its session is replaced or deleted. Signed URLs only ever name a staging key,
+   * so a late write can never put a photo back at a tracked, readable path, and the hourly
+   * sweep removes it once no commit can claim it.
+   */
+  for (const ending of ['replaced', 'deleted'] as const) {
+    it(`4.4-INT-22 keeps a late write after the session was ${ending} in staging until the sweep removes it`, async (context) => {
+      if (!requireSchema(context)) return
+
+      const photo = await portraitPhoto()
+      const first = await serviceA.createMyFormUploadUrl(
+        userId,
+        'guardian',
+        photo.declaration,
+        randomUUID()
+      )
+      if (ending === 'replaced') {
+        await serviceA.createMyFormUploadUrl(
+          userId,
+          'guardian',
+          photo.declaration,
+          randomUUID()
+        )
+      } else {
+        const revision = (
+          await prismaA.silhouetteProfile.findUniqueOrThrow({
+            where: { user_id: userId },
+          })
+        ).revision
+        await serviceA.deleteMyForm(userId, formatSilhouetteETag(userId, revision))
+      }
+
+      // The first session's URL still writes, the way a 2-hour storage token does.
+      await storage.clientPut(first.response.data.uploadUrl, photo.bytes)
+
+      const lateKey = `staging/${userId}/silhouette/${first.response.data.uploadSessionId}.png`
+      expect([...storage.uploaded.keys()]).toEqual([lateKey])
+      const row = await prismaA.silhouetteProfile.findUniqueOrThrow({
+        where: { user_id: userId },
+      })
+      expect(row.my_form_object_path).not.toBe(lateKey)
+      expect(row.my_form_upload_session_id).not.toBe(first.response.data.uploadSessionId)
+      // Nothing the API serves can reach it: the late write is no member's tracked photo.
+      expect(
+        (await serviceA.getProfile(userId)).response.data.myForm?.imageAccess ?? null
+      ).toBeNull()
+
+      const retention = new WardrobeRetentionService(
+        prismaA,
+        storage as unknown as never,
+        {
+          invalidateUserCache: () => Promise.resolve(true),
+        }
+      )
+      // Within the window a slow PUT may still be landing, so the sweep keeps it.
+      await expect(retention.purgeStaleStagedUploads(new Date())).resolves.toBe(0)
+      await expect(
+        retention.purgeStaleStagedUploads(
+          new Date(Date.now() + STAGED_UPLOAD_RETENTION_MS + 1000)
+        )
+      ).resolves.toBe(1)
+      expect(storage.uploaded.size).toBe(0)
+      expect(storage.removed).toContain(lateKey)
+    })
+  }
+
+  /**
+   * A gate a test opens by hand: `entered` settles once the guarded call reaches the gate, and
+   * the call proceeds only after `open()`.
+   */
+  function gate(): {
+    hook: () => Promise<void>
+    entered: Promise<void>
+    open: () => void
+  } {
+    let markEntered: () => void = () => undefined
+    let release: () => void = () => undefined
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    const opened = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    return {
+      hook: () => {
+        markEntered()
+        return opened
+      },
+      entered,
+      open: () => release(),
+    }
+  }
+
+  /**
+   * Round 4 (Codex C3-1): two commits of one session under the same key. The first claims the
+   * session's publication in PostgreSQL before any storage I/O; the second, on its own
+   * connection, finds that live claim and answers 409 UPLOAD_IN_PROGRESS without reading or
+   * writing storage. Once the owner has finished, a same-key retry replays its outcome and never
+   * publishes, so no second write of the final key can land after a later purge.
+   */
+  it('4.4-INT-23 answers a concurrent commit UPLOAD_IN_PROGRESS without touching storage, then replays the owner', async (context) => {
+    if (!requireSchema(context)) return
+
+    const photo = await portraitPhoto()
+    const allocation = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    await storage.clientPut(allocation.response.data.uploadUrl, photo.bytes)
+    const commitInput = {
+      uploadSessionId: allocation.response.data.uploadSessionId,
+      confirmsBasewearGuidance: true as const,
+    }
+    const commitKey = randomUUID()
+    const download = gate()
+    storage.beforeDownload = download.hook
+
+    const owner = serviceA.commitMyForm(userId, 'guardian', commitInput, commitKey)
+    await download.entered
+    storage.beforeDownload = null
+
+    const concurrent = await serviceB
+      .commitMyForm(userId, 'guardian', commitInput, commitKey)
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+    expect(concurrent).toBeInstanceOf(ConflictException)
+    expect(concurrent).toMatchObject({ message: 'UPLOAD_IN_PROGRESS' })
+    expect(storage.downloads).toBe(1)
+    expect(storage.publishes).toBe(0)
+
+    download.open()
+    const committed = await owner
+    const profile = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    onTestFinished(() => drainModerationJob(prismaA, storage, profile.id))
+    expect(committed.replayed).toBe(false)
+    expect(committed.response.data.myForm?.status).toBe('processing')
+    expect(profile.my_form_publish_attempt_id).toBeNull()
+    expect(profile.my_form_processing_job_enqueued_at).not.toBeNull()
+
+    const retried = await serviceB.commitMyForm(
+      userId,
+      'guardian',
+      commitInput,
+      commitKey
+    )
+    expect(retried.replayed).toBe(true)
+    expect(storage.downloads).toBe(1)
+    expect(storage.publishes).toBe(1)
+  }, 15_000)
+
+  /**
+   * Round 5 (Codex C4-5): the member deletes My Form while a commit is publishing. The delete
+   * locks the profile row, sees the live claim, removes the session's keys at once and records
+   * a removal that repeats every 15 minutes until 24 hours after the claim started. The publish
+   * lands after the delete and its acknowledgement is lost, so the commit never reaches
+   * compensation; the next repeat removes the photo, and the row settles only past the horizon.
+   * Round 4 waited for the lease and settled after one removal.
+   */
+  it('4.4-INT-24 removes a publish that lands after a delete with its answer lost on the next repeat, settling after the horizon', async (context) => {
+    if (!requireSchema(context)) return
+
+    const photo = await portraitPhoto()
+    const allocation = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    await storage.clientPut(allocation.response.data.uploadUrl, photo.bytes)
+    const sessionId = allocation.response.data.uploadSessionId
+    const finalKey = `wardrobe/${userId}/silhouette/${sessionId}.png`
+    const stagingKey = `staging/${userId}/silhouette/${sessionId}.png`
+    onTestFinished(async () => {
+      await prismaA.wardrobeObjectDeletion.deleteMany({
+        where: { object_path: { in: [finalKey, stagingKey] } },
+      })
+    })
+    const publish = gate()
+    storage.beforePublish = publish.hook
+    storage.publishAnswerLost = true
+
+    const commit = serviceA
+      .commitMyForm(
+        userId,
+        'guardian',
+        { uploadSessionId: sessionId, confirmsBasewearGuidance: true },
+        randomUUID()
+      )
+      .then(
+        () => null,
+        (error: unknown) => error
+      )
+    await publish.entered
+    const claimed = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(claimed.my_form_publish_attempt_id).not.toBeNull()
+    const horizon = new Date(
+      claimed.my_form_publish_started_at!.getTime() + AMBIGUOUS_PUBLICATION_HORIZON_MS
+    )
+
+    const deletedAt = Date.now()
+    await serviceB.deleteMyForm(userId, formatSilhouetteETag(userId, claimed.revision))
+    // Both keys were removed at once; the final had not landed yet.
+    expect(storage.removed).toEqual([finalKey, stagingKey])
+    expect(storage.uploaded.has(stagingKey)).toBe(false)
+    publish.open()
+    expect(await commit).toMatchObject({ message: 'publish acknowledgement lost' })
+
+    // The late write landed after the delete. Both rows repeat until the horizon.
+    expect(storage.uploaded.has(finalKey)).toBe(true)
+    const repeating = await prismaA.wardrobeObjectDeletion.findMany({
+      where: { object_path: { in: [finalKey, stagingKey] } },
+      orderBy: { object_path: 'asc' },
+    })
+    expect(repeating.map((row) => [row.object_path, row.repeat_until])).toEqual([
+      [stagingKey, horizon],
+      [finalKey, horizon],
+    ])
+
+    // Scoped to this test's keys: the database is shared, and other rows are not this test's
+    // to settle.
+    const outbox = new WardrobeObjectDeletionOutbox(prismaA, storage)
+    const ownKeys = { objectPaths: [finalKey, stagingKey] }
+    const nextRepeat = new Date(deletedAt + REPEATING_REMOVAL_INTERVAL_MS + 1000)
+    await outbox.drainDue(nextRepeat, ownKeys)
+    expect(storage.uploaded.has(finalKey)).toBe(false)
+    expect(
+      await prismaA.wardrobeObjectDeletion.count({
+        where: { object_path: { in: [finalKey, stagingKey] } },
+      })
+    ).toBe(2)
+
+    await outbox.drainDue(new Date(horizon.getTime() + 60 * 60 * 1000), ownKeys)
+    expect(storage.uploaded.has(finalKey)).toBe(false)
+    expect(storage.uploaded.has(stagingKey)).toBe(false)
+    expect(
+      await prismaA.wardrobeObjectDeletion.count({
+        where: { object_path: { in: [finalKey, stagingKey] } },
+      })
+    ).toBe(0)
+  }, 15_000)
+
+  /**
+   * Round 4 (Codex C3-5): the queue refuses the job after the claim moved the photo to
+   * processing. The row stays processing with no handoff marker (no rollback), and the member's
+   * same-key retry enqueues the job under its deterministic id and records the handoff.
+   */
+  it('4.4-INT-25 re-enqueues on the same-key retry after the enqueue failed, recording the handoff', async (context) => {
+    if (!requireSchema(context)) return
+
+    let refuseNext = true
+    const flakyQueue = {
+      enqueue: (profileId: string, sessionId: string) => {
+        if (refuseNext) {
+          refuseNext = false
+          return Promise.reject(new Error('redis unavailable'))
+        }
+        return queue.enqueue(profileId, sessionId)
+      },
+    }
+    const service = new WardrobeSilhouetteService(
+      prismaA,
+      guardian as unknown as GuardianService,
+      storage as unknown as never,
+      flakyQueue as unknown as SilhouettePhotoProcessingQueue
+    )
+    const photo = await portraitPhoto()
+    const allocation = await service.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    await storage.clientPut(allocation.response.data.uploadUrl, photo.bytes)
+    const commitInput = {
+      uploadSessionId: allocation.response.data.uploadSessionId,
+      confirmsBasewearGuidance: true as const,
+    }
+    const commitKey = randomUUID()
+
+    await expect(
+      service.commitMyForm(userId, 'guardian', commitInput, commitKey)
+    ).rejects.toThrow('redis unavailable')
+    const stranded = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(stranded.my_form_status).toBe('processing')
+    expect(stranded.my_form_upload_session_id).toBe(commitInput.uploadSessionId)
+    expect(stranded.my_form_processing_job_enqueued_at).toBeNull()
+
+    const retried = await service.commitMyForm(userId, 'guardian', commitInput, commitKey)
+    onTestFinished(() => drainModerationJob(prismaA, storage, stranded.id))
+    expect(retried.replayed).toBe(true)
+    const handedOff = await prismaA.silhouetteProfile.findUniqueOrThrow({
+      where: { user_id: userId },
+    })
+    expect(handedOff.my_form_processing_job_enqueued_at).not.toBeNull()
+    const bullQueue = new Queue(queueName, { connection: redisOptions })
+    try {
+      const job = await bullQueue.getJob(
+        buildSilhouettePhotoJobId(stranded.id, commitInput.uploadSessionId)
+      )
+      expect(job?.data).toEqual({ silhouetteProfileId: stranded.id })
+    } finally {
+      await bullQueue.close()
+    }
+    expect(storage.publishes).toBe(1)
+  }, 15_000)
+
+  /**
+   * Coordinator follow-up 2 (round 4): a commit's publication claim is a row update. While the
+   * claiming transaction still holds the row lock, a delete on a second connection must wait on
+   * its `FOR UPDATE`; once the claim commits, the delete sees it, removes the session's keys at
+   * once and records them as a removal that repeats until 24 hours after the claim started
+   * (round 5, Codex C4-5).
+   */
+  it('4.4-INT-26 makes a delete wait for a commit holding the claim and the row lock, then removes its keys and repeats the removal', async (context) => {
+    if (!requireSchema(context)) return
+
+    const photo = await portraitPhoto()
+    const allocation = await serviceA.createMyFormUploadUrl(
+      userId,
+      'guardian',
+      photo.declaration,
+      randomUUID()
+    )
+    const sessionId = allocation.response.data.uploadSessionId
+    const finalKey = `wardrobe/${userId}/silhouette/${sessionId}.png`
+    const stagingKey = `staging/${userId}/silhouette/${sessionId}.png`
+    onTestFinished(async () => {
+      await prismaA.wardrobeObjectDeletion.deleteMany({
+        where: { object_path: { in: [finalKey, stagingKey] } },
+      })
+    })
+
+    const claimStartedAt = new Date()
+    const held = gate()
+    const claim = prismaA.$transaction(
+      async (tx) => {
+        const claimed = await tx.silhouetteProfile.updateMany({
+          where: {
+            user_id: userId,
+            my_form_upload_session_id: sessionId,
+            my_form_status: 'pending_upload',
+          },
+          data: {
+            my_form_publish_attempt_id: randomUUID(),
+            my_form_publish_started_at: claimStartedAt,
+          },
+        })
+        expect(claimed.count).toBe(1)
+        // Holds the transaction, and with it the row lock, until the test opens the gate.
+        await held.hook()
+      },
+      { timeout: 20_000 }
+    )
+    await held.entered
+
+    const deleted = serviceB.deleteMyForm(userId, '*')
+    await waitForRowLockWait(prismaA, 'SilhouetteProfile')
+    // Still waiting: nothing is recorded or removed while the claim's transaction is open.
+    expect(
+      await prismaA.wardrobeObjectDeletion.count({
+        where: { object_path: { in: [finalKey, stagingKey] } },
+      })
+    ).toBe(0)
+
+    held.open()
+    await claim
+    await deleted
+
+    const horizon = new Date(claimStartedAt.getTime() + AMBIGUOUS_PUBLICATION_HORIZON_MS)
+    const repeating = await prismaA.wardrobeObjectDeletion.findMany({
+      where: { object_path: { in: [finalKey, stagingKey] } },
+      orderBy: { object_path: 'asc' },
+    })
+    expect(repeating.map((row) => [row.object_path, row.repeat_until])).toEqual([
+      [stagingKey, horizon],
+      [finalKey, horizon],
+    ])
+    expect(storage.removed).toContain(finalKey)
+    expect(storage.removed).toContain(stagingKey)
+  }, 20_000)
 })
+
+/**
+ * Resolves once another backend is blocked on a row lock of `table` taken with `FOR UPDATE`, as
+ * Postgres itself reports it; a bounded poll on that condition, never a fixed sleep.
+ */
+async function waitForRowLockWait(prisma: PrismaClient, table: string): Promise<void> {
+  const deadline = Date.now() + 10_000
+  for (;;) {
+    const waiting = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT count(*)::bigint AS count FROM pg_stat_activity
+      WHERE wait_event_type = 'Lock'
+        AND query LIKE ${`%"${table}"%FOR UPDATE%`}`
+    if (Number(waiting[0]?.count ?? 0) > 0) return
+    if (Date.now() > deadline) throw new Error(`no backend waited on a ${table} row lock`)
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}

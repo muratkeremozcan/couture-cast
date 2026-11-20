@@ -234,7 +234,6 @@ export {
   createPaletteSelfieUploadUrlInputSchema,
   paletteSelfieUploadSessionSchema,
   createPaletteSelfieUploadUrlResponseSchema,
-  paletteSelfieUploadSessionPathParamsSchema,
   commitPaletteSelfieInputSchema,
   commitPaletteSelfieResponseSchema,
   updateAdvisorRecommendationInputSchema,

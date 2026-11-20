@@ -38,12 +38,9 @@ function extractDurationMs(value: unknown): number | undefined {
   return typeof responseTime === 'number' ? responseTime : undefined
 }
 
+/** The request path without its query string, whose values can carry tokens. */
 export function normalizeRequestPath(path: string): string {
-  const pathname = path.split('?')[0] ?? path
-  return pathname.replace(
-    /\/api\/v1\/wardrobe\/uploads\/[^/]+/,
-    '/api/v1/wardrobe/uploads/:uploadSessionId'
-  )
+  return path.split('?')[0] ?? path
 }
 
 export function createRequestLoggerMiddleware(

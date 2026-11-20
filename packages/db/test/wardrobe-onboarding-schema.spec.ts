@@ -1,5 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
@@ -343,7 +345,7 @@ describe('wardrobe onboarding and silhouette schema and migration', () => {
     }
   })
 
-  it('4.4-DB-001 enables row level security and grants CRUD on both tables', async () => {
+  it('4.4-DB-001 enables row level security, grants the onboarding state CRUD and the silhouette profile reads only', async () => {
     const client = await adminPool.connect()
 
     try {
@@ -361,12 +363,20 @@ describe('wardrobe onboarding and silhouette schema and migration', () => {
         `SELECT "tablename", "cmd" FROM pg_policies
          WHERE "tablename" IN ('WardrobeOnboardingState', 'SilhouetteProfile')`
       )
-      for (const table of ['WardrobeOnboardingState', 'SilhouetteProfile']) {
+      // The silhouette profile holds the My Form storage path the API's service role acts on,
+      // so since the 2026-11-19 follow-up (migration
+      // 20261119120000_revoke_member_wardrobe_upload_writes) the owner reads it and only the API
+      // writes it. The onboarding state keeps all four verbs.
+      const ownerVerbs = {
+        WardrobeOnboardingState: ['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
+        SilhouetteProfile: ['SELECT'],
+      } as const
+      for (const table of ['WardrobeOnboardingState', 'SilhouetteProfile'] as const) {
         const commands = policies.rows
           .filter((row) => row.tablename === table)
           .map((row) => row.cmd)
           .sort()
-        expect(commands).toEqual(['DELETE', 'INSERT', 'SELECT', 'UPDATE'])
+        expect(commands, table).toEqual(ownerVerbs[table])
       }
 
       const grants = await client.query<{ table_name: string; privilege_type: string }>(
@@ -375,12 +385,12 @@ describe('wardrobe onboarding and silhouette schema and migration', () => {
            AND "table_name" IN ('WardrobeOnboardingState', 'SilhouetteProfile')
            AND "grantee" = 'authenticated'`
       )
-      for (const table of ['WardrobeOnboardingState', 'SilhouetteProfile']) {
+      for (const table of ['WardrobeOnboardingState', 'SilhouetteProfile'] as const) {
         const privileges = grants.rows
           .filter((row) => row.table_name === table)
           .map((row) => row.privilege_type)
           .sort()
-        expect(privileges).toEqual(['DELETE', 'INSERT', 'SELECT', 'UPDATE'])
+        expect(privileges, table).toEqual(ownerVerbs[table])
       }
     } finally {
       client.release()

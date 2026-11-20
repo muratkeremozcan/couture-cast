@@ -31,6 +31,7 @@ import {
   type AdvisorRecommendationCard,
   type PaletteAdvisorProfile,
   type PaletteAnalysisFailureReason,
+  type UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import {
   beginAffiliatePartnerHandoff,
@@ -39,7 +40,6 @@ import {
 import {
   analyzeWardrobePaletteFromWeb,
   erasePaletteAdvisorFromWeb,
-  generateIdempotencyKey,
   getPaletteAdvisorFromWeb,
   hasWebSession,
   paletteAdvisorFailureReason,
@@ -48,6 +48,7 @@ import {
   uploadPaletteSelfieFromWeb,
   type PaletteSelfieUploadState,
 } from '../../lib/palette-advisor'
+import { currentUploadSession, isUploadSessionCurrent } from '../../lib/upload-attempts'
 
 /**
  * True when a stored palette was derived under a rule table this build has
@@ -463,12 +464,14 @@ function SourceChoice({
   isAnalysisEnabled,
   showUnavailableNote,
   onAnalyzeWardrobe,
+  onSelfiePickerOpen,
   onSelfieChosen,
 }: {
   isBusy: boolean
   isAnalysisEnabled: boolean
   showUnavailableNote: boolean
   onAnalyzeWardrobe: () => void
+  onSelfiePickerOpen: () => void
   onSelfieChosen: (event: React.ChangeEvent<HTMLInputElement>) => void
 }) {
   const { t } = useTranslation()
@@ -522,6 +525,7 @@ function SourceChoice({
             : SELFIE_HINT_ID
         }
         disabled={isBusy || !isAnalysisEnabled}
+        onClick={onSelfiePickerOpen}
         onChange={onSelfieChosen}
       />
     </div>
@@ -662,6 +666,8 @@ export function PaletteAdvisorPanel() {
 
   /** Every in-flight write, so unmounting cancels them. */
   const writeControllerRef = useRef<AbortController | null>(null)
+  /** The session captured when the selfie picker last opened; the photo it returns belongs to it. */
+  const selfiePickerSessionRef = useRef<UploadAttemptSession | null>(null)
   useEffect(() => () => writeControllerRef.current?.abort(), [])
 
   /*
@@ -846,20 +852,31 @@ export function PaletteAdvisorPanel() {
     )
   }
 
+  function handleSelfiePickerOpen(): void {
+    selfiePickerSessionRef.current = currentUploadSession()
+  }
+
   function handleSelfieChosen(event: React.ChangeEvent<HTMLInputElement>): void {
     const file = event.target.files?.[0]
     // Reset immediately so choosing the same file twice still fires `change`.
     event.target.value = ''
-    if (!file) return
+    // Round 5 account epoch: the photo belongs to the account signed in when the picker opened
+    // (a file that arrives without the picker opening, a drop, belongs to the session now). A
+    // photo picked before an account change is dropped; nothing uploads under the next account.
+    const uploadSession = selfiePickerSessionRef.current ?? currentUploadSession()
+    selfiePickerSessionRef.current = null
+    if (!file || !isUploadSessionCurrent(uploadSession)) return
 
     setLastDismissal(null)
     const imagePreview = URL.createObjectURL(file)
-    const idempotencyKey = generateIdempotencyKey()
+    // Picking the same photo again after a failure resumes its pending upload attempt with the
+    // same keys (the lib keys attempts by the prepared bytes), so a lost answer replays the
+    // analysis already started.
     void runWrite('selfie', 'commerce.premium.palette.saveError', async (signal) => {
       try {
         return await uploadPaletteSelfieFromWeb({
           imagePreview,
-          idempotencyKey,
+          uploadSession,
           signal,
           onStateChange: setUploadState,
         })
@@ -1020,6 +1037,7 @@ export function PaletteAdvisorPanel() {
           isAnalysisEnabled={profile?.analysisEnabled !== false}
           showUnavailableNote={view.showUnavailableNote}
           onAnalyzeWardrobe={handleAnalyzeWardrobe}
+          onSelfiePickerOpen={handleSelfiePickerOpen}
           onSelfieChosen={handleSelfieChosen}
         />
       )}

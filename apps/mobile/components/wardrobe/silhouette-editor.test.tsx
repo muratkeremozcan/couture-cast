@@ -1,9 +1,16 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { http, HttpResponse } from 'msw'
 
 vi.mock('expo-localization', () => ({
@@ -41,7 +48,7 @@ const imageManipulator = vi.hoisted(() => ({
 }))
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: imageManipulator.manipulateAsync,
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 
 vi.mock('expo-file-system', () => ({
@@ -57,13 +64,11 @@ vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache/' },
 }))
 
-// Sequential (not fixed) so a test can prove two upload attempts actually
-// mint two different idempotency keys instead of accidentally reusing one.
-let idempotencyKeyCounter = 0
+// Upload keys come from the attempt store (UUID v4 from `src/lib/uuid`), so only the digest
+// the photo fingerprint needs is stood in for here.
 vi.mock('expo-crypto', () => ({
   digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
-  randomUUID: vi.fn(() => `idem-key-${(idempotencyKeyCounter += 1)}`),
 }))
 
 /** Synthetic auth principal; the profile HTTP response supplies the application owner. */
@@ -146,7 +151,6 @@ function renderEditor(pollIntervalMs = 10) {
   render(
     <AccessibilityAnnouncerProvider>
       <SilhouetteEditor
-        accessToken={ACCESS_TOKEN}
         onProfileChange={onProfileChange}
         pollIntervalMs={pollIntervalMs}
       />
@@ -157,6 +161,7 @@ function renderEditor(pollIntervalMs = 10) {
 
 describe('SilhouetteEditor', () => {
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+  let restoreAccessTokenResolver: () => void
 
   beforeAll(async () => {
     await initI18n()
@@ -181,8 +186,9 @@ describe('SilhouetteEditor', () => {
         })
       })
     )
-    idempotencyKeyCounter = 0
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+    // A My Form upload resolves its bearer through the app's resolver at upload time.
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => ACCESS_TOKEN)
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: true })
     imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true })
     imagePicker.launchCameraAsync.mockResolvedValue({
@@ -196,6 +202,10 @@ describe('SilhouetteEditor', () => {
   })
 
   afterEach(() => {
+    // Upload attempts live for the app session; each test starts signed out with none open.
+    setMobileApplicationUserId(null)
+    forgetAllUploadAttempts()
+    restoreAccessTokenResolver()
     process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
     vi.clearAllMocks()
   })
@@ -311,6 +321,82 @@ describe('SilhouetteEditor', () => {
     )
   })
 
+  /**
+   * Review round 1, 2026-11-19: a signed URL writes one object and never overwrites, so a retry
+   * after a PUT whose answer was lost finds storage saying the object already exists. That must
+   * go on to commit, which verifies the stored sha256, instead of failing before it.
+   */
+  it('4.4-MOB-SIL-26 commits when storage says the photo is already uploaded', async () => {
+    const seen: { cacheControl?: string | null; committed: boolean } = {
+      committed: false,
+    }
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', () =>
+        HttpResponse.json(
+          {
+            data: {
+              uploadSessionId: 'session-1',
+              uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+              uploadToken: 'upload-token-1',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-08-09T01:00:00.000Z',
+            },
+          },
+          { status: 201 }
+        )
+      ),
+      http.put('*/mock-storage/session-1', ({ request }) => {
+        seen.cacheControl = request.headers.get('cache-control')
+        return HttpResponse.json(
+          {
+            statusCode: '409',
+            error: 'Duplicate',
+            message: 'The resource already exists',
+          },
+          { status: 400 }
+        )
+      }),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/commit', () => {
+        seen.committed = true
+        return HttpResponse.json({
+          data: {
+            ...defaultProfile,
+            mode: 'my_form',
+            myForm: {
+              status: 'processing',
+              failureReason: null,
+              committedAt: '2026-08-09T00:05:00.000Z',
+              imageAccess: null,
+            },
+          },
+        })
+      })
+    )
+
+    renderEditor()
+    await waitFor(() => screen.getByTestId('silhouette-height-value'))
+    fireEvent.click(screen.getByTestId('silhouette-tab-my-form'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-confirm'))
+    fireEvent.click(screen.getByRole('switch'))
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-library')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    })
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+
+    await waitFor(() => expect(seen.committed).toBe(true))
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('silhouette-my-form-failed')).toBeNull()
+    expect(seen.cacheControl).toBe('private, max-age=0')
+  })
+
   it('4.4-MOB-SIL-07 uploads a My Form photo through processing to ready', async () => {
     server.use(
       http.get('*/api/v1/wardrobe/silhouette', () =>
@@ -323,11 +409,16 @@ describe('SilhouetteEditor', () => {
           // 4096px cap, so no resize is needed, but the photo must still be
           // re-encoded through manipulateAsync so the declared mimeType below
           // is actually true. A prior version skipped re-encoding whenever no
-          // resize was needed, silently uploading the original (possibly JPEG)
-          // bytes under a false 'image/png' declaration.
-          expect(imageManipulator.manipulateAsync).toHaveBeenCalled()
+          // resize was needed, silently uploading the original (possibly PNG
+          // or WebP) bytes under a false declaration. JPEG because a full-body
+          // photo saved as PNG came to several megabytes.
+          expect(imageManipulator.manipulateAsync).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.any(Array),
+            { compress: 0.9, format: 'jpeg' }
+          )
           const body = (await request.json()) as { mimeType: string }
-          expect(body.mimeType).toBe('image/png')
+          expect(body.mimeType).toBe('image/jpeg')
           return HttpResponse.json(
             {
               data: {
@@ -446,7 +537,13 @@ describe('SilhouetteEditor', () => {
     }
   )
 
-  it('4.4-MOB-SIL-08B mints a fresh idempotency key when retrying with a different photo after a failure', async () => {
+  /**
+   * Production follow-up 2026-11-19 (review round 2, Codex 6): an attempt is named by the
+   * prepared photo. Picking the same photo again after a failure resumes it with its key (the
+   * declaration is identical, so the server replays the same session); a different photo is a
+   * new attempt with a fresh key, so a key never carries a second declaration.
+   */
+  it('4.4-MOB-SIL-08B resumes the failed attempt with its key when the same photo is picked again', async () => {
     const seenIdempotencyKeys: string[] = []
     server.use(
       http.get('*/api/v1/wardrobe/silhouette', () =>
@@ -461,23 +558,10 @@ describe('SilhouetteEditor', () => {
       })
     )
     renderEditor()
-    await waitFor(() => screen.getByTestId('silhouette-height-value'))
-    fireEvent.click(screen.getByTestId('silhouette-tab-my-form'))
-    await waitFor(() => screen.getByTestId('silhouette-my-form-confirm'))
-    fireEvent.click(screen.getByRole('switch'))
-    await waitFor(() => {
-      expect(screen.getByTestId('silhouette-my-form-library')).not.toHaveAttribute(
-        'aria-disabled',
-        'true'
-      )
-    })
+    await openConfirmedMyFormTab()
 
     fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
     await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
-    expect(seenIdempotencyKeys).toHaveLength(1)
-
-    // Retry sends the user back to source selection; picking a photo again
-    // (same or different) must not resubmit the failed attempt's key.
     fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
     await waitFor(() => screen.getByTestId('silhouette-my-form-library'))
     fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
@@ -485,7 +569,494 @@ describe('SilhouetteEditor', () => {
       expect(seenIdempotencyKeys).toHaveLength(2)
     })
 
+    // The allocation answer never arrived (a 500), so the same photo replays it with its key.
+    expect(seenIdempotencyKeys[1]).toBe(seenIdempotencyKeys[0])
+  })
+
+  it('4.4-MOB-SIL-08C mints a fresh idempotency key when retrying with a different photo after a failure', async () => {
+    const seenIdempotencyKeys: string[] = []
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', ({ request }) => {
+        seenIdempotencyKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json(
+          { statusCode: 500, message: 'boom', error: 'Internal Server Error' },
+          { status: 500 }
+        )
+      })
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-library'))
+    // A different photo: the prepared frame differs, so its fingerprint does too.
+    imageManipulator.manipulateAsync.mockResolvedValueOnce({
+      uri: 'file:///resized-other.jpg',
+      width: 900,
+      height: 1400,
+    })
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => {
+      expect(seenIdempotencyKeys).toHaveLength(2)
+    })
+
     expect(seenIdempotencyKeys[0]).not.toBe(seenIdempotencyKeys[1])
+  })
+
+  it('4.4-MOB-SIL-27 commits first when the same photo is picked after a lost commit answer', async () => {
+    const seen = { allocateKeys: [] as string[], puts: 0, commitKeys: [] as string[] }
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', ({ request }) => {
+        seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json(
+          {
+            data: {
+              uploadSessionId: 'session-1',
+              uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+              uploadToken: 'upload-token-1',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-08-09T01:00:00.000Z',
+            },
+          },
+          { status: 201 }
+        )
+      }),
+      http.put('*/mock-storage/session-1', () => {
+        seen.puts += 1
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/commit', ({ request }) => {
+        seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+        return seen.commitKeys.length === 1
+          ? HttpResponse.json(
+              { statusCode: 503, message: 'Service Unavailable', error: 'Error' },
+              { status: 503 }
+            )
+          : HttpResponse.json({ data: myFormProfile(processingMyForm) })
+      })
+    )
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-library'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    // The uploading phase shares the processing panel, so wait for the commit itself.
+    await waitFor(() => expect(seen.commitKeys).toHaveLength(2))
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-processing')).toBeInTheDocument()
+    })
+
+    expect(seen.allocateKeys).toHaveLength(1)
+    expect(seen.puts).toBe(1)
+    expect(seen.commitKeys).toEqual([seen.commitKeys[0], seen.commitKeys[0]])
+  })
+
+  /**
+   * Retry routes for the same prepared photo: each leg answers from its own queue and records
+   * the idempotency key it was sent.
+   */
+  function myFormRetryRoutes(commitAnswers: (() => Response)[]) {
+    const seen = { allocateKeys: [] as string[], puts: 0, commitKeys: [] as string[] }
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: defaultProfile })
+      ),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/upload-url', ({ request }) => {
+        seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json(
+          {
+            data: {
+              uploadSessionId: `session-${seen.allocateKeys.length}`,
+              uploadUrl: `${window.location.origin}/mock-storage/my-form-retry`,
+              uploadToken: 'upload-token-1',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-08-09T01:00:00.000Z',
+            },
+          },
+          { status: 201 }
+        )
+      }),
+      http.put('*/mock-storage/my-form-retry', () => {
+        seen.puts += 1
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('*/api/v1/wardrobe/silhouette/my-form/commit', ({ request }) => {
+        seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+        const answer = commitAnswers.shift()
+        if (!answer) throw new Error('No commit answer left')
+        return answer()
+      })
+    )
+    return seen
+  }
+
+  /** The profile poll answers ready once the commit has been accepted. */
+  function serveReadyMyForm() {
+    server.use(
+      http.get('*/api/v1/wardrobe/silhouette', () =>
+        HttpResponse.json({ data: myFormProfile(readyMyForm) })
+      )
+    )
+  }
+
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  /** Retry, then the same photo from the library: the member's retry of the attempt. */
+  async function retryWithSamePhoto() {
+    await waitFor(() => screen.getByTestId('silhouette-my-form-failed'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-library'))
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+  }
+
+  /**
+   * Production follow-up 2026-11-19: when the commit a retry resumed answers that the server
+   * ended the attempt (its session expired), that same pick starts one fresh attempt with fresh
+   * keys: a new allocation, the bytes again, and a commit. The member never retries twice, and
+   * the rejected keys are never sent again.
+   */
+  it('4.4-MOB-SIL-27B starts one fresh attempt in the same retry once the session expired', async () => {
+    const seen = myFormRetryRoutes([
+      () =>
+        HttpResponse.json(
+          { statusCode: 503, message: 'Service Unavailable', error: 'Error' },
+          { status: 503 }
+        ),
+      () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'UPLOAD_SESSION_EXPIRED', error: 'Conflict' },
+          { status: 409 }
+        ),
+      () => HttpResponse.json({ data: myFormProfile(processingMyForm) }),
+    ])
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await retryWithSamePhoto()
+    await waitFor(() => expect(seen.commitKeys).toHaveLength(3))
+    serveReadyMyForm()
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByTestId('silhouette-my-form-failed')).not.toBeInTheDocument()
+    expect(seen.allocateKeys).toHaveLength(2)
+    expect(seen.allocateKeys[1]).toMatch(UUID_V4)
+    expect(seen.allocateKeys[1]).not.toBe(seen.allocateKeys[0])
+    expect(seen.puts).toBe(2)
+    expect(seen.commitKeys[0]).toMatch(UUID_V4)
+    expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+    expect(seen.commitKeys[2]).toMatch(UUID_V4)
+    expect(seen.commitKeys[2]).not.toBe(seen.commitKeys[0])
+  })
+
+  it('4.4-MOB-SIL-27C keeps the attempt on the next retry after UPLOAD_IN_PROGRESS', async () => {
+    const seen = myFormRetryRoutes([
+      () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'UPLOAD_IN_PROGRESS', error: 'Conflict' },
+          { status: 409 }
+        ),
+      () => HttpResponse.json({ data: myFormProfile(processingMyForm) }),
+    ])
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-failed')).toHaveTextContent(
+        'This photo is still being saved. Try again in a moment.'
+      )
+    })
+    await retryWithSamePhoto()
+    await waitFor(() => expect(seen.commitKeys).toHaveLength(2))
+    serveReadyMyForm()
+    await waitFor(() => {
+      expect(screen.getByTestId('silhouette-my-form-ready')).toBeInTheDocument()
+    })
+
+    expect(seen.allocateKeys).toHaveLength(1)
+    expect(seen.puts).toBe(1)
+    expect(seen.commitKeys[0]).toMatch(UUID_V4)
+    expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+  })
+
+  /** The camera and library buttons are enabled only after the basewear confirmation. */
+  function expectConfirmationCleared() {
+    expect(screen.getByTestId('silhouette-my-form-library')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(screen.getByTestId('silhouette-my-form-camera')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  }
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('4.4-MOB-SIL-28 drops a photo the picker returns after the account changed, and uploads nothing', async () => {
+    const seen = myFormRetryRoutes([])
+    let returnPick: (result: unknown) => void = () => undefined
+    imagePicker.launchImageLibraryAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        returnPick = resolve
+      })
+    )
+    setMobileApplicationUserId('member-a')
+    renderEditor()
+    await openConfirmedMyFormTab()
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalled())
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      returnPick({
+        canceled: false,
+        assets: [{ uri: 'file:///photo.png', width: 1000, height: 1600 }],
+      })
+      // The picker callback resumes on microtasks only, so one macrotask turn lets it finish.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expectConfirmationCleared()
+    expect(screen.queryByTestId('silhouette-my-form-failed')).not.toBeInTheDocument()
+    expect(imageManipulator.manipulateAsync).not.toHaveBeenCalled()
+    expect(seen.allocateKeys).toHaveLength(0)
+    expect(seen.puts).toBe(0)
+  })
+
+  it('4.4-MOB-SIL-29 clears the confirmation and the failed photo on an account change, so Retry cannot upload under the next account', async () => {
+    const seen = myFormRetryRoutes([
+      () =>
+        HttpResponse.json(
+          { statusCode: 503, message: 'Service Unavailable', error: 'Error' },
+          { status: 503 }
+        ),
+    ])
+    setMobileApplicationUserId('member-a')
+    renderEditor()
+    await openConfirmedMyFormTab()
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+    await waitFor(() => screen.getByTestId('silhouette-my-form-retry'))
+
+    act(() => setMobileApplicationUserId('member-b'))
+
+    expect(screen.queryByTestId('silhouette-my-form-failed')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('silhouette-my-form-retry')).not.toBeInTheDocument()
+    expectConfirmationCleared()
+    expect(seen.allocateKeys).toHaveLength(1)
+    expect(seen.commitKeys).toHaveLength(1)
+  })
+
+  it('4.4-MOB-SIL-30 refuses the upload when resolving the bearer finds another account signed in', async () => {
+    const seen = myFormRetryRoutes([])
+    setMobileApplicationUserId('member-a')
+    renderEditor()
+    await openConfirmedMyFormTab()
+    // Resolving the token is where the app notices the stored session now belongs to member B.
+    const restoreSwitchingResolver = setMobileAccessTokenResolver(() => {
+      setMobileApplicationUserId('member-b')
+      return fakeAccessToken('auth-principal-member-b')
+    })
+
+    fireEvent.click(screen.getByTestId('silhouette-my-form-library'))
+
+    await waitFor(() => {
+      // The catalog's wardrobe.silhouette.errors.session_changed copy, never the raw error.
+      expect(screen.getByTestId('silhouette-my-form-failed')).toHaveTextContent(
+        'You signed out or switched accounts during this upload. Choose the photo again.'
+      )
+    })
+    restoreSwitchingResolver()
+    fireEvent.click(screen.getByTestId('silhouette-my-form-retry'))
+    expectConfirmationCleared()
+    expect(seen.allocateKeys).toHaveLength(0)
+    expect(seen.puts).toBe(0)
+    expect(seen.commitKeys).toHaveLength(0)
+  })
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  //
+  // Production follow-up 2026-11-19 (review round 6, Codex C5-1): an account change clears
+  // everything read for the previous account (profile, revision, signed photo URL, the bearer
+  // and a running poll) and reads the profile again for the account signed in now. Remove comes
+  // back only once that account's own read landed, and sends its bearer and revision.
+  describe('round 6 account switch with a My Form photo on screen', () => {
+    const MEMBER_A_PHOTO = 'https://example.test/member-a-my-form.png'
+    const MEMBER_B_PHOTO = 'https://example.test/member-b-my-form.png'
+    const MEMBER_B_TOKEN = fakeAccessToken('auth-principal-member-b')
+
+    function photo(url: string) {
+      return { ...readyMyForm, imageAccess: { ...readyMyForm.imageAccess, url } }
+    }
+
+    /** Both members' identity reads, keyed on the bearer each request carries. */
+    function serveBothIdentities() {
+      server.use(
+        http.get('*/api/v1/user/profile', ({ request }) => {
+          const authorization = request.headers.get('authorization')
+          const id =
+            authorization === `Bearer ${ACCESS_TOKEN}`
+              ? 'user-1'
+              : authorization === `Bearer ${MEMBER_B_TOKEN}`
+                ? 'user-b'
+                : null
+          if (!id) return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+          return HttpResponse.json({
+            user: {
+              id,
+              email: `${id}@synthetic.test`,
+              displayName: null,
+              birthdate: '1990-01-01T00:00:00.000Z',
+              role: 'guardian',
+            },
+            linkedGuardians: [],
+            linkedTeens: [],
+          })
+        })
+      )
+    }
+
+    function isMemberA(request: Request) {
+      return request.headers.get('authorization') === `Bearer ${ACCESS_TOKEN}`
+    }
+
+    let restoreMemberBResolver: (() => void) | null = null
+    afterEach(() => {
+      restoreMemberBResolver?.()
+      restoreMemberBResolver = null
+    })
+
+    /** Signs member B in: the app's resolver now answers B's bearer, then the account flips. */
+    function switchToMemberB() {
+      restoreMemberBResolver = setMobileAccessTokenResolver(() => MEMBER_B_TOKEN)
+      act(() => setMobileApplicationUserId('member-b'))
+    }
+
+    it("4.4-MOB-SIL-31 clears A's ready photo and removes only with B's bearer and revision", async () => {
+      let releaseMemberBRead: () => void = () => undefined
+      const memberBRead = new Promise<void>((resolve) => {
+        releaseMemberBRead = resolve
+      })
+      const removals: { authorization: string | null; ifMatch: string | null }[] = []
+      serveBothIdentities()
+      server.use(
+        http.get('*/api/v1/wardrobe/silhouette', async ({ request }) => {
+          if (isMemberA(request)) {
+            return HttpResponse.json({
+              data: myFormProfile(photo(MEMBER_A_PHOTO), { revision: 3 }),
+            })
+          }
+          await memberBRead
+          return HttpResponse.json({
+            data: myFormProfile(photo(MEMBER_B_PHOTO), { revision: 7 }),
+          })
+        }),
+        http.delete('*/api/v1/wardrobe/silhouette/my-form', ({ request }) => {
+          removals.push({
+            authorization: request.headers.get('authorization'),
+            ifMatch: request.headers.get('if-match'),
+          })
+          return HttpResponse.json({ data: { ...defaultProfile, revision: 8 } })
+        })
+      )
+      setMobileApplicationUserId('member-a')
+      const { onProfileChange } = renderEditor()
+      await waitFor(() => screen.getByTestId('silhouette-my-form-remove'))
+      expect(screen.getByTestId('silhouette-my-form-image')).toBeInTheDocument()
+      expect(onProfileChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ myForm: photo(MEMBER_A_PHOTO) })
+      )
+
+      switchToMemberB()
+
+      // Nothing of A's is left while B's own read is still on the wire.
+      expect(screen.queryByTestId('silhouette-my-form-ready')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('silhouette-my-form-image')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('silhouette-my-form-remove')).not.toBeInTheDocument()
+
+      await act(async () => {
+        releaseMemberBRead()
+        await Promise.resolve()
+      })
+      await waitFor(() => screen.getByTestId('silhouette-my-form-remove'))
+      expect(onProfileChange).toHaveBeenLastCalledWith(
+        expect.objectContaining({ revision: 7, myForm: photo(MEMBER_B_PHOTO) })
+      )
+      fireEvent.click(screen.getByTestId('silhouette-my-form-remove'))
+
+      await waitFor(() => expect(removals).toHaveLength(1))
+      expect(removals[0]).toEqual({
+        authorization: `Bearer ${MEMBER_B_TOKEN}`,
+        ifMatch: '"silhouette:user-b:7"',
+      })
+    })
+
+    it("4.4-MOB-SIL-32 drops A's poll answer that lands after the switch", async () => {
+      let memberAReads = 0
+      let releaseMemberAPoll: () => void = () => undefined
+      const memberAPoll = new Promise<void>((resolve) => {
+        releaseMemberAPoll = resolve
+      })
+      let pollReached: () => void = () => undefined
+      const memberAPollReached = new Promise<void>((resolve) => {
+        pollReached = resolve
+      })
+      serveBothIdentities()
+      server.use(
+        http.get('*/api/v1/wardrobe/silhouette', async ({ request }) => {
+          if (!isMemberA(request)) return HttpResponse.json({ data: defaultProfile })
+          memberAReads += 1
+          if (memberAReads === 1) {
+            return HttpResponse.json({ data: myFormProfile(processingMyForm) })
+          }
+          // A's poll is on the wire when the account changes, and answers afterwards.
+          pollReached()
+          await memberAPoll
+          return HttpResponse.json({
+            data: myFormProfile(photo(MEMBER_A_PHOTO), { revision: 3 }),
+          })
+        })
+      )
+      setMobileApplicationUserId('member-a')
+      const { onProfileChange } = renderEditor()
+      await waitFor(() => screen.getByTestId('silhouette-my-form-processing'))
+      await memberAPollReached
+
+      switchToMemberB()
+      await waitFor(() =>
+        expect(onProfileChange).toHaveBeenLastCalledWith(
+          expect.objectContaining({ mode: 'default_mannequin', myForm: null })
+        )
+      )
+      onProfileChange.mockClear()
+      await act(async () => {
+        releaseMemberAPoll()
+        // The held answer resolves through fetch and the response body on macrotasks.
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      expect(onProfileChange).not.toHaveBeenCalled()
+      expect(screen.queryByTestId('silhouette-my-form-ready')).not.toBeInTheDocument()
+      expect(
+        screen.queryByTestId('silhouette-my-form-processing')
+      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('silhouette-my-form-image')).not.toBeInTheDocument()
+    })
   })
 
   it('4.4-MOB-SIL-09 removes the My Form photo and reverts to the default mannequin', async () => {

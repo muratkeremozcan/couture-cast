@@ -139,7 +139,8 @@
       "network_timeout": "Upload timed out.",
       "storage_forbidden": "Storage access forbidden.",
       "consent_required": "Guardian consent required for wardrobe uploads.",
-      "upload_expired": "Upload session expired."
+      "upload_expired": "Upload session expired.",
+      "upload_session_changed": "You signed out or switched accounts during this upload. Choose the photo again."
     },
     "crop": {
       "title": "Crop & Position",
@@ -316,7 +317,8 @@
         "privacy_violation": "This photo can't be used. Choose a different photo.",
         "timeout": "Processing took too long. Try again.",
         "storage_error": "We couldn't save this photo. Try again.",
-        "confirm_required": "Confirm the basewear guidance before uploading."
+        "confirm_required": "Confirm the basewear guidance before uploading.",
+        "session_changed": "You signed out or switched accounts during this upload. Choose the photo again."
       }
     }
   },

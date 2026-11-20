@@ -86,8 +86,9 @@ export function interactiveTransaction<T>(
  * community_privacy_guards, so a pldbgapi2 abort can still reach one. It reaches the
  * caller unretried, and each caller settles it: the send guard records an abort before
  * the provider call as deferred and one after it as handoff_uncertain, the comment
- * outbox leaves the row to redeliver after its lease, and first-outfit telemetry logs
- * it. The guard spec pins the callers.
+ * outbox leaves the row to redeliver after its lease, first-outfit telemetry logs
+ * it, and the wardrobe deletion outbox backs the row off for its next retry (a storage
+ * removal is idempotent, so repeating one is harmless). The guard spec pins the callers.
  */
 export function singleRunTransaction<T>(
   prisma: Transactor,

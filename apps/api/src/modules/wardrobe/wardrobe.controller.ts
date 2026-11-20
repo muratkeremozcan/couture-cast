@@ -1,4 +1,4 @@
-// Story 4.1 Task 5 step 1 owner: expose Wardrobe API endpoints for upload url allocation, binary upload relay, and garment commit
+// Story 4.1 Task 5 step 1 owner: expose Wardrobe API endpoints for upload url allocation and garment commit
 // Story 4.2 Task 5 step 2 owner: expose suggestGarmentTags and updateGarmentTags API endpoints in apps/api/src/modules/wardrobe/wardrobe.controller.ts
 import {
   BadRequestException,
@@ -12,15 +12,11 @@ import {
   Inject,
   Param,
   Patch,
-  PayloadTooLargeException,
   Post,
-  Put,
-  Req,
   Res,
   UseGuards,
-  UnsupportedMediaTypeException,
 } from '@nestjs/common'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { z } from 'zod'
 import {
   createGarmentItemInputSchema,
@@ -36,9 +32,6 @@ import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeUploadGuard } from './wardrobe.guard'
 import { WardrobeService } from './wardrobe.service'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
-import { MAX_GARMENT_IMAGE_BYTES } from './wardrobe-image-validation'
-
-const garmentMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp'])
 
 function validationMessage(prefix: string, error: z.ZodError): string {
   const details = error.issues
@@ -90,46 +83,6 @@ export class WardrobeController {
     )
     response.status(result.replayed ? 200 : 201)
     return result.response
-  }
-
-  @Put('uploads/:uploadSessionId')
-  @HttpCode(204)
-  @Header('Cache-Control', 'private, no-store')
-  async uploadBytes(
-    @AuthContext() auth: RequestAuthContext,
-    @Param('uploadSessionId') uploadSessionId: string,
-    @Headers('x-upload-token') uploadToken: string,
-    @Headers('content-type') mimeType: string,
-    @Headers('content-length') contentLengthHeader: string | undefined,
-    @Req() request: Request
-  ) {
-    if (!uploadToken) {
-      throw new BadRequestException('Missing upload token header')
-    }
-
-    const parsedMimeType = garmentMimeTypeSchema.safeParse(mimeType)
-    if (!parsedMimeType.success) {
-      throw new UnsupportedMediaTypeException('UNSUPPORTED_IMAGE_TYPE')
-    }
-
-    const rawBody = (request as unknown as { body?: unknown }).body
-    const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.alloc(0)
-    const contentLength = contentLengthHeader
-      ? Number.parseInt(contentLengthHeader, 10)
-      : undefined
-    if (contentLength !== undefined && contentLength > MAX_GARMENT_IMAGE_BYTES) {
-      throw new PayloadTooLargeException('IMAGE_TOO_LARGE')
-    }
-
-    await this.wardrobeService.uploadBytes(
-      uploadSessionId,
-      uploadToken,
-      auth.userId,
-      auth.role,
-      parsedMimeType.data,
-      Number.isSafeInteger(contentLength) ? contentLength : undefined,
-      bodyBuffer
-    )
   }
 
   @Post('garments')

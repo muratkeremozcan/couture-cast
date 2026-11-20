@@ -2,9 +2,12 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read vi.fn() members off the mock boundary objects, which is the established pattern for these suites. */
-import { createHash, createHmac } from 'node:crypto'
+import { createHash } from 'node:crypto'
 import {
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
   ServiceUnavailableException,
@@ -30,13 +33,19 @@ import type { TelemetryService } from '../telemetry/telemetry.service'
 import type { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import type { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { WardrobeService } from './wardrobe.service'
+import {
+  createDeletionTable,
+  type DeletionTable,
+} from '../../testing/wardrobe-object-deletion-table'
 
 const USER_ID = 'user-123'
 const OTHER_USER_ID = 'other-user-456'
-const GARMENT_ID = 'garment-123'
-const SESSION_ID = 'session-123'
+// API-allocated ids are UUIDs; a row whose ids are not never reaches a storage key (round 3).
+const GARMENT_ID = '9b2f6c1e-3d4a-4e5b-8c6d-7e8f9a0b1c2d'
+const SESSION_ID = '4a1b2c3d-5e6f-4a7b-8c9d-0e1f2a3b4c5d'
 const IDEMPOTENCY_KEY = '34eff0f2-39b2-454e-b6b1-44a9ebfdb8ec' // gitleaks:allow
-const UPLOAD_SECRET = 'wardrobe-test-secret-at-least-32-bytes' // gitleaks:allow
+const SIGNED_UPLOAD_URL =
+  'https://project.supabase.test/storage/v1/object/upload/sign/wardrobe-images/garment.png?token=signed'
 const FIXTURE_NOW = new Date('2026-08-04T09:25:00.000Z')
 const FIXTURE_EXPIRY = new Date('2026-08-04T09:35:00.000Z')
 
@@ -51,6 +60,8 @@ type MockGarmentRepository = {
 
 type MockPrisma = {
   garmentItem: MockGarmentRepository
+  wardrobeObjectDeletion: DeletionTable
+  $queryRaw: Mock
   $transaction: Mock
 }
 
@@ -90,17 +101,16 @@ function garmentFixture(overrides: Partial<GarmentItem> = {}): GarmentItem {
     has_bg_cleanup: false,
     completion_telemetry_emitted_at: null,
     processing_job_enqueued_at: null,
+    publish_attempt_id: null,
+    publish_started_at: null,
+    upload_ended_at: null,
+    held_source_sha256: null,
+    held_source_captured_at: null,
     failure_code: null,
     created_at: FIXTURE_NOW,
     updated_at: FIXTURE_NOW,
     ...overrides,
   } as GarmentItem
-}
-
-function uploadToken(expiresAt: Date, userId = USER_ID, sessionId = SESSION_ID): string {
-  return createHmac('sha256', UPLOAD_SECRET)
-    .update(`${sessionId}.${userId}.${expiresAt.toISOString()}`)
-    .digest('base64url')
 }
 
 function commitPayloadHash(input: {
@@ -130,16 +140,26 @@ function createHarness() {
   }
   const mockPrisma: MockPrisma = {
     garmentItem,
+    // Round 4: the outbox locks a key's row, then reads and settles its obligation.
+    wardrobeObjectDeletion: createDeletionTable(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     $transaction: vi.fn(async (callback: (tx: MockPrisma) => Promise<unknown>) =>
       callback(mockPrisma)
     ),
   }
   const captureEvent = vi.fn().mockResolvedValue(undefined)
   const assertWardrobeUploadAllowed = vi.fn().mockResolvedValue(undefined)
-  const upload = vi.fn().mockResolvedValue(undefined)
-  const download = vi.fn().mockResolvedValue(Buffer.alloc(0))
+  const createUploadSession = vi.fn().mockResolvedValue({
+    uploadUrl: SIGNED_UPLOAD_URL,
+    uploadToken: 'storage-signed-upload-token',
+    tokenExpiresAt: new Date('2026-08-04T11:25:00.000Z'),
+  })
+  const downloadBounded = vi
+    .fn()
+    .mockResolvedValue({ status: 'present', bytes: Buffer.alloc(0) })
   const signReadUrl = vi.fn().mockResolvedValue('https://storage.test/signed.png')
   const remove = vi.fn().mockResolvedValue(undefined)
+  const publish = vi.fn().mockResolvedValue(undefined)
   const enqueue = vi.fn().mockResolvedValue(undefined)
   const invalidateUserCache = vi.fn().mockResolvedValue(true)
 
@@ -148,10 +168,11 @@ function createHarness() {
     { captureEvent } as unknown as TelemetryService,
     { assertWardrobeUploadAllowed } as unknown as GuardianService,
     {
-      upload,
-      download,
+      createUploadSession,
+      downloadBounded,
       signReadUrl,
       remove,
+      publish,
     } as unknown as SupabaseWardrobeStorageAdapter,
     { enqueue } as unknown as WardrobeProcessingQueue,
     { invalidateUserCache } as unknown as RitualService
@@ -162,16 +183,29 @@ function createHarness() {
     prisma: mockPrisma,
     captureEvent,
     assertWardrobeUploadAllowed,
-    upload,
-    download,
+    createUploadSession,
+    downloadBounded,
     signReadUrl,
     remove,
+    publish,
     enqueue,
     invalidateUserCache,
   }
 }
 
 type Harness = ReturnType<typeof createHarness>
+
+/**
+ * Round 5 (Codex C4-4): a commit classifies and claims inside locked transactions of its own, so
+ * the transition is told apart as the one serializable transaction.
+ */
+function transitionCount(h: Harness): number {
+  return h.prisma.$transaction.mock.calls.filter(
+    ([, options]) =>
+      (options as { isolationLevel?: unknown } | undefined)?.isolationLevel ===
+      Prisma.TransactionIsolationLevel.Serializable
+  ).length
+}
 
 describe('WardrobeService failure and degraded-dependency paths', () => {
   let validPng: Buffer
@@ -206,12 +240,10 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(FIXTURE_NOW)
-    vi.stubEnv('WARDROBE_UPLOAD_TOKEN_SECRET', UPLOAD_SECRET)
     h = createHarness()
   })
 
   afterEach(() => {
-    vi.unstubAllEnvs()
     vi.useRealTimers()
   })
 
@@ -260,22 +292,45 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
         )
 
         const [{ data }] = h.prisma.garmentItem.create.mock.calls[0] as [
-          { data: { object_path: string } },
+          { data: { id: string; object_path: string; upload_session_id: string } },
         ]
-        expect(data.object_path.endsWith(`.${extension}`)).toBe(true)
+        expect(data.object_path).toBe(`wardrobe/${USER_ID}/${data.id}.${extension}`)
+        // The signed upload URL is scoped to the session's staging key, same extension.
+        expect(h.createUploadSession).toHaveBeenCalledExactlyOnceWith(
+          `staging/${USER_ID}/garment/${data.upload_session_id}.${extension}`
+        )
       }
     )
 
-    /** A replay of a key whose session already lapsed must not hand back a dead URL. */
-    it('writes no upload session when the API public base is not configured', async () => {
-      vi.stubEnv('NODE_ENV', 'production')
-      vi.stubEnv('PUBLIC_API_URL', '')
-      vi.stubEnv('VERCEL_ENV', '')
+    /**
+     * Storage refusing to sign surfaces as the 503 the adapter raises. Review round 2,
+     * 2026-11-19: the URL is signed before the row is written, so the outage leaves no session
+     * behind and a same-key retry allocates as if for the first time.
+     */
+    it('answers 503 when storage cannot sign and writes no session row', async () => {
+      h.prisma.garmentItem.create.mockImplementation(
+        ({ data }: { data: Partial<GarmentItem> }) =>
+          Promise.resolve(garmentFixture({ ...data, created_at: FIXTURE_NOW }))
+      )
+      h.createUploadSession.mockRejectedValueOnce(
+        new ServiceUnavailableException('STORAGE_PERMISSION_DENIED')
+      )
 
       await expect(
         h.service.createUploadUrl(USER_ID, 'guardian', declaration, IDEMPOTENCY_KEY)
-      ).rejects.toThrow('PUBLIC_API_URL must be set')
+      ).rejects.toThrow(ServiceUnavailableException)
       expect(h.prisma.garmentItem.create).not.toHaveBeenCalled()
+
+      const retry = await h.service.createUploadUrl(
+        USER_ID,
+        'guardian',
+        declaration,
+        IDEMPOTENCY_KEY
+      )
+
+      expect(retry.replayed).toBe(false)
+      expect(retry.response.data.uploadUrl).toBe(SIGNED_UPLOAD_URL)
+      expect(h.prisma.garmentItem.create).toHaveBeenCalledTimes(1)
     })
 
     it('rejects a replay against a lapsed upload session', async () => {
@@ -341,6 +396,11 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
 
       expect(result.replayed).toBe(true)
       expect(result.response.data.uploadSessionId).toBe(SESSION_ID)
+      // The loser's own pre-signed URL goes unused; the winner's staging key is signed.
+      expect(h.createUploadSession).toHaveBeenCalledTimes(2)
+      expect(h.createUploadSession).toHaveBeenLastCalledWith(
+        `staging/${USER_ID}/garment/${SESSION_ID}.png`
+      )
     })
 
     it('reports key reuse when the racing winner declared different bytes', async () => {
@@ -388,7 +448,70 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     })
   })
 
-  describe('uploadBytes', () => {
+  /**
+   * Clients PUT the bytes straight to storage, so commit is the one place they are checked
+   * against the allocation. Every mismatch removes the staged object, ends the session (review
+   * round 1, 2026-11-19, Codex 3) and leaves no garment behind. Round 3: the session end and the
+   * deletion record commit in one transaction, and nothing is published.
+   */
+  describe('commitGarment verification of the stored object', () => {
+    const commitInput = {
+      garmentId: GARMENT_ID,
+      uploadSessionId: SESSION_ID,
+      hasCropping: true,
+      hasBgCleanup: false,
+    }
+    const stagingPath = `staging/${USER_ID}/garment/${SESSION_ID}.png`
+
+    /**
+     * Round 4: the attempt claims the publication first (updateMany call 1); the rejection
+     * (call 2) ends the session, guarded on that same claim (Codex round 3 finding 7). Round 5
+     * (C4-2): it sets upload_ended_at and keeps the session id, guarded on active retention as
+     * well. The release that follows matches nothing in the database, since the rejection
+     * consumed the claim.
+     */
+    function expectSessionEnded() {
+      const [claim, rejection, ...rest] = h.prisma.garmentItem.updateMany.mock.calls
+      const attemptId = (claim?.[0] as { data: { publish_attempt_id: string } }).data
+        .publish_attempt_id
+      expect(attemptId).toEqual(expect.any(String))
+      expect(rejection?.[0]).toEqual({
+        where: {
+          id: GARMENT_ID,
+          user_id: USER_ID,
+          upload_session_id: SESSION_ID,
+          publish_attempt_id: attemptId,
+          retention_status: 'active',
+          upload_ended_at: null,
+          upload_status: { in: ['pending_upload', 'bytes_uploaded'] },
+        },
+        data: {
+          upload_status: 'pending_upload',
+          upload_ended_at: FIXTURE_NOW,
+          upload_expires_at: FIXTURE_NOW,
+          publish_attempt_id: null,
+          publish_started_at: null,
+        },
+      })
+      expect(rest).toEqual([
+        [
+          {
+            where: { id: GARMENT_ID, publish_attempt_id: attemptId },
+            data: { publish_attempt_id: null, publish_started_at: null },
+          },
+        ],
+      ])
+      expect(h.prisma.wardrobeObjectDeletion.createMany).toHaveBeenCalledExactlyOnceWith({
+        data: [{ object_path: stagingPath, reason: 'upload_rejected' }],
+        skipDuplicates: true,
+      })
+      expect(h.publish).not.toHaveBeenCalled()
+      // The classification and claim, the rejection, then the outbox's locked removal; the row
+      // was never moved on.
+      expect(h.prisma.$transaction).toHaveBeenCalledTimes(4)
+      expect(transitionCount(h)).toBe(0)
+    }
+
     function pending(overrides: Partial<GarmentItem> = {}): GarmentItem {
       return garmentFixture({
         file_size_bytes: validPng.length,
@@ -399,100 +522,100 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
       })
     }
 
-    async function upload(garment: GarmentItem, bytes = validPng, mime = 'image/png') {
+    async function commit(garment: GarmentItem, stored = validPng) {
       h.prisma.garmentItem.findUnique.mockResolvedValue(garment)
-      return h.service.uploadBytes(
-        SESSION_ID,
-        uploadToken(FIXTURE_EXPIRY),
-        USER_ID,
-        'guardian',
-        mime as 'image/png',
-        bytes.length,
-        bytes
-      )
+      h.downloadBounded.mockResolvedValue({ status: 'present', bytes: stored })
+      return h.service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
     }
 
-    it('refuses bytes for a garment that is pending deletion', async () => {
-      await expect(
-        upload(pending({ retention_status: 'deletion_pending' }))
-      ).rejects.toThrow(ForbiddenException)
-      expect(h.upload).not.toHaveBeenCalled()
-    })
-
-    /** The upload token is single-use: a second PUT must not overwrite stored bytes. */
-    it('refuses a second upload against a consumed session', async () => {
-      await expect(upload(pending({ upload_status: 'bytes_uploaded' }))).rejects.toThrow(
-        'UPLOAD_TOKEN_CONSUMED'
-      )
-      expect(h.upload).not.toHaveBeenCalled()
-    })
-
-    /**
-     * The Content-Type on the PUT must match what was declared at allocation, or a
-     * caller could store WebP bytes under a path allocated for PNG.
-     */
-    it('refuses bytes whose content type differs from the declared type', async () => {
-      await expect(
-        upload(pending({ mime_type: 'image/webp' }), validPng, 'image/png')
-      ).rejects.toThrow('INVALID_UPLOAD_BODY')
-    })
-
     it('refuses a garment row with an incomplete upload declaration', async () => {
-      await expect(upload(pending({ content_sha256: null }))).rejects.toThrow(
-        'INVALID_UPLOAD_DECLARATION'
-      )
+      const failure = commit(pending({ content_sha256: null }))
+
+      await expect(failure).rejects.toThrow(BadRequestException)
+      await expect(failure).rejects.toThrow('INVALID_UPLOAD_DECLARATION')
+      expect(h.downloadBounded).not.toHaveBeenCalled()
+      expect(transitionCount(h)).toBe(0)
     })
 
-    it('reports a checksum mismatch as unprocessable', async () => {
-      await expect(upload(pending({ content_sha256: 'f'.repeat(64) }))).rejects.toThrow(
+    it('reports a checksum mismatch as unprocessable and removes the object', async () => {
+      await expect(commit(pending({ content_sha256: 'f'.repeat(64) }))).rejects.toThrow(
         UnprocessableEntityException
       )
-      expect(h.upload).not.toHaveBeenCalled()
+      expect(h.remove).toHaveBeenCalledExactlyOnceWith([stagingPath])
+      expectSessionEnded()
     })
 
     it('reports declared dimensions that the decoder disagrees with', async () => {
-      await expect(upload(pending({ width_px: 1024 }))).rejects.toThrow(
+      await expect(commit(pending({ width_px: 1024 }))).rejects.toThrow(
         'IMAGE_DIMENSIONS_INVALID'
       )
+      expect(h.remove).toHaveBeenCalledExactlyOnceWith([stagingPath])
+      expectSessionEnded()
     })
 
-    /** Magic-byte sniffing, not the header, decides the real format. */
-    it('reports bytes whose real format contradicts the declared type', async () => {
+    /** Magic-byte sniffing, not the Content-Type the client sent storage, decides the format. */
+    it('reports stored bytes whose real format contradicts the declared type', async () => {
       const garment = pending({
         file_size_bytes: jpegBytes.length,
         content_sha256: createHash('sha256').update(jpegBytes).digest('hex'),
       })
 
-      await expect(upload(garment, jpegBytes, 'image/png')).rejects.toThrow(
+      await expect(commit(garment, jpegBytes)).rejects.toThrow(
         UnsupportedMediaTypeException
       )
-    })
-
-    /** Any other validation failure degrades to a generic decode failure. */
-    it('reports a size mismatch against the allocation as a decode failure', async () => {
-      await expect(
-        upload(pending({ file_size_bytes: validPng.length + 1 }))
-      ).rejects.toThrow('IMAGE_DECODE_FAILED')
+      expect(h.remove).toHaveBeenCalledExactlyOnceWith([stagingPath])
+      expectSessionEnded()
     })
 
     /**
-     * The state transition is the real mutex. If a concurrent request consumed the
-     * session between verification and the update, the bytes just written must be
-     * removed rather than left orphaned in storage.
+     * Review round 1, 2026-11-19 (TEA): commit is the only byte check now, so a size mismatch
+     * names itself (422 IMAGE_SIZE_MISMATCH) instead of degrading to IMAGE_DECODE_FAILED.
      */
-    it('removes the uploaded object when a concurrent request consumed the session', async () => {
-      h.prisma.garmentItem.updateMany.mockResolvedValue({ count: 0 })
+    it('reports a size mismatch against the allocation as IMAGE_SIZE_MISMATCH', async () => {
+      const failure = commit(pending({ file_size_bytes: validPng.length + 1 }))
 
-      await expect(upload(pending())).rejects.toThrow('UPLOAD_TOKEN_CONSUMED')
-      expect(h.remove).toHaveBeenCalledWith([`wardrobe/${USER_ID}/${GARMENT_ID}.png`])
+      await expect(failure).rejects.toThrow(UnprocessableEntityException)
+      await expect(failure).rejects.toThrow('IMAGE_SIZE_MISMATCH')
+      expect(h.remove).toHaveBeenCalledExactlyOnceWith([stagingPath])
+      expectSessionEnded()
+    })
+
+    /** A storage fault is not a missing object: it must not read as "upload again". */
+    it('surfaces a storage fault while reading the object as 503', async () => {
+      h.prisma.garmentItem.findUnique.mockResolvedValue(pending())
+      h.downloadBounded.mockRejectedValue(
+        new ServiceUnavailableException('STORAGE_PERMISSION_DENIED')
+      )
+
+      await expect(
+        h.service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
+      ).rejects.toThrow(ServiceUnavailableException)
+      expect(h.remove).not.toHaveBeenCalled()
+      expect(h.publish).not.toHaveBeenCalled()
+      // Round 4: only the publication claim and its release; the session stays open.
+      const calls = h.prisma.garmentItem.updateMany.mock.calls
+      expect(calls).toHaveLength(2)
+      expect(calls[1]?.[0]).toEqual({
+        where: { id: GARMENT_ID, publish_attempt_id: expect.any(String) as unknown },
+        data: { publish_attempt_id: null, publish_started_at: null },
+      })
+      expect(transitionCount(h)).toBe(0)
     })
   })
 
   describe('listGarments', () => {
     it('signs a read URL for every committed garment', async () => {
       h.prisma.garmentItem.findMany.mockResolvedValue([
-        garmentFixture({ id: 'g-1', upload_status: 'ready' }),
-        garmentFixture({ id: 'g-2', upload_status: 'awaiting_tags' }),
+        garmentFixture({
+          id: 'g-1',
+          upload_status: 'ready',
+          object_path: `wardrobe/${USER_ID}/g-1.png`,
+        }),
+        garmentFixture({
+          id: 'g-2',
+          upload_status: 'awaiting_tags',
+          object_path: `wardrobe/${USER_ID}/g-2.png`,
+        }),
       ])
 
       const result = await h.service.listGarments(USER_ID)
@@ -511,12 +634,12 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
         garmentFixture({
           id: 'g-1',
           upload_status: 'ready',
-          object_path: 'users/u/g-1.png',
+          object_path: `wardrobe/${USER_ID}/g-1.png`,
         }),
         garmentFixture({
           id: 'g-2',
           upload_status: 'ready',
-          object_path: 'users/u/g-2.png',
+          object_path: `wardrobe/${USER_ID}/g-2.png`,
         }),
       ])
       h.signReadUrl.mockImplementation((objectPath: string) =>
@@ -541,6 +664,69 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
         { garmentId: 'g-2', errorClass: 'ServiceUnavailableException' },
         'garment_image_signing_failed'
       )
+    })
+
+    /**
+     * Review round 1, 2026-11-19 (Codex 1): a path column naming another member's object must
+     * never be signed for this member. That garment shows no image; storage is never asked.
+     */
+    it('never signs a path that is not the garment own object', async () => {
+      h.prisma.garmentItem.findMany.mockResolvedValue([
+        garmentFixture({
+          id: 'g-1',
+          upload_status: 'ready',
+          object_path: `wardrobe/${OTHER_USER_ID}/g-1.png`,
+        }),
+      ])
+
+      const result = await h.service.listGarments(USER_ID)
+
+      expect(result.data[0]?.imageAccess).toBeNull()
+      expect(h.signReadUrl).not.toHaveBeenCalled()
+    })
+
+    /**
+     * Codex round 2 finding 8: seeded ready garments carry readable ids and no MIME type. Read
+     * signing parses the stored path and compares owner, kind and this garment's own id in any
+     * extension the bucket takes, so such a row keeps its image.
+     */
+    it('signs a seed-shaped ready garment with no MIME type and readable ids', async () => {
+      h.prisma.garmentItem.findMany.mockResolvedValue([
+        garmentFixture({
+          id: 'teen-1-garment-1',
+          user_id: 'teen-1',
+          upload_session_id: null,
+          upload_status: 'ready',
+          mime_type: null,
+          file_size_bytes: null,
+          object_path: 'wardrobe/teen-1/teen-1-garment-1.png',
+        }),
+      ])
+
+      const result = await h.service.listGarments('teen-1')
+
+      expect(result.data[0]?.imageAccess?.url).toBe('https://storage.test/signed.png')
+      expect(h.signReadUrl).toHaveBeenCalledExactlyOnceWith(
+        'wardrobe/teen-1/teen-1-garment-1.png',
+        900
+      )
+    })
+
+    /** The exact object id counts: a sibling garment of the same member is not this one's image. */
+    it('never signs a path naming another garment of the same member', async () => {
+      h.prisma.garmentItem.findMany.mockResolvedValue([
+        garmentFixture({
+          id: 'g-1',
+          upload_status: 'ready',
+          mime_type: null,
+          object_path: `wardrobe/${USER_ID}/g-2.png`,
+        }),
+      ])
+
+      const result = await h.service.listGarments(USER_ID)
+
+      expect(result.data[0]?.imageAccess).toBeNull()
+      expect(h.signReadUrl).not.toHaveBeenCalled()
     })
 
     /**
@@ -750,6 +936,31 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
       )
     })
 
+    /**
+     * Codex round 2 finding 8: a tag edit on a seed-shaped ready garment (no MIME type) used to
+     * save the edit and then fail building its response. It now answers with the image.
+     */
+    it('answers a tag edit on a ready garment with no MIME type with its image', async () => {
+      const seeded = confirmed({
+        category: 'bottom',
+        mime_type: null,
+        upload_session_id: null,
+      })
+      h.prisma.garmentItem.findFirst.mockResolvedValue(seeded)
+      h.prisma.garmentItem.findUniqueOrThrow.mockResolvedValue({
+        ...seeded,
+        category: 'top',
+      })
+
+      const result = await h.service.updateGarmentTags(USER_ID, 'teen', GARMENT_ID, tags)
+
+      expect(result.data.imageAccess?.url).toBe('https://storage.test/signed.png')
+      expect(h.signReadUrl).toHaveBeenCalledExactlyOnceWith(
+        `wardrobe/${USER_ID}/${GARMENT_ID}.png`,
+        900
+      )
+    })
+
     /** Analytics is not on the critical path: the user's tags are already saved. */
     it('still returns the confirmed garment when telemetry delivery throws', async () => {
       h.prisma.garmentItem.findFirst.mockResolvedValue(awaitingTags())
@@ -852,8 +1063,16 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     }
 
     beforeEach(() => {
-      h.download.mockResolvedValue(validPng)
+      h.downloadBounded.mockResolvedValue({ status: 'present', bytes: validPng })
     })
+
+    /**
+     * The row move to processing matches nothing (another commit got there first); the
+     * publication claim and every other conditional write still apply.
+     */
+    function transitionMatchesNothing({ data }: { data: Record<string, unknown> }) {
+      return Promise.resolve({ count: data.upload_status === 'processing' ? 0 : 1 })
+    }
 
     it('refuses a commit for a garment that does not exist', async () => {
       await expect(
@@ -903,7 +1122,8 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
       )
 
       expect(result.replayed).toBe(true)
-      expect(h.enqueue).toHaveBeenCalledWith(GARMENT_ID)
+      // The job id is the garment id until a legal hold defers the garment (round 6, C5-7).
+      expect(h.enqueue).toHaveBeenCalledWith(GARMENT_ID, GARMENT_ID)
     })
 
     /** A garment past processing has already been handed off; do not enqueue twice. */
@@ -968,13 +1188,38 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
       await expect(
         h.service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
       ).rejects.toThrow(UnprocessableEntityException)
+      // A legacy relay row's bytes sit at the final path, so that is what is rejected.
       expect(h.remove).toHaveBeenCalledWith([`wardrobe/${USER_ID}/${GARMENT_ID}.png`])
-      expect(h.prisma.$transaction).not.toHaveBeenCalled()
+      expect(h.prisma.wardrobeObjectDeletion.createMany).toHaveBeenCalledExactlyOnceWith({
+        data: [
+          {
+            object_path: `wardrobe/${USER_ID}/${GARMENT_ID}.png`,
+            reason: 'upload_rejected',
+          },
+        ],
+        skipDuplicates: true,
+      })
+      // The classification and claim, the rejection, then the outbox's locked removal; the row
+      // was never moved on.
+      expect(h.prisma.$transaction).toHaveBeenCalledTimes(4)
+      expect(transitionCount(h)).toBe(0)
+      expect(h.prisma.garmentItem.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: {
+            upload_status: 'pending_upload',
+            upload_ended_at: FIXTURE_NOW,
+            upload_expires_at: FIXTURE_NOW,
+            publish_attempt_id: null,
+            publish_started_at: null,
+          },
+        })
+      )
     })
 
     /** One commit key belongs to one garment; reusing it across garments conflicts. */
     it('reports key reuse when the key already belongs to a different garment', async () => {
       h.prisma.garmentItem.findUnique
+        .mockResolvedValueOnce(verifiable())
         .mockResolvedValueOnce(verifiable())
         .mockResolvedValueOnce(garmentFixture({ id: 'a-different-garment' }))
         .mockResolvedValueOnce(null)
@@ -992,9 +1237,10 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     it('surfaces the claim conflict when there is no committed row to reconcile', async () => {
       h.prisma.garmentItem.findUnique
         .mockResolvedValueOnce(verifiable())
+        .mockResolvedValueOnce(verifiable())
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(verifiable())
-      h.prisma.garmentItem.updateMany.mockResolvedValue({ count: 0 })
+      h.prisma.garmentItem.updateMany.mockImplementation(transitionMatchesNothing)
 
       await expect(
         h.service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
@@ -1025,6 +1271,7 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     it('reports key reuse when the racing winner committed a different payload', async () => {
       h.prisma.garmentItem.findUnique
         .mockResolvedValueOnce(verifiable())
+        .mockResolvedValueOnce(verifiable())
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(
           verifiable({
@@ -1033,7 +1280,7 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
             commit_payload_hash: 'a-different-hash',
           })
         )
-      h.prisma.garmentItem.updateMany.mockResolvedValue({ count: 0 })
+      h.prisma.garmentItem.updateMany.mockImplementation(transitionMatchesNothing)
 
       await expect(
         h.service.commitGarment(USER_ID, 'guardian', commitInput, IDEMPOTENCY_KEY)
@@ -1044,6 +1291,7 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     it('replays a racing winner that reached awaiting_tags without enqueuing again', async () => {
       h.prisma.garmentItem.findUnique
         .mockResolvedValueOnce(verifiable())
+        .mockResolvedValueOnce(verifiable())
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(
           verifiable({
@@ -1052,7 +1300,7 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
             commit_payload_hash: payloadHash,
           })
         )
-      h.prisma.garmentItem.updateMany.mockResolvedValue({ count: 0 })
+      h.prisma.garmentItem.updateMany.mockImplementation(transitionMatchesNothing)
 
       const result = await h.service.commitGarment(
         USER_ID,
