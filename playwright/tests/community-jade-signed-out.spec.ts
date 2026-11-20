@@ -5,6 +5,7 @@
 // appeared. 3.6-E2E-007 proves the member view, but it needs a seeded member and skips outside
 // the local stack. This file needs no member, so it runs in every environment, including the
 // daily production status run: a stub, a missing explainer or a dead tab turns that run red.
+import type { Page } from '@playwright/test'
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 
@@ -19,7 +20,7 @@ test.use({
     'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
 })
 
-async function expectLookbookVocabulary(page: import('@playwright/test').Page) {
+async function expectLookbookVocabulary(page: Page) {
   const community = page.getByTestId('community-page')
   await expect(community.getByRole('heading', { level: 1 })).toHaveText('Community')
 
