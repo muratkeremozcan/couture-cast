@@ -72,7 +72,9 @@ describe('moderation-review consumer registration', () => {
 describe('U-W-POLICY: wardrobe worker guardian consent policy', () => {
   it('resolves the policy before it opens a queue', () => {
     const source = readFileSync(path.resolve(__dirname, 'wardrobe.bootstrap.ts'), 'utf8')
-    const start = source.slice(source.indexOf('async function startWardrobeWorker()'))
+    const start = source.slice(
+      source.indexOf('export async function startWardrobeWorker(')
+    )
     const resolved = start.indexOf('resolveGuardianConsentPolicy()')
     expect(resolved).toBeGreaterThan(-1)
     expect(resolved).toBeLessThan(start.indexOf('createQueues()'))

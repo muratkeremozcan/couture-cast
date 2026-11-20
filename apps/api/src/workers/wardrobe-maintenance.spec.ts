@@ -33,11 +33,24 @@ function sharedRedis() {
 }
 
 function timers() {
-  const pending: { callback: () => void; ms: number; cleared: boolean }[] = []
+  const pending: {
+    callback: () => void
+    ms: number
+    cleared: boolean
+    fired: boolean
+  }[] = []
   return {
     pending,
     setTimer: (callback: () => void, ms: number) => {
-      const entry = { callback, ms, cleared: false }
+      const entry = {
+        callback: () => {
+          entry.fired = true
+          callback()
+        },
+        ms,
+        cleared: false,
+        fired: false,
+      }
       pending.push(entry)
       return Object.assign(entry as unknown as NodeJS.Timeout, { unref: () => undefined })
     },
@@ -45,6 +58,8 @@ function timers() {
       ;(timer as unknown as { cleared: boolean }).cleared = true
     },
     live: () => pending.filter((entry) => !entry.cleared),
+    /** Timers that can still fire: neither cleared by the loop nor already fired. */
+    armed: () => pending.filter((entry) => !entry.cleared && !entry.fired),
   }
 }
 
@@ -203,7 +218,11 @@ describe('WardrobeMaintenanceLoop', () => {
     expect(sweeps.drainDeletions).toHaveBeenCalledOnce()
     expect(sweeps.purgeExpiredAndDeletedGarments).not.toHaveBeenCalled()
     expect(shared.calls).toEqual([
-      ['wardrobe-maintenance:wardrobe-deletion-drain', 'copy-a', 840_000],
+      [
+        'wardrobe-maintenance:wardrobe-deletion-drain',
+        'copy-a',
+        WARDROBE_MAINTENANCE_TASKS['wardrobe-deletion-drain'].lockMs,
+      ],
     ])
     expect(log.info).toHaveBeenCalledWith(
       { job: 'wardrobe-deletion-drain', result: 3 },
@@ -355,7 +374,7 @@ describe('WardrobeMaintenanceLoop', () => {
     releaseDrain()
     await stopping
     expect(stopped).toBe(true)
-    expect(clock.live()).toHaveLength(0)
+    expect(clock.armed()).toHaveLength(0)
   })
 
   it('keeps no BullMQ queue or scheduler: it only reads and writes its own Redis lock keys', () => {

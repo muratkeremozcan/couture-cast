@@ -615,7 +615,7 @@ describe('GarmentTaggingModal manual mode', () => {
 
     expect(await screen.findByText(MANUAL_COPY)).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.queryByText('Loading your garment...')).not.toBeInTheDocument()
+      expect(screen.queryAllByText('Loading your garment...')).toHaveLength(0)
     })
     const dialogText = screen.getByRole('dialog').textContent ?? ''
     expect(dialogText).not.toMatch(/\bsuggest|\bAI\b|\bsmart\b/i)
@@ -642,7 +642,8 @@ describe('GarmentTaggingModal manual mode', () => {
     await screen.findByText(MANUAL_COPY)
 
     expect(screen.getByRole('button', { name: 'Confirm & Save Tags' })).toBeDisabled()
-    await user.click(screen.getByRole('radio', { name: /Outerwear/ }))
+    // Exact name: the Cool comfort option's description also mentions outerwear.
+    await user.click(screen.getByRole('radio', { name: 'Outerwear' }))
     await user.click(screen.getByRole('radio', { name: /Cool/ }))
     await user.click(screen.getByRole('button', { name: 'Confirm & Save Tags' }))
 
@@ -721,7 +722,8 @@ describe('GarmentTaggingModal manual mode', () => {
 
       // Pending: neutral copy only, with the (neutral) loading line that will end.
       expect(screen.getByText(PENDING_COPY)).toBeInTheDocument()
-      expect(screen.getByText('Loading your garment...')).toBeInTheDocument()
+      // The visible line and the screen-reader status both carry it.
+      expect(screen.getAllByText('Loading your garment...').length).toBeGreaterThan(0)
       expect(screen.getByRole('dialog').textContent ?? '').not.toMatch(SUGGESTION_WORDING)
 
       await act(async () => {

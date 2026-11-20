@@ -4,7 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 58: Hosted wardrobe workers and manual tagging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -173,11 +173,11 @@ describe('WardrobeColorProcessor', () => {
         tagging_failure_code: 'TAGGING_MANUAL_MODE',
       }) as unknown as Record<string, unknown>,
     })
-    // No snapshot is written: the stored suggestions stay empty (null), never a stale or partial one.
+    // No snapshot is written: the stored suggestions are cleared to a database null, never a stale or partial one.
     const written = (
       mockUpdateMany.mock.calls.at(-1)?.[0] as { data: Record<string, unknown> }
     ).data
-    expect(written.tag_suggestions ?? null).toBeNull()
+    expect(written.tag_suggestions).toBe(Prisma.DbNull)
     expect(errorLog).not.toHaveBeenCalled()
     expect(warnLog).not.toHaveBeenCalled()
     expect(infoLog).toHaveBeenCalledWith(
