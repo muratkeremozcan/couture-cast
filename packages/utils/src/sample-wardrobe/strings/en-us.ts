@@ -98,6 +98,7 @@ export const enUS = {
     count: '{count} sample items',
   },
   conversionDetail: {
+    garmentHeading: 'Add your own garment',
     canSave: 'Can be saved after sign-in',
     canSaveBody: 'Your three comfort settings.',
     previewOnly: 'Preview only',

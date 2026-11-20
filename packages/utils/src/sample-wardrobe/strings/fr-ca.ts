@@ -101,6 +101,7 @@ export const frCA: GuestPreviewStrings = {
     count: "{count} articles d'exemple",
   },
   conversionDetail: {
+    garmentHeading: 'Ajoutez un de vos vêtements',
     canSave: 'Peut être enregistré après la connexion',
     canSaveBody: 'Vos trois réglages de confort.',
     previewOnly: 'Aperçu seulement',

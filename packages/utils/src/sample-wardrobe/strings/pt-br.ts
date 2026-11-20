@@ -99,6 +99,7 @@ export const ptBR: GuestPreviewStrings = {
     count: 'Itens de exemplo: {count}',
   },
   conversionDetail: {
+    garmentHeading: 'Adicione uma peça sua',
     canSave: 'Pode ser salvo depois de entrar',
     canSaveBody: 'Suas três configurações de conforto.',
     previewOnly: 'Só na prévia',

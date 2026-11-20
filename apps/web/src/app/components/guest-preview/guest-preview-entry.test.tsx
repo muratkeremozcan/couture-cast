@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { GUEST_PREVIEW_STRINGS } from '@couture/utils'
 import { getI18n } from '../../../i18n'
-import { GuestPreviewEntry } from './guest-preview-entry'
+import { GuestPreviewEntry, MemberWardrobeActions } from './guest-preview-entry'
 import { SampleGarmentArt } from './sample-garment-art'
 
 describe('guest preview entry', () => {
@@ -21,7 +21,12 @@ describe('guest preview entry', () => {
   // the one that matches <html data-session> (lib/landing-session.ts).
   it('marks each action with the session it belongs to, in the active locale', async () => {
     await getI18n().changeLanguage('de-DE')
-    render(<GuestPreviewEntry />)
+    render(
+      <>
+        <GuestPreviewEntry />
+        <MemberWardrobeActions />
+      </>
+    )
     const chrome = GUEST_PREVIEW_STRINGS['de-DE'].chrome
     const landing = (id: string) => screen.getByTestId(id).getAttribute('data-landing')
     expect(landing('guest-preview-entry')).toBe('guest')

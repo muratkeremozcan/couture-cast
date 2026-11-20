@@ -22,8 +22,8 @@ export function GuestPreviewConversion({
       data-testid="guest-preview-conversion"
       className="space-y-4 rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] p-5"
     >
-      <h2 id="guest-preview-conversion-heading" className="sr-only">
-        {strings.chrome.createAccount}
+      <h2 id="guest-preview-conversion-heading" className="text-lg font-semibold">
+        {detail.garmentHeading}
       </h2>
       <p className="text-sm text-[#111111]">{strings.chrome.conversion}</p>
       <dl className="grid gap-3 text-sm sm:grid-cols-3">

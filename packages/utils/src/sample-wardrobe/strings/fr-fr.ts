@@ -99,6 +99,7 @@ export const frFR: GuestPreviewStrings = {
     count: "{count} pièces d'exemple",
   },
   conversionDetail: {
+    garmentHeading: 'Ajoutez un de vos vêtements',
     canSave: 'Enregistrable après la connexion',
     canSaveBody: 'Vos trois réglages de confort.',
     previewOnly: 'Aperçu uniquement',

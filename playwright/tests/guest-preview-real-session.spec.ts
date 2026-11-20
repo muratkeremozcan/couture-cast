@@ -3,14 +3,17 @@
 // Story 6.16 E-CONV-REAL-STACK (web): a guest signs up from the preview, signs in through
 // the real local OTP, and applies the preview's comfort settings through the verified API.
 // Runs only in the owned real-session lane (npm run test:pw-real-session).
+import path from 'node:path'
 import type { Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   createRealCommunityAuthAccount,
+  provisionRealCommunityAccount,
   readGeneratedCommunityCode,
   realCommunityEmail,
   realSessionSkipReason,
+  signInRealCommunityWeb,
 } from '../support/helpers/community-real-session'
 
 const skipReason = realSessionSkipReason()
@@ -20,11 +23,33 @@ test.use({ authSessionEnabled: false, trace: 'off', video: 'off', screenshot: 'o
 const choose = (page: Page, testId: string) =>
   page.locator(`label:has([data-testid="${testId}"])`).click()
 
+const cameraRequestKey = 'fixture-camera-requests'
+
+async function denyCameraAndCountRequests(page: Page) {
+  await page.addInitScript((key) => {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: () => {
+          sessionStorage.setItem(key, String(Number(sessionStorage.getItem(key)) + 1))
+          return Promise.reject(
+            new DOMException('Fixture denies camera access', 'NotAllowedError')
+          )
+        },
+      },
+    })
+  }, cameraRequestKey)
+}
+
+const cameraRequests = (page: Page) =>
+  page.evaluate((key) => Number(sessionStorage.getItem(key)), cameraRequestKey)
+
 test('6.16 guest preview carries comfort settings into a real verified account', async ({
   page,
 }) => {
   const prisma = new PrismaClient()
   try {
+    await denyCameraAndCountRequests(page)
     await page.goto('/preview')
     await page.getByTestId('guest-preview-birthdate').fill('1990-06-15')
     await page.getByTestId('guest-preview-gate-submit').click()
@@ -32,7 +57,10 @@ test('6.16 guest preview carries comfort settings into a real verified account',
     await choose(page, 'guest-preview-wind-low')
     await choose(page, 'guest-preview-rain-high')
 
-    await page.getByTestId('guest-preview-create-account').click()
+    await page
+      .getByRole('region', { name: 'Add your own garment' })
+      .getByRole('link', { name: 'Create account' })
+      .click()
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     const email = realCommunityEmail()
     await page.getByLabel('Email').fill(email)
@@ -88,9 +116,47 @@ test('6.16 guest preview carries comfort settings into a real verified account',
     ).toBeNull()
     await page.getByTestId('guest-preview-review-continue').click()
     await expect(page).toHaveURL(/\/wardrobe\/onboarding$/)
+    await expect(
+      page.getByRole('heading', { name: 'Allow camera and photo access' })
+    ).toBeVisible()
+    expect(await cameraRequests(page)).toBe(0)
   } finally {
     await prisma.$disconnect()
   }
+})
+
+test('[P1] [UX-FIRST-003] a verified member can review a garment file after camera denial', async ({
+  apiRequest,
+  page,
+}) => {
+  const account = await provisionRealCommunityAccount(apiRequest, {
+    mapping: 'email',
+    label: 'garment-camera-denied',
+  })
+  await denyCameraAndCountRequests(page)
+  await signInRealCommunityWeb(page, account, () =>
+    Promise.resolve(readGeneratedCommunityCode(account))
+  )
+
+  await page.goto('/wardrobe/onboarding')
+  const step = page.getByTestId('onboarding-step-region')
+  await step.getByRole('button', { name: 'Allow camera and photo access' }).click()
+  await expect(step.getByRole('alert')).toContainText('You can still import files')
+  expect(await cameraRequests(page)).toBe(1)
+
+  await step.getByRole('button', { name: 'Add another garment' }).click()
+  const capture = page.getByRole('dialog', { name: 'Garment Capture Flow' })
+  const chooseFile = page.waitForEvent('filechooser')
+  await capture.getByRole('button', { name: 'Choose File' }).click()
+  await (
+    await chooseFile
+  ).setFiles(
+    path.resolve(
+      __dirname,
+      '../../apps/api/test/fixtures/garment-tagging/neutral-top.png'
+    )
+  )
+  await expect(capture.getByRole('button', { name: 'Use This Image' })).toBeVisible()
 })
 
 test('6.16 a full guest journey writes no row (E-NO-DB-WRITES)', async ({ page }) => {

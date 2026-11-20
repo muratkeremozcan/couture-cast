@@ -98,6 +98,7 @@ export const itIT: GuestPreviewStrings = {
     count: 'Capi di esempio: {count}',
   },
   conversionDetail: {
+    garmentHeading: 'Aggiungi un tuo capo',
     canSave: "Si può salvare dopo l'accesso",
     canSaveBody: 'Le tue tre impostazioni di comfort.',
     previewOnly: 'Solo anteprima',

@@ -110,6 +110,26 @@ export function GuestPreviewOutfit({
         </span>
       </div>
 
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={onTryAnother}
+          data-testid="guest-preview-try-another"
+          className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+        >
+          {strings.outfit.tryAnother}
+        </button>
+        {noAlternative ? (
+          <p
+            role="status"
+            data-testid="guest-preview-no-alternative"
+            className="text-sm text-[#36363D]"
+          >
+            {strings.outfit.noAlternative}
+          </p>
+        ) : null}
+      </div>
+
       <ul
         data-testid="guest-preview-garments"
         className="grid grid-cols-2 gap-3 sm:grid-cols-3"
@@ -155,25 +175,7 @@ export function GuestPreviewOutfit({
         </ul>
       </div>
 
-      {noAlternative ? (
-        <p
-          role="status"
-          data-testid="guest-preview-no-alternative"
-          className="text-sm text-[#36363D]"
-        >
-          {strings.outfit.noAlternative}
-        </p>
-      ) : null}
-
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={onTryAnother}
-          data-testid="guest-preview-try-another"
-          className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
-        >
-          {strings.outfit.tryAnother}
-        </button>
         {hasSwaps ? (
           <button
             type="button"

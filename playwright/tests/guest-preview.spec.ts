@@ -103,6 +103,62 @@ const garmentIds = (page: Page) =>
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
 
+  test('[P0] [UX-FIRST-001] a phone visitor can find and edit a sample outfit', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/')
+    const teaser = page.getByRole('region', { name: 'Sample outfit' })
+    const entry = teaser.getByRole('link', { name: 'Try a sample wardrobe' })
+    await expect(teaser.getByRole('heading', { name: 'Sample outfit' })).toBeInViewport({
+      ratio: 1,
+    })
+    await expect(teaser.getByText(LABEL, { exact: true })).toBeInViewport({ ratio: 1 })
+    await expect(entry).toBeInViewport({ ratio: 1 })
+    await entry.click()
+    await passGate(page)
+
+    const outfit = page.getByTestId('guest-preview-outfit')
+    const nextLook = outfit.getByRole('button', { name: 'Try another look' })
+    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeInViewport({
+      ratio: 1,
+    })
+    await expect(outfit.getByText('Mild and dry', { exact: true })).toBeInViewport({
+      ratio: 1,
+    })
+    await expect(nextLook).toBeInViewport({ ratio: 1 })
+
+    const explanation = outfit.getByTestId('guest-preview-explanation')
+    await expect(outfit.getByText('Loafers', { exact: true })).toBeVisible()
+    await outfit.getByRole('button', { name: 'Swap shoes: Loafers' }).click()
+    await page.getByRole('dialog').getByRole('radio', { name: 'White sneakers' }).click()
+    await expect(outfit.getByText('White sneakers', { exact: true })).toBeVisible()
+    await expect(outfit.getByText('Loafers', { exact: true })).toHaveCount(0)
+    await expect(explanation).toContainText('You chose White sneakers')
+
+    await outfit.getByRole('button', { name: 'Undo swaps' }).click()
+    await expect(outfit.getByText('Loafers', { exact: true })).toBeVisible()
+    await expect(explanation).not.toContainText('You chose White sneakers')
+
+    await nextLook.click()
+    await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
+    await expect(outfit.getByText('Midi skirt', { exact: true })).toBeVisible()
+    await expect(outfit.getByText('Loafers', { exact: true })).toHaveCount(0)
+  })
+
+  test('[P0] [UX-FIRST-002] adding a garment from the preview asks the guest to create an account', async ({
+    page,
+  }) => {
+    await page.goto('/preview')
+    await passGate(page)
+    const add = page.getByRole('region', { name: 'Add your own garment' })
+    await expect(add).toContainText('Create an account to add your clothes')
+    await add.getByRole('link', { name: 'Create account' }).click()
+    await expect(page).toHaveURL(/\/signup\?from=preview$/)
+    await page.getByRole('link', { name: 'Back to preview' }).click()
+    await expect(page.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
+  })
+
   test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({
     page,
   }) => {
