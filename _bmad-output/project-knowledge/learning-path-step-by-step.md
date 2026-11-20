@@ -24,6 +24,7 @@ Added Steps 40 to 58:
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
   - Production follow-ups after the project close: Jade's profile and location fix, on `fix/profile-location`.
   - Production follow-up after the project close, in review: image uploads straight to storage, on `fix/garment-upload`.
+  - Production follow-up after the project close, in progress: hosted wardrobe workers and manual tagging, on `feat/hosted-wardrobe-workers`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -31,6 +32,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58's production follow-up, hosted wardrobe workers and manual tagging, while its change is in progress.
 Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
 Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
 Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
@@ -144,6 +146,7 @@ Read it before changing or adding a numbered step.
   Delivery is done: `6-15b-expo-sdk-55-58-upgrade` stays `backlog`, so `epic-6` stays `in-progress`.
 - Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
   In review under Step 58: production follow-up, image uploads straight to storage, on `fix/garment-upload`; its plan is `_bmad-output/plan-upload-direct-storage.md`.
+  In progress under Step 58: production follow-up, hosted wardrobe workers and manual tagging, on `feat/hosted-wardrobe-workers`; its plan is `_bmad-output/plan-hosted-wardrobe-workers.md`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -12833,3 +12836,161 @@ Evidence boundaries:
   Uploads started after the deploy are unaffected.
 - Prod storage CORS was checked on 2026-11-19 to allow the headers installed apps send, and
   again for `cache-control`, which new builds add (preflight answered all four).
+
+#### Hosted wardrobe workers and manual tagging
+
+User/business impact:
+
+After the direct-to-storage upload fix, a member's garment, My Form or selfie upload committed and
+then stayed in `processing` forever: nothing hosted consumed `color-extraction`,
+`moderation-review` or `palette-analysis`, and nothing hosted ran the wardrobe jobs on
+`maintenance`, so the deletion outbox, the staging sweep and the job handoff never ran in
+production either. Only `community-worker` runs on Northflank, and the free project (0.2 vCPU,
+512 MB) cannot hold the 605 MB FashionCLIP model.
+A second free Northflank service now runs the three upload consumers and a wardrobe-only
+maintenance worker. With `GARMENT_TAGGING_ENGINE=manual` it loads no model: a garment gets its
+colours and reaches `awaiting_tags`, and the web and mobile tag step says the member chooses the
+tags.
+
+Key takeaways:
+
+1. **The mode travels in the API response, not the environment.**
+   The worker records `tagging_failure_code = TAGGING_MANUAL_MODE` (a choice, not a fault; the
+   column already carried state codes such as `LEGACY_TAGS_REQUIRED`) and the suggest-tags
+   response became a union on `mode`: `suggested` with the model's suggestions, or `manual` with
+   only the garment id. The Vercel API never sees the worker's environment, and an engine
+   failure still answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, so a client can tell "no model on
+   purpose" from "the model failed".
+2. **Manual mode loads nothing heavy, and a test says so.**
+   `createTaggingEngine` imports the FashionCLIP engine only on the `fashion-clip` path, and the
+   worker's static import graph reaches no onnxruntime, transformers, TensorFlow or OpenTelemetry
+   SDK. The image prune script fails the build if its package closure reaches one, and the
+   launcher's self-test fails if a model runtime is in the module cache after the manual engine
+   is created.
+3. **One consumer per queue per Redis, enforced where it can be.**
+   BullMQ splits a queue's jobs across every worker subscribed to its name, in any process, so
+   the hosted worker starts no weather, alert, billing, community or general maintenance job.
+   `WARDROBE_MAINTENANCE_ENABLED=true` names it the only `maintenance` consumer, the general
+   bootstrap refuses to start where that is set, the wardrobe processor drops (and logs) any other
+   job name, and the startup log names the queues it consumes.
+4. **Idle cost is the community worker's.**
+   Every consumer takes `drainDelay` 300 seconds (BullMQ takes seconds; the plan's 300000 is the
+   same five minutes in milliseconds), `stalledInterval` 120000 ms, `lockDuration` 30000 ms and
+   `maxStalledCount` 1, at concurrency one. A spec pins them to the community worker's exports.
+   The scheduler registers only `wardrobe-retention-purge` and `wardrobe-deletion-drain`.
+5. **The image is its own tree.**
+   `apps/api/Dockerfile.wardrobe-worker` has the community Dockerfile's three stages and pinned
+   base, a prune script of its own (`scripts/prune-wardrobe-worker-deps.mjs`) and a launcher that
+   refuses any engine but `manual` and any start without the maintenance flag. The community
+   Dockerfile, launcher and prune script are untouched; the launcher imports the community
+   launcher's database TLS refusal so the two cannot drift.
+
+Hard-won lessons from the implementation:
+
+1. **A hash over a whole directory moves with any edit under it.**
+   `scripts/lib/community-screening-input-set.mjs` hashes `apps/api/src/workers` as a directory,
+   so changing the wardrobe bootstrap or the maintenance files changes the community input-set
+   hash by construction, though no community file changed. The committed readiness evidence was
+   already behind the tree before this work. The release-gate spec pins no literal hash and is
+   unchanged.
+2. **A drill child with no Redis cannot register schedulers.**
+   The launcher's build-time drill starts the worker against refused ports, where registering the
+   maintenance schedulers would wait forever, so the drill child runs with maintenance off
+   (`--drill-child`) and only that child may.
+
+Story/Task mapping:
+
+- Plan `_bmad-output/plan-hosted-wardrobe-workers.md`: tasks manual engine and processor path;
+  web and mobile manual copy in ten locales; maintenance worker and scheduler; image and
+  launcher; documentation.
+
+Story reference:
+
+- `_bmad-output/plan-hosted-wardrobe-workers.md`, the intent, the I/O matrix and the
+  Implementation Notes.
+
+Cross-links:
+
+- Step 58, image uploads straight to storage, built the deletion outbox, the staging sweep and
+  the job handoff that now run here.
+- Step 40 built the community worker image this one is modelled on.
+- Step 30 built smart tagging, the suggest-tags endpoint and the tag confirmation screens.
+
+Sequence to follow:
+
+1. `apps/api/src/modules/wardrobe/garment-tagging.engine.ts` (`TAGGING_MANUAL_MODE_CODE`,
+   `GarmentTaggingManualModeError`) and `manual-garment-tagging.engine.ts`.
+2. `apps/api/src/modules/wardrobe/wardrobe-color.processor.ts` (`taggingFailureCodeFor`) and
+   `wardrobe.service.ts` (`suggestGarmentTags`).
+3. `packages/api-client/src/contracts/http/wardrobe.ts` (`suggestGarmentTagsDataSchema`),
+   `docs/http.openapi.json` and the generated models.
+4. `apps/web/src/app/components/garment-tagging-modal.tsx` and
+   `apps/mobile/components/wardrobe/garment-tagging-modal.tsx`.
+5. `apps/api/src/workers/idle-worker-options.ts`, `wardrobe-maintenance.ts` and
+   `wardrobe.bootstrap.ts` (`startWardrobeMaintenance`).
+6. `apps/api/src/workers/maintenance.scheduler.ts` (`registerWardrobeMaintenanceSchedulers`) and
+   `maintenance.processor.ts` (`createWardrobeMaintenanceProcessor`).
+7. `apps/api/Dockerfile.wardrobe-worker`, `scripts/start-wardrobe-worker-production.mjs` and
+   `scripts/prune-wardrobe-worker-deps.mjs`.
+
+Task owner map:
+
+- Hosted wardrobe workers owner: choose the manual engine in `apps/api/src/modules/wardrobe/manual-garment-tagging.engine.ts`, record it in `apps/api/src/modules/wardrobe/wardrobe-color.processor.ts` and answer it in `apps/api/src/modules/wardrobe/wardrobe.service.ts`.
+- Hosted wardrobe workers owner: start the consumers and the wardrobe-only maintenance worker in `apps/api/src/workers/wardrobe.bootstrap.ts`, with the idle backoff in `apps/api/src/workers/idle-worker-options.ts` and the duplicate-consumer guard in `apps/api/src/workers/wardrobe-maintenance.ts`.
+- Hosted wardrobe workers owner: build and launch the model-free image in `apps/api/Dockerfile.wardrobe-worker`, `scripts/start-wardrobe-worker-production.mjs` and `scripts/prune-wardrobe-worker-deps.mjs`.
+
+Tests that cover this step:
+
+API, Vitest:
+
+- [`apps/api/src/modules/wardrobe/manual-garment-tagging.engine.spec.ts`](../../apps/api/src/modules/wardrobe/manual-garment-tagging.engine.spec.ts):
+  proves the manual engine never suggests and imports only the engine contract.
+- [`apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-color.processor.spec.ts):
+  proves a manual-engine garment reaches `awaiting_tags` with `TAGGING_MANUAL_MODE`, no
+  suggestions and no logged error.
+- [`apps/api/src/modules/wardrobe/wardrobe.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.service.spec.ts):
+  proves suggest-tags answers `manual` for that code and keeps 503 for every other empty snapshot.
+- [`apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe.controller.spec.ts):
+  proves the controller validates both answers and rejects a manual answer that carries suggestions.
+- [`apps/api/src/workers/wardrobe.bootstrap.spec.ts`](../../apps/api/src/workers/wardrobe.bootstrap.spec.ts):
+  proves which bootstrap registers which queue, that the wardrobe graph imports no model runtime,
+  and the engine selection (manual loads nothing, fashion-clip loads its module).
+- [`apps/api/src/workers/idle-worker-options.spec.ts`](../../apps/api/src/workers/idle-worker-options.spec.ts):
+  proves the hosted options equal the community worker's.
+- [`apps/api/src/workers/wardrobe-maintenance.spec.ts`](../../apps/api/src/workers/wardrobe-maintenance.spec.ts):
+  proves the flag and that the general bootstrap refuses to start where it is true.
+- [`apps/api/src/workers/maintenance.scheduler.spec.ts`](../../apps/api/src/workers/maintenance.scheduler.spec.ts):
+  proves the wardrobe-only registration (two schedulers, the general worker's ids and patterns).
+- [`apps/api/src/workers/maintenance.processor.spec.ts`](../../apps/api/src/workers/maintenance.processor.spec.ts):
+  proves the wardrobe processor runs the two sweeps and drops every foreign job.
+- [`apps/api/integration/wardrobe-worker-image.spec.ts`](../../apps/api/integration/wardrobe-worker-image.spec.ts):
+  proves the Dockerfile text, the launcher's refusals and the prune script's guards.
+- [`packages/api-client/testing/wardrobe-contract.spec.ts`](../../packages/api-client/testing/wardrobe-contract.spec.ts):
+  proves the response schema rejects an untrusted analysis version.
+
+Web and mobile, Vitest:
+
+- [`apps/web/src/app/components/garment-tagging-modal.test.tsx`](../../apps/web/src/app/components/garment-tagging-modal.test.tsx):
+  proves the manual copy, no spinner and no suggestion text, and that nothing is preselected.
+- [`apps/web/src/lib/wardrobe.test.ts`](../../apps/web/src/lib/wardrobe.test.ts):
+  proves the client returns the manual answer and rejects one with no mode.
+- [`apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx`](../../apps/mobile/components/wardrobe/garment-tagging-modal.test.tsx):
+  proves the same on mobile.
+
+Contract, Pact:
+
+- [`pact/http/consumer/interactions/wardrobe-tags.ts`](../../pact/http/consumer/interactions/wardrobe-tags.ts):
+  proves the consumer pact carries `mode: 'suggested'`; the provider double in
+  [`pact/http/provider/doubles/wardrobe.ts`](../../pact/http/provider/doubles/wardrobe.ts)
+  answers it.
+
+Evidence boundaries:
+
+- No suite, image build or hosted deploy ran for this change (owner rule 2026-11-19: CI is the
+  proof). `tsc --noEmit` ran in apps/api, apps/web, apps/mobile, packages/api-client and `pact`,
+  and `optic diff` against `origin/main` passed 18/18 for the suggest-tags change.
+- The prune script and the launcher's `--self-test`, including the start and SIGTERM drill, ran
+  once against a tree assembled from the local build (macOS arm64): 66.1 MB of `node_modules`,
+  139 MiB resident. The Docker build on Linux and the first hosted deploy are not run; re-measure
+  inside the container.
+- The ten-locale strings for the manual copy are translated without a native review.

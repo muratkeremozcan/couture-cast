@@ -4,7 +4,8 @@ import {
   type GarmentTagSuggestionSnapshot,
   type OutfitCapsuleContract,
   type SilhouetteProfileContract,
-  type SuggestGarmentTagsData,
+  type SuggestGarmentTagsManualData,
+  type SuggestGarmentTagsSuggestedData,
   type WardrobeOnboardingStateContract,
 } from '../contracts/http/wardrobe'
 
@@ -48,9 +49,10 @@ export function createGarmentTagSuggestionSnapshotFixture(
 
 export function createSuggestGarmentTagsDataFixture(
   overrides: SuggestionOverrides & { garmentId?: string } = {}
-): SuggestGarmentTagsData {
+): SuggestGarmentTagsSuggestedData {
   const snapshot = createGarmentTagSuggestionSnapshotFixture(overrides)
   return {
+    mode: 'suggested',
     garmentId: overrides.garmentId ?? 'garment-1',
     analysisVersion: snapshot.analysisVersion,
     suggestions: {
@@ -59,6 +61,12 @@ export function createSuggestGarmentTagsDataFixture(
       comfortRange: snapshot.comfortRange,
     },
   }
+}
+
+export function createManualSuggestGarmentTagsDataFixture(
+  overrides: { garmentId?: string } = {}
+): SuggestGarmentTagsManualData {
+  return { mode: 'manual', garmentId: overrides.garmentId ?? 'garment-1' }
 }
 
 export function createReadyGarmentFixture(

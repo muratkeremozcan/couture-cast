@@ -201,37 +201,54 @@ export const garmentIdPathParamsSchema = z
   })
   .strict()
 
-export const suggestGarmentTagsDataSchema = z
+const garmentTagSuggestionGroupsSchema = z
   .object({
-    garmentId: nonEmptyStringSchema.max(128),
-    analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
-    suggestions: z
+    category: z
       .object({
-        category: z
-          .object({
-            value: garmentCategoryEnum,
-            confidence: z.number().min(0).max(1),
-            isConfident: z.boolean(),
-          })
-          .strict(),
-        material: z
-          .object({
-            value: garmentMaterialEnum,
-            confidence: z.number().min(0).max(1),
-            isConfident: z.boolean(),
-          })
-          .strict(),
-        comfortRange: z
-          .object({
-            value: garmentComfortRangeEnum,
-            confidence: z.number().min(0).max(1),
-            isConfident: z.boolean(),
-          })
-          .strict(),
+        value: garmentCategoryEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
+      })
+      .strict(),
+    material: z
+      .object({
+        value: garmentMaterialEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
+      })
+      .strict(),
+    comfortRange: z
+      .object({
+        value: garmentComfortRangeEnum,
+        confidence: z.number().min(0).max(1),
+        isConfident: z.boolean(),
       })
       .strict(),
   })
   .strict()
+
+/**
+ * `mode` tells the client how this garment's tags are chosen. `suggested`: a model proposed the
+ * tags below. `manual`: the wardrobe worker runs without a model (`GARMENT_TAGGING_ENGINE=manual`),
+ * there are no suggestions, and the member chooses every tag. A garment whose model run failed has
+ * no suggestions either but answers 503 `TAGGING_INFERENCE_UNAVAILABLE`, as before.
+ */
+export const suggestGarmentTagsDataSchema = z.discriminatedUnion('mode', [
+  z
+    .object({
+      mode: z.literal('suggested'),
+      garmentId: nonEmptyStringSchema.max(128),
+      analysisVersion: z.literal(GARMENT_TAGGING_ANALYSIS_VERSION),
+      suggestions: garmentTagSuggestionGroupsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      mode: z.literal('manual'),
+      garmentId: nonEmptyStringSchema.max(128),
+    })
+    .strict(),
+])
 
 export const suggestGarmentTagsResponseSchema = z
   .object({
@@ -613,6 +630,14 @@ export type GarmentItemResponse = z.infer<typeof createGarmentItemResponseSchema
 export type GarmentItemContract = z.infer<typeof garmentItemSchema>
 export type GarmentListResponse = z.infer<typeof garmentListResponseSchema>
 export type SuggestGarmentTagsData = z.infer<typeof suggestGarmentTagsDataSchema>
+export type SuggestGarmentTagsSuggestedData = Extract<
+  SuggestGarmentTagsData,
+  { mode: 'suggested' }
+>
+export type SuggestGarmentTagsManualData = Extract<
+  SuggestGarmentTagsData,
+  { mode: 'manual' }
+>
 export type SuggestGarmentTagsResponse = z.infer<typeof suggestGarmentTagsResponseSchema>
 export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
 export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>

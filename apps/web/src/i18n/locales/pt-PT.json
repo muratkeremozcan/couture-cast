@@ -461,6 +461,10 @@
         "timeout": "O envio excedeu o tempo limite. Tenta novamente.",
         "serviceUnavailable": "O armazenamento está indisponível de momento. Tenta novamente daqui a pouco."
       }
+    },
+    "tagging": {
+      "loading": "A carregar a sua peça...",
+      "manual_desc": "Escolha a categoria e o nível de conforto que servem a esta peça. O material é opcional."
     }
   },
   "community": {

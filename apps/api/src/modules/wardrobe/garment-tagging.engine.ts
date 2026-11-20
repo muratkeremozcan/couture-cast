@@ -16,6 +16,25 @@ export class GarmentTaggingOutputError extends Error {
   }
 }
 
+/**
+ * Stored in `GarmentItem.tagging_failure_code` when the worker runs with
+ * `GARMENT_TAGGING_ENGINE=manual`. It marks a deliberate choice, not a fault: the garment has no
+ * suggestions because no model ran, and the member chooses the tags. The suggest-tags endpoint
+ * answers it with `mode: 'manual'`, so a client learns the mode from the API and never from the
+ * worker's environment.
+ */
+export const TAGGING_MANUAL_MODE_CODE = 'TAGGING_MANUAL_MODE'
+
+/** Thrown by the manual engine so the processor records the manual mode without logging a fault. */
+export class GarmentTaggingManualModeError extends Error {
+  readonly code = TAGGING_MANUAL_MODE_CODE
+
+  constructor() {
+    super('Garment tagging runs in manual mode; the member chooses the tags')
+    this.name = 'GarmentTaggingManualModeError'
+  }
+}
+
 export const CATEGORY_PROMPTS: Record<GarmentCategory, string> = {
   top: 'a photo of a shirt, blouse, sweater, or other upper-body garment',
   bottom: 'a photo of pants, jeans, shorts, or a skirt',

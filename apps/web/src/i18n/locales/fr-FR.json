@@ -461,6 +461,10 @@
         "timeout": "Le chargement a expiré. Réessayez.",
         "serviceUnavailable": "Le stockage est indisponible pour le moment. Réessayez dans un instant."
       }
+    },
+    "tagging": {
+      "loading": "Chargement de votre vêtement...",
+      "manual_desc": "Choisissez la catégorie et la plage de confort qui conviennent à ce vêtement. La matière est facultative."
     }
   },
   "community": {

@@ -461,6 +461,10 @@
         "timeout": "Il caricamento è scaduto. Riprova.",
         "serviceUnavailable": "L'archivio non è disponibile al momento. Riprova tra un momento."
       }
+    },
+    "tagging": {
+      "loading": "Caricamento del tuo capo...",
+      "manual_desc": "Scegli la categoria e la fascia di comfort adatte a questo capo. Il materiale è facoltativo."
     }
   },
   "community": {

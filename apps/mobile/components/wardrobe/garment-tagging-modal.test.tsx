@@ -1,5 +1,7 @@
 // Learning path Step 30: Smart tagging and comfort metadata.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -16,6 +18,7 @@ import {
   liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 import {
+  createManualSuggestGarmentTagsDataFixture,
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -586,5 +589,77 @@ describe('R52 MobileGarmentTaggingModal over the system bars', () => {
     expect(paddingBottomOf(screen.getByTestId('garment-tagging-modal'))).toBe(
       20 + TEST_SAFE_AREA_INSETS.bottom
     )
+  })
+})
+
+describe('MobileGarmentTaggingModal manual mode', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  type UpdateTagsFn = React.ComponentProps<
+    typeof MobileGarmentTaggingModal
+  >['updateTagsFn']
+
+  function renderManual(overrides: { updateTagsFn?: UpdateTagsFn } = {}) {
+    const suggestTagsFn = vi
+      .fn()
+      .mockResolvedValue(
+        createManualSuggestGarmentTagsDataFixture({ garmentId: 'g_123' })
+      )
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId="g_123"
+        accessToken="test_token"
+        suggestTagsFn={suggestTagsFn}
+        updateTagsFn={
+          overrides.updateTagsFn ??
+          vi.fn().mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
+        }
+      />
+    )
+    return { suggestTagsFn }
+  }
+
+  it('says the member chooses the tags and shows no spinner and no suggestion text once the API answers manual', async () => {
+    renderManual()
+
+    expect(await screen.findByTestId('garment-tagging-manual-notice')).toBeDefined()
+    expect(screen.getByText('wardrobe.tagging.manual_title')).toBeDefined()
+    expect(screen.getAllByText('wardrobe.tagging.manual_desc')).toHaveLength(1)
+    expect(screen.queryByText('wardrobe.tagging.title')).toBeNull()
+    expect(screen.queryByLabelText('wardrobe.tagging.loading')).toBeNull()
+    expect(screen.queryByText(/ai_suggested|low_confidence_suggested/)).toBeNull()
+    expect(screen.queryByText('wardrobe.tagging.retry')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('preselects nothing and saves exactly what the member chose', async () => {
+    const updateTagsFn = vi
+      .fn()
+      .mockResolvedValue(createReadyGarmentFixture({ id: 'g_123' }))
+    renderManual({ updateTagsFn })
+    await screen.findByTestId('garment-tagging-manual-notice')
+
+    const save = screen.getByRole('button', { name: 'wardrobe.tagging.save' })
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+
+    fireEvent.click(screen.getByTestId('garment-tag-category-outerwear'))
+    fireEvent.click(screen.getByTestId('garment-tag-comfort-cool'))
+    await waitFor(() => {
+      expect(save.getAttribute('aria-disabled')).not.toBe('true')
+    })
+    fireEvent.click(save)
+
+    await waitFor(() => {
+      expect(updateTagsFn).toHaveBeenCalledWith(
+        'test_token',
+        'g_123',
+        { category: 'outerwear', material: null, comfortRange: 'cool' },
+        expect.any(AbortSignal)
+      )
+    })
   })
 })

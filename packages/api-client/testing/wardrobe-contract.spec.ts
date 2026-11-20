@@ -122,6 +122,7 @@ describe('Wardrobe HTTP Contracts', () => {
       expect(
         suggestGarmentTagsResponseSchema.safeParse({
           data: {
+            mode: 'suggested',
             garmentId: 'garment-1',
             analysisVersion: 'fashion-clip:untrusted',
             suggestions: {

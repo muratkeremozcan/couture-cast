@@ -100,14 +100,14 @@ They are written in the same sweep, or a later one if that write fails, even if 
 1. Run the drill to confirm: `npm run moderation:sla:drill -- --env-file .env.prod`.
 2. Fix the webhook or its destination. Alerts still relevant then deliver by themselves, with no operator step.
 3. Work breached cases from `/moderation` meanwhile.
-4. Remove the failure row in the Supabase SQL editor once fixed. Rows stay until removed, because the job that prunes them runs on `maintenance`, which no hosted process consumes:
+4. Remove the failure row in the Supabase SQL editor once fixed. Rows stay until removed, because the job that prunes them runs on `maintenance`, and the only hosted consumer of that queue, the wardrobe worker, runs the wardrobe retention purge and deletion drain alone:
 
    ```sql
    DELETE FROM "JobFailure" WHERE job_id = 'moderation_sla_delivery__<alertId>';
    ```
 
 Do not use the admin `failed-jobs/retry` route for these rows.
-It adds a `retry` job that `maintenance` logs as unknown and ignores, no hosted process consumes that queue, and it deletes the row while redelivering nothing.
+It adds a `retry` job that the wardrobe worker, the only hosted consumer of `maintenance`, logs as `wardrobe_maintenance_foreign_job_dropped` and ignores, and it deletes the row while redelivering nothing.
 
 Closed codes: `timeout`, `network`, `http_3xx`, `http_4xx`, `http_5xx`, `invalid_config` and `interrupted`.
 `interrupted` means a worker stopped during an attempt.
@@ -160,7 +160,7 @@ Keep both flags off until each step passes.
 2. Confirm the hosted worker runs the release: `community-worker@<COMMIT_SHA>`.
 3. Set the webhook, or the push accounts, and run the drill, or accept console only. Set `MODERATION_OPS_PUSH_USER_IDS` only after the API and web builds that read the `push` channel are live: an older API or dashboard rejects a monitor row stamped `push`. For push, each named moderator first opens the current app, signs in and allows notifications, and the drill must show the notification on that device before the sweep relies on it.
    Rollback: unset `MODERATION_OPS_PUSH_USER_IDS` and restart the worker first, wait for the next sweep to stamp the monitor row `console`, then roll the API and web back; reload any open dashboard.
-4. Turn on `moderation_console_enabled` and `moderation_sla_monitoring_enabled` in PostHog for everyone, or for the subject `system:moderation-sla`, which is the identity the worker evaluates. The fallback table does not carry a production opening, because the `maintenance` job that syncs it has no hosted consumer.
+4. Turn on `moderation_console_enabled` and `moderation_sla_monitoring_enabled` in PostHog for everyone, or for the subject `system:moderation-sla`, which is the identity the worker evaluates. The fallback table does not carry a production opening, because the `maintenance` job that syncs it has no hosted runner: the wardrobe worker consumes that queue for its two wardrobe jobs only.
 5. Open `/moderation/sla` and wait for the stale banner to clear.
 6. Enable the PostHog alert below.
 7. The release owner assigns the coverage table.

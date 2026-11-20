@@ -17,6 +17,7 @@ import type {
   GarmentComfortRange,
   GarmentItemContract,
   SuggestGarmentTagsData,
+  SuggestGarmentTagsSuggestedData,
 } from '@couture/api-client/contracts/http'
 import {
   suggestGarmentTagsFromMobile,
@@ -127,7 +128,11 @@ export function MobileGarmentTaggingModal({
   const [suggestionError, setSuggestionError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isAnalysisPending, setIsAnalysisPending] = useState(false)
-  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsData | null>(null)
+  const [suggestions, setSuggestions] = useState<SuggestGarmentTagsSuggestedData | null>(
+    null
+  )
+  // The API answered `mode: 'manual'`: no model ran, so the member chooses every tag.
+  const [isManualMode, setIsManualMode] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const titleRef = useRef<React.ElementRef<typeof Text> | null>(null)
   const saveAbortRef = useRef<AbortController | null>(null)
@@ -182,6 +187,7 @@ export function MobileGarmentTaggingModal({
       setSelectedMaterial(null)
       setSelectedComfort(null)
       setSuggestions(null)
+      setIsManualMode(false)
       setSuggestionError(null)
       setSaveError(null)
       setIsAnalysisPending(false)
@@ -194,15 +200,20 @@ export function MobileGarmentTaggingModal({
     setSelectedMaterial(null)
     setSelectedComfort(null)
     setSuggestions(null)
+    setIsManualMode(false)
     setIsLoading(true)
     setSuggestionError(null)
     setSaveError(null)
     setIsAnalysisPending(false)
 
-    announce('feedback', t('wardrobe.tagging.loading_suggestions'))
+    announce('feedback', t('wardrobe.tagging.loading'))
     suggestTagsFn(accessToken, garmentId, controller.signal)
       .then((data) => {
         if (!isMounted) return
+        if (data.mode === 'manual') {
+          setIsManualMode(true)
+          return
+        }
         setSuggestions(data)
         if (data.suggestions.category.isConfident) {
           setSelectedCategory(data.suggestions.category.value)
@@ -286,6 +297,10 @@ export function MobileGarmentTaggingModal({
     }
   }
 
+  const tagHint = isManualMode
+    ? t('wardrobe.tagging.manual_desc')
+    : t('wardrobe.tagging.desc')
+
   const isSaveDisabled =
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
@@ -310,7 +325,9 @@ export function MobileGarmentTaggingModal({
               accessible={true}
               accessibilityRole="header"
             >
-              {t('wardrobe.tagging.title')}
+              {isManualMode
+                ? t('wardrobe.tagging.manual_title')
+                : t('wardrobe.tagging.title')}
             </Text>
             <TouchableOpacity
               onPress={onClose}
@@ -338,13 +355,21 @@ export function MobileGarmentTaggingModal({
 
           {isLoading ? (
             <ActivityIndicator
-              accessibilityLabel={t('wardrobe.tagging.loading_suggestions')}
+              accessibilityLabel={t('wardrobe.tagging.loading')}
               size="large"
               color={colors.text}
               style={{ marginVertical: 20 }}
             />
           ) : !isAnalysisPending ? (
             <ScrollView keyboardShouldPersistTaps="handled" style={styles.content}>
+              {isManualMode && (
+                <Text
+                  style={styles.suggestionText}
+                  testID="garment-tagging-manual-notice"
+                >
+                  {t('wardrobe.tagging.manual_desc')}
+                </Text>
+              )}
               {/* Category */}
               <Text style={styles.sectionTitle}>
                 {t('wardrobe.tagging.category')} {t('wardrobe.tagging.required')}
@@ -366,7 +391,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.category')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.chipGrid}
               >
                 {CATEGORY_OPTIONS.map((opt) => {
@@ -417,7 +442,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.material')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.chipGrid}
               >
                 <TouchableOpacity
@@ -491,7 +516,7 @@ export function MobileGarmentTaggingModal({
               <View
                 accessibilityRole="radiogroup"
                 accessibilityLabel={t('wardrobe.tagging.comfort_range')}
-                accessibilityHint={t('wardrobe.tagging.desc')}
+                accessibilityHint={tagHint}
                 style={styles.comfortList}
               >
                 {COMFORT_OPTIONS.map((opt) => {

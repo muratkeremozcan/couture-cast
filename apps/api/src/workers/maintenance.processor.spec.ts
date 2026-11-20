@@ -5,6 +5,7 @@ import {
 } from '../modules/community/community-maintenance.scheduler.js'
 import {
   createMaintenanceProcessor,
+  createWardrobeMaintenanceProcessor,
   JOB_FAILURE_RETENTION_DAYS,
   type MaintenanceProcessorDeps,
 } from './maintenance.processor'
@@ -266,4 +267,76 @@ describe('createMaintenanceProcessor: failure handling', () => {
     )
     expect(deps.logger.error).not.toHaveBeenCalled()
   })
+})
+
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+describe('createWardrobeMaintenanceProcessor', () => {
+  function buildWardrobe() {
+    const deps = {
+      wardrobeRetention: {
+        purgeExpiredAndDeletedGarments: vi.fn().mockResolvedValue(undefined),
+        drainDeletions: vi.fn().mockResolvedValue(3),
+      },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    }
+    return { deps, process: createWardrobeMaintenanceProcessor(deps) }
+  }
+
+  it('runs the retention purge, which carries the job handoff re-enqueue, and logs its event', async () => {
+    const { deps, process } = buildWardrobe()
+    await process({ name: WARDROBE_RETENTION_PURGE_JOB_NAME })
+    expect(deps.wardrobeRetention.purgeExpiredAndDeletedGarments).toHaveBeenCalledOnce()
+    expect(deps.wardrobeRetention.drainDeletions).not.toHaveBeenCalled()
+    expect(deps.logger.info).toHaveBeenCalledWith(
+      { job: WARDROBE_RETENTION_PURGE_JOB_NAME, result: undefined },
+      'wardrobe_retention_purge_completed'
+    )
+  })
+
+  it('runs the deletion drain on its own job', async () => {
+    const { deps, process } = buildWardrobe()
+    await process({ name: WARDROBE_DELETION_DRAIN_JOB_NAME })
+    expect(deps.wardrobeRetention.drainDeletions).toHaveBeenCalledOnce()
+    expect(deps.wardrobeRetention.purgeExpiredAndDeletedGarments).not.toHaveBeenCalled()
+    expect(deps.logger.info).toHaveBeenCalledWith(
+      { job: WARDROBE_DELETION_DRAIN_JOB_NAME, result: 3 },
+      'wardrobe_deletion_drain_completed'
+    )
+  })
+
+  it('rethrows a failed sweep under its own event so BullMQ retries it', async () => {
+    const { deps, process } = buildWardrobe()
+    const failure = new Error('storage unavailable')
+    deps.wardrobeRetention.drainDeletions.mockRejectedValueOnce(failure)
+
+    await expect(process({ name: WARDROBE_DELETION_DRAIN_JOB_NAME })).rejects.toBe(
+      failure
+    )
+    expect(deps.logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ err: failure }),
+      'wardrobe_deletion_drain_failed'
+    )
+  })
+
+  it.each([
+    FEATURE_FLAGS_SYNC_JOB_NAME,
+    GUARDIAN_EMANCIPATION_JOB_NAME,
+    TELEMETRY_EVENT_PRUNE_JOB_NAME,
+    MODERATION_SLA_SWEEP_JOB_NAME,
+    'retired-sweep',
+  ])(
+    'drops %s loudly and runs nothing, so no foreign job executes here',
+    async (name) => {
+      const { deps, process } = buildWardrobe()
+      await expect(process({ name })).resolves.toBeUndefined()
+      expect(deps.wardrobeRetention.purgeExpiredAndDeletedGarments).not.toHaveBeenCalled()
+      expect(deps.wardrobeRetention.drainDeletions).not.toHaveBeenCalled()
+      expect(deps.logger.warn).toHaveBeenCalledWith(
+        { job: name },
+        'wardrobe_maintenance_foreign_job_dropped'
+      )
+      expect(deps.logger.error).not.toHaveBeenCalled()
+    }
+  )
 })

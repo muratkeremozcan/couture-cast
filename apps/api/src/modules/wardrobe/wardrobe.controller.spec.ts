@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 58: Hosted wardrobe workers and manual tagging.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
 import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
@@ -157,6 +159,7 @@ describe('WardrobeController', () => {
   it('rejects a service response that violates the public smart-tagging contract', async () => {
     mockSuggestGarmentTags.mockResolvedValueOnce({
       data: {
+        mode: 'suggested',
         garmentId: 'garment_99',
         analysisVersion: 'untrusted-version',
         suggestions: {},
@@ -305,6 +308,7 @@ describe('WardrobeController', () => {
       const snapshot = createGarmentTagSuggestionSnapshotFixture()
       mockSuggestGarmentTags.mockResolvedValueOnce({
         data: {
+          mode: 'suggested',
           garmentId: 'garment_99',
           analysisVersion: snapshot.analysisVersion,
           suggestions: {
@@ -317,13 +321,40 @@ describe('WardrobeController', () => {
 
       const result = await controller.suggestGarmentTags(mockAuth, 'garment_99')
 
-      expect(result.data.garmentId).toBe('garment_99')
-      expect(result.data.suggestions.category.value).toBe(snapshot.category.value)
+      expect(result.data).toMatchObject({
+        mode: 'suggested',
+        garmentId: 'garment_99',
+        suggestions: { category: { value: snapshot.category.value } },
+      })
       expect(mockSuggestGarmentTags).toHaveBeenCalledWith(
         'user_123',
         'teen',
         'garment_99'
       )
+    })
+
+    it('returns the manual-mode answer with no suggestions', async () => {
+      mockSuggestGarmentTags.mockResolvedValueOnce({
+        data: { mode: 'manual', garmentId: 'garment_99' },
+      })
+
+      const result = await controller.suggestGarmentTags(mockAuth, 'garment_99')
+
+      expect(result).toEqual({ data: { mode: 'manual', garmentId: 'garment_99' } })
+    })
+
+    it('rejects a manual-mode answer that carries suggestions', async () => {
+      mockSuggestGarmentTags.mockResolvedValueOnce({
+        data: {
+          mode: 'manual',
+          garmentId: 'garment_99',
+          suggestions: createGarmentTagSuggestionSnapshotFixture(),
+        },
+      })
+
+      await expect(
+        controller.suggestGarmentTags(mockAuth, 'garment_99')
+      ).rejects.toThrow()
     })
   })
 

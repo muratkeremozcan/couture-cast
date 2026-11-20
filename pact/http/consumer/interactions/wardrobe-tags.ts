@@ -42,6 +42,7 @@ export async function verifySuggestGarmentTagsInteraction(
       setJsonContent({
         body: {
           data: {
+            mode: 'suggested',
             garmentId: string(garmentId),
             analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
             suggestions: {

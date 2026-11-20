@@ -48,6 +48,7 @@ export function createWardrobeDoubles() {
       }
       return Promise.resolve({
         data: {
+          mode: 'suggested',
           garmentId,
           analysisVersion: GARMENT_TAGGING_ANALYSIS_VERSION,
           suggestions: {

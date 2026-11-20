@@ -461,6 +461,10 @@
         "timeout": "Yüklemenin süresi doldu. Tekrar dene.",
         "serviceUnavailable": "Depolama şu anda kullanılamıyor. Birazdan tekrar dene."
       }
+    },
+    "tagging": {
+      "loading": "Parçan yükleniyor...",
+      "manual_desc": "Bu parçaya uyan kategoriyi ve konfor aralığını seç. Malzeme isteğe bağlıdır."
     }
   },
   "community": {

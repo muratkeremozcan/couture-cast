@@ -50,6 +50,7 @@ import {
   WardrobeObjectDeletionOutbox,
   type WardrobeDeletionReason,
 } from './wardrobe-object-deletion.outbox'
+import { TAGGING_MANUAL_MODE_CODE } from './garment-tagging.engine'
 import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import { handOffGarmentProcessing } from './wardrobe-processing-handoff'
 import {
@@ -637,6 +638,11 @@ export class WardrobeService {
     assertTaggableGarment(garment)
 
     if (!garment.tag_suggestions) {
+      // A worker running without a model recorded a choice, not a fault: tell the client the
+      // member chooses the tags. Any other empty snapshot is an inference that did not finish.
+      if (garment.tagging_failure_code === TAGGING_MANUAL_MODE_CODE) {
+        return { data: { mode: 'manual', garmentId: garment.id } }
+      }
       throw new ServiceUnavailableException('TAGGING_INFERENCE_UNAVAILABLE')
     }
 
@@ -655,6 +661,7 @@ export class WardrobeService {
 
     return {
       data: {
+        mode: 'suggested',
         garmentId: garment.id,
         analysisVersion: parsed.data.analysisVersion,
         suggestions: {

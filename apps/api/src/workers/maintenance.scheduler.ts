@@ -119,6 +119,37 @@ export async function registerMaintenanceSchedulers(
 }
 
 /**
+ * The two wardrobe sweeps and nothing else, for the hosted wardrobe worker
+ * (`wardrobe.bootstrap.ts` with `WARDROBE_MAINTENANCE_ENABLED=true`). That process consumes the
+ * `maintenance` queue with a processor that routes only these names, so it must not register the
+ * schedulers of sweeps it cannot run: the retention purge also re-enqueues stranded processing
+ * work (the job handoff), and the deletion drain removes durable storage deletions. Ids and
+ * patterns are `registerMaintenanceSchedulers`' own, so a restart, or a general worker started
+ * later, updates the same two schedulers instead of adding a second pair.
+ */
+export const WARDROBE_MAINTENANCE_JOB_NAMES = [
+  WARDROBE_RETENTION_PURGE_JOB_NAME,
+  WARDROBE_DELETION_DRAIN_JOB_NAME,
+] as const
+
+export async function registerWardrobeMaintenanceSchedulers(
+  queue: MaintenanceSchedulerQueue
+): Promise<void> {
+  await Promise.all([
+    queue.upsertJobScheduler(
+      WARDROBE_RETENTION_PURGE_JOB_NAME,
+      { pattern: WARDROBE_RETENTION_PURGE_CRON_PATTERN },
+      { name: WARDROBE_RETENTION_PURGE_JOB_NAME, data: {} }
+    ),
+    queue.upsertJobScheduler(
+      WARDROBE_DELETION_DRAIN_JOB_NAME,
+      { pattern: WARDROBE_DELETION_DRAIN_CRON_PATTERN },
+      { name: WARDROBE_DELETION_DRAIN_JOB_NAME, data: {} }
+    ),
+  ])
+}
+
+/**
  * Story 6.12: the SLA sweep. Every minute, so a breach alert waits at most one sweep plus the
  * channel. The hosted community worker does not subscribe to this queue, so it runs the same
  * function on `MODERATION_SLA_SWEEP_INTERVAL_MS` instead.

@@ -88,6 +88,7 @@ import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
 import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
+import { assertGeneralWorkerMayConsumeMaintenance } from './wardrobe-maintenance'
 
 const logger = createBaseLogger().child({ feature: 'workers' })
 
@@ -139,6 +140,9 @@ export function createStandaloneWeatherFanout(
 export async function startWorkers(state: WorkerProcessState) {
   const { workers, queues, closeables, redisClients } = state
   try {
+    // The general worker consumes `maintenance` with every sweep; where the dedicated wardrobe
+    // worker owns that queue it must not also be consumed here.
+    assertGeneralWorkerMayConsumeMaintenance()
     // Refuse to start on a guardian consent policy this deployment may not run, as the API's
     // AppModule does (TEA sign-off F-4).
     resolveGuardianConsentPolicy()

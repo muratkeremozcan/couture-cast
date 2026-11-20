@@ -4902,132 +4902,164 @@
         "type": "object",
         "properties": {
           "data": {
-            "type": "object",
-            "properties": {
-              "garmentId": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 128
-              },
-              "analysisVersion": {
-                "type": "string",
-                "enum": [
-                  "fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1"
-                ]
-              },
-              "suggestions": {
+            "oneOf": [
+              {
                 "type": "object",
                 "properties": {
-                  "category": {
-                    "type": "object",
-                    "properties": {
-                      "value": {
-                        "type": "string",
-                        "enum": [
-                          "top",
-                          "bottom",
-                          "outerwear",
-                          "dress",
-                          "shoes",
-                          "accessory",
-                          null
-                        ]
-                      },
-                      "confidence": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
-                      },
-                      "isConfident": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "value",
-                      "confidence",
-                      "isConfident"
-                    ],
-                    "additionalProperties": false
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "suggested"
+                    ]
                   },
-                  "material": {
-                    "type": "object",
-                    "properties": {
-                      "value": {
-                        "type": "string",
-                        "enum": [
-                          "cotton",
-                          "wool",
-                          "linen",
-                          "leather",
-                          "denim",
-                          "fleece",
-                          "synthetic",
-                          "down",
-                          "silk",
-                          null
-                        ]
-                      },
-                      "confidence": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
-                      },
-                      "isConfident": {
-                        "type": "boolean"
-                      }
-                    },
-                    "required": [
-                      "value",
-                      "confidence",
-                      "isConfident"
-                    ],
-                    "additionalProperties": false
+                  "garmentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
                   },
-                  "comfortRange": {
+                  "analysisVersion": {
+                    "type": "string",
+                    "enum": [
+                      "fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1"
+                    ]
+                  },
+                  "suggestions": {
                     "type": "object",
                     "properties": {
-                      "value": {
-                        "type": "string",
-                        "enum": [
-                          "cold",
-                          "cool",
-                          "mild",
-                          "warm",
-                          "hot",
-                          null
-                        ]
+                      "category": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "enum": [
+                              "top",
+                              "bottom",
+                              "outerwear",
+                              "dress",
+                              "shoes",
+                              "accessory",
+                              null
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "isConfident": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "confidence",
+                          "isConfident"
+                        ],
+                        "additionalProperties": false
                       },
-                      "confidence": {
-                        "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
+                      "material": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "enum": [
+                              "cotton",
+                              "wool",
+                              "linen",
+                              "leather",
+                              "denim",
+                              "fleece",
+                              "synthetic",
+                              "down",
+                              "silk",
+                              null
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "isConfident": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "confidence",
+                          "isConfident"
+                        ],
+                        "additionalProperties": false
                       },
-                      "isConfident": {
-                        "type": "boolean"
+                      "comfortRange": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "enum": [
+                              "cold",
+                              "cool",
+                              "mild",
+                              "warm",
+                              "hot",
+                              null
+                            ]
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "isConfident": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "value",
+                          "confidence",
+                          "isConfident"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
-                      "value",
-                      "confidence",
-                      "isConfident"
+                      "category",
+                      "material",
+                      "comfortRange"
                     ],
                     "additionalProperties": false
                   }
                 },
                 "required": [
-                  "category",
-                  "material",
-                  "comfortRange"
+                  "mode",
+                  "garmentId",
+                  "analysisVersion",
+                  "suggestions"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "manual"
+                    ]
+                  },
+                  "garmentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                "required": [
+                  "mode",
+                  "garmentId"
                 ],
                 "additionalProperties": false
               }
-            },
-            "required": [
-              "garmentId",
-              "analysisVersion",
-              "suggestions"
-            ],
-            "additionalProperties": false
+            ]
           }
         },
         "required": [

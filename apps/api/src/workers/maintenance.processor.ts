@@ -83,23 +83,69 @@ export const JOB_FAILURE_RETENTION_DAYS = 30
 
 type MaintenanceJob = { name: string }
 
+async function runSweep(
+  logger: MaintenanceProcessorDeps['logger'],
+  jobName: string,
+  completedEvent: string,
+  failedEvent: string,
+  sweep: () => Promise<unknown>
+): Promise<void> {
+  try {
+    const result = await sweep()
+    logger.info({ job: jobName, result }, completedEvent)
+  } catch (error) {
+    logger.error({ err: error, job: jobName }, failedEvent)
+    throw error
+  }
+}
+
+/**
+ * The hosted wardrobe worker's processor: the retention purge (which also re-enqueues stranded
+ * processing work) and the deletion drain, with the log events `createMaintenanceProcessor`
+ * uses for them. Any other name is somebody else's job landing on this consumer (a general
+ * worker's scheduler left in the same Redis): it is logged loudly under its own event and
+ * dropped, never run, so this process cannot do work it was not composed for.
+ */
+export function createWardrobeMaintenanceProcessor(deps: {
+  wardrobeRetention: MaintenanceSweeps['wardrobeRetention']
+  logger: MaintenanceProcessorDeps['logger']
+}) {
+  const { logger } = deps
+  return async function processWardrobeMaintenanceJob(
+    job: MaintenanceJob
+  ): Promise<void> {
+    switch (job.name) {
+      case WARDROBE_RETENTION_PURGE_JOB_NAME:
+        return runSweep(
+          logger,
+          job.name,
+          'wardrobe_retention_purge_completed',
+          'wardrobe_retention_purge_failed',
+          () => deps.wardrobeRetention.purgeExpiredAndDeletedGarments()
+        )
+      case WARDROBE_DELETION_DRAIN_JOB_NAME:
+        return runSweep(
+          logger,
+          job.name,
+          'wardrobe_deletion_drain_completed',
+          'wardrobe_deletion_drain_failed',
+          () => deps.wardrobeRetention.drainDeletions()
+        )
+      default:
+        logger.warn({ job: job.name }, 'wardrobe_maintenance_foreign_job_dropped')
+        return
+    }
+  }
+}
+
 export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
   const { logger } = deps
-
-  async function run(
+  const run = (
     jobName: string,
     completedEvent: string,
     failedEvent: string,
     sweep: () => Promise<unknown>
-  ): Promise<void> {
-    try {
-      const result = await sweep()
-      logger.info({ job: jobName, result }, completedEvent)
-    } catch (error) {
-      logger.error({ err: error, job: jobName }, failedEvent)
-      throw error
-    }
-  }
+  ) => runSweep(logger, jobName, completedEvent, failedEvent, sweep)
 
   return async function processMaintenanceJob(job: MaintenanceJob): Promise<void> {
     switch (job.name) {

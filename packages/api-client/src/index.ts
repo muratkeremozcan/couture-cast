@@ -24,6 +24,8 @@ export {
   favoriteOutfitCapsuleInputSchema,
   type GarmentItemContract,
   type SuggestGarmentTagsData,
+  type SuggestGarmentTagsSuggestedData,
+  type SuggestGarmentTagsManualData,
   type GarmentCategory,
   type GarmentMaterial,
   type GarmentComfortRange,

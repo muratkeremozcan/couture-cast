@@ -461,6 +461,10 @@
         "timeout": "Se agotó el tiempo de carga. Inténtalo de nuevo.",
         "serviceUnavailable": "El almacenamiento no está disponible en este momento. Inténtalo de nuevo en un momento."
       }
+    },
+    "tagging": {
+      "loading": "Cargando tu prenda...",
+      "manual_desc": "Elige la categoría y el rango de confort que mejor le queden a esta prenda. El material es opcional."
     }
   },
   "community": {
