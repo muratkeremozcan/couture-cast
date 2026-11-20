@@ -20854,6 +20854,11 @@ checks close that gap:
 - [`apps/web/src/app/components/moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx):
   the SLA page subtitle names both the 30-minute and the 24-hour target, in all ten locales
   (C-WEB-TARGETS).
+- [`playwright/tests/community-member.prod.spec.ts`](../../playwright/tests/community-member.prod.spec.ts):
+  the daily production run, as the synthetic member (read-only). The community feed answers 200
+  with a list, and `/community` at phone width shows the member the real grid with the Latest
+  looks heading and the explainer instead of the signed-out prompt (JADE-COMMUNITY-004, -005).
+  A community switched off again, or a stub page, turns the status run red.
 
 #### Jade's profile and location reports are checked in production
 
@@ -20881,9 +20886,3 @@ Test per report:
   the browser's permission refused, expects the reason and a working city search, and that no
   coordinates were sent. The allowed path writes a location, so it stays on the local lane
   (`location-use-my-location.spec.ts` UL-1).
-
-- [`playwright/tests/community-member.prod.spec.ts`](../../playwright/tests/community-member.prod.spec.ts):
-  the daily production run, as the synthetic member (read-only). The community feed answers 200
-  with a list, and `/community` at phone width shows the member the real grid with the Latest
-  looks heading and the explainer instead of the signed-out prompt (JADE-COMMUNITY-004, -005).
-  A community switched off again, or a stub page, turns the status run red.
