@@ -163,6 +163,33 @@ export async function verifyCommunityImage(
   }
 }
 
+/** A small RGBA raster of the verified original. Transparent pixels remain distinguishable. */
+export async function sampleCommunityImageColors(
+  bytes: Buffer,
+  declaration: CommunityImageDeclaration,
+  signal: AbortSignal
+) {
+  checkImageSignal(signal)
+  const sniffedMime = verifyDeclaration(bytes, declaration)
+  try {
+    const { pipeline, metadata } = await openVerifiedImage(bytes, sniffedMime, 2, signal)
+    assertDimensionsInRange(metadata.width ?? 0, metadata.height ?? 0)
+    const sample = pipeline
+      .rotate()
+      .resize(48, 48, { fit: 'inside' })
+      .toColourspace('srgb')
+      .ensureAlpha()
+      .raw()
+    const { data, info } = await runAbortableSharp(sample, signal, () =>
+      sample.toBuffer({ resolveWithObject: true })
+    )
+    return { rgba: data, width: info.width, height: info.height }
+  } catch (error) {
+    if (error instanceof CommunityImageValidationError) throw error
+    throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
+  }
+}
+
 /**
  * Verifies the uploaded bytes against what the client declared at allocate time,
  * then orients, decodes and re-encodes them.

@@ -4,6 +4,7 @@
 import {
   formatPreviewString,
   formatSampleExplanation,
+  hasAppliedSampleSwaps,
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleLookText,
@@ -18,7 +19,6 @@ export function GuestPreviewOutfit({
   strings,
   locale,
   noAlternative,
-  hasSwaps,
   onTryAnother,
   onSwap,
   onUndoSwaps,
@@ -32,7 +32,6 @@ export function GuestPreviewOutfit({
   strings: GuestPreviewStrings
   locale: string
   noAlternative: boolean
-  hasSwaps: boolean
   onTryAnother: () => void
   onSwap: (category: SampleGarmentCategory, invoker: HTMLButtonElement) => void
   onUndoSwaps: () => void
@@ -43,6 +42,7 @@ export function GuestPreviewOutfit({
   continuation?: React.ReactNode
 }) {
   const look = result.look
+  const hasSwaps = hasAppliedSampleSwaps(result)
   const explanation = result.explanation.map((item) =>
     formatSampleExplanation(item, { strings, locale, catalog: SAMPLE_CATALOG })
   )
@@ -94,17 +94,20 @@ export function GuestPreviewOutfit({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <p className="lookbook-metrics text-xs uppercase tracking-[0.12em] text-[#8A691F]">
-            {heading ?? strings.outfit.heading}
-          </p>
+          {(heading || !hasSwaps) && (
+            <p className="lookbook-metrics text-xs uppercase tracking-[0.12em] text-[#8A691F]">
+              {heading ?? strings.outfit.heading}
+            </p>
+          )}
           <h2
             id="guest-preview-outfit-heading"
+            tabIndex={-1}
             data-testid="guest-preview-look-name"
             className="lookbook-display text-2xl font-semibold text-[#111111]"
           >
-            {lookText.name}
+            {hasSwaps ? strings.outfit.heading : lookText.name}
           </h2>
-          <p className="text-sm text-[#36363D]">{lookText.description}</p>
+          {!hasSwaps && <p className="text-sm text-[#36363D]">{lookText.description}</p>}
         </div>
         <span
           data-testid="guest-preview-weather-chip"
@@ -135,6 +138,7 @@ export function GuestPreviewOutfit({
         ) : null}
       </div>
 
+      <p className="text-xs text-[#5C5C66]">{strings.styleIdeas.illustrations}</p>
       <ul
         data-testid="guest-preview-garments"
         className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 sm:grid-cols-3"

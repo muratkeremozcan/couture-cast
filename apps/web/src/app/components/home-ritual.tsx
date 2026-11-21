@@ -11,16 +11,22 @@ import {
 import {
   createMemberSampleOutfit,
   getGuestPreviewStrings,
+  parseSampleBookmarks,
+  reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
+  saveSampleBookmark,
   swapMemberSampleGarment,
   undoMemberSampleSwaps,
+  updateMemberSampleOutfit,
   type GuestPreviewStrings,
   type SampleGarmentCategory,
+  type SampleBookmark,
   type SampleOutfitResult,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { readStorage } from '../../lib/browser-persistence'
 import { formatPlannerTemperature } from '../../lib/planner'
 import { captureLocationCredentials, listLocationsFromWeb } from '../../lib/locations'
 import { getRitualFromWeb, ritualFailure, SET_CITY_FROM_HOME } from '../../lib/ritual'
@@ -32,6 +38,7 @@ import {
 } from '../../lib/use-web-session'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
+import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 
 const linkClass =
@@ -43,6 +50,16 @@ let retainedSample: { owner: string; result: SampleOutfitResult } | undefined
 
 function resetSampleForOwner(owner: string | null) {
   if (retainedSample?.owner !== owner) retainedSample = undefined
+}
+
+type BookmarkChange = (bookmarks: SampleBookmark[]) => SampleBookmark[]
+
+function replayBookmarkChanges(
+  bookmarks: SampleBookmark[],
+  changes: Iterable<BookmarkChange>
+) {
+  for (const change of changes) bookmarks = change(bookmarks)
+  return bookmarks
 }
 
 function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
@@ -72,6 +89,65 @@ function SampleOutfit({
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
+  const bookmarkKey = `couturecast.member-sample-bookmarks.${owner}`
+  const [bookmarks, setBookmarks] = useState(() =>
+    parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
+  )
+  const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
+  const storedBookmarks = useRef(bookmarks)
+  const pendingBookmarkChanges = useRef(new Map<string, BookmarkChange>())
+  const bookmarkOwnerMounted = useRef(true)
+  useEffect(() => {
+    bookmarkOwnerMounted.current = true
+    const onStorage = (event: StorageEvent) => {
+      if (!isLiveOwner(owner) || (event.key !== null && event.key !== bookmarkKey)) return
+      try {
+        const storage = window.localStorage
+        if (event.storageArea !== storage) return
+        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
+        const pending = pendingBookmarkChanges.current
+        storedBookmarks.current = stored
+        setBookmarks(replayBookmarkChanges(stored, pending.values()))
+        setBookmarksPersistent(pending.size === 0)
+      } catch {
+        setBookmarksPersistent(false)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      bookmarkOwnerMounted.current = false
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [bookmarkKey, owner])
+
+  const updateBookmarks = (lookId: string, change: BookmarkChange) => {
+    const apply = () => {
+      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+      // Keep one pending change per catalog look, in the order of the latest actions.
+      const pending = pendingBookmarkChanges.current
+      pending.delete(lookId)
+      pending.set(lookId, change)
+      let next: SampleBookmark[]
+      try {
+        const storage = window.localStorage
+        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
+        storedBookmarks.current = stored
+        next = replayBookmarkChanges(stored, pending.values())
+        storage.setItem(bookmarkKey, JSON.stringify(next))
+        storedBookmarks.current = next
+        pending.clear()
+      } catch {
+        next = replayBookmarkChanges(storedBookmarks.current, pending.values())
+      }
+      setBookmarks(next)
+      setBookmarksPersistent(pending.size === 0)
+    }
+    if (navigator.locks) {
+      void navigator.locks.request(bookmarkKey, apply).catch(apply)
+    } else {
+      apply()
+    }
+  }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
     if (!isLiveOwner(owner)) return
@@ -97,7 +173,6 @@ function SampleOutfit({
           </div>
         }
         noAlternative={result.eligibleLookIds.length < 2}
-        hasSwaps={Boolean(lookId && result.input.swaps[lookId])}
         onTryAnother={() => update(rotateMemberSampleOutfit(result))}
         onSwap={(slot, button) => {
           invoker.current = button
@@ -106,6 +181,28 @@ function SampleOutfit({
         onUndoSwaps={() => update(undoMemberSampleSwaps(result))}
         onReviewChoices={() => update(createMemberSampleOutfit())}
         onResetChoices={() => update(createMemberSampleOutfit())}
+      />
+      <SampleIdeaControls
+        strings={strings}
+        preferences={result.input.preferences}
+        onPreferences={(preferences) =>
+          update(updateMemberSampleOutfit(result, { preferences }))
+        }
+        weather={result.input.weather}
+        onWeather={(weather) => update(updateMemberSampleOutfit(result, { weather }))}
+        bookmarks={bookmarks}
+        persistent={bookmarksPersistent}
+        lookId={lookId}
+        onSave={() => {
+          if (lookId)
+            updateBookmarks(lookId, (current) => saveSampleBookmark(current, result))
+        }}
+        onOpen={(bookmark) => update(reopenMemberSampleOutfit(result, bookmark))}
+        onRemove={(id) =>
+          updateBookmarks(id, (current) =>
+            current.filter((bookmark) => bookmark.lookId !== id)
+          )
+        }
       />
       <GuestPreviewSwapDialog
         category={category}

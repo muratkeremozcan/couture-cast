@@ -6759,6 +6759,51 @@ export type DeleteSavedLocationResponseDataDeletedEnum =
 /**
  *
  * @export
+ * @interface DescribeCommunityDraftInput
+ */
+export interface DescribeCommunityDraftInput {
+  /**
+   *
+   * @type {string}
+   * @memberof DescribeCommunityDraftInput
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof DescribeCommunityDraftInput
+   */
+  uploadSessionId: string
+}
+/**
+ *
+ * @export
+ * @interface DescribeCommunityDraftResponse
+ */
+export interface DescribeCommunityDraftResponse {
+  /**
+   *
+   * @type {DescribeCommunityDraftResponseData}
+   * @memberof DescribeCommunityDraftResponse
+   */
+  data: DescribeCommunityDraftResponseData
+}
+/**
+ *
+ * @export
+ * @interface DescribeCommunityDraftResponseData
+ */
+export interface DescribeCommunityDraftResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof DescribeCommunityDraftResponseData
+   */
+  caption: string
+}
+/**
+ *
+ * @export
  * @interface EditCommunityPostText200Response
  */
 export interface EditCommunityPostText200Response {

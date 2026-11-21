@@ -8,6 +8,7 @@ import React from 'react'
 import { act, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
 import {
@@ -18,6 +19,7 @@ import {
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { noLocationResponse } from '@/src/test-utils/locations'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 
@@ -133,6 +135,72 @@ describe('TabOneScreen identity change on a shared device', () => {
       expect(screen.queryByTestId('weather-header')).toBeNull()
     }
   )
+
+  it('restores an edited sample only for the member who saved it on this device', async () => {
+    server.use(http.get('*/api/v1/ritual', noLocationResponse))
+    setMobileApplicationUserId('member-a')
+    const home = await render(<TabOneScreen />)
+    const savedLookId = 'sample-open-sample:l:office-oxford'
+
+    await userEvent.click(await screen.findByTestId('guest-preview-swap-shoes'))
+    await userEvent.click(
+      await screen.findByTestId('guest-preview-swap-option-white-sneakers')
+    )
+    expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
+    await userEvent.click(await screen.findByTestId('sample-save-look'))
+    expect(await screen.findByTestId(savedLookId)).toBeVisible()
+
+    act(() => setMobileApplicationUserId('member-b'))
+    expect(await screen.findByTestId('sample-save-look')).toBeVisible()
+    expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
+    expect(screen.getByTestId('guest-preview-garment-loafers')).toBeVisible()
+
+    act(() => setMobileApplicationUserId('member-a'))
+    expect(await screen.findByTestId('guest-preview-garment-loafers')).toBeVisible()
+    await userEvent.click(await screen.findByTestId(savedLookId))
+    expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
+    expect(screen.getByTestId('guest-preview-undo-swaps')).toBeVisible()
+
+    await userEvent.click(screen.getByTestId('sample-remove-sample:l:office-oxford'))
+    await home.unmount()
+    await render(<TabOneScreen />)
+    expect(await screen.findByTestId('sample-save-look')).toBeVisible()
+    expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
+  })
+
+  it('shows failed storage after removing the last saved sample', async () => {
+    server.use(http.get('*/api/v1/ritual', noLocationResponse))
+    setMobileApplicationUserId('member-a')
+    await render(<TabOneScreen />)
+    const save = await screen.findByTestId('sample-save-look')
+    expect(screen.queryByText('This preview may reset when you close it.')).toBeNull()
+    await userEvent.click(save)
+    const remove = await screen.findByTestId('sample-remove-sample:l:office-oxford')
+    const key = 'couturecast.member-sample-bookmarks.member-a'
+    const persisted = localStorage.getItem(key)
+    expect(persisted).not.toBeNull()
+
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('Storage unavailable')
+    })
+    try {
+      await userEvent.click(remove)
+      expect(write).toHaveBeenCalledWith(key, '[]')
+      expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
+      expect(screen.getByText('This preview may reset when you close it.')).toBeVisible()
+      expect(localStorage.getItem(key)).toBe(persisted)
+    } finally {
+      write.mockRestore()
+    }
+
+    await userEvent.click(save)
+    await userEvent.click(
+      await screen.findByTestId('sample-remove-sample:l:office-oxford')
+    )
+    expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
+    expect(screen.queryByText('This preview may reset when you close it.')).toBeNull()
+    expect(localStorage.getItem(key)).toBe('[]')
+  })
 
   it('6.5-MOB-HERO-ID-03 never stores a member ritual under the signed-out owner on a cold start', async () => {
     // R9-1 on Home: the first load starts before the stored session restores, so the

@@ -328,6 +328,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
     expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
     expect(cardsShown()).toBe(0)
+    expect(screen.queryByTestId('community-example-inspiration')).not.toBeInTheDocument()
   })
 
   it('leaves nothing of the member feed on screen, their own posts included', async () => {

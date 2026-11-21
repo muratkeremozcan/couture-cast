@@ -62,6 +62,11 @@ export interface CommunityStorage {
     expiresInSeconds?: number
   ): Promise<CommunityUploadSession>
   download(objectPath: string): Promise<Buffer>
+  downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    signal: AbortSignal
+  ): Promise<Buffer>
   /**
    * Authority to overwrite one object, which storage itself stops honoring when it expires. Mint it
    * before the reservation it serves: a pause can follow any check this process makes, so only
@@ -80,6 +85,56 @@ export interface CommunityStorage {
 
 function storageUnavailable(): ServiceUnavailableException {
   return new ServiceUnavailableException('STORAGE_PERMISSION_DENIED')
+}
+
+/** Carries the object-level outcome without changing existing export error responses. */
+export class CommunityObjectDownloadError extends ServiceUnavailableException {
+  constructor(readonly reason: 'missing' | 'too-large') {
+    super('STORAGE_PERMISSION_DENIED')
+  }
+}
+
+async function readBoundedObject(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  maxBytes: number,
+  signal: AbortSignal
+): Promise<Buffer> {
+  const parts: Uint8Array[] = []
+  let size = 0
+  for (;;) {
+    const next = await reader.read()
+    if (signal.aborted) throw storageUnavailable()
+    if (next.done) break
+    size += next.value.byteLength
+    if (size > maxBytes) throw new CommunityObjectDownloadError('too-large')
+    parts.push(next.value)
+  }
+  return Buffer.concat(parts, size)
+}
+
+// Supabase can wrap an object 404 in HTTP 400. Bucket and proxy 404s are outages.
+async function isMissingCommunityObject(
+  response: globalThis.Response,
+  reader: ReadableStreamDefaultReader<Uint8Array> | undefined,
+  signal: AbortSignal
+) {
+  const maxBytes = 4 * 1024
+  if (!reader || ![400, 404].includes(response.status)) return false
+  if (Number(response.headers.get('content-length')) > maxBytes) return false
+  try {
+    const raw = await readBoundedObject(reader, maxBytes, signal)
+    const body = JSON.parse(raw.toString('utf8')) as {
+      error?: unknown
+      code?: unknown
+      message?: unknown
+    } | null
+    if (typeof body?.message === 'string' && /bucket not found/i.test(body.message)) {
+      return false
+    }
+    return body?.error === 'not_found' || body?.code === 'NoSuchKey'
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -215,7 +270,7 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     return Buffer.from(await data.arrayBuffer())
   }
 
-  /** Export-only bounded streaming path. Existing callers keep download(). */
+  /** Bounds private image reads before buffering bytes for analysis or export. */
   async downloadBounded(
     objectPath: string,
     maxBytes: number,
@@ -249,30 +304,19 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
           redirect: 'error',
         }
       )
-      if (
-        !response.ok ||
-        !response.body ||
-        Number(response.headers.get('content-length')) > maxBytes
-      ) {
-        await response.body?.cancel()
+      reader = response.body?.getReader()
+      if (!response.ok || !reader) {
+        if (await isMissingCommunityObject(response, reader, controller.signal)) {
+          throw new CommunityObjectDownloadError('missing')
+        }
         throw storageUnavailable()
       }
-      reader = response.body.getReader()
-      const parts: Buffer[] = []
-      let size = 0
-      for (;;) {
-        const next = await reader.read()
-        if (next.done) break
-        size += next.value.byteLength
-        if (size > maxBytes || controller.signal.aborted) {
-          await reader.cancel()
-          throw storageUnavailable()
-        }
-        parts.push(Buffer.from(next.value))
+      if (Number(response.headers.get('content-length')) > maxBytes) {
+        throw new CommunityObjectDownloadError('too-large')
       }
-      if (controller.signal.aborted) throw storageUnavailable()
-      return Buffer.concat(parts)
-    } catch {
+      return await readBoundedObject(reader, maxBytes, controller.signal)
+    } catch (error) {
+      if (error instanceof CommunityObjectDownloadError) throw error
       throw storageUnavailable()
     } finally {
       clearTimeout(timer)

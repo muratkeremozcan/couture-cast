@@ -2,7 +2,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const ptPT: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Preferências de estilo (opcional)',
+    style: 'Estilo',
+    palette: 'Paleta',
+    texture: 'Textura',
+    any: 'Qualquer',
+    active: 'Desportivo e para o dia a dia',
+    chic: 'Casual chique',
+    cozy: 'Confortável e sofisticado',
+    neutral: 'Neutra',
+    colorful: 'Colorida',
+    smooth: 'Lisa',
+    textured: 'Texturada',
+    save: 'Guardar conjunto de exemplo',
+    update: 'Atualizar conjunto guardado',
+    saved: 'Guardado neste dispositivo',
+    remove: 'Remover {look}',
+    illustrations: 'Ilustrações de roupa',
+    inspiration: 'Ideias de exemplo',
+  },
   firstUse: {
+    cleanupFallback:
+      'Mantivemos o fundo porque não foi possível isolar a peça com segurança.',
     replaceGarment: 'Escolher outra foto',
     discardPhoto: 'Descartar esta foto?',
     keepEditing: 'Continuar a editar',
@@ -163,6 +185,9 @@ export const ptPT: GuestPreviewStrings = {
       'cool-windy': 'Fresco e ventoso',
       'mild-dry': 'Ameno e seco',
       'warm-rainy': 'Quente e chuvoso',
+      'cool-rainy': 'Fresco e chuvoso',
+      'mild-rainy': 'Ameno e chuvoso',
+      'warm-dry': 'Quente e seco',
     },
     collection: {
       all: 'Todos os exemplos',
@@ -247,6 +272,22 @@ export const ptPT: GuestPreviewStrings = {
       'Nenhum conjunto é adequado a estas definições nesta coleção: {collection}.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Camisola canelada',
+      description: 'Camisola de algodão creme com acabamento canelado.',
+    },
+    'ribbed-socks': {
+      name: 'Meias caneladas',
+      description: 'Meias de algodão em tom taupe com punhos canelados.',
+    },
+    'mini-skirt': {
+      name: 'Minissaia',
+      description: 'Saia curta de lã em tom ameixa discreto.',
+    },
+    'opaque-tights': {
+      name: 'Collants opacos',
+      description: 'Collants escuros para tempo fresco.',
+    },
     'fleece-zip': {
       name: 'Casaco polar com fecho',
       description: 'Casaco polar verde-salva com fecho de correr completo.',
@@ -376,6 +417,10 @@ export const ptPT: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minissaia e collants',
+      description: 'Camisola canelada, minissaia ameixa, collants opacos e botins.',
+    },
     'winter-knit': {
       name: 'Malha de inverno',
       description: 'Vestido de malha, botins e cachecol de lã.',

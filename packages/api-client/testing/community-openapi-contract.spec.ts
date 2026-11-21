@@ -34,6 +34,24 @@ describe('community HTTP contracts', () => {
       }
     )
 
+    it('documents every draft caption eligibility refusal', () => {
+      expect(
+        document.paths?.['/api/v1/community/posts/describe']?.post?.responses?.['403']
+      ).toMatchObject({
+        content: {
+          'application/json': {
+            schema: {
+              oneOf: [
+                { $ref: '#/components/schemas/ForbiddenHttpError' },
+                { $ref: '#/components/schemas/CommunityRolloutDeniedError' },
+                { $ref: '#/components/schemas/CommunityBannedError' },
+              ],
+            },
+          },
+        },
+      })
+    })
+
     it('6.1-CON-037 registers the single-post read path used by deep links and polling', () => {
       // Matrix row "Client race": a deep link outside the first page resolves
       // the visible target directly, and an owned post is polled until terminal.

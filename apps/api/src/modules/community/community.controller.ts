@@ -21,6 +21,8 @@ import type { Response } from 'express'
 import {
   allocateCommunityPostInputSchema,
   allocateCommunityPostResponseSchema,
+  describeCommunityDraftInputSchema,
+  describeCommunityDraftResponseSchema,
   communityChallengeResponseSchema,
   communityFeedQuerySchema,
   communityFeedResponseSchema,
@@ -368,6 +370,26 @@ export class CommunityController {
     )
 
     return allocateCommunityPostResponseSchema.parse({ data })
+  }
+
+  @Post('posts/describe')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  async describeDraft(
+    @AuthContext() auth: RequestAuthContext,
+    @Body() rawBody: unknown,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const input = describeCommunityDraftInputSchema.safeParse(rawBody)
+    if (!input.success) throw new BadRequestException('Invalid Community draft.')
+    const caption = await withRetryAfterHeader(response, () =>
+      this.communityService.describeDraft({
+        userId: auth.userId,
+        role: auth.role,
+        input: input.data,
+      })
+    )
+    return describeCommunityDraftResponseSchema.parse({ data: { caption } })
   }
 
   @Patch('posts/:postId/text')

@@ -44,7 +44,7 @@ tags:
 - tapOn:
     id: 'garment-aspect-portrait'
 
-- assertVisible:
+- assertNotVisible:
     id: 'garment-cleanup-toggle'
 
 - assertVisible:

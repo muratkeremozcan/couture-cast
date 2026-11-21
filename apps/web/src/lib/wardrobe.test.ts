@@ -1825,33 +1825,21 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     ).rejects.toThrow('Daily upload limit reached')
   })
 
-  /**
-   * Background cleanup mattes out the corner-matched background so garment
-   * cards composite cleanly. The transparency it writes back is the observable
-   * result; without it the feature is a no-op that still costs a PNG re-encode.
-   */
-  it('mattes the corner-matched background to transparent when cleanup is on', async () => {
-    authenticate()
-    const width = 3
-    const height = 3
-    const pixels = new Uint8ClampedArray(width * height * 4)
-    for (let offset = 0; offset < pixels.length; offset += 4) {
-      // A uniform white field, so every pixel matches the sampled corners.
-      pixels[offset] = 255
-      pixels[offset + 1] = 255
-      pixels[offset + 2] = 255
-      pixels[offset + 3] = 255
+  function plainBackgroundImageData() {
+    const width = 5
+    const height = 5
+    const data = new Uint8ClampedArray(width * height * 4).fill(255)
+    // A dark ring represents a garment with a white detail enclosed in it.
+    for (const index of [6, 7, 8, 11, 13, 16, 17, 18]) {
+      data.set([10, 20, 30, 255], index * 4)
     }
-    // One saturated pixel stands in for the garment itself.
-    pixels[0 + 4 * 4] = 10
-    pixels[1 + 4 * 4] = 20
-    pixels[2 + 4 * 4] = 30
-    // One near-background pixel sits in the feather band, where the matte has
-    // to ramp alpha instead of choosing fully-on or fully-off. Hard-cutting
-    // this band is what produces jagged garment edges.
-    pixels[0 + 1 * 4] = 215
+    return { data, width, height }
+  }
 
-    const imageData = { data: pixels, width, height }
+  it('removes the connected background and preserves the garment and its light detail', async () => {
+    authenticate()
+    const imageData = plainBackgroundImageData()
+    const { width, height, data } = imageData
     const putImageData = vi.fn()
     const context = {
       canvas: { width, height },
@@ -1872,12 +1860,9 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     // Cleanup reads pixels back every frame, so the context must be told.
     expect(getContext).toHaveBeenCalledWith('2d', { willReadFrequently: true })
     expect(putImageData).toHaveBeenCalledWith(imageData, 0, 0)
-    // Background corner went fully transparent; the garment pixel stayed opaque.
-    expect(pixels[3]).toBe(0)
-    expect(pixels[4 * 4 + 3]).toBe(255)
-    // The feather-band pixel got a partial alpha rather than either extreme.
-    expect(pixels[1 * 4 + 3]).toBeGreaterThan(0)
-    expect(pixels[1 * 4 + 3]).toBeLessThan(255)
+    expect(data[3]).toBe(0)
+    expect(Array.from(data.slice(6 * 4, 7 * 4))).toEqual([10, 20, 30, 255])
+    expect(Array.from(data.slice(12 * 4, 13 * 4))).toEqual([255, 255, 255, 255])
   })
 
   /**
@@ -1985,12 +1970,12 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
   it('encodes WebP at 0.9 with no white ground when cleanup is on', async () => {
     authenticate()
     const fillRect = vi.fn()
-    const pixels = new Uint8ClampedArray(4 * 4).fill(255)
+    const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: 2, height: 2 },
+      canvas: { width: imageData.width, height: imageData.height },
       drawImage: vi.fn(),
       fillRect,
-      getImageData: vi.fn().mockReturnValue({ data: pixels, width: 2, height: 2 }),
+      getImageData: vi.fn().mockReturnValue(imageData),
       putImageData: vi.fn(),
     } as unknown as CanvasRenderingContext2D
     const { toBlob } = installImagePrepMocks({ context })
@@ -2009,21 +1994,50 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
     expect(uploadedContentType(fetchMock)).toBe('image/webp')
   })
 
+  it('keeps a light garment when the detected background reaches the center', async () => {
+    authenticate()
+    const width = 10
+    const height = 10
+    const pixels = new Uint8ClampedArray(width * height * 4).fill(255)
+    // These off-center dark accents do not identify a separated garment.
+    for (let row = 3; row < 8; row++) {
+      pixels.set([20, 25, 30, 255, 20, 25, 30, 255], (row * width + 1) * 4)
+    }
+    const putImageData = vi.fn()
+    const context = {
+      canvas: { width, height },
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      getImageData: vi.fn().mockReturnValue({ data: pixels, width, height }),
+      putImageData,
+    } as unknown as CanvasRenderingContext2D
+    installImagePrepMocks({ context })
+    const fetchMock = installTransportFetchMock()
+
+    await uploadGarmentImageFromWeb({
+      imagePreview: 'data:image/jpeg;base64,c2FtcGxl',
+      uploadSession: currentUploadSession(),
+      aspectRatio: '1:1',
+      useBgCleanup: true,
+    })
+
+    expect(putImageData).not.toHaveBeenCalled()
+    expect(pixels[(5 * width + 5) * 4 + 3]).toBe(255)
+    expect(declaredMimeType(fetchMock)).toBe('image/jpeg')
+  })
+
   /** A browser that cannot encode WebP hands back PNG, and the upload declares what it got. */
   it('declares PNG when the browser falls back from WebP', async () => {
     authenticate()
+    const imageData = plainBackgroundImageData()
     const context = {
-      canvas: { width: 1, height: 1 },
+      canvas: { width: imageData.width, height: imageData.height },
       drawImage: vi.fn(),
       fillRect: vi.fn(),
-      getImageData: vi.fn().mockReturnValue({
-        data: new Uint8ClampedArray(4).fill(255),
-        width: 1,
-        height: 1,
-      }),
+      getImageData: vi.fn().mockReturnValue(imageData),
       putImageData: vi.fn(),
     } as unknown as CanvasRenderingContext2D
-    installImagePrepMocks({
+    const { toBlob } = installImagePrepMocks({
       context,
       encoded: new NodeBlob(['png-bytes'], { type: 'image/png' }) as unknown as Blob,
     })
@@ -2036,6 +2050,7 @@ describe('uploadGarmentImageFromWeb transport sequence', () => {
       useBgCleanup: true,
     })
 
+    expect(toBlob).toHaveBeenCalledWith(expect.any(Function), 'image/webp', 0.9)
     expect(declaredMimeType(fetchMock)).toBe('image/png')
     expect(uploadedContentType(fetchMock)).toBe('image/png')
   })

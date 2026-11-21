@@ -896,6 +896,7 @@ export default function TabOneScreen() {
             <HomePlannerLink />
             <MemberSampleOutfit
               key={applicationUserId}
+              owner={applicationUserId}
               error={error}
               busy={isLoading}
               onRetry={handleRetry}

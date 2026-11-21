@@ -6,6 +6,7 @@ import { webSessionIdentity } from './web-session'
 import {
   communityCommentsClient,
   communitySyncClient,
+  CommunityRequestSuperseded,
   commentSessionIdentity,
   ResponseError,
   retryOnceWhenCommunityUnavailable,
@@ -35,6 +36,8 @@ import {
 
 import {
   allocateCommunityPostResponseSchema,
+  describeCommunityDraftResponseSchema,
+  type DescribeCommunityDraftInput,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
   communitySponsoredFeedResponseSchema,
@@ -720,6 +723,28 @@ export async function allocateCommunityLookFromWeb({
     altTextSuggestion: session.altTextSuggestion,
     altTextSuggestionLocale: session.altTextSuggestionLocale,
   }
+}
+
+export async function describeCommunityDraftFromWeb(
+  input: DescribeCommunityDraftInput,
+  owner: string | null,
+  signal: AbortSignal
+) {
+  const assertOwner = () => {
+    signal.throwIfAborted()
+    if (!owner || owner !== communityCommentsSessionFromWeb())
+      throw new CommunityRequestSuperseded()
+  }
+  assertOwner()
+  const api = createWebApiClient({ accessToken: readAccessToken() })
+  const response = await withRequestDeadline(10_000, [signal], (requestSignal) =>
+    api.apiV1CommunityPostsDescribePost(
+      { describeCommunityDraftInput: input },
+      { signal: requestSignal }
+    )
+  )
+  assertOwner()
+  return describeCommunityDraftResponseSchema.parse(response).data.caption
 }
 
 export interface PublishCommunityLookInput {

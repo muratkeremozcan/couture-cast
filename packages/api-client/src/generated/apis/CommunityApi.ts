@@ -24,6 +24,8 @@ import type {
   CommunityReactionResponse,
   CreateCommunityChallengeInput,
   CreateCommunityCommentInput,
+  DescribeCommunityDraftInput,
+  DescribeCommunityDraftResponse,
   EditCommunityPostText200Response,
   EditCommunityPostTextRequest,
   GetCommunitySpotlight200Response,
@@ -61,6 +63,10 @@ export interface ApiV1CommunityPostsAllocatePostRequest {
   idempotencyKey: string
   xCouturePlatform: ApiV1CommunityPostsAllocatePostXCouturePlatformEnum
   allocateCommunityPostInput: AllocateCommunityPostInput
+}
+
+export interface ApiV1CommunityPostsDescribePostRequest {
+  describeCommunityDraftInput: DescribeCommunityDraftInput
 }
 
 export interface ApiV1CommunityPostsPostIdGetRequest {
@@ -494,6 +500,73 @@ export class CommunityApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<AllocateCommunityPostResponse> {
     const response = await this.apiV1CommunityPostsAllocatePostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1CommunityPostsDescribePost without sending the request
+   */
+  async apiV1CommunityPostsDescribePostRequestOpts(
+    requestParameters: ApiV1CommunityPostsDescribePostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['describeCommunityDraftInput'] == null) {
+      throw new runtime.RequiredError(
+        'describeCommunityDraftInput',
+        'Required parameter "describeCommunityDraftInput" was null or undefined when calling apiV1CommunityPostsDescribePost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/describe`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['describeCommunityDraftInput'],
+    }
+  }
+
+  /**
+   * Suggest a caption for an uploaded Community draft
+   */
+  async apiV1CommunityPostsDescribePostRaw(
+    requestParameters: ApiV1CommunityPostsDescribePostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<DescribeCommunityDraftResponse>> {
+    const requestOptions =
+      await this.apiV1CommunityPostsDescribePostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Suggest a caption for an uploaded Community draft
+   */
+  async apiV1CommunityPostsDescribePost(
+    requestParameters: ApiV1CommunityPostsDescribePostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<DescribeCommunityDraftResponse> {
+    const response = await this.apiV1CommunityPostsDescribePostRaw(
       requestParameters,
       initOverrides
     )

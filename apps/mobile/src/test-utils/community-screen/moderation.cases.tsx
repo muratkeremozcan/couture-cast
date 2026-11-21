@@ -89,6 +89,7 @@ export function registerCommunityModerationCases() {
     expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
     expect(screen.queryByTestId('community-new-post-button')).toBeNull()
     expect(screen.queryByTestId('community-filter-chip-all')).toBeNull()
+    expect(screen.queryByTestId('community-example-inspiration')).toBeNull()
   })
 
   // --- Author states --------------------------------------------------------

@@ -2,7 +2,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const deDE: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Stilvorlieben (optional)',
+    style: 'Stil',
+    palette: 'Farbpalette',
+    texture: 'Textur',
+    any: 'Beliebig',
+    active: 'Sportlich und alltagstauglich',
+    chic: 'Lässig und schick',
+    cozy: 'Gemütlich und elegant',
+    neutral: 'Neutral',
+    colorful: 'Farbenfroh',
+    smooth: 'Glatt',
+    textured: 'Strukturiert',
+    save: 'Beispieloutfit speichern',
+    update: 'Gespeichertes Outfit aktualisieren',
+    saved: 'Auf diesem Gerät gespeichert',
+    remove: '{look} entfernen',
+    illustrations: 'Kleidungsillustrationen',
+    inspiration: 'Beispielideen',
+  },
   firstUse: {
+    cleanupFallback:
+      'Der Hintergrund bleibt erhalten, weil das Kleidungsstück nicht sicher freigestellt werden konnte.',
     replaceGarment: 'Anderes Foto wählen',
     discardPhoto: 'Dieses Foto verwerfen?',
     keepEditing: 'Weiter bearbeiten',
@@ -164,6 +186,9 @@ export const deDE: GuestPreviewStrings = {
       'cool-windy': 'Kühl und windig',
       'mild-dry': 'Mild und trocken',
       'warm-rainy': 'Warm und regnerisch',
+      'cool-rainy': 'Kühl und regnerisch',
+      'mild-rainy': 'Mild und regnerisch',
+      'warm-dry': 'Warm und trocken',
     },
     collection: {
       all: 'Alle Beispiele',
@@ -247,6 +272,22 @@ export const deDE: GuestPreviewStrings = {
     'no-eligible': 'Kollektion {collection}: Kein Look passt zu diesen Einstellungen.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Rippenpullover',
+      description: 'Cremefarbener Baumwollpullover in Rippenstrick.',
+    },
+    'ribbed-socks': {
+      name: 'Rippensocken',
+      description: 'Taupefarbene Baumwollsocken mit Rippbündchen.',
+    },
+    'mini-skirt': {
+      name: 'Minirock',
+      description: 'Kurzer Wollrock in gedecktem Pflaumenton.',
+    },
+    'opaque-tights': {
+      name: 'Blickdichte Strumpfhose',
+      description: 'Dunkle Strumpfhose für kühles Wetter.',
+    },
     'fleece-zip': {
       name: 'Fleecejacke mit Reißverschluss',
       description: 'Salbeigrüne Fleecejacke mit durchgehendem Reißverschluss.',
@@ -377,6 +418,11 @@ export const deDE: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minirock und Strumpfhose',
+      description:
+        'Rippenpullover, pflaumenfarbener Minirock, blickdichte Strumpfhose und Stiefeletten.',
+    },
     'winter-knit': {
       name: 'Winterstrick',
       description: 'Strickkleid, Stiefeletten und Wollschal.',

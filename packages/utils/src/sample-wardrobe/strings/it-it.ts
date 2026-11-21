@@ -2,7 +2,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const itIT: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Preferenze di stile (facoltative)',
+    style: 'Stile',
+    palette: 'Palette',
+    texture: 'Texture',
+    any: 'Qualsiasi',
+    active: 'Sportivo e da giorno',
+    chic: 'Casual chic',
+    cozy: 'Comodo e sofisticato',
+    neutral: 'Neutra',
+    colorful: 'Colorata',
+    smooth: 'Liscia',
+    textured: 'Testurizzata',
+    save: 'Salva outfit di esempio',
+    update: 'Aggiorna outfit salvato',
+    saved: 'Salvato su questo dispositivo',
+    remove: 'Rimuovi {look}',
+    illustrations: 'Illustrazioni dei capi',
+    inspiration: 'Idee di esempio',
+  },
   firstUse: {
+    cleanupFallback:
+      'Lo sfondo è stato mantenuto perché non abbiamo potuto isolare il capo con precisione.',
     replaceGarment: 'Scegli un’altra foto',
     discardPhoto: 'Scartare questa foto?',
     keepEditing: 'Continua a modificare',
@@ -162,6 +184,9 @@ export const itIT: GuestPreviewStrings = {
       'cool-windy': 'Fresco e ventoso',
       'mild-dry': 'Mite e asciutto',
       'warm-rainy': 'Caldo e piovoso',
+      'cool-rainy': 'Fresco e piovoso',
+      'mild-rainy': 'Mite e piovoso',
+      'warm-dry': 'Caldo e asciutto',
     },
     collection: {
       all: 'Tutti gli esempi',
@@ -246,6 +271,22 @@ export const itIT: GuestPreviewStrings = {
       'Nessun look adatto a queste impostazioni nella collezione: {collection}.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Maglia a coste',
+      description: 'Maglia di cotone color crema lavorata a coste.',
+    },
+    'ribbed-socks': {
+      name: 'Calzini a coste',
+      description: 'Calzini di cotone color tortora con bordo a coste.',
+    },
+    'mini-skirt': {
+      name: 'Minigonna',
+      description: 'Gonna corta di lana color prugna tenue.',
+    },
+    'opaque-tights': {
+      name: 'Collant coprenti',
+      description: 'Collant scuri per le giornate fresche.',
+    },
     'fleece-zip': {
       name: 'Giacca in pile con zip',
       description: 'Giacca in pile verde salvia con zip intera.',
@@ -369,6 +410,11 @@ export const itIT: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minigonna e collant',
+      description:
+        'Maglia a coste, minigonna color prugna, collant coprenti e stivaletti.',
+    },
     'winter-knit': {
       name: 'Maglia invernale',
       description: 'Abito in maglia, stivaletti e sciarpa di lana.',

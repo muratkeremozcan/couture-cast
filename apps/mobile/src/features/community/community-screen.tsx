@@ -29,6 +29,7 @@ import { CommunityCommentsSheet } from '@/components/community/community-comment
 import { CommunityBannedNotice } from './community-banned-notice'
 import { useCommunityScrollRestore } from './use-community-scroll-restore'
 import { CommunityCommentDrafts } from './community-comment-drafts'
+import { CommunityExampleInspiration } from './community-example-inspiration'
 import {
   communityCommentsSessionFromMobile,
   communitySyncFromMobile,
@@ -2085,7 +2086,27 @@ export function CommunityScreen() {
     </View>
   )
 
-  const renderFooterComponent = () => {
+  const renderExampleInspiration = () => {
+    if (
+      communityAvailable &&
+      !bannedSanction &&
+      feedState === 'ready' &&
+      feedRows.every((post) => post.author.isSelf)
+    ) {
+      return (
+        <CommunityExampleInspiration
+          band={
+            servedMode === 'auto' ? viewerBand : servedMode === 'all' ? null : servedMode
+          }
+          locale={locale}
+          palette={palette}
+        />
+      )
+    }
+    return null
+  }
+
+  const renderPagingFooter = () => {
     if (isLoadingMore) {
       return (
         <View style={styles.loadingMoreContainer} testID="community-feed-loading-more">
@@ -2212,7 +2233,12 @@ export function CommunityScreen() {
           // Elements keep the empty state and the load-more control mounted across
           // renders; a fresh function per render would remount them and drop focus.
           ListEmptyComponent={renderEmptyComponent()}
-          ListFooterComponent={renderFooterComponent()}
+          ListFooterComponent={
+            <>
+              {renderExampleInspiration()}
+              {renderPagingFooter()}
+            </>
+          }
           contentContainerStyle={styles.listContent}
         />
 

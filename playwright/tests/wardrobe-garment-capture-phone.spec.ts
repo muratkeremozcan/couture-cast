@@ -9,9 +9,8 @@
 // object, and the browser must put the bytes at exactly that URL, on the storage host, never
 // on the API or web host.
 //
-// G-2: a phone camera streams a portrait frame, and the preview cropped it to a 16:9 box with
-// object-fit cover while Snap Photo kept the whole frame. The preview must show the whole frame
-// the photo will hold. The stand-in camera streams a portrait frame, as a phone does.
+// G-2: a phone camera streams a portrait frame. The viewfinder must show the whole frame and
+// the crop step must show the crop selected after snapping.
 //
 // G-3: on the same screen the two crop actions wrapped to two lines each, and the background
 // cleanup switch drew its track at the 44 px touch size, a disc instead of a switch. Stacked on
@@ -28,7 +27,9 @@
 // G-5, a separate camera-path case: Snap Photo drew the camera frame into a PNG, so even with
 // cleanup off the camera path uploaded lossless bytes. The fix stores a JPEG straight in
 // storage, and G-5 holds it there.
+import { createHash } from 'node:crypto'
 import path from 'node:path'
+import sharp from 'sharp'
 import {
   garmentListResponseSchema,
   signupResponseSchema,
@@ -39,7 +40,10 @@ import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
 import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
 import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
-import { writePhoneCameraPhoto } from '../support/helpers/phone-camera-photo'
+import {
+  PHONE_CAMERA_FRAME,
+  writePhonePhoto,
+} from '../support/helpers/phone-camera-photo'
 import {
   vercelFunctionBodyLimit,
   watchPuts,
@@ -144,7 +148,7 @@ phoneTest.describe('Garment capture on a phone', () => {
   )
 
   phoneTest(
-    'G-2: the camera preview shows the whole portrait frame that Snap Photo keeps',
+    'G-2: the camera shows the whole portrait frame and crop shows the selected aspect',
     async ({ page }, testInfo) => {
       await page.addInitScript((frame) => {
         const canvas = document.createElement('canvas')
@@ -174,8 +178,13 @@ phoneTest.describe('Garment capture on a phone', () => {
 
       const video = page.getByRole('dialog').locator('video')
       await expect
-        .poll(() => video.evaluate((element: HTMLVideoElement) => element.videoHeight))
-        .toBe(CAMERA_FRAME.height)
+        .poll(() =>
+          video.evaluate((element: HTMLVideoElement) => ({
+            width: element.videoWidth,
+            height: element.videoHeight,
+          }))
+        )
+        .toEqual(CAMERA_FRAME)
       const preview = await video.evaluate((element: HTMLVideoElement) => {
         const box = element.getBoundingClientRect()
         const style = getComputedStyle(element)
@@ -215,17 +224,18 @@ phoneTest.describe('Garment capture on a phone', () => {
       })
 
       await page.getByRole('button', { name: 'Snap Photo' }).click()
-      const snapped = page.getByRole('dialog').getByRole('img').first()
-      await expect(snapped).toBeVisible()
-      // The box is sized by CSS, so it shows before the data URL decodes.
+      const dialog = page.getByRole('dialog')
+      const snapped = dialog.getByRole('img', { name: 'Garment preview' })
+      const decodedSize = () =>
+        snapped.evaluate(async (image: HTMLImageElement) => {
+          await image.decode()
+          return { width: image.naturalWidth, height: image.naturalHeight }
+        })
       await expect
-        .poll(() =>
-          snapped.evaluate((element: HTMLImageElement) => ({
-            width: element.naturalWidth,
-            height: element.naturalHeight,
-          }))
-        )
-        .toEqual(CAMERA_FRAME)
+        .poll(decodedSize)
+        .toEqual({ width: CAMERA_FRAME.width, height: CAMERA_FRAME.width })
+      await dialog.getByRole('button', { name: '4:3 Portrait' }).click()
+      await expect.poll(decodedSize).toEqual({ width: CAMERA_FRAME.width, height: 960 })
     }
   )
 
@@ -281,10 +291,23 @@ phoneTest.describe('Garment capture on a phone', () => {
   )
 
   phoneTest(
-    'G-4: a full-size phone camera photo uploads with the default crop and cleanup',
+    'G-4: a full-size phone photo uploads the WebP alpha preview directly to storage',
     async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       const photoPath = testInfo.outputPath('phone-camera-photo.jpg')
-      const photoBytes = await writePhoneCameraPhoto(photoPath)
+      const subjectPath = testInfo.outputPath('plain-backdrop-garment.png')
+      // A tiny shadow at the square crop's upper-left corner must not stand in for
+      // the whole backdrop when the browser downsamples the grained JPEG.
+      const subject = `<svg xmlns="http://www.w3.org/2000/svg" width="4032" height="3024">
+        <rect width="4032" height="3024" fill="#f5f5f5"/>
+        <rect x="492" width="28" height="16" fill="#ebebeb"/>
+        <path d="M1032 800h570l110-200h608l110 200h570l100 500-450 100-125-200v1200H1507V1200l-125 200-450-100z" fill="#245ca1"/>
+      </svg>`
+      await sharp(Buffer.from(subject)).png().toFile(subjectPath)
+      const photoBytes = await writePhonePhoto(photoPath, {
+        ...PHONE_CAMERA_FRAME,
+        format: 'jpeg',
+        subjectPath,
+      })
       // A file the picker accepts: under the 10 MiB cap, and the size class of a real phone photo.
       expect(photoBytes).toBeGreaterThan(1_500_000)
       expect(photoBytes).toBeLessThan(10 * 1024 * 1024)
@@ -298,7 +321,15 @@ phoneTest.describe('Garment capture on a phone', () => {
         method: 'POST',
         url: '**/api/v1/wardrobe/upload-url',
       })
-      const uploads = watchPuts(page)
+      const uploads: { url: string; bytes: Buffer | null; mimeType: string }[] = []
+      page.on('request', (request) => {
+        if (request.method() !== 'PUT') return
+        uploads.push({
+          url: request.url(),
+          bytes: request.postDataBuffer(),
+          mimeType: request.headers()['content-type'] ?? '',
+        })
+      })
 
       await page.goto('/wardrobe')
       await waitForAccessibilityReady(page)
@@ -308,6 +339,17 @@ phoneTest.describe('Garment capture on a phone', () => {
       await expect(
         page.getByRole('switch', { name: 'Auto Background Cleanup' })
       ).toBeChecked()
+      const preview = page
+        .getByRole('dialog')
+        .getByRole('img', { name: 'Garment preview' })
+      const previewSha256 = await preview.evaluate(async (image: HTMLImageElement) => {
+        const response = await fetch(image.currentSrc || image.src)
+        const bytes = await response.arrayBuffer()
+        const hash = await crypto.subtle.digest('SHA-256', bytes)
+        return Array.from(new Uint8Array(hash), (byte) =>
+          byte.toString(16).padStart(2, '0')
+        ).join('')
+      })
       await page.getByRole('button', { name: 'Use This Image' }).click()
 
       await expect(page.getByText('Garment Upload Complete!')).toBeVisible({
@@ -320,7 +362,18 @@ phoneTest.describe('Garment capture on a phone', () => {
       const { responseJson } = await allocation
       const { uploadUrl } = (responseJson as { data: { uploadUrl: string } }).data
       expectSignedStorageUpload(uploadUrl)
-      expect(uploads).toEqual([uploadUrl])
+      expect(uploads.map(({ url }) => url)).toEqual([uploadUrl])
+      const [put] = uploads
+      expect(put!.mimeType).toBe('image/webp')
+      expect(put!.bytes?.length).toBeGreaterThan(0)
+      expect(createHash('sha256').update(put!.bytes!).digest('hex')).toBe(previewSha256)
+      const image = sharp(put!.bytes!)
+      expect(await image.metadata()).toMatchObject({ format: 'webp', hasAlpha: true })
+      const corner = await image
+        .extract({ left: 0, top: 0, width: 1, height: 1 })
+        .raw()
+        .toBuffer()
+      expect(corner[3]).toBe(0)
 
       const garments = await apiRequest({
         method: 'GET',

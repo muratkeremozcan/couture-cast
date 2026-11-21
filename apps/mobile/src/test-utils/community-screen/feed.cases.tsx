@@ -49,6 +49,22 @@ function distinctNodeHandles() {
 }
 
 export function registerCommunityFeedCases() {
+  it('shows inspiration beside paging until another author appears', async () => {
+    serveFeed((url) =>
+      url.searchParams.has('cursor')
+        ? feedJson({ items: [item({ id: 'post-peer' })] })
+        : feedJson({
+            items: [item({ author: { displayName: 'You', isSelf: true } })],
+            nextCursor: cursor('temperate_dry'),
+          })
+    )
+    await render(<CommunityScreen />)
+    expect(await screen.findByTestId('community-example-inspiration')).toBeVisible()
+    press(screen.getByTestId('community-feed-load-more'))
+    expect(await screen.findByTestId('community-post-card-post-peer')).toBeVisible()
+    expect(screen.queryByTestId('community-example-inspiration')).toBeNull()
+  })
+
   it.each([
     ['published', true],
     ['pending_review', false],

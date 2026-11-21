@@ -11,9 +11,10 @@ import type {
   SampleGarmentCategory,
   SampleGarmentMaterial,
   SampleLook,
+  SampleStylePreferences,
 } from './types'
 
-export const SAMPLE_CATALOG_VERSION = '2026-11-15.1'
+export const SAMPLE_CATALOG_VERSION = '2026-11-21.1'
 
 const PROVENANCE = {
   authored: 'couture-cast',
@@ -57,13 +58,15 @@ function look(
   slug: string,
   collections: readonly SampleCollection[],
   core: readonly string[],
-  feedbackCard: boolean
+  feedbackCard: boolean,
+  preferences?: SampleStylePreferences
 ): SampleLook {
   return {
     id: `sample:l:${slug}`,
     collections: [...collections],
     core: core.map((garmentSlug) => `sample:g:${garmentSlug}`),
     feedbackCard,
+    ...(preferences ? { preferences } : {}),
   }
 }
 
@@ -161,6 +164,10 @@ const TOPS: SampleGarment[] = [
     material: 'linen',
     collections: MENSWEAR,
   }),
+  garment('ribbed-knit', 'top', ['cool', 'mild'], ['sweater', '#ede1d6', '#baa394'], {
+    material: 'cotton',
+    collections: WOMENSWEAR,
+  }),
 ]
 
 const BOTTOMS: SampleGarment[] = [
@@ -213,6 +220,16 @@ const BOTTOMS: SampleGarment[] = [
     material: 'cotton',
     collections: MENSWEAR,
   }),
+  garment(
+    'mini-skirt',
+    'bottom',
+    ['cool', 'mild'],
+    ['mini-skirt', '#684555', '#412a36'],
+    {
+      material: 'wool',
+      collections: WOMENSWEAR,
+    }
+  ),
 ]
 
 const DRESSES: SampleGarment[] = [
@@ -290,42 +307,105 @@ const ACCESSORIES: SampleGarment[] = [
     ['warm', 'hot'],
     ['sunglasses', '#2b2b2b', '#8a6a3a']
   ),
+  garment(
+    'opaque-tights',
+    'accessory',
+    ['cool', 'mild'],
+    ['tights', '#27242b', '#48434c'],
+    {
+      material: 'synthetic',
+      collections: WOMENSWEAR,
+    }
+  ),
+  garment(
+    'ribbed-socks',
+    'accessory',
+    ['cool', 'mild'],
+    ['socks', '#aa8a79', '#dfc9b9'],
+    {
+      material: 'cotton',
+      collections: WOMENSWEAR,
+    }
+  ),
 ]
 
 // Looks carry no outerwear: the policy adds a layer when the context calls for one (D5).
-// Nine are feedback cards; the other three widen coverage for the browse filters.
+// Nine are feedback cards. The other looks widen coverage for the browse filters.
 const LOOKS: SampleLook[] = [
-  look('winter-knit', WOMENSWEAR, ['knit-dress', 'ankle-boots', 'wool-scarf'], true),
-  look('city-wool', BOTH, ['merino-sweater', 'wool-trousers', 'leather-boots'], true),
+  look('winter-knit', WOMENSWEAR, ['knit-dress', 'ankle-boots', 'wool-scarf'], true, {
+    style: 'cozy',
+    palette: 'colorful',
+    texture: 'textured',
+  }),
+  look('city-wool', BOTH, ['merino-sweater', 'wool-trousers', 'leather-boots'], true, {
+    style: 'chic',
+    palette: 'colorful',
+    texture: 'textured',
+  }),
   look(
     'weekend-flannel',
     MENSWEAR,
     ['flannel-shirt', 'dark-jeans', 'leather-boots', 'beanie'],
-    true
+    true,
+    { style: 'active', palette: 'colorful', texture: 'textured' }
   ),
-  look('soft-pleats', WOMENSWEAR, ['cable-knit', 'pleated-skirt', 'ankle-boots'], true),
-  look('office-oxford', BOTH, ['oxford-shirt', 'dark-jeans', 'loafers'], true),
-  look('silk-midi', WOMENSWEAR, ['silk-blouse', 'midi-skirt', 'white-sneakers'], true),
-  look('easy-chinos', MENSWEAR, ['oxford-shirt', 'chinos', 'white-sneakers'], true),
+  look('soft-pleats', WOMENSWEAR, ['cable-knit', 'pleated-skirt', 'ankle-boots'], true, {
+    style: 'cozy',
+    palette: 'neutral',
+    texture: 'textured',
+  }),
+  look('office-oxford', BOTH, ['oxford-shirt', 'dark-jeans', 'loafers'], true, {
+    style: 'chic',
+    palette: 'neutral',
+    texture: 'smooth',
+  }),
+  look('silk-midi', WOMENSWEAR, ['silk-blouse', 'midi-skirt', 'white-sneakers'], true, {
+    style: 'chic',
+    palette: 'colorful',
+    texture: 'smooth',
+  }),
+  look('easy-chinos', MENSWEAR, ['oxford-shirt', 'chinos', 'white-sneakers'], true, {
+    style: 'active',
+    palette: 'neutral',
+    texture: 'smooth',
+  }),
   look(
     'summer-linen',
     BOTH,
     ['cotton-tee', 'linen-trousers', 'sandals', 'sunglasses'],
-    true
+    true,
+    { style: 'active', palette: 'neutral', texture: 'textured' }
   ),
-  look('sun-dress', WOMENSWEAR, ['sundress', 'sandals', 'canvas-tote'], true),
-  look('wrap-day', WOMENSWEAR, ['wrap-dress', 'loafers', 'canvas-tote'], false),
+  look('sun-dress', WOMENSWEAR, ['sundress', 'sandals', 'canvas-tote'], true, {
+    style: 'active',
+    palette: 'colorful',
+    texture: 'smooth',
+  }),
+  look('wrap-day', WOMENSWEAR, ['wrap-dress', 'loafers', 'canvas-tote'], false, {
+    style: 'chic',
+    palette: 'colorful',
+    texture: 'smooth',
+  }),
   look(
     'court-polo',
     MENSWEAR,
     ['polo-shirt', 'tailored-shorts', 'white-sneakers'],
-    false
+    false,
+    { style: 'active', palette: 'colorful', texture: 'smooth' }
   ),
   look(
     'breezy-linen',
     MENSWEAR,
     ['linen-shirt', 'linen-trousers', 'loafers', 'canvas-tote'],
-    false
+    false,
+    { style: 'cozy', palette: 'neutral', texture: 'textured' }
+  ),
+  look(
+    'mini-and-tights',
+    WOMENSWEAR,
+    ['ribbed-knit', 'mini-skirt', 'ankle-boots', 'opaque-tights'],
+    false,
+    { style: 'cozy', palette: 'colorful', texture: 'textured' }
   ),
 ]
 

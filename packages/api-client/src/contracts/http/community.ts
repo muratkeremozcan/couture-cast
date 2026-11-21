@@ -743,6 +743,22 @@ export const allocateCommunityPostInputSchema = z
   .strict()
 export type AllocateCommunityPostInput = z.infer<typeof allocateCommunityPostInputSchema>
 
+export const describeCommunityDraftInputSchema = z
+  .object({
+    postId: z.uuid(),
+    uploadSessionId: z.uuid(),
+  })
+  .strict()
+export type DescribeCommunityDraftInput = z.infer<
+  typeof describeCommunityDraftInputSchema
+>
+
+export const describeCommunityDraftResponseSchema = z
+  .object({
+    data: z.object({ caption: z.string().min(1).max(280) }).strict(),
+  })
+  .strict()
+
 export const allocateCommunityPostSessionSchema = z
   .object({
     postId: nonEmptyStringSchema,
@@ -1080,7 +1096,7 @@ export const communitySpotlightDeniedResponseSchema = z
   })
   .strict()
 
-/** A comment route's refusal while the member's rollout is off. It carries no Nest `error` name. */
+/** A Community refusal with a `denied` code and no Nest `error` name. */
 export const communityRolloutDeniedErrorSchema = z
   .object({
     statusCode: z.literal(403),
@@ -1853,6 +1869,14 @@ export function registerCommunityContracts(
     'PublishCommunityPostResponse',
     publishCommunityPostResponseSchema
   )
+  const registeredDescribeDraftInput = registry.register(
+    'DescribeCommunityDraftInput',
+    describeCommunityDraftInputSchema
+  )
+  const registeredDescribeDraftResponse = registry.register(
+    'DescribeCommunityDraftResponse',
+    describeCommunityDraftResponseSchema
+  )
   const registeredReportInput = registry.register(
     'ReportCommunityPostInput',
     reportCommunityPostInputSchema
@@ -2145,6 +2169,81 @@ export function registerCommunityContracts(
         description: 'Access could not be verified within the authorization budget.',
         content: {
           'application/json': { schema: communitySpotlightUnavailableResponseSchema },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/community/posts/describe',
+    tags: ['community'],
+    summary: 'Suggest a caption for an uploaded Community draft',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: registeredDescribeDraftInput } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Editable caption based on the uploaded photo.',
+        content: { 'application/json': { schema: registeredDescribeDraftResponse } },
+      },
+      400: {
+        description: 'Invalid request or image.',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      403: {
+        description: 'Community eligibility requirement not satisfied.',
+        content: {
+          'application/json': {
+            schema: z.union([
+              commonSchemas.forbiddenHttpErrorSchema,
+              communityRolloutDeniedErrorSchema,
+              communityBannedErrorSchema,
+            ]),
+          },
+        },
+      },
+      404: {
+        description: 'No owned draft matches the request.',
+        content: {
+          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
+        },
+      },
+      409: {
+        description:
+          'The draft upload session has changed, expired, or has no uploaded image.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
+      429: {
+        description: 'The account reached its caption suggestion limit.',
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until the next request can be made.',
+            schema: { type: 'integer' },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
+        },
+      },
+      503: {
+        description: 'Community caption suggestion is temporarily unavailable.',
+        content: {
+          'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },
       },
     },

@@ -35,6 +35,21 @@ export type SampleCollection = (typeof SAMPLE_COLLECTIONS)[number]
 export const SAMPLE_COLLECTION_FILTERS = ['all', ...SAMPLE_COLLECTIONS] as const
 export type SampleCollectionFilter = (typeof SAMPLE_COLLECTION_FILTERS)[number]
 
+export const SAMPLE_STYLE_OPTIONS = {
+  style: ['active', 'chic', 'cozy'],
+  palette: ['neutral', 'colorful'],
+  texture: ['smooth', 'textured'],
+} as const
+
+export const sampleStylePreferencesSchema = z
+  .object({
+    style: z.enum(SAMPLE_STYLE_OPTIONS.style).optional(),
+    palette: z.enum(SAMPLE_STYLE_OPTIONS.palette).optional(),
+    texture: z.enum(SAMPLE_STYLE_OPTIONS.texture).optional(),
+  })
+  .strict()
+export type SampleStylePreferences = z.infer<typeof sampleStylePreferencesSchema>
+
 export const SAMPLE_ART_KEYS = [
   'tee',
   'shirt',
@@ -46,6 +61,7 @@ export const SAMPLE_ART_KEYS = [
   'shorts',
   'skirt',
   'pleated-skirt',
+  'mini-skirt',
   'knit-dress',
   'wrap-dress',
   'sundress',
@@ -64,6 +80,8 @@ export const SAMPLE_ART_KEYS = [
   'beanie',
   'tote',
   'sunglasses',
+  'tights',
+  'socks',
 ] as const
 export type SampleArtKey = (typeof SAMPLE_ART_KEYS)[number]
 
@@ -105,6 +123,7 @@ export const sampleLookSchema = z
     collections: z.array(z.enum(SAMPLE_COLLECTIONS)).min(1),
     core: z.array(z.string().regex(SAMPLE_GARMENT_ID_PATTERN)).min(2),
     feedbackCard: z.boolean(),
+    preferences: sampleStylePreferencesSchema.optional(),
   })
   .strict()
 export type SampleLook = z.infer<typeof sampleLookSchema>

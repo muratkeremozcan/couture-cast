@@ -29,6 +29,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient, resolveWebApiBaseUrl } from './api-client'
+import { removePlainGarmentBackground } from './garment-background'
 import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 import {
   createUploadAttempts,
@@ -57,6 +58,7 @@ export interface UploadGarmentImageInput {
   uploadSession: UploadAttemptSession
   aspectRatio: '1:1' | '4:3'
   useBgCleanup: boolean
+  prepared?: PreparedImage
   signal?: AbortSignal
   onStateChange?: (state: GarmentUploadState) => void
   onProgress?: (percentage: number) => void
@@ -68,6 +70,7 @@ export type PreparedImage = {
   mimeType: 'image/jpeg' | 'image/png' | 'image/webp'
   sha256: string
   widthPx: number
+  backgroundRemoved?: boolean
 }
 
 export class WardrobeRequestError extends Error {
@@ -223,42 +226,6 @@ function toBlob(
   })
 }
 
-function removeCornerMatchedBackground(context: CanvasRenderingContext2D): void {
-  const { width, height } = context.canvas
-  const pixels = context.getImageData(0, 0, width, height)
-  const corners = [
-    0,
-    (width - 1) * 4,
-    (height - 1) * width * 4,
-    ((height - 1) * width + width - 1) * 4,
-  ]
-  const background = corners.reduce(
-    (color, offset) => {
-      color.red += pixels.data[offset] ?? 0
-      color.green += pixels.data[offset + 1] ?? 0
-      color.blue += pixels.data[offset + 2] ?? 0
-      return color
-    },
-    { red: 0, green: 0, blue: 0 }
-  )
-  background.red /= corners.length
-  background.green /= corners.length
-  background.blue /= corners.length
-
-  for (let offset = 0; offset < pixels.data.length; offset += 4) {
-    const red = (pixels.data[offset] ?? 0) - background.red
-    const green = (pixels.data[offset + 1] ?? 0) - background.green
-    const blue = (pixels.data[offset + 2] ?? 0) - background.blue
-    const distance = Math.sqrt(red * red + green * green + blue * blue)
-    if (distance <= 28) {
-      pixels.data[offset + 3] = 0
-    } else if (distance < 72) {
-      pixels.data[offset + 3] = Math.round(((distance - 28) / 44) * 255)
-    }
-  }
-  context.putImageData(pixels, 0, 0)
-}
-
 /**
  * Exported because `palette-advisor.ts` uploads a selfie through the same
  * allocate -> PUT bytes -> commit lifecycle and needs the identical
@@ -324,11 +291,12 @@ export async function prepareGarmentImage(
     outputWidth,
     outputHeight
   )
-  if (useBgCleanup) {
-    removeCornerMatchedBackground(context)
-  }
-
-  const blob = await toBlob(canvas, encoding.mimeType, encoding.quality)
+  const cleanup = useBgCleanup ? removePlainGarmentBackground(context) : null
+  const finalEncoding =
+    cleanup && !cleanup.hasTransparency && encodingChoice === 'compact'
+      ? preparedImageEncoding(false)
+      : encoding
+  const blob = await toBlob(canvas, finalEncoding.mimeType, finalEncoding.quality)
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(blob.type)) {
     throw new WardrobeRequestError(
       'The prepared image format is unsupported.',
@@ -352,6 +320,7 @@ export async function prepareGarmentImage(
     heightPx: outputHeight,
     mimeType: blob.type as PreparedImage['mimeType'],
     sha256,
+    backgroundRemoved: Boolean(cleanup?.removed),
   }
 }
 
@@ -425,6 +394,7 @@ export async function uploadGarmentImageFromWeb({
   imagePreview,
   aspectRatio,
   useBgCleanup,
+  prepared,
   signal,
   onStateChange,
   onProgress,
@@ -435,12 +405,10 @@ export async function uploadGarmentImageFromWeb({
   const accessToken = await resolveUploadBearer(uploadSession, readAccessToken)
   onStateChange?.('preparing')
   onProgress?.(10)
-  const image = await prepareGarmentImage(
-    imagePreview,
-    aspectRatio,
-    useBgCleanup,
-    'compact'
-  )
+  const image =
+    prepared ??
+    (await prepareGarmentImage(imagePreview, aspectRatio, useBgCleanup, 'compact'))
+  const hasBgCleanup = image.backgroundRemoved ?? false
 
   const api = createWebApiClient({ accessToken })
   // A retry of the same prepared image (the member taps Use This Image again after a failure)
@@ -451,7 +419,7 @@ export async function uploadGarmentImageFromWeb({
     mimeType: image.mimeType,
     widthPx: image.widthPx,
     heightPx: image.heightPx,
-  })}:${useBgCleanup ? 'cleanup' : 'original'}`
+  })}:${hasBgCleanup ? 'cleanup' : 'original'}`
   const garment = await runTrackedUpload(
     garmentUploadAttempts,
     uploadSession,
@@ -512,7 +480,7 @@ export async function uploadGarmentImageFromWeb({
                   garmentId: allocation.garmentId,
                   uploadSessionId: allocation.uploadSessionId,
                   hasCropping: true,
-                  hasBgCleanup: useBgCleanup,
+                  hasBgCleanup,
                 },
               },
               { signal }

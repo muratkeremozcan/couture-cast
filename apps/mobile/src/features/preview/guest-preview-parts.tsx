@@ -16,6 +16,7 @@ import {
   formatPreviewString,
   formatSampleExplanation,
   formatSampleTemperature,
+  hasAppliedSampleSwaps,
   resolveSampleArt,
   SAMPLE_ART_VIEWBOX,
   SAMPLE_CATALOG,
@@ -34,7 +35,7 @@ import {
   type SampleGarmentCategory,
   type SampleOutfitResult,
   type SampleVote,
-  type SampleWeatherKey,
+  type GuestSampleWeatherKey,
 } from '@couture/utils'
 import { EdgeToEdgeModal } from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
@@ -96,6 +97,8 @@ export function PreviewButton({
   palette,
   primary = false,
   disabled = false,
+  expanded,
+  selected,
   accessibilityLabel,
   buttonRef,
 }: {
@@ -105,6 +108,8 @@ export function PreviewButton({
   palette: PreviewPalette
   primary?: boolean
   disabled?: boolean
+  expanded?: boolean
+  selected?: boolean
   accessibilityLabel?: string
   buttonRef?: Ref<ComponentRef<typeof Pressable>>
 }) {
@@ -114,7 +119,7 @@ export function PreviewButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, expanded, selected }}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -288,7 +293,6 @@ export function PreviewOutfit({
   locale,
   palette,
   noAlternative,
-  hasSwaps,
   onTryAnother,
   onSwap,
   onUndoSwaps,
@@ -304,7 +308,6 @@ export function PreviewOutfit({
   locale: string
   palette: PreviewPalette
   noAlternative: boolean
-  hasSwaps: boolean
   onTryAnother: () => void
   onSwap: (category: SampleGarmentCategory) => void
   onUndoSwaps: () => void
@@ -317,6 +320,7 @@ export function PreviewOutfit({
 }) {
   const swapButtons = useSwapButtonFocus(swapCategory)
   const look = result.look
+  const hasSwaps = hasAppliedSampleSwaps(result)
   if (!look) {
     return (
       <View
@@ -353,17 +357,21 @@ export function PreviewOutfit({
       testID="guest-preview-outfit"
       style={[styles.card, { borderColor: palette.divider }]}
     >
-      <Text style={[styles.eyebrow, { color: palette.accentText }]}>
-        {heading ?? strings.outfit.heading}
-      </Text>
+      {(heading || !hasSwaps) && (
+        <Text style={[styles.eyebrow, { color: palette.accentText }]}>
+          {heading ?? strings.outfit.heading}
+        </Text>
+      )}
       <Text
         testID="guest-preview-look-name"
         accessibilityRole="header"
         style={[styles.heading, { color: palette.text }]}
       >
-        {lookText.name}
+        {hasSwaps ? strings.outfit.heading : lookText.name}
       </Text>
-      <Text style={{ color: palette.mutedText }}>{lookText.description}</Text>
+      {!hasSwaps && (
+        <Text style={{ color: palette.mutedText }}>{lookText.description}</Text>
+      )}
       <Text
         testID="guest-preview-weather-chip"
         style={[styles.chipLabel, { color: palette.text }]}
@@ -378,6 +386,7 @@ export function PreviewOutfit({
         palette={palette}
         primary
       />
+      <Text style={{ color: palette.mutedText }}>{strings.styleIdeas.illustrations}</Text>
       <View testID="guest-preview-garments" style={styles.wrap}>
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -462,7 +471,7 @@ export function PreviewControls({
   strings: GuestPreviewStrings
   locale: string
   palette: PreviewPalette
-  onWeather: (weather: SampleWeatherKey) => void
+  onWeather: (weather: GuestSampleWeatherKey) => void
   onComfort: (comfort: SampleComfort, control: PreviewControl) => void
 }) {
   const { values } = strings
