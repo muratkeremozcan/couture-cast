@@ -35,7 +35,8 @@ describe('one Node release on every runner', () => {
         // recorded for the Supabase stack alone, and the repo's own pinned Node is installed
         // after it and stays first on PATH, so no test or script runs on it.
         const storageRuntime = (step, index) =>
-          step.with?.['node-version'] === '22' &&
+          step.with?.['node-version'] === '${{ env.NATIVE_SUPABASE_NODE_VERSION }}' &&
+          /^22\.\d+\.\d+$/.test(document.env?.NATIVE_SUPABASE_NODE_VERSION ?? '') &&
           steps[index + 1]?.run?.trim() ===
             'echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"' &&
           steps.slice(index + 2).some((row) => row.uses === './.github/actions/install')
