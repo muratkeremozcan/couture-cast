@@ -3,7 +3,7 @@ title: 'First outfit and Community follow-up'
 type: feature
 ticket: ''
 created: '2026-11-20'
-status: in-review
+status: built
 baseline_revision: 'a73c81e2e8ea81725e65ac0e3b7d91813f81e5b8'
 route: full
 route_source: auto
@@ -63,38 +63,38 @@ source action, use personal photos in tests, or count automation as a study obse
 
 ## Tasks & Acceptance
 
-- [ ] `apps/web/src/app/`, `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/src/features/preview/`.
+- [x] `apps/web/src/app/`, `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/src/features/preview/`.
       Surface a labeled outfit early on both platforms, with rotation, swaps and undo. Prefer
       live data when available. Reuse contextual location flows and read back ambiguous saves
       before retry. Restore direct Planner,
       Community and Home navigation and a Wardrobe fallback from its child pages. Remove
       the static Home health claim.
-- [ ] `packages/utils/src/sample-wardrobe/state.ts`, web/native preview review and Wardrobe
+- [x] `packages/utils/src/sample-wardrobe/state.ts`, web/native preview review and Wardrobe
       hubs. Carry explicit garment intent through the existing verified conversion and consent
       checks. Open Wardrobe's direct capture entry. Keep guided setup independently reachable.
       Repair list recovery and exercise saved tags, upload retry and pending-item resume.
-- [ ] `apps/web/src/lib/planner.ts`, `apps/web/src/app/components/planner-rail.tsx`,
+- [x] `apps/web/src/lib/planner.ts`, `apps/web/src/app/components/planner-rail.tsx`,
       `apps/mobile/src/features/premium/planner-screen.tsx` and the web ritual share launcher.
       Route missing-city members to city setup, recover transient requests, and expose share
       for eligible live recommendations. Retain per-day Planner states and export support.
-- [ ] `packages/db/prisma/`, `packages/api-client/src/contracts/http/community.ts`,
+- [x] `packages/db/prisma/`, `packages/api-client/src/contracts/http/community.ts`,
       `apps/api/src/modules/community/`. Add nullable title and an owner-scoped, revision-checked
       edit with text screening, audit and invalidation. Preserve publish replay and existing
       client projections. Negotiate title in feed, detail, Spotlight and sync. Package the
       existing text policy for lazy edit screening in `apps/api/vercel.json`. Include title
       in post screening, audit, and erasure. Generate OpenAPI and SDK through repository scripts.
-- [ ] `apps/web/src/app/components/community-lookbook-grid.tsx`,
+- [x] `apps/web/src/app/components/community-lookbook-grid.tsx`,
       `apps/mobile/components/community/`, and app Community clients. Put title first in
       the localized composer, render title in feed and detail, and let owners save or cancel
       edits without affecting image, reactions or comments.
-- [ ] `playwright/tests/`, `maestro/`, and colocated tests. TEA owns baseline reproduction,
+- [x] `playwright/tests/`, `maestro/`, and colocated tests. TEA owns baseline reproduction,
       matrix and journey regressions, test review, and CI test accounting.
-- [ ] `playwright/config/prod.config.ts` and `playwright/global-setup-prod-member.ts`.
+- [x] `playwright/config/prod.config.ts` and `playwright/global-setup-prod-member.ts`.
       Reproduce the rejected artifact and move production session setup outside test-worker
       reporting while keeping the secret scan active.
-- [ ] `_bmad-output/test-artifacts/first-use-phone-study.md`. Prepare synthetic tasks and
-      anonymous outcome sheet. Use the existing study protocol. Record real sessions and
-      any build blockers. Participants and consent require the organizer's involvement.
+- [x] `_bmad-output/test-artifacts/first-use-phone-study.md`. Prepare synthetic tasks and
+      anonymous outcome sheet, dry-run the first garment and begin participant outreach.
+- [ ] Run the participant sessions and record the observations in the study sheet.
 
 **Acceptance criteria**
 
@@ -116,8 +116,9 @@ source action, use personal photos in tests, or count automation as a study obse
   revision. The original hosted Planner and ritual responses were unavailable.
 - The [phone study sheet](test-artifacts/first-use-phone-study.md) is ready for participant
   sessions once the isolated build passes preflight.
-- The isolated browser and Android runs reached direct capture. The web run persisted a
-  garment with confirmed tags and showed it again after reload. Participant outreach began.
+- The isolated browser and Android runs uploaded a fixture garment and confirmed its tags.
+  The browser showed it after reload. Android showed it as ready in Wardrobe and verified
+  fixture cleanup. Participant outreach began.
 - Both hosted browser shards passed on the #274 deployment. Their HTML artifacts were
   blocked by the JWT scan. The production runner now masks the synthetic member token
   before test workers start.
@@ -126,21 +127,23 @@ source action, use personal photos in tests, or count automation as a study obse
 
 ## Review Triage Log
 
-| Finding                                                                | Verdict and resolution                                                                                                                                |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Edit could race guardian consent revocation                            | Kept the transactional participation check and used the member lock shared with revocation. Added the denied-edit regression.                         |
-| Previous native member's outfit could survive a failed new member read | Tagged ritual state by owner and fenced late results. Tested missing-city and service errors after a switch. Web also keys its owned view explicitly. |
-| Unbounded edit fanout and missing moderator title                      | Added an atomic edit budget and targeted revision signals. The moderator case includes the reported title.                                            |
-| Legacy or cross-band visible cards missed text changes                 | Compatible revision signals now update rendered public targets across filters. Hidden posts still suppress the signal.                                |
-| Processing timeout opened tagging prematurely                          | Check garment status remains available through timeout and opens tagging only after the item settles.                                                 |
-| Successful guided city save depended on a second list read             | Return to the validated origin immediately after the confirmed write.                                                                                 |
-| Same-member ritual refresh discarded last-known data                   | The web view keeps the owned result, labels it stale, and makes Retry available.                                                                      |
-| Native confirmed tags left Home on its old cache                       | Confirmed garments invalidate the mounted Home ritual and trigger a fresh read.                                                                       |
-| Navigation, wrapping and focus review findings                         | Deep-linked Wardrobe children return to Wardrobe. Narrow dialogs wrap titles. Swap and discard flows restore focus.                                   |
-| Native editor suspension, Spotlight ordering and title visibility      | The editor fences interrupted saves and restores focus. Spotlight honors revisions, and author status views show titles.                              |
-| Pressed scenario and Planner city visual states                        | The controls use existing contrasting theme colors.                                                                                                   |
-| Three TEA test quality comments                                        | Named API steps, reusable fixture intent and user-level interactions added.                                                                           |
-| Phone study needs observed sessions                                    | The study kit and outreach are complete. Results require participant opt-in and actual sessions.                                                      |
+| Finding                                                                | Verdict and resolution                                                                                                                                    |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Edit could race guardian consent revocation                            | Kept the transactional participation check and used the member lock shared with revocation. A guarded HTTP test proves edits return 403 after revocation. |
+| Previous native member's outfit could survive a failed new member read | Tagged ritual state by owner and fenced late results. Tested missing-city and service errors after a switch. Web also keys its owned view explicitly.     |
+| Unbounded edit fanout and missing moderator title                      | Added an atomic edit budget and targeted revision signals. The moderator case includes the reported title.                                                |
+| Legacy or cross-band visible cards missed text changes                 | Compatible revision signals now update rendered public targets across filters. Hidden posts still suppress the signal.                                    |
+| Processing timeout opened tagging prematurely                          | Check garment status remains available through timeout and opens tagging only after the item settles.                                                     |
+| Successful guided city save depended on a second list read             | Return to the validated origin after a confirmed write. The account-switch test holds the write response and verifies that a stale save cannot navigate.  |
+| Same-member ritual refresh discarded last-known data                   | The web view keeps the owned result, labels it stale, and makes Retry available.                                                                          |
+| Native confirmed tags left Home on its old cache                       | Confirmed garments invalidate the mounted Home ritual and trigger a fresh read.                                                                           |
+| Navigation, wrapping and focus review findings                         | Deep-linked Wardrobe children return to Wardrobe. Narrow dialogs wrap titles. Swap and discard flows restore focus.                                       |
+| Native editor suspension, Spotlight ordering and title visibility      | The editor fences interrupted saves and restores focus. Spotlight honors revisions, and author status views show titles.                                  |
+| Pressed scenario and Planner city visual states                        | The controls use existing contrasting theme colors.                                                                                                       |
+| Three TEA test quality comments                                        | Named API steps, reusable fixture intent and user-level interactions added.                                                                               |
+| Production traces could contain a deployment bypass cookie             | Disable request traces when either deployed Playwright lane holds the bypass secret. Both configurations are covered by the same test.                    |
+| Contract suites rejected the new approved public fields                | Updated exact key and negotiation expectations and published the title rule in OpenAPI. The package suite passed with the clock shifted a year ahead.     |
+| Phone study needs observed sessions                                    | The study kit and outreach are complete. Results require participant opt-in and actual sessions.                                                          |
 
 ## Verification
 

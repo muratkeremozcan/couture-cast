@@ -43,5 +43,12 @@ Record one row per task attempt. Use `completed unprompted`, `completed after he
 | ------- | ------ | ---------------- | ------------ | --------- | --------------- | ------- | --------------------- | ---------------------- |
 
 Summarize completion, assistance, repeat actions and abandonment by cohort. Record
-the build or task condition behind any blocked run. Outreach began on 2026-11-20.
-As of that date, zero participant sessions have been run.
+the build or task condition behind any blocked run.
+
+## Preflight and recruitment
+
+On 2026-11-20, the isolated web browser and Android emulator each uploaded the fixture
+garment and confirmed its tags. Web showed the saved garment after reload. Android showed
+it as ready in Wardrobe and deleted the fixture during teardown.
+
+Participant outreach began on 2026-11-20. Zero participants have completed a session.

@@ -48,6 +48,7 @@ describe('community HTTP contracts', () => {
         )
       ).toEqual([
         'x-couture-reactions',
+        'x-couture-post-text',
         'x-couture-sponsorship',
         'postId',
         'x-couture-platform',

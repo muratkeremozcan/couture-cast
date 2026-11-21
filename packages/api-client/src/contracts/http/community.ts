@@ -397,6 +397,9 @@ export const communityPostTitleSchema = z
   .refine((value) => !URL_REGEX.test(value) && !EMAIL_REGEX.test(value), {
     message: 'Title must not contain web links or email addresses.',
   })
+  .openapi({
+    description: 'An outfit title. Web links and email addresses are disallowed.',
+  })
 
 export const communityPostAltTextSchema = z
   .string()

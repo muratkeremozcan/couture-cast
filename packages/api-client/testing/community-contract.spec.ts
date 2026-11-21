@@ -298,9 +298,13 @@ describe('community HTTP contracts', () => {
         'imageAccess',
         'publishedAt',
         'status',
+        'textRevision',
+        'title',
       ])
 
       expect(communityFeedItemSchema.parse(publicItem)).toEqual(publicItem)
+      const titled = { ...publicItem, title: 'Classy in Camouflage', textRevision: 1 }
+      expect(communityFeedItemSchema.parse(titled)).toEqual(titled)
     })
 
     it('6.1-CON-012 refuses an author user id, a storage object path, and moderation internals', () => {
@@ -359,6 +363,7 @@ describe('community HTTP contracts', () => {
         'moderationReason',
         'publishedAt',
         'status',
+        'title',
       ])
       expect(authorStateKeys).not.toEqual(
         Object.keys(communityFeedItemSchema.shape).sort()

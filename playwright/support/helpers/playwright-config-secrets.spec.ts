@@ -87,8 +87,8 @@ describe('Playwright configs keep the environment out of reports', () => {
       // Browser contexts carry no service-role header; only the request fixture does.
       expect(config.use?.extraHTTPHeaders).toBeUndefined()
       // The bypass cookie minted from the secret is a credential too, and
-      // traces record cookies, so preview records none while it holds one.
-      if (name === 'preview') expect(config.use?.trace).toBe('off')
+      // traces record cookies, so disable them whenever the run holds one.
+      expect(config.use?.trace).toBe('off')
       if (name === 'prod') {
         expect(config.globalSetup).toContain(
           resolve(__dirname, '../../global-setup-prod-member.ts')

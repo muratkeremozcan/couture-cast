@@ -6807,7 +6807,7 @@ export interface EditCommunityPostTextRequest {
    */
   baseRevision: number
   /**
-   *
+   * An outfit title. Web links and email addresses are disallowed.
    * @type {string}
    * @memberof EditCommunityPostTextRequest
    */
@@ -16436,7 +16436,7 @@ export interface PublishCommunityPostInput {
    */
   caption?: string | null
   /**
-   *
+   * An outfit title. Web links and email addresses are disallowed.
    * @type {string}
    * @memberof PublishCommunityPostInput
    */

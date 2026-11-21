@@ -15097,7 +15097,8 @@
               "null"
             ],
             "minLength": 1,
-            "maxLength": 80
+            "maxLength": 80,
+            "description": "An outfit title. Web links and email addresses are disallowed."
           },
           "locale": {
             "type": "string",
@@ -29011,7 +29012,8 @@
                       "null"
                     ],
                     "minLength": 1,
-                    "maxLength": 80
+                    "maxLength": 80,
+                    "description": "An outfit title. Web links and email addresses are disallowed."
                   },
                   "caption": {
                     "type": [

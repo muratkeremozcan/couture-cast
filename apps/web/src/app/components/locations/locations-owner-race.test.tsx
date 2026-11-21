@@ -17,10 +17,11 @@ import type * as WebSession from '../../../lib/web-session'
 import type * as Locations from '../../../lib/locations'
 import { LocationsSection } from './locations-section'
 
-/** Every list and rename the section starts, kept until it settles, so a test waits for it. */
+/** Keep the request promises so the tests can wait for their handlers to settle. */
 const lists = vi.hoisted(() => ({
   promises: [] as Promise<unknown>[],
   renames: [] as Promise<unknown>[],
+  saves: [] as Promise<unknown>[],
 }))
 
 vi.mock('../../../lib/locations', async (importOriginal) => {
@@ -36,6 +37,13 @@ vi.mock('../../../lib/locations', async (importOriginal) => {
       const renaming = actual.renameLocationFromWeb(...args)
       lists.renames.push(renaming)
       return renaming
+    },
+    saveLocationFromSearchFromWeb: (
+      ...args: Parameters<typeof actual.saveLocationFromSearchFromWeb>
+    ) => {
+      const saving = actual.saveLocationFromSearchFromWeb(...args)
+      lists.saves.push(saving)
+      return saving
     },
   }
 })
@@ -118,6 +126,8 @@ let renamed: boolean
 /** A rename the test releases by hand, and every list GET's bearer. */
 let heldPatch: { release: () => void } | null
 let holdNextPatch: boolean
+let heldSave: { release: () => void } | null
+let holdNextSave: boolean
 let listBearers: (string | null)[]
 
 function renderSection() {
@@ -164,11 +174,14 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     heldListAnswer = null
     lists.promises = []
     lists.renames = []
+    lists.saves = []
     navigation.push.mockClear()
     navigation.query = ''
     renamed = false
     heldPatch = null
     holdNextPatch = false
+    heldSave = null
+    holdNextSave = false
     listBearers = []
     session.identity = 'member-a'
     session.stored = true
@@ -207,7 +220,13 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
           ],
         })
       ),
-      http.post('/api/v1/locations/from-search', () => {
+      http.post('/api/v1/locations/from-search', async () => {
+        if (holdNextSave) {
+          holdNextSave = false
+          await new Promise<void>((resolve) => {
+            heldSave = { release: resolve }
+          })
+        }
         renamed = true
         return HttpResponse.json({ data: A_RENAMED }, { status: 201 })
       }),
@@ -367,9 +386,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     expect(screen.queryByText(/Alpha/)).toBeNull()
   })
 
-  // Codex product review 6 finding 2: A saves from a guided entry; the list that follows is held,
-  // the bridge moves the session to B, and the list answers before the section heard the switch.
-  it('LOC-OWNER-WEB-08 a post-save list answering after the session moved to B shows, announces and navigates nothing of A', async () => {
+  it('LOC-OWNER-WEB-08 ignores a guided save that settles after the session moved to B', async () => {
     navigation.query = 'addLocation=1&returnTo=%2F'
     const user = userEvent.setup()
     renderSection()
@@ -380,26 +397,26 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     const label = screen.getByRole('textbox', { name: 'Name this place' })
     await user.clear(label)
     await user.type(label, 'Alpha Studio')
-    holdNextAList = true
+    holdNextSave = true
     await user.click(screen.getByRole('button', { name: 'Save location' }))
-    await waitFor(() => expect(heldList).not.toBeNull())
+    await waitFor(() => expect(heldSave).not.toBeNull())
 
     // The backing session is B's; the section has not heard yet.
     session.identity = 'member-b'
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
-    act(() => heldList!.release())
-    await settleLists()
-    expect(heldListAnswer).toBe('rows')
     await act(async () => {
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+      heldSave!.release()
+      const [save] = await Promise.allSettled(lists.saves)
+      expect(save?.status).toBe('fulfilled')
     })
 
     expect(screen.queryByText('Alpha Studio')).toBeNull()
     expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
     expect(navigation.push).not.toHaveBeenCalled()
+    expect(listBearers).toEqual(['Bearer token-a'])
   })
 
-  // Codex review 9 finding 3: the same ordering as WEB-08, with A's post-save list failing.
+  // Saving directly in Settings reloads the list after the save.
   it('LOC-OWNER-WEB-09 a post-save list failing after the session moved to B leaves no error behind, and B loads', async () => {
     const user = userEvent.setup()
     renderSection()
