@@ -16,18 +16,28 @@ import {
   type ComfortRun,
   type ComfortTolerance,
 } from '../comfort-rules'
-import type {
-  SampleCatalog,
-  SampleCollectionFilter,
-  SampleGarment,
-  SampleGarmentCategory,
-  SampleLook,
+import {
+  SAMPLE_STYLE_OPTIONS,
+  type SampleCatalog,
+  type SampleCollectionFilter,
+  type SampleGarment,
+  type SampleGarmentCategory,
+  type SampleLook,
+  type SampleStylePreferences,
 } from './types'
 
-export const SAMPLE_POLICY_VERSION = 1
+export const SAMPLE_POLICY_VERSION = 2
 
 export const SAMPLE_WEATHER_KEYS = ['cool-windy', 'mild-dry', 'warm-rainy'] as const
-export type SampleWeatherKey = (typeof SAMPLE_WEATHER_KEYS)[number]
+export type GuestSampleWeatherKey = (typeof SAMPLE_WEATHER_KEYS)[number]
+export const COMMUNITY_SAMPLE_WEATHER_KEYS = [
+  'cool-rainy',
+  'mild-rainy',
+  'warm-dry',
+] as const
+export type SampleWeatherKey =
+  | GuestSampleWeatherKey
+  | (typeof COMMUNITY_SAMPLE_WEATHER_KEYS)[number]
 
 export type SampleWeather = {
   feelsLike: number
@@ -56,6 +66,24 @@ export const SAMPLE_WEATHER: Readonly<Record<SampleWeatherKey, SampleWeather>> =
     precipitationProbability: 0.6,
     precipitationAmount: 1.2,
   },
+  'cool-rainy': {
+    feelsLike: 9,
+    windSpeed: 5,
+    precipitationProbability: 0.6,
+    precipitationAmount: 1.2,
+  },
+  'mild-rainy': {
+    feelsLike: 16,
+    windSpeed: 2,
+    precipitationProbability: 0.6,
+    precipitationAmount: 1.2,
+  },
+  'warm-dry': {
+    feelsLike: 22,
+    windSpeed: 3,
+    precipitationProbability: 0,
+    precipitationAmount: 0,
+  },
 }
 
 export type SampleComfort = {
@@ -77,6 +105,7 @@ export type SampleSelectionInput = {
   collection: SampleCollectionFilter
   comfort: SampleComfort
   selectedLookId?: string
+  preferences?: SampleStylePreferences
   votes: Readonly<Record<string, SampleVote>>
   swaps: Readonly<
     Record<string, Readonly<Partial<Record<SampleGarmentCategory, string>>>>
@@ -220,6 +249,16 @@ function exactRangeShare(
     garments.get(id)?.comfortRanges.includes(range)
   )
   return exact.length / lookItem.core.length
+}
+
+function styleMatch(look: SampleLook, preferences?: SampleStylePreferences): number {
+  return Object.keys(SAMPLE_STYLE_OPTIONS).reduce((score, key) => {
+    const dimension = key as keyof SampleStylePreferences
+    const answer = preferences?.[dimension]
+    return (
+      score + Number(answer !== undefined && look.preferences?.[dimension] === answer)
+    )
+  }, 0)
 }
 
 /** Exact range first, then the close matches in table order, then catalog order. */
@@ -402,16 +441,20 @@ export function selectSampleOutfit(
   const notDisliked = suitable.filter(
     (lookItem) => input.votes[lookItem.id] !== 'dislike'
   )
-  // Liked looks first, then the share of core garments made for this exact range,
-  // then catalog order. Votes only reorder looks the weather already allows.
+  // Rank only weather-eligible looks. Likes come first, then style preferences,
+  // exact temperature fit, and finally catalog order.
   const ordered = notDisliked
     .map((lookItem, index) => ({
       lookItem,
       index,
       liked: input.votes[lookItem.id] === 'like' ? 1 : 0,
+      style: styleMatch(lookItem, input.preferences),
       fit: exactRangeShare(lookItem, garments, context.range),
     }))
-    .sort((a, b) => b.liked - a.liked || b.fit - a.fit || a.index - b.index)
+    .sort(
+      (a, b) =>
+        b.liked - a.liked || b.style - a.style || b.fit - a.fit || a.index - b.index
+    )
     .map((entry) => entry.lookItem)
   const eligibleLookIds = ordered.map((lookItem) => lookItem.id)
   const explanation = contextExplanation(context, input.comfort)
@@ -458,6 +501,7 @@ export function selectSampleOutfit(
     if (swapId === undefined || !outfit.has(category)) continue
     const check = checkSwap(swapId, category, garments, input, context)
     if ('garment' in check) {
+      if (check.garment.id === outfit.get(category)?.id) continue
       outfit.set(category, check.garment)
       explanation.push({
         key: 'swap-applied',
@@ -501,6 +545,10 @@ export function nextSampleLook(result: SampleOutfitResult): SampleNextLook {
   if (current === undefined || ids.length < 2) return { reason: 'no-alternative' }
   const index = ids.indexOf(current)
   return { lookId: ids[(index + 1) % ids.length] as string }
+}
+
+export function hasAppliedSampleSwaps(result: SampleOutfitResult): boolean {
+  return result.explanation.some(({ key }) => key === 'swap-applied')
 }
 
 /** The nine optional feedback cards and how many carry a vote. */

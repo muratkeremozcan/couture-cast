@@ -33,6 +33,8 @@ import {
   safeDecodeCommunityFeedCursor,
   type AllocateCommunityPostInput,
   type AllocateCommunityPostSession,
+  type DescribeCommunityDraftInput,
+  supportedLocaleSchema,
   type ClimateBand,
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
@@ -83,6 +85,13 @@ import { parseDailySummaries } from '../weather/weather.repository.js'
 import { generateCommunityAuthorAlias } from './community-alias.js'
 import { buildAltTextSuggestion } from './community-alt-text.js'
 import {
+  CommunityImageValidationError,
+  MAX_COMMUNITY_IMAGE_BYTES,
+  sampleCommunityImageColors,
+  type CommunityImageDeclaration,
+} from './community-image-validation.js'
+import { buildCommunityPhotoCaption } from './community-photo-caption.js'
+import {
   feedViewDedupeKey,
   communitySubjectToken,
   postDedupeKey,
@@ -90,6 +99,7 @@ import {
 } from './community-analytics.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import {
+  CommunityObjectDownloadError,
   SupabaseCommunityStorageAdapter,
   type CommunityStorage,
 } from './community-storage.adapter.js'
@@ -156,6 +166,24 @@ function missingReactionSnapshot(
 const readableObjectPath = (post: LookbookPost): string | null =>
   post.erasure_requested_at || post.anonymized_at ? null : post.image_object_path
 
+function draftImageDeclaration(post: LookbookPost): CommunityImageDeclaration {
+  const mimeType = post.image_content_type
+  const sha256 = post.image_checksum
+  const byteSize = post.image_byte_size
+  if (
+    (mimeType !== 'image/jpeg' &&
+      mimeType !== 'image/png' &&
+      mimeType !== 'image/webp') ||
+    !sha256 ||
+    !byteSize ||
+    byteSize < 1 ||
+    byteSize > MAX_COMMUNITY_IMAGE_BYTES
+  )
+    throw new BadRequestException('Invalid Community draft image.')
+
+  return { mimeType, sha256, byteSize }
+}
+
 function projectFeedItem({
   post,
   reactions,
@@ -203,6 +231,7 @@ function projectFeedItem({
 @Injectable()
 export class CommunityService {
   private readonly logger = new Logger(CommunityService.name)
+  private readonly draftCaptionReaders = new Set<string>()
 
   constructor(
     @Inject(CommunityRepository)
@@ -1162,6 +1191,96 @@ export class CommunityService {
       altTextSuggestion,
       altTextSuggestionLocale: input.locale,
     }
+  }
+
+  async describeDraft(params: {
+    userId: string
+    role?: string
+    input: DescribeCommunityDraftInput
+  }) {
+    const { userId, role, input } = params
+    await this.assertDraftCaptionAccess(userId, role)
+
+    const { post, objectPath } = await this.requireOwnedDraftImage(userId, input)
+    const declaration = draftImageDeclaration(post)
+
+    // Limit concurrent storage and decoder work per API instance and per account.
+    if (this.draftCaptionReaders.has(userId)) {
+      throw new CommunityRateLimitException(
+        'A Community caption request is in progress.',
+        1
+      )
+    }
+    if (this.draftCaptionReaders.size >= 4) {
+      throw new ServiceUnavailableException('Community caption suggestion is busy.')
+    }
+    this.draftCaptionReaders.add(userId)
+    try {
+      await this.repository.reserveDraftCaptionRequest(userId)
+      const signal = AbortSignal.timeout(8_000)
+      const bytes = await this.storage.downloadBounded(
+        objectPath,
+        declaration.byteSize,
+        signal
+      )
+      const sample = await sampleCommunityImageColors(bytes, declaration, signal)
+      const locale = supportedLocaleSchema.safeParse(post.locale)
+      const caption = buildCommunityPhotoCaption(
+        sample,
+        locale.success ? locale.data : defaultSupportedLocale
+      )
+      if (!caption)
+        throw new BadRequestException('No visible colors in the Community draft image.')
+      await this.assertDraftCaptionAccess(userId, role)
+      const current = await this.requireOwnedDraftImage(userId, input)
+      if (
+        current.objectPath !== objectPath ||
+        current.post.image_checksum !== declaration.sha256
+      ) {
+        throw new ConflictException(COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE)
+      }
+      return caption
+    } catch (error: unknown) {
+      if (error instanceof CommunityObjectDownloadError && error.reason === 'missing') {
+        throw new ConflictException(COMMUNITY_UPLOAD_NOT_COMPLETED_MESSAGE)
+      }
+      if (
+        error instanceof CommunityImageValidationError ||
+        error instanceof CommunityObjectDownloadError
+      ) {
+        throw new BadRequestException('Invalid Community draft image.')
+      }
+      throw error
+    } finally {
+      this.draftCaptionReaders.delete(userId)
+    }
+  }
+
+  private async assertDraftCaptionAccess(userId: string, role?: string) {
+    await this.assertWriteEnabled(userId)
+    await this.assertAgeGateAllows(userId, role)
+    await this.repository.assertDraftCaptionAccess(userId)
+  }
+
+  private async requireOwnedDraftImage(
+    userId: string,
+    input: DescribeCommunityDraftInput
+  ) {
+    const post = await this.repository.findPostById(input.postId)
+    const objectPath = post && readableObjectPath(post)
+    if (!post || post.user_id !== userId || post.status !== 'draft' || !objectPath) {
+      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+    }
+    const parsedPath = parseCommunityObjectPath(objectPath)
+    if (
+      parsedPath?.postId !== post.id ||
+      parsedPath.uploadSessionId !== input.uploadSessionId ||
+      !post.upload_expires_at ||
+      post.upload_expires_at.getTime() <= Date.now()
+    ) {
+      throw new ConflictException(COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE)
+    }
+    return { post, objectPath }
   }
 
   async editPostText(params: {

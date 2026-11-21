@@ -12,6 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
 import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
 import { http, HttpResponse } from 'msw'
+import {
+  createGarmentItemInputSchema,
+  createGarmentUploadUrlInputSchema,
+  type CreateGarmentItemInput,
+  type CreateGarmentUploadUrlInput,
+} from '@couture/api-client/contracts/http'
 
 import { server } from '@/src/test-utils/msw/server'
 import {
@@ -149,6 +155,57 @@ async function pickLibraryPhotoAndConfirm() {
   fireEvent.click(screen.getByTestId('garment-confirm-image'))
 }
 
+function captureSuccessfulGarmentUpload() {
+  const seen: {
+    allocation?: CreateGarmentUploadUrlInput
+    uploadedContentType?: string | null
+    uploadedCacheControl?: string | null
+    bytes?: Uint8Array
+    commit?: CreateGarmentItemInput
+  } = {}
+  server.use(
+    http.post('*/api/v1/wardrobe/upload-url', async ({ request }) => {
+      seen.allocation = createGarmentUploadUrlInputSchema.parse(await request.json())
+      return HttpResponse.json({
+        data: {
+          garmentId: 'garment-1',
+          uploadSessionId: 'session-1',
+          uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+          uploadToken: 'upload-token-1',
+          requiredHeaders: { 'content-type': 'image/jpeg' },
+          expiresAt: '2026-08-09T01:00:00.000Z',
+        },
+      })
+    }),
+    http.put('*/mock-storage/session-1', async ({ request }) => {
+      seen.uploadedContentType = request.headers.get('content-type')
+      seen.uploadedCacheControl = request.headers.get('cache-control')
+      seen.bytes = new Uint8Array(await request.arrayBuffer())
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.post('*/api/v1/wardrobe/garments', async ({ request }) => {
+      seen.commit = createGarmentItemInputSchema.parse(await request.json())
+      return HttpResponse.json({
+        data: {
+          id: 'garment-1',
+          status: 'awaiting_tags',
+          category: null,
+          material: null,
+          comfortRange: null,
+          tagsConfirmedAt: null,
+          fileSizeBytes: seen.allocation?.fileSizeBytes,
+          mimeType: 'image/jpeg',
+          retentionStatus: 'active',
+          createdAt: '2026-08-09T00:00:00.000Z',
+          committedAt: '2026-08-09T00:00:01.000Z',
+          imageAccess: null,
+        },
+      })
+    })
+  )
+  return seen
+}
+
 describe('MobileGarmentCaptureModal', () => {
   let restoreAccessTokenResolver: () => void
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
@@ -239,71 +296,44 @@ describe('MobileGarmentCaptureModal', () => {
     expect(openSettingsMock).toHaveBeenCalledOnce()
   })
 
-  it('4.4-MOB-CAP-06 toggles aspect ratio and background cleanup in the crop step', async () => {
+  it('4.4-MOB-CAP-06 uploads the selected portrait crop with the original background', async () => {
+    const seen = captureSuccessfulGarmentUpload()
+    const cropped = { uri: 'file:///portrait-crop.jpg', width: 675, height: 900 }
+    imageManipulator.manipulateAsync.mockResolvedValue(cropped)
+    const readCrop = vi.spyOn(fileSystem.File.prototype, 'bytes')
+
     renderModal()
     await pickLibraryPhoto()
-
-    const cleanupToggle = screen.getByRole('switch')
-    expect(cleanupToggle).toBeChecked()
-
-    fireEvent.click(cleanupToggle)
-    expect(cleanupToggle).not.toBeChecked()
-
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('garment-aspect-portrait'))
-    fireEvent.click(screen.getByTestId('garment-aspect-square'))
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+
+    expect(await screen.findByTestId('garment-capture-complete')).toBeInTheDocument()
+    expect(imageManipulator.manipulateAsync).toHaveBeenCalledExactlyOnceWith(
+      libraryAsset.uri,
+      [
+        { crop: { originX: 113, originY: 0, width: 675, height: 900 } },
+        { resize: { width: 675, height: 900 } },
+      ],
+      { compress: 0.9, format: 'jpeg' }
+    )
+    expect(readCrop.mock.contexts).toEqual([
+      expect.objectContaining({ uri: cropped.uri }),
+    ])
+    expect(seen.bytes).toEqual(fileSystem.state.bytes)
+    expect(seen.allocation).toMatchObject({ widthPx: 675, heightPx: 900 })
+    expect(seen.commit).toMatchObject({ hasCropping: true, hasBgCleanup: false })
   })
 
   it('4.4-MOB-CAP-07 uploads the garment and reports the commit with the access token', async () => {
-    const committedGarment = {
-      id: 'garment-1',
-      status: 'awaiting_tags',
-      category: null,
-      material: null,
-      comfortRange: null,
-      tagsConfirmedAt: null,
-      fileSizeBytes: 1024,
-      mimeType: 'image/png',
-      retentionStatus: 'active',
-      createdAt: '2026-08-09T00:00:00.000Z',
-      committedAt: '2026-08-09T00:00:01.000Z',
-      imageAccess: null,
-    }
-    const seen: {
-      declaredMimeType?: string
-      uploadedContentType?: string | null
-      uploadedCacheControl?: string | null
-    } = {}
-    server.use(
-      http.post('*/api/v1/wardrobe/upload-url', async ({ request }) => {
-        seen.declaredMimeType = ((await request.json()) as { mimeType: string }).mimeType
-        return HttpResponse.json({
-          data: {
-            garmentId: 'garment-1',
-            uploadSessionId: 'session-1',
-            uploadUrl: `${window.location.origin}/mock-storage/session-1`,
-            uploadToken: 'upload-token-1',
-            requiredHeaders: { 'content-type': 'image/jpeg' },
-            expiresAt: '2026-08-09T01:00:00.000Z',
-          },
-        })
-      }),
-      http.put('*/mock-storage/session-1', ({ request }) => {
-        seen.uploadedContentType = request.headers.get('content-type')
-        seen.uploadedCacheControl = request.headers.get('cache-control')
-        return new HttpResponse(null, { status: 204 })
-      }),
-      http.post('*/api/v1/wardrobe/garments', () =>
-        HttpResponse.json({ data: committedGarment })
-      )
-    )
-
+    const seen = captureSuccessfulGarmentUpload()
     const { onGarmentCommitted } = renderModal()
     await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
       expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
     })
-    expect(seen.declaredMimeType).toBe('image/jpeg')
+    expect(seen.allocation?.mimeType).toBe('image/jpeg')
     expect(seen.uploadedContentType).toBe('image/jpeg')
     // Review round 1, 2026-11-19: the object is a private photo; the PUT carries the policy
     // the removed server upload set.

@@ -3,7 +3,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const enCA: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Style preferences (optional)',
+    style: 'Style',
+    palette: 'Palette',
+    texture: 'Texture',
+    any: 'Any',
+    active: 'Active and daywear',
+    chic: 'Casual chic',
+    cozy: 'Cosy and sophisticated',
+    neutral: 'Neutral',
+    colorful: 'Colourful',
+    smooth: 'Smooth',
+    textured: 'Textured',
+    save: 'Save example look',
+    update: 'Update saved look',
+    saved: 'Saved on this device',
+    remove: 'Remove {look}',
+    illustrations: 'Garment illustrations',
+    inspiration: 'Example inspiration',
+  },
   firstUse: {
+    cleanupFallback:
+      'The background was kept because cleanup could not isolate the garment.',
     replaceGarment: 'Choose another photo',
     discardPhoto: 'Discard this photo?',
     keepEditing: 'Keep editing',
@@ -160,6 +182,9 @@ export const enCA: GuestPreviewStrings = {
       'cool-windy': 'Cool and windy',
       'mild-dry': 'Mild and dry',
       'warm-rainy': 'Warm and rainy',
+      'cool-rainy': 'Cool and rainy',
+      'mild-rainy': 'Mild and rainy',
+      'warm-dry': 'Warm and dry',
     },
     collection: {
       all: 'All examples',
@@ -241,6 +266,22 @@ export const enCA: GuestPreviewStrings = {
     'no-eligible': 'No look in {collection} suits these settings.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Ribbed knit',
+      description: 'A cream cotton sweater with a ribbed finish.',
+    },
+    'ribbed-socks': {
+      name: 'Ribbed socks',
+      description: 'Taupe cotton socks with ribbed cuffs.',
+    },
+    'mini-skirt': {
+      name: 'Mini skirt',
+      description: 'A short wool skirt in a muted plum.',
+    },
+    'opaque-tights': {
+      name: 'Opaque tights',
+      description: 'Dark tights for cooler weather.',
+    },
     'fleece-zip': {
       name: 'Fleece zip jacket',
       description: 'Sage green fleece jacket with a full zip.',
@@ -349,6 +390,10 @@ export const enCA: GuestPreviewStrings = {
     sunglasses: { name: 'Sunglasses', description: 'Black sunglasses with gold arms.' },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Mini skirt and tights',
+      description: 'Ribbed knit, plum mini skirt, opaque tights and ankle boots.',
+    },
     'winter-knit': {
       name: 'Winter knit',
       description: 'Knit dress, ankle boots and a wool scarf.',

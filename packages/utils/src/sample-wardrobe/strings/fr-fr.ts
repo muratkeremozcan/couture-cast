@@ -2,7 +2,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const frFR: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Préférences de style (facultatif)',
+    style: 'Style',
+    palette: 'Palette',
+    texture: 'Texture',
+    any: 'Au choix',
+    active: 'Sport et quotidien',
+    chic: 'Décontracté chic',
+    cozy: 'Douillet et soigné',
+    neutral: 'Neutre',
+    colorful: 'Colorée',
+    smooth: 'Lisse',
+    textured: 'Texturée',
+    save: 'Enregistrer la tenue exemple',
+    update: 'Mettre à jour la tenue enregistrée',
+    saved: 'Enregistrée sur cet appareil',
+    remove: 'Retirer {look}',
+    illustrations: 'Illustrations de vêtements',
+    inspiration: 'Idées de tenues',
+  },
   firstUse: {
+    cleanupFallback:
+      'Le fond est conservé, car le vêtement ne pouvait pas être isolé avec précision.',
     replaceGarment: 'Choisir une autre photo',
     discardPhoto: 'Supprimer cette photo ?',
     keepEditing: 'Continuer la modification',
@@ -163,6 +185,9 @@ export const frFR: GuestPreviewStrings = {
       'cool-windy': 'Frais et venteux',
       'mild-dry': 'Doux et sec',
       'warm-rainy': 'Chaud et pluvieux',
+      'cool-rainy': 'Frais et pluvieux',
+      'mild-rainy': 'Doux et pluvieux',
+      'warm-dry': 'Chaud et sec',
     },
     collection: {
       all: 'Tous les exemples',
@@ -246,6 +271,22 @@ export const frFR: GuestPreviewStrings = {
     'no-eligible': 'Collection : {collection}. Aucun look ne convient à ces réglages.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Pull côtelé',
+      description: 'Pull en coton crème à maille côtelée.',
+    },
+    'ribbed-socks': {
+      name: 'Chaussettes côtelées',
+      description: 'Chaussettes en coton taupe à bords côtelés.',
+    },
+    'mini-skirt': {
+      name: 'Minijupe',
+      description: 'Jupe courte en laine, couleur prune douce.',
+    },
+    'opaque-tights': {
+      name: 'Collants opaques',
+      description: 'Collants foncés par temps frais.',
+    },
     'fleece-zip': {
       name: 'Veste polaire zippée',
       description: 'Veste polaire vert sauge entièrement zippée.',
@@ -363,6 +404,10 @@ export const frFR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minijupe et collants',
+      description: 'Pull côtelé, minijupe prune, collants opaques et bottines.',
+    },
     'winter-knit': {
       name: "Maille d'hiver",
       description: 'Robe en maille, bottines et écharpe en laine.',

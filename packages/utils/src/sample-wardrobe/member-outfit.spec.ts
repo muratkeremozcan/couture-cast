@@ -1,14 +1,40 @@
 import { describe, expect, it } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import {
+  COMMUNITY_SAMPLE_WEATHER_BY_BAND,
+  communitySampleOutfits,
   createMemberSampleOutfit,
   rotateMemberSampleOutfit,
   swapMemberSampleGarment,
   undoMemberSampleSwaps,
 } from './member-outfit'
-import { sampleSwapCandidates, selectSampleOutfit } from './selector'
+import { SAMPLE_WEATHER_KEYS, sampleSwapCandidates, selectSampleOutfit } from './selector'
 
 describe('member sample outfit', () => {
+  it.each([
+    ['cold_wet', 'cool-rainy', 9, true],
+    ['cold_dry', 'cool-windy', 9, false],
+    ['temperate_wet', 'mild-rainy', 16, true],
+    ['temperate_dry', 'mild-dry', 16, false],
+    ['warm_wet', 'warm-rainy', 22, true],
+    ['warm_dry', 'warm-dry', 22, false],
+  ] as const)(
+    'shows canonical example weather for %s',
+    (band, key, feelsLike, rainReady) => {
+      expect(COMMUNITY_SAMPLE_WEATHER_BY_BAND[band]).toBe(key)
+      const examples = communitySampleOutfits(band)
+      expect(examples).toHaveLength(3)
+      for (const example of examples) {
+        expect(example.context).toMatchObject({ weather: key, feelsLike, rainReady })
+        if (rainReady)
+          expect(
+            example.garments.find((garment) => garment.category === 'outerwear')
+              ?.waterResistant
+          ).toBe(true)
+      }
+      expect(SAMPLE_WEATHER_KEYS).toEqual(['cool-windy', 'mild-dry', 'warm-rainy'])
+    }
+  )
   it('rotates through example outfits and returns to the same look', () => {
     const sample = createMemberSampleOutfit()
     const next = rotateMemberSampleOutfit(sample)

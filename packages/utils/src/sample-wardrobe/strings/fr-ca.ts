@@ -3,7 +3,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const frCA: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Préférences de style (facultatif)',
+    style: 'Style',
+    palette: 'Palette',
+    texture: 'Texture',
+    any: 'Au choix',
+    active: 'Sport et quotidien',
+    chic: 'Décontracté chic',
+    cozy: 'Douillet et soigné',
+    neutral: 'Neutre',
+    colorful: 'Colorée',
+    smooth: 'Lisse',
+    textured: 'Texturée',
+    save: 'Enregistrer la tenue exemple',
+    update: 'Mettre à jour la tenue enregistrée',
+    saved: 'Enregistrée sur cet appareil',
+    remove: 'Retirer {look}',
+    illustrations: 'Illustrations de vêtements',
+    inspiration: 'Idées de tenues',
+  },
   firstUse: {
+    cleanupFallback:
+      'Le fond est conservé, car le vêtement ne pouvait pas être isolé avec précision.',
     replaceGarment: 'Choisir une autre photo',
     discardPhoto: 'Supprimer cette photo?',
     keepEditing: 'Continuer la modification',
@@ -165,6 +187,9 @@ export const frCA: GuestPreviewStrings = {
       'cool-windy': 'Frais et venteux',
       'mild-dry': 'Doux et sec',
       'warm-rainy': 'Chaud et pluvieux',
+      'cool-rainy': 'Frais et pluvieux',
+      'mild-rainy': 'Doux et pluvieux',
+      'warm-dry': 'Chaud et sec',
     },
     collection: {
       all: 'Tous les exemples',
@@ -249,6 +274,22 @@ export const frCA: GuestPreviewStrings = {
     'no-eligible': 'Aucune tenue de « {collection} » ne convient à ces réglages.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Tricot côtelé',
+      description: 'Chandail de coton crème en maille côtelée.',
+    },
+    'ribbed-socks': {
+      name: 'Bas côtelés',
+      description: 'Bas de coton taupe à bords côtelés.',
+    },
+    'mini-skirt': {
+      name: 'Minijupe',
+      description: 'Jupe courte en laine, couleur prune douce.',
+    },
+    'opaque-tights': {
+      name: 'Collants opaques',
+      description: 'Collants foncés pour le temps frais.',
+    },
     'fleece-zip': {
       name: 'Veste polaire à glissière',
       description: 'Veste polaire vert sauge à fermeture éclair complète.',
@@ -367,6 +408,10 @@ export const frCA: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minijupe et collants',
+      description: 'Tricot côtelé, minijupe prune, collants opaques et bottillons.',
+    },
     'winter-knit': {
       name: "Tricot d'hiver",
       description: 'Robe en tricot, bottillons et foulard de laine.',

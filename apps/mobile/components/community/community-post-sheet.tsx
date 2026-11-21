@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { CommunityRequestSuperseded } from '@couture/api-client'
 import {
   communityPostCaptionSchema,
   communityPostTitleSchema,
@@ -27,6 +28,7 @@ import {
   allocateCommunityLookFromMobile,
   communityFailureReason,
   communityRetryAfterSeconds,
+  describeCommunityDraftFromMobile,
   generateIdempotencyKey,
   pickCommunityPhoto,
   publishCommunityLookFromMobile,
@@ -289,6 +291,15 @@ export function CommunityPostSheet({
   const [altText, setAltText] = useState('')
   const [altTextConfirmed, setAltTextConfirmed] = useState(false)
   const [caption, setCaption] = useState('')
+  const [descriptionStatus, setDescriptionStatus] = useState<
+    'idle' | 'loading' | 'failed'
+  >('idle')
+  const description = useRef<AbortController | null>(null)
+  const autoCaption = useRef<string | null>(null)
+  const cancelDescription = useCallback(() => {
+    description.current?.abort()
+    description.current = null
+  }, [])
   const [title, setTitle] = useState('')
   const titleInvalid =
     Boolean(title.trim()) && !communityPostTitleSchema.safeParse(title).success
@@ -307,12 +318,19 @@ export function CommunityPostSheet({
   const verificationWaiters = useRef(new Set<() => void>())
   useEffect(() => {
     if (!suspended) verificationWaiters.current.forEach((resume) => resume())
-  }, [suspended])
+    else {
+      cancelDescription()
+      setDescriptionStatus('idle')
+    }
+  }, [suspended, cancelDescription])
   // One key per attempt, reused across allocate, upload, publish and any retry of
   // that attempt, so a retry replays the first session instead of allocating a second.
   const idempotencyKeyRef = useRef<string | null>(null)
 
   const resetState = useCallback(() => {
+    cancelDescription()
+    autoCaption.current = null
+    setDescriptionStatus('idle')
     controllerRef.current?.abort()
     controllerRef.current = null
     idempotencyKeyRef.current = null
@@ -325,7 +343,7 @@ export function CommunityPostSheet({
     setPublishState(null)
     setIsBusy(false)
     setErrorMessage(null)
-  }, [])
+  }, [cancelDescription])
 
   useEffect(() => {
     if (!visible) {
@@ -347,7 +365,13 @@ export function CommunityPostSheet({
     return () => cancelAnimationFrame(frame)
   }, [defaultChallengeOptIn, resetState, visible])
 
-  useEffect(() => () => controllerRef.current?.abort(), [])
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort()
+      cancelDescription()
+    },
+    [cancelDescription]
+  )
 
   /**
    * Caption rules live on `communityPostCaptionSchema` in the contract. The local
@@ -378,6 +402,8 @@ export function CommunityPostSheet({
 
   const handlePickImage = useCallback(async () => {
     if (access.current.suspended || !access.current.visible) return
+    cancelDescription()
+    setDescriptionStatus('idle')
     setErrorMessage(null)
     setIsBusy(true)
     controllerRef.current?.abort()
@@ -390,6 +416,8 @@ export function CommunityPostSheet({
         return
       }
       setAsset(picked)
+      if (autoCaption.current !== null) setCaption('')
+      autoCaption.current = null
       setAllocated(null)
       setAltText('')
       setAltTextConfirmed(false)
@@ -455,7 +483,41 @@ export function CommunityPostSheet({
         setIsBusy(false)
       }
     }
-  }, [locale, suspended, t])
+  }, [cancelDescription, locale, t])
+
+  const suggestDescription = async () => {
+    if (!visible || suspended || isBusy || !allocated || caption || description.current)
+      return
+    const controller = new AbortController()
+    description.current = controller
+    setDescriptionStatus('loading')
+    try {
+      const suggested = await describeCommunityDraftFromMobile(
+        {
+          postId: allocated.postId,
+          uploadSessionId: allocated.uploadSessionId,
+        },
+        controller.signal
+      )
+      if (
+        controller.signal.aborted ||
+        !access.current.visible ||
+        access.current.suspended
+      )
+        return
+      autoCaption.current = suggested
+      setCaption((current) => current || suggested)
+      setDescriptionStatus('idle')
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setDescriptionStatus(
+          error instanceof CommunityRequestSuperseded ? 'idle' : 'failed'
+        )
+      }
+    } finally {
+      if (description.current === controller) description.current = null
+    }
+  }
 
   /**
    * Why publishing is blocked, as a catalog key, or `null` when it is not.
@@ -492,6 +554,8 @@ export function CommunityPostSheet({
       return
     }
 
+    cancelDescription()
+    setDescriptionStatus('idle')
     setErrorMessage(null)
     setIsBusy(true)
     setPublishState('publishing')
@@ -539,6 +603,7 @@ export function CommunityPostSheet({
     allocated,
     altText,
     caption,
+    cancelDescription,
     challenge,
     handleClose,
     joinChallenge,
@@ -700,7 +765,20 @@ export function CommunityPostSheet({
                 multiline
                 {...reveal.fieldFocus('caption')}
                 value={caption}
-                onChangeText={setCaption}
+                onChangeText={(value) => {
+                  cancelDescription()
+                  autoCaption.current = null
+                  setDescriptionStatus('idle')
+                  setCaption(value)
+                }}
+              />
+              <DraftDescriptionControl
+                hasUpload={Boolean(allocated)}
+                hasCaption={Boolean(caption)}
+                suspended={suspended}
+                isBusy={isBusy}
+                status={descriptionStatus}
+                onSuggest={() => void suggestDescription()}
               />
               {captionErrorKey ? (
                 <ComposeErrorPanel
@@ -779,6 +857,54 @@ export function CommunityPostSheet({
   )
 }
 
+function DraftDescriptionControl({
+  hasUpload,
+  hasCaption,
+  suspended,
+  isBusy,
+  status,
+  onSuggest,
+}: {
+  hasUpload: boolean
+  hasCaption: boolean
+  suspended: boolean
+  isBusy: boolean
+  status: 'idle' | 'loading' | 'failed'
+  onSuggest: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const loading = status === 'loading'
+  const disabled = loading || isBusy || suspended
+  return (
+    <>
+      {hasUpload && !hasCaption && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityState={{ disabled, busy: loading }}
+          testID="community-suggest-description"
+          disabled={disabled}
+          onPress={onSuggest}
+          style={[styles.descriptionButton, { borderColor: palette.divider }]}
+        >
+          <Text style={{ color: palette.text }}>
+            {t(
+              loading
+                ? 'community.compose.descriptionWorking'
+                : 'community.compose.suggestDescription'
+            )}
+          </Text>
+        </TouchableOpacity>
+      )}
+      {status === 'failed' && (
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.mutedText }}>
+          {t('community.compose.descriptionFailed')}
+        </Text>
+      )}
+    </>
+  )
+}
+
 function ComposeActions({
   disabled,
   busy,
@@ -836,6 +962,14 @@ function ComposeActions({
 }
 
 const styles = StyleSheet.create({
+  descriptionButton: {
+    minHeight: 44,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',

@@ -36,6 +36,7 @@ import {
 
 import { CommunityBannedNotice } from './community-banned-notice'
 import { CommunityComments } from './community-comments'
+import { CommunityExampleInspiration } from './community-example-inspiration'
 import {
   ResponseError,
   CommunityCommentsState,
@@ -56,6 +57,7 @@ import {
   communityCommentsDeleteFromWeb,
   communityCommentsReportFromWeb,
   allocateCommunityLookFromWeb,
+  describeCommunityDraftFromWeb,
   CommunityRequestError,
   communityFailureReason,
   communitySanctionOf,
@@ -1498,10 +1500,64 @@ function PostTitleField({
   )
 }
 
+function DraftDescriptionControl({
+  canSuggest,
+  hasCaption,
+  suspended,
+  isPublishing,
+  status,
+  onSuggest,
+  t,
+}: {
+  canSuggest: boolean
+  hasCaption: boolean
+  suspended: boolean
+  isPublishing: boolean
+  status: 'idle' | 'loading' | 'failed'
+  onSuggest: () => void
+  t: Translate
+}) {
+  return (
+    <>
+      {canSuggest && !hasCaption && (
+        <button
+          type="button"
+          data-testid="community-suggest-description"
+          className="block min-h-11 rounded-md border border-[color:var(--theme-card-border)] px-3 text-sm font-semibold text-[color:var(--theme-card-text)] disabled:opacity-60"
+          disabled={suspended || isPublishing || status === 'loading'}
+          onClick={onSuggest}
+        >
+          {t(
+            status === 'loading'
+              ? 'community.compose.descriptionWorking'
+              : 'community.compose.suggestDescription'
+          )}
+        </button>
+      )}
+      {status === 'failed' && (
+        <p role="status" className="text-xs text-[color:var(--theme-card-text)]">
+          {t('community.compose.descriptionFailed')}
+        </p>
+      )}
+    </>
+  )
+}
+
+function describeDraftRequest(
+  allocated: AllocatedLook | null,
+  sessionScope: string | null
+) {
+  if (!allocated) return undefined
+  const { postId, uploadSessionId } = allocated
+  return (signal: AbortSignal) =>
+    describeCommunityDraftFromWeb({ postId, uploadSessionId }, sessionScope, signal)
+}
+
 interface PostCreationModalProps {
   suspended?: boolean
   onClose: () => void
   onSelectPhoto: (file: File) => void
+  describeDraft?: (signal: AbortSignal) => Promise<string>
   onPublish: (params: {
     altText: string
     caption?: string
@@ -1529,6 +1585,7 @@ function PostCreationModal({
   suspended = false,
   onClose,
   onSelectPhoto,
+  describeDraft,
   onPublish,
   photoPreview,
   altTextSuggestion,
@@ -1541,6 +1598,45 @@ function PostCreationModal({
   const [altText, setAltText] = useState('')
   const [isAltTextConfirmed, setIsAltTextConfirmed] = useState(false)
   const [caption, setCaption] = useState('')
+  const [descriptionStatus, setDescriptionStatus] = useState<
+    'idle' | 'loading' | 'failed'
+  >('idle')
+  const description = useRef<AbortController | null>(null)
+  const autoCaption = useRef<string | null>(null)
+
+  const cancelDescription = () => {
+    description.current?.abort()
+    description.current = null
+  }
+  useEffect(() => {
+    if (suspended) {
+      cancelDescription()
+      setDescriptionStatus('idle')
+    }
+    return cancelDescription
+  }, [suspended])
+
+  const suggestDescription = async () => {
+    if (suspended || !describeDraft || caption || description.current) return
+    const controller = new AbortController()
+    description.current = controller
+    setDescriptionStatus('loading')
+    try {
+      const suggested = await describeDraft(controller.signal)
+      if (controller.signal.aborted) return
+      autoCaption.current = suggested
+      setCaption((current) => current || suggested)
+      setDescriptionStatus('idle')
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setDescriptionStatus(
+          error instanceof CommunityRequestSuperseded ? 'idle' : 'failed'
+        )
+      }
+    } finally {
+      if (description.current === controller) description.current = null
+    }
+  }
   const [title, setTitle] = useState('')
   const titleInvalid = invalidPostTitle(title)
   const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(
@@ -1557,6 +1653,7 @@ function PostCreationModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
+    if (isPublishing) return
     const failure = composeValidationKey({
       hasAllocatedPhoto: altTextSuggestion !== null,
       altText,
@@ -1567,6 +1664,8 @@ function PostCreationModal({
     if (failure !== null || titleInvalid) {
       return
     }
+    cancelDescription()
+    setDescriptionStatus('idle')
     onPublish({
       altText: altText.trim(),
       caption: caption.trim() || undefined,
@@ -1590,7 +1689,9 @@ function PostCreationModal({
     <AccessibleModal
       suspended={suspended}
       isOpen
-      onClose={onClose}
+      onClose={() => {
+        if (!isPublishing) onClose()
+      }}
       // The panel follows the lookbook theme, so a premium palette under a dark system setting
       // keeps its light panel and the controls inside it match.
       surface="theme"
@@ -1624,9 +1725,14 @@ function PostCreationModal({
             type="file"
             data-testid="post-image-file-input"
             accept="image/jpeg,image/png,image/webp"
+            disabled={isPublishing}
             onChange={(event) => {
               const file = event.target.files?.[0]
               if (file) {
+                cancelDescription()
+                setDescriptionStatus('idle')
+                if (autoCaption.current !== null) setCaption('')
+                autoCaption.current = null
                 setValidationKey(null)
                 onSelectPhoto(file)
               }
@@ -1719,6 +1825,9 @@ function PostCreationModal({
             data-testid="post-caption-input"
             value={caption}
             onChange={(event) => {
+              cancelDescription()
+              autoCaption.current = null
+              setDescriptionStatus('idle')
               setCaption(event.target.value)
               setValidationKey(captionValidationKey(event.target.value))
             }}
@@ -1730,6 +1839,15 @@ function PostCreationModal({
           <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.captionCount', { count: caption.length })}
           </span>
+          <DraftDescriptionControl
+            canSuggest={Boolean(describeDraft)}
+            hasCaption={Boolean(caption)}
+            suspended={suspended}
+            isPublishing={isPublishing}
+            status={descriptionStatus}
+            onSuggest={() => void suggestDescription()}
+            t={t}
+          />
         </div>
 
         {activeChallenge && (
@@ -3727,10 +3845,12 @@ export function CommunityLookbookGrid({
   }
 
   const closeCreateModal = () => {
+    actionControllerRef.current?.abort()
     setIsCreateModalOpen(false)
     setComposeError(null)
     setAllocated(null)
     setIsPreparingPhoto(false)
+    setIsPublishing(false)
     setPhotoPreview((current) => {
       if (current) URL.revokeObjectURL(current)
       return null
@@ -4098,6 +4218,15 @@ export function CommunityLookbookGrid({
           </button>
         )}
         <AuthorStatesSection states={presentation.authorStates} t={t} />
+        <CommunityExampleInspiration
+          available={feedVisible(communityAvailable, bannedSanction)}
+          loading={isLoading}
+          failed={Boolean(feedError)}
+          servedMode={servedMode}
+          viewerBand={viewerBand}
+          items={presentation.items}
+          locale={i18n.language}
+        />
 
         <LoadMoreControl
           nextCursor={presentation.nextCursor}
@@ -4178,6 +4307,7 @@ export function CommunityLookbookGrid({
 
         {isCreateModalOpen && (
           <PostCreationModal
+            key={sessionScope}
             suspended={!communityAvailable}
             onClose={closeCreateModal}
             onSelectPhoto={(file) => {
@@ -4188,6 +4318,7 @@ export function CommunityLookbookGrid({
             }}
             photoPreview={photoPreview}
             altTextSuggestion={altTextSuggestion}
+            describeDraft={describeDraftRequest(allocated, sessionScope)}
             isPreparing={isPreparingPhoto}
             isPublishing={isPublishing}
             activeChallenge={activeChallenge}

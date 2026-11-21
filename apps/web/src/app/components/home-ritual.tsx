@@ -11,16 +11,22 @@ import {
 import {
   createMemberSampleOutfit,
   getGuestPreviewStrings,
+  parseSampleBookmarks,
+  reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
+  saveSampleBookmark,
   swapMemberSampleGarment,
   undoMemberSampleSwaps,
+  updateMemberSampleOutfit,
   type GuestPreviewStrings,
   type SampleGarmentCategory,
+  type SampleBookmark,
   type SampleOutfitResult,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { readStorage } from '../../lib/browser-persistence'
 import { formatPlannerTemperature } from '../../lib/planner'
 import { captureLocationCredentials, listLocationsFromWeb } from '../../lib/locations'
 import { getRitualFromWeb, ritualFailure, SET_CITY_FROM_HOME } from '../../lib/ritual'
@@ -32,6 +38,7 @@ import {
 } from '../../lib/use-web-session'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
+import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 
 const linkClass =
@@ -72,6 +79,53 @@ function SampleOutfit({
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
+  const bookmarkKey = `couturecast.member-sample-bookmarks.${owner}`
+  const [bookmarks, setBookmarks] = useState(() =>
+    parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
+  )
+  const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
+  const bookmarkSnapshot = useRef(bookmarks)
+  const bookmarkOwnerMounted = useRef(true)
+  useEffect(() => {
+    bookmarkOwnerMounted.current = true
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage || !isLiveOwner(owner)) return
+      if (event.key !== null && event.key !== bookmarkKey) return
+      const next = parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
+      bookmarkSnapshot.current = next
+      setBookmarks(next)
+      setBookmarksPersistent(true)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      bookmarkOwnerMounted.current = false
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [bookmarkKey, owner])
+
+  const updateBookmarks = (change: (current: SampleBookmark[]) => SampleBookmark[]) => {
+    const apply = () => {
+      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+      let next: SampleBookmark[]
+      try {
+        const stored = window.localStorage.getItem(bookmarkKey)
+        const updated = change(parseSampleBookmarks(stored, SAMPLE_CATALOG))
+        window.localStorage.setItem(bookmarkKey, JSON.stringify(updated))
+        next = updated
+        setBookmarksPersistent(true)
+      } catch {
+        next = change(bookmarkSnapshot.current)
+        setBookmarksPersistent(false)
+      }
+      bookmarkSnapshot.current = next
+      setBookmarks(next)
+    }
+    if (navigator.locks) {
+      void navigator.locks.request(bookmarkKey, apply).catch(apply)
+    } else {
+      apply()
+    }
+  }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
     if (!isLiveOwner(owner)) return
@@ -97,7 +151,6 @@ function SampleOutfit({
           </div>
         }
         noAlternative={result.eligibleLookIds.length < 2}
-        hasSwaps={Boolean(lookId && result.input.swaps[lookId])}
         onTryAnother={() => update(rotateMemberSampleOutfit(result))}
         onSwap={(slot, button) => {
           invoker.current = button
@@ -106,6 +159,25 @@ function SampleOutfit({
         onUndoSwaps={() => update(undoMemberSampleSwaps(result))}
         onReviewChoices={() => update(createMemberSampleOutfit())}
         onResetChoices={() => update(createMemberSampleOutfit())}
+      />
+      <SampleIdeaControls
+        strings={strings}
+        preferences={result.input.preferences}
+        onPreferences={(preferences) =>
+          update(updateMemberSampleOutfit(result, { preferences }))
+        }
+        weather={result.input.weather}
+        onWeather={(weather) => update(updateMemberSampleOutfit(result, { weather }))}
+        bookmarks={bookmarks}
+        persistent={bookmarksPersistent}
+        lookId={lookId}
+        onSave={() => updateBookmarks((current) => saveSampleBookmark(current, result))}
+        onOpen={(bookmark) => update(reopenMemberSampleOutfit(result, bookmark))}
+        onRemove={(id) =>
+          updateBookmarks((current) =>
+            current.filter((bookmark) => bookmark.lookId !== id)
+          )
+        }
       />
       <GuestPreviewSwapDialog
         category={category}

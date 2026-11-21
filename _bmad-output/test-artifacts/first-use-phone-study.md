@@ -54,5 +54,24 @@ it as ready in Wardrobe and deleted the fixture during teardown.
 
 Participant outreach began on 2026-11-20. One adult opted in and received an expiring
 guest-task link after a phone-width browser opened the exact isolated preview and reached
-the sample flow. The guest pilot was self-reported. The member tasks and additional
-participants have no outcomes yet.
+the sample flow. The guest pilot was self-reported.
+
+## Single-participant phone follow-up
+
+On 2026-11-21, the same adult reported using their existing account. The build revision,
+first taps and elapsed times were unreported. The owner chose this follow-up with one
+participant for the remaining practical check.
+
+- The participant uploaded multiple garments individually. They reported that enabling
+  background cleanup made the photo look high-contrast while leaving the background visible.
+  This checks garment upload from an existing account. The empty wardrobe start was unobserved.
+- The participant could not evaluate browsing other members' looks because they saw no looks
+  from other members. The guest retest, today's outfit, Planner and return to Home were unreported.
+- Community description edits saved. The title edit outcome was unreported.
+- The participant said that an app requiring individual garment uploads felt empty and tedious
+  at first. They suggested a short survey on color, texture and style, then several editable
+  outfits based on preferences and the weather. They also suggested a short AI-drafted Community
+  description that a member could edit before posting.
+
+These are self-reported results from one adult. The planned teen cohort and timed task
+observations have no results.

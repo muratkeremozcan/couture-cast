@@ -318,13 +318,47 @@ describe('mobile guest preview surfaces', () => {
 
   it('swaps a garment through the sheet and undoes it (D6)', async () => {
     await passGate()
+    const baseCopy = en.looks['office-oxford'].description
+    expect(screen.getByText(baseCopy)).toBeVisible()
     press(screen.getByTestId('guest-preview-swap-shoes'))
     const sheet = await screen.findByTestId('guest-preview-swap-sheet')
     expect(within(sheet).getByText('Swap the shoes')).toBeTruthy()
     press(within(sheet).getByTestId('guest-preview-swap-option-white-sneakers'))
     await waitFor(() => expect(garmentIds()).toContain('white-sneakers'))
+    expect(screen.queryByText(baseCopy)).toBeNull()
     press(screen.getByTestId('guest-preview-undo-swaps'))
     await waitFor(() => expect(garmentIds()).toContain('loafers'))
+    expect(screen.getByText(baseCopy)).toBeVisible()
+  })
+
+  it('reopens an unedited bookmark without an Undo swaps action', async () => {
+    await passGate()
+    press(screen.getByTestId('sample-save-look'))
+    const reopen = await screen.findByTestId('sample-open-sample:l:office-oxford')
+    press(screen.getByTestId('guest-preview-try-another'))
+    expect(screen.getByText('Silk midi')).toBeVisible()
+    press(reopen)
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
+      'Office oxford'
+    )
+    expect(screen.queryByTestId('guest-preview-undo-swaps')).toBeNull()
+    expect(screen.getByText(en.looks['office-oxford'].description)).toBeVisible()
+  })
+
+  it('reopens saved swaps without describing the original garments', async () => {
+    await passGate()
+    press(screen.getByTestId('guest-preview-swap-shoes'))
+    press(await screen.findByTestId('guest-preview-swap-option-white-sneakers'))
+    press(screen.getByTestId('sample-save-look'))
+    const reopen = await screen.findByTestId('sample-open-sample:l:office-oxford')
+    press(screen.getByTestId('guest-preview-try-another'))
+    press(reopen)
+    expect(garmentIds()).toContain('white-sneakers')
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
+      en.outfit.heading
+    )
+    expect(screen.getByTestId('guest-preview-undo-swaps')).toBeVisible()
+    expect(screen.queryByText(en.looks['office-oxford'].description)).toBeNull()
   })
 
   it('shows no suitable alternative and closes the sheet', async () => {

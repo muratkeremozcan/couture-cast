@@ -29,6 +29,26 @@ setupCommunityGridClock()
 describe('CommunityLookbookGrid (Story 6.1)', () => {
   setupCommunityGridSurface()
 
+  it('shows inspiration on a self-only first page and removes it when a peer arrives', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(FEED_PATH, ({ request }) =>
+        new URL(request.url).searchParams.has('cursor')
+          ? feedBody({ items: [item({ id: 'post-peer' })], nextCursor: null })
+          : feedBody({
+              items: [item({ author: { displayName: 'You', isSelf: true } })],
+              nextCursor: cursorFor(),
+            })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    expect(await screen.findByTestId('community-example-inspiration')).toBeVisible()
+    await user.click(screen.getByTestId('load-more-button'))
+    expect(await screen.findByTestId('lookbook-card-post-peer')).toBeVisible()
+    expect(screen.queryByTestId('community-example-inspiration')).not.toBeInTheDocument()
+  })
+
   describe('keyset paging', () => {
     it('6.1-WEB-016 appends the next page without duplicating a row it already holds', async () => {
       signIn()

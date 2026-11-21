@@ -285,17 +285,27 @@ describe('guest preview surfaces', () => {
 
   it('swaps a garment through the dialog, then undoes it (D6)', async () => {
     await passGate()
+    const baseCopy = en.looks['office-oxford'].description
+    expect(screen.getByText(baseCopy)).toBeVisible()
     fireEvent.click(screen.getByTestId('guest-preview-swap-shoes'))
     const dialog = await screen.findByRole('dialog', { name: 'Swap the shoes' })
     fireEvent.click(
       within(dialog).getByTestId('guest-preview-swap-option-white-sneakers')
     )
     expect(garmentIds()).toContain('sample:g:white-sneakers')
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
+      en.outfit.heading
+    )
+    expect(screen.queryByText(baseCopy)).not.toBeInTheDocument()
     expect(screen.getByTestId('guest-preview-announcement').textContent).toBe(
       'White sneakers is now in the outfit.'
     )
     fireEvent.click(screen.getByTestId('guest-preview-undo-swaps'))
     expect(garmentIds()).toContain('sample:g:loafers')
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
+      en.looks['office-oxford'].name
+    )
+    expect(screen.getByText(baseCopy)).toBeVisible()
   })
 
   it('says when a slot has no suitable alternative', async () => {

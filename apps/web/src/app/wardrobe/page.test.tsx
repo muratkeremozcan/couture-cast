@@ -22,6 +22,7 @@ import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 import type * as WebSession from '../../lib/web-session'
+import { stubGarmentPreviewUrl } from '../../test-utils/garment-capture'
 
 const {
   listGarmentsFromWeb,
@@ -68,7 +69,9 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => verifiedSession.owner,
 }))
 
-vi.mock('../../lib/wardrobe', () => ({
+vi.mock('../../lib/wardrobe', async () => ({
+  prepareGarmentImage: (await import('../../test-utils/garment-capture'))
+    .prepareGarmentImageFixture,
   listGarmentsFromWeb,
   uploadGarmentImageFromWeb,
   suggestGarmentTagsFromWeb,
@@ -89,6 +92,12 @@ vi.mock('../../lib/wardrobe', () => ({
 }))
 
 import WardrobePage from './page'
+
+beforeEach(stubGarmentPreviewUrl)
+afterEach(() => {
+  cleanup()
+  vi.unstubAllGlobals()
+})
 
 const persistedGarment: GarmentItemContract = {
   id: 'persisted-garment-1',
@@ -214,8 +223,14 @@ async function commitGarmentThroughCapture(
     screen.getByLabelText('Garment image file'),
     new File(['fixture-image'], 'garment.png', { type: 'image/png' })
   )
-  await user.click(await screen.findByRole('button', { name: 'Use This Image' }))
+  await confirmCrop(user)
   await screen.findByText('Garment Upload Complete!')
+}
+
+async function confirmCrop(user: ReturnType<typeof userEvent.setup>) {
+  const useImage = await screen.findByRole('button', { name: 'Use This Image' })
+  await waitFor(() => expect(useImage).toBeEnabled())
+  await user.click(useImage)
 }
 
 describe('WardrobePage persistence', () => {
@@ -246,7 +261,7 @@ describe('WardrobePage persistence', () => {
       screen.getByLabelText('Garment image file'),
       new File(['fixture-image'], 'garment.png', { type: 'image/png' })
     )
-    await user.click(await screen.findByRole('button', { name: 'Use This Image' }))
+    await confirmCrop(user)
 
     await screen.findByText('Garment Upload Complete!')
     expect(uploadGarmentImageFromWeb).toHaveBeenCalledOnce()
@@ -568,7 +583,10 @@ describe('WardrobePage direct garment entry', () => {
       within(capture).getByLabelText('Garment image file'),
       new File(['fixture-image'], 'garment.png', { type: 'image/png' })
     )
-    await within(capture).findByRole('button', { name: 'Use This Image' })
+    const useImage = await within(capture).findByRole('button', {
+      name: 'Use This Image',
+    })
+    await waitFor(() => expect(useImage).toBeEnabled())
     await user.keyboard('{Escape}')
     expect(within(capture).getByText('Discard this photo?')).toBeVisible()
     expect(within(capture).getByRole('button', { name: 'Keep editing' })).toHaveFocus()

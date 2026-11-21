@@ -41,7 +41,7 @@ const run = (overrides: Partial<SampleSelectionInput> = {}) =>
 
 describe('sample policy determinism (U-SEL-DETERMINISTIC)', () => {
   it('pins the policy version', () => {
-    expect(SAMPLE_POLICY_VERSION).toBe(1)
+    expect(SAMPLE_POLICY_VERSION).toBe(2)
   })
 
   it('gives the same result over 1,000 runs and after a JSON round trip', () => {

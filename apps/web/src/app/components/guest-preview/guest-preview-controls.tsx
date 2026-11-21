@@ -8,7 +8,7 @@ import {
   type GuestPreviewState,
   type GuestPreviewStrings,
   type SampleComfort,
-  type SampleWeatherKey,
+  type GuestSampleWeatherKey,
 } from '@couture/utils'
 import { GuestPreviewChoiceGroup } from './guest-preview-choice-group'
 
@@ -27,7 +27,7 @@ export function GuestPreviewControls({
   state: GuestPreviewState
   strings: GuestPreviewStrings
   locale: string
-  onWeather: (weather: SampleWeatherKey) => void
+  onWeather: (weather: GuestSampleWeatherKey) => void
   onComfort: (comfort: SampleComfort, control: GuestPreviewControl) => void
 }) {
   const { values } = strings

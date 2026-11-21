@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common'
 import {
+  CommunityObjectDownloadError,
   COMMUNITY_SIGNED_UPLOAD_LIFETIME_MS,
   type CommunityOverwriteCapability,
   type CommunityStorage,
@@ -64,6 +65,14 @@ export class InMemoryCommunityStorage implements CommunityStorage {
       return Promise.reject(new ServiceUnavailableException('STORAGE_PERMISSION_DENIED'))
     }
     return Promise.resolve(bytes)
+  }
+
+  async downloadBounded(objectPath: string, maxBytes: number, signal: AbortSignal) {
+    signal.throwIfAborted()
+    if (!this.objects.has(objectPath)) throw new CommunityObjectDownloadError('missing')
+    const bytes = await this.download(objectPath)
+    if (bytes.length > maxBytes) throw new CommunityObjectDownloadError('too-large')
+    return bytes
   }
 
   createOverwriteCapability(objectPath: string): Promise<CommunityOverwriteCapability> {

@@ -15,14 +15,14 @@ import {
   waitFor,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nextProvider } from 'react-i18next'
 import {
   UploadSessionChangedError,
   type GarmentItemContract,
 } from '@couture/api-client/contracts/http'
 import { GarmentCaptureModal } from './garment-capture-modal'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY, WardrobeRequestError } from '../../lib/wardrobe'
+import * as wardrobe from '../../lib/wardrobe'
 import { getI18n } from '../../i18n'
 import {
   forgetAllUploadAttempts,
@@ -48,6 +48,7 @@ const mockCommittedGarment: GarmentItemContract = {
 }
 
 const globalRestorers: (() => void)[] = []
+const { WEB_ACCESS_TOKEN_STORAGE_KEY, WardrobeRequestError } = wardrobe
 
 /**
  * The modal renders inside the app's i18n provider, as the wardrobe page mounts it; every
@@ -64,11 +65,34 @@ function render(ui: React.ReactElement) {
 /** The en-US catalog's generic upload failure copy (wardrobe.capture.errors.failed). */
 const GENERIC_UPLOAD_FAILURE = 'Upload failed. Please try again.'
 
+const preparedPhoto: wardrobe.PreparedImage = {
+  blob: new Blob(['crop'], { type: 'image/webp' }),
+  widthPx: 400,
+  heightPx: 400,
+  mimeType: 'image/webp',
+  sha256: 'prepared-photo-checksum',
+  backgroundRemoved: true,
+}
+const revokePreviewUrl = vi.fn()
+
+beforeEach(() => {
+  vi.spyOn(wardrobe, 'prepareGarmentImage').mockResolvedValue(preparedPhoto)
+  revokePreviewUrl.mockClear()
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:prepared-photo')
+      static revokeObjectURL = revokePreviewUrl
+    }
+  )
+})
+
 afterEach(async () => {
   for (const restore of globalRestorers.splice(0).reverse()) {
     restore()
   }
   cleanup()
+  vi.unstubAllGlobals()
   if (getI18n().language !== 'en-US') await getI18n().changeLanguage('en-US')
   vi.restoreAllMocks()
 })
@@ -164,12 +188,15 @@ describe('GarmentCaptureModal Component', () => {
     // the size (production follow-up 2026-11-19).
     expect(toDataURL).toHaveBeenCalledWith('image/jpeg', 0.9)
 
-    await user.click(await screen.findByRole('button', { name: 'Use This Image' }))
+    await user.click(await readyCropButton())
 
     await waitFor(() => {
       expect(screen.getByText('Garment Upload Complete!')).toBeDefined()
     })
     expect(uploadGarment).toHaveBeenCalledOnce()
+    expect(uploadGarment).toHaveBeenCalledWith(
+      expect.objectContaining({ prepared: preparedPhoto })
+    )
     expect(onGarmentCommitted).toHaveBeenCalledWith(mockCommittedGarment)
   })
 })
@@ -179,7 +206,13 @@ async function chooseValidImage(user: ReturnType<typeof userEvent.setup>) {
     screen.getByLabelText('Garment image file'),
     new File(['fixture-image'], 'garment.png', { type: 'image/png' })
   )
-  await screen.findByRole('button', { name: 'Use This Image' })
+  await readyCropButton()
+}
+
+async function readyCropButton() {
+  const button = await screen.findByRole('button', { name: 'Use This Image' })
+  await waitFor(() => expect(button).toBeEnabled())
+  return button
 }
 
 describe('GarmentCaptureModal camera unavailability', () => {
@@ -332,6 +365,72 @@ describe('GarmentCaptureModal crop controls', () => {
         expect.objectContaining({ aspectRatio: '1:1', useBgCleanup: false })
       )
     )
+  })
+
+  it('waits for the newly selected crop before enabling upload', async () => {
+    const user = userEvent.setup()
+    const uploadGarment = vi.fn().mockResolvedValue(mockCommittedGarment)
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
+    await chooseValidImage(user)
+
+    const portrait = { ...preparedPhoto, heightPx: 532, sha256: 'portrait-checksum' }
+    const preparation = Promise.withResolvers<wardrobe.PreparedImage>()
+    vi.mocked(wardrobe.prepareGarmentImage).mockReturnValueOnce(preparation.promise)
+
+    await user.click(screen.getByRole('button', { name: '4:3 Portrait' }))
+    const confirm = screen.getByRole('button', { name: 'Use This Image' })
+    expect(confirm).toBeDisabled()
+    await user.click(confirm)
+    expect(uploadGarment).not.toHaveBeenCalled()
+
+    await act(async () => {
+      preparation.resolve(portrait)
+      await preparation.promise
+    })
+    await user.click(await readyCropButton())
+    expect(uploadGarment).toHaveBeenCalledWith(
+      expect.objectContaining({ aspectRatio: '4:3', prepared: portrait })
+    )
+  })
+
+  it('keeps the preparation error when the selected crop ratio is tapped again', async () => {
+    const user = userEvent.setup()
+    const prepare = vi.mocked(wardrobe.prepareGarmentImage)
+    prepare.mockRejectedValueOnce(
+      new WardrobeRequestError('too small', 'IMAGE_TOO_SMALL')
+    )
+    render(<GarmentCaptureModal isOpen onClose={vi.fn()} />)
+    await user.upload(
+      screen.getByLabelText('Garment image file'),
+      new File(['photo'], 'small.png', { type: 'image/png' })
+    )
+    const error = await screen.findByRole('alert')
+    expect(error).toHaveTextContent('Choose an image at least 256 pixels wide and tall.')
+    await user.click(screen.getByRole('button', { name: '1:1 Square' }))
+    expect(screen.getByRole('alert')).toBe(error)
+    expect(prepare).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Use This Image' })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: '4:3 Portrait' }))
+    expect(await readyCropButton()).toBeEnabled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('discards the crop and releases its preview when the parent closes the modal', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const { rerender } = render(<GarmentCaptureModal isOpen onClose={onClose} />)
+    await chooseValidImage(user)
+    const preview = screen.getByRole('img', { name: 'Garment preview' })
+    expect(preview).toHaveAttribute('src', 'blob:prepared-photo')
+
+    rerender(<GarmentCaptureModal isOpen={false} onClose={onClose} />)
+    expect(revokePreviewUrl).toHaveBeenCalledWith('blob:prepared-photo')
+    rerender(<GarmentCaptureModal isOpen onClose={onClose} />)
+
+    expect(screen.getByLabelText('Garment image file')).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Garment preview' })).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('narrates each upload phase the client is waiting on', async () => {

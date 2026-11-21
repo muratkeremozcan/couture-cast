@@ -345,7 +345,15 @@ export const createService = (
     })
   const reactionSummaries = vi.fn().mockResolvedValue(new Map())
   const assertNotSanctioned = vi.fn().mockResolvedValue(undefined)
+  const assertDraftCaptionAccess = vi
+    .fn<CommunityRepository['assertDraftCaptionAccess']>()
+    .mockResolvedValue(undefined)
+  const reserveDraftCaptionRequest = vi
+    .fn<CommunityRepository['reserveDraftCaptionRequest']>()
+    .mockResolvedValue(undefined)
   const repository = {
+    assertDraftCaptionAccess,
+    reserveDraftCaptionRequest,
     assertNotSanctioned,
     assertReadEligibility: vi.fn().mockResolvedValue(undefined),
     assertSubjectAvailable: vi.fn().mockResolvedValue(undefined),
@@ -405,10 +413,12 @@ export const createService = (
     uploadToken: 'upload-token-123',
     expiresAt: new Date(SERVICE_REFERENCE_TIME.getTime() + 900_000).toISOString(),
   })
+  const downloadBounded = vi.fn<CommunityStorage['downloadBounded']>()
   const storage = {
     signReadUrl: vi.fn(),
     signReadUrls,
     createUploadSession,
+    downloadBounded,
   } as unknown as CommunityStorage
 
   const assertWardrobeUploadAllowed = vi.fn().mockResolvedValue(undefined)
@@ -425,6 +435,9 @@ export const createService = (
 
   return {
     service,
+    downloadBounded,
+    assertDraftCaptionAccess,
+    reserveDraftCaptionRequest,
     assertNotSanctioned,
     setReaction,
     reactionSummaries,

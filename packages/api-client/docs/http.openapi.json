@@ -15256,6 +15256,47 @@
         ],
         "additionalProperties": false
       },
+      "DescribeCommunityDraftInput": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uploadSessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "postId",
+          "uploadSessionId"
+        ],
+        "additionalProperties": false
+      },
+      "DescribeCommunityDraftResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "caption": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 280
+              }
+            },
+            "required": [
+              "caption"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "ReportCommunityPostInput": {
         "type": "object",
         "properties": {
@@ -28453,6 +28494,126 @@
                     "message"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/describe": {
+      "post": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Suggest a caption for an uploaded Community draft",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DescribeCommunityDraftInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Editable caption based on the uploaded photo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DescribeCommunityDraftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Community eligibility requirement not satisfied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ForbiddenHttpError"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityBannedError"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No owned draft matches the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The draft upload session has changed, expired, or has no uploaded image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The account reached its caption suggestion limit.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the next request can be made.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Community caption suggestion is temporarily unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
                 }
               }
             }

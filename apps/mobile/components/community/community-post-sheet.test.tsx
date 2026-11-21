@@ -295,6 +295,25 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     await i18n.changeLanguage('en-US')
   })
 
+  it('adds the photo suggestion to the editable description and publishes the edited version', async () => {
+    server.use(
+      http.post('*/api/v1/community/posts/describe', () =>
+        HttpResponse.json({ data: { caption: 'This photo features blue tones.' } })
+      )
+    )
+    const { onPublished } = renderSheet()
+    await pickAndAllocate()
+    press(screen.getByTestId('community-suggest-description'))
+    const caption = screen.getByTestId('community-caption-input')
+    await waitFor(() => expect(caption).toHaveValue('This photo features blue tones.'))
+    fireEvent.change(caption, { target: { value: 'Blue tones are my favorite.' } })
+    expect(caption).toHaveValue('Blue tones are my favorite.')
+    expect(screen.queryByTestId('community-suggest-description')).toBeNull()
+    press(screen.getByTestId('community-confirm-alt-text'))
+    press(screen.getByTestId('community-publish-button'))
+    await waitFor(() => expect(onPublished).toHaveBeenCalledOnce())
+  })
+
   it.each(['verified', 'hidden', 'close', 'identity'] as const)(
     'retains a deferred PHPicker selection during foreground suspension and resumes only for %s',
     async (outcome) => {

@@ -3,7 +3,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const es419: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Preferencias de estilo (opcional)',
+    style: 'Estilo',
+    palette: 'Paleta',
+    texture: 'Textura',
+    any: 'Cualquiera',
+    active: 'Activo y de diario',
+    chic: 'Casual chic',
+    cozy: 'Cómodo y sofisticado',
+    neutral: 'Neutra',
+    colorful: 'Colorida',
+    smooth: 'Lisa',
+    textured: 'Con textura',
+    save: 'Guardar atuendo de ejemplo',
+    update: 'Actualizar atuendo guardado',
+    saved: 'Guardado en este dispositivo',
+    remove: 'Quitar {look}',
+    illustrations: 'Ilustraciones de prendas',
+    inspiration: 'Ideas de ejemplo',
+  },
   firstUse: {
+    cleanupFallback:
+      'Conservamos el fondo porque no pudimos separar la prenda con seguridad.',
     replaceGarment: 'Elige otra foto',
     discardPhoto: '¿Descartar esta foto?',
     keepEditing: 'Seguir editando',
@@ -165,6 +187,9 @@ export const es419: GuestPreviewStrings = {
       'cool-windy': 'Fresco y ventoso',
       'mild-dry': 'Templado y seco',
       'warm-rainy': 'Cálido y lluvioso',
+      'cool-rainy': 'Fresco y lluvioso',
+      'mild-rainy': 'Templado y lluvioso',
+      'warm-dry': 'Cálido y seco',
     },
     collection: {
       all: 'Todos los ejemplos',
@@ -249,6 +274,22 @@ export const es419: GuestPreviewStrings = {
       'Ningún conjunto de "{collection}" es adecuado para esta configuración.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Suéter acanalado',
+      description: 'Suéter de algodón color crema con acabado acanalado.',
+    },
+    'ribbed-socks': {
+      name: 'Calcetines acanalados',
+      description: 'Calcetines de algodón color topo con puños acanalados.',
+    },
+    'mini-skirt': {
+      name: 'Minifalda',
+      description: 'Falda corta de lana en tono ciruela apagado.',
+    },
+    'opaque-tights': {
+      name: 'Medias opacas',
+      description: 'Medias oscuras para el clima fresco.',
+    },
     'fleece-zip': {
       name: 'Chaqueta polar con cierre',
       description: 'Chaqueta polar verde salvia con cierre completo.',
@@ -380,6 +421,10 @@ export const es419: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minifalda y medias',
+      description: 'Suéter acanalado, minifalda ciruela, medias opacas y botines.',
+    },
     'winter-knit': {
       name: 'Tejido de invierno',
       description: 'Vestido tejido, botines y bufanda de lana.',

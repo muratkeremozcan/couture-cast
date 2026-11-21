@@ -210,6 +210,9 @@ const MAX_BAND_RESOLUTION_LOCATIONS = 5
 /** The rolling submission window, in hours, per the spec's `(now-24h, now]`. */
 export const SUBMISSION_WINDOW_HOURS = 24
 
+const DRAFT_CAPTION_REQUEST_LIMIT = 10
+const DRAFT_CAPTION_WINDOW_MS = 15 * 60 * 1000
+
 /** Whether a P2002 names `field` among the columns of the violated unique index. */
 function isUniqueViolationOn(
   error: Prisma.PrismaClientKnownRequestError,
@@ -244,6 +247,40 @@ export class CommunityRepository {
   /** For a route with no transaction of its own. */
   assertNotSanctioned(member: string) {
     return assertCommunityMemberNotSanctioned(this.prisma, member)
+  }
+
+  async assertDraftCaptionAccess(member: string) {
+    await assertCommunitySubjectAvailable(this.prisma, member)
+    await assertCommunityDatabaseAccess(this.prisma, member)
+  }
+
+  async reserveDraftCaptionRequest(member: string) {
+    await interactiveTransaction(this.prisma, async (tx) => {
+      const [subject] = await tx.$queryRaw<{ draft_caption_requests: Date[] }[]>`
+        SELECT draft_caption_requests FROM "CommunitySubject"
+        WHERE member_id = ${member}
+        FOR UPDATE
+      `
+      if (!subject) throw new ForbiddenException('Community account unavailable')
+      const [{ now }] = await tx.$queryRaw<
+        [{ now: Date }]
+      >`SELECT clock_timestamp() AS now`
+      const cutoff = now.getTime() - DRAFT_CAPTION_WINDOW_MS
+      const recent = subject.draft_caption_requests.filter(
+        (request) => request.getTime() > cutoff
+      )
+      const oldest = recent[0]
+      if (recent.length >= DRAFT_CAPTION_REQUEST_LIMIT && oldest) {
+        throw new CommunityRateLimitException(
+          'Community caption suggestion limit reached.',
+          Math.max(1, Math.ceil((oldest.getTime() - cutoff) / 1000))
+        )
+      }
+      await tx.communitySubject.update({
+        where: { member_id: member },
+        data: { draft_caption_requests: [...recent, now] },
+      })
+    })
   }
 
   /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */

@@ -11,6 +11,8 @@ import {
   GUEST_PREVIEW_VIEWS,
   getGuestPreviewStrings,
   nextSampleLook,
+  openSampleBookmark,
+  saveSampleBookmark,
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleLookText,
@@ -42,6 +44,7 @@ import { GuestPreviewOutfit } from './guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview-swap-dialog'
 import { GuestPreviewWardrobe } from './guest-preview-wardrobe'
 import { useGuestPreviewSnapshot } from './use-guest-preview'
+import { SampleIdeaControls } from './sample-idea-controls'
 
 function parseView(value: string | null): GuestPreviewView {
   return GUEST_PREVIEW_VIEWS.find((view) => view === value) ?? 'outfit'
@@ -152,7 +155,6 @@ export function GuestPreview() {
 
   const input = toSampleSelectionInput(state)
   const lookId = result.look?.id
-  const lookSwaps = lookId ? state.swaps[lookId] : undefined
   const currentInSlot = (category: SampleGarmentCategory) =>
     result.garments.find((garment) => garment.category === category)?.id
   const usableIds = new Set(
@@ -229,51 +231,86 @@ export function GuestPreview() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <div className="min-w-0 space-y-6">
             {view === 'outfit' ? (
-              <GuestPreviewOutfit
-                result={result}
-                strings={strings}
-                locale={locale}
-                noAlternative={noAlternative}
-                hasSwaps={lookSwaps !== undefined && Object.keys(lookSwaps).length > 0}
-                onTryAnother={() => {
-                  const next = nextSampleLook(result)
-                  if ('lookId' in next) {
-                    update((current) => ({ ...current, selectedLookId: next.lookId }))
-                    guestPreviewAnalytics.interacted('look_changed')
-                    const nextLook = SAMPLE_CATALOG.looks.find(
-                      (look) => look.id === next.lookId
-                    )
-                    if (nextLook) {
-                      setAnnouncement(
-                        formatPreviewString(strings.outfit.updated, {
-                          look: sampleLookText(nextLook, strings).name,
-                        })
+              <>
+                <GuestPreviewOutfit
+                  result={result}
+                  strings={strings}
+                  locale={locale}
+                  noAlternative={noAlternative}
+                  onTryAnother={() => {
+                    const next = nextSampleLook(result)
+                    if ('lookId' in next) {
+                      update((current) => ({ ...current, selectedLookId: next.lookId }))
+                      guestPreviewAnalytics.interacted('look_changed')
+                      const nextLook = SAMPLE_CATALOG.looks.find(
+                        (look) => look.id === next.lookId
                       )
+                      if (nextLook) {
+                        setAnnouncement(
+                          formatPreviewString(strings.outfit.updated, {
+                            look: sampleLookText(nextLook, strings).name,
+                          })
+                        )
+                      }
+                    } else {
+                      setNoAlternative(true)
                     }
-                  } else {
-                    setNoAlternative(true)
+                  }}
+                  onSwap={(category, invoker) => {
+                    swapInvoker.current = invoker
+                    setSwapCategory(category)
+                  }}
+                  onUndoSwaps={() => {
+                    if (!lookId) return
+                    update((current) => {
+                      const { [lookId]: _removed, ...rest } = current.swaps
+                      void _removed
+                      return { ...current, swaps: rest }
+                    })
+                    guestPreviewAnalytics.interacted('swaps_undone')
+                  }}
+                  onBrowseWardrobe={() => navigate('wardrobe')}
+                  onReviewChoices={() => navigate('preferences')}
+                  onResetChoices={() => {
+                    update((current) => ({ ...current, votes: {} }))
+                    guestPreviewAnalytics.interacted('votes_reset')
+                  }}
+                />
+                <SampleIdeaControls
+                  strings={strings}
+                  preferences={state.preferences}
+                  persistent={snapshot?.persistent}
+                  onPreferences={(preferences) =>
+                    update((current) => ({
+                      ...current,
+                      preferences,
+                      selectedLookId: undefined,
+                    }))
                   }
-                }}
-                onSwap={(category, invoker) => {
-                  swapInvoker.current = invoker
-                  setSwapCategory(category)
-                }}
-                onUndoSwaps={() => {
-                  if (!lookId) return
-                  update((current) => {
-                    const { [lookId]: _removed, ...rest } = current.swaps
-                    void _removed
-                    return { ...current, swaps: rest }
-                  })
-                  guestPreviewAnalytics.interacted('swaps_undone')
-                }}
-                onBrowseWardrobe={() => navigate('wardrobe')}
-                onReviewChoices={() => navigate('preferences')}
-                onResetChoices={() => {
-                  update((current) => ({ ...current, votes: {} }))
-                  guestPreviewAnalytics.interacted('votes_reset')
-                }}
-              />
+                  bookmarks={state.bookmarks ?? []}
+                  lookId={lookId}
+                  onSave={() =>
+                    update((current) => ({
+                      ...current,
+                      bookmarks: saveSampleBookmark(current.bookmarks ?? [], result),
+                    }))
+                  }
+                  onOpen={(bookmark) =>
+                    update((current) => ({
+                      ...current,
+                      ...openSampleBookmark(bookmark, current),
+                    }))
+                  }
+                  onRemove={(id) =>
+                    update((current) => ({
+                      ...current,
+                      bookmarks: current.bookmarks?.filter(
+                        (bookmark) => bookmark.lookId !== id
+                      ),
+                    }))
+                  }
+                />
+              </>
             ) : (
               <GuestPreviewFeedback
                 votes={state.votes}

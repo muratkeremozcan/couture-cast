@@ -1,4 +1,9 @@
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
+import {
+  createMemberSampleOutfit,
+  rotateMemberSampleOutfit,
+  saveSampleBookmark,
+} from '@couture/utils'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -131,6 +136,51 @@ beforeEach(async () => {
 })
 
 afterEach(() => window.sessionStorage.clear())
+
+it('merges saves and removals with other tabs and updates when their storage changes', async () => {
+  const owner = 'shared-bookmark-member'
+  const key = `couturecast.member-sample-bookmarks.${owner}`
+  const first = createMemberSampleOutfit()
+  const second = rotateMemberSampleOutfit(first)
+  const third = rotateMemberSampleOutfit(second)
+  const stored = () =>
+    JSON.parse(localStorage.getItem(key) ?? '[]') as { lookId: string }[]
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity))
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    await user.click(await screen.findByRole('button', { name: 'Try another look' }))
+    localStorage.setItem(key, JSON.stringify(saveSampleBookmark([], first)))
+    await user.click(screen.getByRole('button', { name: 'Save example look' }))
+    expect(stored().map(({ lookId }) => lookId)).toEqual([
+      second.look?.id,
+      first.look?.id,
+    ])
+
+    const otherSave = saveSampleBookmark(
+      saveSampleBookmark(saveSampleBookmark([], first), second),
+      third
+    )
+    localStorage.setItem(key, JSON.stringify(otherSave))
+    await user.click(screen.getByRole('button', { name: 'Remove Silk midi' }))
+    expect(stored().map(({ lookId }) => lookId)).toEqual([third.look?.id, first.look?.id])
+
+    const onlyFirst = JSON.stringify(saveSampleBookmark([], first))
+    act(() => {
+      localStorage.setItem(key, onlyFirst)
+      window.dispatchEvent(
+        new StorageEvent('storage', { key, storageArea: window.localStorage })
+      )
+    })
+    const saved = screen.getByRole('region', { name: 'Saved on this device' })
+    expect(within(saved).getAllByRole('button')).toHaveLength(2)
+    expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
+  } finally {
+    view.unmount()
+    localStorage.removeItem(key)
+  }
+})
 
 it('shows the city and garment entry links beside an editable sample when the member has no city', async () => {
   const user = userEvent.setup()

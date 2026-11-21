@@ -20,6 +20,7 @@ import {
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
+import { stubGarmentPreviewUrl } from '../../../test-utils/garment-capture'
 
 const routerReplace = vi.fn()
 const routerPush = vi.fn()
@@ -93,7 +94,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/wardrobe/onboarding',
 }))
 
-vi.mock('../../../lib/wardrobe', () => ({
+vi.mock('../../../lib/wardrobe', async () => ({
+  prepareGarmentImage: (await import('../../../test-utils/garment-capture'))
+    .prepareGarmentImageFixture,
   WardrobeRequestError: class WardrobeRequestError extends Error {
     code?: string
     constructor(message: string, code?: string) {
@@ -229,10 +232,13 @@ async function captureAndCommitGarment(user: ReturnType<typeof userEvent.setup>)
     screen.getByLabelText('Garment image file'),
     new File(['fixture'], 'garment.png', { type: 'image/png' })
   )
-  await user.click(await screen.findByRole('button', { name: 'Use This Image' }))
+  const useImage = await screen.findByRole('button', { name: 'Use This Image' })
+  await waitFor(() => expect(useImage).toBeEnabled())
+  await user.click(useImage)
 }
 
 beforeEach(() => {
+  stubGarmentPreviewUrl()
   resolveCurrentUserId.mockReset().mockResolvedValue(SIGNED_IN_USER)
   getOnboardingStateFromWeb.mockReset()
   advanceOnboardingStepFromWeb.mockReset()
@@ -250,6 +256,7 @@ afterEach(() => {
     restore()
   }
   cleanup()
+  vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 

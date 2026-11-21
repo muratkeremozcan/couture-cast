@@ -85,6 +85,7 @@ describe('CommunityController', () => {
       altTextSuggestionLocale: 'en-US',
     })
     const publishPost = vi.fn().mockResolvedValue(mockFeedData.items[0])
+    const describeDraft = vi.fn<CommunityService['describeDraft']>()
     const reportPost = vi.fn().mockResolvedValue({ tracked: true })
     const recordCardOpened = vi.fn().mockResolvedValue({ tracked: true })
     const withdrawPost = vi.fn().mockResolvedValue({ tracked: true })
@@ -117,6 +118,7 @@ describe('CommunityController', () => {
       getFeed,
       allocatePost,
       publishPost,
+      describeDraft,
       reportPost,
       recordCardOpened,
       withdrawPost,
@@ -149,6 +151,7 @@ describe('CommunityController', () => {
       getFeed,
       allocatePost,
       publishPost,
+      describeDraft,
       reportPost,
       recordCardOpened,
       withdrawPost,
@@ -163,6 +166,23 @@ describe('CommunityController', () => {
         []) as unknown[]
       expect(guards).toContain(RequestAuthGuard)
     })
+  })
+
+  it('sends Retry-After when the caption suggestion budget is full', async () => {
+    const { controller, describeDraft } = createController()
+    const { response, setHeader } = createResponse()
+    describeDraft.mockRejectedValue(new CommunityRateLimitException('Limited', 42))
+    await expect(
+      controller.describeDraft(
+        authContext,
+        {
+          postId: 'ead5dc72-9d08-42a5-820e-c125a8528dcb',
+          uploadSessionId: '1ac688b8-a0ea-4e32-91c1-ee2931fbd10c',
+        },
+        response
+      )
+    ).rejects.toMatchObject({ status: 429 })
+    expect(setHeader).toHaveBeenCalledWith('Retry-After', '42')
   })
 
   describe('platform header validation', () => {

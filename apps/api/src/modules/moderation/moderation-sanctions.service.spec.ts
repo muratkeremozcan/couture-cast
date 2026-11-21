@@ -849,6 +849,28 @@ describe('U-B-ROUTE-MATRIX', () => {
           ],
         },
       },
+      describeDraft: {
+        method: RequestMethod.POST,
+        route: 'posts/describe',
+        expected: {
+          effect: 'enforced',
+          path: [
+            [CONTROLLER, 'describeDraft', 'this.communityService.describeDraft'],
+            ['community.service.ts', 'describeDraft', 'this.assertDraftCaptionAccess'],
+            [
+              'community.service.ts',
+              'assertDraftCaptionAccess',
+              'this.repository.assertDraftCaptionAccess',
+            ],
+            [
+              'community.repository.ts',
+              'assertDraftCaptionAccess',
+              'assertCommunityDatabaseAccess',
+            ],
+            ...DATABASE_ACCESS,
+          ],
+        },
+      },
       editPostText: {
         method: RequestMethod.PATCH,
         route: 'posts/:postId/text',

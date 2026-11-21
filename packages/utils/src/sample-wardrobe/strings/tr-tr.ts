@@ -2,7 +2,28 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const trTR: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Stil tercihleri (isteğe bağlı)',
+    style: 'Stil',
+    palette: 'Renk paleti',
+    texture: 'Doku',
+    any: 'Fark etmez',
+    active: 'Spor ve günlük',
+    chic: 'Günlük şık',
+    cozy: 'Rahat ve zarif',
+    neutral: 'Nötr',
+    colorful: 'Renkli',
+    smooth: 'Düz',
+    textured: 'Dokulu',
+    save: 'Örnek kombini kaydet',
+    update: 'Kayıtlı kombini güncelle',
+    saved: 'Bu cihazda kayıtlı',
+    remove: '{look} kombinini kaldır',
+    illustrations: 'Giysi çizimleri',
+    inspiration: 'Örnek kombin fikirleri',
+  },
   firstUse: {
+    cleanupFallback: 'Giysi arka plandan güvenle ayrılamadığı için arka plan korundu.',
     replaceGarment: 'Başka bir fotoğraf seç',
     discardPhoto: 'Bu fotoğraf silinsin mi?',
     keepEditing: 'Düzenlemeye devam et',
@@ -159,6 +180,9 @@ export const trTR: GuestPreviewStrings = {
       'cool-windy': 'Serin ve rüzgârlı',
       'mild-dry': 'Ilık ve kuru',
       'warm-rainy': 'Sıcak ve yağmurlu',
+      'cool-rainy': 'Serin ve yağmurlu',
+      'mild-rainy': 'Ilık ve yağmurlu',
+      'warm-dry': 'Sıcak ve kuru',
     },
     collection: {
       all: 'Tüm örnekler',
@@ -240,6 +264,22 @@ export const trTR: GuestPreviewStrings = {
     'no-eligible': 'Koleksiyon: {collection}. Bu ayarlara uyan görünüm yok.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Fitilli kazak',
+      description: 'Fitilli yüzeye sahip krem renkli pamuklu kazak.',
+    },
+    'ribbed-socks': {
+      name: 'Fitilli çorap',
+      description: 'Fitilli manşetli açık kahverengi pamuklu çorap.',
+    },
+    'mini-skirt': {
+      name: 'Mini etek',
+      description: 'Soluk mürdüm renginde kısa yün etek.',
+    },
+    'opaque-tights': {
+      name: 'Opak külotlu çorap',
+      description: 'Serin havalar için koyu renkli külotlu çorap.',
+    },
     'fleece-zip': {
       name: 'Fermuarlı polar ceket',
       description: 'Boydan fermuarlı, adaçayı yeşili polar ceket.',
@@ -351,6 +391,10 @@ export const trTR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Mini etek ve külotlu çorap',
+      description: 'Fitilli kazak, mürdüm mini etek, opak külotlu çorap ve bot.',
+    },
     'winter-knit': {
       name: 'Kış örgüsü',
       description: 'Triko elbise, kısa bot ve yün atkı.',

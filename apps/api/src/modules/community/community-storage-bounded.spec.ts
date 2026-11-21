@@ -93,4 +93,31 @@ describe('export-only bounded private media stream', () => {
       )
     ).toEqual(Buffer.from([1, 2, 3]))
   })
+
+  it.each([
+    [400, { statusCode: '404', error: 'not_found', message: 'Object not found' }],
+    [404, { code: 'NoSuchKey' }],
+  ])(
+    'recognizes a missing object from HTTP %s and its storage code',
+    async (status, body) => {
+      const storage = new SupabaseCommunityStorageAdapter()
+      vi.stubGlobal('fetch', () => Promise.resolve(Response.json(body, { status })))
+      await expect(
+        storage.downloadBounded(validPath, 10, new AbortController().signal)
+      ).rejects.toMatchObject({ status: 503, reason: 'missing' })
+    }
+  )
+
+  it.each([
+    [404, JSON.stringify({ error: 'not_found', message: 'Bucket not found' })],
+    [404, 'Proxy error'],
+    [404, JSON.stringify({ error: 'not_found', message: 'x'.repeat(4096) })],
+    [500, 'Storage unavailable'],
+  ])('keeps HTTP %s outages distinct from missing objects', async (status, body) => {
+    const storage = new SupabaseCommunityStorageAdapter()
+    vi.stubGlobal('fetch', () => Promise.resolve(new Response(body, { status })))
+    await expect(
+      storage.downloadBounded(validPath, 10, new AbortController().signal)
+    ).rejects.not.toHaveProperty('reason')
+  })
 })

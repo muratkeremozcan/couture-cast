@@ -5,6 +5,7 @@ import { evaluateBirthdateInput, parseBirthdateInput } from '../age'
 import {
   SAMPLE_GARMENT_CATEGORIES,
   SAMPLE_COLLECTION_FILTERS,
+  sampleStylePreferencesSchema,
   type SampleCatalog,
   type SampleGarmentCategory,
 } from './types'
@@ -14,6 +15,7 @@ import {
   type SampleSelectionInput,
   type SampleVote,
 } from './selector'
+import { keepSampleBookmarks, sampleBookmarksSchema } from './bookmarks'
 
 export const GUEST_PREVIEW_SCHEMA_VERSION = 1
 export const GUEST_PREVIEW_RETENTION_MS = 24 * 60 * 60 * 1000
@@ -37,6 +39,8 @@ export const guestPreviewStateSchema = z
     weather: z.enum(SAMPLE_WEATHER_KEYS),
     collection: z.enum(SAMPLE_COLLECTION_FILTERS),
     selectedLookId: z.string().max(64).optional(),
+    preferences: sampleStylePreferencesSchema.optional(),
+    bookmarks: sampleBookmarksSchema.optional(),
     comfort: z
       .object({
         runsColdWarm: z.enum(['cold', 'neutral', 'warm']),
@@ -171,6 +175,9 @@ function keepCatalogIds(
       : {}),
     votes,
     swaps,
+    ...(state.bookmarks
+      ? { bookmarks: keepSampleBookmarks(state.bookmarks, catalog) }
+      : {}),
   }
 }
 
@@ -183,6 +190,7 @@ export function toSampleSelectionInput(state: GuestPreviewState): SampleSelectio
     weather: state.weather,
     collection: state.collection,
     comfort: state.comfort,
+    ...(state.preferences ? { preferences: state.preferences } : {}),
     ...(state.selectedLookId !== undefined
       ? { selectedLookId: state.selectedLookId }
       : {}),

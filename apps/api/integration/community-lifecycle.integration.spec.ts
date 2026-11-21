@@ -25,6 +25,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
+import { CommunityRateLimitException } from '../src/modules/community/community-rate-limit.exception.js'
 import {
   COMMUNITY_ERASURE_LATE_WRITE_WINDOW_MS,
   CommunityMaintenanceService,
@@ -137,6 +138,8 @@ function storageThatCannotRemove(storage: InMemoryCommunityStorage): CommunitySt
     createUploadSession: (path, expiresIn) =>
       storage.createUploadSession(path, expiresIn),
     download: (path) => storage.download(path),
+    downloadBounded: (path, maxBytes, signal) =>
+      storage.downloadBounded(path, maxBytes, signal),
     createOverwriteCapability: (path) => storage.createOverwriteCapability(path),
     upload: (path, bytes, mimeType, capability) =>
       storage.upload(path, bytes, mimeType, capability),
@@ -273,6 +276,41 @@ afterAll(async () => {
 })
 
 describe('6.1 community lifecycle sweeps', () => {
+  it('shares the rolling draft caption budget across instances and isolates accounts', async (context) => {
+    if (!requireSchema(context)) return
+    const member = await createUser('caption-budget')
+    const other = await createUser('caption-budget-other')
+    const secondRepository = new CommunityRepository(prisma)
+    await prisma.communitySubject.update({
+      where: { member_id: member },
+      data: { draft_caption_requests: [new Date(Date.now() - 16 * 60 * 1000)] },
+    })
+
+    const settled = await Promise.allSettled(
+      Array.from({ length: 11 }, (_, attempt) =>
+        (attempt % 2 ? repository : secondRepository).reserveDraftCaptionRequest(member)
+      )
+    )
+    expect(settled.filter(({ status }) => status === 'fulfilled')).toHaveLength(10)
+    const denied = settled.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    const refusal: unknown = denied?.reason
+    if (!(refusal instanceof CommunityRateLimitException)) {
+      throw new Error('Expected a shared Community caption rate-limit refusal.')
+    }
+    expect(refusal.getStatus()).toBe(429)
+    expect(refusal.retryAfterSeconds).toBeGreaterThan(0)
+    expect(refusal.retryAfterSeconds).toBeLessThanOrEqual(15 * 60)
+    await expect(
+      secondRepository.reserveDraftCaptionRequest(other)
+    ).resolves.toBeUndefined()
+    const subject = await prisma.communitySubject.findUniqueOrThrow({
+      where: { member_id: member },
+    })
+    expect(subject.draft_caption_requests).toHaveLength(10)
+  })
+
   describe('consent suspension', () => {
     it('6.1-INT-030 hides a consent-suspended post from the feed but not from its author', async (context) => {
       if (!requireSchema(context)) return

@@ -2091,14 +2091,15 @@ model CommunityCommentAnalyticsSubject {
 
 /// Story 6.5: API-only privacy generations. Created with the account, never by late work.
 model CommunitySubject {
-  user             User                       @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "community_subject_user_fk")
-  artifacts        CommunityArtifactSubject[]
-  flag_evaluations CommunityFlagEvaluation[]
-  stream_head      CommunityStreamHead?
-  member_id        String                     @id
-  generation       Int                        @default(0)
-  private_revision BigInt                     @default(0)
-  created_at       DateTime                   @default(now())
+  user                   User                       @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "community_subject_user_fk")
+  artifacts              CommunityArtifactSubject[]
+  flag_evaluations       CommunityFlagEvaluation[]
+  stream_head            CommunityStreamHead?
+  member_id              String                     @id
+  generation             Int                        @default(0)
+  private_revision       BigInt                     @default(0)
+  created_at             DateTime                   @default(now())
+  draft_caption_requests DateTime[]                 @default([]) @db.Timestamptz(3)
 }
 
 /// All identifying artifacts enumerate each linked subject and its captured generation.

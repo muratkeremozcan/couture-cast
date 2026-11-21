@@ -122,6 +122,7 @@ describe('CommunityModerationProcessor & Worker', () => {
   const mockUpload = vi.fn().mockResolvedValue(undefined)
   const mockStorage: CommunityStorage = {
     download: mockDownload,
+    downloadBounded: vi.fn(),
     upload: mockUpload,
     createOverwriteCapability: vi
       .fn()

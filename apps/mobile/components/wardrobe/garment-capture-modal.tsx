@@ -20,7 +20,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text as NativeText,
   View,
 } from 'react-native'
@@ -123,7 +122,6 @@ export function MobileGarmentCaptureModal({
   const [step, setStep] = useState<CaptureStep>('source')
   const [selectedImage, setSelectedImage] = useState<PickedImage | null>(null)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
-  const [useBgCleanup, setUseBgCleanup] = useState(true)
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
@@ -319,7 +317,7 @@ export function MobileGarmentCaptureModal({
         mimeType: 'image/jpeg',
         widthPx: prepared.width,
         heightPx: prepared.height,
-      })}:${useBgCleanup ? 'cleanup' : 'original'}`
+      })}:original`
       const garment = await runTrackedUpload(
         garmentUploadAttempts,
         uploadSession,
@@ -382,7 +380,7 @@ export function MobileGarmentCaptureModal({
                   garmentId: allocation.garmentId,
                   uploadSessionId: allocation.uploadSessionId,
                   hasCropping: true,
-                  hasBgCleanup: useBgCleanup,
+                  hasBgCleanup: false,
                 }),
                 signal: controller.signal,
               }
@@ -524,15 +522,6 @@ export function MobileGarmentCaptureModal({
                 <Text>{t('wardrobe.crop.aspect_four_three')}</Text>
               </Pressable>
             </View>
-            <View style={styles.cleanupRow}>
-              <Text>{t('wardrobe.cleanup.title')}</Text>
-              <Switch
-                accessibilityLabel={t('wardrobe.cleanup.title')}
-                testID="garment-cleanup-toggle"
-                value={useBgCleanup}
-                onValueChange={setUseBgCleanup}
-              />
-            </View>
             <Pressable
               accessibilityRole="button"
               testID="garment-confirm-image"
@@ -618,12 +607,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 10,
-  },
-  cleanupRow: {
-    minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
   },
   primaryButton: {
     minHeight: 48,

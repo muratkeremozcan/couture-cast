@@ -5,6 +5,7 @@
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponseError } from '@couture/api-client'
+import { SAMPLE_CATALOG_VERSION } from '@couture/utils'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 
@@ -105,7 +106,7 @@ describe('guest preview analytics (D10)', () => {
     ])
     expect(window.__capturedAnalyticsEvents?.[2]?.properties).toEqual({
       platform: 'web',
-      catalog_version: '2026-11-15.1',
+      catalog_version: SAMPLE_CATALOG_VERSION,
       action: 'look_voted',
     })
     expect(window.__analyticsIdentityResets).toBe(1)

@@ -9,7 +9,9 @@ import type {
   UploadAttemptSession,
 } from '@couture/api-client/contracts/http'
 import {
+  prepareGarmentImage,
   uploadGarmentImageFromWeb,
+  type PreparedImage,
   type UploadGarmentImageInput,
 } from '../../lib/wardrobe'
 import {
@@ -22,6 +24,54 @@ import {
   useUploadSessionChange,
 } from '../../lib/upload-attempts'
 import { AccessibleModal } from './accessible-modal'
+
+type PickedImage = { dataUrl: string; session: UploadAttemptSession }
+type CropRatio = '1:1' | '4:3'
+
+type PreparedCrop = {
+  source: PickedImage
+  aspectRatio: CropRatio
+  useBgCleanup: boolean
+  image: PreparedImage
+  url: string
+}
+
+function usePreparedCrop(
+  isOpen: boolean,
+  source: PickedImage | null,
+  aspectRatio: CropRatio,
+  useBgCleanup: boolean,
+  onError: (key: CaptureErrorKey) => void
+) {
+  const [crop, setCrop] = useState<PreparedCrop | null>(null)
+  useEffect(() => {
+    setCrop(null)
+    if (!isOpen || !source) return
+    let active = true
+    let url: string | undefined
+    void prepareGarmentImage(source.dataUrl, aspectRatio, useBgCleanup, 'compact')
+      .then((image) => {
+        if (!active || !isUploadSessionCurrent(source.session)) return
+        url = URL.createObjectURL(image.blob)
+        setCrop({ source, aspectRatio, useBgCleanup, image, url })
+      })
+      .catch((error: unknown) => {
+        if (active) onError(garmentUploadErrorKey(error))
+      })
+    return () => {
+      active = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [isOpen, source, aspectRatio, useBgCleanup, onError])
+  if (
+    !crop ||
+    crop.source !== source ||
+    crop.aspectRatio !== aspectRatio ||
+    crop.useBgCleanup !== useBgCleanup
+  )
+    return null
+  return crop
+}
 
 export interface GarmentCaptureModalProps {
   confirmDiscard?: boolean
@@ -148,7 +198,7 @@ function CameraStep({
 }
 
 function CropStep({
-  imagePreview,
+  preparedCrop,
   aspectRatio,
   setAspectRatio,
   useBgCleanup,
@@ -156,8 +206,10 @@ function CropStep({
   onReset,
   onConfirm,
   confirmRef,
+  preparationError,
+  cleanupFallback,
 }: {
-  imagePreview: string
+  preparedCrop: PreparedCrop | null
   aspectRatio: '1:1' | '4:3'
   setAspectRatio: (ar: '1:1' | '4:3') => void
   useBgCleanup: boolean
@@ -165,8 +217,14 @@ function CropStep({
   onReset: () => void
   onConfirm: () => void
   confirmRef: React.Ref<HTMLButtonElement>
+  preparationError: boolean
+  cleanupFallback: string
 }) {
   const { t } = useTranslation()
+  const imagePreview = preparedCrop?.url
+  const preparing = !preparedCrop && !preparationError
+  const keptOriginal =
+    useBgCleanup && preparedCrop && !preparedCrop.image.backgroundRemoved
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -202,15 +260,24 @@ function CropStep({
           aspectRatio === '1:1' ? 'aspect-square w-64' : 'aspect-[3/4] w-64'
         }`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imagePreview}
-          alt={t('wardrobe.capture.previewAlt')}
-          className={`h-full w-full object-contain ${
-            useBgCleanup ? 'brightness-105 contrast-105' : ''
-          }`}
-        />
+        {imagePreview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imagePreview}
+            alt={t('wardrobe.capture.previewAlt')}
+            className="h-full w-full object-contain"
+          />
+        ) : preparing ? (
+          <p role="status" className="p-4 text-center text-sm">
+            {t('wardrobe.capture.status.preparing')}
+          </p>
+        ) : null}
       </div>
+      {keptOriginal && (
+        <p role="status" className="text-sm text-zinc-700 dark:text-zinc-300">
+          {cleanupFallback}
+        </p>
+      )}
 
       <div className="flex items-center justify-between rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
         <div>
@@ -257,10 +324,11 @@ function CropStep({
         </button>
         <button
           ref={confirmRef}
+          disabled={!imagePreview}
           onClick={() => {
             onConfirm()
           }}
-          className="whitespace-nowrap rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          className="whitespace-nowrap rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {t('wardrobe.capture.useImage')}
         </button>
@@ -339,12 +407,9 @@ export function GarmentCaptureModal({
   }, [isDiscarding])
   const [step, setStep] = useState<CaptureStep>('source')
   /** The photo to upload, bound to the session captured when its camera or picker opened. */
-  const [imagePreview, setImagePreview] = useState<{
-    dataUrl: string
-    session: UploadAttemptSession
-  } | null>(null)
-  const [aspectRatio, setAspectRatio] = useState<'1:1' | '4:3'>('1:1')
-  const [useBgCleanup, setUseBgCleanup] = useState<boolean>(true)
+  const [imagePreview, setImagePreview] = useState<PickedImage | null>(null)
+  const [aspectRatio, setAspectRatio] = useState<CropRatio>('1:1')
+  const [useBgCleanup, setUseBgCleanup] = useState(true)
   const [uploadState, setUploadState] = useState<string>('')
   const [uploadProgress, setUploadProgress] = useState<number>(0)
   const [errorKey, setErrorKey] = useState<CaptureErrorKey | null>(null)
@@ -353,10 +418,22 @@ export function GarmentCaptureModal({
   const streamRef = useRef<MediaStream | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
   const isOpenRef = useRef(isOpen)
+  const captureEpoch = useRef(0)
   /** The session captured when the camera or file picker last opened. */
-  const pickerSessionRef = useRef<UploadAttemptSession | null>(null)
+  const pickerSessionRef = useRef<{
+    session: UploadAttemptSession
+    epoch: number
+  } | null>(null)
 
   isOpenRef.current = isOpen
+
+  const preparedCrop = usePreparedCrop(
+    isOpen,
+    imagePreview,
+    aspectRatio,
+    useBgCleanup,
+    setErrorKey
+  )
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop())
@@ -380,6 +457,7 @@ export function GarmentCaptureModal({
   }, [stopCamera])
 
   const resetCapture = useCallback(() => {
+    captureEpoch.current++
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     stopCamera()
@@ -393,6 +471,9 @@ export function GarmentCaptureModal({
   // Round 5 account epoch: the camera, the picked photo and its upload belong to the account
   // signed in when the camera or picker opened; any account change drops them.
   useUploadSessionChange(resetCapture)
+  useEffect(() => {
+    if (!isOpen) resetCapture()
+  }, [isOpen, resetCapture])
 
   if (!isOpen) {
     return null
@@ -401,7 +482,8 @@ export function GarmentCaptureModal({
   const handleStartCamera = async () => {
     setErrorKey(null)
     const session = currentUploadSession()
-    pickerSessionRef.current = session
+    const epoch = captureEpoch.current
+    pickerSessionRef.current = { session, epoch }
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setErrorKey('cameraUnavailable')
@@ -410,24 +492,29 @@ export function GarmentCaptureModal({
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       })
-      if (!isOpenRef.current || !isUploadSessionCurrent(session)) {
+      if (captureEpoch.current !== epoch || !isUploadSessionCurrent(session)) {
         stream.getTracks().forEach((track) => track.stop())
         return
       }
       streamRef.current = stream
       setStep('camera')
     } catch {
-      setErrorKey('cameraDenied')
+      if (captureEpoch.current === epoch) setErrorKey('cameraDenied')
     }
   }
 
   const handleCapturePhoto = () => {
     if (!videoRef.current) return
-    const session = pickerSessionRef.current
-    if (!session || !isUploadSessionCurrent(session)) {
+    const capture = pickerSessionRef.current
+    if (
+      !capture ||
+      capture.epoch !== captureEpoch.current ||
+      !isUploadSessionCurrent(capture.session)
+    ) {
       resetCapture()
       return
     }
+    const { session } = capture
     const canvas = document.createElement('canvas')
     canvas.width = videoRef.current.videoWidth || 640
     canvas.height = videoRef.current.videoHeight || 480
@@ -444,18 +531,24 @@ export function GarmentCaptureModal({
   }
 
   const handleFilePickerOpen = () => {
-    pickerSessionRef.current = currentUploadSession()
+    pickerSessionRef.current = {
+      session: currentUploadSession(),
+      epoch: captureEpoch.current,
+    }
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     setErrorKey(null)
     const file = e.target.files?.[0]
     // A file that arrives without the picker opening (a drop) belongs to the session now.
-    const session = pickerSessionRef.current ?? currentUploadSession()
+    const { session, epoch } = pickerSessionRef.current ?? {
+      session: currentUploadSession(),
+      epoch: captureEpoch.current,
+    }
     pickerSessionRef.current = null
     if (!file) return
     // The account changed while the picker was open: the photo was picked for the previous one.
-    if (!isUploadSessionCurrent(session)) return
+    if (captureEpoch.current !== epoch || !isUploadSessionCurrent(session)) return
 
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       setErrorKey('unsupportedType')
@@ -469,8 +562,7 @@ export function GarmentCaptureModal({
 
     const reader = new FileReader()
     reader.onload = (event) => {
-      // A read that finishes after an account change is dropped with the rest of the capture.
-      if (!isUploadSessionCurrent(session)) return
+      if (captureEpoch.current !== epoch || !isUploadSessionCurrent(session)) return
       if (typeof event.target?.result === 'string') {
         setImagePreview({ dataUrl: event.target.result, session })
         setStep('crop')
@@ -480,10 +572,7 @@ export function GarmentCaptureModal({
   }
 
   const handleConfirmAndUpload = async () => {
-    if (!imagePreview) {
-      setErrorKey('noImage')
-      return
-    }
+    if (!imagePreview || !preparedCrop || uploadAbortRef.current) return
     setStep('uploading')
     setUploadState('preparing')
     setUploadProgress(10)
@@ -497,10 +586,12 @@ export function GarmentCaptureModal({
         uploadSession: imagePreview.session,
         aspectRatio,
         useBgCleanup,
+        prepared: preparedCrop.image,
         signal: abortController.signal,
         onStateChange: setUploadState,
         onProgress: setUploadProgress,
       })
+      if (abortController.signal.aborted) return
       onGarmentCommitted?.(garment)
       setStep('complete')
     } catch (error) {
@@ -597,11 +688,20 @@ export function GarmentCaptureModal({
       {step === 'crop' && imagePreview && !isDiscarding && (
         <CropStep
           confirmRef={confirmCrop}
-          imagePreview={imagePreview.dataUrl}
+          preparedCrop={preparedCrop}
+          preparationError={Boolean(errorKey)}
+          cleanupFallback={strings.cleanupFallback}
           aspectRatio={aspectRatio}
-          setAspectRatio={setAspectRatio}
+          setAspectRatio={(value) => {
+            if (value === aspectRatio) return
+            setErrorKey(null)
+            setAspectRatio(value)
+          }}
           useBgCleanup={useBgCleanup}
-          setUseBgCleanup={setUseBgCleanup}
+          setUseBgCleanup={(value) => {
+            setErrorKey(null)
+            setUseBgCleanup(value)
+          }}
           onReset={handleResetModal}
           onConfirm={() => {
             void handleConfirmAndUpload()

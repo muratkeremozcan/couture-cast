@@ -1,6 +1,6 @@
 // Community grid journeys through the real web transport and MSW.
 import { http, HttpResponse } from 'msw'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -46,6 +46,91 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
     afterEach(() => {
       restoreObjectUrl()
       restoreObjectUrl = () => undefined
+    })
+
+    it('keeps the composer open through Close and Escape until publishing settles', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      const started = Promise.withResolvers<AbortSignal>()
+      const finish = Promise.withResolvers<void>()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, () => allocateBody()),
+        http.post(PUBLISH_PATH, async ({ request }) => {
+          started.resolve(request.signal)
+          await finish.promise
+          return publishBody()
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
+      await user.click(screen.getByTestId('confirm-alt-text-checkbox'))
+      await user.click(screen.getByTestId('post-publish-submit'))
+
+      const signal = await started.promise
+      try {
+        const dialog = screen.getByRole('dialog')
+        expect(screen.getByTestId('post-image-file-input')).toBeDisabled()
+        await user.click(
+          within(dialog).getByRole('button', { name: 'Close without sharing' })
+        )
+        expect(dialog).toBeVisible()
+        await user.keyboard('{Escape}')
+        expect(dialog).toBeVisible()
+        expect(signal.aborted).toBe(false)
+      } finally {
+        finish.resolve()
+      }
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(
+        await screen.findAllByText('Your look was submitted for review.')
+      ).not.toHaveLength(0)
+    })
+
+    it('offers an editable photo description after upload and keeps authored text', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      const describe = vi.fn()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, () => allocateBody()),
+        http.post('/api/v1/community/posts/describe', async ({ request }) => {
+          describe(await request.json())
+          return HttpResponse.json({
+            data: { caption: 'This photo features blue tones.' },
+          })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      const description = screen.getByTestId('post-caption-input')
+      await user.click(await screen.findByTestId('community-suggest-description'))
+      expect(await screen.findByDisplayValue('This photo features blue tones.')).toBe(
+        description
+      )
+      expect(describe).toHaveBeenCalledWith({
+        postId: 'mock-allocated-post-id',
+        uploadSessionId: 'mock-upload-session-id',
+      })
+
+      await user.type(description, ' My favorite layer.')
+      await user.upload(
+        screen.getByTestId('post-image-file-input'),
+        new File(['another-look'], 'new.jpg', { type: 'image/jpeg' })
+      )
+      expect(description).toHaveValue(
+        'This photo features blue tones. My favorite layer.'
+      )
+      expect(
+        screen.queryByTestId('community-suggest-description')
+      ).not.toBeInTheDocument()
     })
 
     it('6.1-WEB-031 publishes a confirmed, server-suggested description under one idempotency key', async () => {
@@ -594,6 +679,38 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
       expect(screen.queryByTestId('post-alt-text-input')).not.toBeInTheDocument()
       expect(revoked).toContain(FIXTURE_IMAGE_URL)
+    })
+
+    it('aborts an unfinished upload when closing, so it cannot restore a draft after reopening', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      const started = Promise.withResolvers<AbortSignal>()
+      const finish = Promise.withResolvers<void>()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, async ({ request }) => {
+          started.resolve(request.signal)
+          await finish.promise
+          return allocateBody()
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      const signal = await started.promise
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+      expect(signal.aborted).toBe(true)
+      await user.click(await screen.findByTestId('create-post-button'))
+      await act(async () => {
+        finish.resolve()
+        await finish.promise
+      })
+      expect(
+        screen.queryByTestId('community-suggest-description')
+      ).not.toBeInTheDocument()
+      expect(screen.getByTestId('post-alt-text-input')).toHaveValue('')
     })
   })
 })

@@ -86,6 +86,13 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
     { d: 'M22 9 L42 9 L50 46 L14 46 Z', tone: 'primary' },
     { d: 'M26 14 L22 46 M32 14 L32 46 M38 14 L42 46', tone: 'secondary', stroke: true },
   ],
+  'mini-skirt': [
+    { d: 'M19 16 L45 16 L52 44 L12 44 Z', tone: 'primary' },
+    {
+      d: 'M19 16 L45 16 L46 21 L18 21 Z M35 21 L37 44 L34 44 L32 21 Z',
+      tone: 'secondary',
+    },
+  ],
   'knit-dress': [
     {
       d: 'M24 6 Q32 11 40 6 L53 32 L47 34 L42 22 L48 59 L16 59 L22 22 L17 34 L11 32 Z',
@@ -192,6 +199,20 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
       tone: 'secondary',
       stroke: true,
     },
+  ],
+  tights: [
+    {
+      d: 'M19 7 L45 7 L44 31 L42 53 L50 57 L50 61 L36 61 L32 29 L28 61 L14 61 L14 57 L22 53 L20 31 Z',
+      tone: 'primary',
+    },
+    { d: 'M19 7 L45 7 L45 12 L19 12 Z', tone: 'secondary' },
+  ],
+  socks: [
+    {
+      d: 'M13 10 L27 10 L26 34 L37 42 Q41 49 34 52 L14 49 Q9 48 10 41 Z M36 9 L50 9 L49 29 L58 36 Q64 42 57 46 L38 41 Q33 40 34 34 Z',
+      tone: 'primary',
+    },
+    { d: 'M13 10 L27 10 L27 17 L12 17 Z M36 9 L50 9 L50 16 L35 16 Z', tone: 'secondary' },
   ],
 }
 

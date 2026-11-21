@@ -2,7 +2,29 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const ptBR: GuestPreviewStrings = {
+  styleIdeas: {
+    heading: 'Preferências de estilo (opcional)',
+    style: 'Estilo',
+    palette: 'Paleta',
+    texture: 'Textura',
+    any: 'Qualquer',
+    active: 'Esportivo e para o dia a dia',
+    chic: 'Casual chique',
+    cozy: 'Aconchegante e sofisticado',
+    neutral: 'Neutra',
+    colorful: 'Colorida',
+    smooth: 'Lisa',
+    textured: 'Texturizada',
+    save: 'Salvar look de exemplo',
+    update: 'Atualizar look salvo',
+    saved: 'Salvo neste dispositivo',
+    remove: 'Remover {look}',
+    illustrations: 'Ilustrações de roupas',
+    inspiration: 'Ideias de exemplo',
+  },
   firstUse: {
+    cleanupFallback:
+      'Mantivemos o fundo porque não foi possível isolar a peça com segurança.',
     replaceGarment: 'Escolher outra foto',
     discardPhoto: 'Descartar esta foto?',
     keepEditing: 'Continuar editando',
@@ -163,6 +185,9 @@ export const ptBR: GuestPreviewStrings = {
       'cool-windy': 'Fresco e com vento',
       'mild-dry': 'Ameno e seco',
       'warm-rainy': 'Quente e chuvoso',
+      'cool-rainy': 'Fresco e chuvoso',
+      'mild-rainy': 'Ameno e chuvoso',
+      'warm-dry': 'Quente e seco',
     },
     collection: {
       all: 'Todos os exemplos',
@@ -247,6 +272,22 @@ export const ptBR: GuestPreviewStrings = {
       'Nenhum look combina com essas configurações nesta coleção: {collection}.',
   },
   garments: {
+    'ribbed-knit': {
+      name: 'Suéter canelado',
+      description: 'Suéter creme de algodão com acabamento canelado.',
+    },
+    'ribbed-socks': {
+      name: 'Meias caneladas',
+      description: 'Meias de algodão em tom taupe com punhos canelados.',
+    },
+    'mini-skirt': {
+      name: 'Minissaia',
+      description: 'Saia curta de lã em tom ameixa discreto.',
+    },
+    'opaque-tights': {
+      name: 'Meia-calça opaca',
+      description: 'Meia-calça escura para dias frescos.',
+    },
     'fleece-zip': {
       name: 'Jaqueta de fleece com zíper',
       description: 'Jaqueta de fleece verde-sálvia com zíper inteiro.',
@@ -373,6 +414,10 @@ export const ptBR: GuestPreviewStrings = {
     },
   },
   looks: {
+    'mini-and-tights': {
+      name: 'Minissaia e meia-calça',
+      description: 'Suéter canelado, minissaia ameixa, meia-calça opaca e botas curtas.',
+    },
     'winter-knit': {
       name: 'Tricô de inverno',
       description: 'Vestido de tricô, botinhas e cachecol de lã.',

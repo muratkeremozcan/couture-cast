@@ -5,6 +5,7 @@
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponseError } from '@couture/api-client'
+import { SAMPLE_CATALOG_VERSION } from '@couture/utils'
 
 const analytics = vi.hoisted(() => ({ capture: vi.fn(), reset: vi.fn() }))
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -77,7 +78,7 @@ describe('guest preview analytics (D10)', () => {
     ])
     expect(analytics.capture.mock.calls[2]?.[1]).toEqual({
       platform: expect.stringMatching(/^(ios|android)$/) as string,
-      catalog_version: '2026-11-15.1',
+      catalog_version: SAMPLE_CATALOG_VERSION,
       action: 'look_voted',
     })
     expect(analytics.reset).toHaveBeenCalledOnce()

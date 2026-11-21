@@ -3,6 +3,7 @@ import { Platform } from 'react-native'
 import {
   communityCommentsClient,
   communitySyncClient,
+  CommunityRequestSuperseded,
   commentSessionIdentity,
   ResponseError,
   retryOnceWhenCommunityUnavailable,
@@ -30,6 +31,8 @@ import {
 // shape for `expo-web-browser`.
 import {
   allocateCommunityPostResponseSchema,
+  describeCommunityDraftResponseSchema,
+  type DescribeCommunityDraftInput,
   communityBannedErrorSchema,
   type CommunityBannedError,
   communitySponsoredFeedResponseSchema,
@@ -783,6 +786,27 @@ export async function publishCommunityLookFromMobile({
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to publish this look.')
   }
+}
+
+export async function describeCommunityDraftFromMobile(
+  input: DescribeCommunityDraftInput,
+  signal: AbortSignal
+) {
+  const epoch = mobileIdentityEpoch()
+  const assertOwner = () => {
+    if (signal.aborted || epoch !== mobileIdentityEpoch())
+      throw new CommunityRequestSuperseded()
+  }
+  const token = await readAccessToken()
+  assertOwner()
+  const response = await withRequestTimeout(signal, (requestSignal) =>
+    communityClient(token).apiV1CommunityPostsDescribePost(
+      { describeCommunityDraftInput: input },
+      { signal: requestSignal }
+    )
+  )
+  assertOwner()
+  return describeCommunityDraftResponseSchema.parse(response).data.caption
 }
 
 export async function editCommunityPostTextFromMobile(
