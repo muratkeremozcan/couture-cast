@@ -7,6 +7,7 @@ import {
   buildSampleContext,
   DEFAULT_SAMPLE_COMFORT,
   garmentSuitsRange,
+  hasAppliedSampleSwaps,
   nextSampleLook,
   SAMPLE_POLICY_VERSION,
   sampleFeedbackProgress,
@@ -351,6 +352,20 @@ describe('sample swaps (U-SWAP)', () => {
       key: 'swap-applied',
       params: { category: 'shoes', garmentId: 'sample:g:white-sneakers' },
     })
+    expect(hasAppliedSampleSwaps(result)).toBe(true)
+  })
+
+  it('treats a saved swap back to the original shoes as the unedited look', () => {
+    const base = run()
+    const result = run({
+      selectedLookId: 'sample:l:office-oxford',
+      swaps: { 'sample:l:office-oxford': { shoes: 'sample:g:loafers' } },
+    })
+
+    expect(result.look?.id).toBe('sample:l:office-oxford')
+    expect(ids(result)).toEqual(ids(base))
+    expect(result.explanation).toEqual(base.explanation)
+    expect(hasAppliedSampleSwaps(result)).toBe(false)
   })
 
   it.each([

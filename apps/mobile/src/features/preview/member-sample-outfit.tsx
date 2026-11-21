@@ -185,6 +185,7 @@ export function MemberSampleOutfit({
         bookmarks={bookmarks}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
         persistent={bookmarkStorage === 'ready'}
+        showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}
         onSave={() => updateBookmarks(saveSampleBookmark(bookmarks, result))}
         onOpen={(bookmark) =>
           setResult((current) => reopenMemberSampleOutfit(current, bookmark))

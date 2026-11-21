@@ -41,6 +41,8 @@ const phone = {
 
 type Background = 'plain' | 'detailed' | 'light-sleeves'
 
+const sparseCommunityTest = communityTest.extend({ trace: 'off' })
+
 async function syntheticGarment(page: Page, background: Background) {
   const encoded = await page.evaluate((kind) => {
     const canvas = document.createElement('canvas')
@@ -70,7 +72,7 @@ async function syntheticGarment(page: Page, background: Background) {
       }
     }
     if (kind === 'light-sleeves') {
-      ctx.fillStyle = '#eee8ec'
+      ctx.fillStyle = '#f5f5f5'
       ctx.fillRect(52, 96, 280, 72)
       ctx.fillStyle = '#19466a'
       ctx.fillRect(116, 96, 152, 192)
@@ -194,123 +196,128 @@ test.describe('Jade first use on a phone', () => {
     expect(outsideGuestPreview, 'The sample flow stays local to the browser').toEqual([])
   })
 
-  test('a sparse Community feed keeps the member look and labels example inspiration', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
-    await seedWebSession(page, localE2EAccessToken(memberId))
-    const ownLook: CommunityFeedItem = {
-      id: 'jade-own-look',
-      title: 'My blue layers',
-      caption: 'A blue outfit for a cool day.',
-      altText: 'Illustration of blue layers.',
-      climateBand: 'temperate_dry',
-      status: 'published',
-      challengeId: null,
-      author: { isSelf: true, displayName: 'Fixture member' },
-      publishedAt: '2026-11-21T12:00:00.000Z',
-      createdAt: '2026-11-21T12:00:00.000Z',
-      imageAccess: {
-        url: 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3Cpath%20d=%22M0%200h1v1H0z%22%20fill=%22blue%22/%3E%3C/svg%3E',
-        expiresAt: '2099-12-31T00:00:00.000Z',
-      },
-    }
-    void interceptNetworkCall({
-      method: 'GET',
-      url: `${api}/community/feed?*`,
-      handler: async (route, request) => {
-        const mode = new URL(request.url()).searchParams.get('mode') as CommunityFeedMode
-        await route.fulfill({
-          json: {
+  sparseCommunityTest(
+    'a sparse Community feed keeps the member look and labels example inspiration',
+    async ({ communitySession, page, interceptNetworkCall }) => {
+      const ownLook: CommunityFeedItem = {
+        id: 'jade-own-look',
+        title: 'My blue layers',
+        caption: 'A blue outfit for a cool day.',
+        altText: 'Illustration of blue layers.',
+        climateBand: 'temperate_dry',
+        status: 'published',
+        challengeId: null,
+        author: { isSelf: true, displayName: 'Fixture member' },
+        publishedAt: '2026-11-21T12:00:00.000Z',
+        createdAt: '2026-11-21T12:00:00.000Z',
+        imageAccess: {
+          url: 'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3Cpath%20d=%22M0%200h1v1H0z%22%20fill=%22blue%22/%3E%3C/svg%3E',
+          expiresAt: '2099-12-31T00:00:00.000Z',
+        },
+      }
+      void interceptNetworkCall({
+        method: 'GET',
+        url: `${api}/community/feed?*`,
+        handler: async (route, request) => {
+          expect(
+            request.headers().authorization === `Bearer ${communitySession.accessToken}`,
+            'the feed uses the disposable member session'
+          ).toBe(true)
+          const mode = new URL(request.url()).searchParams.get(
+            'mode'
+          ) as CommunityFeedMode
+          await route.fulfill({
+            json: {
+              data: {
+                items: mode === 'cold_wet' ? [] : [ownLook],
+                authorStates: [],
+                nextCursor: null,
+                mode,
+                viewerBand: 'temperate_dry',
+                bandResolved: true,
+                bandUnresolvedReason: null,
+                experimentVariant: 'auto',
+                activeChallenge: null,
+              },
+            } satisfies CommunityFeedResponse,
+          })
+        },
+      })
+      void interceptNetworkCall({
+        method: 'GET',
+        url: `${api}/community/spotlight?*`,
+        fulfillResponse: {
+          body: { data: { level: 'none', label: null, items: [], nextCursor: null } },
+        },
+      })
+      void interceptNetworkCall({
+        method: 'GET',
+        url: `${api}/community/events?*`,
+        fulfillResponse: {
+          body: {
             data: {
-              items: mode === 'cold_wet' ? [] : [ownLook],
-              authorStates: [],
-              nextCursor: null,
-              mode,
-              viewerBand: 'temperate_dry',
-              bandResolved: true,
-              bandUnresolvedReason: null,
-              experimentVariant: 'auto',
-              activeChallenge: null,
+              events: [],
+              nextCursor: 'fixture',
+              hasMore: false,
+              resyncRequired: false,
             },
-          } satisfies CommunityFeedResponse,
-        })
-      },
-    })
-    void interceptNetworkCall({
-      method: 'GET',
-      url: `${api}/community/spotlight?*`,
-      fulfillResponse: {
-        body: { data: { level: 'none', label: null, items: [], nextCursor: null } },
-      },
-    })
-    void interceptNetworkCall({
-      method: 'GET',
-      url: `${api}/community/events?*`,
-      fulfillResponse: {
-        body: {
-          data: {
-            events: [],
-            nextCursor: 'fixture',
-            hasMore: false,
-            resyncRequired: false,
           },
         },
-      },
-    })
-    void interceptNetworkCall({
-      method: 'POST',
-      url: `${api}/community/targets/resolve`,
-      handler: async (route, request) => {
-        const { targets } = request.postDataJSON() as ResolveCommunityTargetsInput
-        await route.fulfill({
-          json: resolveCommunityTargetsResponseSchema.parse({
-            data: {
-              targets: targets.map(({ key }) => ({
-                key,
-                status: 'available',
-                communityRevision: '0',
-                post: {
-                  ...ownLook,
-                  reactions: {
-                    counts: { applause: 0, love: 0, inspiration: 0 },
-                    total: 0,
-                    viewerReaction: null,
-                    revision: 0,
-                    generation: 0,
+      })
+      void interceptNetworkCall({
+        method: 'POST',
+        url: `${api}/community/targets/resolve`,
+        handler: async (route, request) => {
+          const { targets } = request.postDataJSON() as ResolveCommunityTargetsInput
+          await route.fulfill({
+            json: resolveCommunityTargetsResponseSchema.parse({
+              data: {
+                targets: targets.map(({ key }) => ({
+                  key,
+                  status: 'available',
+                  communityRevision: '0',
+                  post: {
+                    ...ownLook,
+                    reactions: {
+                      counts: { applause: 0, love: 0, inspiration: 0 },
+                      total: 0,
+                      viewerReaction: null,
+                      revision: 0,
+                      generation: 0,
+                    },
                   },
-                },
-                comment: null,
-                parent: null,
-                pageCursor: null,
-                parentPageCursor: null,
-                threadPosition: null,
-              })),
-            },
-          }),
-        })
-      },
-    })
+                  comment: null,
+                  parent: null,
+                  pageCursor: null,
+                  parentPageCursor: null,
+                  threadPosition: null,
+                })),
+              },
+            }),
+          })
+        },
+      })
 
-    await page.goto('/community')
-    const card = page.getByTestId(`lookbook-card-${ownLook.id}`)
-    const rows = page.getByTestId('community-card-grid').getByTestId(/^lookbook-card-/)
-    const examples = page.getByRole('region', { name: 'Example inspiration' })
-    await expect(card).toContainText(ownLook.title!)
-    await expect(rows).toHaveCount(1)
-    await expect(examples.getByText('Garment illustrations')).toBeVisible()
-    await expect(examples.getByText('Sample weather · Mild and dry')).toHaveCount(3)
+      await page.goto('/community')
+      const card = page.getByTestId(`lookbook-card-${ownLook.id}`)
+      const rows = page.getByTestId('community-card-grid').getByTestId(/^lookbook-card-/)
+      const examples = page.getByRole('region', { name: 'Example inspiration' })
+      await expect(card).toContainText(ownLook.title!)
+      await expect(rows).toHaveCount(1)
+      await expect(examples.getByText('Garment illustrations')).toBeVisible()
+      await expect(examples.getByText('Sample weather · Mild and dry')).toHaveCount(3)
 
-    await page.getByTestId('community-filter-cold_wet').click()
-    await expect(card).toHaveCount(0)
-    await expect(rows).toHaveCount(0)
-    await expect(page.getByTestId('community-feed-empty')).toBeVisible()
-    await expect(examples.getByText('Sample weather · Cool and rainy')).toHaveCount(3)
+      await page.getByTestId('community-filter-cold_wet').click()
+      await expect(card).toHaveCount(0)
+      await expect(rows).toHaveCount(0)
+      await expect(page.getByTestId('community-feed-empty')).toBeVisible()
+      await expect(examples.getByText('Sample weather · Cool and rainy')).toHaveCount(3)
 
-    await page.getByTestId('community-filter-all').click()
-    await expect(card).toBeVisible()
-    await expect(rows).toHaveCount(1)
-  })
+      await page.getByTestId('community-filter-all').click()
+      await expect(card).toBeVisible()
+      await expect(rows).toHaveCount(1)
+    }
+  )
 
   for (const background of ['plain', 'detailed', 'light-sleeves'] as const) {
     test(`capture previews the uploaded crop with a ${background} background`, async ({
@@ -615,17 +622,13 @@ communityTest.describe('Jade Community composer @local-lane', () => {
         releaseFirst = resolve
       })
       let describeAttempts = 0
-      const firstDescription = interceptNetworkCall({
-        method: 'POST',
-        url: `**${describeDraftPath}`,
-        handler: async (route) => {
-          if (++describeAttempts === 1) {
-            await holdFirst
-            await route.fulfill({ json: { data: { caption: 'Previous photo draft' } } })
-            return
-          }
-          await route.abort('failed')
-        },
+      await page.route(`**${describeDraftPath}`, async (route) => {
+        if (++describeAttempts === 1) {
+          await holdFirst
+          await route.fulfill({ json: { data: { caption: 'Previous photo draft' } } })
+          return
+        }
+        await route.abort('failed')
       })
       await page.goto('/community')
       await page.getByTestId('create-post-button').click()
@@ -637,10 +640,15 @@ communityTest.describe('Jade Community composer @local-lane', () => {
       const caption = composer.getByTestId('post-caption-input')
       const replacement = await syntheticGarment(page, 'detailed')
       await input.setInputFiles(await syntheticGarment(page, 'plain'))
+      const firstDescription = page.waitForRequest(`**${describeDraftPath}`)
       await suggest.click()
       try {
-        await firstDescription
+        const firstRequest = await firstDescription
+        const cancellation = page.waitForEvent('requestfailed', {
+          predicate: (request) => request === firstRequest,
+        })
         await input.setInputFiles(replacement)
+        expect((await cancellation).failure()?.errorText).toBe('net::ERR_ABORTED')
         await expect(suggest).toBeEnabled()
       } finally {
         releaseFirst()

@@ -1,6 +1,7 @@
 const CORNER_TOLERANCE = 22
 const BACKGROUND_TOLERANCE = 32
 const PLANE_COLOR_TOLERANCE = 12
+const NEAR_PLANE_COLOR_TOLERANCE = 6
 const MAX_AMBIGUOUS_AREA = 0.015
 
 function colorDistance(pixels: Uint8ClampedArray, left: number, right: number) {
@@ -22,16 +23,34 @@ function hasCenteredSubject(background: Uint8Array, width: number, height: numbe
 function hasAmbiguousBackgroundTone(
   pixels: Uint8ClampedArray,
   background: Uint32Array,
-  size: number
+  size: number,
+  width: number
 ) {
   const maxAmbiguousPixels = (pixels.length / 4) * MAX_AMBIGUOUS_AREA
   let ambiguousPixels = 0
   for (let cursor = 0; cursor < size; cursor++) {
-    const offset = background[cursor]! * 4
-    if (colorDistance(pixels, 0, offset) <= PLANE_COLOR_TOLERANCE ** 2) continue
+    const index = background[cursor]!
+    const distance = colorDistance(pixels, 0, index * 4)
+    if (distance <= NEAR_PLANE_COLOR_TOLERANCE ** 2) continue
+    if (distance <= PLANE_COLOR_TOLERANCE ** 2 && !isCoherentTone(pixels, index, width))
+      continue
     if (++ambiguousPixels > maxAmbiguousPixels) return true
   }
   return false
+}
+
+function isCoherentTone(pixels: Uint8ClampedArray, index: number, width: number) {
+  // Sample in both axes beyond a thin antialiased edge. Broad distinct panels can be
+  // part of the garment even when their near-wall color passes the flood-fill test.
+  const reach = Math.max(2, Math.round(width / 100))
+  const below = (index + reach * width) * 4
+  if ((index % width) + reach >= width || below >= pixels.length) return false
+  const offset = index * 4
+  return (
+    colorDistance(pixels, offset, offset + reach * 4) <=
+      NEAR_PLANE_COLOR_TOLERANCE ** 2 &&
+    colorDistance(pixels, offset, below) <= NEAR_PLANE_COLOR_TOLERANCE ** 2
+  )
 }
 
 // A low-contrast, continuous border is required before we remove anything. Color matches
@@ -101,7 +120,7 @@ export function removePlainGarmentBackground(context: CanvasRenderingContext2D):
     size < count * 0.12 ||
     size > count * 0.94 ||
     !hasCenteredSubject(visited, width, height) ||
-    hasAmbiguousBackgroundTone(pixels, queue, size)
+    hasAmbiguousBackgroundTone(pixels, queue, size, width)
   ) {
     return original()
   }

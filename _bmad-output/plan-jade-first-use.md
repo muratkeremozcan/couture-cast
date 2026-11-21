@@ -110,6 +110,16 @@ The optional Community description uses color cues from the member's private dra
 | BMad        | Restoring a default look showed Undo swaps                                 | Low     | Show Undo only when a swap changes a garment.                                                                                         |
 | BMad        | Plan headings used title case                                              | Low     | Apply repository sentence case to the final plan headings.                                                                            |
 
+| CodeRabbit | A failed final bookmark removal hid its warning | Low | Native Home now shows the failure without a saved-item row. |
+| CodeRabbit | Keep editing could target a disabled crop button | Low | Restore focus to an available control and verify with a phone browser. |
+| CodeRabbit | Overlapping camera requests could leave tracks live | High | Fence asynchronous camera ownership and stop a stream that loses ownership. |
+| CodeRabbit | The previous file read could replace the latest photo | Medium | Fence the read to the latest image selection and account. |
+| CodeRabbit | A canceled upload could update a replacement upload | Medium | Check current upload ownership in both observers and on completion. |
+| CodeRabbit | A failed save could disappear when storage recovered | Medium | Replay bounded pending mutations over the latest account storage inside the lock. |
+| CodeRabbit | A nearly matching sleeve shade still disappeared | Medium | Keep the original when a coherent near-background area creates ambiguity. Verify the actual preview and PUT. |
+| CodeRabbit | The caption 403 contract omitted its unavailable-account response | Low | Add the existing denial shape and regenerate the OpenAPI contract. |
+| CodeRabbit | A stale caption assertion could run before the first response settled | Low | Observe cancellation before checking the text and the second request. |
+
 ## Verification
 
 - Run targeted sample policy, image-preparation, Community API and composer tests.
@@ -124,3 +134,9 @@ Supabase error contract changes passed the final 171-test targeted run.
 After review fixes, 2,607 web and 2,382 native tests passed. The web production build
 passed. The affected phone browser cases passed, including the new low-contrast sleeve
 fixture and the edited hosiery save and reopen. Antigravity verified the corrective diff.
+
+Hosted CI exposed missing realtime membership in the sparse Community fixture and
+coverage gaps in the three client and shared workspaces. The fixture now uses an isolated
+member and keeps traces off for that authenticated case. The web, mobile and utilities
+tests keep their existing thresholds. The test also retains its member-card, inspiration,
+and climate-filter assertions.

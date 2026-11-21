@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest'
+import { saveSampleBookmark } from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
 import {
   COMMUNITY_SAMPLE_WEATHER_BY_BAND,
   communitySampleOutfits,
   createMemberSampleOutfit,
+  reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   swapMemberSampleGarment,
   undoMemberSampleSwaps,
+  updateMemberSampleOutfit,
 } from './member-outfit'
 import { SAMPLE_WEATHER_KEYS, sampleSwapCandidates, selectSampleOutfit } from './selector'
 
@@ -48,6 +51,50 @@ describe('member sample outfit', () => {
     }
     expect(rotated.look?.id).toBe(sample.look?.id)
     expect(rotated.garments).toEqual(sample.garments)
+  })
+
+  it('reranks a rotated outfit with the new preferences and keeps them when weather changes', () => {
+    const rotated = rotateMemberSampleOutfit(createMemberSampleOutfit())
+    const preferences = {
+      style: 'cozy',
+      palette: 'colorful',
+      texture: 'textured',
+    } as const
+    const mild = updateMemberSampleOutfit(rotated, { preferences })
+    expect(rotated.look?.id).toBe('sample:l:silk-midi')
+    expect(mild.look?.id).toBe('sample:l:mini-and-tights')
+    expect(mild.garments.map(({ id }) => id)).toContain('sample:g:opaque-tights')
+
+    const windy = updateMemberSampleOutfit(mild, { weather: 'cool-windy' })
+    expect(windy.input.preferences).toEqual(preferences)
+    expect(windy.context).toMatchObject({ weather: 'cool-windy', windLayer: true })
+    expect(windy.look?.id).toBe('sample:l:winter-knit')
+    expect(
+      windy.garments.find(({ category }) => category === 'outerwear')?.windResistant
+    ).toBe(true)
+  })
+
+  it('restores the saved weather and shoe swap after the look was dismissed', () => {
+    const original = createMemberSampleOutfit()
+    const edited = swapMemberSampleGarment(original, 'shoes', 'sample:g:white-sneakers')
+    const [bookmark] = saveSampleBookmark([], edited)
+    expect(bookmark).toBeDefined()
+    const current = selectSampleOutfit(
+      {
+        ...original.input,
+        weather: 'cool-windy',
+        votes: { 'sample:l:office-oxford': 'dislike', 'sample:l:city-wool': 'like' },
+      },
+      SAMPLE_CATALOG
+    )
+    expect(current.look?.id).toBe('sample:l:city-wool')
+
+    const reopened = reopenMemberSampleOutfit(current, bookmark!)
+    expect(reopened.look?.id).toBe('sample:l:office-oxford')
+    expect(reopened.context.weather).toBe('mild-dry')
+    expect(reopened.garments).toEqual(edited.garments)
+    expect(reopened.input.votes).toEqual({ 'sample:l:city-wool': 'like' })
+    expect(current.input.votes['sample:l:office-oxford']).toBe('dislike')
   })
 
   it('swaps an eligible shoe and restores the original outfit on undo', () => {

@@ -28563,6 +28563,9 @@
                       "$ref": "#/components/schemas/ForbiddenHttpError"
                     },
                     {
+                      "$ref": "#/components/schemas/CommunityRolloutDeniedError"
+                    },
+                    {
                       "$ref": "#/components/schemas/CommunityBannedError"
                     }
                   ]

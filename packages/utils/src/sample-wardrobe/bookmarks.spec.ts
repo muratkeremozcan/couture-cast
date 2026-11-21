@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { openSampleBookmark, saveSampleBookmark } from './bookmarks'
+import {
+  MAX_SAMPLE_BOOKMARK_BYTES,
+  openSampleBookmark,
+  parseSampleBookmarks,
+  saveSampleBookmark,
+  type SampleBookmark,
+} from './bookmarks'
 import { SAMPLE_CATALOG } from './catalog'
-import { selectSampleOutfit } from './selector'
+import { DEFAULT_SAMPLE_COMFORT, selectSampleOutfit } from './selector'
 import {
   createGuestPreviewState,
   parseGuestPreviewState,
@@ -59,10 +65,73 @@ describe('style ideas and bookmarks', () => {
     ).toBe(true)
   })
 
-  it('keeps Community-only weather out of saved looks', () => {
+  it.each([
+    ['missing data', null],
+    ['malformed JSON', '{'],
+    ['an invalid bookmark record', '[{"lookId":"sample:l:office-oxford"}]'],
+    ['oversized data', JSON.stringify('x'.repeat(MAX_SAMPLE_BOOKMARK_BYTES))],
+  ])('loads an empty list from %s', (_label, raw) => {
+    expect(parseSampleBookmarks(raw, SAMPLE_CATALOG)).toEqual([])
+  })
+
+  it('keeps the first copy of each current look and drops swaps the catalog cannot apply', () => {
+    const saved: SampleBookmark = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'sample:g:white-sneakers', top: 'sample:g:loafers' },
+    }
+    const other = { ...saved, lookId: 'sample:l:silk-midi', swaps: {} }
+    const raw = JSON.stringify([
+      saved,
+      { ...saved, lookId: 'sample:l:retired-look' },
+      { ...saved, swaps: {} },
+      other,
+    ])
+
+    expect(parseSampleBookmarks(raw, SAMPLE_CATALOG)).toEqual([
+      { ...saved, swaps: { shoes: 'sample:g:white-sneakers' } },
+      other,
+    ])
+  })
+
+  it('moves an updated look to the front and preserves the other saved look', () => {
     const input = toSampleSelectionInput(createGuestPreviewState(1, SAMPLE_CATALOG))
+    const original = selectSampleOutfit(input, SAMPLE_CATALOG)
+    const silkMidi = selectSampleOutfit(
+      { ...input, selectedLookId: 'sample:l:silk-midi' },
+      SAMPLE_CATALOG
+    )
+    const existing = saveSampleBookmark(saveSampleBookmark([], original), silkMidi)
+    const edited = selectSampleOutfit(
+      {
+        ...input,
+        swaps: { 'sample:l:office-oxford': { shoes: 'sample:g:white-sneakers' } },
+      },
+      SAMPLE_CATALOG
+    )
+
+    expect(saveSampleBookmark(existing, edited)).toEqual([
+      {
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: { shoes: 'sample:g:white-sneakers' },
+      },
+      existing[0],
+    ])
+  })
+
+  it('preserves saved looks when the current selection cannot be saved', () => {
+    const input = toSampleSelectionInput(createGuestPreviewState(1, SAMPLE_CATALOG))
+    const saved = saveSampleBookmark([], selectSampleOutfit(input, SAMPLE_CATALOG))
     const example = selectSampleOutfit({ ...input, weather: 'warm-dry' }, SAMPLE_CATALOG)
+    const empty = selectSampleOutfit(input, { ...SAMPLE_CATALOG, looks: [] })
     expect(example.look).toBeTruthy()
-    expect(saveSampleBookmark([], example)).toEqual([])
+    expect(empty.look).toBeNull()
+    expect(saveSampleBookmark(saved, example)).toBe(saved)
+    expect(saveSampleBookmark(saved, empty)).toBe(saved)
   })
 })

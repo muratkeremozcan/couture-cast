@@ -206,6 +206,7 @@ function CropStep({
   onReset,
   onConfirm,
   confirmRef,
+  retakeRef,
   preparationError,
   cleanupFallback,
 }: {
@@ -217,6 +218,7 @@ function CropStep({
   onReset: () => void
   onConfirm: () => void
   confirmRef: React.Ref<HTMLButtonElement>
+  retakeRef: React.Ref<HTMLButtonElement>
   preparationError: boolean
   cleanupFallback: string
 }) {
@@ -317,6 +319,7 @@ function CropStep({
           bottom; side by side they wrapped to two lines each on a 412 px screen. */}
       <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-between">
         <button
+          ref={retakeRef}
           onClick={onReset}
           className="whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
         >
@@ -397,12 +400,16 @@ export function GarmentCaptureModal({
   const [isDiscarding, setIsDiscarding] = useState(false)
   const keepEditing = useRef<HTMLButtonElement>(null)
   const confirmCrop = useRef<HTMLButtonElement>(null)
+  const retakeCrop = useRef<HTMLButtonElement>(null)
   const restoreCropFocus = useRef(false)
   useEffect(() => {
     if (isDiscarding) keepEditing.current?.focus()
     else if (restoreCropFocus.current) {
-      restoreCropFocus.current = false
-      confirmCrop.current?.focus()
+      const target = confirmCrop.current?.disabled
+        ? retakeCrop.current
+        : confirmCrop.current
+      target?.focus()
+      if (document.activeElement === target) restoreCropFocus.current = false
     }
   }, [isDiscarding])
   const [step, setStep] = useState<CaptureStep>('source')
@@ -449,25 +456,24 @@ export function GarmentCaptureModal({
     }
   }, [step])
 
-  useEffect(() => {
-    return () => {
-      stopCamera()
-      uploadAbortRef.current?.abort()
-    }
-  }, [stopCamera])
-
-  const resetCapture = useCallback(() => {
+  const cancelCapture = useCallback(() => {
     captureEpoch.current++
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     stopCamera()
+  }, [stopCamera])
+  useEffect(() => cancelCapture, [cancelCapture])
+
+  const resetCapture = useCallback(() => {
+    cancelCapture()
+    restoreCropFocus.current = false
     setIsDiscarding(false)
     setStep('source')
     setImagePreview(null)
     setErrorKey(null)
     setUploadProgress(0)
     setUploadState('')
-  }, [stopCamera])
+  }, [cancelCapture])
   // Round 5 account epoch: the camera, the picked photo and its upload belong to the account
   // signed in when the camera or picker opened; any account change drops them.
   useUploadSessionChange(resetCapture)
@@ -482,7 +488,7 @@ export function GarmentCaptureModal({
   const handleStartCamera = async () => {
     setErrorKey(null)
     const session = currentUploadSession()
-    const epoch = captureEpoch.current
+    const epoch = ++captureEpoch.current
     pickerSessionRef.current = { session, epoch }
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -560,9 +566,10 @@ export function GarmentCaptureModal({
       return
     }
 
+    const readEpoch = ++captureEpoch.current
     const reader = new FileReader()
     reader.onload = (event) => {
-      if (captureEpoch.current !== epoch || !isUploadSessionCurrent(session)) return
+      if (captureEpoch.current !== readEpoch || !isUploadSessionCurrent(session)) return
       if (typeof event.target?.result === 'string') {
         setImagePreview({ dataUrl: event.target.result, session })
         setStep('crop')
@@ -579,6 +586,8 @@ export function GarmentCaptureModal({
     setErrorKey(null)
     const abortController = new AbortController()
     uploadAbortRef.current = abortController
+    const ownsUpload = () =>
+      uploadAbortRef.current === abortController && !abortController.signal.aborted
 
     try {
       const garment = await uploadGarment({
@@ -588,14 +597,18 @@ export function GarmentCaptureModal({
         useBgCleanup,
         prepared: preparedCrop.image,
         signal: abortController.signal,
-        onStateChange: setUploadState,
-        onProgress: setUploadProgress,
+        onStateChange: (state) => {
+          if (ownsUpload()) setUploadState(state)
+        },
+        onProgress: (progress) => {
+          if (ownsUpload()) setUploadProgress(progress)
+        },
       })
-      if (abortController.signal.aborted) return
+      if (!ownsUpload()) return
       onGarmentCommitted?.(garment)
       setStep('complete')
     } catch (error) {
-      if (!abortController.signal.aborted && isOpenRef.current) {
+      if (ownsUpload() && isOpenRef.current) {
         setErrorKey(garmentUploadErrorKey(error))
         setStep('crop')
       }
@@ -688,6 +701,7 @@ export function GarmentCaptureModal({
       {step === 'crop' && imagePreview && !isDiscarding && (
         <CropStep
           confirmRef={confirmCrop}
+          retakeRef={retakeCrop}
           preparedCrop={preparedCrop}
           preparationError={Boolean(errorKey)}
           cleanupFallback={strings.cleanupFallback}

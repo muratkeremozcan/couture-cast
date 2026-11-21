@@ -1096,7 +1096,7 @@ export const communitySpotlightDeniedResponseSchema = z
   })
   .strict()
 
-/** A comment route's refusal while the member's rollout is off. It carries no Nest `error` name. */
+/** A Community refusal with a `denied` code and no Nest `error` name. */
 export const communityRolloutDeniedErrorSchema = z
   .object({
     statusCode: z.literal(403),
@@ -2209,6 +2209,7 @@ export function registerCommunityContracts(
           'application/json': {
             schema: z.union([
               commonSchemas.forbiddenHttpErrorSchema,
+              communityRolloutDeniedErrorSchema,
               communityBannedErrorSchema,
             ]),
           },

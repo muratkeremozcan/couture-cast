@@ -25,6 +25,7 @@ export function SampleIdeaControls({
   weather,
   onWeather,
   persistent = true,
+  showStorageFailureWhenEmpty = false,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
@@ -38,6 +39,7 @@ export function SampleIdeaControls({
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
   persistent?: boolean
+  showStorageFailureWhenEmpty?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const labels = strings.styleIdeas
@@ -74,10 +76,13 @@ export function SampleIdeaControls({
           </View>
         </View>
       )}
-      {bookmarks.length > 0 && (
-        <View testID="sample-saved-looks" style={styles.group}>
+      {(bookmarks.length > 0 || (!persistent && showStorageFailureWhenEmpty)) && (
+        <View
+          testID={bookmarks.length > 0 ? 'sample-saved-looks' : undefined}
+          style={styles.group}
+        >
           <Text
-            accessibilityRole="header"
+            accessibilityRole={bookmarks.length > 0 ? 'header' : undefined}
             accessibilityLiveRegion="polite"
             style={{ color: palette.text }}
           >

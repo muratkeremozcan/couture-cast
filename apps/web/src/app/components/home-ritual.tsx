@@ -52,6 +52,16 @@ function resetSampleForOwner(owner: string | null) {
   if (retainedSample?.owner !== owner) retainedSample = undefined
 }
 
+type BookmarkChange = (bookmarks: SampleBookmark[]) => SampleBookmark[]
+
+function replayBookmarkChanges(
+  bookmarks: SampleBookmark[],
+  changes: Iterable<BookmarkChange>
+) {
+  for (const change of changes) bookmarks = change(bookmarks)
+  return bookmarks
+}
+
 function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
   return (
     <Link
@@ -84,17 +94,24 @@ function SampleOutfit({
     parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
   )
   const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
-  const bookmarkSnapshot = useRef(bookmarks)
+  const storedBookmarks = useRef(bookmarks)
+  const pendingBookmarkChanges = useRef(new Map<string, BookmarkChange>())
   const bookmarkOwnerMounted = useRef(true)
   useEffect(() => {
     bookmarkOwnerMounted.current = true
     const onStorage = (event: StorageEvent) => {
-      if (event.storageArea !== window.localStorage || !isLiveOwner(owner)) return
-      if (event.key !== null && event.key !== bookmarkKey) return
-      const next = parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
-      bookmarkSnapshot.current = next
-      setBookmarks(next)
-      setBookmarksPersistent(true)
+      if (!isLiveOwner(owner) || (event.key !== null && event.key !== bookmarkKey)) return
+      try {
+        const storage = window.localStorage
+        if (event.storageArea !== storage) return
+        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
+        const pending = pendingBookmarkChanges.current
+        storedBookmarks.current = stored
+        setBookmarks(replayBookmarkChanges(stored, pending.values()))
+        setBookmarksPersistent(pending.size === 0)
+      } catch {
+        setBookmarksPersistent(false)
+      }
     }
     window.addEventListener('storage', onStorage)
     return () => {
@@ -103,22 +120,27 @@ function SampleOutfit({
     }
   }, [bookmarkKey, owner])
 
-  const updateBookmarks = (change: (current: SampleBookmark[]) => SampleBookmark[]) => {
+  const updateBookmarks = (lookId: string, change: BookmarkChange) => {
     const apply = () => {
       if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+      // Keep one pending change per catalog look, in the order of the latest actions.
+      const pending = pendingBookmarkChanges.current
+      pending.delete(lookId)
+      pending.set(lookId, change)
       let next: SampleBookmark[]
       try {
-        const stored = window.localStorage.getItem(bookmarkKey)
-        const updated = change(parseSampleBookmarks(stored, SAMPLE_CATALOG))
-        window.localStorage.setItem(bookmarkKey, JSON.stringify(updated))
-        next = updated
-        setBookmarksPersistent(true)
+        const storage = window.localStorage
+        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
+        storedBookmarks.current = stored
+        next = replayBookmarkChanges(stored, pending.values())
+        storage.setItem(bookmarkKey, JSON.stringify(next))
+        storedBookmarks.current = next
+        pending.clear()
       } catch {
-        next = change(bookmarkSnapshot.current)
-        setBookmarksPersistent(false)
+        next = replayBookmarkChanges(storedBookmarks.current, pending.values())
       }
-      bookmarkSnapshot.current = next
       setBookmarks(next)
+      setBookmarksPersistent(pending.size === 0)
     }
     if (navigator.locks) {
       void navigator.locks.request(bookmarkKey, apply).catch(apply)
@@ -171,10 +193,13 @@ function SampleOutfit({
         bookmarks={bookmarks}
         persistent={bookmarksPersistent}
         lookId={lookId}
-        onSave={() => updateBookmarks((current) => saveSampleBookmark(current, result))}
+        onSave={() => {
+          if (lookId)
+            updateBookmarks(lookId, (current) => saveSampleBookmark(current, result))
+        }}
         onOpen={(bookmark) => update(reopenMemberSampleOutfit(result, bookmark))}
         onRemove={(id) =>
-          updateBookmarks((current) =>
+          updateBookmarks(id, (current) =>
             current.filter((bookmark) => bookmark.lookId !== id)
           )
         }
