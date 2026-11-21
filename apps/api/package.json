@@ -136,7 +136,7 @@
     "posthog-node": "^5.21.2",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "socket.io": "4.8.3",
     "stripe": "^22.5.0",
     "swagger-ui-express": "^5.0.1",
