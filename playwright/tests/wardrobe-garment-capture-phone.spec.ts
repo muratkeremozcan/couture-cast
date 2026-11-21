@@ -295,8 +295,11 @@ phoneTest.describe('Garment capture on a phone', () => {
     async ({ apiRequest, cleanupState, interceptNetworkCall, page }, testInfo) => {
       const photoPath = testInfo.outputPath('phone-camera-photo.jpg')
       const subjectPath = testInfo.outputPath('plain-backdrop-garment.png')
+      // A tiny shadow at the square crop's upper-left corner must not stand in for
+      // the whole backdrop when the browser downsamples the grained JPEG.
       const subject = `<svg xmlns="http://www.w3.org/2000/svg" width="4032" height="3024">
         <rect width="4032" height="3024" fill="#f5f5f5"/>
+        <rect x="492" width="28" height="16" fill="#ebebeb"/>
         <path d="M1032 800h570l110-200h608l110 200h570l100 500-450 100-125-200v1200H1507V1200l-125 200-450-100z" fill="#245ca1"/>
       </svg>`
       await sharp(Buffer.from(subject)).png().toFile(subjectPath)

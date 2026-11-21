@@ -11,6 +11,30 @@ function colorDistance(pixels: Uint8ClampedArray, left: number, right: number) {
   return red * red + green * green + blue * blue
 }
 
+function backdropReference(pixels: Uint8ClampedArray, width: number, height: number) {
+  // Use the sampled color closest to the whole border sample. A single pixel in a
+  // JPEG can be several levels off after downsampling or fall in a small shadow.
+  const inset = Math.round(Math.min(width, height) / 50)
+  const columns = [0, inset, width - inset - 1, width - 1]
+  const rows = [0, inset, height - inset - 1, height - 1]
+  const offsets = rows.flatMap((row) =>
+    columns.map((column) => (row * width + column) * 4)
+  )
+  let reference = 0
+  let bestScore = Infinity
+  for (const offset of offsets) {
+    const score = offsets.reduce(
+      (sum, sample) => sum + colorDistance(pixels, sample, offset),
+      0
+    )
+    if (score < bestScore) {
+      reference = offset
+      bestScore = score
+    }
+  }
+  return reference
+}
+
 function hasCenteredSubject(background: Uint8Array, width: number, height: number) {
   const centerSamples = [0.35, 0.5, 0.65]
   return centerSamples.every((y) =>
@@ -24,32 +48,48 @@ function hasAmbiguousBackgroundTone(
   pixels: Uint8ClampedArray,
   background: Uint32Array,
   size: number,
-  width: number
+  width: number,
+  reference: number
 ) {
   const maxAmbiguousPixels = (pixels.length / 4) * MAX_AMBIGUOUS_AREA
   let ambiguousPixels = 0
   for (let cursor = 0; cursor < size; cursor++) {
     const index = background[cursor]!
-    const distance = colorDistance(pixels, 0, index * 4)
+    const distance = colorDistance(pixels, reference, index * 4)
     if (distance <= NEAR_PLANE_COLOR_TOLERANCE ** 2) continue
-    if (distance <= PLANE_COLOR_TOLERANCE ** 2 && !isCoherentTone(pixels, index, width))
+    if (
+      distance <= PLANE_COLOR_TOLERANCE ** 2 &&
+      !isCoherentTone(pixels, index, width, reference)
+    )
       continue
     if (++ambiguousPixels > maxAmbiguousPixels) return true
   }
   return false
 }
 
-function isCoherentTone(pixels: Uint8ClampedArray, index: number, width: number) {
-  // Sample in both axes beyond a thin antialiased edge. Broad distinct panels can be
-  // part of the garment even when their near-wall color passes the flood-fill test.
+function isCoherentTone(
+  pixels: Uint8ClampedArray,
+  index: number,
+  width: number,
+  reference: number
+) {
+  // The difference must persist in both axes. Sensor grain can vary locally on
+  // the same backdrop. A broad, distinct patch can be a garment panel.
   const reach = Math.max(2, Math.round(width / 100))
+  const column = index % width
+  const above = (index - reach * width) * 4
   const below = (index + reach * width) * 4
-  if ((index % width) + reach >= width || below >= pixels.length) return false
+  if (column < reach || column + reach >= width || above < 0 || below >= pixels.length)
+    return false
   const offset = index * 4
+  const similarDistinctTone = (sample: number) =>
+    colorDistance(pixels, offset, sample) <= NEAR_PLANE_COLOR_TOLERANCE ** 2 &&
+    colorDistance(pixels, reference, sample) > NEAR_PLANE_COLOR_TOLERANCE ** 2
   return (
-    colorDistance(pixels, offset, offset + reach * 4) <=
-      NEAR_PLANE_COLOR_TOLERANCE ** 2 &&
-    colorDistance(pixels, offset, below) <= NEAR_PLANE_COLOR_TOLERANCE ** 2
+    similarDistinctTone(above) &&
+    similarDistinctTone(below) &&
+    similarDistinctTone(offset - reach * 4) &&
+    similarDistinctTone(offset + reach * 4)
   )
 }
 
@@ -70,18 +110,19 @@ export function removePlainGarmentBackground(context: CanvasRenderingContext2D):
     return { removed: false, hasTransparency: false }
   }
   const corners = [0, width - 1, count - width, count - 1]
+  const reference = backdropReference(pixels, width, height)
   if (
     corners.some(
       (corner) =>
         (pixels[corner * 4 + 3] ?? 0) < 250 ||
-        colorDistance(pixels, 0, corner * 4) > CORNER_TOLERANCE ** 2
+        colorDistance(pixels, reference, corner * 4) > CORNER_TOLERANCE ** 2
     )
   )
     return original()
 
   const matches = (index: number) =>
     (pixels[index * 4 + 3] ?? 0) >= 250 &&
-    colorDistance(pixels, 0, index * 4) <= BACKGROUND_TOLERANCE ** 2
+    colorDistance(pixels, reference, index * 4) <= BACKGROUND_TOLERANCE ** 2
   const edges: [number, number, number, number] = [0, 0, 0, 0]
   for (let x = 0; x < width; x++) {
     edges[0] += Number(matches(x))
@@ -120,7 +161,7 @@ export function removePlainGarmentBackground(context: CanvasRenderingContext2D):
     size < count * 0.12 ||
     size > count * 0.94 ||
     !hasCenteredSubject(visited, width, height) ||
-    hasAmbiguousBackgroundTone(pixels, queue, size, width)
+    hasAmbiguousBackgroundTone(pixels, queue, size, width, reference)
   ) {
     return original()
   }
