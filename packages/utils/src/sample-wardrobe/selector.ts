@@ -197,7 +197,10 @@ export function buildSampleContext(
   }
 }
 
-export function garmentSuitsRange(garment: SampleGarment, range: ComfortRange): boolean {
+export function garmentSuitsRange(
+  garment: Pick<SampleGarment, 'comfortRanges'>,
+  range: ComfortRange
+): boolean {
   return (
     garment.comfortRanges.includes(range) ||
     CLOSE_COMFORT_MATCHES[range].some((close) => garment.comfortRanges.includes(close))

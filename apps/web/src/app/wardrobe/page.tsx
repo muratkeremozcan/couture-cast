@@ -5,7 +5,7 @@
 'use client'
 
 import Link from 'next/link'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
@@ -25,7 +25,14 @@ import {
 } from '../../lib/wardrobe'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 import { currentWebSessionOwner, useWebSessionOwner } from '../../lib/use-web-session'
-import { getGuestPreviewStrings } from '@couture/utils'
+import {
+  getGuestPreviewStrings,
+  getStylePieceStrings,
+  nextStylePiecePhotoExpiry,
+  scheduleStylePiecePhotoExpiry,
+  type StylePieceSelection,
+} from '@couture/utils'
+import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 
 export default function WardrobePage() {
   const owner = useWebSessionOwner()
@@ -134,6 +141,29 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [userIdError, setUserIdError] = useState(false)
   const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
   const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
+  const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
+  const styleInvoker = useRef<HTMLButtonElement | null>(null)
+  const styleLabels = getStylePieceStrings(i18n.language)
+  const [, updatePhotoClock] = useState(0)
+  const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
+  useEffect(
+    () =>
+      scheduleStylePiecePhotoExpiry(photoExpiry, () =>
+        updatePhotoClock((clock) => clock + 1)
+      ),
+    [photoExpiry]
+  )
+  const loadStyleInventory = useCallback(
+    async (signal: AbortSignal) => {
+      const items = await listGarmentsFromWeb(signal)
+      if (signal.aborted || currentWebSessionOwner() !== owner) return null
+      setGarments(items)
+      setLoadError(null)
+      setHasLoaded(true)
+      return items
+    },
+    [owner]
+  )
 
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
@@ -415,6 +445,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
               </button>
               <button
                 ref={addGarmentButtonRef}
+                data-testid="garment-capture-open"
                 onClick={(event) => openCapture(event.currentTarget)}
                 className="col-span-2 min-h-[44px] whitespace-nowrap rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
               >
@@ -574,6 +605,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
                           </button>
                         )}
                       </div>
+                      <StylePieceEntry
+                        garment={garment}
+                        owner={owner}
+                        unavailable={Boolean(loadError)}
+                        loading={isLoading}
+                        labels={styleLabels}
+                        onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                        onOpen={(selection, button) => {
+                          styleInvoker.current = button
+                          setStyleSelection(selection)
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -600,6 +643,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         onTagsConfirmed={handleTagsConfirmed}
         invokingElementRef={taggingInvokerRef}
       />
+
+      {owner && styleSelection && (
+        <StylePiecePanel
+          selection={styleSelection}
+          inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
+          loadInventory={loadStyleInventory}
+          owner={owner}
+          locale={i18n.language}
+          invoker={styleInvoker}
+          onClose={() => setStyleSelection(null)}
+        />
+      )}
 
       {isSilhouetteModalOpen && userId && (
         <AccessibleModal

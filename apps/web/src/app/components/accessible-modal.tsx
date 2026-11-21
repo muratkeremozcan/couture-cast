@@ -217,6 +217,12 @@ export function AccessibleModal({
       return
     }
 
+    if (first === last) {
+      event.preventDefault()
+      first.focus()
+      return
+    }
+
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault()
       last.focus()
