@@ -1,11 +1,12 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import type * as EdgeToEdgeModalModule from '@/components/edge-to-edge-modal'
 import { setViewport } from '@/src/test-utils/viewport'
 
 vi.mock('expo-localization', () => ({
@@ -27,6 +28,43 @@ const imagePicker = vi.hoisted(() => ({
 }))
 vi.mock('expo-image-picker', () => imagePicker)
 
+const nativeModalAccessibility = vi.hoisted(() => ({ enabled: false }))
+const nativeStyleRuntime = vi.hoisted(() => ({
+  enabled: false,
+  platform: 'ios' as 'ios' | 'android',
+  files: new Map<string, string>(),
+  read: vi.fn<(uri: string) => void>(),
+  focus: vi.fn<(target: number) => void>(),
+  focusHandles: new Map([
+    ['style-piece-open', 82],
+    ['style-piece-refresh', 82],
+    ['style-piece-close', 83],
+    ['style-piece-weather-mild-dry', 84],
+    ['style-piece-weather-cool-windy', 85],
+    ['style-piece-weather-warm-rainy', 86],
+  ]),
+  holdDismissal: false,
+  finishDismissal: undefined as (() => void) | undefined,
+  state: 'active' as ReactNativeModule.AppStateStatus,
+  stateListeners: new Set<(state: ReactNativeModule.AppStateStatus) => void>(),
+}))
+vi.mock('@/components/edge-to-edge-modal', async (importOriginal) => {
+  const actual = await importOriginal<typeof EdgeToEdgeModalModule>()
+  return {
+    ...actual,
+    underModalAccessibility: (open: boolean) => {
+      if (!nativeModalAccessibility.enabled) return actual.underModalAccessibility(open)
+      const props = actual.underModalAccessibility(open, 'ios')
+      // Expose native hiding props to the web renderer used by this suite.
+      return {
+        ...props,
+        'aria-hidden': props.accessibilityElementsHidden,
+        dataSet: { importantForAccessibility: props.importantForAccessibility },
+      }
+    },
+  }
+})
+
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: vi.fn().mockResolvedValue({
     uri: 'file:///cropped.png',
@@ -39,14 +77,27 @@ vi.mock('expo-image-manipulator', () => ({
 vi.mock('expo-file-system', () => ({
   File: class {
     uri: string
-    constructor(uri: string) {
-      this.uri = uri
+    constructor(uri: string, name?: string) {
+      this.uri = name ? `${uri}/${name}` : uri
+    }
+    get exists() {
+      return nativeStyleRuntime.files.has(this.uri)
+    }
+    get size() {
+      return new TextEncoder().encode(nativeStyleRuntime.files.get(this.uri) ?? '').length
+    }
+    textSync() {
+      nativeStyleRuntime.read(this.uri)
+      return nativeStyleRuntime.files.get(this.uri) ?? ''
+    }
+    write(data: string) {
+      nativeStyleRuntime.files.set(this.uri, data)
     }
     bytes() {
       return Promise.resolve(new Uint8Array([1, 2, 3, 4]))
     }
   },
-  Paths: { cache: 'file:///cache/' },
+  Paths: { cache: 'file:///cache/', document: 'file:///documents' },
 }))
 
 vi.mock('expo-crypto', () => ({
@@ -59,13 +110,71 @@ vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
   return {
     ...actual,
-    findNodeHandle: vi.fn(),
-    Modal: ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
-      visible ? children : null,
+    Platform: {
+      ...actual.Platform,
+      get OS() {
+        return nativeStyleRuntime.enabled
+          ? nativeStyleRuntime.platform
+          : actual.Platform.OS
+      },
+    },
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: nativeStyleRuntime.focus,
+    },
+    AppState: {
+      get currentState() {
+        return nativeStyleRuntime.enabled
+          ? nativeStyleRuntime.state
+          : actual.AppState.currentState
+      },
+      addEventListener: (
+        event: ReactNativeModule.AppStateEvent,
+        listener: (state: ReactNativeModule.AppStateStatus) => void
+      ) => {
+        if (!nativeStyleRuntime.enabled || event !== 'change')
+          return actual.AppState.addEventListener(event, listener)
+        nativeStyleRuntime.stateListeners.add(listener)
+        return { remove: () => nativeStyleRuntime.stateListeners.delete(listener) }
+      },
+    },
+    findNodeHandle: vi.fn((node: unknown) => {
+      if (!nativeStyleRuntime.enabled || !(node instanceof HTMLElement)) return undefined
+      return nativeStyleRuntime.focusHandles.get(node.dataset.testid ?? '')
+    }),
+    Modal: ({
+      children,
+      onDismiss,
+      onShow,
+      visible = true,
+    }: {
+      children: React.ReactNode
+      onDismiss?: () => void
+      onShow?: () => void
+      visible?: boolean
+    }) => {
+      const wasVisible = useRef(false)
+      useEffect(() => {
+        const previous = wasVisible.current
+        wasVisible.current = visible
+        if (!nativeStyleRuntime.enabled || previous === visible) return
+        if (visible) onShow?.()
+        else if (nativeStyleRuntime.platform === 'ios') {
+          if (nativeStyleRuntime.holdDismissal)
+            nativeStyleRuntime.finishDismissal = onDismiss
+          else onDismiss?.()
+        }
+      }, [onDismiss, onShow, visible])
+      return visible ? children : null
+    },
   }
 })
 
-import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
+import {
+  createReadyGarmentFixture,
+  createSuggestGarmentTagsDataFixture,
+} from '@couture/api-client/testing/wardrobe-fixtures'
+import { MAX_SAMPLE_BOOKMARK_BYTES, stylePieceStorageKey } from '@couture/utils'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import {
@@ -87,6 +196,33 @@ function fakeAccessToken(userId: string): string {
 }
 
 const ACCESS_TOKEN = fakeAccessToken('user-1')
+
+function fixtureWardrobePhoto(color: string) {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 16
+  const context = canvas.getContext('2d')!
+  context.fillStyle = color
+  context.fillRect(0, 0, canvas.width, canvas.height)
+  return {
+    url: canvas.toDataURL('image/png'),
+    expiresAt: '2099-12-31T00:00:00.000Z',
+  }
+}
+
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
+function changeNativeAppState(state: ReactNativeModule.AppStateStatus) {
+  act(() => {
+    nativeStyleRuntime.state = state
+    for (const listener of nativeStyleRuntime.stateListeners) listener(state)
+  })
+}
 
 const onboardingNotCompleted = {
   status: 'in_progress' as const,
@@ -188,6 +324,15 @@ describe('WardrobeHubScreen', () => {
     }
     restoreAccessTokenResolver()
     setMobileApplicationUserId(null)
+    nativeModalAccessibility.enabled = false
+    nativeStyleRuntime.enabled = false
+    nativeStyleRuntime.platform = 'ios'
+    nativeStyleRuntime.files.clear()
+    nativeStyleRuntime.read.mockReset()
+    nativeStyleRuntime.holdDismissal = false
+    nativeStyleRuntime.finishDismissal = undefined
+    nativeStyleRuntime.state = 'active'
+    nativeStyleRuntime.stateListeners.clear()
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
     vi.clearAllMocks()
@@ -200,6 +345,635 @@ describe('WardrobeHubScreen', () => {
       expect(screen.getByTestId('wardrobe-screen')).toBeInTheDocument()
     })
     expect(screen.getByTestId('garment-capture-open')).toBeInTheDocument()
+  })
+
+  it('closes the style panel and fences saved looks when the current account changes', async () => {
+    const ownerA = 'style-native-owner-a'
+    const ownerB = 'style-native-owner-b'
+    const garmentA = createReadyGarmentFixture({
+      id: 'style-native-shared-garment-id',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    const garmentB = {
+      ...garmentA,
+      imageAccess: fixtureWardrobePhoto('#663311'),
+    }
+    const wardrobeByBearer = new Map([
+      [`Bearer ${fakeAccessToken(ownerA)}`, garmentA],
+      [`Bearer ${fakeAccessToken(ownerB)}`, garmentB],
+    ])
+    let active = ownerA
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() =>
+      fakeAccessToken(active)
+    )
+    setMobileApplicationUserId(active)
+    nativeModalAccessibility.enabled = true
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', ({ request }) => {
+        const garment = wardrobeByBearer.get(request.headers.get('Authorization') ?? '')
+        return garment
+          ? HttpResponse.json({ data: [garment] })
+          : new HttpResponse(null, { status: 401 })
+      })
+    )
+    renderScreen()
+
+    await screen.findByText(garmentA.id, { exact: true })
+    expect(screen.getByTestId('wardrobe-screen')).not.toHaveAttribute('aria-hidden')
+    await browserUser.click(
+      await screen.findByRole('button', { name: 'Style this piece' })
+    )
+    const panel = await screen.findByTestId('style-piece-panel')
+    const wardrobe = screen.getByTestId('wardrobe-screen')
+    expect(wardrobe).toHaveAttribute('aria-hidden', 'true')
+    expect(wardrobe).toHaveAttribute(
+      'data-important-for-accessibility',
+      'no-hide-descendants'
+    )
+    const [firstLook] = await within(panel).findAllByTestId('style-piece-look')
+    await browserUser.click(within(firstLook!).getByRole('button', { name: 'Save look' }))
+    expect(await within(panel).findByTestId('style-piece-reopen')).toHaveAccessibleName(
+      /^Open saved look\b/
+    )
+
+    act(() => {
+      active = ownerB
+      setMobileApplicationUserId(active)
+    })
+    await screen.findByText(garmentB.id, { exact: true })
+    expect(screen.queryByTestId('style-piece-panel')).toBeNull()
+    const currentWardrobe = screen.getByTestId('wardrobe-screen')
+    expect(currentWardrobe).not.toHaveAttribute('aria-hidden')
+    expect(currentWardrobe).toHaveAttribute('data-important-for-accessibility', 'auto')
+
+    await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
+    const otherPanel = await screen.findByTestId('style-piece-panel')
+    const otherAnchors = await within(otherPanel).findAllByTestId('style-piece-anchor')
+    expect(otherAnchors).toHaveLength(3)
+    await waitFor(() => {
+      for (const anchor of otherAnchors) {
+        expect(anchor.querySelector('img')).toHaveAttribute(
+          'src',
+          garmentB.imageAccess.url
+        )
+      }
+    })
+    await waitFor(() =>
+      expect(within(otherPanel).getAllByTestId('style-piece-save')[0]).toBeEnabled()
+    )
+    expect(within(otherPanel).queryByTestId('style-piece-reopen')).toBeNull()
+
+    act(() => {
+      active = ownerA
+      setMobileApplicationUserId(active)
+    })
+    await screen.findByText(garmentA.id, { exact: true })
+    expect(screen.queryByTestId('style-piece-panel')).toBeNull()
+    await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
+    const restored = await screen.findByTestId('style-piece-panel')
+    expect(await within(restored).findByTestId('style-piece-reopen')).toBeVisible()
+    await browserUser.click(within(restored).getByTestId('style-piece-remove'))
+    await waitFor(() =>
+      expect(within(restored).queryByTestId('style-piece-reopen')).toBeNull()
+    )
+  })
+
+  it('reopens the edited weather and companions from the bounded native recipe file', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-file-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'style-native-file-piece',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
+    )
+    renderScreen()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = await screen.findByTestId('style-piece-panel')
+    await browserUser.click(
+      await within(panel).findByTestId('style-piece-weather-warm-rainy')
+    )
+    const edited = within(panel)
+      .getAllByTestId('style-piece-look')
+      .find((look) => within(look).queryByText('Midi skirt', { exact: true }))!
+    await browserUser.click(within(edited).getByTestId('style-piece-swap-shoes'))
+    await browserUser.click(
+      within(edited).getByTestId('style-piece-option-sample:g:loafers')
+    )
+    await browserUser.click(within(edited).getByTestId('style-piece-save'))
+    expect(await within(panel).findByTestId('style-piece-reopen')).toHaveAccessibleName(
+      /Warm and rainy.*Loafers/
+    )
+
+    expect(nativeStyleRuntime.files.size).toBe(1)
+    const [uri, saved] = [...nativeStyleRuntime.files][0]!
+    expect(uri).toMatch(/^file:\/\/\/documents\/couturecast\.style-piece\..+\.json$/)
+    expect(JSON.parse(saved) as unknown).toEqual([
+      {
+        lookId: 'sample:l:silk-midi',
+        weather: 'warm-rainy',
+        swaps: { shoes: 'sample:g:loafers' },
+      },
+    ])
+    await browserUser.click(within(panel).getByTestId('style-piece-close'))
+    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+    nativeStyleRuntime.read.mockClear()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const restored = await screen.findByTestId('style-piece-panel')
+    await browserUser.click(await within(restored).findByTestId('style-piece-reopen'))
+    expect(nativeStyleRuntime.read).toHaveBeenCalledWith(uri)
+    await waitFor(() => {
+      const reopened = within(restored).getAllByTestId('style-piece-look')[0]!
+      for (const name of ['Rain shell', 'Midi skirt', 'Loafers']) {
+        expect(within(reopened).getByText(name, { exact: true })).toBeVisible()
+      }
+      expect(within(restored).getByText('72°F', { exact: true })).toBeVisible()
+    })
+    await browserUser.click(within(restored).getByTestId('style-piece-remove'))
+    await waitFor(() =>
+      expect(within(restored).queryByTestId('style-piece-reopen')).toBeNull()
+    )
+    expect(nativeStyleRuntime.files.get(uri)).toBe('[]')
+
+    await browserUser.click(within(restored).getByTestId('style-piece-close'))
+    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+    nativeStyleRuntime.files.set(uri, 'x'.repeat(MAX_SAMPLE_BOOKMARK_BYTES + 1))
+    nativeStyleRuntime.read.mockClear()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const bounded = await screen.findByTestId('style-piece-panel')
+    await waitFor(() =>
+      expect(within(bounded).getAllByTestId('style-piece-save')[0]).toBeEnabled()
+    )
+    expect(within(bounded).queryByTestId('style-piece-reopen')).toBeNull()
+    expect(nativeStyleRuntime.read).not.toHaveBeenCalled()
+  })
+
+  it.each(['weather', 'swap'] as const)(
+    'preserves a newer %s choice when a saved look finishes verifying',
+    async (decision) => {
+      nativeStyleRuntime.enabled = true
+      const owner = 'style-native-reopen-race'
+      setMobileApplicationUserId(owner)
+      const garment = createReadyGarmentFixture({
+        id: 'style-native-reopen-race-piece',
+        imageAccess: fixtureWardrobePhoto('#224466'),
+      })
+      const renewed = { ...garment, imageAccess: fixtureWardrobePhoto('#663311') }
+      nativeStyleRuntime.files.set(
+        'file:///documents/' + stylePieceStorageKey(owner, garment.id) + '.json',
+        JSON.stringify([
+          { lookId: 'sample:l:silk-midi', weather: 'warm-rainy', swaps: {} },
+        ])
+      )
+      const verification = deferred()
+      const started = deferred()
+      let reopenPending = false
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', async () => {
+          if (!reopenPending) return HttpResponse.json({ data: [garment] })
+          started.resolve()
+          await verification.promise
+          return HttpResponse.json({ data: [renewed] })
+        })
+      )
+      renderScreen()
+      await browserUser.click(await screen.findByTestId('style-piece-open'))
+      const panel = await screen.findByTestId('style-piece-panel')
+      const reopen = await within(panel).findByTestId('style-piece-reopen')
+      reopenPending = true
+      try {
+        await browserUser.click(reopen)
+        await started.promise
+        if (decision === 'weather') {
+          await browserUser.click(
+            within(panel).getByTestId('style-piece-weather-cool-windy')
+          )
+        } else {
+          const [look] = within(panel).getAllByTestId('style-piece-look')
+          await browserUser.click(within(look!).getByTestId('style-piece-swap-shoes'))
+          await browserUser.click(
+            within(look!).getByTestId('style-piece-option-sample:g:white-sneakers')
+          )
+        }
+        nativeStyleRuntime.focus.mockClear()
+        verification.resolve()
+        await waitFor(() =>
+          expect(
+            within(panel).getAllByTestId('style-piece-anchor')[0]?.querySelector('img')
+          ).toHaveAttribute('src', renewed.imageAccess.url)
+        )
+        expect(within(panel).queryByText('72°F', { exact: true })).toBeNull()
+        if (decision === 'swap') {
+          const [look] = within(panel).getAllByTestId('style-piece-look')
+          expect(within(look!).getByText('White sneakers', { exact: true })).toBeVisible()
+        }
+        expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(86)
+      } finally {
+        verification.resolve()
+      }
+    }
+  )
+
+  it('restores focus to the selected weather after foreground photo verification', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-foreground-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'style-native-foreground-piece',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    const verification = deferred()
+    const started = deferred()
+    let restoring = false
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        if (restoring) {
+          started.resolve()
+          await verification.promise
+        }
+        return HttpResponse.json({ data: [garment] })
+      })
+    )
+    renderScreen()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = await screen.findByTestId('style-piece-panel')
+    await browserUser.click(
+      await within(panel).findByTestId('style-piece-weather-warm-rainy')
+    )
+    nativeStyleRuntime.focus.mockClear()
+    try {
+      changeNativeAppState('background')
+      expect(within(panel).getByRole('progressbar')).toBeVisible()
+      restoring = true
+      changeNativeAppState('active')
+      await started.promise
+      expect(within(panel).queryByTestId('style-piece-weather-warm-rainy')).toBeNull()
+      verification.resolve()
+      expect(
+        await within(panel).findByTestId('style-piece-weather-warm-rainy')
+      ).toBeVisible()
+      await waitFor(() =>
+        expect(nativeStyleRuntime.focus).toHaveBeenCalledExactlyOnceWith(86)
+      )
+    } finally {
+      verification.resolve()
+    }
+  })
+
+  it('moves native accessibility focus to Close when the photo becomes unavailable and restores the garment action', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-expiry-owner')
+    const ready = createReadyGarmentFixture({
+      id: 'style-native-photo-unavailable',
+      imageAccess: fixtureWardrobePhoto('#223355'),
+    })
+    let garment = ready
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
+    )
+    renderScreen()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = await screen.findByTestId('style-piece-panel')
+    expect(await within(panel).findAllByTestId('style-piece-anchor')).toHaveLength(3)
+    nativeStyleRuntime.focus.mockClear()
+    changeNativeAppState('background')
+    garment = { ...ready, imageAccess: null }
+    changeNativeAppState('active')
+    expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
+    await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(83))
+    expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
+
+    nativeStyleRuntime.focus.mockClear()
+    await browserUser.click(within(panel).getByTestId('style-piece-close'))
+    expect(await screen.findByTestId('style-piece-refresh')).toBeVisible()
+    await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(82))
+  })
+
+  it('refreshes an unsigned card and retries a failed photo inside the iOS styling panel', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-retry-owner')
+    const ready = createReadyGarmentFixture({
+      id: 'style-native-retry-piece',
+      imageAccess: fixtureWardrobePhoto('#223355'),
+    })
+    const unsigned = { ...ready, imageAccess: null }
+    const failedPhoto = {
+      ...ready,
+      imageAccess: { ...ready.imageAccess!, url: 'data:image/png;base64,AA==' },
+    }
+    const renewal = { ...ready, imageAccess: fixtureWardrobePhoto('#563312') }
+    let garment: typeof ready = unsigned
+    let holdVerification = false
+    const verification = deferred()
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        const current = garment
+        if (holdVerification) {
+          holdVerification = false
+          await verification.promise
+        }
+        return HttpResponse.json({ data: [current] })
+      })
+    )
+    renderScreen()
+    try {
+      const cardRefresh = await screen.findByTestId('style-piece-refresh')
+      expect(screen.queryByTestId('style-piece-open')).toBeNull()
+      garment = ready
+      await browserUser.click(cardRefresh)
+      const opener = await screen.findByTestId('style-piece-open')
+      await waitFor(() => expect(opener).toBeEnabled())
+
+      garment = failedPhoto
+      holdVerification = true
+      await browserUser.click(opener)
+      const panel = await screen.findByTestId('style-piece-panel')
+      expect(within(panel).getByRole('progressbar')).toHaveTextContent(
+        'Checking your photo'
+      )
+      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(83))
+      verification.resolve()
+
+      expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
+      const retry = within(panel).getByTestId('style-piece-refresh')
+      garment = unsigned
+      await browserUser.click(retry)
+      await waitFor(() => expect(retry).toBeEnabled())
+      expect(within(panel).queryByTestId('style-piece-save')).toBeNull()
+
+      garment = renewal
+      await browserUser.click(retry)
+      const anchors = await within(panel).findAllByTestId('style-piece-anchor')
+      expect(anchors).toHaveLength(3)
+      for (const anchor of anchors) {
+        expect(anchor.querySelector('img')).toHaveAttribute(
+          'src',
+          renewal.imageAccess.url
+        )
+      }
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(84))
+    } finally {
+      verification.resolve()
+    }
+  })
+
+  it('restores the Android garment action when verification finishes after dismissal', async () => {
+    nativeStyleRuntime.enabled = true
+    nativeStyleRuntime.platform = 'android'
+    setMobileApplicationUserId('style-android-dismiss-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'style-android-dismiss-piece',
+      imageAccess: fixtureWardrobePhoto('#225543'),
+    })
+    const reply = deferred()
+    const started = deferred()
+    let verifying = false
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        if (verifying) {
+          started.resolve()
+          await reply.promise
+        }
+        return HttpResponse.json({ data: [garment] })
+      })
+    )
+    renderScreen()
+    try {
+      const opener = await screen.findByTestId('style-piece-open')
+      verifying = true
+      await browserUser.click(opener)
+      const panel = await screen.findByTestId('style-piece-panel')
+      expect(within(panel).getByRole('progressbar')).toBeVisible()
+      await started.promise
+      await browserUser.click(within(panel).getByTestId('style-piece-close'))
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(82))
+      expect(screen.queryByTestId('style-piece-panel')).toBeNull()
+
+      verifying = false
+      reply.resolve()
+      await browserUser.click(opener)
+      const reopened = await screen.findByTestId('style-piece-panel')
+      expect(await within(reopened).findAllByTestId('style-piece-anchor')).toHaveLength(3)
+    } finally {
+      reply.resolve()
+    }
+  })
+
+  it('keeps the photo and swap controls available when the native recipe file cannot be read', async () => {
+    nativeStyleRuntime.enabled = true
+    const owner = 'style-native-storage-error'
+    setMobileApplicationUserId(owner)
+    const garment = createReadyGarmentFixture({
+      id: 'style-native-storage-piece',
+      imageAccess: fixtureWardrobePhoto('#225543'),
+    })
+    const file = `file:///documents/${stylePieceStorageKey(owner, garment.id)}.json`
+    nativeStyleRuntime.files.set(file, '[]')
+    nativeStyleRuntime.read.mockImplementationOnce(() => {
+      throw new Error('Synthetic file read failure')
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
+    )
+    renderScreen()
+    await browserUser.click(await screen.findByTestId('style-piece-open'))
+    const panel = await screen.findByTestId('style-piece-panel')
+    expect(await within(panel).findByRole('alert')).toHaveTextContent(
+      'Saved looks are unavailable on this device.'
+    )
+    const [look] = await within(panel).findAllByTestId('style-piece-look')
+    expect(within(look!).getByTestId('style-piece-anchor')).toBeVisible()
+    expect(within(look!).getByTestId('style-piece-save')).toBeDisabled()
+    await browserUser.click(within(look!).getByTestId('style-piece-swap-shoes'))
+    await browserUser.click(
+      within(look!).getByTestId('style-piece-option-sample:g:white-sneakers')
+    )
+    expect(within(look!).getByText('White sneakers', { exact: true })).toBeVisible()
+    expect(nativeStyleRuntime.files.get(file)).toBe('[]')
+  })
+
+  it('queues a completed tagging poll until the styling modal is dismissed', async () => {
+    nativeStyleRuntime.enabled = true
+    nativeStyleRuntime.holdDismissal = true
+    setMobileApplicationUserId('style-native-queue-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'style-native-queue-piece',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    let deferNextRead = false
+    let pollStarted = false
+    let settled = false
+    let releasePoll!: () => void
+    const pollReply = new Promise<void>((resolve) => {
+      releasePoll = resolve
+    })
+    const taggingId = 'style-native-pending-tags'
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        if (deferNextRead) {
+          deferNextRead = false
+          pollStarted = true
+          await pollReply
+          settled = true
+        }
+        return HttpResponse.json({
+          data: [
+            garment,
+            garmentFixture({
+              id: taggingId,
+              status: settled ? 'awaiting_tags' : 'processing',
+            }),
+          ],
+        })
+      }),
+      http.post(`*/api/v1/wardrobe/garments/${taggingId}/suggest-tags`, () =>
+        HttpResponse.json({
+          data: createSuggestGarmentTagsDataFixture({ garmentId: taggingId }),
+        })
+      )
+    )
+    renderScreen()
+    const checkStatus = await screen.findByRole('button', {
+      name: 'Check garment status',
+    })
+    deferNextRead = true
+    try {
+      await browserUser.click(checkStatus)
+      await waitFor(() => expect(pollStarted).toBe(true))
+      await browserUser.click(await screen.findByTestId('style-piece-open'))
+      const panel = await screen.findByTestId('style-piece-panel')
+      releasePoll()
+      await screen.findByTestId('garment-status-awaiting_tags')
+      expect(screen.queryByTestId('garment-tagging-modal')).toBeNull()
+
+      await browserUser.click(within(panel).getByTestId('style-piece-close'))
+      expect(screen.queryByTestId('style-piece-panel')).toBeNull()
+      expect(screen.queryByTestId('garment-tagging-modal')).toBeNull()
+      await waitFor(() =>
+        expect(nativeStyleRuntime.finishDismissal).toBeTypeOf('function')
+      )
+      act(() => nativeStyleRuntime.finishDismissal?.())
+      expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    } finally {
+      releasePoll()
+    }
+  })
+
+  it('rejects a late styling snapshot after the tagging poll has settled', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-inventory-race-owner')
+    const anchor = createReadyGarmentFixture({
+      id: 'style-native-inventory-anchor',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    const processing = garmentFixture({
+      id: 'style-native-inventory-poll',
+      status: 'processing',
+    })
+    const settled = createReadyGarmentFixture({ id: processing.id })
+    const photoCheck = deferred()
+    const poll = deferred()
+    const pollStarted = deferred()
+    const photoCheckStarted = deferred()
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        const read = ++reads
+        if (read === 2) {
+          pollStarted.resolve()
+          await poll.promise
+          return HttpResponse.json({ data: [anchor, settled] })
+        }
+        if (read === 3) {
+          photoCheckStarted.resolve()
+          await photoCheck.promise
+        }
+        return HttpResponse.json({
+          data: read > 3 ? [settled] : [anchor, processing],
+        })
+      })
+    )
+    renderScreen()
+    try {
+      await browserUser.click(
+        await screen.findByRole('button', { name: 'Check garment status' })
+      )
+      await pollStarted.promise
+      await browserUser.click(await screen.findByTestId('style-piece-open'))
+      const panel = await screen.findByTestId('style-piece-panel')
+      await photoCheckStarted.promise
+      poll.resolve()
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-status-processing')).toBeNull()
+      )
+
+      photoCheck.resolve()
+      await waitFor(() => expect(within(panel).queryByRole('progressbar')).toBeNull())
+      expect(screen.queryByTestId('garment-status-processing')).toBeNull()
+      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
+      expect(screen.getByText(anchor.id, { exact: true })).toBeVisible()
+
+      await browserUser.click(within(panel).getByTestId('style-piece-refresh'))
+      await waitFor(() =>
+        expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+      )
+      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
+    } finally {
+      poll.resolve()
+      photoCheck.resolve()
+    }
+  })
+
+  it('keeps a deleted styling garment hidden when an older poll snapshot settles', async () => {
+    nativeStyleRuntime.enabled = true
+    setMobileApplicationUserId('style-native-poll-race-owner')
+    const anchor = createReadyGarmentFixture({
+      id: 'style-native-poll-anchor',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    const processing = garmentFixture({
+      id: 'style-native-poll-garment',
+      status: 'processing',
+    })
+    const settled = createReadyGarmentFixture({ id: processing.id })
+    const poll = deferred()
+    const pollStarted = deferred()
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        const read = ++reads
+        if (read === 2) {
+          pollStarted.resolve()
+          await poll.promise
+          return HttpResponse.json({ data: [anchor, settled] })
+        }
+        const data =
+          read === 1 ? [anchor, processing] : [read === 3 ? processing : settled]
+        return HttpResponse.json({ data })
+      })
+    )
+    renderScreen()
+    try {
+      await browserUser.click(
+        await screen.findByRole('button', { name: 'Check garment status' })
+      )
+      await pollStarted.promise
+      await browserUser.click(await screen.findByTestId('style-piece-open'))
+      const panel = await screen.findByTestId('style-piece-panel')
+      expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
+      expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+
+      poll.resolve()
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-status-processing')).toBeNull()
+      )
+      expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+      expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
+    } finally {
+      poll.resolve()
+    }
   })
 
   it('withholds the empty state until the failed garment list is retried successfully', async () => {

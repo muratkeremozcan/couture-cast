@@ -1,11 +1,10 @@
 import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Platform, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   createMemberSampleOutfit,
   getGuestPreviewStrings,
-  MAX_SAMPLE_BOOKMARK_BYTES,
   parseSampleBookmarks,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
@@ -20,25 +19,9 @@ import {
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { mobileApplicationUserId } from '@/src/lib/mobile-auth'
+import { sampleRecipeStorage } from '@/src/lib/sample-recipe-storage'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
-
-async function memberBookmarkStorage(owner: string) {
-  const key = `couturecast.member-sample-bookmarks.${encodeURIComponent(owner)}`
-  if (Platform.OS === 'web') {
-    return {
-      read: () => globalThis.localStorage.getItem(key),
-      write: (value: string) => globalThis.localStorage.setItem(key, value),
-    }
-  }
-  const { File, Paths } = await import('expo-file-system')
-  const file = new File(Paths.document, `${key}.json`)
-  return {
-    read: () =>
-      file.exists && file.size <= MAX_SAMPLE_BOOKMARK_BYTES ? file.textSync() : null,
-    write: (value: string) => file.write(value),
-  }
-}
 
 export function HomeAddGarment() {
   const { i18n } = useTranslation()
@@ -95,7 +78,9 @@ export function MemberSampleOutfit({
   useEffect(() => {
     if (!owner) return
     let active = true
-    void memberBookmarkStorage(owner)
+    void sampleRecipeStorage(
+      `couturecast.member-sample-bookmarks.${encodeURIComponent(owner)}`
+    )
       .then(({ read, write }) => {
         if (!active || mobileApplicationUserId() !== owner) return
         bookmarkWriter.current = write

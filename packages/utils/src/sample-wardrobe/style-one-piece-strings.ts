@@ -1,0 +1,192 @@
+import { resolveGuestPreviewLocale } from './format'
+import type { GuestPreviewLocale } from './strings'
+
+const en = {
+  start: 'Style this piece',
+  anchor: 'Your piece',
+  companions: 'Example pieces',
+  weather: 'Example weather',
+  idea: 'Look {number}',
+  save: 'Save look',
+  saved: 'Saved on this device',
+  reopen: 'Open saved look',
+  remove: 'Remove saved look',
+  comfort:
+    'This piece may feel uncomfortable in these conditions. Try another weather example.',
+  protection:
+    'We don’t know if this layer can handle wind or rain. Try mild, dry weather.',
+  noLooks: 'No matching example pieces for this weather. Try another weather example.',
+  photo: 'Your photo is unavailable.',
+  checkingPhoto: 'Checking your photo…',
+  refreshPhoto: 'Refresh photo',
+  storage: 'Saved looks are unavailable on this device.',
+}
+
+const strings: Record<GuestPreviewLocale, typeof en> = {
+  'en-US': en,
+  'en-CA': en,
+  'es-419': {
+    start: 'Combinar esta prenda',
+    anchor: 'Tu prenda',
+    companions: 'Prendas de ejemplo',
+    weather: 'Clima de ejemplo',
+    idea: 'Conjunto {number}',
+    save: 'Guardar conjunto',
+    saved: 'Guardados en este dispositivo',
+    reopen: 'Abrir conjunto guardado',
+    remove: 'Eliminar conjunto guardado',
+    comfort: 'Puede que esta prenda sea incómoda con este clima. Prueba otro ejemplo.',
+    protection:
+      'No sabemos si esta prenda protege del viento o la lluvia. Prueba un clima templado y seco.',
+    noLooks: 'No hay prendas de ejemplo compatibles con este clima. Prueba otro ejemplo.',
+    photo: 'Tu foto no está disponible.',
+    checkingPhoto: 'Verificando tu foto…',
+    refreshPhoto: 'Actualizar foto',
+    storage: 'Los conjuntos guardados no están disponibles en este dispositivo.',
+  },
+  'fr-CA': {
+    start: 'Agencer ce vêtement',
+    anchor: 'Votre vêtement',
+    companions: 'Vêtements en exemple',
+    weather: 'Exemple de météo',
+    idea: 'Tenue {number}',
+    save: 'Enregistrer la tenue',
+    saved: 'Enregistrées sur cet appareil',
+    reopen: 'Ouvrir la tenue enregistrée',
+    remove: 'Supprimer la tenue enregistrée',
+    comfort:
+      'Ce vêtement pourrait être inconfortable par ce temps. Essayez un autre exemple de météo.',
+    protection:
+      'La protection contre le vent ou la pluie est inconnue. Essayez un temps doux et sec.',
+    noLooks:
+      'Aucun vêtement en exemple ne convient à ce temps. Essayez un autre exemple.',
+    photo: 'Votre photo est indisponible.',
+    checkingPhoto: 'Vérification de votre photo…',
+    refreshPhoto: 'Actualiser la photo',
+    storage: 'Les tenues enregistrées sont indisponibles sur cet appareil.',
+  },
+  'fr-FR': {
+    start: 'Associer ce vêtement',
+    anchor: 'Votre vêtement',
+    companions: 'Exemples de vêtements',
+    weather: 'Exemple de météo',
+    idea: 'Tenue {number}',
+    save: 'Enregistrer la tenue',
+    saved: 'Enregistrées sur cet appareil',
+    reopen: 'Ouvrir la tenue enregistrée',
+    remove: 'Supprimer la tenue enregistrée',
+    comfort:
+      'Ce vêtement risque d’être inconfortable par ce temps. Essayez un autre exemple de météo.',
+    protection:
+      'La protection contre le vent ou la pluie est inconnue. Essayez un temps doux et sec.',
+    noLooks:
+      'Aucun exemple de vêtement ne convient à ce temps. Essayez un autre exemple.',
+    photo: 'Votre photo est indisponible.',
+    checkingPhoto: 'Vérification de votre photo…',
+    refreshPhoto: 'Actualiser la photo',
+    storage: 'Les tenues enregistrées sont indisponibles sur cet appareil.',
+  },
+  'tr-TR': {
+    start: 'Bu parçayı kombinle',
+    anchor: 'Senin parçan',
+    companions: 'Örnek parçalar',
+    weather: 'Örnek hava durumu',
+    idea: 'Kombin {number}',
+    save: 'Kombini kaydet',
+    saved: 'Bu cihaza kaydedilenler',
+    reopen: 'Kayıtlı kombini aç',
+    remove: 'Kayıtlı kombini kaldır',
+    comfort: 'Bu parça bu havada rahat olmayabilir. Başka bir hava durumu örneğini dene.',
+    protection:
+      'Bu parçanın rüzgâr veya yağmurdan koruyup korumadığı bilinmiyor. Ilık ve kuru havayı dene.',
+    noLooks: 'Bu havaya uygun örnek parça yok. Başka bir hava durumu örneğini dene.',
+    photo: 'Fotoğrafın kullanılamıyor.',
+    checkingPhoto: 'Fotoğrafın kontrol ediliyor…',
+    refreshPhoto: 'Fotoğrafı yenile',
+    storage: 'Bu cihazda kayıtlı kombinlere erişilemiyor.',
+  },
+  'de-DE': {
+    start: 'Dieses Kleidungsstück kombinieren',
+    anchor: 'Dein Kleidungsstück',
+    companions: 'Beispielkleidung',
+    weather: 'Beispielwetter',
+    idea: 'Outfit {number}',
+    save: 'Outfit speichern',
+    saved: 'Auf diesem Gerät gespeichert',
+    reopen: 'Gespeichertes Outfit öffnen',
+    remove: 'Gespeichertes Outfit entfernen',
+    comfort:
+      'Bei diesem Wetter könnte dieses Kleidungsstück unbequem sein. Probiere anderes Beispielwetter.',
+    protection:
+      'Der Schutz vor Wind oder Regen ist unbekannt. Probiere mildes, trockenes Wetter.',
+    noLooks:
+      'Für dieses Wetter gibt es keine passenden Beispiele. Probiere anderes Beispielwetter.',
+    photo: 'Dein Foto ist nicht verfügbar.',
+    checkingPhoto: 'Dein Foto wird geprüft…',
+    refreshPhoto: 'Foto aktualisieren',
+    storage: 'Gespeicherte Outfits sind auf diesem Gerät nicht verfügbar.',
+  },
+  'it-IT': {
+    start: 'Abbina questo capo',
+    anchor: 'Il tuo capo',
+    companions: 'Capi di esempio',
+    weather: 'Meteo di esempio',
+    idea: 'Look {number}',
+    save: 'Salva il look',
+    saved: 'Salvati su questo dispositivo',
+    reopen: 'Apri il look salvato',
+    remove: 'Rimuovi il look salvato',
+    comfort:
+      'Questo capo potrebbe essere scomodo con questo meteo. Prova un altro esempio.',
+    protection:
+      'Non sappiamo se questo capo protegge da vento o pioggia. Prova un clima mite e asciutto.',
+    noLooks: 'Non ci sono capi di esempio adatti a questo meteo. Prova un altro esempio.',
+    photo: 'La tua foto non è disponibile.',
+    checkingPhoto: 'Verifica della foto in corso…',
+    refreshPhoto: 'Aggiorna la foto',
+    storage: 'I look salvati non sono disponibili su questo dispositivo.',
+  },
+  'pt-BR': {
+    start: 'Combinar esta peça',
+    anchor: 'Sua peça',
+    companions: 'Peças de exemplo',
+    weather: 'Exemplo de clima',
+    idea: 'Look {number}',
+    save: 'Salvar look',
+    saved: 'Salvos neste dispositivo',
+    reopen: 'Abrir look salvo',
+    remove: 'Remover look salvo',
+    comfort: 'Esta peça pode ser desconfortável nesse clima. Experimente outro exemplo.',
+    protection:
+      'Não sabemos se esta peça protege do vento ou da chuva. Experimente um clima ameno e seco.',
+    noLooks: 'Nenhuma peça de exemplo combina com esse clima. Experimente outro exemplo.',
+    photo: 'Sua foto está indisponível.',
+    checkingPhoto: 'Verificando sua foto…',
+    refreshPhoto: 'Atualizar foto',
+    storage: 'Os looks salvos estão indisponíveis neste dispositivo.',
+  },
+  'pt-PT': {
+    start: 'Combinar esta peça',
+    anchor: 'A tua peça',
+    companions: 'Peças de exemplo',
+    weather: 'Exemplo de tempo',
+    idea: 'Conjunto {number}',
+    save: 'Guardar conjunto',
+    saved: 'Guardados neste dispositivo',
+    reopen: 'Abrir conjunto guardado',
+    remove: 'Remover conjunto guardado',
+    comfort:
+      'Esta peça pode ser desconfortável com este tempo. Experimenta outro exemplo.',
+    protection:
+      'Não sabemos se esta peça protege do vento ou da chuva. Experimenta tempo ameno e seco.',
+    noLooks: 'Não há peças de exemplo adequadas a este tempo. Experimenta outro exemplo.',
+    photo: 'A tua fotografia está indisponível.',
+    checkingPhoto: 'A verificar a tua fotografia…',
+    refreshPhoto: 'Atualizar fotografia',
+    storage: 'Os conjuntos guardados estão indisponíveis neste dispositivo.',
+  },
+}
+
+export function getStylePieceStrings(locale: string | undefined) {
+  return strings[resolveGuestPreviewLocale(locale)]
+}

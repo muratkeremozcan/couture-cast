@@ -194,9 +194,8 @@ export function AccessibleModal({
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab') {
-      return
-    }
+    // React bubbles events across portals, even though a nested modal owns its own DOM.
+    if (event.key !== 'Tab' || !event.currentTarget.contains(event.target as Node)) return
 
     const focusable = Array.from(
       dialogRef.current?.querySelectorAll<HTMLElement>(
@@ -214,6 +213,12 @@ export function AccessibleModal({
     if (!first || !last) {
       event.preventDefault()
       dialogRef.current?.focus()
+      return
+    }
+
+    if (first === last) {
+      event.preventDefault()
+      first.focus()
       return
     }
 

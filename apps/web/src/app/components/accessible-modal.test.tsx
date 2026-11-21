@@ -308,6 +308,57 @@ describe('AccessibleModal', () => {
    * control must return to the top of the dialog rather than escape into the
    * inert page behind it.
    */
+  it('traps Tab and Shift+Tab when Close is the only control', () => {
+    render(
+      <AccessibleModal isOpen onClose={vi.fn()} titleId="solo-title" title="One control">
+        <p>Checking…</p>
+      </AccessibleModal>
+    )
+    const close = screen.getByRole('button', { name: 'Close modal' })
+    expect(close).toHaveFocus()
+    expect(fireEvent.keyDown(close, { key: 'Tab' })).toBe(false)
+    expect(close).toHaveFocus()
+    expect(fireEvent.keyDown(close, { key: 'Tab', shiftKey: true })).toBe(false)
+    expect(close).toHaveFocus()
+  })
+
+  it('lets Tab move between controls in a nested portal over a single-control modal', async () => {
+    const user = userEvent.setup()
+    function Parent({ childOpen }: { childOpen: boolean }) {
+      return (
+        <AccessibleModal isOpen onClose={vi.fn()} titleId="parent-title" title="Parent">
+          <AccessibleModal
+            isOpen={childOpen}
+            onClose={vi.fn()}
+            titleId="nested-title"
+            title="Nested"
+            closeLabel="Close nested"
+          >
+            <button type="button">First nested control</button>
+            <button type="button">Last nested control</button>
+          </AccessibleModal>
+        </AccessibleModal>
+      )
+    }
+    const view = render(<Parent childOpen={false} />)
+    view.rerender(<Parent childOpen />)
+    const close = screen.getByRole('button', { name: 'Close nested' })
+    const first = screen.getByRole('button', { name: 'First nested control' })
+    const last = screen.getByRole('button', { name: 'Last nested control' })
+    expect(close).toHaveFocus()
+
+    await user.tab()
+    expect(first).toHaveFocus()
+    await user.tab()
+    expect(last).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(first).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(close).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(last).toHaveFocus()
+  })
+
   it('wraps focus from the last control back to the first on Tab', () => {
     renderModal()
     const closeButton = screen.getByLabelText('Close modal')

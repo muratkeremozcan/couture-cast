@@ -15,8 +15,15 @@ import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
-import { getGuestPreviewStrings } from '@couture/utils'
+import {
+  getGuestPreviewStrings,
+  getStylePieceStrings,
+  nextStylePiecePhotoExpiry,
+  scheduleStylePiecePhotoExpiry,
+  type StylePieceSelection,
+} from '@couture/utils'
 
+import { underModalAccessibility } from '@/components/edge-to-edge-modal'
 import { Text, View, useSchemeColors } from '@/components/themed'
 import {
   mobileApplicationUserId,
@@ -34,6 +41,11 @@ import {
   listGarmentsFromMobile,
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
+import {
+  focusStylePieceControl,
+  StylePieceEntry,
+  StylePiecePanel,
+} from './style-piece-panel'
 
 export interface WardrobeHubScreenProps {
   addEntry?: boolean
@@ -61,6 +73,7 @@ function MemberWardrobeHub({
     borderColor: colors.noticeBorder,
   }
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const inventoryRevision = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -74,11 +87,77 @@ function MemberWardrobeHub({
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showOnboardingCard, setShowOnboardingCard] = useState(false)
+  const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
+  const [styleClosing, setStyleClosing] = useState(false)
+  const styleSelectionRef = useRef<StylePieceSelection | null>(null)
+  const taggingOpen = useRef(false)
+  const styleLabels = getStylePieceStrings(i18n.language)
+  const owner = mobileApplicationUserId()
+  const [, updatePhotoClock] = useState(0)
+  const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
+  useEffect(
+    () =>
+      scheduleStylePiecePhotoExpiry(photoExpiry, () =>
+        updatePhotoClock((clock) => clock + 1)
+      ),
+    [photoExpiry]
+  )
+  const styleButtons = useRef(new Map<string, ElementRef<typeof Pressable>>())
   const pollingAbortRef = useRef<AbortController | null>(null)
-  const pendingTaggingGarmentIdRef = useRef<string | null>(null)
+  const pendingTagging = useRef<{ id: string; invoker?: number | null } | null>(null)
   const isCaptureOpenRef = useRef(false)
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const directEntryConsumed = useRef(false)
+
+  const presentTagging = (id: string, invoker?: number | null) => {
+    if (epoch !== mobileIdentityEpoch()) return
+    if (styleSelectionRef.current || isCaptureOpenRef.current) {
+      pendingTagging.current = { id, invoker }
+      return
+    }
+    taggingOpen.current = true
+    setTaggingInvokerNodeHandle(
+      invoker ?? safeFindNodeHandle(addGarmentButtonRef.current)
+    )
+    setTaggingGarmentId(id)
+  }
+
+  const closeTagging = () => {
+    taggingOpen.current = false
+    setTaggingGarmentId(null)
+  }
+
+  const openStylePanel = (selection: StylePieceSelection) => {
+    if (taggingOpen.current || isCaptureOpenRef.current || styleSelectionRef.current)
+      return
+    styleSelectionRef.current = selection
+    setStyleSelection(selection)
+  }
+
+  const finishStyleDismissal = (selection: StylePieceSelection) => {
+    if (epoch !== mobileIdentityEpoch() || styleSelectionRef.current !== selection) return
+    const invoker = styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
+    styleSelectionRef.current = null
+    setStyleSelection(null)
+    setStyleClosing(false)
+    const pending = pendingTagging.current
+    pendingTagging.current = null
+    if (pending) {
+      presentTagging(pending.id, pending.invoker ?? safeFindNodeHandle(invoker))
+      return
+    }
+    requestAnimationFrame(() => {
+      if (
+        epoch === mobileIdentityEpoch() &&
+        !styleSelectionRef.current &&
+        !taggingOpen.current &&
+        !isCaptureOpenRef.current
+      )
+        focusStylePieceControl(
+          styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
+        )
+    })
+  }
 
   const markGarmentConfirmed = () => {
     if (epoch !== mobileIdentityEpoch()) return
@@ -90,21 +169,45 @@ function MemberWardrobeHub({
     isCaptureOpenRef.current = isCaptureOpen
   }, [isCaptureOpen])
 
+  const refreshGarmentList = useCallback(
+    async (token: string, signal?: AbortSignal) => {
+      const revision = inventoryRevision.current
+      const isCurrent = () =>
+        !signal?.aborted &&
+        epoch === mobileIdentityEpoch() &&
+        revision === inventoryRevision.current
+      if (!isCurrent()) return null
+      let next: GarmentItemContract[]
+      try {
+        next = await listGarmentsFromMobile(token, signal)
+      } catch (error) {
+        if (!isCurrent()) return null
+        throw error
+      }
+      // A concurrent list or write may have updated or removed a garment.
+      // An older snapshot cannot settle a poll or authorize another view.
+      if (!isCurrent()) return null
+      inventoryRevision.current++
+      setGarments(next)
+      return next
+    },
+    [epoch]
+  )
+
   const loadGarments = useCallback(
     async (signal?: AbortSignal) => {
       const token = await resolveMobileAccessToken()
-      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return
-      if (!token) {
-        throw new Error('AUTHENTICATION_REQUIRED')
-      }
+      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
+      if (!token) throw new Error('AUTHENTICATION_REQUIRED')
       setAccessToken(token)
-      const next = await listGarmentsFromMobile(token, signal)
-      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return
-      setGarments(next)
-      setHasLoaded(true)
-      setLoadFailed(false)
+      const next = await refreshGarmentList(token, signal)
+      if (next) {
+        setHasLoaded(true)
+        setLoadFailed(false)
+      }
+      return next
     },
-    [epoch]
+    [epoch, refreshGarmentList]
   )
 
   useEffect(() => {
@@ -158,8 +261,7 @@ function MemberWardrobeHub({
     router.setParams({ entry: undefined })
     const awaitingTags = garments.find((garment) => garment.status === 'awaiting_tags')
     if (awaitingTags) {
-      setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
-      setTaggingGarmentId(awaitingTags.id)
+      presentTagging(awaitingTags.id)
     } else if (!garments.some((garment) => garment.status === 'processing')) {
       setIsCaptureOpen(true)
     }
@@ -167,12 +269,10 @@ function MemberWardrobeHub({
 
   const closeCapture = () => {
     setIsCaptureOpen(false)
-    const pendingGarmentId = pendingTaggingGarmentIdRef.current
-    pendingTaggingGarmentIdRef.current = null
-    if (pendingGarmentId) {
-      setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
-      setTimeout(() => setTaggingGarmentId(pendingGarmentId), 0)
-    }
+    isCaptureOpenRef.current = false
+    const pending = pendingTagging.current
+    pendingTagging.current = null
+    if (pending) setTimeout(() => presentTagging(pending.id, pending.invoker), 0)
   }
 
   const pollCommittedGarment = (garmentId: string, token: string) => {
@@ -186,11 +286,9 @@ function MemberWardrobeHub({
           token,
           garmentId,
           controller.signal,
-          (next) => {
-            if (!controller.signal.aborted && epoch === mobileIdentityEpoch())
-              setGarments(next)
-          },
-          pollOffsetsMs
+          undefined,
+          pollOffsetsMs,
+          refreshGarmentList
         )
         if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
         if (!settled) {
@@ -198,14 +296,7 @@ function MemberWardrobeHub({
           return
         }
         if (settled.status === 'ready') markGarmentConfirmed()
-        if (settled.status === 'awaiting_tags') {
-          if (isCaptureOpenRef.current) {
-            pendingTaggingGarmentIdRef.current = settled.id
-          } else {
-            setTaggingInvokerNodeHandle(safeFindNodeHandle(addGarmentButtonRef.current))
-            setTaggingGarmentId(settled.id)
-          }
-        }
+        if (settled.status === 'awaiting_tags') presentTagging(settled.id)
       } catch (error) {
         if (!controller.signal.aborted) {
           setErrorMessage(
@@ -227,13 +318,12 @@ function MemberWardrobeHub({
       return
     }
     setAccessToken(freshToken)
-    setTaggingInvokerNodeHandle(
-      invokingNodeHandle ?? safeFindNodeHandle(addGarmentButtonRef.current)
-    )
-    setTaggingGarmentId(garmentId)
+    presentTagging(garmentId, invokingNodeHandle)
   }
 
   const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
+    if (epoch !== mobileIdentityEpoch()) return
+    inventoryRevision.current++
     setAccessToken(token)
     setGarments((current) => [
       garment,
@@ -241,7 +331,7 @@ function MemberWardrobeHub({
     ])
     if (garment.status === 'ready') markGarmentConfirmed()
     if (garment.status === 'awaiting_tags') {
-      pendingTaggingGarmentIdRef.current = garment.id
+      pendingTagging.current = { id: garment.id }
     } else if (garment.status === 'processing') {
       pollCommittedGarment(garment.id, token)
     }
@@ -252,7 +342,7 @@ function MemberWardrobeHub({
       <View
         style={styles.screen}
         testID="wardrobe-screen"
-        importantForAccessibility={taggingGarmentId ? 'no-hide-descendants' : 'auto'}
+        {...underModalAccessibility(Boolean(taggingGarmentId || styleSelection))}
       >
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.header}>
@@ -417,6 +507,20 @@ function MemberWardrobeHub({
                       </Text>
                     </Pressable>
                   )}
+                  <StylePieceEntry
+                    garment={garment}
+                    owner={owner}
+                    epoch={epoch}
+                    unavailable={loadFailed}
+                    loading={isLoading}
+                    labels={styleLabels}
+                    buttonRef={(button) => {
+                      if (button) styleButtons.current.set(garment.id, button)
+                      else styleButtons.current.delete(garment.id)
+                    }}
+                    onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                    onOpen={openStylePanel}
+                  />
                 </View>
               ))}
             </View>
@@ -434,19 +538,35 @@ function MemberWardrobeHub({
 
       <MobileGarmentTaggingModal
         visible={Boolean(taggingGarmentId)}
-        onClose={() => setTaggingGarmentId(null)}
+        onClose={closeTagging}
         garmentId={taggingGarmentId}
         accessToken={accessToken}
         invokingNodeHandle={taggingInvokerNodeHandle}
         onTagsConfirmed={(updatedGarment) => {
+          if (epoch !== mobileIdentityEpoch()) return
+          inventoryRevision.current++
           setGarments((current) =>
             current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
           )
-          setTaggingGarmentId(null)
+          closeTagging()
           markGarmentConfirmed()
           setLoadAttempt((attempt) => attempt + 1)
         }}
       />
+
+      {owner && styleSelection && (
+        <StylePiecePanel
+          selection={styleSelection}
+          inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
+          loadInventory={loadGarments}
+          visible={!styleClosing}
+          owner={owner}
+          epoch={epoch}
+          locale={i18n.language}
+          onClose={() => setStyleClosing(true)}
+          onDismiss={() => finishStyleDismissal(styleSelection)}
+        />
+      )}
     </>
   )
 }

@@ -5,7 +5,7 @@
 'use client'
 
 import Link from 'next/link'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
@@ -25,7 +25,14 @@ import {
 } from '../../lib/wardrobe'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 import { currentWebSessionOwner, useWebSessionOwner } from '../../lib/use-web-session'
-import { getGuestPreviewStrings } from '@couture/utils'
+import {
+  getGuestPreviewStrings,
+  getStylePieceStrings,
+  nextStylePiecePhotoExpiry,
+  scheduleStylePiecePhotoExpiry,
+  type StylePieceSelection,
+} from '@couture/utils'
+import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 
 export default function WardrobePage() {
   const owner = useWebSessionOwner()
@@ -124,6 +131,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [hasLoaded, setHasLoaded] = useState(false)
   const listController = useRef<AbortController | null>(null)
+  const inventoryVersion = useRef(0)
   const loadAfterTags = useRef(false)
   const [garmentError, setGarmentError] = useState<string | null>(null)
   const [confirmedGarment, setConfirmedGarment] = useState(false)
@@ -134,6 +142,37 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [userIdError, setUserIdError] = useState(false)
   const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
   const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
+  const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
+  const styleInvoker = useRef<HTMLButtonElement | null>(null)
+  const styleLabels = getStylePieceStrings(i18n.language)
+  const [, updatePhotoClock] = useState(0)
+  const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
+  useEffect(
+    () =>
+      scheduleStylePiecePhotoExpiry(photoExpiry, () =>
+        updatePhotoClock((clock) => clock + 1)
+      ),
+    [photoExpiry]
+  )
+  const loadInventory = useCallback(
+    async (signal: AbortSignal) => {
+      // Give a superseded request one fresh read, including any missing garments.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const version = inventoryVersion.current
+        const items = await listGarmentsFromWeb(signal)
+        if (signal.aborted || currentWebSessionOwner() !== owner) return null
+        // A completed refresh or local update may be newer than this snapshot.
+        if (version !== inventoryVersion.current) continue
+        inventoryVersion.current++
+        setGarments(items)
+        setLoadError(null)
+        setHasLoaded(true)
+        return items
+      }
+      return null
+    },
+    [owner]
+  )
 
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
@@ -203,13 +242,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     const controller = new AbortController()
     listController.current = controller
     setIsLoading(true)
-    void listGarmentsFromWeb(controller.signal)
-      .then((persistedGarments) => {
-        if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
-        setGarments(persistedGarments)
-        setHasLoaded(true)
-        setLoadError(null)
-      })
+    void loadInventory(controller.signal)
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           setLoadError(
@@ -229,7 +262,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         }
       })
     return () => controller.abort()
-  }, [sessionAttempt, missedSession, loadAttempt, owner])
+  }, [sessionAttempt, missedSession, loadAttempt, loadInventory])
 
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
@@ -276,12 +309,9 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
             Math.max(0, startedAt + offsetMs - Date.now()),
             controller.signal
           )
-          const persisted = await listGarmentsFromWeb(controller.signal)
+          const persisted = await loadInventory(controller.signal)
           if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
-          setGarments(persisted)
-          setHasLoaded(true)
-          setLoadError(null)
-          const current = persisted.find((garment) => garment.id === garmentId)
+          const current = persisted?.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
           if (current.status === 'ready') setConfirmedGarment(true)
           if (current.status === 'awaiting_tags') {
@@ -326,6 +356,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   }, [garments, hasLoaded, isLoading, loadError, owner])
 
   const handleGarmentCommitted = (garment: GarmentItemContract) => {
+    inventoryVersion.current++
     setGarments((current) => [
       garment,
       ...current.filter((item) => item.id !== garment.id),
@@ -355,6 +386,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     ) {
       taggingInvokerRef.current = addGarmentButtonRef.current
     }
+    inventoryVersion.current++
     setGarments((current) =>
       current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
     )
@@ -415,6 +447,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
               </button>
               <button
                 ref={addGarmentButtonRef}
+                data-testid="garment-capture-open"
                 onClick={(event) => openCapture(event.currentTarget)}
                 className="col-span-2 min-h-[44px] whitespace-nowrap rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
               >
@@ -574,6 +607,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
                           </button>
                         )}
                       </div>
+                      <StylePieceEntry
+                        garment={garment}
+                        owner={owner}
+                        unavailable={Boolean(loadError)}
+                        loading={isLoading}
+                        labels={styleLabels}
+                        onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                        onOpen={(selection, button) => {
+                          styleInvoker.current = button
+                          setStyleSelection(selection)
+                        }}
+                      />
                     </div>
                   </div>
                 ))}
@@ -600,6 +645,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         onTagsConfirmed={handleTagsConfirmed}
         invokingElementRef={taggingInvokerRef}
       />
+
+      {owner && styleSelection && (
+        <StylePiecePanel
+          selection={styleSelection}
+          inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
+          loadInventory={loadInventory}
+          owner={owner}
+          locale={i18n.language}
+          invoker={styleInvoker}
+          onClose={() => setStyleSelection(null)}
+        />
+      )}
 
       {isSilhouetteModalOpen && userId && (
         <AccessibleModal
