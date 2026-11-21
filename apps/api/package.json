@@ -116,8 +116,8 @@
     "@opentelemetry/exporter-metrics-otlp-http": "^0.222.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
     "@opentelemetry/sdk-node": "^0.222.0",
-    "@prisma/adapter-pg": "6.19.0",
-    "@prisma/client": "6.19.0",
+    "@prisma/adapter-pg": "6.19.3",
+    "@prisma/client": "6.19.3",
     "@supabase/supabase-js": "^2.112.0",
     "@tensorflow/tfjs": "npm:@tensorflow/tfjs-core@4.16.0",
     "@tensorflow/tfjs-backend-wasm": "4.16.0",
@@ -144,8 +144,8 @@
   },
   "devDependencies": {
     "@couture/testing": "file:../../packages/testing",
-    "@nestjs/cli": "11.0.10",
-    "@nestjs/schematics": "11.0.9",
+    "@nestjs/cli": "11.0.24",
+    "@nestjs/schematics": "11.1.0",
     "@nestjs/testing": "11.2.11",
     "@types/express": "5.0.5",
     "@types/pg": "^8.15.6",
@@ -157,6 +157,6 @@
     "testcontainers": "^11.9.0",
     "ts-loader": "9.5.4",
     "ts-node": "10.9.2",
-    "tsconfig-paths": "3.15.0"
+    "tsconfig-paths": "4.2.0"
   }
 }
