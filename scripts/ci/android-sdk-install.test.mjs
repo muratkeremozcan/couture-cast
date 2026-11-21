@@ -41,6 +41,31 @@ test('the emulator SDK step installs its list through the shared script', () => 
   assert.match(step.env.SDK_PACKAGES, / emulator$/)
 })
 
+const shareCardWorkflow = parse(
+  readFileSync(path.join(root, '.github/workflows/pr-share-card-native.yml'), 'utf8')
+)
+
+for (const job of ['original-resource', 'android36-native-matrix']) {
+  test(`share-card ${job} installs its system image before launching the emulator`, () => {
+    const steps = shareCardWorkflow.jobs[job].steps
+    const install = steps.findIndex((candidate) => candidate.id === 'emulator_image')
+    const journey = steps.findIndex(
+      (candidate) => candidate.name === 'Android isolated native journey'
+    )
+
+    assert.ok(install >= 0 && install < journey)
+    assert.equal(steps[install].run, 'bash scripts/ci/android-sdk-install.sh')
+    assert.equal(
+      steps[install].env.SDK_PACKAGES,
+      'system-images;android-${{ matrix.api }};${{ matrix.target }};x86_64'
+    )
+    assert.ok(
+      steps[install]['timeout-minutes'] > 0 && steps[install]['timeout-minutes'] <= 8
+    )
+    assert.match(steps[journey].if, /steps\.emulator_image\.outcome == 'success'/)
+  })
+}
+
 /** Runs the script against a stub sdkmanager; `sdkmanager` is its bash body. */
 function runStep(t, sdkmanager, env = {}, args = [], { node, gradleProperties } = {}) {
   const work = mkdtempSync(path.join(os.tmpdir(), 'sdk-install-'))
