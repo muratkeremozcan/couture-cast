@@ -10,6 +10,8 @@ const healthResponseSchema = z.object({
 })
 
 test.describe('Web smoke', () => {
+  test.use({ authSessionEnabled: false })
+
   test('hero renders with healthy services and passes accessibility scan', async ({
     apiRequest,
     page,
@@ -41,7 +43,7 @@ test.describe('Web smoke', () => {
     )
     await expect(page.getByTestId('primary-nav')).toBeVisible()
     await expect(page.getByTestId('hero-cta-group')).toBeVisible()
-    await expect(page.getByTestId('health-indicator')).toBeVisible()
+    await expect(page.getByTestId('health-indicator')).toHaveCount(0)
 
     await page.addScriptTag({ path: require.resolve('axe-core') })
 

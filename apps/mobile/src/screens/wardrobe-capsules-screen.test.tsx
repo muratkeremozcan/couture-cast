@@ -2,8 +2,9 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import { http, HttpResponse } from 'msw'
 import type {
   GarmentItemContract,
@@ -40,8 +41,14 @@ vi.mock('react-native', async (importOriginal) => {
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import { deleteCapsuleFromMobile, listCapsulesFromMobile } from '@/src/lib/wardrobe'
 import WardrobeCapsulesScreen from '../../app/wardrobe-capsules'
+
+vi.mock('@/src/lib/wardrobe', { spy: true })
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it doesn't
@@ -54,6 +61,7 @@ function fakeAccessToken(userId: string): string {
 }
 
 const ACCESS_TOKEN = fakeAccessToken('auth-principal-user-1')
+const SECOND_ACCESS_TOKEN = fakeAccessToken('auth-principal-user-2')
 
 function garment(id: string, category: string): GarmentItemContract {
   return {
@@ -108,6 +116,12 @@ function capsule(overrides: Partial<OutfitCapsuleContract> = {}): OutfitCapsuleC
   } as unknown as OutfitCapsuleContract
 }
 
+const SECOND_MEMBER_CAPSULE = capsule({
+  id: 'cap-2',
+  ownerUserId: 'user-2',
+  name: 'Current member capsule',
+})
+
 /** Every capsule-list request the screen issued, newest last. */
 let listRequests: URL[] = []
 
@@ -135,6 +149,12 @@ function pressAlertButton(text: string) {
 
 describe('WardrobeCapsulesScreen', () => {
   let restoreAccessTokenResolver: () => void
+  let accessToken: string
+
+  function switchAccount() {
+    accessToken = SECOND_ACCESS_TOKEN
+    act(() => setMobileApplicationUserId('user-2'))
+  }
 
   beforeAll(async () => {
     await initI18n()
@@ -144,12 +164,18 @@ describe('WardrobeCapsulesScreen', () => {
   beforeEach(() => {
     server.use(
       http.get('*/api/v1/user/profile', ({ request }) => {
-        if (request.headers.get('authorization') !== `Bearer ${ACCESS_TOKEN}`)
-          return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        const authorization = request.headers.get('authorization')
+        const owner =
+          authorization === `Bearer ${ACCESS_TOKEN}`
+            ? 'user-1'
+            : authorization === `Bearer ${SECOND_ACCESS_TOKEN}`
+              ? 'user-2'
+              : null
+        if (!owner) return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
         return HttpResponse.json({
           user: {
-            id: 'user-1',
-            email: 'owner@synthetic.test',
+            id: owner,
+            email: `${owner}@synthetic.test`,
             displayName: null,
             birthdate: '1990-01-01T00:00:00.000Z',
             role: 'guardian',
@@ -161,12 +187,15 @@ describe('WardrobeCapsulesScreen', () => {
     )
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     listRequests = []
-    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => ACCESS_TOKEN)
+    accessToken = ACCESS_TOKEN
+    setMobileApplicationUserId('user-1')
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => accessToken)
     server.use(listHandler([capsule()]), garmentsHandler())
   })
 
   afterEach(() => {
     restoreAccessTokenResolver()
+    setMobileApplicationUserId(null)
     vi.clearAllMocks()
   })
 
@@ -182,6 +211,90 @@ describe('WardrobeCapsulesScreen', () => {
     // The canonical profile owns the segment. Its id differs from the bearer principal.
     expect(listRequests.at(-1)?.pathname).toBe('/api/v1/wardrobe/user-1/capsules')
     expect(screen.queryByTestId('capsule-loading-state')).not.toBeInTheDocument()
+  })
+
+  it('capsule account switch discards a late list response from the previous member', async () => {
+    const lateCapsule = capsule({ name: 'Previous member private capsule' })
+    let releaseList!: () => void
+    const heldList = new Promise<void>((resolve) => {
+      releaseList = resolve
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/:ownerUserId/capsules', async ({ request, params }) => {
+        const url = new URL(request.url)
+        listRequests.push(url)
+        const secondMember = params.ownerUserId === 'user-2'
+        const bearer = secondMember ? SECOND_ACCESS_TOKEN : ACCESS_TOKEN
+        if (request.headers.get('authorization') !== `Bearer ${bearer}`)
+          return new HttpResponse(null, { status: 401 })
+        const filtered = !secondMember && url.searchParams.has('occasion')
+        if (filtered) await heldList
+        const item = secondMember
+          ? SECOND_MEMBER_CAPSULE
+          : filtered
+            ? lateCapsule
+            : capsule()
+        return HttpResponse.json({ data: [item], total: 1, limit: 20, offset: 0 })
+      })
+    )
+
+    render(<WardrobeCapsulesScreen />)
+    try {
+      await screen.findByText('Work capsule')
+      await userEvent.click(screen.getByTestId('capsule-occasion-filter-work'))
+      await waitFor(() =>
+        expect(listRequests.at(-1)?.searchParams.get('occasion')).toBe('work')
+      )
+      const previousList = vi.mocked(listCapsulesFromMobile).mock.results.at(-1)
+      if (previousList?.type !== 'return') throw new Error('Expected a pending list call')
+      switchAccount()
+      await act(async () => {
+        releaseList()
+        await previousList.value.catch(() => undefined)
+      })
+
+      expect(screen.queryByText(lateCapsule.name)).not.toBeInTheDocument()
+      expect(await screen.findByText(SECOND_MEMBER_CAPSULE.name)).toBeInTheDocument()
+      expect(screen.queryByText('Work capsule')).not.toBeInTheDocument()
+    } finally {
+      releaseList()
+    }
+  })
+
+  it('capsule account switch retires a previous member’s native delete confirmation', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/user-2/capsules', ({ request }) => {
+        if (request.headers.get('authorization') !== `Bearer ${SECOND_ACCESS_TOKEN}`)
+          return new HttpResponse(null, { status: 401 })
+        return HttpResponse.json({
+          data: [SECOND_MEMBER_CAPSULE],
+          total: 1,
+          limit: 20,
+          offset: 0,
+        })
+      }),
+      http.delete(
+        '*/api/v1/wardrobe/:ownerUserId/capsules/:capsuleId',
+        () => new HttpResponse(null, { status: 204 })
+      )
+    )
+    render(<WardrobeCapsulesScreen />)
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Delete capsule: Work capsule' })
+    )
+    expect(alertMock.alert).toHaveBeenCalledTimes(1)
+    expect(deleteCapsuleFromMobile).not.toHaveBeenCalled()
+
+    switchAccount()
+    await act(async () => {
+      pressAlertButton('Delete capsule')
+      await Promise.resolve()
+    })
+
+    expect(deleteCapsuleFromMobile).not.toHaveBeenCalled()
+    expect(await screen.findByText(SECOND_MEMBER_CAPSULE.name)).toBeInTheDocument()
+    expect(screen.queryByText('Work capsule')).not.toBeInTheDocument()
+    expect(screen.getByTestId('capsule-status-region')).toBeEmptyDOMElement()
   })
 
   it('4.3-MOB-CAPS-02 stops at a sign-in message instead of requesting capsules without a token', async () => {
@@ -571,9 +684,10 @@ describe('WardrobeCapsulesScreen', () => {
     )
 
     render(<WardrobeCapsulesScreen />)
-    await waitFor(() => screen.getByTestId('create-capsule-button'))
+    const createButton = screen.getByRole('button', { name: 'Create capsule' })
+    await waitFor(() => expect(createButton).not.toBeDisabled())
 
-    fireEvent.click(screen.getByTestId('create-capsule-button'))
+    await userEvent.click(createButton)
     await waitFor(() => screen.getByTestId('close-modal-button'))
 
     fireEvent.click(screen.getByTestId('close-modal-button'))

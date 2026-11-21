@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyGuardedErrors,
   guardExpectedError,
+  unexpectedRitualErrors,
   type GuardedError,
 } from './expected-error-guard'
 
@@ -94,4 +95,25 @@ describe('guardExpectedError', () => {
       { ...metadata, bodyUnreadable: true },
     ])
   })
+})
+
+it('retains ritual errors outside the missing-city recovery', () => {
+  const missingCity = {
+    method: 'GET',
+    status: 400,
+    url: 'http://127.0.0.1:3005/api/v1/ritual?locale=en-US',
+  }
+  const wrongMessage = { ...missingCity, code: 'Other bad request' }
+  const unavailable = { ...missingCity, status: 503, bodyUnreadable: true as const }
+  const otherMethod = { ...missingCity, method: 'POST', bodyUnreadable: true as const }
+  expect(
+    unexpectedRitualErrors([
+      { ...missingCity, code: 'No location preferences found for user' },
+      { ...missingCity, bodyUnreadable: true },
+      missingCity,
+      wrongMessage,
+      unavailable,
+      otherMethod,
+    ])
+  ).toEqual([missingCity, wrongMessage, unavailable, otherMethod])
 })

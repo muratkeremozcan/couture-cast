@@ -145,6 +145,16 @@ source action, use personal photos in tests, or count automation as a study obse
 | Contract suites rejected the new approved public fields                | Updated exact key and negotiation expectations and published the title rule in OpenAPI. The package suite passed with the clock shifted a year ahead.     |
 | Phone study needs observed sessions                                    | The study kit and outreach are complete. Results require participant opt-in and actual sessions.                                                          |
 
+## Hosted regressions
+
+- Capsule pages now key their member state by verified identity and cancel old work on
+  both platforms. The four account-switch tests reproduced stale reads and delete
+  confirmations before the fix.
+- Playwright now follows the Community route from Home, checks service health through
+  the endpoint, exercises the title's painted contrast and verifies the new Settings
+  keyboard stop. Community's separate browser contexts still report unexpected HTTP
+  failures. They share Home's scoped missing-city check.
+
 ## Verification
 
 - Run `npm run verify:changed`, `npm run test:pact`, the focused Playwright and Maestro

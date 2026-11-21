@@ -303,8 +303,14 @@ describe('community HTTP contracts', () => {
       ])
 
       expect(communityFeedItemSchema.parse(publicItem)).toEqual(publicItem)
-      const titled = { ...publicItem, title: 'Classy in Camouflage', textRevision: 1 }
+      const titled = { ...publicItem, title: 'Classy in Camouflage' }
       expect(communityFeedItemSchema.parse(titled)).toEqual(titled)
+      const owned = {
+        ...titled,
+        author: { ...titled.author, isSelf: true },
+        textRevision: 1,
+      }
+      expect(communityFeedItemSchema.parse(owned)).toEqual(owned)
     })
 
     it('6.1-CON-012 refuses an author user id, a storage object path, and moderation internals', () => {

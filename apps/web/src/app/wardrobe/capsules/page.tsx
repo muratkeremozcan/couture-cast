@@ -7,6 +7,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../../i18n'
 import {
+  isLiveOwner,
+  MemberScope,
+  useMountSignal,
+  type MemberSession,
+} from '../../../lib/use-web-session'
+import {
   listCapsulesFromWeb,
   createCapsuleFromWeb,
   updateCapsuleFromWeb,
@@ -35,16 +41,58 @@ function capsuleETag(capsule: OutfitCapsuleContract): string {
   return `"capsule:${capsule.id}:${capsule.revision}"`
 }
 
+function CapsuleErrorBanner({
+  session,
+  error,
+}: {
+  session: MemberSession
+  error: string | null
+}) {
+  const { t, i18n } = useTranslation()
+  const message =
+    session.status === 'signed_out'
+      ? 'Sign in to manage capsules.'
+      : session.status === 'unavailable'
+        ? t('wardrobe.capsules.errors.load')
+        : error
+  if (!message) return null
+
+  return (
+    <div
+      role="alert"
+      className="mt-4 rounded-lg bg-red-50 p-4 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300"
+      data-testid="capsule-error-banner"
+    >
+      {message}
+      {session.status === 'unavailable' && (
+        <button
+          type="button"
+          onClick={session.retry}
+          className="ml-2 min-h-11 px-2 font-semibold underline"
+        >
+          {getGuestPreviewStrings(i18n.language).chrome.retry}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function WardrobeCapsulesPage() {
   return (
     <I18nextProvider i18n={getI18n()}>
-      <CapsulesView />
+      <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
     </I18nextProvider>
   )
 }
 
-function CapsulesView() {
+function CapsulesView({ session }: { session: MemberSession }) {
   const { t, i18n } = useTranslation()
+  const { owner, status } = session
+  const mountSignal = useMountSignal()
+  const current = useCallback(
+    (signal: AbortSignal) => !signal.aborted && isLiveOwner(owner),
+    [owner]
+  )
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
@@ -70,16 +118,18 @@ function CapsulesView() {
 
   /** The owner defaults to the signed-in user, as confirmed by the API. */
   useEffect(() => {
+    const signal = mountSignal()
+    if (!current(signal)) return
     let cancelled = false
 
     void (async () => {
       try {
         const userId = await resolveCurrentUserId()
-        if (!cancelled) {
+        if (!cancelled && current(signal)) {
           setOwnerUserId(userId)
         }
       } catch (err: unknown) {
-        if (cancelled) {
+        if (cancelled || !current(signal)) {
           return
         }
         setError(err instanceof Error ? err.message : 'Sign in to manage capsules.')
@@ -90,7 +140,7 @@ function CapsulesView() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [current, mountSignal])
 
   /** Debounce keystrokes into a single query rather than one request per key. */
   useEffect(() => {
@@ -99,13 +149,15 @@ function CapsulesView() {
   }, [searchInput])
 
   const fetchCapsules = useCallback(async () => {
-    if (!ownerUserId) {
+    const signal = mountSignal()
+    if (!ownerUserId || !current(signal)) {
       return
     }
 
     inFlightRef.current?.abort()
     const controller = new AbortController()
     inFlightRef.current = controller
+    const reading = () => !controller.signal.aborted && current(signal)
 
     setIsLoading(true)
     setError(null)
@@ -122,26 +174,26 @@ function CapsulesView() {
           },
           controller.signal
         ),
-        listGarmentsFromWeb(),
+        listGarmentsFromWeb(controller.signal),
       ])
 
-      if (controller.signal.aborted) {
+      if (!reading()) {
         return
       }
       setCapsules(page.items)
       setTotal(page.total)
       setGarments(garmentList)
     } catch (err: unknown) {
-      if (controller.signal.aborted) {
+      if (!reading()) {
         return
       }
       setError(err instanceof Error ? err.message : t('wardrobe.capsules.errors.load'))
     } finally {
-      if (!controller.signal.aborted) {
+      if (reading()) {
         setIsLoading(false)
       }
     }
-  }, [ownerUserId, searchQuery, selectedOccasion, favoriteOnly, t])
+  }, [current, mountSignal, ownerUserId, searchQuery, selectedOccasion, favoriteOnly, t])
 
   useEffect(() => {
     void fetchCapsules()
@@ -163,46 +215,67 @@ function CapsulesView() {
     input: CreateOutfitCapsuleInput,
     options: CapsuleSaveOptions
   ) => {
-    if (!ownerUserId) return
+    const signal = mountSignal()
+    if (!ownerUserId || !current(signal)) return
 
     if (editingCapsule && options.ifMatch) {
-      await updateCapsuleFromWeb(ownerUserId, editingCapsule.id, input, options.ifMatch)
-      setStatusMessage(t('wardrobe.capsules.updated'))
+      await updateCapsuleFromWeb(
+        ownerUserId,
+        editingCapsule.id,
+        input,
+        options.ifMatch,
+        signal
+      )
     } else {
-      await createCapsuleFromWeb(ownerUserId, input, options.idempotencyKey)
-      setStatusMessage(t('wardrobe.capsules.created'))
+      await createCapsuleFromWeb(ownerUserId, input, options.idempotencyKey, signal)
     }
+    if (!current(signal)) return
+    setStatusMessage(
+      t(
+        editingCapsule && options.ifMatch
+          ? 'wardrobe.capsules.updated'
+          : 'wardrobe.capsules.created'
+      )
+    )
     await fetchCapsules()
   }
 
   const handleToggleFavorite = async (capsule: OutfitCapsuleContract) => {
-    if (!ownerUserId) return
+    const signal = mountSignal()
+    if (!ownerUserId || !current(signal)) return
     try {
       await favoriteCapsuleFromWeb(
         ownerUserId,
         capsule.id,
         !capsule.isFavorite,
-        capsuleETag(capsule)
+        capsuleETag(capsule),
+        signal
       )
+      if (!current(signal)) return
       setStatusMessage(t('wardrobe.capsules.favoriteUpdated'))
       await fetchCapsules()
     } catch (err: unknown) {
+      if (!current(signal)) return
       setError(err instanceof Error ? err.message : t('wardrobe.capsules.errors.save'))
     }
   }
 
   const handleDeleteConfirm = async () => {
-    if (!deletingCapsule || !ownerUserId) return
+    const signal = mountSignal()
+    if (!deletingCapsule || !ownerUserId || !current(signal)) return
     try {
       await deleteCapsuleFromWeb(
         ownerUserId,
         deletingCapsule.id,
-        capsuleETag(deletingCapsule)
+        capsuleETag(deletingCapsule),
+        signal
       )
+      if (!current(signal)) return
       setDeletingCapsule(null)
       setStatusMessage(t('wardrobe.capsules.deleted'))
       await fetchCapsules()
     } catch (err: unknown) {
+      if (!current(signal)) return
       setError(err instanceof Error ? err.message : t('wardrobe.capsules.errors.delete'))
     }
   }
@@ -211,6 +284,7 @@ function CapsulesView() {
     () => Math.max(0, total - capsules.length),
     [total, capsules]
   )
+  const loading = status === 'checking' || (status === 'signed_in' && isLoading)
 
   return (
     /*
@@ -242,6 +316,7 @@ function CapsulesView() {
         <button
           ref={createButtonRef}
           type="button"
+          disabled={!ownerUserId}
           onClick={() => {
             setEditingCapsule(null)
             setIsModalOpen(true)
@@ -302,24 +377,16 @@ function CapsulesView() {
         </label>
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="mt-4 rounded-lg bg-red-50 p-4 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300"
-          data-testid="capsule-error-banner"
-        >
-          {error}
-        </div>
-      )}
+      <CapsuleErrorBanner session={session} error={error} />
 
-      {isLoading ? (
+      {loading ? (
         <div
           className="mt-12 text-center text-sm text-zinc-500"
           data-testid="capsule-loading-state"
         >
           Loading outfit capsules…
         </div>
-      ) : capsules.length === 0 ? (
+      ) : !owner ? null : capsules.length === 0 ? (
         <div
           className="mt-12 text-center text-sm text-zinc-500"
           data-testid="capsule-empty-state"

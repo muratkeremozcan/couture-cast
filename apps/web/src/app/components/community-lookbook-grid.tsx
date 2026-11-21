@@ -1487,7 +1487,7 @@ function PostTitleField({
         value={title}
         maxLength={COMMUNITY_POST_TITLE_MAX_LENGTH}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-sm"
+        className="min-h-11 w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-sm text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
       />
       {titleInvalid && (
         <p role="alert" className="text-sm">

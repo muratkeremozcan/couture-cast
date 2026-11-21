@@ -12,6 +12,17 @@ export type GuardedError = {
 /** The error answer a test expects on the guarded URL; the caller says how many times. */
 export type AllowedError = { method: string; status: number; code: string }
 
+export const RITUAL_RESPONSE_URL = /^https?:\/\/[^/]+\/api\/v1\/ritual(?:\?|$)/
+
+export function unexpectedRitualErrors(seen: readonly GuardedError[]): GuardedError[] {
+  return seen.filter(
+    ({ method, status, code, bodyUnreadable }) =>
+      method !== 'GET' ||
+      status !== 400 ||
+      (code !== 'No location preferences found for user' && !bodyUnreadable)
+  )
+}
+
 /**
  * Splits guarded errors into those the allowance covers and the rest. Pure, so it is unit-tested
  * directly; the caller decides how many allowed errors the test expects.

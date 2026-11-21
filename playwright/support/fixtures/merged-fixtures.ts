@@ -18,7 +18,11 @@ import { test as webhookFixture } from '@seontechnologies/playwright-utils/webho
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
-import { guardExpectedError } from '../helpers/expected-error-guard'
+import {
+  guardExpectedError,
+  RITUAL_RESPONSE_URL,
+  unexpectedRitualErrors,
+} from '../helpers/expected-error-guard'
 import {
   createImmutableAssetCache,
   type ImmutableAssetCache,
@@ -62,7 +66,7 @@ const authSession = base.extend<AuthFixtures>({
 // moderation history is off, as it is on deployed environments. Whether a test sees that answer
 // depends on whether the probe lands before the test ends (P-Q-MEDIA on preview, 1 run in 25), so
 // deployed runs exclude it. Locally the feature is on and any 5xx from it still fails the test.
-export const RITUAL_RESPONSE_URL = /^https?:\/\/[^/]+\/api\/v1\/ritual(?:\?|$)/
+export { RITUAL_RESPONSE_URL }
 const networkErrorMonitor = base
   .extend(
     createNetworkErrorMonitorFixture({
@@ -83,14 +87,8 @@ const networkErrorMonitor = base
         await use()
         if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
           return
-        const missingCity = 'No location preferences found for user'
         // Navigation can abort the JSON body after the HTTP status arrives.
-        const unexpected = (await guard.settle()).filter(
-          ({ method, status, code, bodyUnreadable }) =>
-            method !== 'GET' ||
-            status !== 400 ||
-            (code !== missingCity && !bodyUnreadable)
-        )
+        const unexpected = unexpectedRitualErrors(await guard.settle())
         expect(unexpected, 'unexpected ritual HTTP errors').toEqual([])
       },
       { auto: true },
