@@ -6,6 +6,7 @@ import { type PushTokenRepository } from '../notifications/push-token.repository
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
 const receiptBodySchema = z.object({
   data: z.record(
+    z.string(),
     z.object({
       status: z.enum(['ok', 'error']),
       details: z.object({ error: z.string().optional() }).optional(),

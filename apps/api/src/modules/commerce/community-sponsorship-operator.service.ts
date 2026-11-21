@@ -269,7 +269,7 @@ export class CommunitySponsorshipOperatorService {
 }
 
 function parseReason<T extends string>(
-  schema: z.ZodEnum<[T, ...T[]]>,
+  schema: z.ZodType<T> & { options: readonly T[] },
   raw: string,
   command: 'link' | 'end'
 ): T {

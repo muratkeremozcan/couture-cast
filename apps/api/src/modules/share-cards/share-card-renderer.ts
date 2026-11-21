@@ -14,9 +14,9 @@ const catalogSchema = z.object({
   outfit: z.string(),
   watermarkRole: z.string(),
   community: z.string(),
-  scenarios: z.record(z.string()),
-  categories: z.record(z.string()),
-  climateBands: z.record(z.string()),
+  scenarios: z.record(z.string(), z.string()),
+  categories: z.record(z.string(), z.string()),
+  climateBands: z.record(z.string(), z.string()),
 })
 const ivory = '#F7F3E8'
 const charcoal = '#292724'

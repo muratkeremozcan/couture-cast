@@ -25,7 +25,7 @@
     "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/web"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@couture/api-client": "file:../../packages/api-client",
     "@couture/utils": "file:../../packages/utils",
     "@supabase/supabase-js": "^2.118.0",
@@ -36,7 +36,7 @@
     "react-dom": "19.1.0",
     "react-i18next": "^14.1.1",
     "socket.io-client": "4.8.3",
-    "zod": "3.25.76"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

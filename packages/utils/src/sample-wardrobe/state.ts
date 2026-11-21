@@ -47,7 +47,7 @@ export const guestPreviewStateSchema = z
     votes: z.record(z.string().max(64), z.enum(['like', 'dislike'])),
     swaps: z.record(
       z.string().max(64),
-      z.record(z.enum(SAMPLE_GARMENT_CATEGORIES), z.string().max(64))
+      z.partialRecord(z.enum(SAMPLE_GARMENT_CATEGORIES), z.string().max(64))
     ),
     conversion: z
       .object({

@@ -132,7 +132,7 @@ export const screeningPolicySchema = z
     version: z.string().min(1),
     image: imagePolicySchema,
     reasonCodes: z
-      .object({ image: z.record(z.enum(['pass', 'review', 'block'])) })
+      .object({ image: z.record(z.string(), z.enum(['pass', 'review', 'block'])) })
       .passthrough(),
   })
   .passthrough()

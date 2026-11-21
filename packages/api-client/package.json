@@ -46,11 +46,11 @@
     "gen:openapi:http": "tsx scripts/generate-http-openapi.ts"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^7.3.4",
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@couture/utils": "file:../utils",
     "socket.io-client": "4.8.3",
     "ts-node": "^10.9.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0"

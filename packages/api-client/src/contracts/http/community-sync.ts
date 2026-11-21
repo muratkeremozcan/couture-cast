@@ -103,7 +103,7 @@ export const communityNotificationPreferenceSchema = z
   .object({
     enabled: z.boolean(),
     timezoneConfigured: z.boolean().default(true),
-    ...alertPreferencesSchema.innerType().shape,
+    ...alertPreferencesSchema.shape,
     revision: id,
   })
   .strict()
@@ -123,7 +123,7 @@ export const patchCommunityNotificationPreferencesSchema = z
       .string()
       .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)
       .optional(),
-    timezone: alertPreferencesSchema.innerType().shape.timezone.optional(),
+    timezone: alertPreferencesSchema.shape.timezone.optional(),
   })
   .strict()
 const target = z

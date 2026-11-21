@@ -26,7 +26,7 @@ export type EventsPollQuery = z.infer<typeof eventsPollQuerySchema>
 export const polledEventSchema = z.object({
   id: nonEmptyStringSchema,
   channel: nonEmptyStringSchema,
-  payload: z.unknown(),
+  payload: z.unknown().optional(),
   userId: nonEmptyStringSchema.nullable(),
   createdAt: isoTimestampSchema,
 })

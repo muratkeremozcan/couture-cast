@@ -29,10 +29,7 @@ import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { CommunitySyncService } from './community-sync.service.js'
 import { CommunityTargetsService } from './community-targets.service.js'
-export function parseCommunityInput<T>(
-  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
-  value: unknown
-): T {
+export function parseCommunityInput<T>(schema: z.ZodType<T>, value: unknown): T {
   const parsed = schema.safeParse(value)
   if (!parsed.success)
     throw new BadRequestException({

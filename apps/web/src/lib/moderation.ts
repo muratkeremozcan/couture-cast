@@ -120,7 +120,7 @@ export function parseTolerant<T>(schema: z.ZodType<T>, data: unknown): T {
     for (const issue of unknownKeys) {
       let node: unknown = current
       for (const key of issue.path) {
-        node = (node as Record<string | number, unknown> | null)?.[key]
+        node = (node as Record<PropertyKey, unknown> | null)?.[key]
       }
       if (typeof node === 'object' && node !== null) {
         for (const key of issue.keys) delete (node as Record<string, unknown>)[key]

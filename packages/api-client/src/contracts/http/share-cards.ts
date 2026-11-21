@@ -48,6 +48,8 @@ export const prepareShareCardInputSchema = z.discriminatedUnion('purpose', [
     })
     .strict(),
 ])
+const accessibilityLabelPattern = /^[^\p{Cc}]+$/u
+
 export const preparedShareCardSchema = z
   .object({
     pngBase64: z
@@ -59,7 +61,8 @@ export const preparedShareCardSchema = z
       .string()
       .min(1)
       .max(1024)
-      .regex(/^[^\p{Cc}]+$/u),
+      .regex(accessibilityLabelPattern)
+      .openapi({ pattern: accessibilityLabelPattern.source }),
     sha256: shareCardDigestSchema,
     width: z.literal(1080),
     height: z.literal(1350),

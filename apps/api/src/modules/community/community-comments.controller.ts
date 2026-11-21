@@ -33,7 +33,7 @@ import type { RequestAuthContext } from '../auth/security.types.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { CommunityCommentsService } from './community-comments.service.js'
 
-function parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, value: unknown): T {
+function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value)
   if (!result.success)
     throw new BadRequestException(

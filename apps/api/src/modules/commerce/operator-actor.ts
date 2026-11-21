@@ -11,7 +11,7 @@ export type OperatorActorRefusalCode =
 
 const authUserRowSchema = z.object({
   email: z.string().nullable(),
-  raw_app_meta_data: z.record(z.unknown()).nullable(),
+  raw_app_meta_data: z.record(z.string(), z.unknown()).nullable(),
 })
 
 /**

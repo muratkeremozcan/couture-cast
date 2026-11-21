@@ -283,11 +283,17 @@ export const suggestGarmentTagsResponseSchema = z
   })
   .strict()
 
+// Optic 1.0.9 reports removal of the legacy null enum entry as a breaking
+// change. Keep the published arrays for these request fields.
 export const updateGarmentTagsInputSchema = z
   .object({
-    category: garmentCategoryEnum,
+    category: garmentCategoryEnum.openapi({
+      enum: [...garmentCategoryEnum.options, null],
+    }),
     material: garmentMaterialEnum.nullable().optional(),
-    comfortRange: garmentComfortRangeEnum,
+    comfortRange: garmentComfortRangeEnum.openapi({
+      enum: [...garmentComfortRangeEnum.options, null],
+    }),
   })
   .strict()
 
@@ -451,7 +457,7 @@ function graphemeBoundedText(maxGraphemes: number, minGraphemes = 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.too_small,
           minimum: minGraphemes,
-          type: 'string',
+          origin: 'string',
           inclusive: true,
           message: `must be at least ${minGraphemes} characters after normalization`,
         })
@@ -460,7 +466,7 @@ function graphemeBoundedText(maxGraphemes: number, minGraphemes = 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.too_big,
           maximum: maxGraphemes,
-          type: 'string',
+          origin: 'string',
           inclusive: true,
           message: `must be at most ${maxGraphemes} characters after normalization`,
         })
@@ -560,7 +566,9 @@ export const listOutfitCapsulesQuerySchema = z
       return val
     }, z.boolean().optional()),
     garmentId: nonEmptyStringSchema.max(128).optional(),
-    comfortRange: garmentComfortRangeEnum.optional(),
+    comfortRange: garmentComfortRangeEnum.optional().openapi({
+      enum: [...garmentComfortRangeEnum.options, null],
+    }),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).max(10000).default(0),
   })

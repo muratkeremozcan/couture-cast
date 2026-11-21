@@ -37,7 +37,7 @@ const withoutKey = (
 const enumOptionsOf = (schema: z.ZodTypeAny): readonly string[] => {
   const inner = unwrapSchema(schema)
   expect(inner).toBeInstanceOf(z.ZodEnum)
-  return (inner as z.ZodEnum<[string, ...string[]]>).options
+  return (inner as z.ZodEnum<Record<string, string>>).options
 }
 
 const lookbookDataShape = lookbookNewEventSchema.shape.data.shape

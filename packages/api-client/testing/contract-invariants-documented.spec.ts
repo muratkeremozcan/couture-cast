@@ -1,5 +1,6 @@
 // Learning path Step 14: Author public REST contracts in shared Zod modules.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-14-author-public-rest-contracts-in-shared-zod-modules
+import { getOpenApiMetadata } from '@asteasolutions/zod-to-openapi'
 import { expect, test } from 'vitest'
 import { z } from 'zod'
 import * as httpContracts from '../src/contracts/http'
@@ -19,146 +20,94 @@ import * as httpContracts from '../src/contracts/http'
 // `.openapi({ description })` explaining the rule, so it is published in the spec and
 // visible in the generated SDK.
 
-type ZodDef = Record<string, unknown>
-
-const defOf = (schema: z.ZodTypeAny): ZodDef => schema._def as unknown as ZodDef
-
-const describedBy = (schema: z.ZodTypeAny): string | undefined => {
-  const openapi = defOf(schema).openapi as
-    | { metadata?: { description?: string } }
-    | undefined
-  return openapi?.metadata?.description
-}
-
-const isRefinement = (schema: z.ZodTypeAny): boolean => {
-  const def = defOf(schema)
-  if (def.typeName !== z.ZodFirstPartyTypeKind.ZodEffects) return false
-  const effect = def.effect as { type?: string } | undefined
-  return effect?.type === 'refinement'
-}
-
 type Child = [string, unknown]
 
-/**
- * How to reach the child schemas of each zod node kind. Node kinds absent from
- * this table fall back to `innerType`, which covers every simple wrapper
- * (optional, nullable, default, catch, readonly, branded, promise).
- */
-const CHILD_ACCESSORS: Partial<Record<string, (def: ZodDef) => Child[]>> = {
-  [z.ZodFirstPartyTypeKind.ZodObject]: (def) =>
-    Object.entries((def.shape as () => Record<string, z.ZodTypeAny>)()).map(
-      ([key, value]) => [`.${key}`, value]
-    ),
-  [z.ZodFirstPartyTypeKind.ZodArray]: (def) => [['[]', def.type]],
-  [z.ZodFirstPartyTypeKind.ZodEffects]: (def) => [['', def.schema]],
-  [z.ZodFirstPartyTypeKind.ZodUnion]: (def) =>
-    [...((def.options ?? []) as Iterable<z.ZodTypeAny>)].map((option, index) => [
-      `|${index}`,
-      option,
-    ]),
-  [z.ZodFirstPartyTypeKind.ZodDiscriminatedUnion]: (def) =>
-    [...((def.options ?? []) as Iterable<z.ZodTypeAny>)].map((option, index) => [
-      `|${index}`,
-      option,
-    ]),
-  [z.ZodFirstPartyTypeKind.ZodIntersection]: (def) => [
-    ['&left', def.left],
-    ['&right', def.right],
-  ],
-  [z.ZodFirstPartyTypeKind.ZodTuple]: (def) => [
-    ...((def.items ?? []) as z.ZodTypeAny[]).map(
-      (item, index): Child => [`[${index}]`, item]
-    ),
-    ['[...]', def.rest],
-  ],
-  [z.ZodFirstPartyTypeKind.ZodRecord]: (def) => [
-    ['{key}', def.keyType],
-    ['{value}', def.valueType],
-  ],
-  [z.ZodFirstPartyTypeKind.ZodMap]: (def) => [
-    ['{key}', def.keyType],
-    ['{value}', def.valueType],
-  ],
-  [z.ZodFirstPartyTypeKind.ZodSet]: (def) => [['{value}', def.valueType]],
-  [z.ZodFirstPartyTypeKind.ZodLazy]: (def) => [
-    ['()', (def.getter as () => z.ZodTypeAny)()],
-  ],
-  [z.ZodFirstPartyTypeKind.ZodPipeline]: (def) => [
-    ['>in', def.in],
-    ['>out', def.out],
-  ],
+const describedBy = (schema: z.ZodType): string | undefined => {
+  const description: unknown = getOpenApiMetadata(schema)?.description
+  return typeof description === 'string' ? description : undefined
 }
 
-const isSchema = (value: unknown): value is z.ZodTypeAny =>
-  Boolean(value) && typeof value === 'object' && '_def' in (value as object)
+const isRefinement = (schema: z.ZodType): boolean =>
+  schema._zod.def.checks?.some((check) => check._zod.def.check === 'custom') ?? false
 
-/**
- * Unknown node types yield nothing, which keeps the walker from throwing as the
- * contract surface grows.
- */
-function childrenOf(schema: z.ZodTypeAny): [string, z.ZodTypeAny][] {
-  const def = defOf(schema)
-  const accessor =
-    CHILD_ACCESSORS[def.typeName as string] ??
-    ((wrapper: ZodDef): Child[] => [['', wrapper.innerType]])
+const isSchema = (value: unknown): value is z.ZodType => value instanceof z.ZodType
 
-  return accessor(def).filter((child): child is [string, z.ZodTypeAny] =>
-    isSchema(child[1])
-  )
+function childrenOf(schema: z.ZodType): [string, z.ZodType][] {
+  const def = schema._zod.def
+  const fields = def as unknown as Record<string, unknown>
+  const entries = (values: unknown, label: (index: number) => string): Child[] =>
+    Array.isArray(values) ? values.map((value, index) => [label(index), value]) : []
+  let children: Child[]
+
+  switch (def.type) {
+    case 'object':
+      children = Object.entries(fields.shape as Record<string, unknown>).map(
+        ([key, value]) => [`.${key}`, value]
+      )
+      break
+    case 'array':
+      children = [['[]', fields.element]]
+      break
+    case 'union':
+      children = entries(fields.options, (index) => `|${index}`)
+      break
+    case 'intersection':
+      children = [
+        ['&left', fields.left],
+        ['&right', fields.right],
+      ]
+      break
+    case 'tuple':
+      children = [
+        ...entries(fields.items, (index) => `[${index}]`),
+        ['[...]', fields.rest],
+      ]
+      break
+    case 'record':
+    case 'map':
+      children = [
+        ['{key}', fields.keyType],
+        ['{value}', fields.valueType],
+      ]
+      break
+    case 'set':
+      children = [['{value}', fields.valueType]]
+      break
+    case 'lazy':
+      children = [['()', (fields.getter as () => unknown)()]]
+      break
+    case 'pipe':
+      children = [
+        ['>in', fields.in],
+        ['>out', fields.out],
+      ]
+      break
+    default:
+      children = [['', fields.innerType]]
+  }
+
+  return children.filter((child): child is [string, z.ZodType] => isSchema(child[1]))
 }
 
 function findUndocumentedRefinements(
   roots: [string, unknown][] = Object.entries(httpContracts)
 ): string[] {
   const undocumented: string[] = []
+  const ancestors = new Set<z.ZodType>()
+  const walk = (schema: z.ZodType, path: string) => {
+    if (ancestors.has(schema)) return
+    ancestors.add(schema)
 
-  /**
-   * Keyed by `(schema, covered)` rather than by schema alone. A schema shared
-   * between a documented `.refine().refine().openapi({...})` chain and a plain
-   * property reference is reachable in both states, and collapsing them would
-   * let the covered visit mark the node seen and silently suppress the
-   * uncovered one.
-   */
-  const seen = new WeakMap<object, Set<boolean>>()
-  const alreadyWalked = (schema: z.ZodTypeAny, covered: boolean): boolean => {
-    const states = seen.get(schema)
-    if (states?.has(covered)) return true
-    if (states) states.add(covered)
-    else seen.set(schema, new Set([covered]))
-    return false
-  }
-
-  /**
-   * `covered` propagates only through consecutive ZodEffects nodes, so a single
-   * description covers a chain like `.refine().refine().openapi({...})` while a
-   * refinement nested inside an object property still has to document itself.
-   */
-  const walk = (schema: z.ZodTypeAny, path: string, covered: boolean) => {
-    if (alreadyWalked(schema, covered)) return
-
-    let coveredForChildren = false
-
-    if (isRefinement(schema)) {
-      const description = describedBy(schema)
-      if (description && description.trim().length > 0) {
-        coveredForChildren = true
-      } else if (!covered) {
-        undocumented.push(path || '<root>')
-      } else {
-        coveredForChildren = true
-      }
+    if (isRefinement(schema) && !describedBy(schema)?.trim()) {
+      undocumented.push(path || '<root>')
     }
+    for (const [label, child] of childrenOf(schema)) walk(child, `${path}${label}`)
 
-    for (const [label, child] of childrenOf(schema)) {
-      const childIsEffectsChain =
-        defOf(schema).typeName === z.ZodFirstPartyTypeKind.ZodEffects
-      walk(child, `${path}${label}`, childIsEffectsChain ? coveredForChildren : false)
-    }
+    ancestors.delete(schema)
   }
 
   for (const [name, exported] of roots) {
-    if (!isSchema(exported)) continue
-    walk(exported, name, false)
+    if (isSchema(exported)) walk(exported, name)
   }
 
   return [...new Set(undocumented)].sort()
@@ -203,9 +152,8 @@ test('the walker actually detects an undocumented refinement', () => {
 })
 
 test('a shared refinement is still reported when only one path documents it', () => {
-  // `shared` is undocumented. `documented` wraps it in a described chain, which
-  // reaches it with covered=true; `viaProperty` reaches the same node with
-  // covered=false.
+  // Zod 4 keeps chained checks on the cloned schema. The property still uses
+  // the original schema, which needs its own description.
   const shared = z.object({ value: z.string() }).refine(() => true)
   const documented = shared
     .refine(() => true)

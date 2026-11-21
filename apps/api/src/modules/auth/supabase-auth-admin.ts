@@ -34,7 +34,7 @@ const adminUserSchema = z.object({
   id: z.string().min(1),
   email: z.string().nullish(),
   created_at: z.string(),
-  app_metadata: z.record(z.unknown()).nullish(),
+  app_metadata: z.record(z.string(), z.unknown()).nullish(),
 })
 
 const adminUserPageSchema = z.object({

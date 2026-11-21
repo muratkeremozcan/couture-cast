@@ -24,7 +24,7 @@ const mobileE2EClaimsSchema = z.object({
 const supabaseIdentitySchema = z
   .object({
     id: z.unknown().optional(),
-    app_metadata: z.record(z.unknown()).optional(),
+    app_metadata: z.record(z.string(), z.unknown()).optional(),
     confirmed_at: z.unknown().optional(),
     email: z.unknown().optional(),
     email_confirmed_at: z.unknown().optional(),
