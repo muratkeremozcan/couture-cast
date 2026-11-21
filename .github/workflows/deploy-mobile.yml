@@ -40,7 +40,7 @@ jobs:
         run: node scripts/ci/mobile-release-hold.mjs
 
       - name: Install EAS CLI
-        run: npm install --global eas-cli@latest
+        run: npm install --global eas-cli@27.11.0
 
       - name: Authenticate EAS
         env:
