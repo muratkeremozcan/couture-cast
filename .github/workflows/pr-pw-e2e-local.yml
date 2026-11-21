@@ -162,6 +162,10 @@ jobs:
 
       - name: Build web app
         run: npm run build --workspace web
+        env:
+          # Next.js inlines the local public Auth settings during the build.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
 
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
@@ -180,6 +184,9 @@ jobs:
           npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob $PSP_ARGS
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          # The Playwright launcher also builds the web app before starting Next.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
 
       - name: Copy trace files to blob-report

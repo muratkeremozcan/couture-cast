@@ -267,6 +267,8 @@ jobs:
           fi
           npm run test:pw:burn-in-changed -- --base-branch=${{ needs.plan.outputs.base-ref }} "${SHARD_FLAG[@]}"
         env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ env.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
           # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.git-sha.outputs.sha }}
