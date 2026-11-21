@@ -45,13 +45,17 @@ export function classifyGuardedErrors(
  * Watches every page of a context for 4xx/5xx answers on one URL, any method, for as long as the
  * caller keeps it. It is the companion of a network-error monitor that excludes that URL: the
  * monitor stands aside for the URL, and this guard still fails on every error there except the one
- * the test expects. `settle` waits for the bodies and returns what was seen.
+ * the test expects. A navigation can leave Playwright's body read pending after
+ * the response status arrives. `settle` bounds that wait and reports the status
+ * with an unavailable body when the read cannot finish.
  */
 export function guardExpectedError(
   context: BrowserContext,
-  urlPattern: RegExp
+  urlPattern: RegExp,
+  bodySettleMs = 2_000
 ): { settle: () => Promise<GuardedError[]> } {
-  const pending: Promise<GuardedError>[] = []
+  const seen: GuardedError[] = []
+  const pending: Promise<void>[] = []
   context.on('response', (response) => {
     if (response.status() < 400 || !urlPattern.test(response.url())) return
     const metadata = {
@@ -59,6 +63,7 @@ export function guardExpectedError(
       status: response.status(),
       url: response.url(),
     }
+    const index = seen.push({ ...metadata, bodyUnreadable: true }) - 1
     pending.push(
       response.body().then(
         (bytes) => {
@@ -66,15 +71,33 @@ export function guardExpectedError(
           try {
             body = JSON.parse(bytes.toString()) as typeof body
           } catch {
-            return metadata
+            seen[index] = metadata
+            return
           }
-          return typeof body?.message === 'string'
-            ? { ...metadata, code: body.message }
-            : metadata
+          seen[index] =
+            typeof body?.message === 'string'
+              ? { ...metadata, code: body.message }
+              : metadata
         },
-        () => ({ ...metadata, bodyUnreadable: true as const })
+        () => undefined
       )
     )
   })
-  return { settle: () => Promise.all(pending) }
+  return {
+    async settle() {
+      const count = pending.length
+      let timer: ReturnType<typeof setTimeout> | undefined
+      try {
+        await Promise.race([
+          Promise.all(pending),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, bodySettleMs)
+          }),
+        ])
+        return seen.slice(0, count)
+      } finally {
+        clearTimeout(timer)
+      }
+    },
+  }
 }

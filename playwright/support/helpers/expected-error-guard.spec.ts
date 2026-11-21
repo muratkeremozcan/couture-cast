@@ -95,6 +95,30 @@ describe('guardExpectedError', () => {
       { ...metadata, bodyUnreadable: true },
     ])
   })
+
+  it('settles a stalled response body without losing other errors', async () => {
+    const emitter = new EventEmitter()
+    const guard = guardExpectedError(emitter as unknown as BrowserContext, /commit$/, 20)
+    const response = {
+      request: () => ({ method: () => 'GET' }),
+      url: () => url,
+    }
+    emitter.emit('response', {
+      ...response,
+      status: () => 400,
+      body: () => new Promise<Buffer>(() => undefined),
+    })
+    emitter.emit('response', {
+      ...response,
+      status: () => 503,
+      body: () => Promise.resolve(Buffer.from('{"message":"Unexpected outage"}')),
+    })
+
+    expect(await guard.settle()).toEqual([
+      { method: 'GET', status: 400, url, bodyUnreadable: true },
+      { method: 'GET', status: 503, url, code: 'Unexpected outage' },
+    ])
+  }, 500)
 })
 
 it('retains ritual errors outside the missing-city recovery', () => {

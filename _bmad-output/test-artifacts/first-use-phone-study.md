@@ -39,8 +39,9 @@ caused hesitation and what the weather label meant.
 Record one row per task attempt. Use `completed unprompted`, `completed after help`,
 `stopped` or `blocked by the build` for the outcome. Mark timing as elapsed seconds.
 
-| Session | Cohort | Platform / build | Task / order | First tap | Elapsed seconds | Outcome | Change or stop reason | Weather interpretation |
-| ------- | ------ | ---------------- | ------------ | --------- | --------------- | ------- | --------------------- | ---------------------- |
+| Session | Cohort | Platform / build       | Task / order       | First tap  | Elapsed seconds | Outcome                       | Change or stop reason                                                                             | Weather interpretation |
+| ------- | ------ | ---------------------- | ------------------ | ---------- | --------------- | ----------------------------- | ------------------------------------------------------------------------------------------------- | ---------------------- |
+| G01     | Adult  | Phone web / `5862e9cf` | Guest Home / first | Unreported | Unreported      | Made two looks, self-reported | Could not save or preview the looks. Could not find a mini skirt. Hosiery options were unchecked. | Unreported             |
 
 Summarize completion, assistance, repeat actions and abandonment by cohort. Record
 the build or task condition behind any blocked run.
@@ -53,4 +54,5 @@ it as ready in Wardrobe and deleted the fixture during teardown.
 
 Participant outreach began on 2026-11-20. One adult opted in and received an expiring
 guest-task link after a phone-width browser opened the exact isolated preview and reached
-the sample flow. No participant outcomes have been received.
+the sample flow. The guest pilot was self-reported. The member tasks and additional
+participants have no outcomes yet.

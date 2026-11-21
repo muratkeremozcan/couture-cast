@@ -160,6 +160,9 @@ source action, use personal photos in tests, or count automation as a study obse
 - Added tests for outfit rotation and swaps, API validation, direct capture, city save
   recovery and Community editing. Web, API-client and utility coverage pass the
   existing thresholds.
+- The real-session burn-in reproduced a response read that could outlive the test
+  during reload. The guard bounds teardown and retains the method, status and any
+  readable error message. The stalled-body regression keeps unexpected outages visible.
 
 ## Verification
 
