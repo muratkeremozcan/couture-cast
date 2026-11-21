@@ -10,6 +10,8 @@
 // run against generated route types, not assumed. `page.tsx` stays a thin default-only wrapper.
 'use client'
 
+import Link from 'next/link'
+import { getGuestPreviewStrings } from '@couture/utils'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
@@ -99,7 +101,7 @@ function OnboardingFlow({
 }: {
   garmentPollIntervalsMs?: readonly number[]
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const router = useRouter()
 
   const [userId, setUserId] = useState<string | null>(null)
@@ -480,6 +482,12 @@ function OnboardingFlow({
             {liveAnnouncement ?? ''}
           </p>
 
+          <Link
+            href="/wardrobe"
+            className="inline-flex min-h-11 items-center text-sm font-semibold underline"
+          >
+            {getGuestPreviewStrings(i18n.language).firstUse.backToWardrobe}
+          </Link>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
             {t('wardrobe.onboarding.title')}
           </h1>

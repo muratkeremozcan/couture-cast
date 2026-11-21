@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getGuestPreviewStrings } from '@couture/utils'
 import type {
   GarmentItemContract,
   UploadAttemptSession,
@@ -23,6 +24,7 @@ import {
 import { AccessibleModal } from './accessible-modal'
 
 export interface GarmentCaptureModalProps {
+  confirmDiscard?: boolean
   isOpen: boolean
   onClose: () => void
   onGarmentCommitted?: (garment: GarmentItemContract) => void
@@ -153,6 +155,7 @@ function CropStep({
   setUseBgCleanup,
   onReset,
   onConfirm,
+  confirmRef,
 }: {
   imagePreview: string
   aspectRatio: '1:1' | '4:3'
@@ -161,6 +164,7 @@ function CropStep({
   setUseBgCleanup: (val: boolean) => void
   onReset: () => void
   onConfirm: () => void
+  confirmRef: React.Ref<HTMLButtonElement>
 }) {
   const { t } = useTranslation()
   return (
@@ -252,6 +256,7 @@ function CropStep({
           {t('wardrobe.capture.retake')}
         </button>
         <button
+          ref={confirmRef}
           onClick={() => {
             onConfirm()
           }}
@@ -317,8 +322,21 @@ export function GarmentCaptureModal({
   onGarmentCommitted,
   uploadGarment = uploadGarmentImageFromWeb,
   invokingElementRef,
+  confirmDiscard = false,
 }: GarmentCaptureModalProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const strings = getGuestPreviewStrings(i18n.language).firstUse
+  const [isDiscarding, setIsDiscarding] = useState(false)
+  const keepEditing = useRef<HTMLButtonElement>(null)
+  const confirmCrop = useRef<HTMLButtonElement>(null)
+  const restoreCropFocus = useRef(false)
+  useEffect(() => {
+    if (isDiscarding) keepEditing.current?.focus()
+    else if (restoreCropFocus.current) {
+      restoreCropFocus.current = false
+      confirmCrop.current?.focus()
+    }
+  }, [isDiscarding])
   const [step, setStep] = useState<CaptureStep>('source')
   /** The photo to upload, bound to the session captured when its camera or picker opened. */
   const [imagePreview, setImagePreview] = useState<{
@@ -365,6 +383,7 @@ export function GarmentCaptureModal({
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     stopCamera()
+    setIsDiscarding(false)
     setStep('source')
     setImagePreview(null)
     setErrorKey(null)
@@ -503,10 +522,22 @@ export function GarmentCaptureModal({
     onClose()
   }
 
+  const dismissDiscard = () => {
+    restoreCropFocus.current = true
+    setIsDiscarding(false)
+  }
+
   return (
     <AccessibleModal
       isOpen={isOpen}
-      onClose={handleClose}
+      onClose={() => {
+        if (confirmDiscard && step === 'crop') {
+          if (isDiscarding) dismissDiscard()
+          else setIsDiscarding(true)
+          return
+        }
+        handleClose()
+      }}
       titleId="garment-capture-title"
       title={t('wardrobe.capture.title')}
       invokingElementRef={invokingElementRef}
@@ -541,8 +572,31 @@ export function GarmentCaptureModal({
         />
       )}
 
-      {step === 'crop' && imagePreview && (
+      {isDiscarding && (
+        <div className="space-y-2" aria-live="polite">
+          <p>{strings.discardPhoto}</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              ref={keepEditing}
+              type="button"
+              className="min-h-11 rounded border px-3"
+              onClick={dismissDiscard}
+            >
+              {strings.keepEditing}
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded border px-3"
+              onClick={handleClose}
+            >
+              {strings.discard}
+            </button>
+          </div>
+        </div>
+      )}
+      {step === 'crop' && imagePreview && !isDiscarding && (
         <CropStep
+          confirmRef={confirmCrop}
           imagePreview={imagePreview.dataUrl}
           aspectRatio={aspectRatio}
           setAspectRatio={setAspectRatio}

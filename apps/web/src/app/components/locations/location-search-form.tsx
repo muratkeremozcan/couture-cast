@@ -21,10 +21,11 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import type {
-  LocationSearchCandidate,
-  SavedLocation,
-  SupportedLocale,
+import {
+  findSavedSearchLocation,
+  type LocationSearchCandidate,
+  type SavedLocation,
+  type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 import {
   DevicePositionError,
@@ -32,6 +33,7 @@ import {
 } from '../../../lib/device-position'
 import {
   LocationRequestError,
+  listLocationsFromWeb,
   type LocationCredentials,
   locationsFromCoordinatesFromWeb,
   saveLocationFromSearchFromWeb,
@@ -119,6 +121,7 @@ export function LocationSearchForm({
   const [selected, setSelected] = useState<LocationSearchCandidate | null>(null)
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const attemptedSave = useRef<{ token: string; label: string } | null>(null)
   const [error, setError] = useState<FormError | null>(null)
   const [searchAttempt, setSearchAttempt] = useState(0)
   const [isLocating, setIsLocating] = useState(false)
@@ -343,11 +346,27 @@ export function LocationSearchForm({
     try {
       const credentials = claimed.credentials()
       if (!credentials) return
-      const saved = await saveLocationFromSearchFromWeb(
-        selected.candidateToken,
-        trimmedLabel,
-        credentials
-      )
+      const previous = attemptedSave.current
+      const recovered =
+        previous?.token === selected.candidateToken
+          ? findSavedSearchLocation(
+              await listLocationsFromWeb(undefined, credentials),
+              selected,
+              previous.label
+            )
+          : undefined
+      if (!claimed.current()) return
+      const freshCredentials = claimed.credentials()
+      if (!freshCredentials) return
+      attemptedSave.current = { token: selected.candidateToken, label: trimmedLabel }
+      const saved =
+        recovered ??
+        (await saveLocationFromSearchFromWeb(
+          selected.candidateToken,
+          trimmedLabel,
+          freshCredentials
+        ))
+      attemptedSave.current = null
       if (!claimed.current()) return
       setSelected(null)
       setQuery('')

@@ -26,8 +26,7 @@ import {
   type ReactNode,
 } from 'react'
 import { hasWebSession } from './commerce'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
-import { readStorage } from './browser-persistence'
+import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 import {
   hasStoredWebSession,
   isE2EFixtureBearer,

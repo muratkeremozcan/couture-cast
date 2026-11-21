@@ -5,6 +5,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { AccessibilityInfo, Platform } from 'react-native'
 import type * as NotificationLoadRetry from '../lib/notification-load-retry'
+import type * as MobileAuthModule from '../lib/mobile-auth'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../test-utils/msw/server'
@@ -29,7 +30,8 @@ vi.mock('../lib/native-session', () => ({
   },
   signOutNativeSession: vi.fn(),
 }))
-vi.mock('../lib/mobile-auth', () => ({
+vi.mock('../lib/mobile-auth', async (importOriginal) => ({
+  ...(await importOriginal<typeof MobileAuthModule>()),
   resolveMobileAccessToken: () =>
     session.hold
       ? new Promise<string | undefined>((resolve) => {

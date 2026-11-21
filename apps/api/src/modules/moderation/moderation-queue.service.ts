@@ -9,6 +9,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common'
 import {
+  COMMUNITY_POST_TITLE_MAX_LENGTH,
   communityModerationReasonCategories,
   deriveCaseRisk,
   deriveSlaState,
@@ -70,7 +71,7 @@ const auditUnavailable = () =>
 type Snapshot = ModerationCaseDetail['snapshot']
 
 /** Allowlist projection: unknown stored keys never leave the API, malformed JSON reads as unavailable. */
-export function projectSnapshot(raw: unknown): Snapshot {
+export function projectSnapshot(raw: unknown, includeTitle = false): Snapshot {
   const empty: Snapshot = {
     available: false,
     caption: null,
@@ -89,7 +90,11 @@ export function projectSnapshot(raw: unknown): Snapshot {
     capturedAt !== null && !Number.isNaN(Date.parse(capturedAt))
       ? new Date(capturedAt).toISOString()
       : null
+  const title = includeTitle
+    ? clamp(text('title'), COMMUNITY_POST_TITLE_MAX_LENGTH)
+    : null
   const projected = {
+    ...(title !== null ? { title } : {}),
     caption: text('caption'),
     altText: text('altText'),
     body: text('body'),
@@ -210,7 +215,7 @@ export class ModerationQueueService {
     })
   }
 
-  async getCase(auth: RequestAuthContext, caseId: string) {
+  async getCase(auth: RequestAuthContext, caseId: string, includeTitle = false) {
     const id = parseModerationCaseId(caseId)
     if (!id) throw caseNotFound()
     const now = this.clock()
@@ -221,7 +226,7 @@ export class ModerationQueueService {
     if (!read) throw caseNotFound()
     const { visible: loaded, state: decisionState } = read
 
-    const built = this.buildDetail(auth, caseId, loaded, now)
+    const built = this.buildDetail(auth, caseId, loaded, now, includeTitle)
     const detail = {
       ...built,
       viewerConflict: built.viewerConflict || read.viewerConflict,
@@ -253,7 +258,8 @@ export class ModerationQueueService {
     auth: RequestAuthContext,
     caseId: string,
     loaded: LoadedCase,
-    now: Date
+    now: Date,
+    includeTitle: boolean
   ): Omit<ModerationCaseDetail, 'media' | keyof ModerationCaseDecisionState> {
     const open = loaded.reports.filter((report) => report.resolvedAt === null)
     const status: ModerationCaseStatus = open.length > 0 ? 'open' : 'resolved'
@@ -286,7 +292,7 @@ export class ModerationQueueService {
       reportCount: relevant.length,
       locale: this.locale(loaded, relevant),
       subject: this.subject(loaded, first),
-      snapshot: projectSnapshot(first.snapshot),
+      snapshot: projectSnapshot(first.snapshot, includeTitle),
       target: this.target(loaded),
       findings,
       reporters: relevant.map((report) => ({

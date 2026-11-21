@@ -21,6 +21,7 @@ export const GUEST_PREVIEW_MAX_BYTES = 16 * 1024
 export const GUEST_PREVIEW_VIEWS = ['outfit', 'wardrobe', 'preferences'] as const
 export type GuestPreviewView = (typeof GUEST_PREVIEW_VIEWS)[number]
 export const GUEST_PREVIEW_CONVERSION_INTENT = 'guest-preview-carryover'
+export const GUEST_PREVIEW_GARMENT_INTENT = 'guest-preview-first-garment'
 
 const tolerance = z.enum(['low', 'medium', 'high'])
 
@@ -49,7 +50,9 @@ export const guestPreviewStateSchema = z
       z.record(z.enum(SAMPLE_GARMENT_CATEGORIES), z.string().max(64))
     ),
     conversion: z
-      .object({ intent: z.literal(GUEST_PREVIEW_CONVERSION_INTENT) })
+      .object({
+        intent: z.enum([GUEST_PREVIEW_CONVERSION_INTENT, GUEST_PREVIEW_GARMENT_INTENT]),
+      })
       .strict()
       .optional(),
   })

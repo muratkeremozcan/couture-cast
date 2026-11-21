@@ -849,6 +849,27 @@ describe('U-B-ROUTE-MATRIX', () => {
           ],
         },
       },
+      editPostText: {
+        method: RequestMethod.PATCH,
+        route: 'posts/:postId/text',
+        expected: {
+          effect: 'enforced',
+          path: [
+            [CONTROLLER, 'editPostText', 'this.communityService.editPostText'],
+            [
+              'community.service.ts',
+              'editPostText',
+              'this.repository.editPublishedPostText',
+            ],
+            [
+              'community.repository.ts',
+              'editPublishedPostText',
+              'assertCommunityDatabaseAccess',
+            ],
+            ...DATABASE_ACCESS,
+          ],
+        },
+      },
       publishPost: {
         method: RequestMethod.POST,
         route: 'posts/publish',

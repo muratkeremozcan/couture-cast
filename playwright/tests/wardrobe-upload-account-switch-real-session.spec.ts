@@ -30,7 +30,7 @@ import type {
   Request,
 } from '@playwright/test'
 import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-utils/network-error-monitor/fixtures'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { expect, RITUAL_RESPONSE_URL, test } from '../support/fixtures/merged-fixtures'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 import {
   createRealCommunityAuthAccount,
@@ -193,6 +193,13 @@ async function expectMemberBProfile(dialog: Locator) {
   )
 }
 
+async function reopenMemberBSilhouette(page: Page, previousDialog: Locator) {
+  await expect(previousDialog).toBeHidden()
+  await expectHubSignedIn(page)
+  await page.getByRole('button', { name: 'Silhouette' }).click()
+  await expectMemberBProfile(previousDialog)
+}
+
 /** How the browser ended a held read: its answer read in full, or cancelled by the app. */
 type HeldEnding = 'delivered' | 'cancelled'
 
@@ -263,7 +270,11 @@ async function releaseHeldRead(
  * exactly one PUT 412 SILHOUETTE_REVISION_MISMATCH there and no other error.
  */
 const conflictTest = test
-  .extend(createNetworkErrorMonitorFixture({ excludePatterns: [SILHOUETTE_URL] }))
+  .extend(
+    createNetworkErrorMonitorFixture({
+      excludePatterns: [SILHOUETTE_URL, RITUAL_RESPONSE_URL],
+    })
+  )
   .extend<{ silhouetteConflictGuard: void }>({
     silhouetteConflictGuard: [
       async ({ context }, use, testInfo) => {
@@ -366,7 +377,9 @@ test.describe('Upload state follows the signed-in account', () => {
     // The picked photo, its preview and the choice to use it are gone from A's tab.
     await expect(useThisImage).toHaveCount(0)
     await expect(dialog.getByRole('img')).toHaveCount(0)
-    // Back at the start: the member chooses a source again.
+    await expect(dialog).toBeHidden()
+    await page.getByRole('button', { name: '+ Add Garment' }).click()
+    // The new owner gets a fresh capture with a choice of sources.
     await expect(dialog.getByRole('button', { name: 'Take Photo' })).toBeVisible()
     expect(uploads, 'upload requests after the switch').toEqual([])
   })
@@ -401,8 +414,7 @@ test.describe('Upload state follows the signed-in account', () => {
     const uploads = watchUploadRequests(context, page)
     await switchToMemberB(context, b)
 
-    // B's profile shows, and the preview, the Retry action and the basewear confirmation are gone.
-    await expectMemberBProfile(dialog)
+    await reopenMemberBSilhouette(page, dialog)
     await expect(retry).toHaveCount(0)
     await expect(dialog.getByAltText('My Form')).toHaveCount(0)
     await expect(basewear).not.toBeChecked()
@@ -429,7 +441,7 @@ test.describe('Upload state follows the signed-in account', () => {
     const uploads = watchUploadRequests(context, page)
     await switchToMemberB(context, b)
 
-    await expectMemberBProfile(dialog)
+    await reopenMemberBSilhouette(page, dialog)
     await expect(dialog.getByAltText('My Form')).toHaveCount(0)
     await expect(dialog.getByText('My Form photo ready')).toHaveCount(0)
     expect(uploads, 'upload requests after the switch').toEqual([])
@@ -484,8 +496,8 @@ test.describe('Upload state follows the signed-in account', () => {
     await expect(dialog.getByAltText('My Form')).toHaveCount(0)
 
     await switchToMemberB(context, b)
-    await expectMemberBProfile(dialog)
     holding = false
+    await reopenMemberBSilhouette(page, dialog)
     // The app either reads A's ready answer after the switch or cancelled the read on it; either
     // way B's profile stays and nothing of A shows.
     await releaseHeldRead(page, await held, release)
@@ -551,7 +563,7 @@ test.describe('Upload state follows the signed-in account', () => {
       await expect(height).toHaveValue('40')
 
       await switchToMemberB(context, b)
-      await expectMemberBProfile(dialog)
+      await reopenMemberBSilhouette(page, dialog)
       // The app either reads A's answer after the switch or cancelled the read on it; either way
       // B's sliders stay and A's conflict is gone.
       await releaseHeldRead(page, read, release)

@@ -50,8 +50,11 @@ import {
 } from '@prisma/client'
 import type { ClimateBand } from '@couture/utils'
 import { COMMUNITY_CANARY_USER_ID_PREFIX } from './community-analytics.js'
+import { postTextFingerprint } from './community-post-text.js'
+import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
+  COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE,
   encodeCommunityFeedCursor,
   type CommunityFeedCursorPayload,
   type CommunityFeedMode,
@@ -94,6 +97,7 @@ export interface FeedPostsResult {
 }
 
 export interface PublishPostData {
+  title?: string | null
   altText: string
   caption: string | null
   climateBand: ClimateBand | null
@@ -752,6 +756,7 @@ export class CommunityRepository {
         data: {
           status: 'pending_review',
           alt_text: data.altText,
+          ...(data.title !== undefined ? { title: data.title } : {}),
           caption: data.caption,
           climate_band: data.climateBand,
           locale: data.locale,
@@ -783,6 +788,73 @@ export class CommunityRepository {
 
       const post = await tx.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
       return { kind: 'published' as const, post }
+    })
+  }
+
+  async editPublishedPostText(params: {
+    userId: string
+    postId: string
+    baseRevision: number
+    title: string | null
+    caption: string | null
+    screen: () => Promise<{ passed: boolean; policyVersion: string }>
+  }) {
+    const { userId, postId, baseRevision, title, caption, screen } = params
+    return communityPrivacyTransaction(this.prisma, async (tx) => {
+      // Guardian grant and revocation take this same member lock. Check participation
+      // after obtaining it so a revoked grant cannot authorize a later edit.
+      await guardCommunitySubject(tx, userId)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await guardCommunityPost(tx, postId)
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      await assertCommunitySubjectAvailable(tx, userId)
+      await assertCommunityDatabaseAccess(tx, userId)
+      const post = await tx.lookbookPost.findUnique({ where: { id: postId } })
+      if (!post || post.user_id !== userId || !isPubliclyVisiblePost(post))
+        throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+      if (post.text_revision !== baseRevision)
+        throw new ConflictException('Community post text has changed.')
+      if (post.title === title && post.caption === caption)
+        return { title, caption, textRevision: post.text_revision }
+      await assertPostTextEditBudget(tx, userId)
+      const screening = await screen()
+      if (!screening.passed) {
+        await tx.moderationEvent.create({
+          data: {
+            post_id: postId,
+            action: 'post_text_withheld',
+            reason: screening.policyVersion,
+          },
+        })
+        return null
+      }
+
+      const textRevision = baseRevision + 1
+      await tx.lookbookPost.update({
+        where: { id: postId },
+        data: {
+          title,
+          caption,
+          text_revision: textRevision,
+          original_text_fingerprint:
+            post.original_text_fingerprint ??
+            postTextFingerprint(post.title, post.caption),
+        },
+      })
+      await tx.moderationEvent.create({
+        data: {
+          post_id: postId,
+          action: 'post_text_approved',
+          reason: screening.policyVersion,
+          image_object_path: post.image_object_path,
+          content_snapshot: buildCommunityContentSnapshot(
+            { ...post, title, caption },
+            new Date()
+          ),
+        },
+      })
+      await tx.$executeRaw`SELECT community_record_invalidation('post.text_changed', ${postId})`
+      return { title, caption, textRevision }
     })
   }
 
@@ -870,6 +942,7 @@ export class CommunityRepository {
             erasure_requested_at: Date | null
             anonymized_at: Date | null
             image_object_path: string | null
+            title: string | null
             caption: string | null
             alt_text: string | null
             locale: string | null
@@ -882,6 +955,7 @@ export class CommunityRepository {
                  erasure_requested_at,
                  anonymized_at,
                  image_object_path,
+                 title,
                  caption,
                  alt_text,
                  locale,
@@ -1295,6 +1369,34 @@ function extractSqlState(error: unknown): string | null {
   }
 
   return null
+}
+
+const POST_TEXT_EDIT_CAP = 10
+const POST_TEXT_EDIT_WINDOW_MS = 60 * 60 * 1000
+
+async function assertPostTextEditBudget(tx: Prisma.TransactionClient, userId: string) {
+  const now = Date.now()
+  const attempts = await tx.moderationEvent.findMany({
+    where: {
+      action: { in: ['post_text_approved', 'post_text_withheld'] },
+      created_at: { gt: new Date(now - POST_TEXT_EDIT_WINDOW_MS) },
+      post: { user_id: userId },
+    },
+    orderBy: { created_at: 'desc' },
+    take: POST_TEXT_EDIT_CAP,
+    select: { created_at: true },
+  })
+  const oldest = attempts[POST_TEXT_EDIT_CAP - 1]
+  if (oldest) {
+    const retryAfter = Math.max(
+      1,
+      Math.ceil((oldest.created_at.getTime() + POST_TEXT_EDIT_WINDOW_MS - now) / 1000)
+    )
+    throw new CommunityRateLimitException(
+      COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE,
+      retryAfter
+    )
+  }
 }
 
 /**

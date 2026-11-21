@@ -129,6 +129,7 @@ export interface CommunityModerationResult {
 }
 
 export interface PostScreeningInput {
+  title?: string | null
   caption?: string | null
   altText?: string | null
   locale?: string | null
@@ -404,6 +405,11 @@ async function screenPostText(
     }),
   ]
 
+  if (input.title != null) {
+    results.push(
+      await engine.screenText({ text: input.title, field: 'title', locale: input.locale })
+    )
+  }
   return combineTextResults(results)
 }
 

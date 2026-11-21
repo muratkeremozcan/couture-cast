@@ -16,12 +16,53 @@ import {
   communityModerationReasonCategories,
   communityModerationReasonCategorySchema,
   decodeCommunityFeedCursor,
+  editCommunityPostTextInputSchema,
   encodeCommunityFeedCursor,
   safeDecodeCommunityFeedCursor,
 } from '../src/contracts/http'
 import { failureMessageOf, withoutKey } from './community-contract-support'
 
 describe('community HTTP contracts', () => {
+  describe('published post text edits', () => {
+    const edit = { baseRevision: 2, title: 'Classy in Camouflage', caption: null }
+
+    it('trims the title and supports clearing both fields', () => {
+      expect(
+        editCommunityPostTextInputSchema.parse({
+          ...edit,
+          title: '  Classy in Camouflage ',
+        })
+      ).toEqual(edit)
+      expect(editCommunityPostTextInputSchema.parse({ ...edit, title: null })).toEqual({
+        ...edit,
+        title: null,
+      })
+    })
+
+    it.each([
+      'See https://example.com',
+      'Reach me at visitor@example.com',
+      'x'.repeat(81),
+    ])('rejects an invalid title', (title) => {
+      expect(editCommunityPostTextInputSchema.safeParse({ ...edit, title }).success).toBe(
+        false
+      )
+    })
+
+    it('rejects an overflowing revision and an explicit owner override', () => {
+      expect(
+        editCommunityPostTextInputSchema.safeParse({
+          ...edit,
+          baseRevision: 2_147_483_647,
+        }).success
+      ).toBe(false)
+      expect(
+        editCommunityPostTextInputSchema.safeParse({ ...edit, ownerId: 'another-member' })
+          .success
+      ).toBe(false)
+    })
+  })
+
   describe('cursor serialization and decoding', () => {
     it('6.1-CON-001 round-trips a publishedAt, id, mode, band cursor payload', () => {
       // Matrix row "Feed page": public rows page on `published_at,id`.
@@ -298,9 +339,19 @@ describe('community HTTP contracts', () => {
         'imageAccess',
         'publishedAt',
         'status',
+        'textRevision',
+        'title',
       ])
 
       expect(communityFeedItemSchema.parse(publicItem)).toEqual(publicItem)
+      const titled = { ...publicItem, title: 'Classy in Camouflage' }
+      expect(communityFeedItemSchema.parse(titled)).toEqual(titled)
+      const owned = {
+        ...titled,
+        author: { ...titled.author, isSelf: true },
+        textRevision: 1,
+      }
+      expect(communityFeedItemSchema.parse(owned)).toEqual(owned)
     })
 
     it('6.1-CON-012 refuses an author user id, a storage object path, and moderation internals', () => {
@@ -359,6 +410,7 @@ describe('community HTTP contracts', () => {
         'moderationReason',
         'publishedAt',
         'status',
+        'title',
       ])
       expect(authorStateKeys).not.toEqual(
         Object.keys(communityFeedItemSchema.shape).sort()

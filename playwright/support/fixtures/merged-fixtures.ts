@@ -19,6 +19,11 @@ import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixt
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
 import {
+  guardExpectedError,
+  RITUAL_RESPONSE_URL,
+  unexpectedRitualErrors,
+} from '../helpers/expected-error-guard'
+import {
   createImmutableAssetCache,
   type ImmutableAssetCache,
 } from '../helpers/immutable-asset-cache'
@@ -61,17 +66,34 @@ const authSession = base.extend<AuthFixtures>({
 // moderation history is off, as it is on deployed environments. Whether a test sees that answer
 // depends on whether the probe lands before the test ends (P-Q-MEDIA on preview, 1 run in 25), so
 // deployed runs exclude it. Locally the feature is on and any 5xx from it still fails the test.
-const networkErrorMonitor = base.extend(
-  createNetworkErrorMonitorFixture(
-    environment.name === 'local'
-      ? undefined
-      : {
-          excludePatterns: [
-            /\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/,
-          ],
-        }
+export { RITUAL_RESPONSE_URL }
+const networkErrorMonitor = base
+  .extend(
+    createNetworkErrorMonitorFixture({
+      excludePatterns: [
+        RITUAL_RESPONSE_URL,
+        ...(environment.name === 'local'
+          ? []
+          : [/\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/]),
+      ],
+    })
   )
-)
+  .extend<{ ritualErrorGuard: void }>({
+    ritualErrorGuard: [
+      async ({ context }, use, testInfo) => {
+        // The monitor filters by URL. Preserve monitoring of every ritual failure
+        // except the exact no-city response that Home converts into city setup.
+        const guard = guardExpectedError(context, RITUAL_RESPONSE_URL)
+        await use()
+        if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
+          return
+        // Navigation can abort the JSON body after the HTTP status arrives.
+        const unexpected = unexpectedRitualErrors(await guard.settle())
+        expect(unexpected, 'unexpected ritual HTTP errors').toEqual([])
+      },
+      { auto: true },
+    ],
+  })
 
 // Story 6.13: before the context closes, so a proxied call still in flight cannot leave a report secret.
 const drainedProxyPage = base.extend({

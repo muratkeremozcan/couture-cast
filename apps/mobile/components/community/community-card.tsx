@@ -1,3 +1,7 @@
+import {
+  CommunityPostTextEditor,
+  type SavedCommunityText,
+} from './community-post-text-editor'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type { ReactionControls } from '@couture/api-client'
 import { CommunityReactions } from './community-reactions'
@@ -214,6 +218,8 @@ function CommunityCardActions({
 }
 
 export interface CommunityCardProps {
+  onTextSaved?: (postId: string, text: SavedCommunityText) => void
+  textEditingEnabled?: boolean
   onExport?: (postId: string, opener: () => number | null) => void
   onComments?: (item: CommunityFeedItem) => void
   commentsButtonRef?: React.Ref<View>
@@ -269,7 +275,46 @@ function CommunityShareAction({
   )
 }
 
+function CommunityCardText({
+  item,
+  onTextSaved,
+  textEditingEnabled,
+}: Pick<CommunityCardProps, 'item' | 'onTextSaved' | 'textEditingEnabled'>) {
+  const palette = useHeroPalette()
+  return (
+    <>
+      {item.title ? (
+        <Text
+          accessibilityRole="header"
+          style={[styles.caption, { color: palette.text, fontWeight: '700' }]}
+          testID={`community-card-title-${item.id}`}
+        >
+          {item.title}
+        </Text>
+      ) : null}
+      {item.caption ? (
+        <Text
+          style={[styles.caption, { color: palette.text }]}
+          testID={`community-card-caption-${item.id}`}
+        >
+          {item.caption}
+        </Text>
+      ) : null}
+      {onTextSaved && (
+        <CommunityPostTextEditor
+          key={item.id}
+          item={item}
+          enabled={Boolean(textEditingEnabled)}
+          onSaved={onTextSaved}
+        />
+      )}
+    </>
+  )
+}
+
 export function CommunityCard({
+  onTextSaved,
+  textEditingEnabled,
   onExport,
   onComments,
   commentsButtonRef,
@@ -418,6 +463,7 @@ export function CommunityCard({
 
   const imageLabel =
     item.altText?.trim() ||
+    item.title?.trim() ||
     item.caption?.trim() ||
     t('community.card.label', { author: authorName })
 
@@ -505,14 +551,11 @@ export function CommunityCard({
         onOpen={handleOpen}
       />
 
-      {item.caption ? (
-        <Text
-          style={[styles.caption, { color: palette.text }]}
-          testID={`community-card-caption-${item.id}`}
-        >
-          {item.caption}
-        </Text>
-      ) : null}
+      <CommunityCardText
+        item={item}
+        onTextSaved={onTextSaved}
+        textEditingEnabled={textEditingEnabled}
+      />
 
       {sponsorship ? (
         // A sibling of the photo's open target.

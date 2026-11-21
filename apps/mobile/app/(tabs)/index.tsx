@@ -34,6 +34,7 @@ import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
 import { onLocationsChanged } from '@/src/lib/locations'
+import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import {
   mobileApplicationUserId,
   resolveMobileAccessToken,
@@ -80,7 +81,6 @@ import {
 } from '@/components/hero/garment-item-tile'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
-import { useGlyphBox } from '@/components/glyph-box'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
@@ -89,6 +89,11 @@ import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
+import {
+  HomeAddGarment,
+  HomePlannerLink,
+  MemberSampleOutfit,
+} from '@/src/features/preview/member-sample-outfit'
 import { getGuestPreviewStrings } from '@couture/utils'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
@@ -228,6 +233,19 @@ function activeHomeLocale(i18n: { resolvedLanguage?: string; language: string })
   )
 }
 
+function showSampleOutfit(
+  session: ReturnType<typeof useMemberSessionState>[0],
+  outfit: RitualResponse['data']['outfits'][number] | undefined
+) {
+  return session === 'member' && !outfit?.garmentIds.length
+}
+
+type OwnedRitual = { owner: string | null; data: RitualResponse }
+
+function ritualForOwner(record: OwnedRitual | null, owner: string | null) {
+  return record?.owner === owner ? record.data : null
+}
+
 export default function TabOneScreen() {
   const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
@@ -257,18 +275,11 @@ export default function TabOneScreen() {
   const params = useLocalSearchParams()
   const { source, size, slot, type, alertId, cardId, expiresAt } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
-  // After a cold start the first load can run before the stored session is restored and
-  // fail without a bearer. The restored identity re-runs it.
   const applicationUserId = useSyncExternalStore(
     subscribeMobileApplicationUser,
     mobileApplicationUserId,
     mobileApplicationUserId
   )
-  useEffect(() => {
-    traceShareCardOpener('reset-identity')
-    setShareCardSource(null)
-    setShareCardOpen(false)
-  }, [applicationUserId])
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
   const [sessionState, retrySession] = useMemberSessionState()
@@ -293,7 +304,6 @@ export default function TabOneScreen() {
   const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale = activeHomeLocale(i18n)
   const palette = useHeroPalette()
-  const errorMarkBox = useGlyphBox(52, true)
   const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const reduceMotion = useReducedMotion()
@@ -314,7 +324,8 @@ export default function TabOneScreen() {
   const swapTriggerRef = useRef<SwapFocusTarget | null>(null)
   const garmentRefs = useRef(new Map<string, ComponentRef<typeof Pressable> | null>())
 
-  const [ritual, setRitual] = useState<RitualResponse | null>(null)
+  const [ownedRitual, setOwnedRitual] = useState<OwnedRitual | null>(null)
+  const ritual = ritualForOwner(ownedRitual, applicationUserId)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<HeroLoadError | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
@@ -338,9 +349,26 @@ export default function TabOneScreen() {
   const [swappingGarmentId, setSwappingGarmentId] = useState<string | null>(null)
   const [garmentFocusTarget, setGarmentFocusTarget] = useState<string | null>(null)
 
+  useEffect(() => {
+    traceShareCardOpener('reset-identity')
+    setShareCardSource(null)
+    setShareCardOpen(false)
+    setOwnedRitual(null)
+    setAlertPreferences(undefined)
+    setError(null)
+    setIsCacheServed(false)
+    setIsStale(false)
+    setIsSwapModalVisible(false)
+    setSwappingGarmentId(null)
+  }, [applicationUserId])
+
   const fetchRitual = async () => {
+    const token = await resolveMobileAccessToken()
+    if (!token || applicationUserId !== mobileApplicationUserId()) {
+      throw new Error('Ritual session changed.')
+    }
     const client = createMobileApiClient({
-      accessToken: async () => (await resolveMobileAccessToken()) || '',
+      accessToken: token,
     })
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), ritualRequestTimeoutMs)
@@ -362,6 +390,8 @@ export default function TabOneScreen() {
 
   const loadData = async (forceRefresh = false, allowCacheFallback = true) => {
     const loadId = ++latestLoadId.current
+    const isCurrent = () =>
+      loadId === latestLoadId.current && applicationUserId === mobileApplicationUserId()
     setIsLoading(true)
     setError(null)
     setIsStale(false)
@@ -369,25 +399,22 @@ export default function TabOneScreen() {
     const cached = allowCacheFallback
       ? await readLatestRitualCache(cacheOwner, activeLocale)
       : null
+    if (!isCurrent()) return
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
-      if (loadId === latestLoadId.current) {
-        setRitual(cached.data)
-        setAlertPreferences(cached.alertPreferences)
-        setIsCacheServed(true)
-        setIsLoading(false)
-      }
+      setOwnedRitual({ owner: applicationUserId, data: cached.data })
+      setAlertPreferences(cached.alertPreferences)
+      setIsCacheServed(true)
+      setIsLoading(false)
       return
     }
 
     try {
       const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
-      if (loadId !== latestLoadId.current) {
-        return
-      }
+      if (!isCurrent()) return
 
-      setRitual(data)
+      setOwnedRitual({ owner: applicationUserId, data })
       setAlertPreferences(fetchedPreferences)
       setIsCacheServed(false)
       void saveRitualCache(cacheOwner, activeLocale, {
@@ -415,21 +442,22 @@ export default function TabOneScreen() {
       }
     } catch (loadError) {
       const errorKind = await classifyRitualError(loadError)
-      if (loadId !== latestLoadId.current) {
-        return
-      }
+      if (!isCurrent()) return
 
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
-        setRitual(cached.data)
+        setOwnedRitual({ owner: applicationUserId, data: cached.data })
         setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
         setIsCacheServed(true)
       } else {
+        setOwnedRitual(null)
+        setAlertPreferences(undefined)
+        setIsCacheServed(false)
         setError(errorKind)
       }
     } finally {
-      if (loadId === latestLoadId.current) {
+      if (isCurrent()) {
         setIsLoading(false)
       }
     }
@@ -439,24 +467,28 @@ export default function TabOneScreen() {
   // previous primary's ritual leaves the screen and the device cache at once, and
   // the refetch never falls back to it: a no-location or weather-unavailable
   // answer shows as itself.
-  const reloadForLocationChange = async () => {
+  const reloadForRitualChange = async () => {
     latestLoadId.current += 1
     setIsLoading(true)
-    setRitual(null)
+    setOwnedRitual(null)
     setIsCacheServed(false)
     setIsStale(false)
     await forgetLatestRitual(cacheOwner)
-    await loadData(true, false)
+    if (applicationUserId === mobileApplicationUserId()) await loadData(true, false)
   }
-  const reloadForLocationChangeRef = useRef(reloadForLocationChange)
-  reloadForLocationChangeRef.current = reloadForLocationChange
-  useEffect(
-    () =>
-      onLocationsChanged(() => {
-        void reloadForLocationChangeRef.current()
-      }),
-    []
-  )
+  const reloadForRitualChangeRef = useRef(reloadForRitualChange)
+  reloadForRitualChangeRef.current = reloadForRitualChange
+  useEffect(() => {
+    const reload = () => {
+      void reloadForRitualChangeRef.current()
+    }
+    const unsubscribeLocations = onLocationsChanged(reload)
+    const unsubscribeWardrobe = onWardrobeChanged(reload)
+    return () => {
+      unsubscribeLocations()
+      unsubscribeWardrobe()
+    }
+  }, [])
 
   useEffect(() => {
     // Track when user views Tab One - top of the engagement funnel
@@ -466,6 +498,9 @@ export default function TabOneScreen() {
     }
     if (sessionState !== 'member') return
     void loadData()
+    return () => {
+      latestLoadId.current += 1
+    }
   }, [activeLocale, analyticsUserId, applicationUserId, sessionState])
 
   useEffect(() => {
@@ -701,7 +736,7 @@ export default function TabOneScreen() {
       },
     }
 
-    setRitual(updatedRitual)
+    setOwnedRitual({ owner: applicationUserId, data: updatedRitual })
 
     void saveRitualCache(cacheOwner, activeLocale, {
       // A swap rewrites a network payload, so this write can carry a commerce
@@ -856,63 +891,24 @@ export default function TabOneScreen() {
               </Text>
             </Pressable>
           </View>
-        ) : error === 'no-location' && !ritual ? (
-          <View
-            style={[
-              styles.errorState,
-              { backgroundColor: palette.surface, borderColor: palette.divider },
-            ]}
-            testID="hero-no-location-state"
-          >
-            <Text style={[styles.errorText, { color: palette.text }]}>
-              {t('hero.no_location')}
-            </Text>
-            <Pressable
-              style={[styles.retryButton, { backgroundColor: palette.text }]}
-              onPress={() => router.push('/locations?guided=1')}
-              accessibilityRole="button"
-              testID="hero-add-location"
-            >
-              <Text style={[styles.retryText, { color: palette.background }]}>
-                {t('locations.guided.add')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : error && !ritual ? (
-          <View
-            style={[
-              styles.errorState,
-              { backgroundColor: palette.surface, borderColor: palette.divider },
-            ]}
-            testID="hero-error-state"
-          >
-            <View
-              style={[styles.errorMark, errorMarkBox, { borderColor: palette.divider }]}
-            >
-              <Text style={[styles.errorMarkText, { color: palette.text }]}>!</Text>
-            </View>
-            <Text style={[styles.errorText, { color: palette.text }]}>
-              {t('hero.load_error', {
-                defaultValue: 'Unable to load daily recommendations',
-              })}
-            </Text>
-            <Pressable
-              style={[styles.retryButton, { backgroundColor: palette.text }]}
-              onPress={handleRetry}
-              accessibilityRole="button"
-              testID="hero-retry"
-            >
-              <Text style={[styles.retryText, { color: palette.background }]}>
-                {t('hero.retry', { defaultValue: 'Retry' })}
-              </Text>
-            </Pressable>
-          </View>
+        ) : showSampleOutfit(sessionState, activeOutfit) ? (
+          <>
+            <HomePlannerLink />
+            <MemberSampleOutfit
+              key={applicationUserId}
+              error={error}
+              busy={isLoading}
+              onRetry={handleRetry}
+            />
+          </>
         ) : (
           <>
             {/* Weather Alert Banner */}
             {ritual?.data.weather.alerts && (
               <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
             )}
+
+            {sessionState === 'member' && <HomePlannerLink />}
 
             {/* Weather Header */}
             <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
@@ -931,6 +927,8 @@ export default function TabOneScreen() {
                 onScenarioChange={handleScenarioChange}
               />
             )}
+
+            {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
 
             {/* Primary Outfit Card */}
             <OutfitRecommendationCard
@@ -1137,19 +1135,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  errorMark: {
-    width: 52,
-    height: 52,
-    borderWidth: 1,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  errorMarkText: {
-    fontSize: 24,
-    fontWeight: '700',
   },
   errorText: {
     fontSize: 17,

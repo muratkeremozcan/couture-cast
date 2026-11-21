@@ -121,13 +121,14 @@ describe('the production synthetic member', () => {
     })
   })
 
-  it('masks the minted token in the runner log, only on a runner', async () => {
+  it('keeps sign-in silent even inside a GitHub Actions worker', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    await signInProdSyntheticMember(ENV, answering(200))
-    expect(log).not.toHaveBeenCalled()
-    await signInProdSyntheticMember({ ...ENV, GITHUB_ACTIONS: 'true' }, answering(200))
-    expect(log).toHaveBeenCalledWith('::add-mask::access-1')
-    log.mockRestore()
+    try {
+      await signInProdSyntheticMember({ ...ENV, GITHUB_ACTIONS: 'true' }, answering(200))
+      expect(log).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it('names the status, never the password, when production refuses the sign-in', async () => {

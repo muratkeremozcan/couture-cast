@@ -9,6 +9,7 @@
  * (playwright/lib/plugins/webServerPlugin.js), so the runner's environment does
  * not need to be, and must not be, copied into the config.
  */
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlaywrightTestConfig } from '@playwright/test'
 
@@ -19,6 +20,7 @@ const DUMMY_SECRETS = {
   DATABASE_URL_PROD: 'postgresql://dummy:dummy-password@prod.invalid:5432/db',
   GH_TOKEN: 'dummy-gh-token-for-config-test',
   PROD_SYNTHETIC_MEMBER_PASSWORD: 'dummy-synthetic-member-password-for-config-test',
+  COUTURE_E2E_PROD_MEMBER_SESSION: 'dummy-synthetic-member-session-for-config-test',
   SUPABASE_SERVICE_ROLE_KEY: 'dummy-service-role-key-for-config-test',
   UNRELATED_CI_VARIABLE: 'dummy-unrelated-ci-variable',
 }
@@ -85,8 +87,13 @@ describe('Playwright configs keep the environment out of reports', () => {
       // Browser contexts carry no service-role header; only the request fixture does.
       expect(config.use?.extraHTTPHeaders).toBeUndefined()
       // The bypass cookie minted from the secret is a credential too, and
-      // traces record cookies, so preview records none while it holds one.
-      if (name === 'preview') expect(config.use?.trace).toBe('off')
+      // traces record cookies, so disable them whenever the run holds one.
+      expect(config.use?.trace).toBe('off')
+      if (name === 'prod') {
+        expect(config.globalSetup).toContain(
+          resolve(__dirname, '../../global-setup-prod-member.ts')
+        )
+      }
       expectNoDummySecret({
         metadata: config.metadata,
         extraHTTPHeaders: config.use?.extraHTTPHeaders,

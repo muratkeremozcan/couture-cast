@@ -12708,6 +12708,16 @@
               "null"
             ]
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "textRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
           "altText": {
             "type": [
               "string",
@@ -12892,6 +12902,16 @@
                         "null"
                       ]
                     },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "altText": {
                       "type": [
                         "string",
@@ -13066,6 +13086,12 @@
                       "minLength": 1
                     },
                     "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
                       "type": [
                         "string",
                         "null"
@@ -13324,6 +13350,16 @@
                   "string",
                   "null"
                 ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "textRevision": {
+                "type": "integer",
+                "minimum": 0
               },
               "altText": {
                 "type": [
@@ -13607,6 +13643,16 @@
               "null"
             ]
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "textRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
           "altText": {
             "type": [
               "string",
@@ -13717,6 +13763,12 @@
             "minLength": 1
           },
           "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
             "type": [
               "string",
               "null"
@@ -13834,6 +13886,16 @@
                     "null"
                   ]
                 },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "textRevision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
                 "altText": {
                   "type": [
                     "string",
@@ -13947,6 +14009,12 @@
                   "minLength": 1
                 },
                 "caption": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
                   "type": [
                     "string",
                     "null"
@@ -14352,6 +14420,16 @@
                         "null"
                       ]
                     },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "altText": {
                       "type": [
                         "string",
@@ -14465,6 +14543,12 @@
                       "minLength": 1
                     },
                     "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
                       "type": [
                         "string",
                         "null"
@@ -14723,6 +14807,16 @@
                   "string",
                   "null"
                 ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "textRevision": {
+                "type": "integer",
+                "minimum": 0
               },
               "altText": {
                 "type": [
@@ -14997,6 +15091,15 @@
             "maxLength": 280,
             "description": "Caption of at most 280 characters. Applies a best-effort denylist. Anything carrying an http://, https:// or www. prefix is refused whatever its TLD, and so is anything matching a generic email pattern, again whatever its TLD. The fixed TLD list (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) governs only bare domain-like values carrying no such prefix, so a bare domain outside that list (example.xyz) passes unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control."
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 80,
+            "description": "An outfit title. Web links and email addresses are disallowed."
+          },
           "locale": {
             "type": "string",
             "enum": [
@@ -15041,6 +15144,16 @@
                   "string",
                   "null"
                 ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "textRevision": {
+                "type": "integer",
+                "minimum": 0
               },
               "altText": {
                 "type": [
@@ -15396,6 +15509,16 @@
                         "null"
                       ]
                     },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "altText": {
                       "type": [
                         "string",
@@ -15603,6 +15726,12 @@
                       "minLength": 1
                     },
                     "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "title": {
                       "type": [
                         "string",
                         "null"
@@ -15862,6 +15991,16 @@
                   "null"
                 ]
               },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "textRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
               "altText": {
                 "type": [
                   "string",
@@ -16100,6 +16239,16 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
                     },
                     "altText": {
                       "type": [
@@ -16348,6 +16497,16 @@
               "null"
             ]
           },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "textRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
           "altText": {
             "type": [
               "string",
@@ -16469,6 +16628,16 @@
               "string",
               "null"
             ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "textRevision": {
+            "type": "integer",
+            "minimum": 0
           },
           "altText": {
             "type": [
@@ -16677,6 +16846,16 @@
                         "null"
                       ]
                     },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "altText": {
                       "type": [
                         "string",
@@ -16844,6 +17023,16 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "textRevision": {
+                      "type": "integer",
+                      "minimum": 0
                     },
                     "altText": {
                       "type": [
@@ -17189,7 +17378,8 @@
                           "enum": [
                             "post.published",
                             "reactions.changed",
-                            "comment.published"
+                            "comment.published",
+                            "post.text_changed"
                           ]
                         },
                         "postId": {
@@ -17540,6 +17730,16 @@
                                 "string",
                                 "null"
                               ]
+                            },
+                            "title": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "textRevision": {
+                              "type": "integer",
+                              "minimum": 0
                             },
                             "altText": {
                               "type": [
@@ -18322,6 +18522,12 @@
                 "properties": {
                   "available": {
                     "type": "boolean"
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "caption": {
                     "type": [
@@ -27341,6 +27547,18 @@
             "description": "Opt in to reaction summaries. Omission preserves the strict legacy response."
           },
           {
+            "name": "x-couture-post-text",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to titles and owner text revisions. Omission preserves the legacy response shape."
+          },
+          {
             "name": "x-couture-sponsorship",
             "in": "header",
             "required": false,
@@ -27437,6 +27655,16 @@
                                       "string",
                                       "null"
                                     ]
+                                  },
+                                  "title": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "textRevision": {
+                                    "type": "integer",
+                                    "minimum": 0
                                   },
                                   "altText": {
                                     "type": [
@@ -27612,6 +27840,12 @@
                                     "minLength": 1
                                   },
                                   "caption": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "title": {
                                     "type": [
                                       "string",
                                       "null"
@@ -27971,6 +28205,18 @@
               ]
             },
             "description": "Opt in to live reaction summaries on each item, exactly like the feed."
+          },
+          {
+            "name": "x-couture-post-text",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to titles and owner text revisions. Omission preserves the legacy response shape."
           },
           {
             "name": "x-couture-sponsorship",
@@ -28373,6 +28619,18 @@
             "description": "Opt in to reaction summaries. Omission preserves the strict legacy response."
           },
           {
+            "name": "x-couture-post-text",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to titles and owner text revisions. Omission preserves the legacy response shape."
+          },
+          {
             "name": "x-couture-sponsorship",
             "in": "header",
             "required": false,
@@ -28432,6 +28690,16 @@
                                 "string",
                                 "null"
                               ]
+                            },
+                            "title": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "textRevision": {
+                              "type": "integer",
+                              "minimum": 0
                             },
                             "altText": {
                               "type": [
@@ -28699,6 +28967,153 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/community/posts/{postId}/text": {
+      "patch": {
+        "tags": [
+          "community"
+        ],
+        "operationId": "editCommunityPostText",
+        "summary": "Screen and replace a published post title and description",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "postId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "baseRevision": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2147483646
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "An outfit title. Web links and email addresses are disallowed."
+                  },
+                  "caption": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 280,
+                    "description": "Caption of at most 280 characters. Applies a best-effort denylist. Anything carrying an http://, https:// or www. prefix is refused whatever its TLD, and so is anything matching a generic email pattern, again whatever its TLD. The fixed TLD list (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) governs only bare domain-like values carrying no such prefix, so a bare domain outside that list (example.xyz) passes unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control."
+                  }
+                },
+                "required": [
+                  "baseRevision",
+                  "title",
+                  "caption"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved replacement text and its revision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "caption": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "textRevision": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "caption",
+                        "textRevision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or withheld text."
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Community write access is required."
+          },
+          "404": {
+            "description": "No eligible published post owned by this member."
+          },
+          "409": {
+            "description": "The text revision has changed."
+          },
+          "429": {
+            "description": "Ten approved or withheld edits per member per rolling hour.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another edit may be screened.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Screening or Community write access is temporarily unavailable."
           }
         }
       }
@@ -29493,6 +29908,18 @@
         ],
         "parameters": [
           {
+            "in": "header",
+            "name": "x-couture-post-text",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to targeted post text events and post title projections."
+          },
+          {
             "schema": {
               "type": "string",
               "maxLength": 4096
@@ -30192,6 +30619,20 @@
         "security": [
           {
             "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-couture-post-text",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to targeted post text events and post title projections."
           }
         ],
         "requestBody": {
@@ -31448,6 +31889,18 @@
         "description": "Moderator and admin only. Read-only except for one audit row per successful read.",
         "parameters": [
           {
+            "name": "x-couture-post-text",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to approved post titles in moderation snapshots."
+          },
+          {
             "schema": {
               "type": "string",
               "minLength": 1,
@@ -31562,6 +32015,12 @@
                           "properties": {
                             "available": {
                               "type": "boolean"
+                            },
+                            "title": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
                             },
                             "caption": {
                               "type": [

@@ -29,7 +29,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient, resolveWebApiBaseUrl } from './api-client'
-import { readStorage } from './browser-persistence'
+import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 import {
   createUploadAttempts,
   preparedImageFingerprint,
@@ -38,7 +38,7 @@ import {
   throwUploadStepError,
 } from './upload-attempts'
 
-export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
+export { WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 
 export type GarmentUploadState =
   | 'preparing'

@@ -250,7 +250,7 @@ export function AccessibleModal({
         <div
           className={`flex items-center justify-between border-b pb-3 ${SURFACE_PARTS[surface].rule}`}
         >
-          <div>
+          <div className="min-w-0 flex-1 [overflow-wrap:anywhere]">
             <h2 id={titleId} className="text-xl font-bold">
               {title}
             </h2>
@@ -266,7 +266,7 @@ export function AccessibleModal({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg ${surface === 'theme' ? 'text-[color:var(--theme-card-text)] hover:bg-black/5' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+            className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg ${surface === 'theme' ? 'text-[color:var(--theme-card-text)] hover:bg-black/5' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
             aria-label={closeLabel}
           >
             ✕

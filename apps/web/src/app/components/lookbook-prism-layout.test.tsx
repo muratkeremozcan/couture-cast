@@ -183,19 +183,23 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
    * `MOCK_LOOKBOOK_ITEMS`; both are gone, because the spec's Boundaries forbid a
    * chip with no server behind it.
    */
-  it('3.5-INT-005: Keeps semantic reading order and excludes static cards from Tab', async () => {
+  it('3.5-INT-005: Keeps the member outfit before Community filters and cards', async () => {
     signIn()
-    useMswHandlers(communityFeedHandler())
+    useMswHandlers(
+      communityFeedHandler(),
+      http.get('/api/v1/ritual', () =>
+        HttpResponse.json(
+          { message: 'No location preferences found for user' },
+          { status: 400 }
+        )
+      )
+    )
     render(<LookbookPrismLayout />)
 
     const community = await screen.findByTestId(`lookbook-card-${COMMUNITY_POST_ID}`)
     const hero = screen.getByRole('region', { name: /hero ritual canvas/i })
     const communitySection = screen.getByRole('region', { name: 'Community Section' })
-    const garment = screen.getByText(/double-breasted blazer/i).closest('div.group')
-
-    if (!garment) {
-      throw new Error('Expected focus targets')
-    }
+    const outfit = await within(hero).findByTestId('member-sample-outfit')
 
     // Production follow-up 2026-11-19: the climate filters moved out of the hero
     // column and into the Community Section, beside the feed they filter. On a
@@ -210,15 +214,12 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     const filter = within(filterNav).getByTestId('community-filter-auto')
 
     expect(
-      hero.compareDocumentPosition(garment) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-    expect(
-      garment.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING
+      outfit.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(
       filter.compareDocumentPosition(community) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    expect(garment).not.toHaveAttribute('tabindex')
+    expect(outfit).not.toHaveAttribute('tabindex')
     expect(community).toHaveAttribute('tabindex', '-1')
   })
 

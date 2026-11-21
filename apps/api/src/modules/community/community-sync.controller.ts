@@ -6,6 +6,7 @@ import {
   Controller,
   Get,
   Header,
+  Headers,
   HttpCode,
   Inject,
   Post,
@@ -15,6 +16,7 @@ import {
 } from '@nestjs/common'
 import type { z } from 'zod'
 import {
+  COMMUNITY_POST_TEXT_HEADER,
   communityEventsQuerySchema,
   communityNotificationPreferencesResponseSchema,
   patchCommunityNotificationPreferencesSchema,
@@ -74,21 +76,35 @@ export class CommunitySyncController {
   @Get('events')
   @ConsentCheckedInTransaction()
   @Header('Cache-Control', 'private, no-store')
-  async events(@AuthContext() auth: RequestAuthContext, @Query() query: unknown) {
+  async events(
+    @AuthContext() auth: RequestAuthContext,
+    @Query() query: unknown,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
+  ) {
     const input = parseCommunityInput(communityEventsQuerySchema, query)
     return communityEventsResponseSchema.parse({
-      data: await this.sync.events(auth.userId, input.mode, input.cursor),
+      data: await this.sync.events(
+        auth.userId,
+        input.mode,
+        input.cursor,
+        ...(postTextHeader === '1' ? ([true] as const) : [])
+      ),
     })
   }
   @Post('targets/resolve')
   @HttpCode(200)
   @ConsentCheckedInTransaction()
   @Header('Cache-Control', 'private, no-store')
-  async resolve(@AuthContext() auth: RequestAuthContext, @Body() input: unknown) {
+  async resolve(
+    @AuthContext() auth: RequestAuthContext,
+    @Body() input: unknown,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
+  ) {
     return resolveCommunityTargetsResponseSchema.parse({
       data: await this.targets.resolve(
         auth.userId,
-        parseCommunityInput(resolveCommunityTargetsInputSchema, input)
+        parseCommunityInput(resolveCommunityTargetsInputSchema, input),
+        ...(postTextHeader === '1' ? ([true] as const) : [])
       ),
     })
   }

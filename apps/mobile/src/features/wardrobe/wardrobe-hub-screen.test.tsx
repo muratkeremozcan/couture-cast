@@ -12,7 +12,11 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-const routerMock = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
+const routerMock = vi.hoisted(() => ({
+  replace: vi.fn(),
+  push: vi.fn(),
+  setParams: vi.fn(),
+}))
 vi.mock('expo-router', () => ({ router: routerMock }))
 
 const imagePicker = vi.hoisted(() => ({
@@ -64,7 +68,10 @@ vi.mock('react-native', async (importOriginal) => {
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
@@ -180,6 +187,7 @@ describe('WardrobeHubScreen', () => {
       process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
     }
     restoreAccessTokenResolver()
+    setMobileApplicationUserId(null)
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
     vi.clearAllMocks()
@@ -192,6 +200,71 @@ describe('WardrobeHubScreen', () => {
       expect(screen.getByTestId('wardrobe-screen')).toBeInTheDocument()
     })
     expect(screen.getByTestId('garment-capture-open')).toBeInTheDocument()
+  })
+
+  it('withholds the empty state until the failed garment list is retried successfully', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json(null, { status: 503 })
+      )
+    )
+
+    renderScreen()
+
+    const retry = await screen.findByTestId('wardrobe-list-retry')
+    await screen.findByTestId('wardrobe-onboarding-card')
+    const empty = i18n.t('wardrobe.empty_title')
+    expect(screen.queryByText(empty)).toBeNull()
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
+    )
+    await browserUser.click(retry)
+
+    expect(await screen.findByText(empty)).toBeVisible()
+    expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
+  })
+
+  it('opens the existing garment awaiting tags from direct entry', async () => {
+    setMobileApplicationUserId('user-1')
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garmentFixture()] })
+      ),
+      http.post('*/api/v1/wardrobe/garments/garment-1/suggest-tags', () =>
+        HttpResponse.json({ data: createSuggestGarmentTagsDataFixture() })
+      )
+    )
+
+    render(<WardrobeHubScreen addEntry />)
+
+    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
+    expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+  })
+
+  it('checks an existing processing garment from direct entry and opens its tags', async () => {
+    setMobileApplicationUserId('user-1')
+    server.use(
+      http.get(
+        '*/api/v1/wardrobe/garments',
+        () => HttpResponse.json({ data: [garmentFixture({ status: 'processing' })] }),
+        { once: true }
+      ),
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garmentFixture()] })
+      ),
+      http.post('*/api/v1/wardrobe/garments/garment-1/suggest-tags', () =>
+        HttpResponse.json({ data: createSuggestGarmentTagsDataFixture() })
+      )
+    )
+
+    render(<WardrobeHubScreen addEntry pollOffsetsMs={[1]} />)
+
+    expect(await screen.findByTestId('garment-status-processing')).toBeVisible()
+    expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+    await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
+    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
   })
 
   it('4.4-MOB-HUB-02 opens the extracted capture modal from the existing entry point (regression)', async () => {
@@ -327,18 +400,15 @@ describe('WardrobeHubScreen', () => {
     })
   })
 
-  it('4.4-MOB-HUB-09 settles into the empty state instead of a permanent spinner when there is no session', async () => {
+  it('4.4-MOB-HUB-09 shows a recovery action when the wardrobe session is missing', async () => {
     restoreAccessTokenResolver()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
 
     renderScreen()
 
-    // The load rejects with AUTHENTICATION_REQUIRED; the `finally` must still
-    // clear `isLoading` or the hub shows a spinner forever with no way out.
-    await waitFor(() => {
-      expect(screen.getByText('No garments added yet')).toBeInTheDocument()
-    })
-    expect(screen.queryByLabelText('Loading wardrobe')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
+    expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
+    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
   })
 
   it('4.4-MOB-HUB-10 opens tagging from the Needs tags action on an already-untagged garment', async () => {
@@ -430,7 +500,7 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
   })
 
-  it('4.4-MOB-HUB-13 flags a garment that never leaves processing and offers a manual tagging route', async () => {
+  it('4.4-MOB-HUB-13 resumes a timed-out garment when it is ready to tag', async () => {
     server.use(
       ...captureUploadHandlers('garment-3', 'processing'),
       http.get('*/api/v1/wardrobe/garments', () =>
@@ -447,12 +517,17 @@ describe('WardrobeHubScreen', () => {
         'Smart tagging is taking longer than expected.'
       )
     })
-    // Exhausting the poll budget must not strand the garment: the manual
-    // action is the only remaining way to get tags onto it.
-    fireEvent.click(screen.getByTestId('garment-capture-done'))
-    await waitFor(() => {
-      expect(screen.getByLabelText('Needs tags')).toBeInTheDocument()
-    })
+    await browserUser.click(screen.getByTestId('garment-capture-done'))
+    expect(screen.queryByLabelText('Needs tags')).not.toBeInTheDocument()
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({
+          data: [garmentFixture({ id: 'garment-3', status: 'awaiting_tags' })],
+        })
+      )
+    )
+    await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
+    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
   })
 
   it('4.4-MOB-HUB-14 surfaces a wardrobe read failure that happens mid-poll', async () => {

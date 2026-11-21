@@ -586,6 +586,8 @@ export class CommunityMaintenanceService {
           status: 'withdrawn',
           ...(anonymized
             ? {
+                title: null,
+                original_text_fingerprint: null,
                 caption: null,
                 alt_text: null,
                 locale: null,

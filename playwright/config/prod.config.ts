@@ -6,10 +6,14 @@ import { resolveEnvironmentConfig } from './environments'
 import { VERCEL_BYPASS_STATE_PATH } from '../global-setup-vercel-bypass'
 
 const environment = resolveEnvironmentConfig('prod')
+const holdsBypassSecret = Boolean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim())
 
 export default defineConfig(
   merge({}, baseConfig, {
-    globalSetup: path.resolve(__dirname, '..', 'global-setup-vercel-bypass.ts'),
+    globalSetup: [
+      path.resolve(__dirname, '..', 'global-setup-vercel-bypass.ts'),
+      path.resolve(__dirname, '..', 'global-setup-prod-member.ts'),
+    ],
     // Story 1.2b: specs tagged @local-lane write locations and need the local
     // weather provider double, so the production run never selects them.
     grepInvert: /@local-lane/,
@@ -18,6 +22,8 @@ export default defineConfig(
       // Vercel bypass cookies minted by global setup; see that file for why
       // the secret itself must not be sent from tests.
       storageState: VERCEL_BYPASS_STATE_PATH,
+      // Request traces can record the bypass cookie as a credential.
+      ...(holdsBypassSecret ? { trace: 'off' as const } : {}),
     },
     metadata: {
       environment: environment.name,

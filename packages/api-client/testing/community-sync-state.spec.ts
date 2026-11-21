@@ -132,6 +132,43 @@ describe('Story 6.5 reconciliation ownership', () => {
     )
     state.stop()
   })
+  it('resolves only rendered post text changes without rebuilding or reconciling comments', async () => {
+    const { client, callbacks, state } = setup()
+    callbacks.rendered = () => ['unchanged', 'post']
+    callbacks.reconcile = vi.fn(() => Promise.resolve())
+    await state.catchUp()
+    client.resolve.mockClear()
+    vi.mocked(callbacks.reconcile).mockClear()
+    const edited = {
+      version: 1,
+      kind: 'post.text_changed',
+      postId: 'post',
+      communityRevision: '7',
+    } as const
+    client.events.mockResolvedValueOnce(
+      page('edits', {
+        events: [edited, { ...edited, postId: 'outside-view', communityRevision: '8' }],
+      })
+    )
+    try {
+      await state.catchUp()
+      expect(callbacks.rebuild).toHaveBeenCalledTimes(1)
+      expect(callbacks.reconcile).not.toHaveBeenCalled()
+      expect(callbacks.changed).toHaveBeenCalledExactlyOnceWith(
+        [edited],
+        expect.any(AbortSignal)
+      )
+      expect(client.resolve).toHaveBeenCalledExactlyOnceWith(
+        {
+          targets: [{ key: 'post', postId: 'post' }],
+        },
+        expect.any(AbortSignal)
+      )
+    } finally {
+      state.stop()
+    }
+  })
+
   it('refuses an older projection even when newer invalidation still needs consuming', async () => {
     const { client, callbacks, state } = setup()
     const current = {

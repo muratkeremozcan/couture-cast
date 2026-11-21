@@ -6,11 +6,13 @@
 // implementations across apps).
 import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getGuestPreviewStrings } from '@couture/utils'
 import { File, Paths } from 'expo-file-system'
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 import {
   AccessibilityInfo,
+  Alert,
   ActivityIndicator,
   Image,
   Linking,
@@ -91,6 +93,7 @@ function cropForAspect(image: SelectedImage, aspectRatio: AspectRatio) {
 }
 
 export interface MobileGarmentCaptureModalProps {
+  confirmDiscard?: boolean
   visible: boolean
   onClose: () => void
   /**
@@ -110,8 +113,10 @@ export function MobileGarmentCaptureModal({
   onClose,
   onGarmentCommitted,
   invokingNodeHandle,
+  confirmDiscard = false,
 }: MobileGarmentCaptureModalProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const strings = getGuestPreviewStrings(i18n.language).firstUse
   const colors = useSchemeColors()
   const themed = useThemedStyles()
   const insets = useModalInsets()
@@ -159,8 +164,18 @@ export function MobileGarmentCaptureModal({
   useUploadSessionChange(resetCapture)
 
   const handleClose = () => {
-    resetCapture()
-    onClose()
+    const close = () => {
+      resetCapture()
+      onClose()
+    }
+    if (confirmDiscard && step === 'crop') {
+      Alert.alert(strings.discardPhoto, undefined, [
+        { text: strings.keepEditing, style: 'cancel' },
+        { text: strings.discard, style: 'destructive', onPress: close },
+      ])
+    } else {
+      close()
+    }
   }
 
   const selectAsset = (

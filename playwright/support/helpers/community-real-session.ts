@@ -3,6 +3,7 @@ import path from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { signupResponseSchema } from '@couture/api-client/contracts/http'
+import { isWardrobePathSegment } from '@couture/utils'
 import type { Page } from '@playwright/test'
 import { realSessionSkipReason as harnessSkipReason } from '../../../scripts/e2e-real-session/harness.mjs'
 import {
@@ -73,6 +74,29 @@ function adminClient() {
   return createClient(origin.href, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+}
+
+/** The app database is disposable. The wardrobe bucket lives on the shared local Auth stack. */
+export async function removeRealSessionGarmentObjects(userId: string): Promise<void> {
+  harnessDirectory()
+  if (!isWardrobePathSegment(userId)) throw new Error('Invalid garment fixture owner.')
+  const bucket = adminClient().storage.from('wardrobe-images')
+  for (const prefix of [
+    `wardrobe/${userId}`,
+    `staging/${userId}/garment`,
+    `held/${userId}`,
+  ]) {
+    const { data, error } = await bucket.list(prefix)
+    if (error) throw new Error('Could not list the real-session garment fixture objects.')
+    // The journey creates a single garment. Directory placeholders carry no object id.
+    const paths = data
+      .filter((object) => object.id)
+      .map((object) => `${prefix}/${object.name}`)
+    if (!paths.length) continue
+    const removed = await bucket.remove(paths)
+    if (removed.error)
+      throw new Error('Could not remove the real-session garment fixture objects.')
+  }
 }
 
 export const realCommunityEmail = () => `story65-real-${randomUUID()}@example.test`

@@ -220,7 +220,7 @@ export async function getModerationCaseFromWeb(
   const accessToken = readAccessToken()
   try {
     const response = await createWebApiClient({ accessToken }).getModerationCase(
-      { caseId },
+      { caseId, xCouturePostText: '1' },
       { signal }
     )
     const data = parseTolerant(moderationCaseDetailResponseSchema, response).data

@@ -2,6 +2,23 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const trTR: GuestPreviewStrings = {
+  firstUse: {
+    replaceGarment: 'Başka bir fotoğraf seç',
+    discardPhoto: 'Bu fotoğraf silinsin mi?',
+    keepEditing: 'Düzenlemeye devam et',
+    discard: 'Sil',
+    today: 'Bugünkü kombinin',
+    addGarment: 'Bir giysi ekle',
+    setCity: 'Şehrini seç',
+    wardrobeFailed: 'Gardırobun yüklenemedi.',
+    staleWardrobe: 'Kayıtlı giysilerin gösteriliyor. Güncelleme başarısız oldu.',
+    backToOutfit: 'Bugünkü kombinine dön',
+    checkGarment: 'Giysinin durumuna bak',
+    backToWardrobe: 'Gardıroba dön',
+    outfitFailed: 'Bugünkü kombin yüklenemedi.',
+    sampleEntry: 'Örnek bir kombin dene',
+    outfitIdea: 'Kombin fikri',
+  },
   chrome: {
     entry: 'Örnek gardırobu deneyin',
     exampleLabel: 'Örnek',

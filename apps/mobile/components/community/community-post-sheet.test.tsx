@@ -949,7 +949,7 @@ describe('6.15 CommunityPostSheet at the largest text sizes', () => {
   })
 
   // Story 6.15 F-00i: at Android 2.0 "0 of 280 characters" ran past the sheet edge beside
-  // "Caption (optional)". A narrow window stands in for the larger text: the counter wraps
+  // the description label. A narrow window stands in for the larger text: the counter wraps
   // below the label and stays inside the sheet.
   it('6.15-MOB-WRAP-02 wraps the caption counter below its label inside a narrow sheet', async () => {
     await setViewport(180, 896)
@@ -959,7 +959,7 @@ describe('6.15 CommunityPostSheet at the largest text sizes', () => {
     await waitFor(() => expect(count).toBeVisible())
     const field = caption.getBoundingClientRect()
     const counter = count.getBoundingClientRect()
-    const label = screen.getByText('Caption (optional)').getBoundingClientRect()
+    const label = screen.getByText('Description (optional)').getBoundingClientRect()
     expect(counter.right).toBeLessThanOrEqual(field.right + 0.5)
     expect(counter.left).toBeGreaterThanOrEqual(field.left - 0.5)
     // Wrapped onto its own line: native text does not shrink in a row the way web text does,

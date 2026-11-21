@@ -17,8 +17,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
-import { readStorage } from './browser-persistence'
+import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 
 /**
  * Thrown for every failure these wrappers surface, so a caller can tell an API

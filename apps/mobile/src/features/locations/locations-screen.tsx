@@ -43,6 +43,7 @@ import {
   listLocationsFromMobile,
   locationFailureReason,
   renameLocationFromMobile,
+  recoverSavedSearchLocationFromMobile,
   saveLocationFromSearchFromMobile,
   locationsNearFromMobile,
   searchLocationsFromMobile,
@@ -157,6 +158,35 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   )
 }
 
+function GuidedLocationCancel({
+  guided,
+  label,
+  color,
+}: {
+  guided: boolean
+  label: string
+  color: string
+}) {
+  if (!guided) return null
+  return (
+    <Pressable
+      accessibilityRole="button"
+      testID="locations-guided-cancel"
+      style={{ minHeight: 44, justifyContent: 'center' }}
+      onPress={() => {
+        if (router.canGoBack()) router.back()
+        else router.replace('/')
+      }}
+    >
+      <Text style={{ color }}>{label}</Text>
+    </Pressable>
+  )
+}
+
+function finishGuidedSave(guided: boolean): boolean {
+  return guided && router.canGoBack()
+}
+
 function MemberLocationsScreen({
   guided,
   memberEpoch,
@@ -194,6 +224,7 @@ function MemberLocationsScreen({
   const locateAttemptRef = useRef(0)
   const locateControllerRef = useRef<AbortController | null>(null)
   const saveControllerRef = useRef<AbortController | null>(null)
+  const attemptedSave = useRef<{ token: string; label: string } | null>(null)
   const listActionControllerRef = useRef<AbortController | null>(null)
   // False once the screen is gone: nothing it started may write, announce or navigate.
   const mountedRef = useRef(true)
@@ -458,17 +489,33 @@ function MemberLocationsScreen({
     setIsSaving(true)
     setFormError(null)
     try {
-      const saved = await saveLocationFromSearchFromMobile(
-        selected.candidateToken,
-        label.trim() || selected.city,
-        controller.signal,
-        current
-      )
+      const trimmedLabel = label.trim() || selected.city
+      const previous = attemptedSave.current
+      const recovered =
+        previous?.token === selected.candidateToken
+          ? await recoverSavedSearchLocationFromMobile(
+              selected,
+              previous.label,
+              controller.signal,
+              current
+            )
+          : undefined
+      if (!current()) return
+      attemptedSave.current = { token: selected.candidateToken, label: trimmedLabel }
+      const saved =
+        recovered ??
+        (await saveLocationFromSearchFromMobile(
+          selected.candidateToken,
+          trimmedLabel,
+          controller.signal,
+          current
+        ))
+      attemptedSave.current = null
       if (!current()) return
       setSelected(null)
       setQuery('')
       setLabel('')
-      const navigatesBack = guided && router.canGoBack()
+      const navigatesBack = finishGuidedSave(guided)
       // A guided save leaves this screen on purpose; its confirmation belongs to
       // the member, not the screen, so it is still heard on the next one.
       announce('feedback', t('locations.saved', { label: saved.label }), {
@@ -508,6 +555,11 @@ function MemberLocationsScreen({
       keyboardShouldPersistTaps="handled"
       testID="locations-screen"
     >
+      <GuidedLocationCancel
+        guided={guided}
+        label={t('locations.cancel')}
+        color={palette.text}
+      />
       {/* The native header carries the title; this screen renders no second one. */}
       <Text ref={headingRef} style={[styles.body, mutedStyle]}>
         {t('locations.intro')}

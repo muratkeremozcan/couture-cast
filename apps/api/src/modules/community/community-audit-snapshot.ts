@@ -24,6 +24,7 @@ import type { Prisma } from '@prisma/client'
  * retracting a reported post must not destroy the evidence.
  */
 export interface CommunityAuditSnapshotSource {
+  title?: string | null
   caption: string | null
   alt_text: string | null
   locale: string | null
@@ -35,6 +36,7 @@ export function buildCommunityContentSnapshot(
   capturedAt: Date
 ): Prisma.InputJsonValue {
   return {
+    ...(post.title != null ? { title: post.title } : {}),
     caption: post.caption,
     altText: post.alt_text,
     locale: post.locale,

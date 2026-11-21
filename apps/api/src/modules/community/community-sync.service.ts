@@ -56,6 +56,28 @@ function publicCommentMatches(
   )
 }
 
+function inFeedScope(
+  post: { climate_band: ClimateBand | null } | undefined,
+  scope: Scope
+): boolean {
+  return Boolean(post && (!scope.band || post.climate_band === scope.band))
+}
+
+function targetedPostTextEvent(
+  event: StoredEvent,
+  post: { id: string } | undefined
+): CommunityStreamEvent[] {
+  if (!post) return []
+  return [
+    {
+      version: 1,
+      kind: 'post.text_changed',
+      postId: post.id,
+      communityRevision: event.revision.toString(),
+    },
+  ]
+}
+
 @Injectable()
 export class CommunitySyncService {
   private assistance: Promise<number> | undefined
@@ -66,7 +88,12 @@ export class CommunitySyncService {
     @Inject(CommunityStreamRepository) private readonly streams: CommunityStreamRepository
   ) {}
 
-  async events(member: string, mode: CommunityFeedMode, cursor?: string) {
+  async events(
+    member: string,
+    mode: CommunityFeedMode,
+    cursor?: string,
+    includePostText = false
+  ) {
     const budget = new CommunityAuthorizationBudget()
     return communityDependency(() =>
       budget.run(async () => {
@@ -135,7 +162,7 @@ export class CommunitySyncService {
         // A fresh primary visibility check happens after ending the captured snapshot.
         const events = await this.serializeEvents(captured.events, member, scope)
         grant = await this.access.authorize(member, budget)
-        const fresh = await this.finalizeEvents(events, member, scope)
+        const fresh = await this.finalizeEvents(events, member, scope, includePostText)
         budget.check(grant)
         return {
           events: fresh,
@@ -150,20 +177,17 @@ export class CommunitySyncService {
   private async finalizeEvents(
     events: CommunityStreamEvent[],
     member: string,
-    scope: Scope
+    scope: Scope,
+    includePostText: boolean
   ): Promise<CommunityStreamEvent[]> {
     const postIds = events.flatMap((event) => ('postId' in event ? [event.postId] : []))
-    const visible = new Set(
+    const visible = new Map(
       (
         await this.prisma.lookbookPost.findMany({
-          where: {
-            id: { in: postIds },
-            ...PUBLICLY_VISIBLE_POST_WHERE,
-            ...(scope.band ? { climate_band: scope.band } : {}),
-          },
-          select: { id: true },
+          where: { id: { in: postIds }, ...PUBLICLY_VISIBLE_POST_WHERE },
+          select: { id: true, climate_band: true },
         })
-      ).map((post) => post.id)
+      ).map((post) => [post.id, post])
     )
     const commentIds = events.flatMap((event) =>
       'commentId' in event && event.commentId ? [event.commentId] : []
@@ -189,7 +213,15 @@ export class CommunitySyncService {
           : undefined
       if (event.kind === 'comment.status')
         return comment?.user_id === member ? [event] : []
-      if (!visible.has(event.postId))
+      const post = visible.get(event.postId)
+      if (event.kind === 'post.text_changed') {
+        // Older clients reconcile visible cards for this revision signal.
+        // Both versions use target authorization before any content is read.
+        return post
+          ? [{ ...event, kind: includePostText ? event.kind : 'reactions.changed' }]
+          : []
+      }
+      if (!inFeedScope(post, scope))
         return [{ version: 1, kind: 'resync', resyncRequired: true }]
       if (
         event.commentId &&
@@ -290,6 +322,7 @@ export class CommunitySyncService {
             ]
           : []
       const post = posts.find((row) => row.id === event.post_id)
+      if (event.kind === 'post.text_changed') return targetedPostTextEvent(event, post)
       const commentVisible = publicCommentMatches(comment, event)
       if (!post || event.kind === 'resync' || (event.comment_id && !commentVisible))
         return [{ version: 1, kind: 'resync', resyncRequired: true }]

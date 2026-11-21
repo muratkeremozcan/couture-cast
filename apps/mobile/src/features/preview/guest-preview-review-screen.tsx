@@ -7,6 +7,7 @@ import { ScrollView, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   applyComfortCarryover,
+  GUEST_PREVIEW_GARMENT_INTENT,
   getGuestPreviewStrings,
   type GuestPreviewStrings,
   type SampleComfort,
@@ -98,6 +99,7 @@ export function GuestPreviewReviewScreen() {
   const [loadAttempt, setLoadAttempt] = useState(0)
   const client = useRef<MobileComfortClient | null>(null)
   const inFlight = useRef(false)
+  const garmentIntent = useRef(false)
   const mounted = useRef(true)
 
   useEffect(() => {
@@ -110,7 +112,9 @@ export function GuestPreviewReviewScreen() {
     }
     void (async () => {
       const snapshot = await store.load()
-      const proposal = snapshot.state?.conversion ? snapshot.state.comfort : null
+      const conversion = snapshot.state?.conversion
+      const proposal = conversion ? snapshot.state?.comfort : null
+      garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
       if (!proposal) {
         router.replace('/')
         return
@@ -295,7 +299,15 @@ export function GuestPreviewReviewScreen() {
           <PreviewButton
             label={strings.review.continue}
             onPress={() => {
-              void resolveMobileNextStep().then((next) => router.replace(next))
+              const verified = client.current
+              if (!verified || mobileApplicationUserId() !== verified.memberId) return
+              const next = garmentIntent.current
+                ? resolveMobileNextStep(true)
+                : resolveMobileNextStep()
+              void next.then((destination) => {
+                if (mounted.current && mobileApplicationUserId() === verified.memberId)
+                  router.replace(destination)
+              })
             }}
             testID="guest-preview-review-continue"
             palette={palette}

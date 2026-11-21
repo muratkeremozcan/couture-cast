@@ -12,6 +12,7 @@ import {
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
@@ -21,6 +22,72 @@ import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 
 export function registerCommunityPublishingCases() {
+  it('keeps approved Community text visible after a failed edit and saves the retained draft on retry', async () => {
+    const original = item({
+      id: 'own-text',
+      title: 'Plum layers',
+      caption: 'Layers for a cool evening',
+      textRevision: 0,
+      author: { displayName: 'You', isSelf: true },
+    })
+    const foreign = item({ id: 'foreign-text', title: 'Autumn outfit', textRevision: 2 })
+    const updated = {
+      title: 'Plum layers for autumn',
+      caption: 'A wrap dress and light jacket',
+    }
+    let approved = original
+    serveFeed(() => HttpResponse.json({ data: feed({ items: [approved, foreign] }) }))
+    const edits: unknown[] = []
+    server.use(
+      http.patch('*/api/v1/community/posts/own-text/text', async ({ request }) => {
+        edits.push(await request.json())
+        return HttpResponse.json({ message: 'Temporary save failure' }, { status: 503 })
+      })
+    )
+
+    await render(<CommunityScreen />)
+    const title = await screen.findByTestId('community-card-title-own-text')
+    const caption = screen.getByTestId('community-card-caption-own-text')
+    expect(title).toHaveTextContent(original.title!)
+    expect(screen.getByTestId('community-card-title-foreign-text')).toHaveTextContent(
+      'Autumn outfit'
+    )
+    expect(screen.getAllByTestId('community-edit-text')).toHaveLength(1)
+    await userEvent.click(screen.getByTestId('community-edit-text'))
+    const draftTitle = screen.getByTestId('community-edit-title')
+    const draftCaption = screen.getByTestId('community-edit-description')
+    await userEvent.fill(draftTitle, updated.title)
+    await userEvent.fill(draftCaption, updated.caption)
+    await userEvent.click(screen.getByTestId('community-edit-save'))
+
+    await screen.findByText(enUS.community.compose.editFailed)
+    expect(title).toHaveTextContent(original.title!)
+    expect(caption).toHaveTextContent(original.caption!)
+    expect(draftTitle).toHaveValue(updated.title)
+    expect(draftCaption).toHaveValue(updated.caption)
+    server.use(
+      http.patch('*/api/v1/community/posts/own-text/text', async ({ request }) => {
+        edits.push(await request.json())
+        const text = { ...updated, textRevision: 1 }
+        approved = { ...approved, ...text }
+        return HttpResponse.json({ data: text })
+      })
+    )
+    await userEvent.click(screen.getByTestId('community-edit-save'))
+    await waitFor(() =>
+      expect(edits).toEqual(Array(2).fill({ ...updated, baseRevision: 0 }))
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('community-card-title-own-text')).toHaveTextContent(
+        updated.title
+      )
+    )
+    expect(screen.getByTestId('community-card-caption-own-text')).toHaveTextContent(
+      updated.caption
+    )
+    expect(screen.queryByTestId('community-edit-form')).toBeNull()
+  })
+
   // --- Compose --------------------------------------------------------------
 
   it('6.1-MOB-018 publishes a flat body with confirmed alt text on one idempotency key', async () => {
@@ -72,7 +139,12 @@ export function registerCommunityPublishingCases() {
     const publishButton = screen.getByTestId('community-publish-button')
     expect(publishButton.getAttribute('aria-disabled')).toBe('true')
 
+    const titleInput = screen.getByTestId('community-title-input')
     const captionInput = screen.getByTestId('community-caption-input')
+    expect(
+      titleInput.compareDocumentPosition(captionInput) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    await userEvent.fill(titleInput, 'Layers for the commute')
     fireEvent.change(captionInput, { target: { value: 'Look at https://bad-link.com' } })
     expect((await screen.findByTestId('community-caption-error')).textContent).toBe(
       enUS.community.validation.captionUrl
@@ -104,6 +176,7 @@ export function registerCommunityPublishingCases() {
       uploadSessionId: 'session-42',
       altText: suggestion,
       altTextConfirmed: true,
+      title: 'Layers for the commute',
       caption: 'Clean aesthetic daily style',
       locale: 'en-US',
     })

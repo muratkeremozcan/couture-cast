@@ -214,13 +214,12 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     )
 
     await log.step('Tab from the top of the document to the control')
-    // The skip link is the first focusable element in the layout. Story 1.2b put
-    // the Locations section first inside `main`, and for this member, who has no
-    // saved location, its controls are the city search and Use my location (the
-    // Jade follow-up, Step 58), so four presses is the whole path. The exact count
-    // is the point: a control reachable only after ten tabs is unusable.
+    // The desktop path reaches the toggle in five presses via Skip, Home and
+    // the two city controls. Check each stop to catch extra focus targets.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
     await page.keyboard.press('Tab')

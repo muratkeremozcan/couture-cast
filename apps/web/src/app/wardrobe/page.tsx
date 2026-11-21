@@ -24,25 +24,109 @@ import {
   resolveCurrentUserId,
 } from '../../lib/wardrobe'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
+import { currentWebSessionOwner, useWebSessionOwner } from '../../lib/use-web-session'
+import { getGuestPreviewStrings } from '@couture/utils'
 
 export default function WardrobePage() {
+  const owner = useWebSessionOwner()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <WardrobeHubView />
+      <WardrobeHubView key={owner} owner={owner} />
     </I18nextProvider>
   )
 }
 
-function WardrobeHubView() {
-  const { t } = useTranslation()
+function WardrobeLoadError({
+  loadError,
+  hasGarments,
+  isLoading,
+  strings,
+  onRetry,
+}: {
+  loadError: string | null
+  hasGarments: boolean
+  isLoading: boolean
+  strings: ReturnType<typeof getGuestPreviewStrings>
+  onRetry: () => void
+}) {
+  if (!loadError) return null
+  return (
+    <div
+      role="alert"
+      className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800"
+    >
+      <div>
+        {hasGarments && <p>{strings.firstUse.staleWardrobe}</p>}
+        <p>
+          {loadError === 'Unable to load your wardrobe.'
+            ? strings.firstUse.wardrobeFailed
+            : loadError}
+        </p>
+      </div>
+      <button
+        type="button"
+        className="min-h-11 px-2 font-semibold underline"
+        data-testid="wardrobe-list-retry"
+        disabled={isLoading}
+        onClick={onRetry}
+      >
+        {strings.chrome.retry}
+      </button>
+    </div>
+  )
+}
+
+function WardrobeEmptyState({
+  isLoading,
+  hasLoaded,
+  loadError,
+  openCapture,
+}: {
+  isLoading: boolean
+  hasLoaded: boolean
+  loadError: string | null
+  openCapture: (opener: HTMLElement) => void
+}) {
+  if (isLoading)
+    return (
+      <p role="status" className="mt-8 text-center text-sm text-zinc-500">
+        Loading your wardrobe...
+      </p>
+    )
+  if (!hasLoaded || loadError) return null
+  return (
+    <div className="mt-8 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-200 py-12 text-center dark:border-zinc-800">
+      <div className="text-4xl">🧥</div>
+      <h3 className="mt-3 text-base font-semibold text-zinc-800 dark:text-zinc-200">
+        No garments added yet
+      </h3>
+      <p className="mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+        Snap a photo of your favorite jacket, top, or dress to get started.
+      </p>
+      <button
+        onClick={(event) => openCapture(event.currentTarget)}
+        className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+      >
+        Snap or Import Garment
+      </button>
+    </div>
+  )
+}
+
+function WardrobeHubView({ owner }: { owner: string | null }) {
+  const { t, i18n } = useTranslation()
+  const strings = getGuestPreviewStrings(i18n.language)
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [timedOutGarmentIds, setTimedOutGarmentIds] = useState<Set<string>>(
-    () => new Set()
-  )
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  const [hasLoaded, setHasLoaded] = useState(false)
+  const listController = useRef<AbortController | null>(null)
+  const loadAfterTags = useRef(false)
+  const [garmentError, setGarmentError] = useState<string | null>(null)
+  const [confirmedGarment, setConfirmedGarment] = useState(false)
   const [onboardingStatus, setOnboardingStatus] =
     useState<WardrobeOnboardingStatus | null>(null)
   const [onboardingStatusError, setOnboardingStatusError] = useState(false)
@@ -58,6 +142,7 @@ function WardrobeHubView() {
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
   const pollingControllerRef = useRef<AbortController | null>(null)
+  const directEntryConsumed = useRef(false)
   const silhouetteButtonRef = useRef<HTMLButtonElement | null>(null)
   /**
    * The account, setup progress and closet reads below run once at mount. One that ran before
@@ -114,16 +199,25 @@ function WardrobeHubView() {
   }
 
   useEffect(() => {
+    pollingControllerRef.current?.abort()
     const controller = new AbortController()
+    listController.current = controller
+    setIsLoading(true)
     void listGarmentsFromWeb(controller.signal)
       .then((persistedGarments) => {
+        if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
         setGarments(persistedGarments)
+        setHasLoaded(true)
         setLoadError(null)
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) {
           setLoadError(
-            error instanceof Error ? error.message : 'Unable to load your wardrobe.'
+            error instanceof Error
+              ? error.message
+              : loadAfterTags.current
+                ? 'Unable to refresh your wardrobe.'
+                : 'Unable to load your wardrobe.'
           )
           missedSession()
         }
@@ -131,10 +225,11 @@ function WardrobeHubView() {
       .finally(() => {
         if (!controller.signal.aborted) {
           setIsLoading(false)
+          loadAfterTags.current = false
         }
       })
     return () => controller.abort()
-  }, [sessionAttempt, missedSession])
+  }, [sessionAttempt, missedSession, loadAttempt, owner])
 
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
@@ -167,8 +262,11 @@ function WardrobeHubView() {
 
   const pollCommittedGarment = (garmentId: string) => {
     pollingControllerRef.current?.abort()
+    listController.current?.abort()
+    setIsLoading(false)
     const controller = new AbortController()
     pollingControllerRef.current = controller
+    setGarmentError(null)
 
     void (async () => {
       try {
@@ -179,14 +277,13 @@ function WardrobeHubView() {
             controller.signal
           )
           const persisted = await listGarmentsFromWeb(controller.signal)
+          if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
           setGarments(persisted)
+          setHasLoaded(true)
+          setLoadError(null)
           const current = persisted.find((garment) => garment.id === garmentId)
           if (!current || current.status === 'processing') continue
-          setTimedOutGarmentIds((ids) => {
-            const next = new Set(ids)
-            next.delete(garmentId)
-            return next
-          })
+          if (current.status === 'ready') setConfirmedGarment(true)
           if (current.status === 'awaiting_tags') {
             if (isCaptureOpenRef.current) {
               pendingTaggingGarmentIdRef.current = current.id
@@ -196,13 +293,12 @@ function WardrobeHubView() {
           }
           return
         }
-        setTimedOutGarmentIds((ids) => new Set(ids).add(garmentId))
-        setLoadError(
+        setGarmentError(
           'Smart tagging is taking longer than expected. The garment will remain visible while processing continues.'
         )
       } catch (error) {
         if (!controller.signal.aborted) {
-          setLoadError(
+          setGarmentError(
             error instanceof Error ? error.message : 'Unable to refresh garment status.'
           )
         }
@@ -210,11 +306,31 @@ function WardrobeHubView() {
     })()
   }
 
+  useEffect(() => {
+    if (!owner || !hasLoaded || isLoading || loadError || directEntryConsumed.current)
+      return
+    if (new URLSearchParams(window.location.search).get('entry') !== 'add') return
+    directEntryConsumed.current = true
+    const url = new URL(window.location.href)
+    url.searchParams.delete('entry')
+    window.history.replaceState(window.history.state, '', url)
+    const awaitingTags = garments.find((garment) => garment.status === 'awaiting_tags')
+    if (awaitingTags) {
+      openTagging(awaitingTags.id)
+      return
+    }
+    // The processing row can be resumed without starting another upload.
+    const isProcessing = garments.some((garment) => garment.status === 'processing')
+    if (!isProcessing && addGarmentButtonRef.current)
+      openCapture(addGarmentButtonRef.current)
+  }, [garments, hasLoaded, isLoading, loadError, owner])
+
   const handleGarmentCommitted = (garment: GarmentItemContract) => {
     setGarments((current) => [
       garment,
       ...current.filter((item) => item.id !== garment.id),
     ])
+    if (garment.status === 'ready') setConfirmedGarment(true)
     if (garment.status === 'awaiting_tags') {
       pendingTaggingGarmentIdRef.current = garment.id
     } else if (garment.status === 'processing') {
@@ -243,13 +359,9 @@ function WardrobeHubView() {
       current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
     )
     setTaggingGarmentId(null)
-    void listGarmentsFromWeb()
-      .then((persisted) => setGarments(persisted))
-      .catch((error: unknown) => {
-        setLoadError(
-          error instanceof Error ? error.message : 'Unable to refresh your wardrobe.'
-        )
-      })
+    setConfirmedGarment(true)
+    loadAfterTags.current = true
+    setLoadAttempt((attempt) => attempt + 1)
   }
 
   return (
@@ -265,16 +377,24 @@ function WardrobeHubView() {
               title, wrapped Outfit capsules and pushed + Add Garment off the screen. Below the
               sm breakpoint the title takes its own row and the actions wrap beneath it. */}
           <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              Wardrobe Hub
-            </h1>
+            <div>
+              <Link
+                href="/"
+                className="hidden min-h-11 items-center text-sm underline md:inline-flex"
+              >
+                {t('nav.home')}
+              </Link>
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
+                Wardrobe Hub
+              </h1>
+            </div>
             {/* TEA P4: on phones the two secondary actions share the first row in equal halves and
                 + Add Garment, the primary, takes the full second row. */}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
               {/* The capsules route had no entry point anywhere in the app. */}
               <Link
                 href="/wardrobe/capsules"
-                className="flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-2 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 sm:px-4 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 data-testid="wardrobe-capsules-link"
               >
                 Outfit capsules
@@ -289,7 +409,7 @@ function WardrobeHubView() {
                     ? 'Unable to load your account. Reload the page to try again.'
                     : undefined
                 }
-                className="flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-2 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {t('wardrobe.silhouette.title')}
               </button>
@@ -353,35 +473,34 @@ function WardrobeHubView() {
               Photograph or upload clothing items to power personalized weather guidance.
             </p>
 
-            {loadError && (
-              <p
-                role="alert"
-                className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800"
-              >
-                {loadError}
+            <WardrobeLoadError
+              loadError={loadError}
+              hasGarments={garments.length > 0}
+              isLoading={isLoading}
+              strings={strings}
+              onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+            />
+            {garmentError && (
+              <p role="alert" className="mt-4 text-sm">
+                {garmentError}
               </p>
             )}
+            {confirmedGarment && (
+              <Link
+                href="/"
+                className="inline-flex min-h-11 items-center text-sm underline"
+              >
+                {strings.firstUse.backToOutfit}
+              </Link>
+            )}
 
-            {isLoading ? (
-              <p role="status" className="mt-8 text-center text-sm text-zinc-500">
-                Loading your wardrobe...
-              </p>
-            ) : garments.length === 0 ? (
-              <div className="mt-8 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-200 py-12 text-center dark:border-zinc-800">
-                <div className="text-4xl">🧥</div>
-                <h3 className="mt-3 text-base font-semibold text-zinc-800 dark:text-zinc-200">
-                  No garments added yet
-                </h3>
-                <p className="mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
-                  Snap a photo of your favorite jacket, top, or dress to get started.
-                </p>
-                <button
-                  onClick={(event) => openCapture(event.currentTarget)}
-                  className="mt-4 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  Snap or Import Garment
-                </button>
-              </div>
+            {garments.length === 0 ? (
+              <WardrobeEmptyState
+                isLoading={isLoading}
+                hasLoaded={hasLoaded}
+                loadError={loadError}
+                openCapture={openCapture}
+              />
             ) : (
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
                 {garments.map((garment) => (
@@ -414,15 +533,14 @@ function WardrobeHubView() {
                               .replace(/_/g, ' ')
                           : 'Untagged'}
                       </span>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center gap-1">
                         <span
                           data-testid={`garment-status-${garment.status}`}
                           className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
                         >
                           {garment.status.replace('_', ' ')}
                         </span>
-                        {(garment.status === 'awaiting_tags' ||
-                          timedOutGarmentIds.has(garment.id)) && (
+                        {garment.status === 'awaiting_tags' && (
                           <button
                             ref={(element) => {
                               if (element)
@@ -435,6 +553,24 @@ function WardrobeHubView() {
                             className="min-h-[44px] min-w-[44px] rounded bg-gold-500/20 px-2 py-1 text-xs font-semibold text-gold-700 hover:bg-gold-500/30 dark:text-gold-300"
                           >
                             Needs tags
+                          </button>
+                        )}
+                        {garment.status === 'failed' && (
+                          <button
+                            type="button"
+                            className="min-h-11 px-2 text-left text-xs font-semibold underline"
+                            onClick={(event) => openCapture(event.currentTarget)}
+                          >
+                            {strings.firstUse.replaceGarment}
+                          </button>
+                        )}
+                        {garment.status === 'processing' && (
+                          <button
+                            type="button"
+                            onClick={() => pollCommittedGarment(garment.id)}
+                            className="min-h-11 px-2 text-xs font-semibold underline"
+                          >
+                            {strings.firstUse.checkGarment}
                           </button>
                         )}
                       </div>
@@ -450,6 +586,7 @@ function WardrobeHubView() {
       </div>
 
       <GarmentCaptureModal
+        confirmDiscard
         isOpen={isCaptureModalOpen}
         onClose={closeCapture}
         onGarmentCommitted={handleGarmentCommitted}

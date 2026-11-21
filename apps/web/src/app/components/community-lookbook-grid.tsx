@@ -74,6 +74,7 @@ import {
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { useMemberSession } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import { CommunityPostTextEditor } from './community-post-text-editor'
 import {
   LiveSponsorshipLedger,
   type LiveReadStamp,
@@ -111,6 +112,9 @@ import { parseDeepLink, CLIMATE_BANDS } from '@couture/utils'
 import {
   communityModerationReasonCategories,
   communityPostCaptionSchema,
+  communityPostTitleSchema,
+  COMMUNITY_POST_TITLE_MAX_LENGTH,
+  type EditCommunityPostTextResponse,
   communityReportReasonSchema,
   defaultSupportedLocale,
   supportedLocaleSchema,
@@ -491,7 +495,7 @@ export function LookbookFilterNav({
       aria-label={t('community.filters.label')}
       aria-describedby={explainerId}
       style={{ top: stickyTop }}
-      className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur"
+      className="flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur min-[360px]:sticky min-[360px]:z-10"
     >
       {/* Translated actions can outgrow a 320 px row, so they wrap below the heading as a group. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -821,7 +825,7 @@ function LookbookCardContent({
     <div className="flex flex-1 flex-col justify-between gap-3 p-5">
       <div className="space-y-2">
         <h3 id={`${scope}lookbook-card-title-${item.id}`} className="sr-only">
-          {t('community.card.label', { author: authorName })}
+          {item.title || t('community.card.label', { author: authorName })}
         </h3>
         <span
           data-testid={`${scope}author-name-${item.id}`}
@@ -830,6 +834,14 @@ function LookbookCardContent({
           {authorName}
         </span>
 
+        {item.title && (
+          <p
+            className="break-words text-base font-semibold"
+            data-testid={`${scope}title-${item.id}`}
+          >
+            {item.title}
+          </p>
+        )}
         {item.caption && (
           <p
             data-testid={`${scope}caption-${item.id}`}
@@ -1055,6 +1067,7 @@ interface LookbookDetailDialogProps {
   t: Translate
   /** Where focus goes after close when the control that opened the detail is gone. */
   restoreFocus: { opener: string | undefined; final: string }
+  onTextSaved: (postId: string, text: EditCommunityPostTextResponse['data']) => void
   onClose: () => void
 }
 
@@ -1078,6 +1091,7 @@ function LookbookDetailDialog({
   t,
   restoreFocus,
   onClose,
+  onTextSaved,
   reactionControls,
   commentTarget,
 }: LookbookDetailDialogProps) {
@@ -1088,7 +1102,7 @@ function LookbookDetailDialog({
       suspended={suspended}
       isOpen
       onClose={onClose}
-      title={t('community.card.label', { author: authorName })}
+      title={item.title || t('community.card.label', { author: authorName })}
       surface="theme"
       titleId="community-detail-title"
       fallbackFocusSelector={restoreFocus.opener}
@@ -1160,6 +1174,13 @@ function LookbookDetailDialog({
             {item.caption}
           </p>
         )}
+        <CommunityPostTextEditor
+          key={item.id}
+          item={item}
+          enabled={canAct && !suspended}
+          onSaved={onTextSaved}
+          t={t}
+        />
         {canAct && item.sponsorship && (
           <CommunitySponsoredCta
             postId={item.id}
@@ -1277,6 +1298,14 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
                   className="text-xs text-[color:var(--lookbook-ink-muted)]"
                 >
                   {moderationReasonText(state.moderationReason, t)}
+                </p>
+              )}
+              {state.title && (
+                <p
+                  data-testid={`author-state-title-${state.id}`}
+                  className="break-words text-sm font-semibold"
+                >
+                  {state.title}
                 </p>
               )}
               {state.caption && (
@@ -1429,6 +1458,46 @@ function CommunityReportModal({
 // PostCreationModal
 // ---------------------------------------------------------------------------
 
+function invalidPostTitle(title: string) {
+  return Boolean(title.trim()) && !communityPostTitleSchema.safeParse(title).success
+}
+
+function PostTitleField({
+  title,
+  onChange,
+  titleInvalid,
+  t,
+}: {
+  title: string
+  onChange: (title: string) => void
+  titleInvalid: boolean
+  t: Translate
+}) {
+  return (
+    <div className="space-y-2">
+      <label
+        htmlFor="post-title-input"
+        className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+      >
+        {t('community.compose.titleLabel')}
+      </label>
+      <input
+        id="post-title-input"
+        data-testid="post-title-input"
+        value={title}
+        maxLength={COMMUNITY_POST_TITLE_MAX_LENGTH}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-11 w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-sm text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+      />
+      {titleInvalid && (
+        <p role="alert" className="text-sm">
+          {t('community.compose.titleInvalid')}
+        </p>
+      )}
+    </div>
+  )
+}
+
 interface PostCreationModalProps {
   suspended?: boolean
   onClose: () => void
@@ -1436,6 +1505,7 @@ interface PostCreationModalProps {
   onPublish: (params: {
     altText: string
     caption?: string
+    title?: string
     challengeId?: string | null
   }) => void
   /** Preview of the chosen photo, owned by the grid so it can revoke the object URL. */
@@ -1471,6 +1541,8 @@ function PostCreationModal({
   const [altText, setAltText] = useState('')
   const [isAltTextConfirmed, setIsAltTextConfirmed] = useState(false)
   const [caption, setCaption] = useState('')
+  const [title, setTitle] = useState('')
+  const titleInvalid = invalidPostTitle(title)
   const [selectedChallengeId, setSelectedChallengeId] = useState<string | null>(
     activeChallenge?.id ?? null
   )
@@ -1492,17 +1564,19 @@ function PostCreationModal({
       caption,
     })
     setValidationKey(failure)
-    if (failure !== null) {
+    if (failure !== null || titleInvalid) {
       return
     }
     onPublish({
       altText: altText.trim(),
       caption: caption.trim() || undefined,
+      title: title.trim() || undefined,
       challengeId: selectedChallengeId,
     })
   }
 
   const isPublishBlocked =
+    titleInvalid ||
     isPublishing ||
     isPreparing ||
     composeValidationKey({
@@ -1625,6 +1699,13 @@ function PostCreationModal({
             </label>
           </div>
         </div>
+
+        <PostTitleField
+          title={title}
+          onChange={setTitle}
+          titleInvalid={titleInvalid}
+          t={t}
+        />
 
         <div className="space-y-2">
           <label
@@ -1819,6 +1900,13 @@ function CommunityNotices({
   )
 }
 
+function clearClimateFilters(
+  mode: FilterCategory,
+  onModeChange: (mode: FilterCategory) => void
+) {
+  return mode === 'all' || mode === 'auto' ? undefined : () => onModeChange('all')
+}
+
 interface CommunityFeedStatesProps {
   isLoading: boolean
   errorText: string | null
@@ -1830,6 +1918,7 @@ interface CommunityFeedStatesProps {
   itemCount: number
   gridColumns: string
   canShare: boolean
+  onClearFilters: (() => void) | undefined
   onRetry: () => void
   onShare: () => void
   t: Translate
@@ -1843,6 +1932,7 @@ function CommunityFeedStates({
   gridColumns,
   canShare,
   onRetry,
+  onClearFilters,
   onShare,
   t,
 }: CommunityFeedStatesProps) {
@@ -1907,6 +1997,16 @@ function CommunityFeedStates({
           <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
             {t('community.feed.emptyBody')}
           </p>
+          {onClearFilters && (
+            <button
+              type="button"
+              className="min-h-11 px-3 text-sm font-semibold underline"
+              onClick={onClearFilters}
+              data-testid="community-clear-filters"
+            >
+              {t('community.feed.clearFilters')}
+            </button>
+          )}
           {canShare && (
             <button
               type="button"
@@ -3678,6 +3778,7 @@ export function CommunityLookbookGrid({
   const handlePublishPost = async (params: {
     altText: string
     caption?: string
+    title?: string
     challengeId?: string | null
   }): Promise<void> => {
     if (!communityAvailable) return
@@ -3694,6 +3795,7 @@ export function CommunityLookbookGrid({
         uploadSessionId: allocated.uploadSessionId,
         altText: params.altText,
         caption: params.caption ?? null,
+        title: params.title,
         challengeId: params.challengeId,
         locale,
         idempotencyKey: allocated.idempotencyKey,
@@ -3944,6 +4046,7 @@ export function CommunityLookbookGrid({
             gridColumns={gridColumns}
             canShare={presentation.canAct}
             onRetry={handleRetry}
+            onClearFilters={clearClimateFilters(currentMode, handleModeChange)}
             onShare={openCreateModal}
             t={t}
           />
@@ -4041,6 +4144,16 @@ export function CommunityLookbookGrid({
             sponsored={sponsoredHost(detailSurface)}
             t={t}
             restoreFocus={detailOpener.restoreFocus}
+            onTextSaved={(postId, text) => {
+              const update = (post: CommunityFeedItem | null) =>
+                post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
+                  ? { ...post, ...text }
+                  : post
+              setItems((previous) => previous.map((item) => update(item)!))
+              setOpenedItem(update)
+              setDeepLinkedItem(update)
+              applySpotlight(update)
+            }}
             onClose={() => {
               notificationIntentRef.current++
               comments.retireFocus(presentation.detail!.id)

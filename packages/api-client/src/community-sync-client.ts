@@ -54,7 +54,8 @@ export function communitySyncClient(
     | 'removePushRegistration'
   >,
   requestInit?: RequestInit | (() => RequestInit),
-  timeoutMs = 5000
+  timeoutMs = 5000,
+  includePostText = false
 ) {
   function request<T>(work: (options: RequestInit) => Promise<T>, signal?: AbortSignal) {
     const options = typeof requestInit === 'function' ? requestInit() : requestInit
@@ -67,7 +68,15 @@ export function communitySyncClient(
     events: async (mode: CommunityFeedMode, cursor?: string, signal?: AbortSignal) =>
       communityEventsResponseSchema.parse(
         await request(
-          (options) => api.getCommunityEvents({ mode, cursor }, options),
+          (options) =>
+            api.getCommunityEvents(
+              {
+                mode,
+                cursor,
+                ...(includePostText ? { xCouturePostText: '1' as const } : {}),
+              },
+              options
+            ),
           signal
         )
       ).data,
@@ -93,6 +102,7 @@ export function communitySyncClient(
           (options) =>
             api.resolveCommunityTargets(
               {
+                ...(includePostText ? { xCouturePostText: '1' as const } : {}),
                 resolveCommunityTargetsInput:
                   resolveCommunityTargetsInputSchema.parse(input),
               },

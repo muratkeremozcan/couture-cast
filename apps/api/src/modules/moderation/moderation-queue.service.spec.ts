@@ -224,6 +224,18 @@ describe('U-Q-SVC-SNAPSHOT: allowlist projection', () => {
     })
   })
 
+  it('includes the report title on request and omits it from legacy and redacted snapshots', () => {
+    const raw = { title: 'Evening layers', caption: null }
+    expect(projectSnapshot(raw, true)).toMatchObject({
+      title: 'Evening layers',
+      available: true,
+    })
+    expect(projectSnapshot(raw)).not.toHaveProperty('title')
+    expect(projectSnapshot({ ...raw, unavailable: true }, true)).not.toHaveProperty(
+      'title'
+    )
+  })
+
   it('keeps only the known keys and drops the rest', () => {
     const projected = projectSnapshot({
       caption: 'c',

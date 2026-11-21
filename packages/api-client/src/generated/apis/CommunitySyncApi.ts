@@ -26,6 +26,7 @@ import type {
 } from '../models/index'
 
 export interface GetCommunityEventsRequest {
+  xCouturePostText?: GetCommunityEventsXCouturePostTextEnum
   cursor?: string
   mode?: GetCommunityEventsModeEnum
 }
@@ -44,6 +45,7 @@ export interface RemovePushRegistrationRequest {
 }
 
 export interface ResolveCommunityTargetsRequest {
+  xCouturePostText?: ResolveCommunityTargetsXCouturePostTextEnum
   resolveCommunityTargetsInput?: ResolveCommunityTargetsInput
 }
 
@@ -68,6 +70,12 @@ export class CommunitySyncApi extends runtime.BaseAPI {
     }
 
     const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
+      )
+    }
 
     if (this.configuration && this.configuration.accessToken) {
       const token = this.configuration.accessToken
@@ -416,6 +424,12 @@ export class CommunitySyncApi extends runtime.BaseAPI {
 
     headerParameters['Content-Type'] = 'application/json'
 
+    if (requestParameters['xCouturePostText'] != null) {
+      headerParameters['x-couture-post-text'] = String(
+        requestParameters['xCouturePostText']
+      )
+    }
+
     if (this.configuration && this.configuration.accessToken) {
       const token = this.configuration.accessToken
       const tokenString = await token('bearerAuth', [])
@@ -468,6 +482,14 @@ export class CommunitySyncApi extends runtime.BaseAPI {
 /**
  * @export
  */
+export const GetCommunityEventsXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type GetCommunityEventsXCouturePostTextEnum =
+  (typeof GetCommunityEventsXCouturePostTextEnum)[keyof typeof GetCommunityEventsXCouturePostTextEnum]
+/**
+ * @export
+ */
 export const GetCommunityEventsModeEnum = {
   auto: 'auto',
   all: 'all',
@@ -480,3 +502,11 @@ export const GetCommunityEventsModeEnum = {
 } as const
 export type GetCommunityEventsModeEnum =
   (typeof GetCommunityEventsModeEnum)[keyof typeof GetCommunityEventsModeEnum]
+/**
+ * @export
+ */
+export const ResolveCommunityTargetsXCouturePostTextEnum = {
+  _1: '1',
+} as const
+export type ResolveCommunityTargetsXCouturePostTextEnum =
+  (typeof ResolveCommunityTargetsXCouturePostTextEnum)[keyof typeof ResolveCommunityTargetsXCouturePostTextEnum]

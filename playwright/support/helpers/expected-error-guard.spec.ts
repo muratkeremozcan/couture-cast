@@ -1,5 +1,12 @@
+import { EventEmitter } from 'node:events'
+import type { BrowserContext } from '@playwright/test'
 import { describe, expect, it } from 'vitest'
-import { classifyGuardedErrors, type GuardedError } from './expected-error-guard'
+import {
+  classifyGuardedErrors,
+  guardExpectedError,
+  unexpectedRitualErrors,
+  type GuardedError,
+} from './expected-error-guard'
 
 const allowed = { method: 'POST', status: 409, code: 'UPLOAD_BYTES_MISSING' }
 const url = 'http://127.0.0.1:3005/api/v1/wardrobe/silhouette/my-form/commit'
@@ -62,4 +69,75 @@ describe('classifyGuardedErrors', () => {
       wrongStatus,
     ])
   })
+})
+
+describe('guardExpectedError', () => {
+  it('distinguishes an interrupted body read from a readable error without a message', async () => {
+    const emitter = new EventEmitter()
+    const guard = guardExpectedError(emitter as unknown as BrowserContext, /commit$/)
+    const metadata = { method: 'POST', status: 409, url }
+    const response = {
+      request: () => ({ method: () => metadata.method }),
+      status: () => metadata.status,
+      url: () => metadata.url,
+    }
+    emitter.emit('response', {
+      ...response,
+      body: () => Promise.resolve(Buffer.from('{}')),
+    })
+    emitter.emit('response', {
+      ...response,
+      body: () => Promise.reject(new Error('Navigation interrupted the response')),
+    })
+
+    expect(await guard.settle()).toEqual([
+      metadata,
+      { ...metadata, bodyUnreadable: true },
+    ])
+  })
+
+  it('settles a stalled response body without losing other errors', async () => {
+    const emitter = new EventEmitter()
+    const guard = guardExpectedError(emitter as unknown as BrowserContext, /commit$/, 20)
+    const response = {
+      request: () => ({ method: () => 'GET' }),
+      url: () => url,
+    }
+    emitter.emit('response', {
+      ...response,
+      status: () => 400,
+      body: () => new Promise<Buffer>(() => undefined),
+    })
+    emitter.emit('response', {
+      ...response,
+      status: () => 503,
+      body: () => Promise.resolve(Buffer.from('{"message":"Unexpected outage"}')),
+    })
+
+    expect(await guard.settle()).toEqual([
+      { method: 'GET', status: 400, url, bodyUnreadable: true },
+      { method: 'GET', status: 503, url, code: 'Unexpected outage' },
+    ])
+  }, 500)
+})
+
+it('retains ritual errors outside the missing-city recovery', () => {
+  const missingCity = {
+    method: 'GET',
+    status: 400,
+    url: 'http://127.0.0.1:3005/api/v1/ritual?locale=en-US',
+  }
+  const wrongMessage = { ...missingCity, code: 'Other bad request' }
+  const unavailable = { ...missingCity, status: 503, bodyUnreadable: true as const }
+  const otherMethod = { ...missingCity, method: 'POST', bodyUnreadable: true as const }
+  expect(
+    unexpectedRitualErrors([
+      { ...missingCity, code: 'No location preferences found for user' },
+      { ...missingCity, bodyUnreadable: true },
+      missingCity,
+      wrongMessage,
+      unavailable,
+      otherMethod,
+    ])
+  ).toEqual([missingCity, wrongMessage, unavailable, otherMethod])
 })

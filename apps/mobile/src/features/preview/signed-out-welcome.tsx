@@ -3,7 +3,8 @@
 import { router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings } from '@couture/utils'
+import { createMemberSampleOutfit, getGuestPreviewStrings } from '@couture/utils'
+import { SampleGarmentArt } from './guest-preview-parts'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
 export function SignedOutWelcome() {
@@ -12,7 +13,7 @@ export function SignedOutWelcome() {
   const palette = useHeroPalette()
   const actions = [
     {
-      label: strings.chrome.entry,
+      label: strings.firstUse.sampleEntry,
       href: '/preview',
       testID: 'home-try-sample',
       primary: true,
@@ -36,8 +37,19 @@ export function SignedOutWelcome() {
         {strings.chrome.welcomeHeading}
       </Text>
       <Text style={[styles.body, { color: palette.mutedText }]}>
-        {strings.chrome.welcomeBody}
+        {strings.chrome.sampleLabel}
       </Text>
+      <View
+        style={styles.art}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden
+      >
+        {createMemberSampleOutfit().garments.map((garment) => (
+          <View key={garment.id} style={styles.tile}>
+            <SampleGarmentArt garment={garment} size={44} />
+          </View>
+        ))}
+      </View>
       {actions.map((action) => {
         const primary = 'primary' in action
         return (
@@ -69,6 +81,8 @@ export function SignedOutWelcome() {
 }
 
 const styles = StyleSheet.create({
+  art: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tile: { backgroundColor: '#F5F5F7', padding: 5, borderRadius: 8 },
   card: {
     marginHorizontal: 20,
     marginTop: 28,

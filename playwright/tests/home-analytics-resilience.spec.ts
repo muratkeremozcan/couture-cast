@@ -29,11 +29,13 @@ async function expectKeyInteractionsWork(page: Page) {
   await expect(page).toHaveURL(/#wardrobe$/)
 
   await page.getByTestId('nav-community').click()
-  await expect(page).toHaveURL(/#community$/)
-  await expect(page.getByTestId('health-indicator')).toBeVisible()
+  await expect(page).toHaveURL(/\/community$/)
+  await expect(page.getByTestId('community-page')).toBeVisible()
 }
 
 test.describe('Home analytics resilience', () => {
+  test.use({ authSessionEnabled: false })
+
   test(
     '[P0] keeps key interactions working for a signed-out visitor',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },

@@ -118,6 +118,7 @@ const CONSENT_CHECKED_IN_TRANSACTION = [
   'CommunityCommentsController.report',
   'CommunityCommentsController.roots',
   'CommunityCommentsController.submissions',
+  'CommunityController.editPostText',
   'CommunityController.setReaction',
   'CommunitySyncController.events',
   'CommunitySyncController.preferencesGet',

@@ -1,5 +1,13 @@
 // Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { WardrobeBackButton } from '@/src/features/wardrobe/wardrobe-back-button'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -25,7 +33,11 @@ import {
 } from '@/components/wardrobe/capsule-builder-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { createSchemeStyles, useSchemeColors } from '@/components/themed'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import {
   capsuleETag,
   createCapsuleFromMobile,
@@ -59,11 +71,15 @@ const OCCASION_FILTERS: (CapsuleOccasion | 'all')[] = [
  * these flows were reachable on mobile.
  */
 export default function WardrobeCapsulesScreen() {
+  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  return <MemberCapsulesScreen key={epoch} epoch={epoch} />
+}
+
+function MemberCapsulesScreen({ epoch }: { epoch: number }) {
   const { t } = useTranslation()
   const colors = useSchemeColors()
   const themed = useThemedStyles()
   const insets = useSafeAreaInsets()
-  const [accessToken, setAccessToken] = useState('')
   const [ownerUserId, setOwnerUserId] = useState('')
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
@@ -81,34 +97,50 @@ export default function WardrobeCapsulesScreen() {
   const [createNodeHandle, setCreateNodeHandle] = useState<number | null>(null)
 
   const inFlightRef = useRef<AbortController | null>(null)
+  const mountRef = useRef<AbortController | null>(null)
+  const current = useCallback(
+    (signal: AbortSignal) => !signal.aborted && mobileIdentityEpoch() === epoch,
+    [epoch]
+  )
+
+  useLayoutEffect(() => {
+    const controller = new AbortController()
+    mountRef.current = controller
+    return () => {
+      controller.abort()
+      inFlightRef.current?.abort()
+    }
+  }, [])
+
+  const memberToken = useCallback(
+    async (signal: AbortSignal) => {
+      if (!current(signal)) return null
+      const token = await resolveMobileAccessToken()
+      return current(signal) ? token : null
+    },
+    [current]
+  )
 
   useEffect(() => {
-    let cancelled = false
+    const signal = mountRef.current?.signal
+    if (!signal) return
     void (async () => {
-      const token = await resolveMobileAccessToken()
-      if (cancelled) return
-      if (!token) {
-        setErrorMessage('Sign in to manage capsules.')
-        setIsLoading(false)
-        return
-      }
-      setAccessToken(token)
       try {
+        const token = await memberToken(signal)
+        if (!current(signal)) return
+        if (!token) throw new Error('Sign in to manage capsules.')
         const owner = await resolveOwnerUserId(token)
-        if (cancelled) return
+        if (!current(signal)) return
         setOwnerUserId(owner)
       } catch (error: unknown) {
-        if (cancelled) return
+        if (!current(signal)) return
         setErrorMessage(
           error instanceof Error ? error.message : 'Sign in to manage capsules.'
         )
         setIsLoading(false)
       }
     })()
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  }, [current, memberToken])
 
   /** Debounce keystrokes into one query instead of a request per character. */
   useEffect(() => {
@@ -117,20 +149,25 @@ export default function WardrobeCapsulesScreen() {
   }, [searchInput])
 
   const loadCapsules = useCallback(async () => {
-    if (!accessToken || !ownerUserId) {
+    const signal = mountRef.current?.signal
+    if (!ownerUserId || !signal || !current(signal)) {
       return
     }
 
     inFlightRef.current?.abort()
     const controller = new AbortController()
     inFlightRef.current = controller
+    const reading = () => !controller.signal.aborted && current(signal)
 
     setIsLoading(true)
     setErrorMessage(null)
     try {
+      const token = await memberToken(controller.signal)
+      if (!reading()) return
+      if (!token) throw new Error('Sign in to manage capsules.')
       const [page, garmentList] = await Promise.all([
         listCapsulesFromMobile(
-          accessToken,
+          token,
           ownerUserId,
           {
             limit: 20,
@@ -141,67 +178,86 @@ export default function WardrobeCapsulesScreen() {
           },
           controller.signal
         ),
-        listGarmentsFromMobile(accessToken, controller.signal),
+        listGarmentsFromMobile(token, controller.signal),
       ])
-      if (controller.signal.aborted) return
+      if (!reading()) return
       setCapsules(page.items)
       setTotal(page.total)
       setGarments(garmentList)
     } catch (error: unknown) {
-      if (controller.signal.aborted) return
+      if (!reading()) return
       setErrorMessage(
         error instanceof Error ? error.message : t('wardrobe.capsules.errors.load')
       )
     } finally {
-      if (!controller.signal.aborted) {
+      if (reading()) {
         setIsLoading(false)
       }
     }
-  }, [accessToken, ownerUserId, searchQuery, occasionFilter, favoriteOnly])
+  }, [current, memberToken, ownerUserId, searchQuery, occasionFilter, favoriteOnly])
 
   useEffect(() => {
     void loadCapsules()
   }, [loadCapsules])
 
-  useEffect(() => () => inFlightRef.current?.abort(), [])
-
   const handleSave = async (
     input: CreateOutfitCapsuleInput,
     options: MobileCapsuleSaveOptions
   ) => {
+    const signal = mountRef.current?.signal
+    if (!signal || !ownerUserId) return
+    const token = await memberToken(signal)
+    if (!current(signal)) return
+    if (!token) throw new Error('Sign in to manage capsules.')
     if (editingCapsule && options.ifMatch) {
       await updateCapsuleFromMobile(
-        accessToken,
+        token,
         ownerUserId,
         editingCapsule.id,
         input,
-        options.ifMatch
+        options.ifMatch,
+        signal
       )
-      setStatusMessage(t('wardrobe.capsules.updated'))
     } else {
       await createCapsuleFromMobile(
-        accessToken,
+        token,
         ownerUserId,
         input,
-        options.idempotencyKey
+        options.idempotencyKey,
+        signal
       )
-      setStatusMessage(t('wardrobe.capsules.created'))
     }
+    if (!current(signal)) return
+    setStatusMessage(
+      t(
+        editingCapsule && options.ifMatch
+          ? 'wardrobe.capsules.updated'
+          : 'wardrobe.capsules.created'
+      )
+    )
     await loadCapsules()
   }
 
   const handleToggleFavorite = async (capsule: OutfitCapsuleContract) => {
+    const signal = mountRef.current?.signal
+    if (!signal || !ownerUserId) return
     try {
+      const token = await memberToken(signal)
+      if (!current(signal)) return
+      if (!token) throw new Error('Sign in to manage capsules.')
       await favoriteCapsuleFromMobile(
-        accessToken,
+        token,
         ownerUserId,
         capsule.id,
         !capsule.isFavorite,
-        capsuleETag(capsule.id, capsule.revision)
+        capsuleETag(capsule.id, capsule.revision),
+        signal
       )
+      if (!current(signal)) return
       setStatusMessage(t('wardrobe.capsules.favoriteUpdated'))
       await loadCapsules()
     } catch (error: unknown) {
+      if (!current(signal)) return
       setErrorMessage(
         error instanceof Error ? error.message : t('wardrobe.capsules.errors.save')
       )
@@ -209,6 +265,8 @@ export default function WardrobeCapsulesScreen() {
   }
 
   const confirmDelete = (capsule: OutfitCapsuleContract) => {
+    const signal = mountRef.current?.signal
+    if (!signal || !ownerUserId || !current(signal)) return
     Alert.alert(
       t('wardrobe.capsules.deleteConfirmTitle'),
       t('wardrobe.capsules.deleteConfirmBody'),
@@ -220,15 +278,21 @@ export default function WardrobeCapsulesScreen() {
           onPress: () => {
             void (async () => {
               try {
+                const token = await memberToken(signal)
+                if (!current(signal)) return
+                if (!token) throw new Error('Sign in to manage capsules.')
                 await deleteCapsuleFromMobile(
-                  accessToken,
+                  token,
                   ownerUserId,
                   capsule.id,
-                  capsuleETag(capsule.id, capsule.revision)
+                  capsuleETag(capsule.id, capsule.revision),
+                  signal
                 )
+                if (!current(signal)) return
                 setStatusMessage(t('wardrobe.capsules.deleted'))
                 await loadCapsules()
               } catch (error: unknown) {
+                if (!current(signal)) return
                 setErrorMessage(
                   error instanceof Error
                     ? error.message
@@ -246,7 +310,12 @@ export default function WardrobeCapsulesScreen() {
 
   return (
     <View style={[styles.screen, themed.screen]}>
-      <Stack.Screen options={{ title: t('wardrobe.capsules.title') }} />
+      <Stack.Screen
+        options={{
+          headerLeft: () => <WardrobeBackButton />,
+          title: t('wardrobe.capsules.title'),
+        }}
+      />
 
       {/* Polite status so success does not interrupt a screen reader mid-sentence. */}
       <Text
@@ -288,6 +357,7 @@ export default function WardrobeCapsulesScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={t('wardrobe.capsules.create')}
+          disabled={!ownerUserId}
           style={[styles.primaryButton, themed.primaryButton]}
           testID="create-capsule-button"
         >

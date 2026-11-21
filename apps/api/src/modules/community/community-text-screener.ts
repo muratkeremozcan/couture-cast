@@ -29,11 +29,15 @@
 // up in logs, metrics and readiness evidence.
 
 import { createHash } from 'node:crypto'
+import { createRequire } from 'node:module'
 import fs from 'node:fs'
 import path from 'node:path'
-import { Filter } from 'bad-words'
+import type { Filter } from 'bad-words'
 import { z } from 'zod'
-import { supportedLocales } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_POST_TITLE_MAX_LENGTH,
+  supportedLocales,
+} from '@couture/api-client/contracts/http'
 import reviewedOccurrenceBank from '../../../policies/community-screening/reviewed-occurrence-constructions-v1.json'
 
 export const SCREENING_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
@@ -52,7 +56,8 @@ export const TEXT_SCREENING_SEVERITIES = ['low', 'medium', 'high'] as const
 
 export type ScreeningLanguage = (typeof SCREENING_LANGUAGES)[number]
 
-export type TextScreeningField = 'caption' | 'altText'
+type ExistingTextField = 'caption' | 'altText'
+export type TextScreeningField = ExistingTextField | 'title'
 
 export type TextScreeningCategory = (typeof TEXT_SCREENING_CATEGORIES)[number]
 
@@ -138,7 +143,7 @@ export interface CommunityTextPolicy {
      * {@link CONTRACT_FIELD_CEILINGS} is what the public contract actually
      * enforces; the smaller of the two always wins.
      */
-    readonly maxInputCharacters: number | Readonly<Record<TextScreeningField, number>>
+    readonly maxInputCharacters: number | Readonly<Record<ExistingTextField, number>>
     readonly maxCanonicalRepresentations: number
     readonly maxExpandedCharacters: number
   }
@@ -170,17 +175,18 @@ export interface CommunityTextPolicy {
  * at it and fails the submission closed rather than normalizing the overflow.
  * The spec pins both numbers against those schemas.
  */
-export const CONTRACT_FIELD_CEILINGS: Readonly<Record<TextScreeningField, number>> =
+export const CONTRACT_FIELD_CEILINGS: Readonly<Record<ExistingTextField, number>> =
   Object.freeze({ caption: 280, altText: 200 })
 
 function resolveFieldLimits(
-  configured: number | Readonly<Record<TextScreeningField, number>>
+  configured: number | Readonly<Record<ExistingTextField, number>>
 ): Readonly<Record<TextScreeningField, number>> {
   const perField =
     typeof configured === 'number'
       ? { caption: configured, altText: configured }
       : configured
   return Object.freeze({
+    title: Math.min(perField.caption, COMMUNITY_POST_TITLE_MAX_LENGTH),
     caption: Math.min(perField.caption, CONTRACT_FIELD_CEILINGS.caption),
     altText: Math.min(perField.altText, CONTRACT_FIELD_CEILINGS.altText),
   })
@@ -1570,12 +1576,21 @@ interface LanguageIndex {
   readonly disharmonicForms: ReadonlySet<string>
 }
 
+function resolveEnglishFilter(injected: Filter | undefined): Filter {
+  if (injected) return injected
+  const localRequire = createRequire(__filename)
+  const filterPackage = localRequire('bad-words') as { Filter: new () => Filter }
+  return new filterPackage.Filter()
+}
+
 export interface CommunityTextScreenerOptions {
   /** Structurally `policy.text` from the loaded `policy-v2.json`. */
   readonly policy?: CommunityTextPolicy
   readonly policyVersion?: string
   /** Overridden by tests that need a deliberately malformed list directory. */
   readonly listsDirectory?: string
+  /** A fresh filter from the package’s ESM export on the Vercel request path. */
+  readonly englishFilter?: Filter
 }
 
 /**
@@ -2729,7 +2744,7 @@ export class CommunityTextScreener {
     // the repository lists as a low-severity backstop that routes to a human
     // rather than as a blocking authority, and the repository allow list is
     // removed from it so our own decisions win.
-    this.englishFilter = new Filter()
+    this.englishFilter = resolveEnglishFilter(options.englishFilter)
     const allowed = [...allowSingles]
     if (allowed.length > 0) {
       this.englishFilter.removeWords(...allowed)

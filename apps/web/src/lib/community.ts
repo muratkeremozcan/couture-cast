@@ -9,6 +9,7 @@ import {
   commentSessionIdentity,
   ResponseError,
   retryOnceWhenCommunityUnavailable,
+  withRequestDeadline,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the web app's community feed client.
 //
@@ -50,6 +51,8 @@ import {
   type CommunityReactionSummary,
   openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
+  editCommunityPostTextResponseSchema,
+  type EditCommunityPostTextInput,
   reportCommunityPostResponseSchema,
   uploadGarmentBytes,
   withdrawCommunityPostResponseSchema,
@@ -348,6 +351,7 @@ const OPT_IN_HEADERS = {
   xCouturePlatform: 'web',
   xCoutureReactions: '1',
   xCoutureSponsorship: '1',
+  xCouturePostText: '1',
 } as const
 
 /**
@@ -723,6 +727,7 @@ export interface PublishCommunityLookInput {
   uploadSessionId: string
   altText: string
   caption?: string | null
+  title?: string | null
   challengeId?: string | null
   /** Locale the caption and alt text are screened in. */
   locale: SupportedLocale
@@ -735,6 +740,7 @@ export async function publishCommunityLookFromWeb({
   uploadSessionId,
   altText,
   caption,
+  title,
   challengeId,
   locale,
   idempotencyKey,
@@ -754,6 +760,7 @@ export async function publishCommunityLookFromWeb({
           altText,
           altTextConfirmed: true,
           caption: caption?.trim() || null,
+          ...(title?.trim() ? { title: title.trim() } : {}),
           locale,
           ...(challengeId ? { challengeId } : {}),
         },
@@ -763,6 +770,25 @@ export async function publishCommunityLookFromWeb({
     return publishCommunityPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to publish this look.')
+  }
+}
+
+export async function editCommunityPostTextFromWeb(
+  postId: string,
+  input: EditCommunityPostTextInput,
+  signal?: AbortSignal
+) {
+  try {
+    const api = createWebApiClient({ accessToken: readAccessToken() })
+    const response = await withRequestDeadline(15_000, [signal], (requestSignal) =>
+      api.editCommunityPostText(
+        { postId, editCommunityPostTextRequest: input },
+        { signal: requestSignal }
+      )
+    )
+    return editCommunityPostTextResponseSchema.parse(response).data
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to save this look.')
   }
 }
 
@@ -871,7 +897,10 @@ export function communityCommentsSessionFromWeb() {
 
 export const communitySyncFromWeb = (token?: string | (() => Promise<string>)) =>
   communitySyncClient(
-    createWebApiClient({ accessToken: token ?? (() => readAccessToken()) })
+    createWebApiClient({ accessToken: token ?? (() => readAccessToken()) }),
+    undefined,
+    undefined,
+    true
   )
 export async function communityRealtimeTokenFromWeb() {
   const { resolveWebSessionToken } = await import('./web-session')

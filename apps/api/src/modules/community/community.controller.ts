@@ -44,6 +44,9 @@ import {
   communitySponsoredPostResponseSchema,
   communitySponsoredSpotlightResponseSchema,
   COMMUNITY_SPONSORSHIP_HEADER,
+  COMMUNITY_POST_TEXT_HEADER,
+  editCommunityPostTextInputSchema,
+  editCommunityPostTextResponseSchema,
   type CommunitySponsorship,
   type CommunitySpotlightResponse,
   reportCommunityPostInputSchema,
@@ -99,7 +102,7 @@ async function withRetryAfterHeader<T>(
  * this header and must say so to caches.
  */
 const COMMUNITY_READ_VARY =
-  'x-couture-reactions, x-couture-sponsorship, x-couture-platform, Authorization'
+  'x-couture-reactions, x-couture-sponsorship, x-couture-post-text, x-couture-platform, Authorization'
 
 type WithSponsorship<T> = T & { sponsorship?: CommunitySponsorship }
 
@@ -146,7 +149,8 @@ export class CommunityController {
     @Headers('accept-language') acceptLanguage: string | undefined,
     @Query() rawQuery: Record<string, unknown>,
     @Headers('x-couture-reactions') reactionsHeader?: string,
-    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
   ): Promise<CommunityFeedResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -174,6 +178,7 @@ export class CommunityController {
       limit,
       acceptLanguage,
       ...(reactionsHeader === '1' ? { reactions: true } : {}),
+      ...(postTextHeader === '1' ? { postText: true } : {}),
     })
 
     if (sponsorshipHeader === '1') {
@@ -206,7 +211,8 @@ export class CommunityController {
     @Res({ passthrough: true }) response: Response,
     @Headers('x-couture-reactions') reactionsHeader?: string,
     @Headers('accept-language') acceptLanguage?: string,
-    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
   ): Promise<CommunitySpotlightResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -231,6 +237,7 @@ export class CommunityController {
         limit: queryResult.data.limit,
         surface: queryResult.data.surface,
         ...(reactions ? { reactions: true } : {}),
+        ...(postTextHeader === '1' ? { postText: true } : {}),
       })
     )
     if (sponsorshipHeader === '1') {
@@ -262,7 +269,8 @@ export class CommunityController {
     @Headers('x-couture-platform') platformHeader: string | undefined,
     @Headers('x-couture-reactions') reactionsHeader?: string,
     @Headers('accept-language') acceptLanguage?: string,
-    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string,
+    @Headers(COMMUNITY_POST_TEXT_HEADER) postTextHeader?: string
   ): Promise<CommunityPostResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -277,6 +285,7 @@ export class CommunityController {
       userId: auth.userId,
       postId,
       ...(reactionsHeader === '1' ? { reactions: true } : {}),
+      ...(postTextHeader === '1' ? { postText: true } : {}),
     })
 
     if (sponsorshipHeader === '1') {
@@ -359,6 +368,28 @@ export class CommunityController {
     )
 
     return allocateCommunityPostResponseSchema.parse({ data })
+  }
+
+  @Patch('posts/:postId/text')
+  @ConsentCheckedInTransaction()
+  @Header('Cache-Control', 'private, no-store')
+  async editPostText(
+    @AuthContext() auth: RequestAuthContext,
+    @Param('postId') postId: string,
+    @Body() rawBody: unknown,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const input = editCommunityPostTextInputSchema.safeParse(rawBody)
+    if (!input.success) throw new BadRequestException('Invalid Community post text.')
+    const data = await withRetryAfterHeader(response, () =>
+      this.communityService.editPostText({
+        userId: auth.userId,
+        role: auth.role,
+        postId,
+        input: input.data,
+      })
+    )
+    return editCommunityPostTextResponseSchema.parse({ data })
   }
 
   @Post('posts/publish')

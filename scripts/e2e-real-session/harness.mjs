@@ -335,15 +335,6 @@ export function realSessionConsentPolicy(env = process.env) {
 }
 
 /**
- * The tests a default (policy off) run holds: one in `community-real-session.spec.ts`,
- * five in `community-real-session-identity.spec.ts`, two in
- * `guest-preview-real-session.spec.ts` (Story 6.16) and eleven untagged ones in
- * `google-sign-in-real-session.spec.ts` (Story 6.17, three of them the policy-off teen
- * cases), and thirteen in `signed-in-landing-real-session.spec.ts` (owner report 2026-11-16) that
- * run in Chromium and again in WebKit with the iPhone 15 descriptor. A full run must report
- * exactly this many, none skipped.
- */
-/**
  * The real-session specs by file name: real-session.config.ts runs exactly these. Burn-in
  * (.github/workflows/rwf-burn-in.yml) leaves every *-real-session.spec.ts to this lane, so a spec
  * named that way and missing here would run nowhere; real-session-harness.spec.ts checks.
@@ -351,7 +342,8 @@ export function realSessionConsentPolicy(env = process.env) {
 export const REAL_SESSION_SPEC_PATTERN =
   /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session|settings-locations-real-session|wardrobe-upload-account-switch-real-session|settings-sections-real-session)\.spec\.ts$/
 
-export const EXPECTED_REAL_SESSION_TESTS = 59
+/** A full policy-off run counts both Chromium and iPhone WebKit landing cases. */
+export const EXPECTED_REAL_SESSION_TESTS = 61
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
 export const EXPECTED_CONSENT_REQUIRED_TESTS = 5

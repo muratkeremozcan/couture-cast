@@ -24,6 +24,9 @@
 // fetch once showed an entitled member the signed-out lock on a direct load (2026-11-19).
 'use client'
 
+import Link from 'next/link'
+import { getGuestPreviewStrings } from '@couture/utils'
+import { SET_CITY_FROM_PLANNER } from '../../lib/ritual'
 import React, {
   useCallback,
   useEffect,
@@ -65,7 +68,7 @@ export interface PlannerRailProps {
   invokingElementRef?: React.RefObject<HTMLElement | null>
 }
 
-type EntitlementState = 'checking' | 'entitled' | 'locked' | 'error'
+type EntitlementState = 'checking' | 'entitled' | 'locked' | 'error' | 'missing_city'
 
 interface RailState {
   entitlementState: EntitlementState
@@ -738,13 +741,12 @@ function PlannerWeek({
           return
         }
         const reason = plannerFailureReason(loadError)
-        if (reason === 'signed_out' || reason === 'not_entitled') {
+        if (['signed_out', 'not_entitled', 'disabled'].includes(reason)) {
           setEntitlementState('locked')
-          setLockedReason('not_entitled')
+          setLockedReason(reason === 'disabled' ? 'disabled' : 'not_entitled')
           setPlannerData(null)
-        } else if (reason === 'disabled') {
-          setEntitlementState('locked')
-          setLockedReason('disabled')
+        } else if (reason === 'missing_city') {
+          setEntitlementState('missing_city')
           setPlannerData(null)
         } else if (!options.silent) {
           // A silent (background) refresh that fails leaves the last known
@@ -918,6 +920,15 @@ function PlannerWeek({
       {entitlementState === 'checking' && <PlannerSkeleton />}
       {entitlementState === 'locked' && <LockedPanel reason={lockedReason} t={t} />}
       {entitlementState === 'error' && <ErrorPanel onRetry={handleRetry} t={t} />}
+      {entitlementState === 'missing_city' && (
+        <Link
+          className="inline-flex min-h-11 items-center font-semibold underline"
+          href={SET_CITY_FROM_PLANNER}
+          data-testid="planner-set-city"
+        >
+          {getGuestPreviewStrings(locale).firstUse.setCity}
+        </Link>
+      )}
       {entitlementState === 'entitled' && (
         <ol className="space-y-3" data-testid="planner-days">
           {days.map((day, index) =>

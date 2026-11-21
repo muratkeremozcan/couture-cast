@@ -319,6 +319,7 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       await expect(compose).toBeVisible()
       // Empty first: each field's prompt is read before anything is typed.
       expect(await placeholderContrastFailures(compose)).toEqual([])
+      await page.getByTestId('post-title-input').fill('Classy in Camouflage')
       await page.getByTestId('post-alt-text-input').fill('Synthetic plum satin fabric')
       await page
         .getByTestId('post-caption-input')

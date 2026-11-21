@@ -57,7 +57,7 @@ export function revealOffset(
   return bottom - viewport.height
 }
 
-export type ComposeField = 'alt' | 'caption'
+export type ComposeField = 'alt' | 'title' | 'caption'
 /** A section the sheet measures: a field, or the photo above them. */
 export type ComposeSection = ComposeField | 'photo'
 

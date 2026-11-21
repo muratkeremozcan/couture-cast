@@ -1,11 +1,14 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import React from 'react'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { act, render, screen, waitFor, fireEvent, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import type { OutfitCapsuleContract } from '@couture/api-client/contracts/http'
 import WardrobeCapsulesPage from './page'
 import * as wardrobeApi from '../../../lib/wardrobe'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
+import type * as WebSession from '../../../lib/web-session'
 
 vi.mock('../../../lib/wardrobe', () => ({
   listCapsulesFromWeb: vi.fn(),
@@ -18,6 +21,21 @@ vi.mock('../../../lib/wardrobe', () => ({
 }))
 
 const SIGNED_IN_USER = 'user-signed-in'
+const session = vi.hoisted(() => ({ owner: 'user-signed-in' }))
+
+vi.mock('../../../lib/web-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof WebSession>()),
+  webSessionIdentity: () => session.owner,
+}))
+
+function publishCapsuleOwner(owner: string) {
+  session.owner = owner
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `test-token-${owner}`)
+  window.dispatchEvent(new Event('couture:session'))
+}
+
+beforeEach(() => publishCapsuleOwner(SIGNED_IN_USER))
+afterEach(() => window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY))
 
 function buildCapsule(overrides: Partial<OutfitCapsuleContract> = {}) {
   return {
@@ -59,6 +77,73 @@ function buildCapsule(overrides: Partial<OutfitCapsuleContract> = {}) {
 function mockPage(items: OutfitCapsuleContract[], total = items.length) {
   return { items, total, limit: 50, offset: 0 }
 }
+
+describe('WardrobeCapsulesPage account switch', () => {
+  const memberA = buildCapsule({ name: 'Member A weekend capsule' })
+  const memberB = buildCapsule({
+    id: 'cap-b',
+    ownerUserId: 'member-b',
+    name: 'Member B travel capsule',
+  })
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockImplementation(() =>
+      Promise.resolve(session.owner)
+    )
+    vi.mocked(wardrobeApi.listCapsulesFromWeb).mockImplementation((owner) =>
+      Promise.resolve(mockPage([owner === memberB.ownerUserId ? memberB : memberA]))
+    )
+    vi.mocked(wardrobeApi.listGarmentsFromWeb).mockResolvedValue([])
+  })
+
+  it('account switch discards a prior member’s late capsule read', async () => {
+    const delayed = buildCapsule({ id: 'late-a', name: 'Member A private capsule' })
+    const oldRefresh = Promise.withResolvers<ReturnType<typeof mockPage>>()
+    const list = vi.mocked(wardrobeApi.listCapsulesFromWeb)
+
+    render(<WardrobeCapsulesPage />)
+    expect(await screen.findByRole('heading', { name: memberA.name })).toBeVisible()
+    list.mockReturnValueOnce(oldRefresh.promise)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(list.mock.calls.at(-1)?.[0]).toBe(memberA.ownerUserId)
+    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+
+    act(() => publishCapsuleOwner(memberB.ownerUserId))
+    await act(async () => {
+      oldRefresh.resolve(mockPage([delayed]))
+      await oldRefresh.promise
+    })
+
+    expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: memberB.name })).toBeVisible()
+    expect(screen.queryByRole('heading', { name: memberA.name })).not.toBeInTheDocument()
+  })
+
+  it('account switch prevents confirmation of a prior member’s delete dialog', async () => {
+    const user = userEvent.setup()
+    vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockResolvedValue(undefined)
+
+    render(<WardrobeCapsulesPage />)
+    expect(await screen.findByRole('heading', { name: memberA.name })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /^Delete$/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Delete this capsule?' })
+    const confirm = within(dialog).getByRole('button', { name: 'Delete capsule' })
+
+    await act(async () => {
+      publishCapsuleOwner(memberB.ownerUserId)
+      // Exercise a late click from the dialog that was visible at the switch.
+      confirm.click()
+      await Promise.resolve()
+    })
+
+    expect(wardrobeApi.deleteCapsuleFromWeb).not.toHaveBeenCalled()
+    expect(dialog).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: memberB.name })).toBeVisible()
+  })
+})
 
 describe('WardrobeCapsulesPage', () => {
   beforeEach(() => {
@@ -133,7 +218,8 @@ describe('WardrobeCapsulesPage', () => {
       expect(wardrobeApi.deleteCapsuleFromWeb).toHaveBeenCalledWith(
         SIGNED_IN_USER,
         'cap-1',
-        '"capsule:cap-1:3"'
+        '"capsule:cap-1:3"',
+        expect.any(AbortSignal)
       )
     })
   })
@@ -155,7 +241,8 @@ describe('WardrobeCapsulesPage', () => {
         SIGNED_IN_USER,
         'cap-1',
         false,
-        '"capsule:cap-1:3"'
+        '"capsule:cap-1:3"',
+        expect.any(AbortSignal)
       )
     })
   })
@@ -250,7 +337,8 @@ describe('WardrobeCapsulesPage builder integration', () => {
       expect(wardrobeApi.createCapsuleFromWeb).toHaveBeenCalledWith(
         SIGNED_IN_USER,
         expect.objectContaining({ name: 'Weekend', garmentIds: ['g-1', 'g-2'] }),
-        expect.any(String)
+        expect.any(String),
+        expect.any(AbortSignal)
       )
     })
     await waitFor(() =>
@@ -283,7 +371,8 @@ describe('WardrobeCapsulesPage builder integration', () => {
         SIGNED_IN_USER,
         'cap-1',
         expect.objectContaining({ name: 'Summer Basics v2' }),
-        '"capsule:cap-1:3"'
+        '"capsule:cap-1:3"',
+        expect.any(AbortSignal)
       )
     })
     await waitFor(() =>
@@ -329,26 +418,26 @@ describe('WardrobeCapsulesPage builder integration', () => {
     await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(2))
   })
 
-  it('writes nothing from a builder opened before the session resolved', async () => {
-    vi.mocked(wardrobeApi.resolveCurrentUserId).mockReturnValue(
-      new Promise(() => undefined)
-    )
+  it('keeps the builder closed until the session resolves', async () => {
+    const user = userEvent.setup()
+    const identity = Promise.withResolvers<string>()
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockReturnValue(identity.promise)
     render(<WardrobeCapsulesPage />)
 
-    fireEvent.click(screen.getByTestId('create-capsule-button'))
-    fireEvent.change(screen.getByTestId('capsule-name-input'), {
-      target: { value: 'Premature' },
-    })
-    fireEvent.click(screen.getByTestId('save-capsule-button'))
-
-    // With no owner there are no garments to pick either, so the builder's own
-    // minimum-selection guard stops the submit before any request is shaped
-    // against an empty owner path segment.
-    await waitFor(() =>
-      expect(screen.getByTestId('save-capsule-button')).not.toBeDisabled()
-    )
+    const create = screen.getByTestId('create-capsule-button')
+    expect(create).toBeDisabled()
+    await user.click(create)
+    expect(screen.queryByTestId('capsule-builder-form')).not.toBeInTheDocument()
     expect(wardrobeApi.createCapsuleFromWeb).not.toHaveBeenCalled()
     expect(wardrobeApi.updateCapsuleFromWeb).not.toHaveBeenCalled()
+
+    await act(async () => {
+      identity.resolve(SIGNED_IN_USER)
+      await identity.promise
+    })
+    expect(create).toBeEnabled()
+    await user.click(create)
+    expect(screen.getByTestId('capsule-builder-form')).toBeVisible()
   })
 })
 

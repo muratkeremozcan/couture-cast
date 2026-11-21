@@ -62,5 +62,57 @@ env:
       text: ${SAVED}
     timeout: 20000
     label: 'The proposal was saved to the account'
-- assertVisible:
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-review-continue'
+    direction: DOWN
+    centerElement: true
+- tapOn:
     id: 'guest-preview-review-continue'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-capture-modal'
+    timeout: 20000
+    label: 'The verified guest enters direct garment capture'
+- assertVisible:
+    id: 'garment-source-camera'
+- assertVisible:
+    id: 'garment-source-library'
+
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: 'garment-e2e-fixture-source'
+          label: 'Choose the bundled garment photo'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-crop-preview'
+          timeout: 15000
+      - tapOn:
+          id: 'garment-confirm-image'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-capture-complete'
+          timeout: 30000
+          label: 'The first garment uploaded successfully'
+      - tapOn:
+          id: 'garment-capture-done'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-tagging-modal'
+          timeout: 30000
+      - tapOn:
+          id: 'garment-tag-category-bottom'
+      - tapOn:
+          id: 'garment-tag-comfort-mild'
+      - tapOn:
+          id: 'garment-tagging-save'
+      - extendedWaitUntil:
+          visible:
+            id: 'garment-status-ready'
+          timeout: 30000
+          label: 'The saved garment appears as ready in Wardrobe'
+      - assertVisible:
+          id: 'wardrobe-garment-list'

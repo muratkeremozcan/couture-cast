@@ -28,7 +28,9 @@ describe('signed-out Home welcome', () => {
     expect(screen.getByTestId('home-signed-out-welcome').textContent).toContain(
       de.chrome.welcomeHeading
     )
-    expect(screen.getByTestId('home-try-sample').textContent).toBe(de.chrome.entry)
+    expect(screen.getByTestId('home-try-sample').textContent).toBe(
+      de.firstUse.sampleEntry
+    )
     press(screen.getByTestId('home-try-sample'))
     press(screen.getByTestId('home-create-account'))
     press(screen.getByTestId('home-sign-in'))

@@ -226,6 +226,8 @@ describe('CommunityMaintenanceService', () => {
         where: { id: 'post-erase' },
         data: {
           status: 'withdrawn',
+          title: null,
+          original_text_fingerprint: null,
           caption: null,
           alt_text: null,
           locale: null,

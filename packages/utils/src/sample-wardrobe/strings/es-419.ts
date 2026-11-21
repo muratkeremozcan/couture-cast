@@ -3,6 +3,23 @@
 import type { GuestPreviewStrings } from './en-us'
 
 export const es419: GuestPreviewStrings = {
+  firstUse: {
+    replaceGarment: 'Elige otra foto',
+    discardPhoto: '¿Descartar esta foto?',
+    keepEditing: 'Seguir editando',
+    discard: 'Descartar',
+    today: 'Tu atuendo de hoy',
+    addGarment: 'Agregar una prenda',
+    setCity: 'Configura tu ciudad',
+    wardrobeFailed: 'No pudimos cargar tu clóset.',
+    staleWardrobe: 'Mostramos tus prendas guardadas. No pudimos actualizarlas.',
+    backToOutfit: 'Volver al atuendo de hoy',
+    checkGarment: 'Consultar el estado de la prenda',
+    backToWardrobe: 'Volver al clóset',
+    outfitFailed: 'No pudimos cargar el atuendo de hoy.',
+    sampleEntry: 'Prueba un look de ejemplo',
+    outfitIdea: 'Idea de atuendo',
+  },
   chrome: {
     entry: 'Prueba un guardarropa de muestra',
     exampleLabel: 'Ejemplo',

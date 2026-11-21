@@ -166,16 +166,16 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     }
   })
 
-  it('displays skeleton state while loading and then loads current weather, 48-hour ribbon, and morning outfit card', async () => {
+  it('shows a labeled sample while loading, then current weather, the 48-hour ribbon and a live outfit', async () => {
     await render(<TabOneScreen />)
 
-    expect(screen.getByTestId('weather-header-skeleton')).toBeTruthy()
-    expect(screen.getByTestId('hourly-forecast-ribbon-skeleton')).toBeTruthy()
-    expect(screen.getByTestId('outfit-recommendation-card-skeleton')).toBeTruthy()
+    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    expect(screen.queryByTestId('weather-header')).toBeNull()
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
 
     expect(screen.getByTestId('weather-header')).toHaveAttribute(
       'aria-label',
@@ -379,10 +379,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('hero-error-state')).toBeTruthy()
     })
-    expect(screen.getByText('Unable to load daily recommendations')).toBeTruthy()
-    expect(screen.getByText('Retry')).toBeTruthy()
+    expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
+    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
     // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
-    expect(screen.getByTestId('hero-retry').textContent).toBe('Retry')
+    expect(screen.getByTestId('hero-retry')).toHaveAccessibleName('Try again')
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
     expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
   })

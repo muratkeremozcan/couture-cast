@@ -1,3 +1,4 @@
+import type { SavedCommunityText } from '@/components/community/community-post-text-editor'
 // Story 6.7 mobile destination owner: intent copy, outcomes and the focused notice in `apps/mobile/src/features/community/community-screen.tsx`, with handled-request retirement in `apps/mobile/src/features/community/use-community-spotlight.ts`
 // Step 58 step 7 owner: searchable owner anchor
 import { useAndroidSpotlightDetailPresentation } from '@/components/android-spotlight-detail-presentation'
@@ -1819,6 +1820,18 @@ export function CommunityScreen() {
         >
           {t('community.feed.emptyBody')}
         </Text>
+        {mode !== 'all' && mode !== 'auto' && (
+          <TouchableOpacity
+            testID="community-clear-filters"
+            accessibilityRole="button"
+            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            onPress={() => handleSelectMode('all')}
+          >
+            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+              {t('community.feed.clearFilters')}
+            </Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           testID="community-feed-empty-cta"
           style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
@@ -1874,6 +1887,14 @@ export function CommunityScreen() {
                 {t(`community.removed.${authorState.status}`)}
               </Text>
             ) : null}
+            {authorState.title ? (
+              <Text
+                testID={`community-author-state-title-${authorState.id}`}
+                style={[styles.authorStateStatus, { color: palette.text }]}
+              >
+                {authorState.title}
+              </Text>
+            ) : null}
             {authorState.moderationReason ? (
               <Text
                 testID={`community-author-state-reason-${authorState.id}`}
@@ -1893,6 +1914,16 @@ export function CommunityScreen() {
    * comments and report first close the sheet and return focus to the card's
    * rank in the module when they finish.
    */
+  const updateSavedText = (postId: string, text: SavedCommunityText) => {
+    const update = (post: CommunityFeedItem | null) =>
+      post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
+        ? { ...post, ...text }
+        : post
+    setItems((previous) => previous.map((item) => update(item)!))
+    setDeepLinkPost(update)
+    spotlight.applyText(postId, text)
+  }
+
   const renderSpotlightCard = (
     post: CommunityReactionSpotlightItem,
     inDetail: boolean
@@ -1930,6 +1961,8 @@ export function CommunityScreen() {
           })
         }
         onWithdraw={handleWithdrawPost}
+        onTextSaved={updateSavedText}
+        textEditingEnabled={communityAvailable && screenFocused}
         // Only this post is re-read, so every loaded page and the reader's place
         // survive a fresh signed image URL.
         onImageExpiry={(target) => spotlight.refreshItem(target.id)}
@@ -2154,6 +2187,8 @@ export function CommunityScreen() {
               }}
               reactionControls={reactionState.controls(item.id)}
               item={item}
+              onTextSaved={updateSavedText}
+              textEditingEnabled={communityAvailable && screenFocused}
               isReported={reportedPostIds.has(item.id)}
               containerRef={(node) => {
                 cardRefs.current.set(item.id, node)

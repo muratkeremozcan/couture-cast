@@ -36,6 +36,11 @@ import { buildUniqueId } from './api-test'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
 import { localE2EAccessToken as engagementToken } from './local-e2e-token'
 import { holdEngagementFeed } from './engagement-feed-lock'
+import {
+  guardExpectedError,
+  RITUAL_RESPONSE_URL,
+  unexpectedRitualErrors,
+} from './expected-error-guard'
 export { engagementToken }
 
 export type Utilities = {
@@ -89,9 +94,13 @@ async function monitorPage(
         failures.push(error instanceof Error ? error.message : String(error))
       }
     })
-  const monitor = createNetworkErrorMonitorFixture(
-    expectsResync || expectsErasure ? { excludePatterns: excluded } : undefined
-  ).networkErrorMonitor[0] as (
+  const ritual = guardExpectedError(page.context(), RITUAL_RESPONSE_URL)
+  const monitor = createNetworkErrorMonitorFixture({
+    excludePatterns: [
+      RITUAL_RESPONSE_URL,
+      ...(expectsResync || expectsErasure ? excluded : []),
+    ],
+  }).networkErrorMonitor[0] as (
     args: { page: Page },
     use: () => Promise<void>,
     info: TestInfo
@@ -100,6 +109,12 @@ async function monitorPage(
     await monitor({ page }, use, info)
   } finally {
     expect(failures).toEqual([])
+    if (!info.annotations.some(({ type }) => type === 'skipNetworkMonitoring')) {
+      expect(
+        unexpectedRitualErrors(await ritual.settle()),
+        'unexpected ritual HTTP errors'
+      ).toEqual([])
+    }
   }
 }
 

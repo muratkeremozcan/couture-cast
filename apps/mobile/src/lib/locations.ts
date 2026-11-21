@@ -8,6 +8,7 @@ import {
   createSavedLocationFromSearchResponseSchema,
   deleteSavedLocationResponseSchema,
   listSavedLocationsResponseSchema,
+  findSavedSearchLocation,
   locationRequestErrorResponseSchema,
   locationSearchResponseSchema,
   locationUnavailableResponseSchema,
@@ -310,4 +311,16 @@ export async function deleteLocationFromMobile(
   } catch (error) {
     throw await locationError(error)
   }
+}
+
+export async function recoverSavedSearchLocationFromMobile(
+  candidate: LocationSearchCandidate,
+  label: string,
+  signal: AbortSignal,
+  stillCurrent: StillCurrent
+) {
+  const locations = await listLocationsFromMobile(signal, stillCurrent)
+  const saved = findSavedSearchLocation(locations, candidate, label)
+  if (saved) notifyIfOwned(signal, stillCurrent)
+  return saved
 }
