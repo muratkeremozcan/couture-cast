@@ -11,6 +11,7 @@ import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { ZodError } from 'zod'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeController } from './wardrobe.controller'
 import type { WardrobeRetentionService } from './wardrobe-retention.service'
@@ -165,19 +166,17 @@ describe('WardrobeController', () => {
       },
     })
 
-    // The response contract is a union (suggested or manual); neither branch accepts this answer,
-    // and the suggested branch rejects it on the pinned analysis version.
     const error = (await controller
       .suggestGarmentTags(mockAuth, 'garment_99')
-      .catch((caught: unknown) => caught)) as {
-      name: string
-      issues: { code: string; unionErrors: { issues: unknown[] }[] }[]
-    }
+      .catch((caught: unknown) => caught)) as ZodError
     expect(error.name).toBe('ZodError')
-    expect(error.issues[0]?.code).toBe('invalid_union')
-    expect(
-      JSON.stringify(error.issues[0]?.unionErrors.map((union) => union.issues))
-    ).toContain('Invalid literal value')
+    const issue = error.issues[0]
+    if (issue?.code !== 'invalid_union') {
+      throw new Error('Expected the smart-tagging response union to reject the result.')
+    }
+    expect(issue.errors.flat()).toContainEqual(
+      expect.objectContaining({ code: 'invalid_value', path: ['analysisVersion'] })
+    )
   })
 
   describe('createUploadUrl', () => {
@@ -309,7 +308,9 @@ describe('WardrobeController', () => {
     it('rejects a garment id that exceeds the contract length bound', async () => {
       await expect(
         controller.suggestGarmentTags(mockAuth, 'g'.repeat(129))
-      ).rejects.toThrow(/Invalid garment id: garmentId/)
+      ).rejects.toThrow(
+        'Invalid garment id: garmentId: String must contain at most 128 character(s)'
+      )
       expect(mockSuggestGarmentTags).not.toHaveBeenCalled()
     })
 

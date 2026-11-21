@@ -185,7 +185,8 @@
     "tsx": "4.20.6",
     "turbo": "2.6.1",
     "typescript": "5.9.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "zod": "^4.6.7"
   },
   "dependencies": {
     "@prisma/client": "6.19.0"
@@ -202,6 +203,9 @@
     },
     "router@2": {
       "path-to-regexp": "^8.4.2"
+    },
+    "@useoptic/standard-rulesets": {
+      "openai": "6.0.0"
     }
   }
 }

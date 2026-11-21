@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-14-author-public-rest-contracts-in-shared-zod-modules
 // Learning path Step 22: Localization infrastructure and quality gates.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-22-localization-infrastructure-and-quality-gates
+import { BadRequestException } from '@nestjs/common'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   buildUserProfileResponse,
@@ -66,7 +67,7 @@ describe('UserController', () => {
     }
 
     await expect(controller.updatePreferences(auth, { locale: 'ja-JP' })).rejects.toThrow(
-      'Invalid enum value'
+      BadRequestException
     )
     expect(updatePreferences).not.toHaveBeenCalled()
   })

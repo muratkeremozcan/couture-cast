@@ -3813,8 +3813,7 @@
                   "outerwear",
                   "dress",
                   "shoes",
-                  "accessory",
-                  null
+                  "accessory"
                 ],
                 "description": "The outfit slot this offer matched."
               }
@@ -4183,8 +4182,7 @@
                             "outerwear",
                             "dress",
                             "shoes",
-                            "accessory",
-                            null
+                            "accessory"
                           ],
                           "description": "The outfit slot this offer matched."
                         }
@@ -4591,8 +4589,8 @@
                   "ready",
                   "failed"
                 ],
-                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
-                "x-optic-exemptions": "request and response property enums"
+                "x-optic-exemptions": "request and response property enums",
+                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
               },
               "category": {
                 "type": [
@@ -4667,8 +4665,8 @@
                   "image/webp",
                   null
                 ],
-                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
-                "x-optic-exemptions": "request and response property enums"
+                "x-optic-exemptions": "request and response property enums",
+                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
               },
               "retentionStatus": {
                 "type": "string",
@@ -4755,8 +4753,8 @@
                     "ready",
                     "failed"
                   ],
-                  "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
-                  "x-optic-exemptions": "request and response property enums"
+                  "x-optic-exemptions": "request and response property enums",
+                  "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
                 },
                 "category": {
                   "type": [
@@ -4831,8 +4829,8 @@
                     "image/webp",
                     null
                   ],
-                  "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
-                  "x-optic-exemptions": "request and response property enums"
+                  "x-optic-exemptions": "request and response property enums",
+                  "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
                 },
                 "retentionStatus": {
                   "type": "string",
@@ -4937,8 +4935,7 @@
                               "outerwear",
                               "dress",
                               "shoes",
-                              "accessory",
-                              null
+                              "accessory"
                             ]
                           },
                           "confidence": {
@@ -4971,8 +4968,7 @@
                               "fleece",
                               "synthetic",
                               "down",
-                              "silk",
-                              null
+                              "silk"
                             ]
                           },
                           "confidence": {
@@ -5001,8 +4997,7 @@
                               "cool",
                               "mild",
                               "warm",
-                              "hot",
-                              null
+                              "hot"
                             ]
                           },
                           "confidence": {
@@ -5137,8 +5132,8 @@
                   "ready",
                   "failed"
                 ],
-                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.",
-                "x-optic-exemptions": "request and response property enums"
+                "x-optic-exemptions": "request and response property enums",
+                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
               },
               "category": {
                 "type": [
@@ -5213,8 +5208,8 @@
                   "image/webp",
                   null
                 ],
-                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.",
-                "x-optic-exemptions": "request and response property enums"
+                "x-optic-exemptions": "request and response property enums",
+                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
               },
               "retentionStatus": {
                 "type": "string",
@@ -7110,8 +7105,7 @@
               "outerwear",
               "dress",
               "shoes",
-              "accessory",
-              null
+              "accessory"
             ],
             "description": "The outfit slot this offer matched."
           }
@@ -7666,13 +7660,13 @@
               "string",
               "null"
             ],
-            "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored.",
             "enum": [
               "jewel_radiance",
               "autumn_umber",
               "winter_metallic",
               null
-            ]
+            ],
+            "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored."
           },
           "isEntitled": {
             "type": "boolean",
@@ -7701,13 +7695,13 @@
                   "string",
                   "null"
                 ],
-                "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored.",
                 "enum": [
                   "jewel_radiance",
                   "autumn_umber",
                   "winter_metallic",
                   null
-                ]
+                ],
+                "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored."
               },
               "isEntitled": {
                 "type": "boolean",
@@ -7738,13 +7732,13 @@
               "string",
               "null"
             ],
-            "description": "The palette to store. Null resets to Default; it upserts the stored row to null and never deletes it, so reset and downgrade stay distinguishable from \"never chose\".",
             "enum": [
               "jewel_radiance",
               "autumn_umber",
               "winter_metallic",
               null
-            ]
+            ],
+            "description": "The palette to store. Null resets to Default; it upserts the stored row to null and never deletes it, so reset and downgrade stay distinguishable from \"never chose\"."
           }
         },
         "required": [
@@ -7763,13 +7757,13 @@
                   "string",
                   "null"
                 ],
-                "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored.",
                 "enum": [
                   "jewel_radiance",
                   "autumn_umber",
                   "winter_metallic",
                   null
-                ]
+                ],
+                "description": "The palette to render, already resolved server-side. Null is the Default monochrome-and-gold system, which is also what a non-entitled caller reads regardless of what is stored."
               },
               "isEntitled": {
                 "type": "boolean",
@@ -7979,8 +7973,7 @@
           "light",
           "medium",
           "tan",
-          "deep",
-          null
+          "deep"
         ]
       },
       "PaletteAnalysisStatus": {
@@ -8018,8 +8011,7 @@
         "type": "string",
         "enum": [
           "saved",
-          "dismissed",
-          null
+          "dismissed"
         ]
       },
       "PaletteAnalysis": {
@@ -12479,7 +12471,8 @@
             "format": "uuid"
           },
           "body": {
-            "type": "string"
+            "type": "string",
+            "description": "Single-line valid Unicode. Control characters and line separators are rejected before NFC normalization and trimming."
           },
           "locale": {
             "type": "string",
@@ -12729,7 +12722,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band stamped when the post was published, or null if unclassified.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -12738,7 +12730,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified."
           },
           "imageAccess": {
             "type": "object",
@@ -12923,7 +12916,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -12932,7 +12924,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -13108,7 +13101,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was classified, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -13117,7 +13109,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was classified, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": [
@@ -13216,7 +13209,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band resolved for the viewer, or null if unresolvable.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -13225,7 +13217,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band resolved for the viewer, or null if unresolvable."
               },
               "bandResolved": {
                 "type": "boolean"
@@ -13235,7 +13228,6 @@
                   "string",
                   "null"
                 ],
-                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
                 "enum": [
                   "no_location",
                   "weather_unavailable",
@@ -13243,7 +13235,8 @@
                   "weather_malformed",
                   "insufficient_usable_days",
                   null
-                ]
+                ],
+                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this."
               },
               "experimentVariant": {
                 "type": "string",
@@ -13271,7 +13264,6 @@
                       "string",
                       "null"
                     ],
-                    "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                     "enum": [
                       "cold_wet",
                       "cold_dry",
@@ -13280,7 +13272,8 @@
                       "warm_wet",
                       "warm_dry",
                       null
-                    ]
+                    ],
+                    "description": "The climate band this challenge is restricted to, or null if unrestricted."
                   },
                   "title": {
                     "type": "string",
@@ -13372,7 +13365,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band stamped when the post was published, or null if unclassified.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -13381,7 +13373,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified."
               },
               "imageAccess": {
                 "type": "object",
@@ -13664,7 +13657,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band stamped when the post was published, or null if unclassified.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -13673,7 +13665,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified."
           },
           "imageAccess": {
             "type": "object",
@@ -13785,7 +13778,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band stamped when the post was classified, or null if unclassified.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -13794,7 +13786,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band stamped when the post was classified, or null if unclassified."
           },
           "imageAccess": {
             "type": [
@@ -13907,7 +13900,6 @@
                     "string",
                     "null"
                   ],
-                  "description": "The climate band stamped when the post was published, or null if unclassified.",
                   "enum": [
                     "cold_wet",
                     "cold_dry",
@@ -13916,7 +13908,8 @@
                     "warm_wet",
                     "warm_dry",
                     null
-                  ]
+                  ],
+                  "description": "The climate band stamped when the post was published, or null if unclassified."
                 },
                 "imageAccess": {
                   "type": "object",
@@ -14031,7 +14024,6 @@
                     "string",
                     "null"
                   ],
-                  "description": "The climate band stamped when the post was classified, or null if unclassified.",
                   "enum": [
                     "cold_wet",
                     "cold_dry",
@@ -14040,7 +14032,8 @@
                     "warm_wet",
                     "warm_dry",
                     null
-                  ]
+                  ],
+                  "description": "The climate band stamped when the post was classified, or null if unclassified."
                 },
                 "imageAccess": {
                   "type": [
@@ -14139,7 +14132,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band resolved for the viewer, or null if unresolvable.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -14148,7 +14140,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band resolved for the viewer, or null if unresolvable."
           },
           "bandResolved": {
             "type": "boolean"
@@ -14158,7 +14151,6 @@
               "string",
               "null"
             ],
-            "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
             "enum": [
               "no_location",
               "weather_unavailable",
@@ -14166,7 +14158,8 @@
               "weather_malformed",
               "insufficient_usable_days",
               null
-            ]
+            ],
+            "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this."
           },
           "experimentVariant": {
             "type": "string",
@@ -14194,7 +14187,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -14203,7 +14195,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band this challenge is restricted to, or null if unrestricted."
               },
               "title": {
                 "type": "string",
@@ -14268,7 +14261,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -14277,7 +14269,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted."
           },
           "title": {
             "type": "string",
@@ -14328,7 +14321,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -14337,7 +14329,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted."
           },
           "startsAt": {
             "type": "string",
@@ -14353,7 +14346,6 @@
           },
           "copy": {
             "type": "object",
-            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
             "additionalProperties": {
               "type": "object",
               "properties": {
@@ -14371,7 +14363,8 @@
                 "body"
               ],
               "additionalProperties": false
-            }
+            },
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback."
           },
           "isActive": {
             "type": "boolean"
@@ -14441,7 +14434,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -14450,7 +14442,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -14565,7 +14558,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was classified, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -14574,7 +14566,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was classified, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": [
@@ -14673,7 +14666,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band resolved for the viewer, or null if unresolvable.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -14682,7 +14674,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band resolved for the viewer, or null if unresolvable."
               },
               "bandResolved": {
                 "type": "boolean"
@@ -14692,7 +14685,6 @@
                   "string",
                   "null"
                 ],
-                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
                 "enum": [
                   "no_location",
                   "weather_unavailable",
@@ -14700,7 +14692,8 @@
                   "weather_malformed",
                   "insufficient_usable_days",
                   null
-                ]
+                ],
+                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this."
               },
               "experimentVariant": {
                 "type": "string",
@@ -14728,7 +14721,6 @@
                       "string",
                       "null"
                     ],
-                    "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                     "enum": [
                       "cold_wet",
                       "cold_dry",
@@ -14737,7 +14729,8 @@
                       "warm_wet",
                       "warm_dry",
                       null
-                    ]
+                    ],
+                    "description": "The climate band this challenge is restricted to, or null if unrestricted."
                   },
                   "title": {
                     "type": "string",
@@ -14829,7 +14822,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band stamped when the post was published, or null if unclassified.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -14838,7 +14830,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified."
               },
               "imageAccess": {
                 "type": "object",
@@ -15166,7 +15159,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band stamped when the post was published, or null if unclassified.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -15175,7 +15167,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified."
               },
               "imageAccess": {
                 "type": "object",
@@ -15299,7 +15292,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -15308,7 +15300,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted."
           },
           "startsAt": {
             "type": "string",
@@ -15321,11 +15314,10 @@
           "timeZone": {
             "type": "string",
             "minLength": 1,
-            "description": "IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected."
+            "description": "IANA zone the Monday boundary and the seven-day span are evaluated in."
           },
           "copy": {
             "type": "object",
-            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
             "additionalProperties": {
               "type": "object",
               "properties": {
@@ -15343,7 +15335,8 @@
                 "body"
               ],
               "additionalProperties": false
-            }
+            },
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback."
           },
           "isActive": {
             "type": "boolean",
@@ -15379,7 +15372,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -15388,7 +15380,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band this challenge is restricted to, or null if unrestricted."
               },
               "startsAt": {
                 "type": "string",
@@ -15404,7 +15397,6 @@
               },
               "copy": {
                 "type": "object",
-                "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
                 "additionalProperties": {
                   "type": "object",
                   "properties": {
@@ -15422,7 +15414,8 @@
                     "body"
                   ],
                   "additionalProperties": false
-                }
+                },
+                "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback."
               },
               "isActive": {
                 "type": "boolean"
@@ -15530,7 +15523,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -15539,7 +15531,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -15748,7 +15741,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was classified, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -15757,7 +15749,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was classified, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": [
@@ -15856,7 +15849,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band resolved for the viewer, or null if unresolvable.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -15865,7 +15857,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band resolved for the viewer, or null if unresolvable."
               },
               "bandResolved": {
                 "type": "boolean"
@@ -15875,7 +15868,6 @@
                   "string",
                   "null"
                 ],
-                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
                 "enum": [
                   "no_location",
                   "weather_unavailable",
@@ -15883,7 +15875,8 @@
                   "weather_malformed",
                   "insufficient_usable_days",
                   null
-                ]
+                ],
+                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this."
               },
               "experimentVariant": {
                 "type": "string",
@@ -15911,7 +15904,6 @@
                       "string",
                       "null"
                     ],
-                    "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                     "enum": [
                       "cold_wet",
                       "cold_dry",
@@ -15920,7 +15912,8 @@
                       "warm_wet",
                       "warm_dry",
                       null
-                    ]
+                    ],
+                    "description": "The climate band this challenge is restricted to, or null if unrestricted."
                   },
                   "title": {
                     "type": "string",
@@ -16012,7 +16005,6 @@
                   "string",
                   "null"
                 ],
-                "description": "The climate band stamped when the post was published, or null if unclassified.",
                 "enum": [
                   "cold_wet",
                   "cold_dry",
@@ -16021,7 +16013,8 @@
                   "warm_wet",
                   "warm_dry",
                   null
-                ]
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified."
               },
               "imageAccess": {
                 "type": "object",
@@ -16261,7 +16254,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -16270,7 +16262,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -16518,7 +16511,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band stamped when the post was published, or null if unclassified.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -16527,7 +16519,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified."
           },
           "imageAccess": {
             "type": "object",
@@ -16650,7 +16643,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band stamped when the post was published, or null if unclassified.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -16659,7 +16651,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified."
           },
           "imageAccess": {
             "type": "object",
@@ -16867,7 +16860,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -16876,7 +16868,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -17045,7 +17038,6 @@
                         "string",
                         "null"
                       ],
-                      "description": "The climate band stamped when the post was published, or null if unclassified.",
                       "enum": [
                         "cold_wet",
                         "cold_dry",
@@ -17054,7 +17046,8 @@
                         "warm_wet",
                         "warm_dry",
                         null
-                      ]
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified."
                     },
                     "imageAccess": {
                       "type": "object",
@@ -17272,7 +17265,6 @@
               "string",
               "null"
             ],
-            "description": "The climate band this challenge is restricted to, or null if unrestricted.",
             "enum": [
               "cold_wet",
               "cold_dry",
@@ -17281,7 +17273,8 @@
               "warm_wet",
               "warm_dry",
               null
-            ]
+            ],
+            "description": "The climate band this challenge is restricted to, or null if unrestricted."
           },
           "startsAt": {
             "type": "string",
@@ -17298,7 +17291,6 @@
           },
           "copy": {
             "type": "object",
-            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback.",
             "additionalProperties": {
               "type": "object",
               "properties": {
@@ -17316,7 +17308,8 @@
                 "body"
               ],
               "additionalProperties": false
-            }
+            },
+            "description": "Localized challenge copy keyed by supported IETF locale tag, for example \"en-US\". Keys are the tags themselves, hyphenated and case-sensitive. An en-US entry is required as the fallback."
           },
           "isActive": {
             "type": "boolean"
@@ -17752,7 +17745,6 @@
                                 "string",
                                 "null"
                               ],
-                              "description": "The climate band stamped when the post was published, or null if unclassified.",
                               "enum": [
                                 "cold_wet",
                                 "cold_dry",
@@ -17761,7 +17753,8 @@
                                 "warm_wet",
                                 "warm_dry",
                                 null
-                              ]
+                              ],
+                              "description": "The climate band stamped when the post was published, or null if unclassified."
                             },
                             "imageAccess": {
                               "type": "object",
@@ -23580,6 +23573,7 @@
               "description": "Trimmed and NFC-normalized before validation, then bounded to 0-120 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them."
             },
             "required": false,
+            "description": "Trimmed and NFC-normalized before validation, then bounded to 0-120 extended grapheme clusters (user-perceived characters), not UTF-16 code units. A JSON Schema maxLength cannot express this: an emoji with a skin-tone modifier counts as one here and as four code units there. Null bytes are rejected because PostgreSQL text cannot store them.",
             "name": "q",
             "in": "query"
           },
@@ -26286,6 +26280,7 @@
               "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape."
             },
             "required": true,
+            "description": "Runtime invariant NOT expressible in this schema: a real calendar date (e.g. `2026-02-30` fails), not just the `YYYY-MM-DD` digit shape.",
             "name": "planDate",
             "in": "path"
           },
@@ -27677,7 +27672,6 @@
                                       "string",
                                       "null"
                                     ],
-                                    "description": "The climate band stamped when the post was published, or null if unclassified.",
                                     "enum": [
                                       "cold_wet",
                                       "cold_dry",
@@ -27686,7 +27680,8 @@
                                       "warm_wet",
                                       "warm_dry",
                                       null
-                                    ]
+                                    ],
+                                    "description": "The climate band stamped when the post was published, or null if unclassified."
                                   },
                                   "imageAccess": {
                                     "type": "object",
@@ -27862,7 +27857,6 @@
                                       "string",
                                       "null"
                                     ],
-                                    "description": "The climate band stamped when the post was classified, or null if unclassified.",
                                     "enum": [
                                       "cold_wet",
                                       "cold_dry",
@@ -27871,7 +27865,8 @@
                                       "warm_wet",
                                       "warm_dry",
                                       null
-                                    ]
+                                    ],
+                                    "description": "The climate band stamped when the post was classified, or null if unclassified."
                                   },
                                   "imageAccess": {
                                     "type": [
@@ -27970,7 +27965,6 @@
                                 "string",
                                 "null"
                               ],
-                              "description": "The climate band resolved for the viewer, or null if unresolvable.",
                               "enum": [
                                 "cold_wet",
                                 "cold_dry",
@@ -27979,7 +27973,8 @@
                                 "warm_wet",
                                 "warm_dry",
                                 null
-                              ]
+                              ],
+                              "description": "The climate band resolved for the viewer, or null if unresolvable."
                             },
                             "bandResolved": {
                               "type": "boolean"
@@ -27989,7 +27984,6 @@
                                 "string",
                                 "null"
                               ],
-                              "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
                               "enum": [
                                 "no_location",
                                 "weather_unavailable",
@@ -27997,7 +27991,8 @@
                                 "weather_malformed",
                                 "insufficient_usable_days",
                                 null
-                              ]
+                              ],
+                              "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this."
                             },
                             "experimentVariant": {
                               "type": "string",
@@ -28025,7 +28020,6 @@
                                     "string",
                                     "null"
                                   ],
-                                  "description": "The climate band this challenge is restricted to, or null if unrestricted.",
                                   "enum": [
                                     "cold_wet",
                                     "cold_dry",
@@ -28034,7 +28028,8 @@
                                     "warm_wet",
                                     "warm_dry",
                                     null
-                                  ]
+                                  ],
+                                  "description": "The climate band this challenge is restricted to, or null if unrestricted."
                                 },
                                 "title": {
                                   "type": "string",
@@ -28712,7 +28707,6 @@
                                 "string",
                                 "null"
                               ],
-                              "description": "The climate band stamped when the post was published, or null if unclassified.",
                               "enum": [
                                 "cold_wet",
                                 "cold_dry",
@@ -28721,7 +28715,8 @@
                                 "warm_wet",
                                 "warm_dry",
                                 null
-                              ]
+                              ],
+                              "description": "The climate band stamped when the post was published, or null if unclassified."
                             },
                             "imageAccess": {
                               "type": "object",
@@ -29986,7 +29981,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30109,7 +30105,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30150,7 +30147,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30208,7 +30206,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30331,7 +30330,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30372,7 +30372,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30437,7 +30438,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30560,7 +30562,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30601,7 +30604,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30682,7 +30686,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30805,7 +30810,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30846,7 +30852,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -30913,7 +30920,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31036,7 +31044,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31077,7 +31086,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31133,7 +31143,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31256,7 +31267,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31297,7 +31309,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31374,7 +31387,8 @@
                   "required": [
                     "code",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31497,7 +31511,8 @@
                   },
                   "required": [
                     "code"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }
@@ -31538,7 +31553,8 @@
                     "code",
                     "retryAfterSeconds",
                     "message"
-                  ]
+                  ],
+                  "additionalProperties": {}
                 }
               }
             }

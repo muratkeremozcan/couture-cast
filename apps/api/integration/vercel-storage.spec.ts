@@ -23,9 +23,9 @@ const projects = ['web', 'api'] as const
 const repoRoot = path.resolve(__dirname, '../../..')
 const vercelConfig = z.object({
   ignoreCommand: z.string().optional(),
-  git: z.object({ deploymentEnabled: z.record(z.boolean()) }),
+  git: z.object({ deploymentEnabled: z.record(z.string(), z.boolean()) }),
   outputDirectory: z.string().optional(),
-  functions: z.record(z.unknown()).optional(),
+  functions: z.record(z.string(), z.unknown()).optional(),
   rewrites: z.array(z.object({ source: z.string(), destination: z.string() })).optional(),
 })
 

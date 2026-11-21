@@ -15,6 +15,7 @@ import {
 
 const remoteFlagResponseSchema = z.object({
   flags: z.record(
+    z.string(),
     z.object({
       key: z.string(),
       enabled: z.boolean(),

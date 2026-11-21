@@ -427,7 +427,7 @@ export const communityChallengeCopyItemSchema = z
  * stated in the description, which is where the generated SDK surfaces them.
  */
 export const communityChallengeCopySchema = z
-  .record(supportedLocaleSchema, communityChallengeCopyItemSchema)
+  .partialRecord(supportedLocaleSchema, communityChallengeCopyItemSchema)
   .refine((copy) => 'en-US' in copy, {
     message: 'Community challenge copy must include an en-US fallback.',
   })
@@ -1400,6 +1400,7 @@ export const communityCommentBodySchema = z
       .string()
       .min(1)
       .max(280)
+      .refine((value) => value.length <= 280, 'Comment must be at most 280 UTF-16 units.')
       .refine(
         (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
         'Comments must be a single line.'

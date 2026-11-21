@@ -5,9 +5,14 @@
 // whether the member has premium and where it comes from, so a complimentary member sees that
 // state and no subscribe control. Every premium feature surface keeps rendering from its own
 // server-side `isEntitled` and per-member flags.
-import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
+import {
+  extendZodWithOpenApi,
+  type OpenAPIRegistry,
+} from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import type { RegisteredCommonHttpSchemas } from './common'
+
+extendZodWithOpenApi(z)
 
 /**
  * `complimentary` wins when a member also pays, because the grant is what keeps access open

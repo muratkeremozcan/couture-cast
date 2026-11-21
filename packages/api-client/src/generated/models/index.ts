@@ -5987,7 +5987,7 @@ export interface CreateCommunityChallengeInput {
    */
   endsAt: string
   /**
-   * IANA time zone identifier, for example Europe/Istanbul. Validated against the host tz database; an unknown zone is rejected.
+   * IANA zone the Monday boundary and the seven-day span are evaluated in.
    * @type {string}
    * @memberof CreateCommunityChallengeInput
    */
@@ -6033,7 +6033,7 @@ export interface CreateCommunityCommentInput {
    */
   mutationId: string
   /**
-   *
+   * Single-line valid Unicode. Control characters and line separators are rejected before NFC normalization and trimming.
    * @type {string}
    * @memberof CreateCommunityCommentInput
    */
@@ -8271,6 +8271,7 @@ export type GetCommunityComments403Response =
  * @interface GetCommunityEvents400Response
  */
 export interface GetCommunityEvents400Response {
+  [key: string]: any | any
   /**
    *
    * @type {GetCommunityEvents400ResponseStatusCodeEnum}
@@ -8316,6 +8317,7 @@ export type GetCommunityEvents400ResponseCodeEnum =
  * @interface GetCommunityEvents409Response
  */
 export interface GetCommunityEvents409Response {
+  [key: string]: any | any
   /**
    *
    * @type {GetCommunityEvents409ResponseStatusCodeEnum}
@@ -8424,6 +8426,7 @@ export interface GetCommunityEvents409ResponseCurrent {
  * @interface GetCommunityEvents503Response
  */
 export interface GetCommunityEvents503Response {
+  [key: string]: any | any
   /**
    *
    * @type {GetCommunityEvents503ResponseStatusCodeEnum}
@@ -8707,6 +8710,7 @@ export type GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum =
  * @interface GetCommunityNotificationPreferences409Response
  */
 export interface GetCommunityNotificationPreferences409Response {
+  [key: string]: any | any
   /**
    *
    * @type {GetCommunityNotificationPreferences409ResponseStatusCodeEnum}
@@ -17911,7 +17915,7 @@ export interface ScenarioOutfitShopThisLook {
    * @type {ScenarioOutfitShopThisLookGarmentCategoryEnum}
    * @memberof ScenarioOutfitShopThisLook
    */
-  garmentCategory: ScenarioOutfitShopThisLookGarmentCategoryEnum | null
+  garmentCategory: ScenarioOutfitShopThisLookGarmentCategoryEnum
 }
 
 /**
@@ -18109,7 +18113,7 @@ export interface ShopThisLook {
    * @type {ShopThisLookGarmentCategoryEnum}
    * @memberof ShopThisLook
    */
-  garmentCategory: ShopThisLookGarmentCategoryEnum | null
+  garmentCategory: ShopThisLookGarmentCategoryEnum
 }
 
 /**
@@ -19306,7 +19310,7 @@ export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory {
    * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum}
    * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsCategory
    */
-  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsCategoryValueEnum
   /**
    *
    * @type {number}
@@ -19346,7 +19350,7 @@ export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange {
    * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum}
    * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRange
    */
-  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsComfortRangeValueEnum
   /**
    *
    * @type {number}
@@ -19385,7 +19389,7 @@ export interface SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial {
    * @type {SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum}
    * @memberof SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterial
    */
-  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum | null
+  value: SuggestGarmentTagsResponseDataAnyOfSuggestionsMaterialValueEnum
   /**
    *
    * @type {number}
