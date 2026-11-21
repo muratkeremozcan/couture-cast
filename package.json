@@ -169,7 +169,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-no-only-tests": "3.3.0",
     "eslint-plugin-prettier": "5.5.4",
-    "fflate": "0.8.2",
+    "fflate": "0.8.3",
     "husky": "9.1.7",
     "lint-staged": "15.2.10",
     "lodash.merge": "4.6.2",
@@ -206,6 +206,7 @@
     },
     "@useoptic/standard-rulesets": {
       "openai": "6.0.0"
-    }
+    },
+    "postcss@8": "8.5.23"
   }
 }

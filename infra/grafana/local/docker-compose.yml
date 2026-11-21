@@ -1,11 +1,11 @@
 services:
   lgtm:
-    image: grafana/otel-lgtm:0.22.0
+    image: grafana/otel-lgtm:0.41.1@sha256:1b852b77d7bcadb7699bfe7c78a51d059dff85168de674728cf7abf4474645e5
     container_name: couturecast-lgtm
     ports:
-      - '3300:3000'
-      - '4318:4318'
-      - '9090:9090'
+      - '127.0.0.1:3300:3000'
+      - '127.0.0.1:4318:4318'
+      - '127.0.0.1:9090:9090'
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: 'true'
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
