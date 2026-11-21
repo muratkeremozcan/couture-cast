@@ -291,9 +291,18 @@ jobs:
           sudo udevadm settle --timeout=30
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
+      # Retry and verify the image before the emulator runner attempts its one-shot install.
+      - &android_system_image
+        name: Install the Android system image
+        id: emulator_image
+        if: ${{ !cancelled() && steps.kvm.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') }}
+        timeout-minutes: 8
+        env:
+          SDK_PACKAGES: system-images;android-${{ matrix.api }};${{ matrix.target }};x86_64
+        run: bash scripts/ci/android-sdk-install.sh
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && matrix.platform == 'android' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' && steps.emulator_image.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -595,11 +604,12 @@ jobs:
           sudo udevadm settle --timeout=30
           ls -l /dev/kvm
           test -r /dev/kvm && test -w /dev/kvm
+      - *android_system_image
       # The share-sheet lane runs only with both share-receive APKs restored or built and scanned;
       # CC68_SHARE_RECEIVE_PREBUILT tells share-sheet to install them without building.
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.share_receive_key.outcome == 'success' && (steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.share_receive_key.outcome == 'success' && (steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' && steps.emulator_image.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
