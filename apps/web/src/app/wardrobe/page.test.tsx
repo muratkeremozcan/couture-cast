@@ -8,9 +8,9 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
 import React from 'react'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   GarmentItemContract,
   SilhouetteProfileContract,
@@ -19,7 +19,9 @@ import type {
   WardrobeOnboardingStateContract,
 } from '@couture/api-client/contracts/http'
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
+import type * as WebSession from '../../lib/web-session'
 
 const {
   listGarmentsFromWeb,
@@ -58,6 +60,12 @@ const {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wardrobe',
+}))
+
+const verifiedSession = vi.hoisted(() => ({ owner: null as string | null }))
+vi.mock('../../lib/web-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof WebSession>()),
+  webSessionIdentity: () => verifiedSession.owner,
 }))
 
 vi.mock('../../lib/wardrobe', () => ({
@@ -518,6 +526,151 @@ describe('WardrobePage wardrobe load failures', () => {
   })
 })
 
+describe('WardrobePage direct garment entry', () => {
+  let previousUrl: string
+
+  function publishMember(owner: string) {
+    verifiedSession.owner = owner
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `test-token-${owner}`)
+    window.dispatchEvent(new Event('couture:session'))
+  }
+
+  beforeEach(() => {
+    resetWardrobeMocks()
+    previousUrl = window.location.href
+    window.history.replaceState(window.history.state, '', '/wardrobe?entry=add&from=home')
+    publishMember('user-hub-1')
+  })
+
+  afterEach(() => {
+    cleanup()
+    verifiedSession.owner = null
+    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    window.history.replaceState(window.history.state, '', previousUrl)
+  })
+
+  it('retries the closet before opening capture and consumes the direct entry once', async () => {
+    const user = userEvent.setup()
+    listGarmentsFromWeb.mockRejectedValueOnce('connection lost').mockResolvedValue([])
+    const view = render(<WardrobePage />)
+
+    const error = await screen.findByRole('alert')
+    const opener = screen.getByRole('button', { name: '+ Add Garment' })
+    expect(error).toHaveTextContent('Unable to load your wardrobe.')
+    expect(screen.queryByText('No garments added yet')).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(window.location.search).toBe('?entry=add&from=home')
+    await user.click(within(error).getByRole('button', { name: 'Try again' }))
+
+    const capture = await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
+    expect(window.location.search).toBe('?from=home')
+    await user.upload(
+      within(capture).getByLabelText('Garment image file'),
+      new File(['fixture-image'], 'garment.png', { type: 'image/png' })
+    )
+    await within(capture).findByRole('button', { name: 'Use This Image' })
+    await user.keyboard('{Escape}')
+    expect(within(capture).getByText('Discard this photo?')).toBeVisible()
+    expect(within(capture).getByRole('button', { name: 'Keep editing' })).toHaveFocus()
+    await user.click(within(capture).getByRole('button', { name: 'Keep editing' }))
+    expect(within(capture).getByRole('button', { name: 'Use This Image' })).toHaveFocus()
+    await user.keyboard('{Escape}')
+    await user.click(within(capture).getByRole('button', { name: 'Discard' }))
+    await waitFor(() => expect(opener).toHaveFocus())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
+
+    view.unmount()
+    render(<WardrobePage />)
+    expect(await screen.findByText('No garments added yet')).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('resumes an unfinished tag review and keeps the updated tile through a retry', async () => {
+    const user = userEvent.setup()
+    const pending = garmentFixture('garment-pending', 'awaiting_tags')
+    const ready = garmentFixture(pending.id, 'ready')
+    listGarmentsFromWeb
+      .mockResolvedValueOnce([pending])
+      .mockRejectedValueOnce(new Error('Refresh rejected'))
+      .mockResolvedValue([ready])
+    updateGarmentTagsFromWeb.mockResolvedValue(ready)
+    render(<WardrobePage />)
+
+    const tagging = await screen.findByRole('dialog', { name: 'Organize Garment Tags' })
+    expect(window.location.search).toBe('?from=home')
+    await user.click(
+      await within(tagging).findByRole('button', { name: 'Confirm & Save Tags' })
+    )
+    const error = await screen.findByRole('alert')
+    expect(error).toHaveTextContent('Refresh rejected')
+    expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
+    expect(
+      within(screen.getByTestId(`garment-card-${pending.id}`)).getByText('ready')
+    ).toBeVisible()
+    expect(screen.getByRole('link', { name: "Back to today's outfit" })).toHaveAttribute(
+      'href',
+      '/'
+    )
+    expect(updateGarmentTagsFromWeb).toHaveBeenCalledWith(
+      pending.id,
+      expect.any(Object),
+      expect.any(AbortSignal)
+    )
+    await user.click(within(error).getByRole('button', { name: 'Try again' }))
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
+  })
+
+  it('checks an existing processing garment without starting a second upload', async () => {
+    const user = userEvent.setup()
+    collapsePollSchedule()
+    const processing = garmentFixture('garment-processing', 'processing')
+    listGarmentsFromWeb
+      .mockResolvedValueOnce([processing])
+      .mockResolvedValue([garmentFixture(processing.id, 'ready')])
+    render(<WardrobePage />)
+
+    const check = await screen.findByRole('button', { name: 'Check garment status' })
+    expect(window.location.search).toBe('?from=home')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    await user.click(check)
+
+    const card = screen.getByTestId(`garment-card-${processing.id}`)
+    expect(await within(card).findByText('ready')).toBeVisible()
+    expect(screen.getByRole('link', { name: "Back to today's outfit" })).toBeVisible()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
+  })
+
+  it('drops an earlier member’s held wardrobe list when the verified owner changes', async () => {
+    const olderList = Promise.withResolvers<GarmentItemContract[]>()
+    const previous = garmentFixture('garment-previous', 'awaiting_tags')
+    const current = garmentFixture('garment-current', 'ready')
+    listGarmentsFromWeb
+      .mockReturnValueOnce(olderList.promise)
+      .mockResolvedValue([current])
+    render(<WardrobePage />)
+    const [firstSignal] = listGarmentsFromWeb.mock.calls[0] ?? []
+    expect(await screen.findByText('Loading your wardrobe...')).toBeVisible()
+
+    act(() => publishMember('user-hub-2'))
+    expect(await screen.findByTestId(`garment-card-${current.id}`)).toBeVisible()
+    expect(firstSignal?.aborted).toBe(true)
+    await act(async () => {
+      olderList.resolve([previous])
+      await olderList.promise
+    })
+
+    expect(screen.queryByTestId(`garment-card-${previous.id}`)).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('dialog', { name: 'Organize Garment Tags' })
+    ).not.toBeInTheDocument()
+  })
+})
+
 describe('WardrobePage garment grid', () => {
   beforeEach(resetWardrobeMocks)
 
@@ -544,6 +697,23 @@ describe('WardrobePage garment grid', () => {
     // Rendering <img src={undefined}> would show a broken-image glyph instead.
     expect(within(card).queryByRole('img')).not.toBeInTheDocument()
     expect(card).toHaveTextContent('👗')
+  })
+
+  it('opens capture for a failed garment and restores the replacement action on close', async () => {
+    const user = userEvent.setup()
+    listGarmentsFromWeb.mockResolvedValue([garmentFixture('garment-failed', 'failed')])
+    render(<WardrobePage />)
+
+    const replace = await screen.findByRole('button', { name: 'Choose another photo' })
+    await user.click(replace)
+    expect(
+      await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
+    ).toBeVisible()
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(replace).toHaveFocus())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
   })
 
   it('closes the tagging modal without saving when the user cancels', async () => {

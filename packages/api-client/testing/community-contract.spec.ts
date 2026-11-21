@@ -16,12 +16,53 @@ import {
   communityModerationReasonCategories,
   communityModerationReasonCategorySchema,
   decodeCommunityFeedCursor,
+  editCommunityPostTextInputSchema,
   encodeCommunityFeedCursor,
   safeDecodeCommunityFeedCursor,
 } from '../src/contracts/http'
 import { failureMessageOf, withoutKey } from './community-contract-support'
 
 describe('community HTTP contracts', () => {
+  describe('published post text edits', () => {
+    const edit = { baseRevision: 2, title: 'Classy in Camouflage', caption: null }
+
+    it('trims the title and supports clearing both fields', () => {
+      expect(
+        editCommunityPostTextInputSchema.parse({
+          ...edit,
+          title: '  Classy in Camouflage ',
+        })
+      ).toEqual(edit)
+      expect(editCommunityPostTextInputSchema.parse({ ...edit, title: null })).toEqual({
+        ...edit,
+        title: null,
+      })
+    })
+
+    it.each([
+      'See https://example.com',
+      'Reach me at visitor@example.com',
+      'x'.repeat(81),
+    ])('rejects an invalid title', (title) => {
+      expect(editCommunityPostTextInputSchema.safeParse({ ...edit, title }).success).toBe(
+        false
+      )
+    })
+
+    it('rejects an overflowing revision and an explicit owner override', () => {
+      expect(
+        editCommunityPostTextInputSchema.safeParse({
+          ...edit,
+          baseRevision: 2_147_483_647,
+        }).success
+      ).toBe(false)
+      expect(
+        editCommunityPostTextInputSchema.safeParse({ ...edit, ownerId: 'another-member' })
+          .success
+      ).toBe(false)
+    })
+  })
+
   describe('cursor serialization and decoding', () => {
     it('6.1-CON-001 round-trips a publishedAt, id, mode, band cursor payload', () => {
       // Matrix row "Feed page": public rows page on `published_at,id`.

@@ -51,4 +51,6 @@ On 2026-11-20, the isolated web browser and Android emulator each uploaded the f
 garment and confirmed its tags. Web showed the saved garment after reload. Android showed
 it as ready in Wardrobe and deleted the fixture during teardown.
 
-Participant outreach began on 2026-11-20. Zero participants have completed a session.
+Participant outreach began on 2026-11-20. One adult opted in and received an expiring
+guest-task link after a phone-width browser opened the exact isolated preview and reached
+the sample flow. No participant outcomes have been received.

@@ -154,6 +154,12 @@ source action, use personal photos in tests, or count automation as a study obse
   the endpoint, exercises the title's painted contrast and verifies the new Settings
   keyboard stop. Community's separate browser contexts still report unexpected HTTP
   failures. They share Home's scoped missing-city check.
+- The browser suite checks example comparison on the guest Home and the live member
+  layout separately. Wardrobe labels fit at 320 pixels in Chromium and iPhone WebKit.
+  The member Home still reserves no space when Spotlight is absent.
+- Added tests for outfit rotation and swaps, API validation, direct capture, city save
+  recovery and Community editing. Web, API-client and utility coverage pass the
+  existing thresholds.
 
 ## Verification
 

@@ -649,7 +649,7 @@ export function LookbookPrismLayout() {
         plannerOpenerRef={plannerOpenerRef}
       />
 
-      <div className="mt-8 flex justify-end">
+      <div data-landing="guest" className="mt-8 flex justify-end">
         <LayoutControls
           isComparisonMode={isComparisonMode}
           onToggleComparison={() => setIsComparisonMode((currentValue) => !currentValue)}

@@ -283,6 +283,33 @@ describe('GarmentCaptureModal file validation', () => {
 })
 
 describe('GarmentCaptureModal crop controls', () => {
+  it('keeps the selected photo and restores crop focus until discard is confirmed', async () => {
+    const user = userEvent.setup()
+    const close = vi.fn()
+    const upload = vi.fn()
+    render(
+      <GarmentCaptureModal isOpen confirmDiscard onClose={close} uploadGarment={upload} />
+    )
+    await chooseValidImage(user)
+
+    const closeButton = screen.getByRole('button', { name: 'Close capture modal' })
+    await user.click(closeButton)
+    const keep = screen.getByRole('button', { name: 'Keep editing' })
+    expect(keep).toHaveFocus()
+    await user.click(keep)
+    expect(screen.getByRole('button', { name: 'Use This Image' })).toHaveFocus()
+    expect(close).not.toHaveBeenCalled()
+
+    await user.click(closeButton)
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('button', { name: 'Use This Image' })).toHaveFocus()
+
+    await user.click(closeButton)
+    await user.click(screen.getByRole('button', { name: /^Discard$/ }))
+    expect(close).toHaveBeenCalledOnce()
+    expect(upload).not.toHaveBeenCalled()
+  })
+
   it('switches aspect ratio and toggles background cleanup', async () => {
     const user = userEvent.setup()
     const uploadGarment = vi.fn().mockResolvedValue(mockCommittedGarment)

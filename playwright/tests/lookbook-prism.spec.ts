@@ -4,6 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 3.5 Task 6 step 4 owner: E2E smoke test responsive layout boundaries across viewports in `playwright/tests/lookbook-prism.spec.ts`
 import { log } from '@seontechnologies/playwright-utils/log'
+import { test as guestTest } from '../support/fixtures/merged-fixtures'
 import { communityTest, expect } from '../support/helpers/community-session'
 
 /**
@@ -135,11 +136,7 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         .toBeGreaterThanOrEqual(1300)
       await expect.poll(() => evenColumns(1440)).toBe(true)
 
-      await log.step('Toggle comparison mode and verify comparison view container')
-      const comparisonToggle = page.getByRole('button', { name: /comparison mode/i })
-      await expect(comparisonToggle).toBeVisible()
-      await comparisonToggle.click()
-      await expect(page.getByTestId('comparison-container')).toBeVisible()
+      await expect(page.getByRole('button', { name: /comparison mode/i })).toBeHidden()
 
       await log.step('Set mobile viewport (700x812) and verify the single-column grid')
       await page.setViewportSize({ width: 700, height: 812 })
@@ -186,4 +183,17 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
       await expect(page.locator('h1')).toHaveCount(1)
     }
   )
+})
+
+guestTest.describe('Guest outfit comparison', () => {
+  guestTest.use({ authSessionEnabled: false })
+
+  guestTest('opens comparison controls for the guest example', async ({ page }) => {
+    await page.goto('/')
+    const comparisonToggle = page.getByRole('button', { name: /comparison mode/i })
+    await expect(comparisonToggle).toBeVisible()
+    await comparisonToggle.click()
+    await expect(page.getByTestId('comparison-container')).toBeVisible()
+    await expect(comparisonToggle).toHaveAttribute('aria-pressed', 'true')
+  })
 })

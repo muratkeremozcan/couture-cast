@@ -3,6 +3,7 @@ import {
   createSavedLocationInputSchema,
   createSavedLocationResponseSchema,
   deleteSavedLocationResponseSchema,
+  findSavedSearchLocation,
   generateHttpOpenApiDocument,
   listSavedLocationsResponseSchema,
   savedLocationSchema,
@@ -25,6 +26,28 @@ const savedLocation = {
   createdAt: '2026-07-09T12:00:00.000Z',
   updatedAt: '2026-07-09T12:00:00.000Z',
 }
+
+test('recovers the submitted location by coordinates, country and submitted label', () => {
+  const candidate = {
+    city: savedLocation.city,
+    region: savedLocation.region,
+    country: savedLocation.country,
+    latitude: savedLocation.latitude,
+    longitude: savedLocation.longitude,
+    displayLabel: 'Chicago, Illinois, United States',
+    candidateToken: 'fixture',
+  }
+  const differentPlaces = [
+    { ...savedLocation, country: 'CA' },
+    { ...savedLocation, latitude: 42 },
+    { ...savedLocation, longitude: -88 },
+    { ...savedLocation, label: 'Home' },
+  ]
+  expect(findSavedSearchLocation(differentPlaces, candidate, 'Office')).toBeUndefined()
+  expect(
+    findSavedSearchLocation([...differentPlaces, savedLocation], candidate, 'Office')
+  ).toBe(savedLocation)
+})
 
 test('validates saved-location request and response envelopes', () => {
   expect(savedLocationSchema.parse(savedLocation)).toEqual(savedLocation)

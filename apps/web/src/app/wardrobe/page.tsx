@@ -394,7 +394,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
               {/* The capsules route had no entry point anywhere in the app. */}
               <Link
                 href="/wardrobe/capsules"
-                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-2 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 sm:px-4 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 data-testid="wardrobe-capsules-link"
               >
                 Outfit capsules
@@ -409,7 +409,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
                     ? 'Unable to load your account. Reload the page to try again.'
                     : undefined
                 }
-                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center rounded-lg border text-center border-zinc-300 px-2 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {t('wardrobe.silhouette.title')}
               </button>

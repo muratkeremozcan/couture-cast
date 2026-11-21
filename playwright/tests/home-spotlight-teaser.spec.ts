@@ -204,19 +204,18 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
         )
     )
     await expect(page.locator('[data-testid^="home-spotlight-teaser"]')).toHaveCount(0)
-    // The hero ends with the outfit tiles: nothing is reserved after them.
+    const sample = heroCanvas(page).getByTestId('member-sample-outfit')
+    await expect(sample).toBeVisible()
+    // The hero ends with the member's example outfit.
     const gap = await heroCanvas(page).evaluate((canvas) => {
       const last = canvas.lastElementChild!.getBoundingClientRect()
       const bottom = canvas.getBoundingClientRect().bottom
       return Math.round(bottom - last.bottom)
     })
     expect(gap).toBeLessThanOrEqual(48)
-    expect(
-      await heroCanvas(page).evaluate(
-        (canvas) =>
-          canvas.lastElementChild?.querySelector('[data-testid="outfit-scroll"]') !== null
-      )
-    ).toBe(true)
+    await expect(
+      heroCanvas(page).locator(':scope > [data-testid="member-sample-outfit"]:last-child')
+    ).toBeVisible()
     await checkA11y(page)
   })
 })

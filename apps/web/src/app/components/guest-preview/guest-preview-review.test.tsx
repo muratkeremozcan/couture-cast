@@ -195,6 +195,44 @@ describe('preview carryover review (D8)', () => {
     expect(api.nextStep).toHaveBeenCalledExactlyOnceWith('token-a', true)
   })
 
+  it('drops the garment handoff when the member changes during the profile check', async () => {
+    const user = userEvent.setup()
+    await seedProposal(GUEST_PREVIEW_GARMENT_INTENT)
+    server()
+    const nextStep = Promise.withResolvers<string>()
+    api.nextStep.mockReturnValue(nextStep.promise)
+    render(<GuestPreviewReview />)
+
+    await user.click(await screen.findByTestId('guest-preview-review-keep'))
+    await user.click(screen.getByTestId('guest-preview-review-continue'))
+    await waitFor(() =>
+      expect(api.nextStep).toHaveBeenCalledExactlyOnceWith('token-a', true)
+    )
+    member.id = 'member-b'
+    await act(async () => {
+      nextStep.resolve('/wardrobe?entry=add')
+      await nextStep.promise
+    })
+
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it('returns to sign-in when the session ends before the garment handoff', async () => {
+    const user = userEvent.setup()
+    await seedProposal(GUEST_PREVIEW_GARMENT_INTENT)
+    server()
+    render(<GuestPreviewReview />)
+
+    await user.click(await screen.findByTestId('guest-preview-review-keep'))
+    member.id = null
+    await user.click(screen.getByTestId('guest-preview-review-continue'))
+
+    await waitFor(() =>
+      expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/signin')
+    )
+    expect(api.nextStep).not.toHaveBeenCalled()
+  })
+
   it('issues one application for a double tap', async () => {
     const client = server()
     const commit = client.write.getMockImplementation()

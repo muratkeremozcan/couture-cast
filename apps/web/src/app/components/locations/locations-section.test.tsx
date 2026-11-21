@@ -534,6 +534,57 @@ describe('LocationsSection', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/'))
   })
 
+  it('finds a city that was saved before the response failed and returns to Planner on retry', async () => {
+    signIn()
+    searchParams = new URLSearchParams({ addLocation: '1', returnTo: '/?planner=1' })
+    const lists = vi.fn(() => HttpResponse.json({ data: saved }))
+    const save = vi.fn(() => {
+      saved = [location({ label: CANDIDATE.city })]
+      return unavailable('location_service_unavailable')
+    })
+    useMswHandlers(
+      http.get('/api/v1/locations', lists),
+      searchHandler(),
+      http.post(FROM_SEARCH_PATH, save)
+    )
+
+    renderSection()
+    await searchFor(user, CANDIDATE.city)
+    await user.click(await findOption(CANDIDATE.displayLabel))
+    await user.click(screen.getByRole('button', { name: 'Save location' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Locations are temporarily unavailable. Try again later.'
+    )
+    expect(push).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+
+    await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith('/?planner=1'))
+    expect(lists).toHaveBeenCalledTimes(2)
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['/?planner=1', '/?planner=1'],
+    ['//evil.example', '/'],
+  ])(
+    'cancels guided city setup from %s without saving a selected city',
+    async (returnTo, target) => {
+      signIn()
+      searchParams = new URLSearchParams({ addLocation: '1', returnTo })
+      const save = vi.fn(() => new HttpResponse(null, { status: 500 }))
+      useMswHandlers(listHandler(), searchHandler(), http.post(FROM_SEARCH_PATH, save))
+
+      renderSection()
+      await searchFor(user, CANDIDATE.city)
+      await user.click(await findOption(CANDIDATE.displayLabel))
+      await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+      expect(push).toHaveBeenCalledExactlyOnceWith(target)
+      expect(save).not.toHaveBeenCalled()
+    }
+  )
+
   it('1.2b-WEB-11 sends a return target outside this origin home', async () => {
     signIn()
     searchParams = new URLSearchParams('addLocation=1&returnTo=%2F%2Fevil.example')
@@ -621,13 +672,13 @@ describe('LocationsSection', () => {
     expect(screen.queryByRole('option')).toBeNull()
   })
 
-  it('1.2b-WEB-15 explains a failed list load', async () => {
+  it('1.2b-WEB-15 explains a failed list load and recovers when retried', async () => {
     signIn()
-    useMswHandlers(
-      http.get('/api/v1/locations', () =>
-        HttpResponse.json({ statusCode: 500, message: 'boom' }, { status: 500 })
-      )
+    const list = vi.fn(() => HttpResponse.json({ data: [location()] }))
+    list.mockImplementationOnce(() =>
+      HttpResponse.json({ statusCode: 500, message: 'boom' }, { status: 500 })
     )
+    useMswHandlers(http.get('/api/v1/locations', list))
 
     renderSection()
 
@@ -635,6 +686,13 @@ describe('LocationsSection', () => {
       'Unable to load your locations.'
     )
     expect(screen.queryByTestId('location-search-input')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByTestId('location-primary-badge')).toHaveTextContent(
+      'Primary'
+    )
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(list).toHaveBeenCalledTimes(2)
   })
 
   it('1.2b-WEB-16 reports a failed primary switch and keeps the list as it was', async () => {
