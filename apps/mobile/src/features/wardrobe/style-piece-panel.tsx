@@ -153,10 +153,11 @@ export function StylePiecePanel({
   const palette = useHeroPalette()
   const insets = useModalInsets()
   const closeButton = useRef<ComponentRef<typeof Pressable> | null>(null)
-  const [{ anchor, piece }, setInventoryView] = useState<{
+  const [{ anchor, piece, restoreWeatherFocus }, setInventoryView] = useState<{
     anchor?: StylePiecePhotoAnchor | null
     piece: StylePieceAnchor
-  }>({ piece: selection })
+    restoreWeatherFocus: boolean
+  }>({ piece: selection, restoreWeatherFocus: false })
   const refreshRef = useRef<InventoryRefresh | null>(null)
   const dismissRef = useRef(onDismiss)
   dismissRef.current = onDismiss
@@ -175,6 +176,10 @@ export function StylePiecePanel({
           piece: next
             ? { category: next.category, comfortRange: next.comfortRange }
             : view.piece,
+          // A background pause explicitly puts the panel back into the checking state.
+          restoreWeatherFocus:
+            next === undefined ||
+            (Boolean(next) && view.anchor === undefined && view.restoreWeatherFocus),
         }))
       },
     })
@@ -252,6 +257,7 @@ export function StylePiecePanel({
           key={JSON.stringify([selection.id, piece.category, piece.comfortRange])}
           anchor={inWardrobe ? anchor : null}
           piece={piece}
+          restoreWeatherFocus={restoreWeatherFocus}
           refreshRef={refreshRef}
           closeButton={closeButton}
           owner={owner}
@@ -306,6 +312,7 @@ function StylePieceUnavailable({
 function StylePieceIdeas({
   anchor,
   piece,
+  restoreWeatherFocus,
   refreshRef,
   closeButton,
   owner,
@@ -317,6 +324,7 @@ function StylePieceIdeas({
 }: {
   anchor: StylePiecePhotoAnchor | null | undefined
   piece: StylePieceAnchor
+  restoreWeatherFocus: boolean
   refreshRef: RefObject<InventoryRefresh | null>
   closeButton: RefObject<ComponentRef<typeof Pressable> | null>
   owner: string
@@ -345,6 +353,16 @@ function StylePieceIdeas({
   const adapter = useRef<Awaited<ReturnType<typeof sampleRecipeStorage>> | null>(null)
   const scroll = useRef<ScrollView | null>(null)
   const selectedWeather = useRef<ComponentRef<typeof Pressable> | null>(null)
+  const reopenAction = useRef(0)
+
+  useEffect(() => {
+    if (!authorized || !restoreWeatherFocus) return
+    const frame = requestAnimationFrame(() => {
+      if (refreshRef.current?.currentAnchor())
+        focusStylePieceControl(selectedWeather.current)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [authorized, refreshRef, restoreWeatherFocus])
 
   useEffect(() => {
     if (!authorized) return
@@ -403,6 +421,7 @@ function StylePieceIdeas({
 
   const changeWeather = (value: StylePieceWeatherKey) => {
     if (value === weather) return
+    reopenAction.current++
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
@@ -411,8 +430,9 @@ function StylePieceIdeas({
   }
 
   const openSaved = async (entry: StylePieceLook) => {
+    const action = ++reopenAction.current
     const inventory = refreshRef.current
-    if (!(await inventory?.refresh())) return
+    if (!(await inventory?.refresh()) || reopenAction.current !== action) return
     const fresh = currentPiece(inventory)
     const store = adapter.current
     if (!fresh || !store) return
@@ -430,6 +450,7 @@ function StylePieceIdeas({
     setReopened(recipe.lookId)
     setLatestEdit(recipe.lookId)
     requestAnimationFrame(() => {
+      if (reopenAction.current !== action || !currentPiece(inventory)) return
       scroll.current?.scrollTo({ y: 0, animated: false })
       focusStylePieceControl(selectedWeather.current)
     })
@@ -534,6 +555,7 @@ function StylePieceIdeas({
             )
           }}
           onSwap={(category, id) => {
+            reopenAction.current++
             setLatestEdit(look.recipe.lookId)
             setEdits((current) => ({
               ...current,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { withRequestDeadline } from '@couture/api-client'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
   createStylePieceRefresh,
@@ -105,14 +106,38 @@ export function StylePiecePanel({
     piece: StylePieceAnchor
   }>({ piece: selection })
   const refreshRef = useRef<InventoryRefresh | null>(null)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const restoreFocus = useRef<{ id: string; look?: string; label: string | null } | null>(
+    null
+  )
 
   useLayoutEffect(() => {
     const isCurrent = () => currentWebSessionOwner() === owner
     const inventory = createStylePieceRefresh({
       garmentId: selection.id,
-      load: loadInventory,
+      load: (signal) => withRequestDeadline(15_000, [signal], loadInventory),
       isCurrent,
       onAnchor: (next) => {
+        const panel = panelRef.current
+        const focused = document.activeElement
+        if (
+          next === undefined &&
+          panel &&
+          focused instanceof HTMLElement &&
+          focused !== panel &&
+          panel.contains(focused)
+        ) {
+          const id = focused.dataset.testid
+          restoreFocus.current = id
+            ? {
+                id,
+                look: focused.closest<HTMLElement>('[data-style-look]')?.dataset
+                  .styleLook,
+                label: focused.getAttribute('aria-label'),
+              }
+            : null
+          panel.focus()
+        }
         setInventoryView((view) => ({
           anchor: next,
           piece: next
@@ -150,6 +175,25 @@ export function StylePiecePanel({
     }
   }, [loadInventory, owner, selection.id])
 
+  useLayoutEffect(() => {
+    if (anchor === undefined && inWardrobe) return
+    const target = restoreFocus.current
+    restoreFocus.current = null
+    const panel = panelRef.current
+    if (!anchor || !inWardrobe || !target || !panel || document.activeElement !== panel)
+      return
+    const previous = Array.from(
+      panel.querySelectorAll<HTMLElement>('[data-testid]')
+    ).find(
+      (element) =>
+        element.dataset.testid === target.id &&
+        element.closest<HTMLElement>('[data-style-look]')?.dataset.styleLook ===
+          target.look &&
+        element.getAttribute('aria-label') === target.label
+    )
+    previous?.focus()
+  }, [anchor, inWardrobe])
+
   return (
     <AccessibleModal
       isOpen
@@ -163,7 +207,16 @@ export function StylePiecePanel({
       invokingElementRef={invoker}
       fallbackFocusSelector="[data-testid='garment-capture-open']"
     >
-      <div data-testid="style-piece-panel">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        role="group"
+        aria-labelledby="style-piece-heading"
+        data-testid="style-piece-panel"
+        onBlur={(event) => {
+          if (event.target === event.currentTarget) restoreFocus.current = null
+        }}
+      >
         <StylePieceIdeas
           key={JSON.stringify([selection.id, piece.category, piece.comfortRange])}
           anchor={inWardrobe ? anchor : null}
@@ -252,6 +305,14 @@ function StylePieceIdeas({
   const authorized = Boolean(anchor) && !photoFailed
   const weatherRef = useRef<HTMLButtonElement | null>(null)
   const currentLookHeading = useRef<HTMLHeadingElement | null>(null)
+  const draftRevision = useRef(0)
+  const focusAfterRetry = useRef(false)
+
+  useLayoutEffect(() => {
+    if (retrying || !focusAfterRetry.current) return
+    focusAfterRetry.current = false
+    if (authorized) weatherRef.current?.focus()
+  }, [authorized, retrying])
 
   useEffect(() => {
     if (!authorized) return
@@ -284,8 +345,8 @@ function StylePieceIdeas({
 
   const updateSaved = async (update: (entries: StylePieceLook[]) => StylePieceLook[]) => {
     const inventory = refreshRef.current
-    const apply = async () => {
-      if (!(await inventory?.refresh())) return false
+    if (!(await inventory?.refresh())) return false
+    const apply = () => {
       const fresh = currentPiece(inventory)
       if (!fresh) return false
       try {
@@ -319,14 +380,15 @@ function StylePieceIdeas({
     setRetrying(true)
     const inventory = refreshRef.current
     if ((await inventory?.refresh()) && inventory?.currentAnchor()) {
+      focusAfterRetry.current = true
       setFailedPhotoUrl((failed) => (failed === failedPhotoUrl ? undefined : failed))
-      requestAnimationFrame(() => weatherRef.current?.focus())
     }
     setRetrying(false)
   }
 
   const changeWeather = (value: StylePieceWeatherKey) => {
     if (value === weather) return
+    draftRevision.current += 1
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
@@ -335,8 +397,9 @@ function StylePieceIdeas({
   }
 
   const openSaved = async (entry: StylePieceLook) => {
+    const revision = ++draftRevision.current
     const inventory = refreshRef.current
-    if (!(await inventory?.refresh())) return
+    if (!(await inventory?.refresh()) || draftRevision.current !== revision) return
     const fresh = currentPiece(inventory)
     if (!fresh) return
     let recipe: StylePieceRecipe | undefined
@@ -352,7 +415,10 @@ function StylePieceIdeas({
     setEdits({ [recipe.lookId]: recipe })
     setReopened(recipe.lookId)
     setLatestEdit(recipe.lookId)
-    requestAnimationFrame(() => currentLookHeading.current?.focus())
+    requestAnimationFrame(() => {
+      if (draftRevision.current === revision && currentPiece(inventory))
+        currentLookHeading.current?.focus()
+    })
   }
 
   if (anchor === undefined)
@@ -449,6 +515,7 @@ function StylePieceIdeas({
             )
           }}
           onSwap={(category, id) => {
+            draftRevision.current += 1
             setLatestEdit(look.recipe.lookId)
             setEdits((current) => ({
               ...current,
@@ -547,9 +614,15 @@ function StylePieceCard({
   return (
     <article
       data-testid="style-piece-look"
+      data-style-look={stylePieceRecipeKey(look.recipe)}
       className="space-y-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700"
     >
-      <h3 ref={headingRef} tabIndex={-1} className="font-semibold">
+      <h3
+        ref={headingRef}
+        tabIndex={-1}
+        data-testid="style-piece-look-title"
+        className="font-semibold"
+      >
         {formatPreviewString(labels.idea, { number: index + 1 })}
       </h3>
       <div className="flex flex-wrap items-start gap-3">

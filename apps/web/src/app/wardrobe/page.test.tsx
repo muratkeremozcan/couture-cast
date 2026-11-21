@@ -870,6 +870,76 @@ describe('WardrobePage commit reconciliation', () => {
 describe('WardrobePage processing poll', () => {
   beforeEach(resetWardrobeMocks)
 
+  it('does not let a styling snapshot undo a processing poll that settled first', async () => {
+    const user = userEvent.setup()
+    collapsePollSchedule()
+    const poll = Promise.withResolvers<GarmentItemContract[]>()
+    const styling = Promise.withResolvers<GarmentItemContract[]>()
+    const authoritative = Promise.withResolvers<GarmentItemContract[]>()
+    const photo = {
+      url: 'https://example.test/styling-photo.png',
+      expiresAt: '2090-01-01T00:00:00.000Z',
+    }
+    const anchor = garmentFixture('styling-anchor', 'ready', {
+      category: 'top',
+      comfortRange: 'mild',
+      imageAccess: photo,
+    })
+    const processing = garmentFixture('styling-while-processing', 'processing')
+    const ready = { ...processing, status: 'ready' } as const
+    listGarmentsFromWeb
+      .mockResolvedValueOnce([anchor])
+      .mockReturnValueOnce(poll.promise)
+      .mockReturnValueOnce(styling.promise)
+      .mockReturnValueOnce(authoritative.promise)
+    verifiedSession.owner = 'styling-while-processing-member'
+    sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-styling-member')
+    try {
+      render(<WardrobePage />)
+      const openStyling = await screen.findByRole('button', { name: 'Style this piece' })
+      await commitGarmentThroughCapture(
+        user,
+        processing,
+        screen.getByRole('button', { name: '+ Add Garment' })
+      )
+      await user.click(screen.getByRole('button', { name: 'Done' }))
+      await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
+      await user.click(openStyling)
+      const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
+      await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(3))
+      const card = screen.getByTestId(`garment-card-${processing.id}`)
+      await act(async () => {
+        poll.resolve([anchor, ready])
+        await poll.promise
+      })
+      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+
+      await act(async () => {
+        styling.resolve([anchor, processing])
+        await styling.promise
+      })
+      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+      expect(
+        within(panel).queryByRole('img', { name: 'Your piece' })
+      ).not.toBeInTheDocument()
+      expect(listGarmentsFromWeb).toHaveBeenCalledTimes(4)
+      await act(async () => {
+        authoritative.resolve([ready])
+        await authoritative.promise
+      })
+      expect(screen.queryByTestId(`garment-card-${anchor.id}`)).not.toBeInTheDocument()
+      expect(
+        within(panel).queryByRole('img', { name: 'Your piece' })
+      ).not.toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(within(card).getByTestId('garment-status-ready')).toBeVisible()
+    } finally {
+      cleanup()
+      verifiedSession.owner = null
+      sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    }
+  })
+
   it('queues tagging when the poll finishes while capture is still open', async () => {
     const user = userEvent.setup()
     collapsePollSchedule()

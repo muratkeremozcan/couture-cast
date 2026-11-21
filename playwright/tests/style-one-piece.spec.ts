@@ -140,6 +140,7 @@ test.describe('Style this piece on a phone', () => {
     await expect(reopen).toHaveCount(0)
     await page.reload()
     await openStylePanel(page, garment.id)
+    await expect(panel.getByTestId('style-piece-save').first()).toBeEnabled()
     await expect(reopen).toHaveCount(0)
     expect(writes, 'Wardrobe styling is local to this device').toEqual([])
   })
@@ -478,13 +479,20 @@ test.describe('Style this piece on a phone', () => {
             .map((key) => localStorage.getItem(key))
         )
       const prior = await deviceRecipes()
+
+      if (trigger === 'resume') {
+        await page.evaluate(() =>
+          window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
+        )
+        await expect(panel.getByRole('status')).toHaveText('Checking your photo…')
+        await expect(panel.getByTestId('style-piece-anchor')).toHaveCount(0)
+      }
       inventory[memberA] = []
 
       if (trigger === 'resume') {
-        await page.evaluate(() => {
-          document.dispatchEvent(new Event('visibilitychange'))
-          window.dispatchEvent(new Event('focus'))
-        })
+        await page.evaluate(() =>
+          window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
+        )
       } else if (trigger === 'periodic') {
         await page.clock.fastForward(5 * 60_000)
       } else {

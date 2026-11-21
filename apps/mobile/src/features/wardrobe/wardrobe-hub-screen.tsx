@@ -73,6 +73,7 @@ function MemberWardrobeHub({
     borderColor: colors.noticeBorder,
   }
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const inventoryRevision = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -168,22 +169,45 @@ function MemberWardrobeHub({
     isCaptureOpenRef.current = isCaptureOpen
   }, [isCaptureOpen])
 
+  const refreshGarmentList = useCallback(
+    async (token: string, signal?: AbortSignal) => {
+      const revision = inventoryRevision.current
+      const isCurrent = () =>
+        !signal?.aborted &&
+        epoch === mobileIdentityEpoch() &&
+        revision === inventoryRevision.current
+      if (!isCurrent()) return null
+      let next: GarmentItemContract[]
+      try {
+        next = await listGarmentsFromMobile(token, signal)
+      } catch (error) {
+        if (!isCurrent()) return null
+        throw error
+      }
+      // A concurrent list or write may have updated or removed a garment.
+      // An older snapshot cannot settle a poll or authorize another view.
+      if (!isCurrent()) return null
+      inventoryRevision.current++
+      setGarments(next)
+      return next
+    },
+    [epoch]
+  )
+
   const loadGarments = useCallback(
     async (signal?: AbortSignal) => {
       const token = await resolveMobileAccessToken()
       if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
-      if (!token) {
-        throw new Error('AUTHENTICATION_REQUIRED')
-      }
+      if (!token) throw new Error('AUTHENTICATION_REQUIRED')
       setAccessToken(token)
-      const next = await listGarmentsFromMobile(token, signal)
-      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
-      setGarments(next)
-      setHasLoaded(true)
-      setLoadFailed(false)
+      const next = await refreshGarmentList(token, signal)
+      if (next) {
+        setHasLoaded(true)
+        setLoadFailed(false)
+      }
       return next
     },
-    [epoch]
+    [epoch, refreshGarmentList]
   )
 
   useEffect(() => {
@@ -262,11 +286,9 @@ function MemberWardrobeHub({
           token,
           garmentId,
           controller.signal,
-          (next) => {
-            if (!controller.signal.aborted && epoch === mobileIdentityEpoch())
-              setGarments(next)
-          },
-          pollOffsetsMs
+          undefined,
+          pollOffsetsMs,
+          refreshGarmentList
         )
         if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
         if (!settled) {
@@ -300,6 +322,8 @@ function MemberWardrobeHub({
   }
 
   const handleGarmentCommitted = (garment: GarmentItemContract, token: string) => {
+    if (epoch !== mobileIdentityEpoch()) return
+    inventoryRevision.current++
     setAccessToken(token)
     setGarments((current) => [
       garment,
@@ -519,6 +543,8 @@ function MemberWardrobeHub({
         accessToken={accessToken}
         invokingNodeHandle={taggingInvokerNodeHandle}
         onTagsConfirmed={(updatedGarment) => {
+          if (epoch !== mobileIdentityEpoch()) return
+          inventoryRevision.current++
           setGarments((current) =>
             current.map((item) => (item.id === updatedGarment.id ? updatedGarment : item))
           )

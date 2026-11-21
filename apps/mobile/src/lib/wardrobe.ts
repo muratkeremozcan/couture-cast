@@ -111,7 +111,8 @@ const GARMENT_POLL_OFFSETS_MS = [1_000, 2_000, 4_000, 8_000]
 /**
  * Polls the wardrobe list until `garmentId` leaves `processing`, or the
  * schedule below is exhausted. `onUpdate` fires with every refreshed list so
- * a caller can keep its own garment state in sync while polling runs.
+ * a caller can keep its own garment state in sync while polling runs. A shared
+ * list reader may return null for a superseded result; continue to the next offset.
  *
  * Every offset is measured from a single `startedAt`, not from the previous
  * tick, so the four checks land at roughly +1s/+2s/+4s/+8s (~8s total) no
@@ -125,15 +126,20 @@ export async function pollGarmentUntilSettled(
   accessToken: string,
   garmentId: string,
   signal: AbortSignal,
-  onUpdate: (garments: GarmentItemContract[]) => void,
+  onUpdate: ((garments: GarmentItemContract[]) => void) | undefined,
   /** Test-only override for the poll cadence. */
-  offsetsMs: readonly number[] = GARMENT_POLL_OFFSETS_MS
+  offsetsMs: readonly number[] = GARMENT_POLL_OFFSETS_MS,
+  loadList: (
+    accessToken: string,
+    signal: AbortSignal
+  ) => Promise<GarmentItemContract[] | null> = listGarmentsFromMobile
 ): Promise<GarmentItemContract | undefined> {
   const startedAt = Date.now()
   for (const offsetMs of offsetsMs) {
     await waitForPoll(Math.max(0, startedAt + offsetMs - Date.now()), signal)
-    const persisted = await listGarmentsFromMobile(accessToken, signal)
-    onUpdate(persisted)
+    const persisted = await loadList(accessToken, signal)
+    if (!persisted) continue
+    onUpdate?.(persisted)
     const current = persisted.find((garment) => garment.id === garmentId)
     if (current && current.status !== 'processing') {
       return current

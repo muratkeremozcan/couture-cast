@@ -9,6 +9,7 @@ import {
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
+import type * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -22,6 +23,27 @@ import type * as WebSession from '../../lib/web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { HomeRitual } from '../components/home-ritual'
 import WardrobePage from './page'
+
+const photoErrors = vi.hoisted(() => new Map<string, () => void>())
+vi.mock('react/jsx-dev-runtime', async (importOriginal) => {
+  const runtime = await importOriginal<typeof ReactJsxDevRuntime>()
+  return {
+    ...runtime,
+    jsxDEV: ((...args) => {
+      const [type, props] = args
+      if (type === 'img') {
+        const image = props as {
+          'data-testid'?: string
+          src?: string
+          onError?: () => void
+        }
+        if (image['data-testid'] === 'style-piece-anchor' && image.src && image.onError)
+          photoErrors.set(image.src, image.onError)
+      }
+      return runtime.jsxDEV(...args)
+    }) as typeof runtime.jsxDEV,
+  }
+})
 
 const session = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../lib/web-session', async (importOriginal) => ({
@@ -63,7 +85,10 @@ const otherRecipe = {
 const inventory = vi.fn<(request: Request) => Response | Promise<Response>>()
 const list = (...items: (typeof garment)[]) => HttpResponse.json({ data: items })
 const locksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
-type RequestLock = (key: string, apply: () => Promise<boolean>) => Promise<boolean>
+type RequestLock = (
+  key: string,
+  apply: () => boolean | Promise<boolean>
+) => Promise<boolean>
 
 function setLocks(request?: RequestLock) {
   Object.defineProperty(navigator, 'locks', {
@@ -140,6 +165,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  photoErrors.clear()
   vi.useRealTimers()
   vi.restoreAllMocks()
   session.owner = null
@@ -190,7 +216,7 @@ describe('Wardrobe styling', () => {
   })
 
   it('edits a sample companion, saves through Web Locks, and restores the look, weather and focus', async () => {
-    const requestLock = vi.fn<RequestLock>((_key, apply) => apply())
+    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
     setLocks(requestLock)
     publishOwner(owner)
     render(<WardrobePage />)
@@ -403,6 +429,8 @@ describe('Wardrobe styling', () => {
     await user.click(firstLook(dialog).getByTestId('style-piece-swap-shoes'))
     await user.click(firstLook(dialog).getByRole('button', { name: 'Loafers' }))
     const failedPhoto = firstLook(dialog).getByRole('img', { name: 'Your piece' })
+    const onOldPhotoError = photoErrors.get(garment.imageAccess!.url)
+    expect(onOldPhotoError).toBeTypeOf('function')
     fireEvent.error(failedPhoto)
     expect(within(dialog).getByRole('alert')).toBeVisible()
 
@@ -428,7 +456,7 @@ describe('Wardrobe styling', () => {
     expect(
       within(dialog).getByRole('button', { name: 'Warm and rainy' })
     ).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.error(failedPhoto)
+    act(() => onOldPhotoError!())
     expect(newPhoto).toBeVisible()
     expect(within(dialog).queryByRole('alert')).toBeNull()
 
@@ -445,43 +473,63 @@ describe('Wardrobe styling', () => {
       )
     )
     expect(newPhoto).not.toBeInTheDocument()
-    fireEvent.error(newPhoto)
-    expect(within(dialog).queryByRole('alert')).toBeNull()
     expect(firstLook(dialog).getByText('Loafers')).toBeVisible()
+
+    // A late error must also leave an error from the currently mounted image intact.
+    fireEvent.error(firstLook(dialog).getByRole('img', { name: 'Your piece' }))
+    expect(within(dialog).getByRole('alert')).toBeVisible()
+    act(() => onOldPhotoError!())
+    expect(within(dialog).getByRole('alert')).toBeVisible()
   })
 
-  it('revalidates after the tab resumes and coalesces focus and visibility reads', async () => {
-    publishOwner(owner)
-    render(<WardrobePage />)
-    const { user, dialog } = await startStyling()
-    await user.click(within(dialog).getByRole('button', { name: 'Warm and rainy' }))
-    fireEvent(window, new Event('pagehide'))
-    expect(within(dialog).getByText('Checking your photo…')).toBeVisible()
-    expect(within(dialog).queryByRole('img', { name: 'Your piece' })).toBeNull()
+  it.each(['previous control', 'new focus'] as const)(
+    'revalidates on tab resume and preserves %s',
+    async (focus) => {
+      publishOwner(owner)
+      render(<WardrobePage />)
+      const { user, dialog } = await startStyling()
+      const previous = within(dialog).getByRole('button', { name: 'Warm and rainy' })
+      await user.click(previous)
+      expect(previous).toHaveFocus()
+      fireEvent(window, new Event('pagehide'))
+      expect(within(dialog).getByText('Checking your photo…')).toBeVisible()
+      expect(within(dialog).queryByRole('img', { name: 'Your piece' })).toBeNull()
+      expect(dialog.contains(document.activeElement)).toBe(true)
+      const close = within(dialog).getByRole('button', { name: 'Close' })
+      if (focus === 'new focus') {
+        await user.tab()
+        expect(close).toHaveFocus()
+      }
 
-    const visibility = vi
-      .spyOn(document, 'visibilityState', 'get')
-      .mockReturnValue('hidden')
-    fireEvent(document, new Event('visibilitychange'))
-    expect(inventory).toHaveBeenCalledTimes(2)
+      const visibility = vi
+        .spyOn(document, 'visibilityState', 'get')
+        .mockReturnValue('hidden')
+      fireEvent(document, new Event('visibilitychange'))
+      expect(inventory).toHaveBeenCalledTimes(2)
 
-    const refresh = Promise.withResolvers<Response>()
-    inventory.mockReturnValueOnce(refresh.promise)
-    visibility.mockReturnValue('visible')
-    fireEvent(window, new Event('pageshow'))
-    fireEvent(window, new Event('focus'))
-    fireEvent(document, new Event('visibilitychange'))
-    await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
-    await completeRead(refresh, list(renewed))
-    expect(
-      await within(dialog).findByRole('button', { name: 'Warm and rainy' })
-    ).toHaveAttribute('aria-pressed', 'true')
-    expect(firstLook(dialog).getByRole('img', { name: 'Your piece' })).toHaveAttribute(
-      'src',
-      renewed.imageAccess.url
-    )
-    expect(inventory).toHaveBeenCalledTimes(3)
-  })
+      const refresh = Promise.withResolvers<Response>()
+      inventory.mockReturnValueOnce(refresh.promise)
+      visibility.mockReturnValue('visible')
+      fireEvent(window, new Event('pageshow'))
+      fireEvent(window, new Event('focus'))
+      fireEvent(document, new Event('visibilitychange'))
+      await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
+      await completeRead(refresh, list(renewed))
+      expect(
+        await within(dialog).findByRole('button', { name: 'Warm and rainy' })
+      ).toHaveAttribute('aria-pressed', 'true')
+      expect(
+        focus === 'new focus'
+          ? close
+          : within(dialog).getByRole('button', { name: 'Warm and rainy' })
+      ).toHaveFocus()
+      expect(firstLook(dialog).getByRole('img', { name: 'Your piece' })).toHaveAttribute(
+        'src',
+        renewed.imageAccess.url
+      )
+      expect(inventory).toHaveBeenCalledTimes(3)
+    }
+  )
 
   it('changes the card action when its signed photo expires in the wardrobe', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
@@ -568,46 +616,147 @@ describe('Wardrobe styling', () => {
     publishOwner(owner)
     render(<WardrobePage />)
     const { user, dialog } = await startStyling()
+    const write = vi.spyOn(Storage.prototype, 'setItem')
+    const remove = vi.spyOn(Storage.prototype, 'removeItem')
     inventory.mockImplementation(() => list())
     await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
     expect(await within(dialog).findByRole('alert')).toHaveFocus()
     expect(within(dialog).queryByRole('img', { name: 'Your piece' })).toBeNull()
-    expect(readRecipes()).toEqual([])
+    expect(localStorage.getItem(storageKey)).toBeNull()
+    expect(write).not.toHaveBeenCalledWith(storageKey, expect.anything())
+    expect(remove).not.toHaveBeenCalledWith(storageKey)
     await user.keyboard('{Escape}')
     await waitFor(() =>
       expect(screen.getByRole('button', { name: '+ Add Garment' })).toHaveFocus()
     )
   })
 
-  it('does not expose or write another owner’s look when a queued lock acquires after a switch', async () => {
-    const lock = Promise.withResolvers<void>()
-    const finished = Promise.withResolvers<boolean>()
-    const requestLock = vi.fn<RequestLock>(async (_key, apply) => {
-      await lock.promise
-      const applied = await apply()
-      finished.resolve(applied)
-      return applied
-    })
+  it('waits for the wardrobe GET before taking the saved-look lock', async () => {
+    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
     setLocks(requestLock)
     publishOwner(owner)
     render(<WardrobePage />)
     const { user, dialog } = await startStyling()
-    await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
+    const reply = Promise.withResolvers<Response>()
+    inventory.mockReturnValueOnce(reply.promise)
+    try {
+      await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
+      await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
+      expect(requestLock).not.toHaveBeenCalled()
+    } finally {
+      await completeRead(reply, list(renewed))
+    }
+    await waitFor(() => expect(readRecipes()).toEqual([defaultRecipe]))
     expect(requestLock).toHaveBeenCalledOnce()
-
-    inventory.mockImplementation(() => list(renewed))
-    publishOwner('different-owner')
-    expect(screen.queryByRole('dialog', dialogName)).toBeNull()
-    await act(async () => {
-      lock.resolve()
-      expect(await finished.promise).toBe(false)
-    })
-    expect(await openButton()).toBeVisible()
-    expect(localStorage.getItem(storageKey)).toBeNull()
-    expect(
-      localStorage.getItem(stylePieceStorageKey('different-owner', garmentId))
-    ).toBeNull()
   })
+
+  it('aborts a stalled wardrobe GET before taking the saved-look lock', async () => {
+    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
+    setLocks(requestLock)
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { dialog } = await startStyling()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const pending = Promise.withResolvers<Response>()
+    inventory.mockReturnValueOnce(pending.promise)
+    try {
+      fireEvent.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
+      await vi.waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
+      const signal = inventory.mock.lastCall?.[0].signal
+      expect(signal?.aborted).toBe(false)
+      await act(async () => vi.advanceTimersByTimeAsync(15_000))
+      expect(signal?.aborted).toBe(true)
+      await vi.waitFor(() =>
+        expect(within(dialog).getByRole('alert')).toHaveTextContent(
+          'Your photo is unavailable.'
+        )
+      )
+      expect(requestLock).not.toHaveBeenCalled()
+      expect(localStorage.getItem(storageKey)).toBeNull()
+    } finally {
+      await completeRead(pending, list(renewed))
+      vi.useRealTimers()
+    }
+  })
+
+  it.each(['weather', 'companion'] as const)(
+    'keeps a newer %s edit when an old saved-look request completes',
+    async (edit) => {
+      localStorage.setItem(storageKey, JSON.stringify([defaultRecipe]))
+      publishOwner(owner)
+      render(<WardrobePage />)
+      const { user, dialog } = await startStyling()
+      const weather = within(dialog).getByRole('button', { name: 'Warm and rainy' })
+      await user.click(weather)
+      const reply = Promise.withResolvers<Response>()
+      inventory.mockReturnValueOnce(reply.promise)
+      try {
+        await user.click(
+          await within(dialog).findByRole('button', { name: /open saved look/i })
+        )
+        await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
+        if (edit === 'weather') {
+          await user.click(within(dialog).getByRole('button', { name: 'Cool and windy' }))
+        } else {
+          await user.click(firstLook(dialog).getByTestId('style-piece-swap-shoes'))
+          await user.click(firstLook(dialog).getByRole('button', { name: 'Loafers' }))
+        }
+      } finally {
+        await completeRead(reply, list(renewed))
+      }
+      await waitFor(() =>
+        expect(
+          screen.getByTestId('garment-card-style-top').querySelector('img')
+        ).toHaveAttribute('src', renewed.imageAccess.url)
+      )
+      if (edit === 'weather') {
+        const cool = within(dialog).getByRole('button', { name: 'Cool and windy' })
+        expect(cool).toHaveAttribute('aria-pressed', 'true')
+        expect(cool).toHaveFocus()
+      } else {
+        expect(firstLook(dialog).getByText('Loafers')).toBeVisible()
+        expect(weather).toHaveAttribute('aria-pressed', 'true')
+      }
+    }
+  )
+
+  it.each(['account switch', 'page hide'] as const)(
+    'does not write a look when a queued lock acquires after %s',
+    async (boundary) => {
+      const lock = Promise.withResolvers<void>()
+      const finished = Promise.withResolvers<boolean>()
+      const requestLock = vi.fn<RequestLock>(async (_key, apply) => {
+        await lock.promise
+        const applied = await apply()
+        finished.resolve(applied)
+        return applied
+      })
+      setLocks(requestLock)
+      publishOwner(owner)
+      render(<WardrobePage />)
+      const { user, dialog } = await startStyling()
+      await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
+      await waitFor(() => expect(requestLock).toHaveBeenCalledOnce())
+
+      if (boundary === 'account switch') {
+        inventory.mockImplementation(() => list(renewed))
+        publishOwner('different-owner')
+        expect(screen.queryByRole('dialog', dialogName)).toBeNull()
+      } else {
+        fireEvent(window, new Event('pagehide'))
+        expect(within(dialog).getByText('Checking your photo…')).toBeVisible()
+      }
+      await act(async () => {
+        lock.resolve()
+        expect(await finished.promise).toBe(false)
+      })
+      if (boundary === 'account switch') expect(await openButton()).toBeVisible()
+      expect(localStorage.getItem(storageKey)).toBeNull()
+      expect(
+        localStorage.getItem(stylePieceStorageKey('different-owner', garmentId))
+      ).toBeNull()
+    }
+  )
 
   it('keeps first-use Home bookmarks separate from saves for a wardrobe garment', async () => {
     useMswHandlers(
