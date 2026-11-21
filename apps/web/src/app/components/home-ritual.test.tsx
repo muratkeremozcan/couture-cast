@@ -282,10 +282,7 @@ it('keeps bookmarks editable in memory when the browser rejects persistence', as
   const weather = screen.getByRole('combobox', { name: 'Sample weather' })
   await user.selectOptions(weather, 'cool-windy')
   await user.click(screen.getByText('Style preferences (optional)'))
-  await user.selectOptions(
-    screen.getByRole('combobox', { name: 'Style', exact: true }),
-    'cozy'
-  )
+  await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
   await user.click(screen.getByRole('button', { name: 'Try another look' }))
   await user.click(screen.getByRole('button', { name: 'Save example look' }))
   expect(within(saved).getAllByRole('button')).toHaveLength(4)
