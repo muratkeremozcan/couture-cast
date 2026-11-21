@@ -41,7 +41,18 @@ const phone = {
 
 type Background = 'plain' | 'detailed' | 'light-sleeves'
 
-const sparseCommunityTest = communityTest.extend({ trace: 'off' })
+// Public signup does not need fixture service-role headers in request diagnostics.
+const privateCommunityTest = communityTest.extend({
+  trace: 'off',
+  request: async ({ playwright }, use) => {
+    const request = await playwright.request.newContext()
+    try {
+      await use(request)
+    } finally {
+      await request.dispose()
+    }
+  },
+})
 
 async function syntheticGarment(page: Page, background: Background) {
   const encoded = await page.evaluate((kind) => {
@@ -196,7 +207,7 @@ test.describe('Jade first use on a phone', () => {
     expect(outsideGuestPreview, 'The sample flow stays local to the browser').toEqual([])
   })
 
-  sparseCommunityTest(
+  privateCommunityTest(
     'a sparse Community feed keeps the member look and labels example inspiration',
     async ({ communitySession, page, interceptNetworkCall }) => {
       const ownLook: CommunityFeedItem = {
@@ -518,10 +529,10 @@ test.describe('Jade first use on a phone', () => {
   }
 })
 
-communityTest.describe('Jade Community composer @local-lane', () => {
-  communityTest.use(phone)
+privateCommunityTest.describe('Jade Community composer @local-lane', () => {
+  privateCommunityTest.use(phone)
 
-  communityTest(
+  privateCommunityTest(
     'an owned photo draft is optional, editable, and published through screening',
     async (
       { apiRequest, communitySession, interceptNetworkCall, page, recurse, request },
@@ -612,7 +623,7 @@ communityTest.describe('Jade Community composer @local-lane', () => {
     }
   )
 
-  communityTest(
+  privateCommunityTest(
     'a late or failed photo suggestion leaves manual writing available',
     async ({ communitySession, interceptNetworkCall, page }) => {
       // Activate the disposable member fixture for this browser context.
