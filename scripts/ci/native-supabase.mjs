@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The iOS share-card lane's local Supabase, run as native processes on the macOS
- * runner: PostgreSQL 17.6, Redis 7.4, GoTrue (supabase/auth v2.183.0),
+ * runner: PostgreSQL 17.12, Redis 7.4, GoTrue (supabase/auth v2.183.0),
  * storage-api (supabase/storage v1.32.0) and a Node gateway in place of Kong
  * (native-supabase-gateway.mjs). Every component is built from a pinned upstream
  * source and cached by the workflow under the key `cache-keys` prints.
@@ -36,10 +36,10 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
  */
 export const PINS = {
   postgres: {
-    version: '17.6',
-    url: 'https://ftp.postgresql.org/pub/source/v17.6/postgresql-17.6.tar.gz',
-    // Published beside the tarball as postgresql-17.6.tar.gz.sha256; checked again at build.
-    sha256: '2910b85283674da2dae6ac13fe5ebbaaf3c482446396cba32e6728d3cc736d86',
+    version: '17.12',
+    url: 'https://ftp.postgresql.org/pub/source/v17.12/postgresql-17.12.tar.gz',
+    // Published beside the tarball as postgresql-17.12.tar.gz.sha256; checked again at build.
+    sha256: 'b46f61048797e9cf1728dd4ac459831f5126c4745581f729500541c86e59a8ac',
     configureFlags: ['--without-icu', '--without-readline'],
     contrib: ['pg_trgm'],
   },

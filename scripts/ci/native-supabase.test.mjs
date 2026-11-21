@@ -168,7 +168,7 @@ test('cache keys follow every pinned input and name the install paths', () => {
   )
   assert.match(
     outputs['postgres-key'],
-    /^native-supabase-darwin25-x64-postgres-17\.6-[a-f0-9]{16}$/
+    /^native-supabase-darwin25-x64-postgres-17\.12-[a-f0-9]{16}$/
   )
   assert.match(
     outputs['redis-key'],
@@ -241,8 +241,8 @@ test('cache keys follow every pinned input and name the install paths', () => {
 })
 
 test('the pinned versions are the ones the lane is decided on', () => {
-  assert.equal(PINS.postgres.version, '17.6')
-  assert.ok(PINS.postgres.url.startsWith('https://ftp.postgresql.org/pub/source/v17.6/'))
+  assert.equal(PINS.postgres.version, '17.12')
+  assert.ok(PINS.postgres.url.startsWith('https://ftp.postgresql.org/pub/source/v17.12/'))
   assert.deepEqual(PINS.postgres.contrib, ['pg_trgm'])
   assert.match(PINS.redis.version, /^7\.\d+\.\d+$/)
   assert.equal(PINS.gotrue.tag, 'v2.183.0')

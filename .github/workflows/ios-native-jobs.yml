@@ -50,6 +50,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NATIVE_SUPABASE_NODE_VERSION: '22.23.5'
+
 jobs:
   ios-build:
     runs-on: macos-26
@@ -126,7 +129,7 @@ jobs:
       - name: Provision Node 22 for the native storage-api
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NATIVE_SUPABASE_NODE_VERSION }}
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       # A local action is the dispatched commit's own code, and the shared install saves caches.
@@ -424,7 +427,7 @@ jobs:
         name: Provision Node 22 for the native storage-api
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NATIVE_SUPABASE_NODE_VERSION }}
       - &node22_record
         name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
@@ -724,7 +727,7 @@ jobs:
       - name: Provision Node 22 for the native storage-api
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: ${{ env.NATIVE_SUPABASE_NODE_VERSION }}
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
       # A local action is the dispatched commit's own code, and the shared install saves caches.
