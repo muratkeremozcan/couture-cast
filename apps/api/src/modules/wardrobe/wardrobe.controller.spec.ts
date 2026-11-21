@@ -308,7 +308,9 @@ describe('WardrobeController', () => {
     it('rejects a garment id that exceeds the contract length bound', async () => {
       await expect(
         controller.suggestGarmentTags(mockAuth, 'g'.repeat(129))
-      ).rejects.toThrow(/Invalid garment id: garmentId/)
+      ).rejects.toThrow(
+        'Invalid garment id: garmentId: String must contain at most 128 character(s)'
+      )
       expect(mockSuggestGarmentTags).not.toHaveBeenCalled()
     })
 

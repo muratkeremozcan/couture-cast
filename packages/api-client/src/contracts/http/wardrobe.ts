@@ -197,7 +197,9 @@ export const garmentListResponseSchema = z
 
 export const garmentIdPathParamsSchema = z
   .object({
-    garmentId: nonEmptyStringSchema.max(128).describe('Unique garment item ID.'),
+    garmentId: nonEmptyStringSchema
+      .max(128, { error: 'String must contain at most 128 character(s)' })
+      .describe('Unique garment item ID.'),
   })
   .strict()
 
