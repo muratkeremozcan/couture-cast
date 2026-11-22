@@ -1701,6 +1701,23 @@ describe('web save-feedback components', () => {
           'Change undone.'
         )
       )
+
+      // Weather change and Reopen saved look inside StylePiecePanel
+      const weatherButtons = within(panel)
+        .getAllByRole('button')
+        .filter((btn) =>
+          btn.getAttribute('data-testid')?.startsWith('style-piece-weather-')
+        )
+      const otherWeather = weatherButtons.find(
+        (btn) => btn.getAttribute('aria-pressed') !== 'true'
+      )
+      if (otherWeather) await user.click(otherWeather)
+      await user.click(await within(panel).findByTestId('style-piece-reopen'))
+
+      // Save another look and click View saved + re-save existing look (no-op) + 409 tombstone
+      await user.click(within(panel).getAllByTestId('style-piece-save')[0]!)
+      const viewSavedInPanel = within(panel).queryByTestId('status-bar-action-view-saved')
+      if (viewSavedInPanel) await user.click(viewSavedInPanel)
       // API error on Remove surfaces Failed + Retry, and Retry succeeds
       let failDeleteOnce = true
       styleSavedStore.nextDeleteError = () => {

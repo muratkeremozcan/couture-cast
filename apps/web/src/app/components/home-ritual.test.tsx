@@ -484,7 +484,27 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
       return HttpResponse.json({ message: 'Restore error' }, { status: 503 })
     }
     const undoDeleteSample = await screen.findByTestId('status-bar-action-undo')
+    // First click Undo while offline -> shows offline notice without calling /restore.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
     await user.click(undoDeleteSample)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+
+    // Re-save and Remove again so Undo is back, then test 503 restore failure.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    const removeAgainBtns = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button',
+      { name: /^Remove / }
+    )
+    await user.click(removeAgainBtns[0]!)
+    await waitFor(() => expect(store.items).toHaveLength(0))
+    const undoDeleteSample2 = await screen.findByTestId('status-bar-action-undo')
+    await user.click(undoDeleteSample2)
     await waitFor(() =>
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
         'Could not save. Try again.'
