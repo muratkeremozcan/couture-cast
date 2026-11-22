@@ -92,7 +92,7 @@ vi.mock('expo-crypto', () => ({
   digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
 }))
-// Retain the real RNW Image and record native onError, which DOM errors cannot reach.
+// Retain the real RNW Image and record its native source and error callback.
 vi.mock('react-native', async (importOriginal) => {
   const { imageEvents, refreshEvents } = await import(
     '../test-utils/community-screen/mock-state.js'
@@ -102,8 +102,19 @@ vi.mock('react-native', async (importOriginal) => {
     '../test-utils/edge-to-edge-modal'
   )
   function RecordingImage(props: Record<string, unknown>) {
-    if (typeof props.testID === 'string' && typeof props.onError === 'function') {
-      imageEvents.errors.set(props.testID, props.onError as () => void)
+    if (typeof props.testID === 'string') {
+      if (typeof props.onError === 'function') {
+        imageEvents.errors.set(props.testID, props.onError as () => void)
+      }
+      const source = props.source
+      if (
+        source &&
+        typeof source === 'object' &&
+        'uri' in source &&
+        typeof source.uri === 'string'
+      ) {
+        imageEvents.sources.set(props.testID, source.uri)
+      }
     }
     return imageEvents.createElement(actual.Image as never, props)
   }
@@ -184,6 +195,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     setMockParams({})
     screenFocus.reset()
     imageEvents.errors.clear()
+    imageEvents.sources.clear()
     refreshEvents.onRefresh = undefined
     resetFeedUrls()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')

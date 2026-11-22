@@ -5,6 +5,7 @@ import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
   COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   editCommunityPostTextResponseSchema,
 } from '@couture/api-client/contracts/http'
@@ -17,6 +18,7 @@ import { GuardianConsentStateService } from '../src/modules/auth/guardian-consen
 import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
+import * as postTextScreening from '../src/modules/community/community-post-text.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
@@ -211,12 +213,39 @@ it('persists title-only, caption-only, and combined edits over HTTP and keeps re
   }
 })
 
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  const promise = new Promise<T>((res) => {
-    resolve = res
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
   })
   return { promise, resolve }
+}
+
+function pauseScreening() {
+  const started = deferred()
+  const released = deferred()
+  return {
+    screen: async ({
+      locale,
+      textFingerprint,
+    }: {
+      locale: string | null
+      textFingerprint: string
+    }) => {
+      started.resolve()
+      await released.promise
+      return { passed: true, policyVersion: 'fixture-v1', locale, textFingerprint }
+    },
+    waitForStart(edit: Promise<unknown>) {
+      return Promise.race([
+        started.promise,
+        edit.then(() => {
+          throw new Error('Edit settled before screening started')
+        }),
+      ])
+    },
+    release: released.resolve,
+  }
 }
 
 it('rechecks guardian consent inside the lock when consent is revoked during pre-transaction screening', async () => {
@@ -235,16 +264,7 @@ it('rechecks guardian consent inside the lock when consent is revoked during pre
     invalidateUserSessions: vi.fn().mockResolvedValue(undefined),
   } as never)
 
-  const screeningStarted = deferred<{
-    locale: string | null
-    textFingerprint: string
-  }>()
-  const releaseScreening = deferred<{
-    passed: boolean
-    policyVersion: string
-    locale: string | null
-    textFingerprint: string
-  }>()
+  const screening = pauseScreening()
 
   const editPromise = repository.editPublishedPostText({
     userId: teen.userId,
@@ -253,29 +273,21 @@ it('rechecks guardian consent inside the lock when consent is revoked during pre
     title: 'Screen-raced title',
     caption: 'Screen-raced caption',
     expectedPolicyVersion: 'fixture-v1',
-    screen: ({ locale, textFingerprint }) => {
-      screeningStarted.resolve({ locale, textFingerprint })
-      return releaseScreening.promise
-    },
+    screen: screening.screen,
   })
 
-  const screenCtx = await screeningStarted.promise
-  // Revocation acquires `community_member:<userId>`. Succeeding while screening is
-  // suspended proves screening does not hold the privacy/member lock.
-  await expect(
-    guardianService.revokeConsent(guardian.userId, teen.userId)
-  ).resolves.toMatchObject({
-    remainingActiveGuardians: 0,
-  })
-  releaseScreening.resolve({
-    passed: true,
-    policyVersion: 'fixture-v1',
-    ...screenCtx,
-  })
-
-  await expect(editPromise).rejects.toMatchObject({
-    status: 403,
-  })
+  try {
+    await screening.waitForStart(editPromise)
+    // Revocation takes the same member lock while screening is still paused.
+    await expect(
+      guardianService.revokeConsent(guardian.userId, teen.userId)
+    ).resolves.toMatchObject({ remainingActiveGuardians: 0 })
+    screening.release()
+    await expect(editPromise).rejects.toMatchObject({ status: 403 })
+  } finally {
+    screening.release()
+    await Promise.allSettled([editPromise])
+  }
 
   const stored = await prisma.lookbookPost.findUniqueOrThrow({
     where: { id: teen.postId },
@@ -286,16 +298,7 @@ it('rechecks guardian consent inside the lock when consent is revoked during pre
 
 it('rechecks active sanctions inside the lock when a member is banned during pre-transaction screening', async () => {
   const member = await fixture()
-  const screeningStarted = deferred<{
-    locale: string | null
-    textFingerprint: string
-  }>()
-  const releaseScreening = deferred<{
-    passed: boolean
-    policyVersion: string
-    locale: string | null
-    textFingerprint: string
-  }>()
+  const screening = pauseScreening()
 
   const editPromise = repository.editPublishedPostText({
     userId: member.userId,
@@ -304,35 +307,26 @@ it('rechecks active sanctions inside the lock when a member is banned during pre
     title: 'Sanction-raced title',
     caption: null,
     expectedPolicyVersion: 'fixture-v1',
-    screen: ({ locale, textFingerprint }) => {
-      screeningStarted.resolve({ locale, textFingerprint })
-      return releaseScreening.promise
-    },
+    screen: screening.screen,
   })
 
-  const screenCtx = await screeningStarted.promise
-  const at = new Date()
-  const caseKey = `post.${member.postId}`
-  const decision = await seedDecision(prisma, {
-    caseKey,
-    at,
-    action: 'ban',
-  })
-  const sanction = await prisma.communitySanction.create({
-    data: {
-      user_id: member.userId,
-      decision_id: decision.id,
-      case_key: caseKey,
-      kind: 'permanent',
-      created_at: at,
-    },
-  })
+  let sanctionId: string | undefined
   try {
-    releaseScreening.resolve({
-      passed: true,
-      policyVersion: 'fixture-v1',
-      ...screenCtx,
+    await screening.waitForStart(editPromise)
+    const at = new Date()
+    const caseKey = `post.${member.postId}`
+    const decision = await seedDecision(prisma, { caseKey, at, action: 'ban' })
+    const sanction = await prisma.communitySanction.create({
+      data: {
+        user_id: member.userId,
+        decision_id: decision.id,
+        case_key: caseKey,
+        kind: 'permanent',
+        created_at: at,
+      },
     })
+    sanctionId = sanction.id
+    screening.release()
 
     await expect(editPromise).rejects.toMatchObject({
       status: 403,
@@ -344,22 +338,16 @@ it('rechecks active sanctions inside the lock when a member is banned during pre
     })
     expect(stored).toEqual({ title: null, text_revision: 0 })
   } finally {
-    await prisma.communitySanction.deleteMany({ where: { id: sanction.id } })
+    screening.release()
+    await Promise.allSettled([editPromise])
+    if (sanctionId)
+      await prisma.communitySanction.deleteMany({ where: { id: sanctionId } })
   }
 })
 
 it('rejects a stale edit with 409 when a competing edit commits while screening is in flight', async () => {
   const member = await fixture()
-  const screeningStarted = deferred<{
-    locale: string | null
-    textFingerprint: string
-  }>()
-  const releaseScreening = deferred<{
-    passed: boolean
-    policyVersion: string
-    locale: string | null
-    textFingerprint: string
-  }>()
+  const screening = pauseScreening()
 
   const slowEdit = repository.editPublishedPostText({
     userId: member.userId,
@@ -368,45 +356,43 @@ it('rejects a stale edit with 409 when a competing edit commits while screening 
     title: 'Slow edit title',
     caption: 'Slow edit caption',
     expectedPolicyVersion: 'fixture-v1',
-    screen: ({ locale, textFingerprint }) => {
-      screeningStarted.resolve({ locale, textFingerprint })
-      return releaseScreening.promise
-    },
+    screen: screening.screen,
   })
 
-  const screenCtx = await screeningStarted.promise
-  // Competing edit acquires `LookbookPost FOR UPDATE` while slowEdit is still screening.
-  await expect(
-    repository.editPublishedPostText({
-      userId: member.userId,
-      postId: member.postId,
-      baseRevision: 0,
+  try {
+    await screening.waitForStart(slowEdit)
+    // Competing edit acquires `LookbookPost FOR UPDATE` while slowEdit is still screening.
+    await expect(
+      repository.editPublishedPostText({
+        userId: member.userId,
+        postId: member.postId,
+        baseRevision: 0,
+        title: 'Fast winning title',
+        caption: 'Fast winning caption',
+        expectedPolicyVersion: 'fixture-v1',
+        screen: ({ locale, textFingerprint }) =>
+          Promise.resolve({
+            passed: true,
+            policyVersion: 'fixture-v1',
+            locale,
+            textFingerprint,
+          }),
+      })
+    ).resolves.toEqual({
       title: 'Fast winning title',
       caption: 'Fast winning caption',
-      expectedPolicyVersion: 'fixture-v1',
-      screen: ({ locale, textFingerprint }) =>
-        Promise.resolve({
-          passed: true,
-          policyVersion: 'fixture-v1',
-          locale,
-          textFingerprint,
-        }),
+      textRevision: 1,
     })
-  ).resolves.toEqual({
-    title: 'Fast winning title',
-    caption: 'Fast winning caption',
-    textRevision: 1,
-  })
 
-  releaseScreening.resolve({
-    passed: true,
-    policyVersion: 'fixture-v1',
-    ...screenCtx,
-  })
-  await expect(slowEdit).rejects.toMatchObject({
-    status: 409,
-    message: COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
-  })
+    screening.release()
+    await expect(slowEdit).rejects.toMatchObject({
+      status: 409,
+      message: COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
+    })
+  } finally {
+    screening.release()
+    await Promise.allSettled([slowEdit])
+  }
 
   const stored = await prisma.lookbookPost.findUniqueOrThrow({
     where: { id: member.postId },
@@ -448,11 +434,53 @@ it('treats legacy blank or whitespace stored captions as unchanged without scree
   expect(events).toHaveLength(0)
 })
 
+it('returns an unchanged revision over HTTP during a screening policy outage', async () => {
+  vi.stubEnv('TEST_ENV', 'local')
+  const member = await fixture()
+  const approved = { title: 'Approved look', caption: 'Approved caption' }
+  await prisma.lookbookPost.update({ where: { id: member.postId }, data: approved })
+  const policy = vi
+    .spyOn(postTextScreening, 'expectedPostTextPolicyVersion')
+    .mockRejectedValue(
+      new ServiceUnavailableException(COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE)
+    )
+  const { app, api } = await buildHttpHarness()
+  try {
+    const patch = () =>
+      api
+        .patch(`/api/v1/community/posts/${member.postId}/text`)
+        .set('Authorization', `Bearer test-token:guardian:${member.userId}`)
+    const unchanged = await patch()
+      .send({ baseRevision: 0, ...approved })
+      .expect(200)
+    expect(
+      editCommunityPostTextResponseSchema.parse(unchanged.body as unknown).data
+    ).toEqual({ ...approved, textRevision: 0 })
+    expect(policy).not.toHaveBeenCalled()
+
+    const unavailable = await patch()
+      .send({ baseRevision: 0, ...approved, title: 'Different look' })
+      .expect(503)
+    expect(unavailable.body).toMatchObject({
+      message: COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
+    })
+    expect(policy).toHaveBeenCalledTimes(1)
+    expect(
+      await prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: member.postId },
+        select: { title: true, caption: true, text_revision: true },
+      })
+    ).toEqual({ ...approved, text_revision: 0 })
+  } finally {
+    policy.mockRestore()
+    await app.close()
+  }
+})
+
 it('caps concurrent in-flight pre-lock screening work per member with 429', async () => {
   const member = await fixture()
-  const firstStarted = deferred<{ locale: string | null; textFingerprint: string }>()
-  const secondStarted = deferred<{ locale: string | null; textFingerprint: string }>()
-  const release = deferred<void>()
+  const firstScreening = pauseScreening()
+  const secondScreening = pauseScreening()
 
   const first = repository.editPublishedPostText({
     userId: member.userId,
@@ -461,11 +489,7 @@ it('caps concurrent in-flight pre-lock screening work per member with 429', asyn
     title: 'Concurrent one',
     caption: null,
     expectedPolicyVersion: 'fixture-v1',
-    screen: async ({ locale, textFingerprint }) => {
-      firstStarted.resolve({ locale, textFingerprint })
-      await release.promise
-      return { passed: true, policyVersion: 'fixture-v1', locale, textFingerprint }
-    },
+    screen: firstScreening.screen,
   })
   const second = repository.editPublishedPostText({
     userId: member.userId,
@@ -474,32 +498,43 @@ it('caps concurrent in-flight pre-lock screening work per member with 429', asyn
     title: 'Concurrent two',
     caption: null,
     expectedPolicyVersion: 'fixture-v1',
-    screen: async ({ locale, textFingerprint }) => {
-      secondStarted.resolve({ locale, textFingerprint })
-      await release.promise
-      return { passed: true, policyVersion: 'fixture-v1', locale, textFingerprint }
-    },
+    screen: secondScreening.screen,
   })
 
-  await Promise.all([firstStarted.promise, secondStarted.promise])
-  const thirdScreen = vi.fn()
-  await expect(
-    repository.editPublishedPostText({
-      userId: member.userId,
-      postId: member.postId,
-      baseRevision: 0,
-      title: 'Concurrent three',
-      caption: null,
-      expectedPolicyVersion: 'fixture-v1',
-      screen: thirdScreen,
+  const settled = Promise.allSettled([first, second])
+  try {
+    await Promise.all([
+      firstScreening.waitForStart(first),
+      secondScreening.waitForStart(second),
+    ])
+    const thirdScreen = vi.fn()
+    await expect(
+      repository.editPublishedPostText({
+        userId: member.userId,
+        postId: member.postId,
+        baseRevision: 0,
+        title: 'Concurrent three',
+        caption: null,
+        expectedPolicyVersion: 'fixture-v1',
+        screen: thirdScreen,
+      })
+    ).rejects.toMatchObject({
+      status: 429,
+      message: COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
     })
-  ).rejects.toMatchObject({ status: 429 })
-  expect(thirdScreen).not.toHaveBeenCalled()
-
-  release.resolve()
-  const outcomes = await Promise.allSettled([first, second])
-  expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1)
-  expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1)
+    expect(thirdScreen).not.toHaveBeenCalled()
+  } finally {
+    firstScreening.release()
+    secondScreening.release()
+    await settled
+  }
+  const outcomes = await settled
+  expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toMatchObject([
+    { value: { textRevision: 1 } },
+  ])
+  expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toMatchObject([
+    { reason: { status: 409, message: COMMUNITY_POST_TEXT_CONFLICT_MESSAGE } },
+  ])
 })
 
 it('refuses commits when screening is unavailable or missing/mismatched binding metadata', async () => {

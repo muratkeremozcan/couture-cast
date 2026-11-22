@@ -562,7 +562,6 @@ export function CommunityScreen() {
     const intent = notificationIntentRef.current
     let detailGeneration = ++detailGenerationRef.current
     const readTicket = reactionState.beginRead()
-    const textStamp = postTextLedger.begin()
     let active = true
     const controller = new AbortController()
     const operationTimer = setTimeout(() => controller.abort(), 10_000)
@@ -597,8 +596,9 @@ export function CommunityScreen() {
       const remaining = deadline - performance.now()
       if (remaining < MINIMUM_TARGET_ATTEMPT_MS) throw new CommunityRequestSuperseded()
       const timeout = Math.min(2000, Math.floor(remaining))
-      return payload.commentId
-        ? withRequestDeadline(timeout, [controller.signal], (signal) =>
+      const textStamp = postTextLedger.begin()
+      const target = payload.commentId
+        ? await withRequestDeadline(timeout, [controller.signal], (signal) =>
             communitySyncFromMobile(token).resolve(
               {
                 targets: [
@@ -613,7 +613,7 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : readTargetPost(timeout, token).then((post) => ({
+        : await readTargetPost(timeout, token).then((post) => ({
             status: 'available' as const,
             post,
             comment: null,
@@ -621,19 +621,20 @@ export function CommunityScreen() {
             pageCursor: null,
             parentPageCursor: null,
           }))
+      return { target, textStamp }
     }
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const targetRequest = async () => {
       do {
         detailGeneration = detailGenerationRef.current
         try {
-          const target = await requestTarget()
+          const attempt = await requestTarget()
           if (
             !active ||
             intent !== notificationIntentRef.current ||
             detailGeneration === detailGenerationRef.current
           )
-            return target
+            return attempt
         } catch (error) {
           if (
             !notificationFailureIsRetryable(error) ||
@@ -680,7 +681,7 @@ export function CommunityScreen() {
       comments.evict(targetPostId)
     }
     void Promise.race([targetRequest(), aborted])
-      .then((target) => {
+      .then(({ target, textStamp }) => {
         if (!active || detailGeneration !== detailGenerationRef.current) return
         if (!target || target.status === 'unavailable') {
           if (target?.status === 'unavailable') forgetTarget()

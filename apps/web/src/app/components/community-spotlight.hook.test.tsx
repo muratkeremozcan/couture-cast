@@ -171,6 +171,35 @@ describe('6.6 spotlight single-post refresh', () => {
     expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a'])
   })
 
+  it('keeps a higher fetched text revision after a local text update during image refresh', async () => {
+    const first = { ...item('a', 1), title: 'Revision one', textRevision: 1 }
+    lib.getCommunitySpotlightFromWeb.mockResolvedValueOnce(page([first]))
+    const { result } = setup()
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+
+    const response = Promise.withResolvers<CommunitySpotlightItem>()
+    lib.getCommunityPostFromWeb.mockReturnValueOnce(response.promise)
+    const refresh = result.current.refreshItem('a')
+    act(() =>
+      result.current.apply(
+        (post) => post && { ...post, title: 'Revision two', textRevision: 2 }
+      )
+    )
+    expect(result.current.state.items[0]).toMatchObject({
+      title: 'Revision two',
+      textRevision: 2,
+    })
+
+    await act(async () => {
+      response.resolve({ ...first, title: 'Revision three', textRevision: 3 })
+      await refresh
+    })
+    expect(result.current.state.items[0]).toMatchObject({
+      title: 'Revision three',
+      textRevision: 3,
+    })
+  })
+
   /**
    * Starts a refresh of 'a' on a held read, resets, and reloads the same page,
    * so a late answer that slipped past the abort would visibly change `a`.

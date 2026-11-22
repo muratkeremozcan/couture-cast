@@ -6,6 +6,7 @@ import { beforeAll, beforeEach, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
   COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   type CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
@@ -155,6 +156,12 @@ it.each<[CommunityFailureReason, number, string, string]>([
     429,
     'You have reached the hourly post edit limit.',
     'You’ve reached the hourly post edit limit. Try again later.',
+  ],
+  [
+    'rate_limited',
+    429,
+    COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
+    'Text screening is temporarily unavailable. Your draft is still here—try again shortly.',
   ],
 ])(
   'maps %s (%i) to distinct message and retains attempted draft',

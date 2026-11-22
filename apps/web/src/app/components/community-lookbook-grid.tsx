@@ -3583,7 +3583,6 @@ export function CommunityLookbookGrid({
     const intent = notificationIntentRef.current
     let generation = detailGenerationRef.current
     const readTicket = reactionState.beginRead()
-    const textStamp = postTextLedger.begin()
     const controller = new AbortController()
     const deadline = performance.now() + 10_000
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -3596,6 +3595,7 @@ export function CommunityLookbookGrid({
         const remaining = deadline - performance.now()
         if (remaining < MINIMUM_TARGET_ATTEMPT_MS) break
         try {
+          const textStamp = postTextLedger.begin()
           const result = await communitySyncFromWeb().resolve(
             {
               targets: [
@@ -3617,7 +3617,7 @@ export function CommunityLookbookGrid({
             intent !== notificationIntentRef.current ||
             generation === detailGenerationRef.current
           )
-            return result
+            return { result, textStamp }
         } catch (error) {
           if (
             !notificationFailureIsRetryable(error) ||
@@ -3645,7 +3645,7 @@ export function CommunityLookbookGrid({
       controller.signal.addEventListener('abort', abortOperation, { once: true })
     })
     void Promise.race([resolveOwned(), aborted])
-      .then((result) => {
+      .then(({ result, textStamp }) => {
         if (!active || generation !== detailGenerationRef.current) return
         const target = result.targets[0]
         if (!target || target.status === 'unavailable') {

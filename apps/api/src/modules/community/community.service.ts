@@ -78,7 +78,6 @@ import {
   parseCommunityObjectPath,
 } from '@couture/utils'
 import {
-  expectedPostTextPolicyVersion,
   normalizePostText,
   postTextFingerprint,
   screenPostText,
@@ -1313,7 +1312,6 @@ export class CommunityService {
       baseRevision: input.baseRevision,
       title: normalized.title,
       caption: normalized.caption,
-      expectedPolicyVersion: await expectedPostTextPolicyVersion(),
       screen: ({ title, caption, locale }) => screenPostText(title, caption, locale),
     })
     if (!edited) throw new BadRequestException(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)
@@ -1463,11 +1461,16 @@ export class CommunityService {
     userId: string
   ): Promise<CommunityFeedItem> {
     const sameAltText = (post.alt_text ?? '') === altText
-    const caption = input.caption?.trim() ?? null
-    const title = input.title ?? null
+    const { title, caption, textFingerprint } = normalizePostText(
+      input.title,
+      input.caption
+    )
+    // Older posts could store a blank caption before empty captions became null.
     const sameText = post.original_text_fingerprint
-      ? post.original_text_fingerprint === postTextFingerprint(title, caption)
-      : (post.caption ?? null) === caption && (post.title ?? null) === title
+      ? post.original_text_fingerprint === textFingerprint ||
+        (caption === null &&
+          post.original_text_fingerprint === postTextFingerprint(title, ''))
+      : normalizePostText(post.title, post.caption).textFingerprint === textFingerprint
     const sameLocale = (post.locale ?? null) === input.locale
 
     if (!sameAltText || !sameText || !sameLocale) {

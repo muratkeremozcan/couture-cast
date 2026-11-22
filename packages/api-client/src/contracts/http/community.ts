@@ -391,6 +391,8 @@ export const COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE =
 export const COMMUNITY_POST_TEXT_CONFLICT_MESSAGE = 'Community post text has changed.'
 export const COMMUNITY_POST_TEXT_REJECTED_MESSAGE =
   'Community post text could not be approved.'
+export const COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE =
+  'Community text screening is busy. Try again shortly.'
 export const COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE =
   'Community text screening is temporarily unavailable.'
 
@@ -721,30 +723,19 @@ interface CommunityPostTextLedgerEntry {
   clock: number
 }
 
-function canFenceTextEntry(
-  entry: CommunityPostTextLedgerEntry,
-  result: CommunityPostTextSnapshot,
-  startClock: number
-): boolean {
-  if (entry.clock <= startClock) return false
-  if (result.textRevision === undefined || entry.textRevision === undefined) return true
-  return entry.textRevision >= result.textRevision
-}
-
 /**
  * Per-viewer post text reconciliation ledger shared across feed, Spotlight,
  * New Looks buffer, and deep-link reads. Keeps owner `textRevision` monotonic
- * across surfaces and fences non-author reads started before a newer realtime
- * text update without disclosing owner-only numeric revisions.
+ * across surfaces and orders non-author reads by when they started.
  */
 export class CommunityPostTextLedger {
   private readonly entries = new Map<string, CommunityPostTextLedgerEntry>()
   private clock = 0
   private clearedAt = 0
 
-  /** Captures the current clock when a read starts. */
+  /** Reserves an ordering stamp when a read starts. */
   begin(): number {
-    return this.clock
+    return ++this.clock
   }
 
   /** Records a confirmed local save or ordered realtime target update. */
@@ -757,18 +748,7 @@ export class CommunityPostTextLedger {
     const next = previous
       ? reconcileCommunityPostText(post, { id: post.id, ...previous })
       : post
-    const changed =
-      !previous ||
-      next.title !== previous.title ||
-      next.caption !== previous.caption ||
-      next.textRevision !== previous.textRevision
-    const clock = changed ? ++this.clock : previous.clock
-    this.entries.set(post.id, {
-      title: next.title,
-      caption: next.caption,
-      textRevision: next.textRevision,
-      clock,
-    })
+    this.remember(next, ++this.clock)
   }
 
   /** Reconciles an incoming read started at `startClock` against newer text. */
@@ -788,34 +768,26 @@ export class CommunityPostTextLedger {
     if (entry) {
       result = reconcileCommunityPostText(result, {
         id: incoming.id,
-        title: entry.title,
-        caption: entry.caption,
-        textRevision: entry.textRevision,
+        ...entry,
       })
-      if (canFenceTextEntry(entry, result, startClock)) {
+      if (entry.clock > startClock && entry.textRevision === result.textRevision) {
         return {
           ...result,
           title: entry.title,
           caption: entry.caption,
-          textRevision: entry.textRevision ?? result.textRevision,
         }
       }
     }
-    this.rememberRevision(result, entry)
+    this.remember(result, Math.max(startClock, entry?.clock ?? 0))
     return result
   }
 
-  private rememberRevision(
-    result: CommunityPostTextSnapshot,
-    entry: CommunityPostTextLedgerEntry | undefined
-  ): void {
-    if (result.textRevision === undefined) return
-    if (entry !== undefined && result.textRevision <= (entry.textRevision ?? -1)) return
+  private remember(result: CommunityPostTextSnapshot, clock: number): void {
     this.entries.set(result.id, {
       title: result.title,
       caption: result.caption,
       textRevision: result.textRevision,
-      clock: entry?.clock ?? 0,
+      clock,
     })
   }
 

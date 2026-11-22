@@ -1003,9 +1003,11 @@ export function registerCommunitySpotlightCases() {
 
     // Delayed image refresh carries stale text (without owner textRevision).
     releaseRefresh()
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 25))
-    })
+    await waitFor(() =>
+      expect(imageEvents.sources.get('community-card-image-spot-viewer')).toBe(
+        'https://fixtures.invalid/refreshed.jpg'
+      )
+    )
     expect(
       within(spotCard).getByTestId('community-card-title-spot-viewer')
     ).toHaveTextContent('Realtime viewer title')

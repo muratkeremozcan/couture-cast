@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
   COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   COMMUNITY_POST_TITLE_MAX_LENGTH,
   editCommunityPostTextInputSchema,
@@ -25,7 +26,11 @@ function editErrorKey(failure: unknown): string {
   if (!(failure instanceof CommunityRequestError)) return 'editFailed'
   const status = failure.httpStatus
   if (status === 409) return 'editConflict'
-  if (status === 429) return 'editRateLimited'
+  if (status === 429) {
+    return failure.message.includes(COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE)
+      ? 'editScreeningUnavailable'
+      : 'editRateLimited'
+  }
   if (status === 400 && failure.message.includes(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)) {
     return 'editRejected'
   }
@@ -73,6 +78,7 @@ export function CommunityPostTextEditor({
   const [error, setError] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<OutcomeFeedbackKey | null>(null)
   const request = useRef<AbortController | null>(null)
+  const feedbackId = useId()
   const feedbackSerial = useRef(0)
   const opener = useRef<HTMLButtonElement>(null)
   const field = useRef<HTMLInputElement>(null)
@@ -107,7 +113,7 @@ export function CommunityPostTextEditor({
     onStatus?.(`community.compose.${key}`)
     if (statusBar.hasProvider) {
       statusBar.showNotice({
-        id: `community-edit-${item.id}-${++feedbackSerial.current}`,
+        id: `community-edit-${feedbackId}-${++feedbackSerial.current}`,
         message: t(`community.compose.${key}`),
         tone: key === 'editSaved' ? 'success' : 'neutral',
       })

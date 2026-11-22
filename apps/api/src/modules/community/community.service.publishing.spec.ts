@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment -- assertions nest expect.objectContaining() and vi.fn() members, which is the established pattern for these suites. */
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { postTextFingerprint } from './community-post-text'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
 import { type CommunityService } from './community.service'
 import {
@@ -412,6 +413,52 @@ describe('CommunityService publishing and challenges', () => {
       expect(feedItem.id).toBe('post-draft-1')
       expect(publishWithinQuota).not.toHaveBeenCalled()
     })
+
+    it.each([null, ''])(
+      'replays a blank caption persisted as %j before and after editing',
+      async (storedCaption) => {
+        const { service, findPostById, publishWithinQuota } = createService()
+        const original = {
+          ...draftPost,
+          status: 'pending_review',
+          alt_text: validPublishInput.altText,
+          title: 'Original look',
+          caption: storedCaption,
+          locale: 'en-US',
+        }
+        const edited = {
+          ...original,
+          status: 'published',
+          published_at: SERVICE_REFERENCE_TIME,
+          title: 'Edited look',
+          caption: 'Edited caption',
+          text_revision: 1,
+          original_text_fingerprint: postTextFingerprint(
+            original.title,
+            original.caption
+          ),
+        }
+        const input = { ...validPublishInput, title: original.title, caption: '' }
+        findPostById
+          .mockResolvedValueOnce(original)
+          .mockResolvedValueOnce(edited)
+          .mockResolvedValueOnce(edited)
+
+        await expect(publish(service, input)).resolves.toMatchObject({
+          id: original.id,
+          title: original.title,
+        })
+        await expect(publish(service, input)).resolves.toMatchObject({
+          id: original.id,
+          title: edited.title,
+          textRevision: 1,
+        })
+        await expect(
+          publish(service, { ...input, caption: 'Another caption' })
+        ).rejects.toThrow(ConflictException)
+        expect(publishWithinQuota).not.toHaveBeenCalled()
+      }
+    )
 
     it('rejects a second publish that changes the payload', async () => {
       const { service, findPostById } = createService()

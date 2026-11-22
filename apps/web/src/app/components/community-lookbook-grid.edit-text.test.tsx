@@ -7,6 +7,7 @@ import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   type CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
@@ -158,18 +159,24 @@ describe('Community look text editing', () => {
   })
 
   it.each([
-    [400, 'We couldn’t save your changes. Check the text and try again.'],
+    [400, 'Edit refused', 'We couldn’t save your changes. Check the text and try again.'],
     [
       409,
+      'Edit refused',
       'The look changed while you were editing. Reopen it to edit the latest version.',
     ],
-    [429, 'You’ve reached the hourly post edit limit. Try again later.'],
+    [429, 'Edit refused', 'You’ve reached the hourly post edit limit. Try again later.'],
+    [
+      429,
+      COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
+      'Text screening is temporarily unavailable. Your draft is still here—try again shortly.',
+    ],
   ])(
     'preserves the editable draft and published copy when save returns %s',
-    async (status, message) => {
+    async (status, serverMessage, message) => {
       signIn()
       const user = userEvent.setup()
-      mockApi(http.patch(EDIT_PATH, () => errorBody(status, 'Edit refused', 'Error')))
+      mockApi(http.patch(EDIT_PATH, () => errorBody(status, serverMessage, 'Error')))
       const detail = await openDetail(user)
       await user.click(detail.getByRole('button', { name: EDIT }))
       const title = detail.getByRole('textbox', { name: 'Title (optional)' })
@@ -707,7 +714,7 @@ describe('Community look text editing', () => {
     )
 
     // Delayed image refresh returns stale text without textRevision.
-    await act(async () => {
+    act(() => {
       releaseRefresh.resolve(
         HttpResponse.json({
           data: {
@@ -719,8 +726,13 @@ describe('Community look text editing', () => {
           },
         })
       )
-      await releaseRefresh.promise
     })
+    await waitFor(() =>
+      expect(within(card).getByRole('img')).toHaveAttribute(
+        'src',
+        'https://fixtures.invalid/refreshed.jpg'
+      )
+    )
 
     expect(screen.getByTestId(`spotlight-title-${viewerPost.id}`)).toHaveTextContent(
       'Realtime non-author title'

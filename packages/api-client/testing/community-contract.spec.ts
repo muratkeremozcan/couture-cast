@@ -232,6 +232,44 @@ describe('community HTTP contracts', () => {
         status: 'published',
       })
     })
+
+    it.each([false, true])(
+      'keeps the newer revisionless read when it settles first: %s',
+      (newerArrivesFirst) => {
+        const ledger = new CommunityPostTextLedger()
+        const oldRead = ledger.begin()
+        const newRead = ledger.begin()
+        const older = { id: 'post', title: 'Old title', caption: 'Old caption' }
+        const newer = { id: 'post', title: 'New title', caption: 'New caption' }
+
+        if (newerArrivesFirst) {
+          expect(ledger.reconcile(newer, newRead)).toMatchObject(newer)
+          expect(ledger.reconcile(older, oldRead)).toMatchObject(newer)
+        } else {
+          expect(ledger.reconcile(older, oldRead)).toMatchObject(older)
+          expect(ledger.reconcile(newer, newRead)).toMatchObject(newer)
+        }
+      }
+    )
+
+    it('keeps numeric revisions authoritative and clears snapshots on visibility or viewer changes', () => {
+      const ledger = new CommunityPostTextLedger()
+      const post = { id: 'post', caption: null }
+      const inFlight = ledger.begin()
+      ledger.record({ ...post, title: 'Revision 2', textRevision: 2 })
+      const advanced = { ...post, title: 'Revision 3', textRevision: 3 }
+      expect(ledger.reconcile(advanced, inFlight)).toEqual(advanced)
+      expect(
+        ledger.reconcile({ ...post, title: 'Old title', textRevision: 1 }, ledger.begin())
+      ).toEqual(advanced)
+
+      ledger.record({ ...post, status: 'withdrawn' })
+      expect(ledger.reconcile(post, ledger.begin())).toEqual(post)
+      const previousViewer = ledger.begin()
+      ledger.clear()
+      ledger.record(advanced)
+      expect(ledger.reconcile(post, previousViewer)).toEqual(post)
+    })
   })
 
   describe('cursor serialization and decoding', () => {

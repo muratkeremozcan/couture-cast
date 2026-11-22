@@ -159,6 +159,7 @@ export function useCommunitySpotlight<Token = number>({
       const reconciled = reconcileCommunityPostText(incoming, existing)
       if (
         reconciled.status === 'published' &&
+        reconciled.textRevision === undefined &&
         (textFenceRef.current.get(incoming.id) ?? 0) > startClock
       ) {
         return {

@@ -62,6 +62,7 @@ import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE,
   COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   encodeCommunityFeedCursor,
   type CommunityFeedCursorPayload,
@@ -844,7 +845,7 @@ export class CommunityRepository {
   ): Promise<T> {
     const active = this.inFlightTextScreens.get(userId) ?? 0
     if (active >= MAX_IN_FLIGHT_TEXT_SCREENS_PER_MEMBER) {
-      throw new CommunityRateLimitException(COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE, 60)
+      throw new CommunityRateLimitException(COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE, 1)
     }
     this.inFlightTextScreens.set(userId, active + 1)
     try {
@@ -861,16 +862,18 @@ export class CommunityRepository {
     postId: string
     baseRevision: number
     normalized: ReturnType<typeof normalizePostText>
-    expectedPolicyVersion: string
+    expectedPolicyVersion?: string
     screen: (context: {
       title: string | null
       caption: string | null
       locale: string | null
       textFingerprint: string
     }) => Promise<ScreenedPostTextDecision>
-  }): Promise<ScreenedPostTextDecision | null> {
-    const { userId, postId, baseRevision, normalized, expectedPolicyVersion, screen } =
-      params
+  }): Promise<{
+    decision: ScreenedPostTextDecision
+    expectedPolicyVersion: string
+  } | null> {
+    const { userId, postId, baseRevision, normalized, screen } = params
     await assertCommunityDatabaseAccess(this.prisma, userId)
     const preview = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
     if (!preview || preview.user_id !== userId || !isPubliclyVisiblePost(preview))
@@ -881,27 +884,29 @@ export class CommunityRepository {
     if (stored.title === normalized.title && stored.caption === normalized.caption)
       return null
     await assertPostTextEditBudget(this.prisma, userId)
-    const raw = await this.withInFlightTextScreen(userId, () =>
-      screen({
+    return this.withInFlightTextScreen(userId, async () => {
+      const expectedPolicyVersion =
+        params.expectedPolicyVersion ?? (await expectedPostTextPolicyVersion())
+      const decision = await screen({
         title: normalized.title,
         caption: normalized.caption,
         locale: preview.locale,
         textFingerprint: normalized.textFingerprint,
       })
-    )
-    if (
-      !matchesBoundScreeningDecision(
-        raw,
-        expectedPolicyVersion,
-        normalized.textFingerprint,
-        preview.locale
-      )
-    ) {
-      throw new ServiceUnavailableException(
-        COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE
-      )
-    }
-    return raw
+      if (
+        !matchesBoundScreeningDecision(
+          decision,
+          expectedPolicyVersion,
+          normalized.textFingerprint,
+          preview.locale
+        )
+      ) {
+        throw new ServiceUnavailableException(
+          COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE
+        )
+      }
+      return { decision, expectedPolicyVersion }
+    })
   }
 
   async editPublishedPostText(params: {
@@ -920,8 +925,6 @@ export class CommunityRepository {
   }) {
     const { userId, postId, baseRevision, title, caption, screen } = params
     const normalized = normalizePostText(title, caption)
-    const expectedPolicyVersion =
-      params.expectedPolicyVersion ?? (await expectedPostTextPolicyVersion())
     // Screen before acquiring privacy/row locks so screening never holds locks or
     // consumes the 7-second privacy transaction budget. Every invariant is rechecked
     // under the locks below before committing.
@@ -930,7 +933,7 @@ export class CommunityRepository {
       postId,
       baseRevision,
       normalized,
-      expectedPolicyVersion,
+      expectedPolicyVersion: params.expectedPolicyVersion,
       screen,
     })
 
@@ -958,17 +961,20 @@ export class CommunityRepository {
       await assertPostTextEditBudget(tx, userId)
       if (
         !screening ||
-        screening.policyVersion !== expectedPolicyVersion ||
-        screening.textFingerprint !== normalized.textFingerprint ||
-        screening.locale !== post.locale
+        !matchesBoundScreeningDecision(
+          screening.decision,
+          screening.expectedPolicyVersion,
+          normalized.textFingerprint,
+          post.locale
+        )
       )
         throw new ConflictException(COMMUNITY_POST_TEXT_CONFLICT_MESSAGE)
-      if (!screening.passed) {
+      if (!screening.decision.passed) {
         await tx.moderationEvent.create({
           data: {
             post_id: postId,
             action: 'post_text_withheld',
-            reason: screening.policyVersion,
+            reason: screening.decision.policyVersion,
           },
         })
         return null
@@ -990,7 +996,7 @@ export class CommunityRepository {
         data: {
           post_id: postId,
           action: 'post_text_approved',
-          reason: screening.policyVersion,
+          reason: screening.decision.policyVersion,
           image_object_path: post.image_object_path,
           content_snapshot: buildCommunityContentSnapshot(
             { ...post, title: normalized.title, caption: normalized.caption },
@@ -1527,12 +1533,11 @@ function matchesBoundScreeningDecision(
   expectedLocale: string | null
 ): decision is ScreenedPostTextDecision {
   return (
-    Boolean(decision) &&
-    typeof decision!.policyVersion === 'string' &&
-    decision!.policyVersion === expectedPolicyVersion &&
-    typeof decision!.textFingerprint === 'string' &&
-    decision!.textFingerprint === expectedFingerprint &&
-    decision!.locale === expectedLocale
+    decision != null &&
+    typeof decision.passed === 'boolean' &&
+    decision.policyVersion === expectedPolicyVersion &&
+    decision.textFingerprint === expectedFingerprint &&
+    decision.locale === expectedLocale
   )
 }
 
