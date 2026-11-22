@@ -287,7 +287,10 @@ export const savedLookNotFoundErrorSchema = z
 export const savedLookConflictErrorSchema = z
   .object({
     statusCode: z.literal(409),
-    message: z.literal('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'),
+    message: z.enum([
+      'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+      'SAVED_LOOK_ALREADY_REMOVED',
+    ]),
     error: z.literal('Conflict'),
   })
   .strict()
@@ -366,6 +369,29 @@ export function registerSavedLooksContracts(
     savedLookPreconditionRequiredErrorSchema
   )
 
+  const privateNoStoreHeader = z
+    .object({
+      'Cache-Control': z.string().openapi({
+        description: 'Always private, no-store on all responses.',
+        example: 'private, no-store',
+      }),
+    })
+    .openapi({ description: 'Private no-store response header.' })
+
+  const resourceHeaders = z
+    .object({
+      'Cache-Control': z.string().openapi({
+        description: 'Always private, no-store on all responses.',
+        example: 'private, no-store',
+      }),
+      ETag: z.string().openapi({
+        description:
+          'Strong resource revision tag ("saved-look:<id>:<revision>") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.',
+        example: '"saved-look:sl-1:0"',
+      }),
+    })
+    .openapi({ description: 'Saved look response headers.' })
+
   registry.registerPath({
     method: 'get',
     path: '/api/v1/wardrobe/saved-looks',
@@ -378,6 +404,7 @@ export function registerSavedLooksContracts(
     responses: {
       200: {
         description: 'List of account-backed saved looks.',
+        headers: privateNoStoreHeader,
         content: {
           'application/json': {
             schema: registeredSavedLookListResponse,
@@ -419,7 +446,14 @@ export function registerSavedLooksContracts(
     security: [{ bearerAuth: [] }],
     request: {
       headers: z.object({
-        'idempotency-key': z.string().uuid().optional(),
+        'idempotency-key': z
+          .string()
+          .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+          .optional()
+          .openapi({
+            description:
+              'UUID v4 idempotency key scoped per account. Replays matching payloads with 200 and rejects mismatched payloads or already-removed rows with 409.',
+          }),
       }),
       body: {
         required: true,
@@ -433,6 +467,7 @@ export function registerSavedLooksContracts(
     responses: {
       201: {
         description: 'Saved look created.',
+        headers: resourceHeaders,
         content: {
           'application/json': {
             schema: registeredSavedLookResponse,
@@ -441,6 +476,7 @@ export function registerSavedLooksContracts(
       },
       200: {
         description: 'Idempotent replay of an existing saved look.',
+        headers: resourceHeaders,
         content: {
           'application/json': {
             schema: registeredSavedLookResponse,
@@ -480,7 +516,8 @@ export function registerSavedLooksContracts(
         },
       },
       409: {
-        description: 'Idempotency-Key reused with a different payload.',
+        description:
+          'Idempotency-Key reused with a different payload or for an already-removed saved look.',
         content: {
           'application/json': {
             schema: registeredConflictError,
@@ -502,6 +539,62 @@ export function registerSavedLooksContracts(
     responses: {
       200: {
         description: 'Saved look details.',
+        headers: resourceHeaders,
+        content: {
+          'application/json': {
+            schema: registeredSavedLookResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid savedLookId path parameter.',
+        content: {
+          'application/json': {
+            schema: registeredBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.unauthorizedHttpErrorSchema,
+          },
+        },
+      },
+      403: {
+        description: 'Account access restricted.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+      404: {
+        description: 'Saved look not found for this account.',
+        content: {
+          'application/json': {
+            schema: registeredNotFoundError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/wardrobe/saved-looks/{savedLookId}/restore',
+    tags: ['wardrobe'],
+    summary:
+      'Restore a recently removed saved look belonging to the authenticated account',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: savedLookIdPathParamsSchema,
+    },
+    responses: {
+      200: {
+        description: 'Saved look restored (idempotent if already active).',
+        headers: resourceHeaders,
         content: {
           'application/json': {
             schema: registeredSavedLookResponse,
@@ -552,12 +645,16 @@ export function registerSavedLooksContracts(
     request: {
       params: savedLookIdPathParamsSchema,
       headers: z.object({
-        'if-match': z.string(),
+        'if-match': z.string().openapi({
+          description:
+            'Required strong ETag ("saved-look:<id>:<revision>"), comma-separated list of strong ETags, or *.',
+        }),
       }),
     },
     responses: {
       204: {
         description: 'Saved look removed.',
+        headers: privateNoStoreHeader,
       },
       400: {
         description: 'Invalid savedLookId path parameter.',

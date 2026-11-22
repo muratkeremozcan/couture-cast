@@ -1,5 +1,7 @@
 // Learning path Step 59: Shared save, undo and status feedback.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-59-shared-save-undo-and-status-feedback
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
@@ -1368,20 +1370,32 @@ describe('web save-feedback components', () => {
       )
       await user.click(screen.getByTestId('status-bar-action-view'))
 
-      // Save again and Undo Save cleanly
+      // Re-saving an already-saved look is a non-destructive no-op (no Undo action)
+      await user.click(saveBtn)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Saved to your looks.'
+        )
+      )
+      expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
+      expect(store.items).toHaveLength(1)
+
+      // Switch to a different look, Save it, and Undo Save cleanly
+      await user.click(tryAnother)
       await user.click(saveBtn)
       await waitFor(() =>
         expect(screen.getByTestId('status-bar-action-undo')).toBeInTheDocument()
       )
+      expect(store.items).toHaveLength(2)
       await user.click(screen.getByTestId('status-bar-action-undo'))
       await waitFor(() =>
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
           'Change undone.'
         )
       )
+      expect(store.items).toHaveLength(1)
 
-      // Save so we have a saved item, then Remove -> Undo Remove succeeds
-      await user.click(saveBtn)
+      // Remove the saved item -> Undo Remove restores it cleanly
       const savedRegion = await screen.findByTestId('sample-saved-looks')
       const removeBtn = within(savedRegion).getAllByRole('button', {
         name: /^Remove /,
@@ -1419,11 +1433,11 @@ describe('web save-feedback components', () => {
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
       )
 
-      // Failed Undo POST leaves store empty cleanly
-      let failPostOnce = true
-      store.nextPostError = () => {
-        if (!failPostOnce) return null
-        failPostOnce = false
+      // Failed Undo restore leaves store empty cleanly
+      let failRestoreOnce = true
+      store.nextRestoreError = () => {
+        if (!failRestoreOnce) return null
+        failRestoreOnce = false
         return HttpResponse.json({ message: 'Server error' }, { status: 503 })
       }
       await user.click(screen.getByTestId('status-bar-action-undo'))
@@ -1562,7 +1576,7 @@ describe('web save-feedback components', () => {
         }
       }
 
-      // Save look -> click View -> Save look again -> click Undo Save
+      // Save look -> click View -> Save unchanged look again -> NO destructive Undo & original row remains intact
       const firstSave = within(panel).getAllByTestId('style-piece-save')[0]!
       await user.click(firstSave)
       await waitFor(() =>
@@ -1570,8 +1584,24 @@ describe('web save-feedback components', () => {
           'Saved to your looks.'
         )
       )
+      expect(within(panel).getByTestId('status-bar-action-undo')).toBeInTheDocument()
       await user.click(within(panel).getByTestId('status-bar-action-view'))
 
+      // Clicking Save again on an already-saved identical look does not offer Undo or duplicate the row.
+      await user.click(firstSave)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Saved to your looks.'
+        )
+      )
+      expect(
+        within(panel).queryByTestId('status-bar-action-undo')
+      ).not.toBeInTheDocument()
+      expect(styleSavedStore.items).toHaveLength(1)
+
+      // Remove -> fresh Save -> Undo Save works cleanly on a newly created row
+      await user.click(await within(panel).findByTestId('style-piece-remove'))
+      await waitFor(() => expect(styleSavedStore.items).toHaveLength(0))
       await user.click(firstSave)
       await waitFor(() =>
         expect(within(panel).getByTestId('status-bar-action-undo')).toBeInTheDocument()
@@ -1582,6 +1612,7 @@ describe('web save-feedback components', () => {
           'Change undone.'
         )
       )
+      expect(styleSavedStore.items).toHaveLength(0)
 
       // Save again so we have a saved item for Remove flows
       await user.click(firstSave)

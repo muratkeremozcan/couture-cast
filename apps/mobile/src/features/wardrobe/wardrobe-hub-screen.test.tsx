@@ -1,5 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'

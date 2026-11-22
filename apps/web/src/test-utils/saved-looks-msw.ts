@@ -7,12 +7,16 @@ import {
 
 export type SavedLooksMswStore = {
   items: SavedLookContract[]
+  deletedItems: Map<string, SavedLookContract>
   idempotencyKeys: Map<string, SavedLookContract>
   nextPostError?: () => Response | null
   nextDeleteError?: () => Response | null
+  nextRestoreError?: () => Response | null
   nextGetError?: () => Response | null
+  onGet?: (request: Request) => void | Promise<void>
   onPost?: (request: Request) => void | Promise<void>
   onDelete?: (request: Request, id: string) => void | Promise<void>
+  onRestore?: (request: Request, id: string) => void | Promise<void>
 }
 
 export function createSavedLooksMswHandlers(
@@ -22,6 +26,7 @@ export function createSavedLooksMswHandlers(
   let seq = 1
   const store: SavedLooksMswStore = {
     items: [...initial],
+    deletedItems: new Map(),
     idempotencyKeys: new Map(),
   }
 
@@ -32,25 +37,51 @@ export function createSavedLooksMswHandlers(
       .trim() || 'anonymous'
 
   const handlers = [
-    http.get(basePattern, ({ request }) => {
+    http.get(basePattern, async ({ request }) => {
+      if (store.onGet) await store.onGet(request)
       const errorRes = store.nextGetError?.()
       if (errorRes) return errorRes
       const owner = ownerFromRequest(request)
       const url = new URL(request.url)
       const source = url.searchParams.get('source')
       const anchorGarmentId = url.searchParams.get('anchorGarmentId')
+      const limit = Number(url.searchParams.get('limit') ?? '50')
+      const offset = Number(url.searchParams.get('offset') ?? '0')
       const filtered = store.items.filter(
         (item) =>
           item.ownerUserId === owner &&
           (!source || item.source === source) &&
           (!anchorGarmentId || item.anchorGarmentId === anchorGarmentId)
       )
+      const page = filtered.slice(offset, offset + limit)
       return HttpResponse.json({
-        data: filtered,
+        data: page,
         total: filtered.length,
-        limit: 50,
-        offset: 0,
+        limit,
+        offset,
       })
+    }),
+    http.get(`${basePattern}/:savedLookId`, ({ request, params }) => {
+      const errorRes = store.nextGetError?.()
+      if (errorRes) return errorRes
+      const id = String(params.savedLookId)
+      const owner = ownerFromRequest(request)
+      const found = store.items.find(
+        (item) => item.id === id && item.ownerUserId === owner
+      )
+      if (!found) {
+        return HttpResponse.json(
+          { statusCode: 404, message: 'SAVED_LOOK_NOT_FOUND', error: 'Not Found' },
+          { status: 404 }
+        )
+      }
+      return HttpResponse.json(
+        { data: found },
+        {
+          status: 200,
+          headers: { ETag: `"saved-look:${found.id}:${found.revision}"` },
+        }
+      )
     }),
     http.post(basePattern, async ({ request }) => {
       if (store.onPost) await store.onPost(request)
@@ -61,6 +92,16 @@ export function createSavedLooksMswHandlers(
       const scopedKey = idemKey ? `${owner}:${idemKey}` : null
       if (scopedKey && store.idempotencyKeys.has(scopedKey)) {
         const existing = store.idempotencyKeys.get(scopedKey)!
+        if (store.deletedItems.has(existing.id)) {
+          return HttpResponse.json(
+            {
+              statusCode: 409,
+              message: 'SAVED_LOOK_ALREADY_REMOVED',
+              error: 'Conflict',
+            },
+            { status: 409 }
+          )
+        }
         return HttpResponse.json(
           { data: existing },
           {
@@ -109,6 +150,46 @@ export function createSavedLooksMswHandlers(
         }
       )
     }),
+    http.post(`${basePattern}/:savedLookId/restore`, async ({ request, params }) => {
+      const id = String(params.savedLookId)
+      if (store.onRestore) await store.onRestore(request, id)
+      const errorRes = store.nextRestoreError?.() ?? store.nextPostError?.()
+      if (errorRes) return errorRes
+      const owner = ownerFromRequest(request)
+      const active = store.items.find(
+        (item) => item.id === id && item.ownerUserId === owner
+      )
+      if (active) {
+        return HttpResponse.json(
+          { data: active },
+          {
+            status: 200,
+            headers: { ETag: `"saved-look:${active.id}:${active.revision}"` },
+          }
+        )
+      }
+      const deleted = store.deletedItems.get(id)
+      if (!deleted || deleted.ownerUserId !== owner) {
+        return HttpResponse.json(
+          { statusCode: 404, message: 'SAVED_LOOK_NOT_FOUND', error: 'Not Found' },
+          { status: 404 }
+        )
+      }
+      const restored: SavedLookContract = {
+        ...deleted,
+        revision: deleted.revision + 1,
+        updatedAt: new Date().toISOString(),
+      }
+      store.deletedItems.delete(id)
+      store.items = [restored, ...store.items.filter((item) => item.id !== id)]
+      return HttpResponse.json(
+        { data: restored },
+        {
+          status: 200,
+          headers: { ETag: `"saved-look:${restored.id}:${restored.revision}"` },
+        }
+      )
+    }),
     http.delete(`${basePattern}/:savedLookId`, async ({ request, params }) => {
       const id = String(params.savedLookId)
       if (store.onDelete) await store.onDelete(request, id)
@@ -136,7 +217,13 @@ export function createSavedLooksMswHandlers(
         )
       }
       const expected = `"saved-look:${existing.id}:${existing.revision}"`
-      if (ifMatch !== '*' && ifMatch !== expected) {
+      if (
+        ifMatch !== '*' &&
+        !ifMatch
+          .split(',')
+          .map((s) => s.trim())
+          .includes(expected)
+      ) {
         return HttpResponse.json(
           {
             statusCode: 412,
@@ -146,6 +233,7 @@ export function createSavedLooksMswHandlers(
           { status: 412 }
         )
       }
+      store.deletedItems.set(id, { ...existing, revision: existing.revision + 1 })
       store.items = store.items.filter((item) => item.id !== id)
       return new HttpResponse(null, { status: 204 })
     }),

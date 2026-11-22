@@ -93,9 +93,18 @@ vi.mock('../../lib/wardrobe', async () => ({
 
 vi.mock('../../lib/saved-looks', () => ({
   listSavedLooksFromWeb: vi.fn().mockResolvedValue([]),
+  listSavedLooksPageFromWeb: vi.fn().mockResolvedValue({
+    data: [],
+    total: 0,
+    limit: 50,
+    offset: 0,
+  }),
   createSavedLookFromWeb: vi.fn(),
   getSavedLookFromWeb: vi.fn(),
   deleteSavedLookFromWeb: vi.fn(),
+  restoreSavedLookFromWeb: vi.fn(),
+  notifySavedLooksChanged: vi.fn(),
+  subscribeSavedLooksChanged: vi.fn(() => () => undefined),
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
 }))

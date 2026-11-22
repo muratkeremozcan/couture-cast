@@ -33,7 +33,10 @@ import {
   scheduleStylePiecePhotoExpiry,
   type StylePieceSelection,
 } from '@couture/utils'
-import { listSavedLooksFromWeb } from '../../lib/saved-looks'
+import {
+  listSavedLooksPageFromWeb,
+  subscribeSavedLooksChanged,
+} from '../../lib/saved-looks'
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 import { ClosetSavedLooksRow } from './saved-looks-row'
 
@@ -148,7 +151,9 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
+  const [savedLooksTotal, setSavedLooksTotal] = useState(0)
   const [savedLooksLoading, setSavedLooksLoading] = useState(false)
+  const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
   const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
   const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
   const styleInvoker = useRef<HTMLButtonElement | null>(null)
@@ -277,16 +282,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   useEffect(() => {
     if (!owner) {
       setSavedLooks([])
+      setSavedLooksTotal(0)
       setSavedLooksError(null)
       setSavedLooksLoading(false)
       return
     }
     const controller = new AbortController()
     setSavedLooksLoading(true)
-    void listSavedLooksFromWeb({ signal: controller.signal })
-      .then((items) => {
+    void listSavedLooksPageFromWeb({ limit: 50, offset: 0, signal: controller.signal })
+      .then((page) => {
         if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
-        setSavedLooks(items)
+        setSavedLooks(page.data)
+        setSavedLooksTotal(page.total)
         setSavedLooksError(null)
       })
       .catch((error: unknown) => {
@@ -301,6 +308,34 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       })
     return () => controller.abort()
   }, [owner, sessionAttempt, missedSession, savedLooksAttempt])
+
+  useEffect(() => {
+    if (!owner) return
+    return subscribeSavedLooksChanged((changedOwner) => {
+      if (changedOwner === owner) {
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }
+    })
+  }, [owner])
+
+  const loadMoreSavedLooks = useCallback(() => {
+    if (!owner || savedLooksLoadingMore || savedLooks.length >= savedLooksTotal) return
+    setSavedLooksLoadingMore(true)
+    const offset = savedLooks.length
+    void listSavedLooksPageFromWeb({ limit: 50, offset })
+      .then((page) => {
+        if (currentWebSessionOwner() !== owner) return
+        setSavedLooks((current) => {
+          const seen = new Set(current.map((item) => item.id))
+          return [...current, ...page.data.filter((item) => !seen.has(item.id))]
+        })
+        setSavedLooksTotal(page.total)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        setSavedLooksLoadingMore(false)
+      })
+  }, [owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -537,6 +572,10 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
           <ClosetSavedLooksRow
             owner={owner}
             savedLooks={savedLooks}
+            totalCount={savedLooksTotal}
+            hasMore={savedLooks.length < savedLooksTotal}
+            isLoadingMore={savedLooksLoadingMore}
+            onLoadMore={loadMoreSavedLooks}
             isLoading={savedLooksLoading}
             loadError={savedLooksError}
             garments={garments}

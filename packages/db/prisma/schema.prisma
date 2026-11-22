@@ -2394,12 +2394,13 @@ model SavedLook {
   revision                 Int             @default(0)
   idempotency_key          String?
   idempotency_payload_hash String?
+  deleted_at               DateTime?
   created_at               DateTime        @default(now())
   updated_at               DateTime        @updatedAt
 
   @@unique([id, user_id])
   @@unique([user_id, idempotency_key])
-  @@index([user_id, updated_at(sort: Desc), id(sort: Asc)])
+  @@index([user_id, deleted_at, updated_at(sort: Desc), id(sort: Asc)])
   @@index([user_id, source, anchor_garment_id])
   @@map("SavedLook")
 }

@@ -135,6 +135,9 @@ describe('WardrobeSavedLookController', () => {
         offset: 0,
       }),
       getSavedLook: vi.fn().mockResolvedValue({ data: makeContract() }),
+      restoreSavedLook: vi.fn().mockResolvedValue({
+        data: { ...makeContract(), revision: 2 },
+      }),
       deleteSavedLook: vi.fn().mockResolvedValue(undefined),
     }
     const controller = new WardrobeSavedLookController(
@@ -160,5 +163,9 @@ describe('WardrobeSavedLookController', () => {
       'sl-1',
       '"saved-look:sl-1:0"'
     )
+
+    const restored = await controller.restoreSavedLook(req, 'sl-1', res)
+    expect(restored.data.revision).toBe(2)
+    expect(setHeader).toHaveBeenCalledWith('ETag', '"saved-look:sl-1:2"')
   })
 })

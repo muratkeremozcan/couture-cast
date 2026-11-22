@@ -1,3 +1,5 @@
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import {
   act,
   cleanup,
@@ -784,5 +786,96 @@ describe('Wardrobe styling', () => {
     await user.click(savedOnHome.getByRole('button', { name: /^Remove / }))
     expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
     expect(readRecipes()).toEqual([defaultRecipe])
+  })
+
+  it('replays a committed Style this piece POST after a lost response without creating a duplicate row', async () => {
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const seenKeys: string[] = []
+    let simulateLostResponse = true
+    savedLooksStore.onPost = async (request) => {
+      const key = request.headers.get('Idempotency-Key')
+      if (key) seenKeys.push(key)
+      if (!simulateLostResponse) return
+      simulateLostResponse = false
+      // Commit on server before simulating a lost HTTP response to the client.
+      const body = (await request.clone().json()) as {
+        source: 'style_piece'
+        lookId: string
+        weather: string
+        anchorGarmentId: string
+        anchorSnapshot: {
+          garmentId: string
+          category: 'top'
+          comfortRange: 'mild'
+        }
+        composition: {
+          slotIndex: number
+          category: 'top' | 'bottom' | 'shoes' | 'outerwear' | 'dress' | 'accessory'
+          kind: 'garment' | 'catalog'
+          itemId: string
+          label?: string | null
+        }[]
+        swaps?: Record<string, string>
+      }
+      const now = new Date().toISOString()
+      const ownerToken =
+        request.headers
+          .get('Authorization')
+          ?.replace(/^Bearer\s+/i, '')
+          .trim() || 'anonymous'
+      const committed = {
+        id: 'saved-look-committed-lost',
+        ownerUserId: ownerToken,
+        source: body.source,
+        lookId: body.lookId,
+        weather: body.weather,
+        title: null,
+        anchorGarmentId: body.anchorGarmentId,
+        anchorSnapshot: body.anchorSnapshot,
+        composition: body.composition.map((s) => ({
+          ...s,
+          label: s.label ?? null,
+          missing: false,
+          imageAccess: null,
+        })),
+        swaps: body.swaps ?? {},
+        collection: null,
+        comfort: null,
+        availabilityStatus: 'ready' as const,
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+      }
+      savedLooksStore.items = [committed]
+      if (key) savedLooksStore.idempotencyKeys.set(`${ownerToken}:${key}`, committed)
+      savedLooksStore.nextPostError = () => {
+        savedLooksStore.nextPostError = undefined
+        return HttpResponse.json({ message: 'Response dropped' }, { status: 503 })
+      }
+    }
+
+    const save = firstLook(dialog).getByRole('button', { name: 'Save look' })
+    await waitFor(() => expect(save).toBeEnabled())
+    await user.click(save)
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+    expect(savedLooksStore.items).toHaveLength(1)
+
+    await user.click(within(dialog).getByTestId('status-bar-action-retry'))
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Saved to your looks.'
+      )
+    )
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toBe(seenKeys[1])
+    expect(savedLooksStore.items).toHaveLength(1)
   })
 })

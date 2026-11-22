@@ -30,7 +30,33 @@ export function formatSavedLookIfMatch(savedLookId: string, revision: number): s
   return `"saved-look:${savedLookId}:${revision}"`
 }
 
-function resolveAccessToken(): string {
+export type SavedLookPageResult = {
+  data: SavedLookContract[]
+  total: number
+  limit: number
+  offset: number
+}
+
+const savedLookChangeListeners = new Set<(owner: string | null) => void>()
+
+export function notifySavedLooksChanged(owner: string | null): void {
+  for (const listener of savedLookChangeListeners) {
+    listener(owner)
+  }
+}
+
+export function subscribeSavedLooksChanged(
+  listener: (owner: string | null) => void
+): () => void {
+  savedLookChangeListeners.add(listener)
+  return () => {
+    savedLookChangeListeners.delete(listener)
+  }
+}
+
+function resolveAccessToken(explicitToken?: string): string {
+  const pinned = explicitToken?.trim()
+  if (pinned) return pinned
   const verified = currentWebSessionBearer()?.trim()
   if (verified) return verified
   const stored = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
@@ -66,17 +92,18 @@ async function normalizeSavedLookError(error: unknown, fallback: string): Promis
   return error instanceof Error ? error : new Error(fallback)
 }
 
-export async function listSavedLooksFromWeb(
+export async function listSavedLooksPageFromWeb(
   options: {
+    accessToken?: string
     source?: SavedLookSource
     anchorGarmentId?: string
     limit?: number
     offset?: number
     signal?: AbortSignal
   } = {}
-): Promise<SavedLookContract[]> {
+): Promise<SavedLookPageResult> {
   try {
-    const accessToken = resolveAccessToken()
+    const accessToken = resolveAccessToken(options.accessToken)
     const client = createWebApiClient({ accessToken })
     const response = await withRequestDeadline(
       SAVED_LOOK_REQUEST_TIMEOUT_MS,
@@ -92,21 +119,36 @@ export async function listSavedLooksFromWeb(
           { signal: requestSignal }
         )
     )
-    return savedLookListResponseSchema.parse(response).data
+    return savedLookListResponseSchema.parse(response)
   } catch (error) {
     throw await normalizeSavedLookError(error, 'Unable to load your saved looks.')
   }
 }
 
+export async function listSavedLooksFromWeb(
+  options: {
+    accessToken?: string
+    source?: SavedLookSource
+    anchorGarmentId?: string
+    limit?: number
+    offset?: number
+    signal?: AbortSignal
+  } = {}
+): Promise<SavedLookContract[]> {
+  const page = await listSavedLooksPageFromWeb(options)
+  return page.data
+}
+
 export async function createSavedLookFromWeb(
   input: CreateSavedLookInput,
   options: {
+    accessToken?: string
     idempotencyKey?: string
     signal?: AbortSignal
   } = {}
 ): Promise<SavedLookContract> {
   try {
-    const accessToken = resolveAccessToken()
+    const accessToken = resolveAccessToken(options.accessToken)
     const client = createWebApiClient({ accessToken })
     const response = await withRequestDeadline(
       SAVED_LOOK_REQUEST_TIMEOUT_MS,
@@ -128,14 +170,18 @@ export async function createSavedLookFromWeb(
 
 export async function getSavedLookFromWeb(
   savedLookId: string,
-  signal?: AbortSignal
+  options?: AbortSignal | { accessToken?: string; signal?: AbortSignal }
 ): Promise<SavedLookContract> {
+  const resolved =
+    options && typeof options === 'object' && 'aborted' in options
+      ? { signal: options }
+      : (options ?? {})
   try {
-    const accessToken = resolveAccessToken()
+    const accessToken = resolveAccessToken(resolved.accessToken)
     const client = createWebApiClient({ accessToken })
     const response = await withRequestDeadline(
       SAVED_LOOK_REQUEST_TIMEOUT_MS,
-      signal ? [signal] : [],
+      resolved.signal ? [resolved.signal] : [],
       (requestSignal) =>
         client.apiV1WardrobeSavedLooksSavedLookIdGet(
           { savedLookId },
@@ -148,17 +194,43 @@ export async function getSavedLookFromWeb(
   }
 }
 
+export async function restoreSavedLookFromWeb(
+  savedLookId: string,
+  options: { accessToken?: string; signal?: AbortSignal } = {}
+): Promise<SavedLookContract> {
+  try {
+    const accessToken = resolveAccessToken(options.accessToken)
+    const client = createWebApiClient({ accessToken })
+    const response = await withRequestDeadline(
+      SAVED_LOOK_REQUEST_TIMEOUT_MS,
+      options.signal ? [options.signal] : [],
+      (requestSignal) =>
+        client.apiV1WardrobeSavedLooksSavedLookIdRestorePost(
+          { savedLookId },
+          { signal: requestSignal }
+        )
+    )
+    return savedLookResponseSchema.parse(response).data
+  } catch (error) {
+    throw await normalizeSavedLookError(error, 'Unable to restore this saved look.')
+  }
+}
+
 export async function deleteSavedLookFromWeb(
   savedLookId: string,
   ifMatch: string,
-  signal?: AbortSignal
+  options?: AbortSignal | { accessToken?: string; signal?: AbortSignal }
 ): Promise<void> {
+  const resolved =
+    options && typeof options === 'object' && 'aborted' in options
+      ? { signal: options }
+      : (options ?? {})
   try {
-    const accessToken = resolveAccessToken()
+    const accessToken = resolveAccessToken(resolved.accessToken)
     const client = createWebApiClient({ accessToken })
     await withRequestDeadline(
       SAVED_LOOK_REQUEST_TIMEOUT_MS,
-      signal ? [signal] : [],
+      resolved.signal ? [resolved.signal] : [],
       (requestSignal) =>
         client.apiV1WardrobeSavedLooksSavedLookIdDelete(
           { savedLookId, ifMatch },

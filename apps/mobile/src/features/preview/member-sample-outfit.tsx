@@ -2,10 +2,7 @@ import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type {
-  CreateSavedLookInput,
-  SavedLookContract,
-} from '@couture/api-client/contracts/http'
+import type { SavedLookContract } from '@couture/api-client/contracts/http'
 import {
   buildHomeSampleSavedLookInput,
   createAnnouncementToken,
@@ -37,36 +34,42 @@ import {
   setMobilePrimaryActionClearance,
   useStatusBar,
 } from '@/components/save-feedback'
-import { mobileApplicationUserId } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+} from '@/src/lib/mobile-auth'
 import {
   createSavedLookFromMobile,
   deleteSavedLookFromMobile,
   formatSavedLookIfMatch,
   listSavedLooksFromMobile,
   MobileSavedLookRequestError,
+  notifyMobileSavedLooksChanged,
+  restoreSavedLookFromMobile,
 } from '@/src/lib/saved-looks'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
 
-function toRecreateSampleInput(look: SavedLookContract): CreateSavedLookInput {
-  return {
-    source: look.source,
-    lookId: look.lookId,
-    weather: look.weather,
-    title: look.title,
-    anchorGarmentId: look.anchorGarmentId,
-    anchorSnapshot: look.anchorSnapshot,
-    composition: look.composition.map((slot) => ({
-      slotIndex: slot.slotIndex,
-      category: slot.category,
-      kind: slot.kind,
-      itemId: slot.itemId,
-      label: slot.label,
-    })),
-    swaps: look.swaps,
-    collection: look.collection,
-    comfort: look.comfort,
-  }
+function buildMobileSampleAttemptKey(
+  owner: string,
+  lookId: string,
+  garmentsSignature: string,
+  weather: string,
+  payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>
+): string {
+  const comfortSig = payload.comfort
+    ? `${payload.comfort.runsColdWarm}/${payload.comfort.windTolerance}/${payload.comfort.precipPreparedness}`
+    : ''
+  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection ?? ''}:${comfortSig}`
+}
+
+async function ensureMobileOnlineForAction(
+  readLiveOnline: () => boolean
+): Promise<boolean> {
+  if (readLiveOnline()) return true
+  if (hasReliableBrowserOnline()) return false
+  return checkNetworkOnlineForAction()
 }
 
 export function HomeAddGarment() {
@@ -137,14 +140,41 @@ export function MemberSampleOutfit({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  const mutationVersionRef = useRef(0)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
   const noticeSeqRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
   const readLiveOnline = () => statusBarRef.current.isOnline && getNetworkOnline()
+  const isLiveSession = (actionOwner: string | null, actionEpoch: number) =>
+    Boolean(
+      actionOwner &&
+        mobileApplicationUserId() === actionOwner &&
+        mobileIdentityEpoch() === actionEpoch
+    )
+  const showSampleActionError = (kind: string, error: unknown, retry?: () => void) => {
+    const seq = ++noticeSeqRef.current
+    const offline = isOfflineError(error) || !readLiveOnline()
+    if (offline) reportNetworkOffline()
+    statusBarRef.current.showNotice({
+      id: `${kind}-${offline ? 'offline' : 'failed'}-${seq}`,
+      announcementId: createAnnouncementToken(
+        `${kind}-${offline ? 'offline' : 'failed'}`,
+        seq
+      ),
+      message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+      tone: offline ? 'offline' : 'error',
+      actions:
+        !offline && retry
+          ? [{ id: 'retry', kind: 'retry', label: t('feedback.retry'), onPress: retry }]
+          : [],
+    })
+  }
 
   useEffect(() => {
     statusBarRef.current.dismissNotice()
+    saveAttemptKeysRef.current.clear()
+    lastCreatedRef.current = null
     if (!owner) {
       savedLooksRef.current = []
       setSavedLooks([])
@@ -152,16 +182,25 @@ export function MemberSampleOutfit({
       return
     }
     const controller = new AbortController()
+    const loadVersion = mutationVersionRef.current
     setBookmarkStorage('loading')
     void listSavedLooksFromMobile({ source: 'home_sample', signal: controller.signal })
       .then((items) => {
-        if (controller.signal.aborted || mobileApplicationUserId() !== owner) return
+        if (
+          controller.signal.aborted ||
+          mobileApplicationUserId() !== owner ||
+          mutationVersionRef.current !== loadVersion
+        ) {
+          return
+        }
         savedLooksRef.current = items
         setSavedLooks(items)
         setBookmarkStorage('ready')
       })
       .catch(() => {
-        if (!controller.signal.aborted) setBookmarkStorage('unavailable')
+        if (!controller.signal.aborted && mutationVersionRef.current === loadVersion) {
+          setBookmarkStorage('unavailable')
+        }
       })
     return () => {
       controller.abort()
@@ -169,13 +208,11 @@ export function MemberSampleOutfit({
     }
   }, [owner])
 
-  const bookmarks: SampleBookmark[] = []
-  const seenBookmarkLookIds = new Set<string>()
+  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
   for (const saved of savedLooks) {
     const bookmark = savedLookToSampleBookmark(saved)
-    if (!bookmark || seenBookmarkLookIds.has(bookmark.lookId)) continue
-    seenBookmarkLookIds.add(bookmark.lookId)
-    bookmarks.push(bookmark)
+    if (!bookmark) continue
+    bookmarks.push({ ...bookmark, savedLookId: saved.id })
   }
   const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
     if (next === result) return
@@ -265,13 +302,11 @@ export function MemberSampleOutfit({
         onUndoSwaps={() => setResult(undoMemberSampleSwaps)}
         onReviewChoices={() => {
           lookUndoStackRef.current = []
-          saveAttemptKeysRef.current.clear()
           statusBar.dismissNotice()
           setResult(createMemberSampleOutfit())
         }}
         onResetChoices={() => {
           lookUndoStackRef.current = []
-          saveAttemptKeysRef.current.clear()
           statusBar.dismissNotice()
           setResult(createMemberSampleOutfit())
         }}
@@ -282,14 +317,12 @@ export function MemberSampleOutfit({
         preferences={result.input.preferences}
         onPreferences={(preferences) => {
           lookUndoStackRef.current = []
-          saveAttemptKeysRef.current.clear()
           statusBar.dismissNotice()
           setResult((current) => updateMemberSampleOutfit(current, { preferences }))
         }}
         weather={result.input.weather}
         onWeather={(weather) => {
           lookUndoStackRef.current = []
-          saveAttemptKeysRef.current.clear()
           statusBar.dismissNotice()
           setResult((current) => updateMemberSampleOutfit(current, { weather }))
         }}
@@ -299,9 +332,11 @@ export function MemberSampleOutfit({
         showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}
         ownerKey={owner}
         useSharedFeedback
+        requiresNetwork
         saveResetKey={`${owner ?? 'anon'}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
         onSave={async () => {
-          if (!lookId || !owner || mobileApplicationUserId() !== owner) return false
+          const actionEpoch = mobileIdentityEpoch()
+          if (!lookId || !isLiveSession(owner, actionEpoch) || !owner) return false
           lookUndoStackRef.current = []
           const payload = buildHomeSampleSavedLookInput(result)
           if (!payload) return false
@@ -309,30 +344,38 @@ export function MemberSampleOutfit({
             savedLookMatchesHomeSample(item, result)
           )
           if (existingMatch) {
-            lastCreatedRef.current = existingMatch
+            lastCreatedRef.current = null
             setBookmarkStorage('ready')
-            return true
+            return { saved: true, undoable: false }
           }
-          const comfortSig = payload.comfort
-            ? `${payload.comfort.runsColdWarm}/${payload.comfort.windTolerance}/${payload.comfort.precipPreparedness}`
-            : ''
-          const attemptKey = `${owner}:${lookId}:${garmentsSignature}:${result.input.weather}:${payload.collection ?? ''}:${comfortSig}`
-          let idempotencyKey = saveAttemptKeysRef.current.get(attemptKey)
-          if (!idempotencyKey) {
-            idempotencyKey = createIdempotencyKey()
-            saveAttemptKeysRef.current.set(attemptKey, idempotencyKey)
-          }
+          const actionToken = (await resolveMobileAccessToken()) ?? undefined
+          if (!isLiveSession(owner, actionEpoch)) return false
+          const attemptKey = buildMobileSampleAttemptKey(
+            owner,
+            lookId,
+            garmentsSignature,
+            result.input.weather,
+            payload
+          )
+          const idempotencyKey =
+            saveAttemptKeysRef.current.get(attemptKey) ?? createIdempotencyKey()
+          saveAttemptKeysRef.current.set(attemptKey, idempotencyKey)
           let created: SavedLookContract
           try {
-            created = await createSavedLookFromMobile(payload, { idempotencyKey })
+            created = await createSavedLookFromMobile(payload, {
+              accessToken: actionToken,
+              idempotencyKey,
+            })
           } catch (error) {
             if (error instanceof MobileSavedLookRequestError && error.status === 409) {
               saveAttemptKeysRef.current.delete(attemptKey)
+              if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return false
             }
             throw error
           }
-          if (mobileApplicationUserId() !== owner) return false
+          if (!isLiveSession(owner, actionEpoch)) return false
           saveAttemptKeysRef.current.delete(attemptKey)
+          mutationVersionRef.current += 1
           lastCreatedRef.current = created
           const next = [
             created,
@@ -341,20 +384,33 @@ export function MemberSampleOutfit({
           savedLooksRef.current = next
           setSavedLooks(next)
           setBookmarkStorage('ready')
+          notifyMobileSavedLooksChanged(owner)
           return true
         }}
         onUndoSave={async () => {
+          const actionEpoch = mobileIdentityEpoch()
           const created = lastCreatedRef.current
-          if (!created || !owner || mobileApplicationUserId() !== owner) return false
-          await deleteSavedLookFromMobile(
-            created.id,
-            formatSavedLookIfMatch(created.id, created.revision)
-          )
-          if (mobileApplicationUserId() !== owner) return false
+          if (!created || !isLiveSession(owner, actionEpoch) || !owner) return false
+          const actionToken = (await resolveMobileAccessToken()) ?? undefined
+          if (!isLiveSession(owner, actionEpoch)) return false
+          try {
+            await deleteSavedLookFromMobile(
+              created.id,
+              formatSavedLookIfMatch(created.id, created.revision),
+              { accessToken: actionToken }
+            )
+          } catch (error) {
+            if (!(error instanceof MobileSavedLookRequestError && error.status === 404)) {
+              throw error
+            }
+          }
+          if (!isLiveSession(owner, actionEpoch)) return false
+          mutationVersionRef.current += 1
           lastCreatedRef.current = null
           const next = savedLooksRef.current.filter((item) => item.id !== created.id)
           savedLooksRef.current = next
           setSavedLooks(next)
+          notifyMobileSavedLooksChanged(owner)
           return true
         }}
         onOpen={(bookmark) => {
@@ -363,153 +419,118 @@ export function MemberSampleOutfit({
           setResult((current) => reopenMemberSampleOutfit(current, bookmark))
         }}
         onRemove={(id) => {
+          const runUndoRemove = async (
+            target: SavedLookContract,
+            actionOwner: string,
+            actionEpoch: number,
+            actionToken: string | undefined
+          ) => {
+            if (!isLiveSession(actionOwner, actionEpoch)) return
+            const reachable = await ensureMobileOnlineForAction(readLiveOnline)
+            if (!isLiveSession(actionOwner, actionEpoch)) return
+            if (!reachable) {
+              showSampleActionError(
+                'sample-remove-undo',
+                new TypeError('Failed to fetch')
+              )
+              return
+            }
+            try {
+              const restored = await restoreSavedLookFromMobile(target.id, {
+                accessToken: actionToken,
+              })
+              if (!isLiveSession(actionOwner, actionEpoch)) return
+              mutationVersionRef.current += 1
+              const restoredList = [
+                restored,
+                ...savedLooksRef.current.filter((item) => item.id !== restored.id),
+              ]
+              savedLooksRef.current = restoredList
+              setSavedLooks(restoredList)
+              notifyMobileSavedLooksChanged(actionOwner)
+              const undoSeq = ++noticeSeqRef.current
+              statusBarRef.current.showNotice({
+                id: `sample-remove-undo-${undoSeq}`,
+                announcementId: createAnnouncementToken('sample-remove-undo', undoSeq),
+                message: t('feedback.undone'),
+                tone: 'neutral',
+              })
+            } catch (undoError) {
+              if (!isLiveSession(actionOwner, actionEpoch)) return
+              showSampleActionError('sample-remove-undo', undoError)
+            }
+          }
           const runRemove = async () => {
-            if (!owner || mobileApplicationUserId() !== owner) return
-            if (!readLiveOnline()) {
-              const reachable = hasReliableBrowserOnline()
-                ? false
-                : await checkNetworkOnlineForAction()
-              if (!reachable) {
-                const offSeq = ++noticeSeqRef.current
-                statusBarRef.current.showNotice({
-                  id: `sample-remove-offline-${offSeq}`,
-                  announcementId: createAnnouncementToken(
-                    'sample-remove-offline',
-                    offSeq
-                  ),
-                  message: t('feedback.offlineAction'),
-                  tone: 'offline',
-                  actions: [],
+            const actionEpoch = mobileIdentityEpoch()
+            const actionOwner = owner
+            if (!actionOwner || !isLiveSession(actionOwner, actionEpoch)) return
+            const reachable = await ensureMobileOnlineForAction(readLiveOnline)
+            if (!isLiveSession(actionOwner, actionEpoch)) return
+            if (!reachable) {
+              showSampleActionError('sample-remove', new TypeError('Failed to fetch'))
+              return
+            }
+            const actionToken = (await resolveMobileAccessToken()) ?? undefined
+            if (!isLiveSession(actionOwner, actionEpoch)) return
+            const target = savedLooksRef.current.find(
+              (item) => item.id === id || item.lookId === id
+            )
+            if (!target) return
+            setBookmarkRevision((value) => value + 1)
+            let alreadyDeleted = false
+            try {
+              await deleteSavedLookFromMobile(
+                target.id,
+                formatSavedLookIfMatch(target.id, target.revision),
+                { accessToken: actionToken }
+              )
+            } catch (error) {
+              if (!isLiveSession(actionOwner, actionEpoch)) return
+              if (error instanceof MobileSavedLookRequestError && error.status === 404) {
+                alreadyDeleted = true
+              } else {
+                showSampleActionError('sample-remove', error, () => {
+                  if (isLiveSession(actionOwner, actionEpoch)) void runRemove()
                 })
                 return
               }
             }
-            const target = savedLooksRef.current.find((item) => item.lookId === id)
-            if (!target) return
-            setBookmarkRevision((value) => value + 1)
-            try {
-              await deleteSavedLookFromMobile(
-                target.id,
-                formatSavedLookIfMatch(target.id, target.revision)
-              )
-              if (mobileApplicationUserId() !== owner) return
-              const next = savedLooksRef.current.filter((item) => item.id !== target.id)
-              savedLooksRef.current = next
-              setSavedLooks(next)
-            } catch (error) {
-              if (mobileApplicationUserId() !== owner) return
-              const failSeq = ++noticeSeqRef.current
-              if (isOfflineError(error) || !readLiveOnline()) {
-                reportNetworkOffline()
-                statusBarRef.current.showNotice({
-                  id: `sample-remove-offline-${failSeq}`,
-                  announcementId: createAnnouncementToken(
-                    'sample-remove-offline',
-                    failSeq
-                  ),
-                  message: t('feedback.offlineAction'),
-                  tone: 'offline',
-                  actions: [],
-                })
-              } else {
-                statusBarRef.current.showNotice({
-                  id: `sample-remove-failed-${failSeq}`,
-                  announcementId: createAnnouncementToken(
-                    'sample-remove-failed',
-                    failSeq
-                  ),
-                  message: t('feedback.saveFailed'),
-                  tone: 'error',
-                  actions: [
-                    {
-                      id: 'retry',
-                      kind: 'retry',
-                      label: t('feedback.retry'),
-                      onPress: () => {
-                        void runRemove()
-                      },
-                    },
-                  ],
-                })
-              }
-              return
-            }
+            if (!isLiveSession(actionOwner, actionEpoch)) return
+            mutationVersionRef.current += 1
+            const next = savedLooksRef.current.filter((item) => item.id !== target.id)
+            savedLooksRef.current = next
+            setSavedLooks(next)
+            notifyMobileSavedLooksChanged(actionOwner)
+            let undoInFlight = false
             const seq = ++noticeSeqRef.current
             statusBarRef.current.showNotice({
               id: `sample-remove-${seq}`,
               announcementId: createAnnouncementToken('sample-remove', seq),
               message: t('feedback.removed'),
               tone: 'neutral',
-              actions: [
-                {
-                  id: 'undo',
-                  kind: 'undo',
-                  label: t('feedback.undo'),
-                  onPress: async () => {
-                    if (mobileApplicationUserId() !== owner) return
-                    if (!readLiveOnline()) {
-                      const reachable = hasReliableBrowserOnline()
-                        ? false
-                        : await checkNetworkOnlineForAction()
-                      if (!reachable) {
-                        const offSeq = ++noticeSeqRef.current
-                        statusBarRef.current.showNotice({
-                          id: `sample-remove-undo-offline-${offSeq}`,
-                          announcementId: createAnnouncementToken(
-                            'sample-remove-undo-offline',
-                            offSeq
-                          ),
-                          message: t('feedback.offlineAction'),
-                          tone: 'offline',
-                          actions: [],
-                        })
-                        return
-                      }
-                    }
-                    try {
-                      const restored = await createSavedLookFromMobile(
-                        toRecreateSampleInput(target),
-                        { idempotencyKey: createIdempotencyKey() }
-                      )
-                      if (mobileApplicationUserId() !== owner) return
-                      const next = [
-                        restored,
-                        ...savedLooksRef.current.filter(
-                          (item) => item.id !== restored.id
-                        ),
-                      ]
-                      savedLooksRef.current = next
-                      setSavedLooks(next)
-                      const undoSeq = ++noticeSeqRef.current
-                      statusBarRef.current.showNotice({
-                        id: `sample-remove-undo-${undoSeq}`,
-                        announcementId: createAnnouncementToken(
-                          'sample-remove-undo',
-                          undoSeq
-                        ),
-                        message: t('feedback.undone'),
-                        tone: 'neutral',
-                      })
-                    } catch (undoError) {
-                      const undoSeq = ++noticeSeqRef.current
-                      const offline = isOfflineError(undoError) || !readLiveOnline()
-                      if (offline) reportNetworkOffline()
-                      statusBarRef.current.showNotice({
-                        id: `sample-remove-undo-${offline ? 'offline' : 'failed'}-${undoSeq}`,
-                        announcementId: createAnnouncementToken(
-                          `sample-remove-undo-${offline ? 'offline' : 'failed'}`,
-                          undoSeq
-                        ),
-                        message: offline
-                          ? t('feedback.offlineAction')
-                          : t('feedback.saveFailed'),
-                        tone: offline ? 'offline' : 'error',
-                        actions: [],
-                      })
-                    }
-                  },
-                },
-              ],
+              actions: alreadyDeleted
+                ? []
+                : [
+                    {
+                      id: 'undo',
+                      kind: 'undo',
+                      label: t('feedback.undo'),
+                      onPress: async () => {
+                        if (undoInFlight) return
+                        undoInFlight = true
+                        try {
+                          await runUndoRemove(
+                            target,
+                            actionOwner,
+                            actionEpoch,
+                            actionToken
+                          )
+                        } finally {
+                          undoInFlight = false
+                        }
+                      },
+                    },
+                  ],
             })
           }
           void runRemove()

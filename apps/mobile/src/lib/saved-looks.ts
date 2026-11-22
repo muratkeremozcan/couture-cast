@@ -66,7 +66,31 @@ async function normalizeMobileSavedLookError(
   return error instanceof Error ? error : new Error(fallback)
 }
 
-export async function listSavedLooksFromMobile(
+export type MobileSavedLookPageResult = {
+  data: SavedLookContract[]
+  total: number
+  limit: number
+  offset: number
+}
+
+const savedLookChangeListeners = new Set<(owner: string | null) => void>()
+
+export function notifyMobileSavedLooksChanged(owner: string | null): void {
+  for (const listener of savedLookChangeListeners) {
+    listener(owner)
+  }
+}
+
+export function subscribeMobileSavedLooksChanged(
+  listener: (owner: string | null) => void
+): () => void {
+  savedLookChangeListeners.add(listener)
+  return () => {
+    savedLookChangeListeners.delete(listener)
+  }
+}
+
+export async function listSavedLooksPageFromMobile(
   options: {
     accessToken?: string
     source?: SavedLookSource
@@ -75,7 +99,7 @@ export async function listSavedLooksFromMobile(
     offset?: number
     signal?: AbortSignal
   } = {}
-): Promise<SavedLookContract[]> {
+): Promise<MobileSavedLookPageResult> {
   try {
     const accessToken = await requireAccessToken(options.accessToken)
     const client = createMobileApiClient({ accessToken })
@@ -93,10 +117,24 @@ export async function listSavedLooksFromMobile(
           { signal: requestSignal }
         )
     )
-    return savedLookListResponseSchema.parse(response).data
+    return savedLookListResponseSchema.parse(response)
   } catch (error) {
     throw await normalizeMobileSavedLookError(error, 'Unable to load your saved looks.')
   }
+}
+
+export async function listSavedLooksFromMobile(
+  options: {
+    accessToken?: string
+    source?: SavedLookSource
+    anchorGarmentId?: string
+    limit?: number
+    offset?: number
+    signal?: AbortSignal
+  } = {}
+): Promise<SavedLookContract[]> {
+  const page = await listSavedLooksPageFromMobile(options)
+  return page.data
 }
 
 export async function createSavedLookFromMobile(
@@ -147,6 +185,28 @@ export async function getSavedLookFromMobile(
     return savedLookResponseSchema.parse(response).data
   } catch (error) {
     throw await normalizeMobileSavedLookError(error, 'Unable to open this saved look.')
+  }
+}
+
+export async function restoreSavedLookFromMobile(
+  savedLookId: string,
+  options: { accessToken?: string; signal?: AbortSignal } = {}
+): Promise<SavedLookContract> {
+  try {
+    const accessToken = await requireAccessToken(options.accessToken)
+    const client = createMobileApiClient({ accessToken })
+    const response = await withRequestDeadline(
+      SAVED_LOOK_REQUEST_TIMEOUT_MS,
+      options.signal ? [options.signal] : [],
+      (requestSignal) =>
+        client.apiV1WardrobeSavedLooksSavedLookIdRestorePost(
+          { savedLookId },
+          { signal: requestSignal }
+        )
+    )
+    return savedLookResponseSchema.parse(response).data
+  } catch (error) {
+    throw await normalizeMobileSavedLookError(error, 'Unable to restore this saved look.')
   }
 }
 

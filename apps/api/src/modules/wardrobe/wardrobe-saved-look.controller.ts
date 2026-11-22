@@ -135,6 +135,32 @@ export class WardrobeSavedLookController {
     return result
   }
 
+  @Post(':savedLookId/restore')
+  @HttpCode(HttpStatus.OK)
+  async restoreSavedLook(
+    @Req() req: AuthenticatedRequest,
+    @Param('savedLookId') savedLookIdParam: string,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    if (!req.auth) {
+      throw new UnauthorizedException('Missing or invalid bearer token')
+    }
+
+    const parsedParams = savedLookIdPathParamsSchema.safeParse({
+      savedLookId: savedLookIdParam,
+    })
+    if (!parsedParams.success) {
+      throw formatZodBadRequest('Invalid saved look id', parsedParams.error)
+    }
+
+    const result = await this.savedLookService.restoreSavedLook(
+      req.auth,
+      parsedParams.data.savedLookId
+    )
+    applyETag(res, result.data.id, result.data.revision)
+    return result
+  }
+
   @Delete(':savedLookId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteSavedLook(

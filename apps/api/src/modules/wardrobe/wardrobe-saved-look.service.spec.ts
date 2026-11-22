@@ -71,6 +71,7 @@ function makeSavedLookRow(overrides: Partial<SavedLook> = {}): SavedLook {
     revision: 0,
     idempotency_key: '11111111-1111-4111-8111-111111111111',
     idempotency_payload_hash: null,
+    deleted_at: null,
     created_at: now,
     updated_at: now,
     ...overrides,
@@ -155,6 +156,7 @@ function createHarness() {
       findMany: vi.fn(),
       count: vi.fn(),
       create: vi.fn(),
+      updateMany: vi.fn(),
       deleteMany: vi.fn(),
     },
     garmentItem: {
@@ -176,13 +178,16 @@ function createHarness() {
 }
 
 describe('WardrobeSavedLookService', () => {
-  it('formats and parses strong ETags and If-Match headers', () => {
+  it('formats and parses strong ETags and If-Match headers including multi-tag lists', () => {
     expect(formatSavedLookETag('sl-1', 2)).toBe('"saved-look:sl-1:2"')
     expect(parseSavedLookIfMatchHeader('*', 'sl-1')).toBeNull()
-    expect(parseSavedLookIfMatchHeader('"saved-look:sl-1:3"', 'sl-1')).toBe(3)
+    expect(parseSavedLookIfMatchHeader('"saved-look:sl-1:3"', 'sl-1')).toEqual([3])
     expect(
-      parseSavedLookIfMatchHeader('W/"saved-look:sl-1:3", "saved-look:sl-1:4"', 'sl-1')
-    ).toBe(4)
+      parseSavedLookIfMatchHeader(
+        'W/"saved-look:sl-1:2", "saved-look:sl-1:3", "saved-look:sl-1:4"',
+        'sl-1'
+      )
+    ).toEqual([3, 4])
 
     expect(() => parseSavedLookIfMatchHeader(undefined, 'sl-1')).toThrow(HttpException)
     try {
@@ -385,7 +390,7 @@ describe('WardrobeSavedLookService', () => {
     expect(reviewLook.composition[0]?.imageAccess).toBeNull()
   })
 
-  it('enforces ownership and If-Match revision checks on get and delete', async () => {
+  it('enforces ownership, multi-tag If-Match soft-delete, delayed-replay tombstone, and exact Undo restore', async () => {
     const { prisma, service } = createHarness()
     prisma.savedLook.findFirst.mockResolvedValueOnce(null)
     await expect(service.getSavedLook(ACTOR, 'missing-id')).rejects.toThrow(
@@ -397,11 +402,59 @@ describe('WardrobeSavedLookService', () => {
       service.deleteSavedLook(ACTOR, 'sl-1', '"saved-look:sl-1:1"')
     ).rejects.toThrow(PreconditionFailedException)
 
+    // Multi-tag If-Match succeeds when ANY strong candidate matches current revision.
     prisma.savedLook.findFirst.mockResolvedValueOnce({ id: 'sl-1', revision: 2 })
-    prisma.savedLook.deleteMany.mockResolvedValueOnce({ count: 1 })
+    prisma.savedLook.updateMany.mockResolvedValueOnce({ count: 1 })
     await expect(
-      service.deleteSavedLook(ACTOR, 'sl-1', '"saved-look:sl-1:2"')
+      service.deleteSavedLook(ACTOR, 'sl-1', '"saved-look:sl-1:0", "saved-look:sl-1:2"')
     ).resolves.toBeUndefined()
+
+    // Delayed create replay after removal returns 409 SAVED_LOOK_ALREADY_REMOVED (never resurrects).
+    const input = makeHomeSampleInput()
+    prisma.savedLook.findUnique.mockResolvedValueOnce(
+      makeSavedLookRow({
+        source: 'home_sample',
+        look_id: input.lookId,
+        weather: input.weather,
+        anchor_garment_id: null,
+        anchor_snapshot: null,
+        composition: input.composition,
+        swaps: {},
+        collection: 'all',
+        comfort: input.comfort,
+        idempotency_payload_hash: computeSavedLookPayloadHash(input),
+        deleted_at: new Date('2026-11-22T02:00:00.000Z'),
+      })
+    )
+    await expect(
+      service.createSavedLook(ACTOR, input, '11111111-1111-4111-8111-111111111111')
+    ).rejects.toThrow(ConflictException)
+
+    // Restore brings back the deleted row with its original anchor snapshot and missing/needs_review state intact.
+    const deletedMissing = makeSavedLookRow({
+      id: 'sl-restore',
+      anchor_garment_id: 'g-gone',
+      revision: 1,
+      deleted_at: new Date('2026-11-22T02:00:00.000Z'),
+    })
+    const activeRestored = { ...deletedMissing, deleted_at: null, revision: 2 }
+    prisma.savedLook.findFirst
+      .mockResolvedValueOnce(deletedMissing)
+      .mockResolvedValueOnce(activeRestored)
+    prisma.savedLook.updateMany.mockResolvedValueOnce({ count: 1 })
+    prisma.garmentItem.findMany.mockResolvedValueOnce([])
+
+    const restored = await service.restoreSavedLook(ACTOR, 'sl-restore')
+    expect(restored.data.id).toBe('sl-restore')
+    expect(restored.data.revision).toBe(2)
+    expect(restored.data.availabilityStatus).toBe('missing_garment')
+    expect(restored.data.anchorSnapshot?.category).toBe('top')
+
+    // Calling restore again when already active is idempotent.
+    prisma.savedLook.findFirst.mockResolvedValueOnce(activeRestored)
+    prisma.garmentItem.findMany.mockResolvedValueOnce([])
+    const restoredAgain = await service.restoreSavedLook(ACTOR, 'sl-restore')
+    expect(restoredAgain.data.id).toBe('sl-restore')
   })
 
   it('blocks guardian-pending teens from photo URL signing and style_piece creation while allowing home_sample', async () => {

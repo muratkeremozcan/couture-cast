@@ -44,7 +44,10 @@ import {
   listGarmentsFromMobile,
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
-import { listSavedLooksFromMobile } from '@/src/lib/saved-looks'
+import {
+  listSavedLooksPageFromMobile,
+  subscribeMobileSavedLooksChanged,
+} from '@/src/lib/saved-looks'
 import { ClosetSavedLooksRow } from './saved-looks-row'
 import {
   focusStylePieceControl,
@@ -95,7 +98,9 @@ function MemberWardrobeHub({
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
+  const [savedLooksTotal, setSavedLooksTotal] = useState(0)
   const [savedLooksLoading, setSavedLooksLoading] = useState(false)
+  const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
   const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
   const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
   const [styleClosing, setStyleClosing] = useState(false)
@@ -224,16 +229,18 @@ function MemberWardrobeHub({
   useEffect(() => {
     if (!owner) {
       setSavedLooks([])
+      setSavedLooksTotal(0)
       setSavedLooksError(null)
       setSavedLooksLoading(false)
       return
     }
     const controller = new AbortController()
     setSavedLooksLoading(true)
-    void listSavedLooksFromMobile({ signal: controller.signal })
-      .then((items) => {
+    void listSavedLooksPageFromMobile({ limit: 50, offset: 0, signal: controller.signal })
+      .then((page) => {
         if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
-        setSavedLooks(items)
+        setSavedLooks(page.data)
+        setSavedLooksTotal(page.total)
         setSavedLooksError(null)
       })
       .catch((error: unknown) => {
@@ -247,6 +254,35 @@ function MemberWardrobeHub({
       })
     return () => controller.abort()
   }, [epoch, owner, savedLooksAttempt])
+
+  useEffect(() => {
+    if (!owner) return
+    return subscribeMobileSavedLooksChanged((changedOwner) => {
+      if (changedOwner === owner) {
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }
+    })
+  }, [owner])
+
+  const loadMoreSavedLooks = useCallback(() => {
+    if (!owner || savedLooksLoadingMore || savedLooks.length >= savedLooksTotal) return
+    setSavedLooksLoadingMore(true)
+    const offset = savedLooks.length
+    const startEpoch = epoch
+    void listSavedLooksPageFromMobile({ limit: 50, offset })
+      .then((page) => {
+        if (startEpoch !== mobileIdentityEpoch()) return
+        setSavedLooks((current) => {
+          const seen = new Set(current.map((item) => item.id))
+          return [...current, ...page.data.filter((item) => !seen.has(item.id))]
+        })
+        setSavedLooksTotal(page.total)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        setSavedLooksLoadingMore(false)
+      })
+  }, [epoch, owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -441,6 +477,10 @@ function MemberWardrobeHub({
           <ClosetSavedLooksRow
             owner={owner}
             savedLooks={savedLooks}
+            totalCount={savedLooksTotal}
+            hasMore={savedLooks.length < savedLooksTotal}
+            isLoadingMore={savedLooksLoadingMore}
+            onLoadMore={loadMoreSavedLooks}
             isLoading={savedLooksLoading}
             loadError={savedLooksError}
             garments={garments}

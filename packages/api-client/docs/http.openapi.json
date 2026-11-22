@@ -7986,7 +7986,8 @@
           "message": {
             "type": "string",
             "enum": [
-              "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD"
+              "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD",
+              "SAVED_LOOK_ALREADY_REMOVED"
             ]
           },
           "error": {
@@ -25828,6 +25829,17 @@
         "responses": {
           "200": {
             "description": "List of account-backed saved looks.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -25882,9 +25894,11 @@
           {
             "schema": {
               "type": "string",
-              "format": "uuid"
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+              "description": "UUID v4 idempotency key scoped per account. Replays matching payloads with 200 and rejects mismatched payloads or already-removed rows with 409."
             },
             "required": false,
+            "description": "UUID v4 idempotency key scoped per account. Replays matching payloads with 200 and rejects mismatched payloads or already-removed rows with 409.",
             "name": "idempotency-key",
             "in": "header"
           }
@@ -25902,6 +25916,26 @@
         "responses": {
           "200": {
             "description": "Idempotent replay of an existing saved look.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -25912,6 +25946,26 @@
           },
           "201": {
             "description": "Saved look created.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -25961,7 +26015,7 @@
             }
           },
           "409": {
-            "description": "Idempotency-Key reused with a different payload.",
+            "description": "Idempotency-Key reused with a different payload or for an already-removed saved look.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26001,6 +26055,26 @@
         "responses": {
           "200": {
             "description": "Saved look details.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -26076,16 +26150,29 @@
           },
           {
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "Required strong ETag (\"saved-look:<id>:<revision>\"), comma-separated list of strong ETags, or *."
             },
             "required": true,
+            "description": "Required strong ETag (\"saved-look:<id>:<revision>\"), comma-separated list of strong ETags, or *.",
             "name": "if-match",
             "in": "header"
           }
         ],
         "responses": {
           "204": {
-            "description": "Saved look removed."
+            "description": "Saved look removed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              }
+            }
           },
           "400": {
             "description": "Invalid savedLookId path parameter.",
@@ -26143,6 +26230,105 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SavedLookPreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/saved-looks/{savedLookId}/restore": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Restore a recently removed saved look belonging to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique saved look ID."
+            },
+            "required": true,
+            "description": "Unique saved look ID.",
+            "name": "savedLookId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved look restored (idempotent if already active).",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid savedLookId path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Saved look not found for this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookNotFoundError"
                 }
               }
             }

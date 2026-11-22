@@ -21105,21 +21105,23 @@ Cross-links:
 
 Sequence to follow:
 
-1. Add `SavedLookSource` and `SavedLook` to `packages/db/prisma/schema.prisma` with migration
-   `20261122040000_add_saved_looks`, Postgres RLS, and `ON DELETE CASCADE` on `User(id)`.
-2. Define Zod HTTP contracts and OpenAPI 3.1 paths in
-   `packages/api-client/src/contracts/http/saved-looks.ts`, regenerate the SDK, and verify Optic
-   lint.
+1. Add `SavedLookSource` and `SavedLook` (with `deleted_at` soft-delete tombstone) to
+   `packages/db/prisma/schema.prisma` with migration `20261122040000_add_saved_looks`, API-only
+   grants (`REVOKE ALL FROM anon, authenticated`, RLS enabled), and `ON DELETE CASCADE` on
+   `User(id)`.
+2. Define Zod HTTP contracts and OpenAPI 3.1 paths (including `/restore`, UUID v4 `Idempotency-Key`,
+   and `ETag` / `Cache-Control` headers) in `packages/api-client/src/contracts/http/saved-looks.ts`,
+   regenerate the SDK, and verify Optic lint.
 3. Add shared payload/reopen/UUID v4 idempotency helpers in
    `packages/utils/src/sample-wardrobe/saved-looks.ts`.
 4. Implement `@AllowPendingGuardianTeen()`, `WardrobeSavedLookService`, and
    `WardrobeSavedLookController` in `apps/api/src/modules/wardrobe/` and wire
    `CapsuleCacheHeadersMiddleware`.
 5. Add Pact consumer interactions and provider doubles under `pact/http/`.
-6. Wire web and mobile `saved-looks.ts` clients, `StylePiecePanel`, `HomeRitual` /
-   `MemberSampleOutfit`, the temporary Closet `ClosetSavedLooksRow`, and 10-locale `savedLooks.*`
-   strings.
-7. Verify unit, schema/RLS, Pact, and two-context blocked-storage Playwright E2E tests.
+6. Wire web and mobile `saved-looks.ts` clients (pinned bearer, pagination, `/restore`, and
+   owner-scoped change notifications), `StylePiecePanel`, `HomeRitual` / `MemberSampleOutfit`, the
+   temporary Closet `ClosetSavedLooksRow`, and 10-locale `savedLooks.*` strings.
+7. Verify unit, schema/API-only grant, Pact, and two-context blocked-storage Playwright E2E tests.
 
 Task owner map:
 
@@ -21143,7 +21145,8 @@ Database schema, cascade, and RLS, Vitest:
 
 - [`packages/db/test/saved-looks-schema.spec.ts`](../../packages/db/test/saved-looks-schema.spec.ts):
   verifies Postgres migration indexes, `ON DELETE CASCADE` on `User`, preservation of `SavedLook`
-  when a referenced `GarmentItem` is deleted, per-owner idempotency uniqueness, and RLS isolation.
+  when a referenced `GarmentItem` is deleted, per-owner idempotency uniqueness, and API-only access
+  (`42501` for `authenticated` owner, unrelated member, moderator, and `anon`).
 
 Shared utils, Vitest:
 
@@ -21190,9 +21193,11 @@ Mobile unit, component, and locale parity, Vitest:
 End-to-end, Playwright:
 
 - [`playwright/tests/saved-looks-follow-account.spec.ts`](../../playwright/tests/saved-looks-follow-account.spec.ts):
-  proves saving a swapped Style this piece look in Context 1, reopening it with exact weather and
-  swaps from Closet "Saved looks" in Context 2 with `localStorage` blocked, removing it across
-  reload, and saving/reopening/removing a Home sample look through the same account list.
+  proves saving a swapped Style this piece look in Context 1, reopening it with exact stored slot
+  order, weather, and swaps from Closet "Saved looks" in Context 2 with `localStorage` blocked
+  (session re-established as on re-authentication), saving/reloading and removing in the blocked
+  context, and saving/reopening/removing a Home sample look in exact slot order through the same
+  account list, cleaning up only the IDs created by each test.
 
 Evidence boundaries:
 

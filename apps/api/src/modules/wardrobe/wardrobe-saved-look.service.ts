@@ -59,12 +59,12 @@ export function formatSavedLookETag(savedLookId: string, revision: number): stri
 
 /**
  * Parses `If-Match` against the strong ETag issued for a saved look.
- * Returns the expected revision, or `null` for `*`.
+ * Returns all matching strong candidate revisions for `savedLookId`, or `null` for `*`.
  */
 export function parseSavedLookIfMatchHeader(
   ifMatchHeader: string | undefined,
   savedLookId: string
-): number | null {
+): number[] | null {
   if (!ifMatchHeader || ifMatchHeader.trim().length === 0) {
     throw new HttpException('PRECONDITION_REQUIRED', HttpStatus.PRECONDITION_REQUIRED)
   }
@@ -74,6 +74,7 @@ export function parseSavedLookIfMatchHeader(
     return null
   }
 
+  const revisions: number[] = []
   const candidates = raw.split(',').map((entry) => entry.trim())
   for (const candidate of candidates) {
     if (/^W\//i.test(candidate)) {
@@ -91,7 +92,11 @@ export function parseSavedLookIfMatchHeader(
     if (!Number.isSafeInteger(revision) || revision < 0) {
       continue
     }
-    return revision
+    revisions.push(revision)
+  }
+
+  if (revisions.length > 0) {
+    return Array.from(new Set(revisions))
   }
 
   throw new PreconditionFailedException('SAVED_LOOK_REVISION_MISMATCH')
@@ -294,11 +299,12 @@ export class WardrobeSavedLookService {
           .map((garment) => garment.object_path as string)
       : []
 
+    const signedAtMs = Date.now()
     const signedUrls =
       objectPaths.length > 0
         ? await this.signReadUrls(objectPaths)
         : new Map<string, string>()
-    const expiresAt = new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString()
+    const expiresAt = new Date(signedAtMs + READ_URL_EXPIRY_SECONDS * 1000).toISOString()
 
     return rows.map((row) => {
       const storedSlots = canonicalizeComposition(
@@ -421,6 +427,9 @@ export class WardrobeSavedLookService {
     if (!existing) return null
     if (existing.idempotency_payload_hash !== payloadHash) {
       throw new ConflictException('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD')
+    }
+    if (existing.deleted_at !== null) {
+      throw new ConflictException('SAVED_LOOK_ALREADY_REMOVED')
     }
     const [formatted] = await this.formatSavedLooks(actor, [existing])
     return { data: formatted!, isReplay: true }
@@ -584,6 +593,7 @@ export class WardrobeSavedLookService {
   }> {
     const where: Prisma.SavedLookWhereInput = {
       user_id: actor.userId,
+      deleted_at: null,
       ...(query.source ? { source: query.source } : {}),
       ...(query.anchorGarmentId ? { anchor_garment_id: query.anchorGarmentId } : {}),
     }
@@ -615,6 +625,7 @@ export class WardrobeSavedLookService {
       where: {
         id: savedLookId,
         user_id: actor.userId,
+        deleted_at: null,
       },
     })
     if (!row) {
@@ -624,17 +635,62 @@ export class WardrobeSavedLookService {
     return { data: formatted! }
   }
 
+  async restoreSavedLook(
+    actor: RequestAuthContext,
+    savedLookId: string
+  ): Promise<{ data: SavedLookContract }> {
+    const existing = await this.prisma.savedLook.findFirst({
+      where: {
+        id: savedLookId,
+        user_id: actor.userId,
+      },
+    })
+    if (!existing) {
+      throw new NotFoundException('SAVED_LOOK_NOT_FOUND')
+    }
+
+    if (existing.deleted_at !== null) {
+      await this.prisma.savedLook.updateMany({
+        where: {
+          id: savedLookId,
+          user_id: actor.userId,
+          deleted_at: { not: null },
+        },
+        data: {
+          deleted_at: null,
+          revision: { increment: 1 },
+        },
+      })
+      const restored = await this.prisma.savedLook.findFirst({
+        where: {
+          id: savedLookId,
+          user_id: actor.userId,
+          deleted_at: null,
+        },
+      })
+      if (!restored) {
+        throw new NotFoundException('SAVED_LOOK_NOT_FOUND')
+      }
+      const [formatted] = await this.formatSavedLooks(actor, [restored])
+      return { data: formatted! }
+    }
+
+    const [formatted] = await this.formatSavedLooks(actor, [existing])
+    return { data: formatted! }
+  }
+
   async deleteSavedLook(
     actor: RequestAuthContext,
     savedLookId: string,
     ifMatchHeader: string | undefined
   ): Promise<void> {
-    const expectedRevision = parseSavedLookIfMatchHeader(ifMatchHeader, savedLookId)
+    const expectedRevisions = parseSavedLookIfMatchHeader(ifMatchHeader, savedLookId)
 
     const existing = await this.prisma.savedLook.findFirst({
       where: {
         id: savedLookId,
         user_id: actor.userId,
+        deleted_at: null,
       },
       select: {
         id: true,
@@ -644,21 +700,26 @@ export class WardrobeSavedLookService {
     if (!existing) {
       throw new NotFoundException('SAVED_LOOK_NOT_FOUND')
     }
-    if (expectedRevision !== null && existing.revision !== expectedRevision) {
+    if (expectedRevisions !== null && !expectedRevisions.includes(existing.revision)) {
       throw new PreconditionFailedException('SAVED_LOOK_REVISION_MISMATCH')
     }
 
-    const result = await this.prisma.savedLook.deleteMany({
+    const result = await this.prisma.savedLook.updateMany({
       where: {
         id: savedLookId,
         user_id: actor.userId,
-        ...(expectedRevision !== null ? { revision: expectedRevision } : {}),
+        deleted_at: null,
+        ...(expectedRevisions !== null ? { revision: { in: expectedRevisions } } : {}),
+      },
+      data: {
+        deleted_at: new Date(),
+        revision: { increment: 1 },
       },
     })
 
     if (result.count === 0) {
       const remaining = await this.prisma.savedLook.findFirst({
-        where: { id: savedLookId, user_id: actor.userId },
+        where: { id: savedLookId, user_id: actor.userId, deleted_at: null },
         select: { id: true },
       })
       if (remaining) {

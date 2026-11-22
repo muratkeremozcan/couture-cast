@@ -50,28 +50,56 @@ function stubReadyGarmentWithPhoto(
   })
 }
 
-async function cleanupAccountSavedLooks(
+function trackCreatedSavedLookIds(
+  page: Parameters<typeof interceptOnPage>[0]['page'],
+  createdIds: Set<string>,
+  capturedCompositions?: Map<string, string[]>
+) {
+  page.on('response', async (response) => {
+    if (
+      response.request().method() === 'POST' &&
+      response.url().endsWith('/api/v1/wardrobe/saved-looks') &&
+      (response.status() === 200 || response.status() === 201)
+    ) {
+      try {
+        const body = (await response.json()) as {
+          data?: {
+            id?: string
+            composition?: { slotIndex: number; itemId: string }[]
+          }
+        }
+        if (body.data?.id) {
+          createdIds.add(body.data.id)
+          if (capturedCompositions && Array.isArray(body.data.composition)) {
+            const ordered = [...body.data.composition]
+              .sort((a, b) => a.slotIndex - b.slotIndex)
+              .map((slot) => slot.itemId)
+            capturedCompositions.set(body.data.id, ordered)
+          }
+        }
+      } catch {
+        // Ignore non-JSON or aborted responses
+      }
+    }
+  })
+}
+
+async function cleanupCreatedSavedLooks(
   apiRequest: Parameters<Parameters<typeof test>[2]>[0]['apiRequest'],
   apiBaseUrl: string,
-  accessToken: string
+  accessToken: string,
+  createdIds: ReadonlySet<string>
 ) {
-  const listed = await apiRequest<{ data: { id: string }[] }>({
-    method: 'GET',
-    path: '/api/v1/wardrobe/saved-looks',
-    baseUrl: apiBaseUrl,
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
-  if (listed.status !== 200 || !Array.isArray(listed.body?.data)) return
-  for (const look of listed.body.data) {
+  for (const id of createdIds) {
     await apiRequest({
       method: 'DELETE',
-      path: `/api/v1/wardrobe/saved-looks/${look.id}`,
+      path: `/api/v1/wardrobe/saved-looks/${id}`,
       baseUrl: apiBaseUrl,
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'If-Match': '*',
       },
-    })
+    }).catch(() => undefined)
   }
 }
 
@@ -81,16 +109,18 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
   test.describe.configure({ mode: 'serial' })
 
   test(
-    '[P0] saves a Style this piece look with swaps, reopens in a second browser context with blocked storage, and removes it @local-lane',
+    '[P0] saves a Style this piece look with swaps, reopens in exact slot order in a second browser context with blocked storage, saves and reloads there, and removes it @local-lane',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ apiRequest, baseURL, browser, capsuleSession, page }) => {
       const apiBaseUrl = wardrobeOnboardingEnvironment.apiBaseUrl
       const garmentId = SEEDED_GARMENT_IDS[0]
-      await cleanupAccountSavedLooks(apiRequest, apiBaseUrl, capsuleSession.accessToken)
+      const createdIds = new Set<string>()
+      const capturedCompositions = new Map<string, string[]>()
 
       try {
         // Context 1: open Wardrobe, open Style this piece, swap shoes, and save the look.
         await page.setViewportSize({ width: 390, height: 844 })
+        trackCreatedSavedLookIds(page, createdIds, capturedCompositions)
         stubReadyGarmentWithPhoto(page, garmentId)
         await page.goto('/wardrobe')
 
@@ -109,8 +139,14 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           'data-save-state',
           'saved'
         )
+        await expect.poll(() => createdIds.size).toBe(1)
+        const firstSavedId = Array.from(createdIds)[0]!
+        const expectedOrder = capturedCompositions.get(firstSavedId)!
+        expect(expectedOrder.length).toBeGreaterThanOrEqual(2)
+        expect(expectedOrder[0]).toBe(garmentId)
 
-        // Context 2: completely separate browser context (second device) with localStorage blocked.
+        // Context 2: separate browser context (second device) with localStorage blocked.
+        // Session bearer is re-established on navigation (as after re-authentication when storage is blocked).
         const secondContext = await browser.newContext({
           viewport: { width: 390, height: 844 },
         })
@@ -125,6 +161,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           })
           await seedWebSession(secondContext, capsuleSession.accessToken)
           const secondPage = await secondContext.newPage()
+          trackCreatedSavedLookIds(secondPage, createdIds, capturedCompositions)
           stubReadyGarmentWithPhoto(secondPage, garmentId)
           await secondPage.goto(`${baseURL}/wardrobe`)
 
@@ -133,10 +170,17 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           await expect(savedLooksRow).toBeVisible()
           await savedLooksRow.click()
 
-          const savedLookItem = secondPage.getByTestId('saved-look-reopen').first()
-          await expect(savedLookItem).toBeVisible()
-          await savedLookItem.click()
+          // Verify exact stored composition slot IDs and ordering in Context 2.
+          const card = secondPage.getByTestId(`saved-look-card-${firstSavedId}`)
+          await expect(card).toBeVisible()
+          const renderedOrder = await card
+            .locator('[data-slot-item-id]')
+            .evaluateAll((els) =>
+              els.map((el) => el.getAttribute('data-slot-item-id') ?? '')
+            )
+          expect(renderedOrder).toEqual(expectedOrder)
 
+          await card.getByTestId('saved-look-reopen').click()
           const reopenedDialog = secondPage.getByRole('dialog', {
             name: 'Style this piece',
           })
@@ -148,21 +192,19 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
             reopenedDialog.getByTestId('style-piece-look').first()
           ).toContainText('Loafers')
 
-          // Close dialog, remove from Closet Saved looks row, reload, and confirm gone.
+          // Close dialog, remove this specific saved look, reload, and confirm it is gone.
           await reopenedDialog.getByRole('button', { name: 'Close' }).click()
           await expect(reopenedDialog).toBeHidden()
-          await secondPage.getByTestId('saved-look-remove').first().click()
-          await expect(secondPage.getByTestId('closet-saved-looks-list')).toContainText(
-            'No saved looks yet.'
-          )
+          await card.getByTestId('saved-look-remove').click()
+          await expect(card).toBeHidden()
 
           await secondPage.reload()
           await secondPage.getByTestId('closet-saved-looks-row').click()
-          await expect(secondPage.getByTestId('closet-saved-looks-list')).toContainText(
-            'No saved looks yet.'
-          )
+          await expect(
+            secondPage.getByTestId(`saved-look-card-${firstSavedId}`)
+          ).toHaveCount(0)
 
-          // Also verify saving and reloading directly inside the storage-blocked context (AC 3 & AC 6).
+          // Verify saving and reloading directly inside the storage-blocked context (AC 3 & AC 6).
           await secondPage.getByTestId('style-piece-open').first().click()
           const blockedDialog = secondPage.getByRole('dialog', {
             name: 'Style this piece',
@@ -174,28 +216,39 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
             'data-save-state',
             'saved'
           )
+          await expect.poll(() => createdIds.size).toBe(2)
+          const secondSavedId = Array.from(createdIds)[1]!
           await blockedDialog.getByRole('button', { name: 'Close' }).click()
           await secondPage.reload()
           await secondPage.getByTestId('closet-saved-looks-row').click()
-          await expect(secondPage.getByTestId('saved-look-reopen').first()).toBeVisible()
+          await expect(
+            secondPage.getByTestId(`saved-look-card-${secondSavedId}`)
+          ).toBeVisible()
         } finally {
           await secondContext.close()
         }
       } finally {
-        await cleanupAccountSavedLooks(apiRequest, apiBaseUrl, capsuleSession.accessToken)
+        await cleanupCreatedSavedLooks(
+          apiRequest,
+          apiBaseUrl,
+          capsuleSession.accessToken,
+          createdIds
+        )
       }
     }
   )
 
   test(
-    '[P1] saves a Home sample look into the same account list and opens it from Closet Saved looks @local-lane',
+    '[P1] saves a Home sample look into the same account list and opens it in exact slot order from Closet Saved looks @local-lane',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ apiRequest, baseURL, browser, capsuleSession, page }) => {
       const apiBaseUrl = wardrobeOnboardingEnvironment.apiBaseUrl
-      await cleanupAccountSavedLooks(apiRequest, apiBaseUrl, capsuleSession.accessToken)
+      const createdIds = new Set<string>()
+      const capturedCompositions = new Map<string, string[]>()
 
       try {
         await page.setViewportSize({ width: 390, height: 844 })
+        trackCreatedSavedLookIds(page, createdIds, capturedCompositions)
         // Force Home into the member sample outfit path (no location yet) so Save sample is shown.
         void interceptOnPage({
           page,
@@ -211,6 +264,10 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         await expect(sampleSave).toBeVisible()
         await sampleSave.click()
         await expect(sampleSave).toHaveAttribute('data-save-state', 'saved')
+        await expect.poll(() => createdIds.size).toBe(1)
+        const homeSavedId = Array.from(createdIds)[0]!
+        const expectedOrder = capturedCompositions.get(homeSavedId)!
+        expect(expectedOrder.length).toBeGreaterThanOrEqual(2)
 
         // Open Closet in a second context with localStorage blocked and verify the Home sample look appears.
         const secondContext = await browser.newContext({
@@ -231,20 +288,31 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           await secondPage.goto(`${baseURL}/wardrobe`)
 
           await secondPage.getByTestId('closet-saved-looks-row').click()
-          await expect(secondPage.getByTestId('closet-saved-looks-list')).toContainText(
-            'From sample idea'
-          )
-          await secondPage.getByTestId('saved-look-reopen').first().click()
-          await expect(secondPage.getByTestId('saved-look-detail-modal')).toBeVisible()
+          const card = secondPage.getByTestId(`saved-look-card-${homeSavedId}`)
+          await expect(card).toContainText('From sample idea')
+          await card.getByTestId('saved-look-reopen').click()
+
+          const modal = secondPage.getByTestId('saved-look-detail-modal')
+          await expect(modal).toBeVisible()
+          const modalOrder = await modal
+            .locator('[data-slot-item-id]')
+            .evaluateAll((els) =>
+              els.map((el) => el.getAttribute('data-slot-item-id') ?? '')
+            )
+          expect(modalOrder).toEqual(expectedOrder)
+
           await secondPage.getByTestId('saved-look-detail-remove').click()
-          await expect(secondPage.getByTestId('closet-saved-looks-list')).toContainText(
-            'No saved looks yet.'
-          )
+          await expect(card).toHaveCount(0)
         } finally {
           await secondContext.close()
         }
       } finally {
-        await cleanupAccountSavedLooks(apiRequest, apiBaseUrl, capsuleSession.accessToken)
+        await cleanupCreatedSavedLooks(
+          apiRequest,
+          apiBaseUrl,
+          capsuleSession.accessToken,
+          createdIds
+        )
       }
     }
   )

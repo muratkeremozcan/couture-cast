@@ -75,18 +75,23 @@ Ran against isolated PostgreSQL 17 (`127.0.0.1:54361`, `PLAYWRIGHT_SKIP_DB_RESET
   - `revision Int @default(0)`
   - `idempotency_key String?`
   - `idempotency_payload_hash String?`
+  - `deleted_at DateTime?` (soft-delete tombstone so delayed create retries cannot resurrect a removed look and owner-scoped `/restore` Undo restores the exact original `anchor_snapshot`, `composition`, `missing_garment`, and `needs_review` states)
   - `created_at DateTime @default(now())`
   - `updated_at DateTime @updatedAt`
   - Indexes & unique constraints:
     - `@@unique([id, user_id])`
     - `@@unique([user_id, idempotency_key])`
-    - `@@index([user_id, updated_at(sort: Desc), id(sort: Asc)])`
+    - `@@index([user_id, deleted_at, updated_at(sort: Desc), id(sort: Asc)])`
     - `@@index([user_id, source, anchor_garment_id])`
 - Add `saved_looks SavedLook[]` to `model User`.
-- **Postgres RLS & Grants in migration SQL:**
-  - `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public."SavedLook" TO authenticated;`
+- **Postgres RLS & Grants in migration SQL (API-only table):**
+  - `REVOKE ALL ON TABLE public."SavedLook" FROM anon;`
+  - `REVOKE ALL ON TABLE public."SavedLook" FROM authenticated;`
   - `ALTER TABLE public."SavedLook" ENABLE ROW LEVEL SECURITY;`
-  - Policies `authenticated_read_own_saved_looks` / `insert` / `update` / `delete` using `private.can_read_shared_user_row("user_id")` and `private.can_write_shared_user_row("user_id")` (matching `OutfitCapsule`, `WardrobeOnboardingState`, `SilhouetteProfile`).
+  - All reads and writes go strictly through the NestJS API (`/api/v1/wardrobe/saved-looks`) so moderators, anon, and suspended/missing-profile accounts cannot bypass API ownership, guardian consent, photo-signing, or cache-control rules via direct PostgREST queries.
+- **Guardian-pending teens & blocked-storage session boundary:**
+  - Under the shipped default policy (`GUARDIAN_CONSENT_POLICY=off`), teens with `pending_guardian_consent` sign in normally and can use saved looks; at the API layer, whenever `canTeenAccess(userId)` is false (e.g. under `required_13_15` or consent revocation), `/api/v1/wardrobe/saved-looks` allows `home_sample` CRUD and listing/removing existing looks with `imageAccess: null` while blocking `style_piece` garment creation and wardrobe photo signing (`403`). Under `required_13_15`, web `/signin` continues to route awaiting teens to the guardian invitation step per Story 4.4 / CC-0.11.
+  - When browser `localStorage` is blocked (`SecurityError`), the account saved looks API persists and restores all saved looks without touching `localStorage`; web session persistence itself falls back to in-memory auth (requiring re-authentication after a hard browser reload unless a session bearer is re-established).
 - **Account Erasure:** `ON DELETE CASCADE` on `SavedLook.user_id -> User.id`.
 
 ### 2. HTTP Contracts, OpenAPI & Pact (`packages/api-client`, `pact/`)

@@ -1,6 +1,6 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,16 +8,44 @@ import type {
   GarmentItemContract,
   SavedLookContract,
 } from '@couture/api-client/contracts/http'
+import { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } from '@couture/utils'
+import { SaveFeedbackProvider } from '@/components/save-feedback'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { setMobileApplicationUserId } from '@/src/lib/mobile-auth'
 
-const { createSavedLookFromMobile, deleteSavedLookFromMobile } = vi.hoisted(() => ({
-  createSavedLookFromMobile: vi.fn(),
+const {
+  deleteSavedLookFromMobile,
+  getSavedLookFromMobile,
+  notifyMobileSavedLooksChanged,
+  restoreSavedLookFromMobile,
+} = vi.hoisted(() => ({
   deleteSavedLookFromMobile: vi.fn(),
+  getSavedLookFromMobile: vi.fn(),
+  notifyMobileSavedLooksChanged: vi.fn(),
+  restoreSavedLookFromMobile: vi.fn(),
+}))
+
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn().mockResolvedValue(null),
+  setItemAsync: vi.fn().mockResolvedValue(undefined),
+  deleteItemAsync: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/src/lib/saved-looks', () => ({
-  createSavedLookFromMobile,
+  MobileSavedLookRequestError: class MobileSavedLookRequestError extends Error {
+    constructor(
+      message: string,
+      readonly status?: number,
+      readonly code?: string
+    ) {
+      super(message)
+      this.name = 'MobileSavedLookRequestError'
+    }
+  },
   deleteSavedLookFromMobile,
+  getSavedLookFromMobile,
+  notifyMobileSavedLooksChanged,
+  restoreSavedLookFromMobile,
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
 }))
@@ -42,37 +70,45 @@ const ACTIVE_GARMENT: GarmentItemContract = {
   },
 }
 
-function makeSavedLook(overrides: Partial<SavedLookContract> = {}): SavedLookContract {
+function makeExactEditorLook(
+  overrides: Partial<SavedLookContract> = {}
+): SavedLookContract {
+  const selection = stylePieceAnchor(ACTIVE_GARMENT)!
+  const generated = stylePieceLooks(selection, 'warm-rainy', SAMPLE_CATALOG).looks[0]!
   return {
     id: 'sl-m1',
     ownerUserId: 'user-1',
     source: 'style_piece',
-    lookId: 'sample:l:soft-pleats',
+    lookId: generated.recipe.lookId,
     weather: 'warm-rainy',
     title: null,
-    anchorGarmentId: 'garment-1',
-    anchorSnapshot: { garmentId: 'garment-1', category: 'top', comfortRange: 'mild' },
+    anchorGarmentId: ACTIVE_GARMENT.id,
+    anchorSnapshot: {
+      garmentId: ACTIVE_GARMENT.id,
+      category: 'top',
+      comfortRange: 'mild',
+    },
     composition: [
       {
         slotIndex: 0,
         category: 'top',
         kind: 'garment',
-        itemId: 'garment-1',
+        itemId: ACTIVE_GARMENT.id,
         label: null,
         missing: false,
         imageAccess: null,
       },
-      {
-        slotIndex: 1,
-        category: 'shoes',
-        kind: 'catalog',
-        itemId: 'sample:g:loafers',
-        label: 'Loafers',
+      ...generated.companions.map((companion, idx) => ({
+        slotIndex: idx + 1,
+        category: companion.category,
+        kind: 'catalog' as const,
+        itemId: companion.id,
+        label: null,
         missing: false,
         imageAccess: null,
-      },
+      })),
     ],
-    swaps: { shoes: 'sample:g:loafers' },
+    swaps: generated.recipe.swaps,
     collection: null,
     comfort: null,
     availabilityStatus: 'ready',
@@ -93,14 +129,16 @@ describe('ClosetSavedLooksRow (mobile)', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    setMobileApplicationUserId(null)
     deleteSavedLookFromMobile.mockResolvedValue(undefined)
-    createSavedLookFromMobile.mockResolvedValue(makeSavedLook({ id: 'sl-m-restored' }))
+    restoreSavedLookFromMobile.mockResolvedValue(makeExactEditorLook({ revision: 2 }))
+    getSavedLookFromMobile.mockResolvedValue(makeExactEditorLook())
   })
 
-  it('reopens ready style_piece look, renders photo-unavailable placeholder, and removes with Undo', async () => {
+  it('reopens exact-order style_piece look, renders photo-unavailable placeholder, and removes with /restore Undo', async () => {
     const onReopenStylePiece = vi.fn()
     const onChanged = vi.fn()
-    const look = makeSavedLook()
+    const look = makeExactEditorLook()
 
     await render(
       <ClosetSavedLooksRow
@@ -125,19 +163,156 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await waitFor(() =>
       expect(deleteSavedLookFromMobile).toHaveBeenCalledWith(
         'sl-m1',
-        '"saved-look:sl-m1:0"'
+        '"saved-look:sl-m1:0"',
+        { accessToken: undefined }
       )
     )
     expect(onChanged).toHaveBeenCalledTimes(1)
 
     const undoButton = await screen.findByText('Undo')
     await userEvent.click(undoButton)
-    await waitFor(() => expect(createSavedLookFromMobile).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(restoreSavedLookFromMobile).toHaveBeenCalledWith('sl-m1', {
+        accessToken: undefined,
+      })
+    )
     expect(onChanged).toHaveBeenCalledTimes(2)
   })
 
-  it('renders missing garment and needs review looks and opens detail modal', async () => {
-    const missingLook = makeSavedLook({
+  it('fences Closet Undo and late DELETE across account switches in a shared root provider', async () => {
+    const onChanged = vi.fn()
+    const lookA = makeExactEditorLook({ id: 'sl-ma', ownerUserId: 'member-a' })
+    const lookB = makeExactEditorLook({ id: 'sl-mb', ownerUserId: 'member-b' })
+    setMobileApplicationUserId('member-a')
+
+    const { rerender } = await render(
+      <SaveFeedbackProvider>
+        <ClosetSavedLooksRow
+          owner="member-a"
+          savedLooks={[lookA]}
+          isLoading={false}
+          loadError={null}
+          garments={[ACTIVE_GARMENT]}
+          onRetry={vi.fn()}
+          onChanged={onChanged}
+          onReopenStylePiece={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    await userEvent.click(screen.getByTestId('closet-saved-looks-row'))
+    await userEvent.click(screen.getByTestId('saved-look-remove'))
+    await screen.findByText('Undo')
+
+    setMobileApplicationUserId('member-b')
+    await rerender(
+      <SaveFeedbackProvider>
+        <ClosetSavedLooksRow
+          owner="member-b"
+          savedLooks={[lookB]}
+          isLoading={false}
+          loadError={null}
+          garments={[ACTIVE_GARMENT]}
+          onRetry={vi.fn()}
+          onChanged={onChanged}
+          onReopenStylePiece={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    expect(screen.queryByText('Undo')).not.toBeInTheDocument()
+    expect(restoreSavedLookFromMobile).not.toHaveBeenCalled()
+
+    // Late DELETE after account switch does not emit notice or onChanged for the next account.
+    let finishDelete!: () => void
+    deleteSavedLookFromMobile.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishDelete = resolve
+        })
+    )
+    onChanged.mockClear()
+    deleteSavedLookFromMobile.mockClear()
+    await userEvent.click(screen.getByTestId('saved-look-remove'))
+    await waitFor(() => expect(deleteSavedLookFromMobile).toHaveBeenCalledTimes(1))
+
+    setMobileApplicationUserId('member-a')
+    await rerender(
+      <SaveFeedbackProvider>
+        <ClosetSavedLooksRow
+          owner="member-a"
+          savedLooks={[lookA]}
+          isLoading={false}
+          loadError={null}
+          garments={[ACTIVE_GARMENT]}
+          onRetry={vi.fn()}
+          onChanged={onChanged}
+          onReopenStylePiece={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    finishDelete()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(onChanged).not.toHaveBeenCalled()
+    expect(screen.queryByText('Undo')).not.toBeInTheDocument()
+  })
+
+  it('opens exact detail modal for non-default slot ordering, handles expired photos, and supports pagination', async () => {
+    const onReopenStylePiece = vi.fn()
+    const onLoadMore = vi.fn()
+    const base = makeExactEditorLook()
+    const reordered = makeExactEditorLook({
+      id: 'sl-reordered',
+      composition: [
+        {
+          ...base.composition[0]!,
+          imageAccess: {
+            url: 'https://photos.example.test/expired.png',
+            expiresAt: '2020-01-01T00:00:00.000Z',
+          },
+        },
+        { ...base.composition[base.composition.length - 1]!, slotIndex: 1 },
+        { ...base.composition[1]!, slotIndex: 2 },
+      ],
+    })
+
+    await render(
+      <ClosetSavedLooksRow
+        owner="user-1"
+        savedLooks={[reordered]}
+        totalCount={51}
+        hasMore
+        onLoadMore={onLoadMore}
+        isLoading={false}
+        loadError={null}
+        garments={[ACTIVE_GARMENT]}
+        onRetry={vi.fn()}
+        onChanged={vi.fn()}
+        onReopenStylePiece={onReopenStylePiece}
+      />
+    )
+
+    expect(screen.getByTestId('closet-saved-looks-row')).toHaveTextContent('51')
+    await userEvent.click(screen.getByTestId('closet-saved-looks-row'))
+    expect(screen.getByTestId('saved-look-photo-placeholder')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByTestId('saved-look-reopen'))
+    expect(onReopenStylePiece).not.toHaveBeenCalled()
+    expect(screen.getByTestId('saved-look-detail-modal')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(getSavedLookFromMobile).toHaveBeenCalledWith('sl-reordered', {
+        accessToken: undefined,
+      })
+    )
+
+    await userEvent.click(screen.getByTestId('saved-look-detail-close'))
+    await userEvent.click(screen.getByTestId('saved-looks-load-more'))
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders missing garment, needs review, and image-error fallback cleanly', async () => {
+    const missingLook = makeExactEditorLook({
       id: 'sl-missing',
       availabilityStatus: 'missing_garment',
       missingGarmentIds: ['garment-gone'],
@@ -153,16 +328,30 @@ describe('ClosetSavedLooksRow (mobile)', () => {
         },
       ],
     })
-    const reviewLook = makeSavedLook({
+    const errorPhotoLook = makeExactEditorLook({
       id: 'sl-review',
       availabilityStatus: 'needs_review',
       needsReviewReasons: ['comfort_range_changed'],
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top',
+          kind: 'garment',
+          itemId: 'garment-1',
+          label: null,
+          missing: false,
+          imageAccess: {
+            url: 'https://photos.example.test/broken.png',
+            expiresAt: '2099-01-01T00:00:00.000Z',
+          },
+        },
+      ],
     })
 
     await render(
       <ClosetSavedLooksRow
         owner="user-1"
-        savedLooks={[missingLook, reviewLook]}
+        savedLooks={[missingLook, errorPhotoLook]}
         isLoading={false}
         loadError={null}
         garments={[ACTIVE_GARMENT]}
@@ -175,6 +364,14 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(screen.getByTestId('closet-saved-looks-row'))
     expect(screen.getByTestId('saved-look-missing-garment')).toBeInTheDocument()
     expect(screen.getByTestId('saved-look-needs-review')).toBeInTheDocument()
+
+    const img = document.querySelector('img')
+    expect(img).not.toBeNull()
+    expect(screen.queryAllByTestId('saved-look-photo-placeholder')).toHaveLength(0)
+    fireEvent.error(img!)
+    await waitFor(() =>
+      expect(screen.getAllByTestId('saved-look-photo-placeholder')).toHaveLength(1)
+    )
 
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     expect(screen.getByTestId('saved-look-detail-modal')).toBeInTheDocument()

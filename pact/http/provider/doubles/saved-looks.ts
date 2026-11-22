@@ -113,6 +113,12 @@ export function createSavedLookDoubles() {
       }
       return Promise.resolve({ data: buildContract() })
     },
+    restoreSavedLook: (_actor: unknown, savedLookId: string) => {
+      if (state.scenario === 'missing' || savedLookId !== state.savedLookId) {
+        return Promise.reject(new NotFoundException('SAVED_LOOK_NOT_FOUND'))
+      }
+      return Promise.resolve({ data: { ...buildContract(), revision: 2 } })
+    },
     deleteSavedLook: (
       _actor: unknown,
       savedLookId: string,
@@ -122,7 +128,7 @@ export function createSavedLookDoubles() {
       if (state.scenario === 'missing' || savedLookId !== state.savedLookId) {
         return Promise.reject(new NotFoundException('SAVED_LOOK_NOT_FOUND'))
       }
-      if (expected !== null && expected !== 0) {
+      if (expected !== null && !expected.includes(0)) {
         return Promise.reject(
           new PreconditionFailedException('SAVED_LOOK_REVISION_MISMATCH')
         )

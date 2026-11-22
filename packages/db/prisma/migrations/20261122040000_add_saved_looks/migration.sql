@@ -22,6 +22,7 @@ CREATE TABLE "SavedLook" (
     "revision" INTEGER NOT NULL DEFAULT 0,
     "idempotency_key" TEXT,
     "idempotency_payload_hash" TEXT,
+    "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -35,7 +36,7 @@ CREATE UNIQUE INDEX "SavedLook_id_user_id_key" ON "SavedLook"("id", "user_id");
 CREATE UNIQUE INDEX "SavedLook_user_id_idempotency_key_key" ON "SavedLook"("user_id", "idempotency_key");
 
 -- CreateIndex
-CREATE INDEX "SavedLook_user_id_updated_at_id_idx" ON "SavedLook"("user_id", "updated_at" DESC, "id" ASC);
+CREATE INDEX "SavedLook_user_id_deleted_at_updated_at_id_idx" ON "SavedLook"("user_id", "deleted_at", "updated_at" DESC, "id" ASC);
 
 -- CreateIndex
 CREATE INDEX "SavedLook_user_id_source_anchor_garment_id_idx" ON "SavedLook"("user_id", "source", "anchor_garment_id");
@@ -43,13 +44,9 @@ CREATE INDEX "SavedLook_user_id_source_anchor_garment_id_idx" ON "SavedLook"("us
 -- AddForeignKey
 ALTER TABLE "SavedLook" ADD CONSTRAINT "SavedLook_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- RLS policies and grants for SavedLook
--- All writes go through the NestJS API so PostgREST clients cannot bypass
--- validation, idempotency, revision checks, or garment ownership guards.
+-- API-only access for SavedLook: revoke all direct PostgREST privileges from anon and
+-- authenticated so moderators and restricted/suspended accounts cannot bypass the
+-- NestJS API ownership, guardian consent, signed URL, and cache-control checks.
 REVOKE ALL ON TABLE public."SavedLook" FROM anon;
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public."SavedLook" FROM authenticated;
-GRANT SELECT ON TABLE public."SavedLook" TO authenticated;
+REVOKE ALL ON TABLE public."SavedLook" FROM authenticated;
 ALTER TABLE public."SavedLook" ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS authenticated_read_own_saved_looks ON public."SavedLook";
-CREATE POLICY authenticated_read_own_saved_looks ON public."SavedLook" FOR SELECT TO authenticated USING (private.can_read_shared_user_row("user_id"));

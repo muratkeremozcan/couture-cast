@@ -1,21 +1,22 @@
 // Story CC-7.2: Temporary "Saved looks" row at the top of the mobile Closet screen until CC-7.12 ships.
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type {
-  CreateSavedLookInput,
   GarmentItemContract,
   SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import {
   createAnnouncementToken,
-  createIdempotencyKey,
   getGuestPreviewStrings,
   isOfflineError,
   SAMPLE_CATALOG,
   sampleGarmentText,
   sampleLookText,
+  savedLookToStylePieceRecipe,
   stylePieceAnchor,
+  stylePieceLooks,
+  visibleStylePieceLooks,
   type SampleWeatherKey,
 } from '@couture/utils'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
@@ -30,45 +31,151 @@ import {
 } from '@/components/save-feedback'
 import { useSchemeColors } from '@/components/themed'
 import {
-  createSavedLookFromMobile,
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
+  resolveMobileAccessToken,
+} from '@/src/lib/mobile-auth'
+import {
   deleteSavedLookFromMobile,
   formatSavedLookIfMatch,
+  getSavedLookFromMobile,
+  MobileSavedLookRequestError,
+  notifyMobileSavedLooksChanged,
+  restoreSavedLookFromMobile,
 } from '@/src/lib/saved-looks'
 import { PreviewButton, SampleGarmentArt } from '../preview/guest-preview-parts'
 
 const CATALOG_BY_ID = new Map(SAMPLE_CATALOG.garments.map((item) => [item.id, item]))
 
-function toRecreateInput(look: SavedLookContract): CreateSavedLookInput {
-  return {
-    source: look.source,
-    lookId: look.lookId,
-    weather: look.weather,
-    title: look.title,
-    anchorGarmentId: look.anchorGarmentId,
-    anchorSnapshot: look.anchorSnapshot,
-    composition: look.composition.map((slot) => ({
-      slotIndex: slot.slotIndex,
-      category: slot.category,
-      kind: slot.kind,
-      itemId: slot.itemId,
-      label: slot.label,
-    })),
-    swaps: look.swaps,
-    collection: look.collection,
-    comfort: look.comfort,
-  }
+function sortedSlots(look: SavedLookContract) {
+  return [...look.composition].sort((a, b) => a.slotIndex - b.slotIndex)
 }
 
-export function ClosetSavedLooksRow(props: {
+function editorPreservesExactComposition(
+  look: SavedLookContract,
+  anchor: GarmentItemContract
+): boolean {
+  const selection = stylePieceAnchor(anchor)
+  const recipe = savedLookToStylePieceRecipe(look)
+  if (!selection || !recipe) return false
+  const generated = visibleStylePieceLooks(
+    stylePieceLooks(selection, recipe.weather, SAMPLE_CATALOG).looks,
+    { [recipe.lookId]: recipe },
+    { reopenedLookId: recipe.lookId }
+  )
+  const matched = generated.find((entry) => entry.recipe.lookId === recipe.lookId)
+  if (!matched) return false
+  const expectedSlots = [
+    { kind: 'garment', category: selection.category, itemId: anchor.id },
+    ...matched.companions.map((companion) => ({
+      kind: 'catalog',
+      category: companion.category,
+      itemId: companion.id,
+    })),
+  ]
+  const stored = sortedSlots(look)
+  if (stored.length !== expectedSlots.length) return false
+  return stored.every((slot, index) => {
+    const expected = expectedSlots[index]
+    return (
+      expected !== undefined &&
+      slot.slotIndex === index &&
+      slot.kind === expected.kind &&
+      slot.category === expected.category &&
+      slot.itemId === expected.itemId
+    )
+  })
+}
+
+function isSlotImageValid(
+  lookId: string,
+  slot: SavedLookContract['composition'][number],
+  failedImageKeys: ReadonlySet<string>
+): boolean {
+  if (!slot.imageAccess?.url) return false
+  const expiresAtMs = Date.parse(slot.imageAccess.expiresAt)
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) return false
+  return !failedImageKeys.has(`${lookId}:${slot.slotIndex}:${slot.imageAccess.url}`)
+}
+
+function SavedLookStatusBadges({
+  status,
+  missingLabel,
+  needsReviewLabel,
+  color,
+}: {
+  status: SavedLookContract['availabilityStatus']
+  missingLabel: string
+  needsReviewLabel: string
+  color: string
+}) {
+  if (status === 'missing_garment') {
+    return (
+      <Text testID="saved-look-missing-garment" style={[styles.badge, { color }]}>
+        {missingLabel}
+      </Text>
+    )
+  }
+  if (status === 'needs_review') {
+    return (
+      <Text testID="saved-look-needs-review" style={[styles.badge, { color }]}>
+        {needsReviewLabel}
+      </Text>
+    )
+  }
+  return null
+}
+
+function SavedLookDetailNotices({
+  status,
+  missingDetail,
+  needsReviewDetail,
+  color,
+}: {
+  status: SavedLookContract['availabilityStatus']
+  missingDetail: string
+  needsReviewDetail: string
+  color: string
+}) {
+  if (status === 'missing_garment') {
+    return (
+      <Text testID="saved-look-detail-missing" style={{ color }}>
+        {missingDetail}
+      </Text>
+    )
+  }
+  if (status === 'needs_review') {
+    return (
+      <Text testID="saved-look-detail-needs-review" style={{ color }}>
+        {needsReviewDetail}
+      </Text>
+    )
+  }
+  return null
+}
+
+async function ensureMobileOnline(readLiveOnline: () => boolean): Promise<boolean> {
+  if (readLiveOnline()) return true
+  if (hasReliableBrowserOnline()) return false
+  return checkNetworkOnlineForAction()
+}
+
+export type ClosetSavedLooksRowProps = {
   owner: string | null
   savedLooks: SavedLookContract[]
+  totalCount?: number
+  hasMore?: boolean
+  isLoadingMore?: boolean
+  onLoadMore?: () => void
   isLoading: boolean
   loadError: string | null
   garments: GarmentItemContract[]
   onRetry: () => void
   onChanged: () => void
   onReopenStylePiece: (look: SavedLookContract) => void
-}) {
+}
+
+export function ClosetSavedLooksRow(props: ClosetSavedLooksRowProps) {
   const { hasProvider } = useStatusBar()
   if (!props.owner) return null
   if (hasProvider) {
@@ -82,45 +189,102 @@ export function ClosetSavedLooksRow(props: {
 }
 
 function ClosetSavedLooksRowInner({
+  owner,
   savedLooks,
+  totalCount,
+  hasMore = false,
+  isLoadingMore = false,
+  onLoadMore,
   isLoading,
   loadError,
   garments,
   onRetry,
   onChanged,
   onReopenStylePiece,
-}: {
-  owner: string | null
-  savedLooks: SavedLookContract[]
-  isLoading: boolean
-  loadError: string | null
-  garments: GarmentItemContract[]
-  onRetry: () => void
-  onChanged: () => void
-  onReopenStylePiece: (look: SavedLookContract) => void
-}) {
+}: ClosetSavedLooksRowProps) {
   const { t, i18n } = useTranslation()
   const samples = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
   const palette = useHeroPalette()
   const insets = useModalInsets()
   const statusBar = useStatusBar()
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+  const mountedRef = useRef(true)
+  const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
+  const detailLookIdRef = useRef<string | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [detailLook, setDetailLook] = useState<SavedLookContract | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
   const noticeSeqRef = useRef(0)
+  detailLookIdRef.current = detailLook?.id ?? null
 
-  const readLiveOnline = () => statusBar.isOnline && getNetworkOnline()
+  const isActiveOwnerSession = (
+    actionOwner: string | null,
+    actionEpoch: number
+  ): boolean => {
+    if (!mountedRef.current || !actionOwner || ownerRef.current !== actionOwner) {
+      return false
+    }
+    if (mobileIdentityEpoch() !== actionEpoch) return false
+    const liveUser = mobileApplicationUserId()
+    return liveUser === null || liveUser === actionOwner
+  }
+
+  const showOwnedNotice = (
+    actionOwner: string | null,
+    actionEpoch: number,
+    notice: Parameters<typeof statusBar.showNotice>[0]
+  ) => {
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    ownedNoticeIdsRef.current.add(notice.id)
+    statusBarRef.current.showNotice(notice)
+  }
+
+  useEffect(() => {
+    mountedRef.current = true
+    const owned = ownedNoticeIdsRef.current
+    return () => {
+      mountedRef.current = false
+      for (const id of owned) {
+        statusBarRef.current.dismissNotice(id)
+      }
+      owned.clear()
+    }
+  }, [])
+
+  useEffect(() => {
+    const owned = ownedNoticeIdsRef.current
+    setDetailLook(null)
+    setRemovingId(null)
+    setFailedImageKeys(new Set())
+    return () => {
+      for (const id of owned) {
+        statusBarRef.current.dismissNotice(id)
+      }
+      owned.clear()
+    }
+  }, [owner])
+
+  const readLiveOnline = () => statusBarRef.current.isOnline && getNetworkOnline()
 
   const weatherLabel = (weather: string) =>
     samples.values.weather[weather as SampleWeatherKey] ?? weather
+
+  const isSlotPhotoUsable = (
+    lookId: string,
+    slot: SavedLookContract['composition'][number]
+  ): boolean => isSlotImageValid(lookId, slot, failedImageKeys)
 
   const canReopenInStylePiece = (look: SavedLookContract): boolean => {
     if (look.source !== 'style_piece' || look.availabilityStatus !== 'ready') {
       return false
     }
     const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-    return Boolean(anchor && stylePieceAnchor(anchor))
+    return Boolean(anchor && editorPreservesExactComposition(look, anchor))
   }
 
   const handleReopen = (look: SavedLookContract) => {
@@ -129,142 +293,174 @@ function ClosetSavedLooksRowInner({
       return
     }
     setDetailLook(look)
+    const needsPhotoRefresh = look.composition.some(
+      (slot) =>
+        slot.kind === 'garment' && !slot.missing && !isSlotPhotoUsable(look.id, slot)
+    )
+    if (needsPhotoRefresh && owner) {
+      const actionOwner = owner
+      const actionEpoch = mobileIdentityEpoch()
+      void resolveMobileAccessToken()
+        .catch(() => null)
+        .then((token) =>
+          getSavedLookFromMobile(look.id, { accessToken: token ?? undefined })
+        )
+        .then((fresh) => {
+          if (
+            !isActiveOwnerSession(actionOwner, actionEpoch) ||
+            detailLookIdRef.current !== look.id
+          ) {
+            return
+          }
+          setDetailLook(fresh)
+        })
+        .catch(() => undefined)
+    }
+  }
+
+  const showActionError = (
+    actionOwner: string | null,
+    actionEpoch: number,
+    kind: string,
+    error: unknown,
+    retry?: () => void
+  ) => {
+    const seq = ++noticeSeqRef.current
+    const offline = isOfflineError(error) || !readLiveOnline()
+    if (offline) reportNetworkOffline()
+    showOwnedNotice(actionOwner, actionEpoch, {
+      id: `${kind}-${offline ? 'offline' : 'failed'}-${seq}`,
+      announcementId: createAnnouncementToken(
+        `${kind}-${offline ? 'offline' : 'failed'}`,
+        seq
+      ),
+      message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+      tone: offline ? 'offline' : 'error',
+      actions:
+        !offline && retry
+          ? [{ id: 'retry', kind: 'retry', label: t('feedback.retry'), onPress: retry }]
+          : [],
+    })
+  }
+
+  const runUndoRemove = async (
+    look: SavedLookContract,
+    actionOwner: string | null,
+    actionEpoch: number,
+    actionToken: string | undefined
+  ) => {
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    const reachable = await ensureMobileOnline(readLiveOnline)
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    if (!reachable) {
+      showActionError(
+        actionOwner,
+        actionEpoch,
+        'mobile-saved-look-undo',
+        new TypeError('Failed to fetch')
+      )
+      return
+    }
+    try {
+      await restoreSavedLookFromMobile(look.id, { accessToken: actionToken })
+      if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+      onChanged()
+      notifyMobileSavedLooksChanged(actionOwner)
+      const undoSeq = ++noticeSeqRef.current
+      showOwnedNotice(actionOwner, actionEpoch, {
+        id: `mobile-saved-look-undo-${undoSeq}`,
+        announcementId: createAnnouncementToken('mobile-saved-look-undo', undoSeq),
+        message: t('feedback.undone'),
+        tone: 'neutral',
+      })
+    } catch (undoError) {
+      if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+      showActionError(actionOwner, actionEpoch, 'mobile-saved-look-undo', undoError)
+    }
   }
 
   const handleRemove = async (look: SavedLookContract) => {
-    if (!readLiveOnline()) {
-      const reachable = hasReliableBrowserOnline()
-        ? false
-        : await checkNetworkOnlineForAction()
-      if (!reachable) {
-        const seq = ++noticeSeqRef.current
-        statusBar.showNotice({
-          id: `mobile-saved-look-offline-${seq}`,
-          announcementId: createAnnouncementToken('mobile-saved-look-offline', seq),
-          message: t('feedback.offlineAction'),
-          tone: 'offline',
-          actions: [],
-        })
+    const actionOwner = owner
+    const actionEpoch = mobileIdentityEpoch()
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+
+    const reachable = await ensureMobileOnline(readLiveOnline)
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    if (!reachable) {
+      showActionError(
+        actionOwner,
+        actionEpoch,
+        'mobile-saved-look-remove',
+        new TypeError('Failed to fetch')
+      )
+      return
+    }
+
+    const actionToken = (await resolveMobileAccessToken().catch(() => null)) ?? undefined
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+
+    setRemovingId(look.id)
+    let alreadyDeleted = false
+    try {
+      await deleteSavedLookFromMobile(
+        look.id,
+        formatSavedLookIfMatch(look.id, look.revision),
+        { accessToken: actionToken }
+      )
+    } catch (error) {
+      if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+      if (error instanceof MobileSavedLookRequestError && error.status === 404) {
+        alreadyDeleted = true
+      } else {
+        showActionError(
+          actionOwner,
+          actionEpoch,
+          'mobile-saved-look-remove',
+          error,
+          () => {
+            if (isActiveOwnerSession(actionOwner, actionEpoch)) void handleRemove(look)
+          }
+        )
+        setRemovingId(null)
         return
       }
     }
 
-    setRemovingId(look.id)
-    try {
-      await deleteSavedLookFromMobile(
-        look.id,
-        formatSavedLookIfMatch(look.id, look.revision)
-      )
-      if (detailLook?.id === look.id) setDetailLook(null)
-      onChanged()
-      const seq = ++noticeSeqRef.current
-      statusBar.showNotice({
-        id: `mobile-saved-look-remove-${seq}`,
-        announcementId: createAnnouncementToken('mobile-saved-look-remove', seq),
-        message: t('feedback.removed'),
-        tone: 'neutral',
-        actions:
-          look.availabilityStatus === 'missing_garment'
-            ? []
-            : [
-                {
-                  id: 'undo',
-                  kind: 'undo',
-                  label: t('feedback.undo'),
-                  onPress: async () => {
-                    if (!readLiveOnline()) {
-                      const reachable = hasReliableBrowserOnline()
-                        ? false
-                        : await checkNetworkOnlineForAction()
-                      if (!reachable) {
-                        const offSeq = ++noticeSeqRef.current
-                        statusBar.showNotice({
-                          id: `mobile-saved-look-undo-offline-${offSeq}`,
-                          announcementId: createAnnouncementToken(
-                            'mobile-saved-look-undo-offline',
-                            offSeq
-                          ),
-                          message: t('feedback.offlineAction'),
-                          tone: 'offline',
-                          actions: [],
-                        })
-                        return
-                      }
-                    }
-                    try {
-                      await createSavedLookFromMobile(toRecreateInput(look), {
-                        idempotencyKey: createIdempotencyKey(),
-                      })
-                      onChanged()
-                      const undoSeq = ++noticeSeqRef.current
-                      statusBar.showNotice({
-                        id: `mobile-saved-look-undo-${undoSeq}`,
-                        announcementId: createAnnouncementToken(
-                          'mobile-saved-look-undo',
-                          undoSeq
-                        ),
-                        message: t('feedback.undone'),
-                        tone: 'neutral',
-                      })
-                    } catch (undoError) {
-                      const errSeq = ++noticeSeqRef.current
-                      const offline = isOfflineError(undoError) || !readLiveOnline()
-                      if (offline) reportNetworkOffline()
-                      statusBar.showNotice({
-                        id: `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
-                        announcementId: createAnnouncementToken(
-                          `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}`,
-                          errSeq
-                        ),
-                        message: offline
-                          ? t('feedback.offlineAction')
-                          : t('feedback.saveFailed'),
-                        tone: offline ? 'offline' : 'error',
-                        actions: [],
-                      })
-                    }
-                  },
-                },
-              ],
-      })
-    } catch (error) {
-      const seq = ++noticeSeqRef.current
-      if (isOfflineError(error) || !readLiveOnline()) {
-        reportNetworkOffline()
-        statusBar.showNotice({
-          id: `mobile-saved-look-remove-offline-${seq}`,
-          announcementId: createAnnouncementToken(
-            'mobile-saved-look-remove-offline',
-            seq
-          ),
-          message: t('feedback.offlineAction'),
-          tone: 'offline',
-          actions: [],
-        })
-      } else {
-        statusBar.showNotice({
-          id: `mobile-saved-look-remove-failed-${seq}`,
-          announcementId: createAnnouncementToken('mobile-saved-look-remove-failed', seq),
-          message: t('feedback.saveFailed'),
-          tone: 'error',
-          actions: [
+    if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    setRemovingId(null)
+    if (detailLookIdRef.current === look.id) setDetailLook(null)
+    onChanged()
+    notifyMobileSavedLooksChanged(actionOwner)
+
+    let undoInFlight = false
+    const seq = ++noticeSeqRef.current
+    showOwnedNotice(actionOwner, actionEpoch, {
+      id: `mobile-saved-look-remove-${seq}`,
+      announcementId: createAnnouncementToken('mobile-saved-look-remove', seq),
+      message: t('feedback.removed'),
+      tone: 'neutral',
+      actions: alreadyDeleted
+        ? []
+        : [
             {
-              id: 'retry',
-              kind: 'retry',
-              label: t('feedback.retry'),
-              onPress: () => {
-                void handleRemove(look)
+              id: 'undo',
+              kind: 'undo',
+              label: t('feedback.undo'),
+              onPress: async () => {
+                if (undoInFlight) return
+                undoInFlight = true
+                try {
+                  await runUndoRemove(look, actionOwner, actionEpoch, actionToken)
+                } finally {
+                  undoInFlight = false
+                }
               },
             },
           ],
-        })
-      }
-    } finally {
-      setRemovingId(null)
-    }
+    })
   }
 
-  const renderSlot = (slot: SavedLookContract['composition'][number]) => {
+  const renderSlot = (lookId: string, slot: SavedLookContract['composition'][number]) => {
     if (slot.kind === 'catalog') {
       const catalogItem = CATALOG_BY_ID.get(slot.itemId)
       const label = catalogItem
@@ -274,6 +470,7 @@ function ClosetSavedLooksRowInner({
         <View
           key={`${slot.slotIndex}-${slot.itemId}`}
           testID={`saved-look-slot-${slot.slotIndex}`}
+          accessibilityHint={slot.itemId}
           style={[styles.slotChip, { borderColor: colors.strongBorder }]}
         >
           {catalogItem ? <SampleGarmentArt garment={catalogItem} size={24} /> : null}
@@ -287,6 +484,7 @@ function ClosetSavedLooksRowInner({
         <View
           key={`${slot.slotIndex}-${slot.itemId}`}
           testID={`saved-look-slot-${slot.slotIndex}`}
+          accessibilityHint={slot.itemId}
           style={[
             styles.slotChip,
             {
@@ -302,17 +500,32 @@ function ClosetSavedLooksRowInner({
       )
     }
 
+    const photoUsable = isSlotPhotoUsable(lookId, slot)
+    const photoKey = slot.imageAccess?.url
+      ? `${lookId}:${slot.slotIndex}:${slot.imageAccess.url}`
+      : null
+
     return (
       <View
         key={`${slot.slotIndex}-${slot.itemId}`}
         testID={`saved-look-slot-${slot.slotIndex}`}
+        accessibilityHint={slot.itemId}
         style={[styles.slotChip, { borderColor: colors.strongBorder }]}
       >
-        {slot.imageAccess ? (
+        {photoUsable && slot.imageAccess ? (
           <Image
             source={{ uri: slot.imageAccess.url }}
             accessibilityLabel={samples.values.category[slot.category]}
             style={styles.slotImage}
+            onError={() => {
+              if (!photoKey) return
+              setFailedImageKeys((prev) => {
+                if (prev.has(photoKey)) return prev
+                const next = new Set(prev)
+                next.add(photoKey)
+                return next
+              })
+            }}
           />
         ) : (
           <View
@@ -325,13 +538,15 @@ function ClosetSavedLooksRowInner({
           </View>
         )}
         <Text style={[styles.slotText, { color: colors.text }]}>
-          {slot.imageAccess
+          {photoUsable
             ? samples.values.category[slot.category]
             : `${samples.values.category[slot.category]} · ${t('savedLooks.photoUnavailable')}`}
         </Text>
       </View>
     )
   }
+
+  const displayedCount = totalCount ?? savedLooks.length
 
   return (
     <View style={[styles.container, { borderColor: colors.strongBorder }]}>
@@ -349,7 +564,7 @@ function ClosetSavedLooksRowInner({
           <Text style={[styles.count, { color: colors.text }]}>
             {isLoading && savedLooks.length === 0
               ? '…'
-              : t('savedLooks.count', { count: savedLooks.length })}
+              : t('savedLooks.count', { count: displayedCount })}
           </Text>
         </View>
         <Text style={[styles.toggle, { color: colors.text }]}>
@@ -396,24 +611,14 @@ function ClosetSavedLooksRowInner({
                         : t('savedLooks.sourceHomeSample')
                     }`}
                   </Text>
-                  {look.availabilityStatus === 'missing_garment' ? (
-                    <Text
-                      testID="saved-look-missing-garment"
-                      style={[styles.badge, { color: colors.noticeText }]}
-                    >
-                      {t('savedLooks.missingPiece')}
-                    </Text>
-                  ) : null}
-                  {look.availabilityStatus === 'needs_review' ? (
-                    <Text
-                      testID="saved-look-needs-review"
-                      style={[styles.badge, { color: colors.noticeText }]}
-                    >
-                      {t('savedLooks.needsReview')}
-                    </Text>
-                  ) : null}
+                  <SavedLookStatusBadges
+                    status={look.availabilityStatus}
+                    missingLabel={t('savedLooks.missingPiece')}
+                    needsReviewLabel={t('savedLooks.needsReview')}
+                    color={colors.noticeText}
+                  />
                   <View style={styles.slotsRow}>
-                    {look.composition.map((slot) => renderSlot(slot))}
+                    {sortedSlots(look).map((slot) => renderSlot(look.id, slot))}
                   </View>
                   <View style={styles.actionsRow}>
                     <PreviewButton
@@ -434,6 +639,15 @@ function ClosetSavedLooksRowInner({
               )
             })
           )}
+          {hasMore && onLoadMore ? (
+            <PreviewButton
+              label={isLoadingMore ? '…' : t('savedLooks.showList')}
+              testID="saved-looks-load-more"
+              palette={palette}
+              disabled={isLoadingMore}
+              onPress={onLoadMore}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -477,27 +691,17 @@ function ClosetSavedLooksRowInner({
                     : t('savedLooks.sourceHomeSample')
                 }`}
               </Text>
-              {detailLook.availabilityStatus === 'missing_garment' ? (
-                <Text
-                  testID="saved-look-detail-missing"
-                  style={{ color: colors.noticeText }}
-                >
-                  {t('savedLooks.missingPieceDetail')}
-                </Text>
-              ) : null}
-              {detailLook.availabilityStatus === 'needs_review' ? (
-                <Text
-                  testID="saved-look-detail-needs-review"
-                  style={{ color: colors.noticeText }}
-                >
-                  {t('savedLooks.needsReviewDetail')}
-                </Text>
-              ) : null}
+              <SavedLookDetailNotices
+                status={detailLook.availabilityStatus}
+                missingDetail={t('savedLooks.missingPieceDetail')}
+                needsReviewDetail={t('savedLooks.needsReviewDetail')}
+                color={colors.noticeText}
+              />
               <Text style={[styles.cardTitle, { color: palette.text }]}>
                 {t('savedLooks.slotOrderLabel')}
               </Text>
               <View style={styles.slotsRow}>
-                {detailLook.composition.map((slot) => renderSlot(slot))}
+                {sortedSlots(detailLook).map((slot) => renderSlot(detailLook.id, slot))}
               </View>
               <PreviewButton
                 label={t('savedLooks.remove')}
@@ -531,19 +735,19 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700' },
   count: { fontSize: 12, opacity: 0.75 },
   toggle: { fontSize: 13, fontWeight: '600' },
-  errorBox: { borderRadius: 10, padding: 10, gap: 8 },
+  errorBox: { borderRadius: 10, padding: 12, gap: 8 },
   list: { gap: 12 },
   card: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
-  cardTitle: { fontSize: 14, fontWeight: '700' },
-  meta: { fontSize: 12, opacity: 0.8 },
+  cardTitle: { fontSize: 15, fontWeight: '600' },
+  meta: { fontSize: 12, opacity: 0.75 },
   badge: { fontSize: 12, fontWeight: '700' },
   slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slotChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderWidth: 1,
     borderRadius: 8,
+    borderWidth: 1,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -558,15 +762,13 @@ const styles = StyleSheet.create({
   photoFallbackText: { fontSize: 10, fontWeight: '700' },
   slotText: { fontSize: 12 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modal: { flex: 1 },
+  modal: { flex: 1, paddingHorizontal: 16 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
     paddingVertical: 12,
-    gap: 12,
   },
-  modalTitle: { fontSize: 20, fontWeight: '700', flex: 1 },
-  modalBody: { paddingHorizontal: 20, paddingVertical: 12, gap: 14 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalBody: { gap: 12, paddingBottom: 24 },
 })

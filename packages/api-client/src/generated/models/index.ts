@@ -18155,6 +18155,7 @@ export type SavedLookConflictErrorStatusCodeEnum =
 export const SavedLookConflictErrorMessageEnum = {
   IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD:
     'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+  SAVED_LOOK_ALREADY_REMOVED: 'SAVED_LOOK_ALREADY_REMOVED',
 } as const
 export type SavedLookConflictErrorMessageEnum =
   (typeof SavedLookConflictErrorMessageEnum)[keyof typeof SavedLookConflictErrorMessageEnum]

@@ -1,5 +1,7 @@
 // Learning path Step 59: Shared save, undo and status feedback.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-59-shared-save-undo-and-status-feedback
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import { useRef } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -55,6 +57,8 @@ vi.mock('@/src/lib/saved-looks', () => ({
   listSavedLooksFromMobile: mocks.listSavedLooksFromMobile,
   createSavedLookFromMobile: mocks.createSavedLookFromMobile,
   deleteSavedLookFromMobile: mocks.deleteSavedLookFromMobile,
+  restoreSavedLookFromMobile: vi.fn().mockResolvedValue(null),
+  notifyMobileSavedLooksChanged: vi.fn(),
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
 }))
@@ -1396,36 +1400,55 @@ describe('mobile save-feedback components', () => {
     mocks.listSavedLooksFromMobile.mockResolvedValue([])
     mocks.createSavedLookFromMobile
       .mockRejectedValueOnce(new Error('503 Service Unavailable'))
-      .mockResolvedValueOnce({
-        id: 'sl-mob-retry-1',
-        ownerUserId: 'mobile-storage-retry-owner',
-        source: 'style_piece',
-        lookId: 'sample:l:soft-pleats',
-        weather: 'mild-dry',
-        title: null,
-        anchorGarmentId: garment.id,
-        anchorSnapshot: { garmentId: garment.id, category: 'top', comfortRange: 'mild' },
-        composition: [
-          {
-            slotIndex: 0,
-            category: 'top',
-            kind: 'garment',
-            itemId: garment.id,
-            label: null,
-            missing: false,
-            imageAccess: null,
-          },
-        ],
-        swaps: {},
-        collection: null,
-        comfort: null,
-        availabilityStatus: 'ready',
-        missingGarmentIds: [],
-        needsReviewReasons: [],
-        revision: 0,
-        createdAt: '2026-11-22T00:00:00.000Z',
-        updatedAt: '2026-11-22T00:00:00.000Z',
-      })
+      .mockImplementationOnce(
+        (input: {
+          source: 'style_piece' | 'home_sample'
+          lookId: string
+          weather: string
+          title?: string | null
+          anchorGarmentId?: string | null
+          anchorSnapshot?: {
+            garmentId: string
+            category: 'top' | 'bottom' | 'shoes' | 'outerwear' | 'dress' | 'accessory'
+            comfortRange: 'cool' | 'mild' | 'warm'
+          } | null
+          composition: {
+            slotIndex: number
+            category: 'top' | 'bottom' | 'shoes' | 'outerwear' | 'dress' | 'accessory'
+            kind: 'garment' | 'catalog'
+            itemId: string
+            label?: string | null
+          }[]
+          swaps?: Record<string, string>
+          collection?: string | null
+          comfort?: string | null
+        }) =>
+          Promise.resolve({
+            id: 'sl-mob-retry-1',
+            ownerUserId: 'mobile-storage-retry-owner',
+            source: input.source,
+            lookId: input.lookId,
+            weather: input.weather,
+            title: input.title ?? null,
+            anchorGarmentId: input.anchorGarmentId ?? null,
+            anchorSnapshot: input.anchorSnapshot ?? null,
+            composition: input.composition.map((slot) => ({
+              ...slot,
+              label: slot.label ?? null,
+              missing: false,
+              imageAccess: null,
+            })),
+            swaps: input.swaps ?? {},
+            collection: input.collection ?? null,
+            comfort: input.comfort ?? null,
+            availabilityStatus: 'ready',
+            missingGarmentIds: [],
+            needsReviewReasons: [],
+            revision: 0,
+            createdAt: '2026-11-22T00:00:00.000Z',
+            updatedAt: '2026-11-22T00:00:00.000Z',
+          })
+      )
     try {
       const panelView = await render(
         <SaveFeedbackProvider>
@@ -1450,13 +1473,15 @@ describe('mobile save-feedback components', () => {
       const saveBtn = (await within(panel).findAllByTestId('style-piece-save'))[0]!
       await waitFor(() => expect(saveBtn).not.toBeDisabled())
 
-      // First save fails API write -> shows Failed + Retry
+      // First save fails API write -> shows Failed state on button + Retry bar
       fireEvent.click(saveBtn)
       await waitFor(() =>
         expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
           'Could not save. Try again.'
         )
       )
+      expect(saveBtn).toHaveTextContent('Failed')
+      expect(within(panel).getByTestId('status-bar-action-retry')).toBeInTheDocument()
 
       // Clicking Retry succeeds and reuses the exact same Idempotency-Key
       fireEvent.click(within(panel).getByTestId('status-bar-action-retry'))
@@ -1464,6 +1489,16 @@ describe('mobile save-feedback components', () => {
       const calls = mocks.createSavedLookFromMobile.mock.calls.slice(-2)
       expect(calls[0]?.[1]?.idempotencyKey).toBeTruthy()
       expect(calls[0]?.[1]?.idempotencyKey).toBe(calls[1]?.[1]?.idempotencyKey)
+
+      // Saving the same unchanged look again is a no-op without destructive Undo
+      fireEvent.click(saveBtn)
+      await waitFor(() =>
+        expect(
+          within(panel).queryByTestId('status-bar-action-undo')
+        ).not.toBeInTheDocument()
+      )
+      expect(saveBtn).toHaveTextContent('Saved')
+      expect(mocks.createSavedLookFromMobile).toHaveBeenCalledTimes(2)
       await panelView.unmount()
     } finally {
       setMobileApplicationUserId(null)

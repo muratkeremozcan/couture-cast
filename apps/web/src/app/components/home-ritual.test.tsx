@@ -1,3 +1,5 @@
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { createMemberSampleOutfit, rotateMemberSampleOutfit } from '@couture/utils'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -179,9 +181,11 @@ it('persists Home sample saves and removals to the account API across remounts',
 it('scopes account saved looks by member and drops late responses after switching members', async () => {
   const owner = 'locked-bookmark-member'
   const nextOwner = 'next-bookmark-member'
+  const postStarted = Promise.withResolvers<void>()
   const delayedPost = Promise.withResolvers<void>()
   const { store, handlers } = createSavedLooksMswHandlers()
   store.onPost = async () => {
+    postStarted.resolve()
     await delayedPost.promise
   }
   const user = userEvent.setup()
@@ -190,14 +194,71 @@ it('scopes account saved looks by member and drops late responses after switchin
   const view = renderHome()
   try {
     await user.click(await screen.findByRole('button', { name: 'Save example look' }))
+    await postStarted.promise
     publishMember(nextOwner)
     expect(await screen.findByRole('button', { name: 'Save example look' })).toBeVisible()
     await act(async () => {
       delayedPost.resolve()
       await delayedPost.promise
     })
+    await waitFor(() => expect(store.items).toHaveLength(1))
     expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
-    expect(store.items.every((item) => item.ownerUserId === `bearer-${owner}`)).toBe(true)
+    expect(store.items[0]?.ownerUserId).toBe(`bearer-${owner}`)
+  } finally {
+    view.unmount()
+  }
+})
+
+it('blocks signed-in Home Save while offline and prevents a stale GET from overwriting a completed save', async () => {
+  const owner = 'stale-get-member'
+  const delayedGet = Promise.withResolvers<void>()
+  let getCount = 0
+  let postCount = 0
+  const { store, handlers } = createSavedLooksMswHandlers()
+  store.onGet = async () => {
+    getCount += 1
+    if (getCount === 1) await delayedGet.promise
+  }
+  store.onPost = () => {
+    postCount += 1
+  }
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    // Offline Home Save sends zero POSTs and preserves the outfit.
+    const onlineDescriptor = Object.getOwnPropertyDescriptor(window.navigator, 'onLine')
+    Object.defineProperty(window.navigator, 'onLine', {
+      configurable: true,
+      value: false,
+    })
+    window.dispatchEvent(new Event('offline'))
+    try {
+      await user.click(await screen.findByRole('button', { name: 'Save example look' }))
+      expect(postCount).toBe(0)
+    } finally {
+      if (onlineDescriptor) {
+        Object.defineProperty(window.navigator, 'onLine', onlineDescriptor)
+      } else {
+        Object.defineProperty(window.navigator, 'onLine', {
+          configurable: true,
+          value: true,
+        })
+      }
+      window.dispatchEvent(new Event('online'))
+    }
+
+    // Reconnect: Save completes before slow initial GET resolves; stale GET must not wipe saved item.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    expect(await screen.findByTestId('sample-saved-looks')).toBeVisible()
+
+    await act(async () => {
+      delayedGet.resolve()
+      await delayedGet.promise
+    })
+    expect(screen.getByTestId('sample-saved-looks')).toBeVisible()
   } finally {
     view.unmount()
   }

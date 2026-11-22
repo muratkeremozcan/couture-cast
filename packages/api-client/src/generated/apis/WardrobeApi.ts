@@ -120,6 +120,10 @@ export interface ApiV1WardrobeSavedLooksSavedLookIdGetRequest {
   savedLookId: string
 }
 
+export interface ApiV1WardrobeSavedLooksSavedLookIdRestorePostRequest {
+  savedLookId: string
+}
+
 export interface ApiV1WardrobeSilhouetteMyFormCommitPostRequest {
   idempotencyKey: string
   commitSilhouettePhotoInput: CommitSilhouettePhotoInput
@@ -1388,6 +1392,76 @@ export class WardrobeApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<SavedLookResponse> {
     const response = await this.apiV1WardrobeSavedLooksSavedLookIdGetRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1WardrobeSavedLooksSavedLookIdRestorePost without sending the request
+   */
+  async apiV1WardrobeSavedLooksSavedLookIdRestorePostRequestOpts(
+    requestParameters: ApiV1WardrobeSavedLooksSavedLookIdRestorePostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['savedLookId'] == null) {
+      throw new runtime.RequiredError(
+        'savedLookId',
+        'Required parameter "savedLookId" was null or undefined when calling apiV1WardrobeSavedLooksSavedLookIdRestorePost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/wardrobe/saved-looks/{savedLookId}/restore`
+    urlPath = urlPath.replace(
+      `{${'savedLookId'}}`,
+      encodeURIComponent(String(requestParameters['savedLookId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Restore a recently removed saved look belonging to the authenticated account
+   */
+  async apiV1WardrobeSavedLooksSavedLookIdRestorePostRaw(
+    requestParameters: ApiV1WardrobeSavedLooksSavedLookIdRestorePostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SavedLookResponse>> {
+    const requestOptions =
+      await this.apiV1WardrobeSavedLooksSavedLookIdRestorePostRequestOpts(
+        requestParameters
+      )
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Restore a recently removed saved look belonging to the authenticated account
+   */
+  async apiV1WardrobeSavedLooksSavedLookIdRestorePost(
+    requestParameters: ApiV1WardrobeSavedLooksSavedLookIdRestorePostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SavedLookResponse> {
+    const response = await this.apiV1WardrobeSavedLooksSavedLookIdRestorePostRaw(
       requestParameters,
       initOverrides
     )

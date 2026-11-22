@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import { useTranslation } from 'react-i18next'
 import { withRequestDeadline } from '@couture/api-client'
 import type {
-  CreateSavedLookInput,
   GarmentItemContract,
   SavedLookContract,
 } from '@couture/api-client/contracts/http'
@@ -46,9 +45,15 @@ import {
   deleteSavedLookFromWeb,
   formatSavedLookIfMatch,
   listSavedLooksFromWeb,
+  notifySavedLooksChanged,
+  restoreSavedLookFromWeb,
+  SavedLookRequestError,
 } from '../../lib/saved-looks'
 import { onWebSessionIdentity } from '../../lib/web-session'
-import { currentWebSessionOwner } from '../../lib/use-web-session'
+import {
+  currentWebSessionBearer,
+  currentWebSessionOwner,
+} from '../../lib/use-web-session'
 import { AccessibleModal } from '../components/accessible-modal'
 import { SampleGarmentArt } from '../components/guest-preview/sample-garment-art'
 import {
@@ -105,27 +110,6 @@ export function StylePieceEntry({
 }
 
 const CATALOG_BY_ID = new Map(SAMPLE_CATALOG.garments.map((item) => [item.id, item]))
-
-function toRecreateInput(look: SavedLookContract): CreateSavedLookInput {
-  return {
-    source: look.source,
-    lookId: look.lookId,
-    weather: look.weather,
-    title: look.title,
-    anchorGarmentId: look.anchorGarmentId,
-    anchorSnapshot: look.anchorSnapshot,
-    composition: look.composition.map((slot) => ({
-      slotIndex: slot.slotIndex,
-      category: slot.category,
-      kind: slot.kind,
-      itemId: slot.itemId,
-      label: slot.label,
-    })),
-    swaps: look.swaps,
-    collection: look.collection,
-    comfort: look.comfort,
-  }
-}
 
 export function StylePiecePanel({
   selection,
@@ -611,20 +595,35 @@ function StylePieceIdeas({
                 })
               })
               if (existingMatch) {
-                lastCreatedRef.current[recipeKey] = existingMatch
+                delete lastCreatedRef.current[recipeKey]
                 setSavedState('ready')
                 if (swapRevisionRef.current === startSwapRevision) {
                   swapUndoStackRef.current = []
                 }
-                return true
+                return { saved: true, undoable: false }
               }
+              const actionToken = currentWebSessionBearer() ?? undefined
               const attemptKey = `${recipeKey}:${compositionKey}`
               let idempotencyKey = saveAttemptKeysRef.current.get(attemptKey)
               if (!idempotencyKey) {
                 idempotencyKey = createIdempotencyKey()
                 saveAttemptKeysRef.current.set(attemptKey, idempotencyKey)
               }
-              const created = await createSavedLookFromWeb(payload, { idempotencyKey })
+              let created: SavedLookContract
+              try {
+                created = await createSavedLookFromWeb(payload, {
+                  accessToken: actionToken,
+                  idempotencyKey,
+                })
+              } catch (error) {
+                if (error instanceof SavedLookRequestError && error.status === 409) {
+                  saveAttemptKeysRef.current.delete(attemptKey)
+                  if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') {
+                    return false
+                  }
+                }
+                throw error
+              }
               if (currentWebSessionOwner() !== owner) return false
               saveAttemptKeysRef.current.delete(attemptKey)
               lastCreatedRef.current[recipeKey] = created
@@ -634,6 +633,7 @@ function StylePieceIdeas({
               ])
               setSavedState('ready')
               onSavedLooksChanged?.()
+              notifySavedLooksChanged(owner)
               if (swapRevisionRef.current === startSwapRevision) {
                 swapUndoStackRef.current = []
               }
@@ -644,14 +644,23 @@ function StylePieceIdeas({
               if (!created) return false
               const fresh = await verifyAnchorForAction()
               if (!fresh) return false
-              await deleteSavedLookFromWeb(
-                created.id,
-                formatSavedLookIfMatch(created.id, created.revision)
-              )
+              const actionToken = currentWebSessionBearer() ?? undefined
+              try {
+                await deleteSavedLookFromWeb(
+                  created.id,
+                  formatSavedLookIfMatch(created.id, created.revision),
+                  { accessToken: actionToken }
+                )
+              } catch (error) {
+                if (!(error instanceof SavedLookRequestError && error.status === 404)) {
+                  throw error
+                }
+              }
               if (currentWebSessionOwner() !== owner) return false
               delete lastCreatedRef.current[recipeKey]
               setSaved((current) => current.filter((item) => item.id !== created.id))
               onSavedLooksChanged?.()
+              notifySavedLooksChanged(owner)
               return true
             }}
             onViewSaved={() => {
@@ -780,15 +789,29 @@ function StylePieceIdeas({
                         try {
                           const fresh = await verifyAnchorForAction()
                           if (!fresh) return
-                          await deleteSavedLookFromWeb(
-                            entry.id,
-                            formatSavedLookIfMatch(entry.id, entry.revision)
-                          )
+                          const actionToken = currentWebSessionBearer() ?? undefined
+                          try {
+                            await deleteSavedLookFromWeb(
+                              entry.id,
+                              formatSavedLookIfMatch(entry.id, entry.revision),
+                              { accessToken: actionToken }
+                            )
+                          } catch (deleteError) {
+                            if (
+                              !(
+                                deleteError instanceof SavedLookRequestError &&
+                                deleteError.status === 404
+                              )
+                            ) {
+                              throw deleteError
+                            }
+                          }
                           if (currentWebSessionOwner() !== owner) return
                           setSaved((current) =>
                             current.filter((item) => item.id !== entry.id)
                           )
                           onSavedLooksChanged?.()
+                          notifySavedLooksChanged(owner)
                         } catch (error) {
                           const errSeq = ++noticeSeqRef.current
                           if (isOfflineError(error) || !readLiveOnline()) {
@@ -859,9 +882,11 @@ function StylePieceIdeas({
                                 try {
                                   const fresh = await verifyAnchorForAction()
                                   if (!fresh) return
-                                  const restored = await createSavedLookFromWeb(
-                                    toRecreateInput(entry),
-                                    { idempotencyKey: createIdempotencyKey() }
+                                  const restored = await restoreSavedLookFromWeb(
+                                    entry.id,
+                                    {
+                                      accessToken: currentWebSessionBearer() ?? undefined,
+                                    }
                                   )
                                   if (currentWebSessionOwner() !== owner) return
                                   setSaved((current) => [
@@ -869,6 +894,7 @@ function StylePieceIdeas({
                                     ...current.filter((item) => item.id !== restored.id),
                                   ])
                                   onSavedLooksChanged?.()
+                                  notifySavedLooksChanged(owner)
                                   const undoSeq = ++noticeSeqRef.current
                                   statusBarRef.current.showNotice({
                                     id: `style-piece-remove-undo-${undoSeq}`,
@@ -950,7 +976,7 @@ function StylePieceCard({
   labels: Labels
   samples: SampleLabels
   canSave: boolean
-  onSave: () => Promise<boolean>
+  onSave: () => Promise<boolean | { saved: boolean; undoable?: boolean }>
   onUndoSave: () => Promise<boolean>
   onViewSaved: () => void
   onSwap: (category: SampleGarmentCategory, id: string) => void

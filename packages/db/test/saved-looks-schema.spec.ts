@@ -93,7 +93,7 @@ describe('saved looks schema, cascade, and RLS invariants', () => {
         expect.arrayContaining([
           'SavedLook_id_user_id_key',
           'SavedLook_user_id_idempotency_key_key',
-          'SavedLook_user_id_updated_at_id_idx',
+          'SavedLook_user_id_deleted_at_updated_at_id_idx',
           'SavedLook_user_id_source_anchor_garment_id_idx',
         ])
       )
@@ -106,23 +106,15 @@ describe('saved looks schema, cascade, and RLS invariants', () => {
       const policies = await client.query<{ cmd: string }>(
         'SELECT "cmd" FROM pg_policies WHERE "tablename" = \'SavedLook\''
       )
-      expect(policies.rows.map((r) => r.cmd).sort()).toEqual(['SELECT'])
+      expect(policies.rows).toEqual([])
 
       const grants = await client.query<{ privilege_type: string }>(
         `SELECT "privilege_type" FROM information_schema.role_table_grants
          WHERE "table_schema" = 'public'
            AND "table_name" = 'SavedLook'
-           AND "grantee" = 'authenticated'`
+           AND "grantee" IN ('authenticated', 'anon')`
       )
-      expect(grants.rows.map((r) => r.privilege_type).sort()).toEqual(['SELECT'])
-
-      const anonGrants = await client.query<{ privilege_type: string }>(
-        `SELECT "privilege_type" FROM information_schema.role_table_grants
-         WHERE "table_schema" = 'public'
-           AND "table_name" = 'SavedLook'
-           AND "grantee" = 'anon'`
-      )
-      expect(anonGrants.rows).toEqual([])
+      expect(grants.rows).toEqual([])
     } finally {
       client.release()
     }
@@ -240,62 +232,41 @@ describe('saved looks schema, cascade, and RLS invariants', () => {
         expect(otherInsert.rows).toHaveLength(1)
       })
 
-      // Owner can read own row under RLS, and direct client writes are revoked (API-only).
-      await withRole('authenticated', buildClaims(ownerEmail, 'teen'), async (client) => {
-        const res = await client.query<{ id: string }>(
-          'SELECT "id" FROM public."SavedLook" WHERE "user_id" = $1',
-          [ownerId]
-        )
-        expect(res.rows).toEqual([{ id: ownerLookId }])
+      // Direct PostgREST reads and writes are denied for every client role (API-only table):
+      // owner, unrelated member, moderator, and anon all receive 42501.
+      for (const [role, claims] of [
+        ['authenticated', buildClaims(ownerEmail, 'teen')],
+        ['authenticated', buildClaims(otherEmail, 'teen')],
+        ['authenticated', buildClaims(`mod-${suffix}@example.com`, 'moderator')],
+        ['anon', null],
+      ] as const) {
+        await withRole(role, claims, async (client) => {
+          await client.query('SAVEPOINT sp_select')
+          await expect(
+            client.query('SELECT "id" FROM public."SavedLook" WHERE "user_id" = $1', [
+              ownerId,
+            ])
+          ).rejects.toMatchObject({ code: '42501' })
+          await client.query('ROLLBACK TO SAVEPOINT sp_select')
 
-        await client.query('SAVEPOINT sp_insert')
-        await expect(
-          client.query(
-            `INSERT INTO public."SavedLook"
-              ("id", "user_id", "source", "look_id", "weather", "composition", "swaps", "updated_at")
-             VALUES ($1, $2, 'home_sample', 'sample-direct', 'mild-clear', '[]'::jsonb, '{}'::jsonb, NOW())`,
-            [`sl-direct-${randomUUID()}`, ownerId]
-          )
-        ).rejects.toMatchObject({ code: '42501' })
-        await client.query('ROLLBACK TO SAVEPOINT sp_insert')
+          await client.query('SAVEPOINT sp_insert')
+          await expect(
+            client.query(
+              `INSERT INTO public."SavedLook"
+                ("id", "user_id", "source", "look_id", "weather", "composition", "swaps", "updated_at")
+               VALUES ($1, $2, 'home_sample', 'sample-direct', 'mild-clear', '[]'::jsonb, '{}'::jsonb, NOW())`,
+              [`sl-direct-${randomUUID()}`, ownerId]
+            )
+          ).rejects.toMatchObject({ code: '42501' })
+          await client.query('ROLLBACK TO SAVEPOINT sp_insert')
 
-        await client.query('SAVEPOINT sp_update')
-        await expect(
-          client.query('UPDATE public."SavedLook" SET "title" = $1 WHERE "id" = $2', [
-            'Injected',
-            ownerLookId,
-          ])
-        ).rejects.toMatchObject({ code: '42501' })
-        await client.query('ROLLBACK TO SAVEPOINT sp_update')
-
-        await client.query('SAVEPOINT sp_delete')
-        await expect(
-          client.query('DELETE FROM public."SavedLook" WHERE "id" = $1', [ownerLookId])
-        ).rejects.toMatchObject({ code: '42501' })
-        await client.query('ROLLBACK TO SAVEPOINT sp_delete')
-      })
-
-      // Another authenticated member sees zero rows and cannot mutate.
-      await withRole('authenticated', buildClaims(otherEmail, 'teen'), async (client) => {
-        const res = await client.query<{ id: string }>(
-          'SELECT "id" FROM public."SavedLook" WHERE "user_id" = $1',
-          [ownerId]
-        )
-        expect(res.rows).toHaveLength(0)
-
-        await expect(
-          client.query('DELETE FROM public."SavedLook" WHERE "id" = $1', [ownerLookId])
-        ).rejects.toMatchObject({ code: '42501' })
-      })
-
-      // Anon is denied with 42501.
-      await withRole('anon', null, async (client) => {
-        await expect(
-          client.query('SELECT "id" FROM public."SavedLook" WHERE "user_id" = $1', [
-            ownerId,
-          ])
-        ).rejects.toMatchObject({ code: '42501' })
-      })
+          await client.query('SAVEPOINT sp_delete')
+          await expect(
+            client.query('DELETE FROM public."SavedLook" WHERE "id" = $1', [ownerLookId])
+          ).rejects.toMatchObject({ code: '42501' })
+          await client.query('ROLLBACK TO SAVEPOINT sp_delete')
+        })
+      }
     } finally {
       const cleanup = await adminPool.connect()
       try {

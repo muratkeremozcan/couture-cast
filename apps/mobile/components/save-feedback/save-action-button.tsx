@@ -472,7 +472,7 @@ export function useSaveAction({
         }
       }
 
-      const settleSuccess = () => {
+      const settleSuccess = (allowUndo = true) => {
         clearRunTimer()
         if (isStale()) return false
         if (requiresNetwork) {
@@ -498,7 +498,7 @@ export function useSaveAction({
             },
           })
         }
-        if (onUndoRef.current) {
+        if (allowUndo && onUndoRef.current) {
           actions.push({
             id: 'undo',
             kind: 'undo',
@@ -576,14 +576,33 @@ export function useSaveAction({
         return Promise.resolve(settleFailure(error))
       }
 
+      const resolveSaveValue = (value: unknown) => {
+        if (value === false) return settleFailure()
+        if (
+          value &&
+          typeof value === 'object' &&
+          'saved' in value &&
+          (value as { saved?: unknown }).saved === false
+        ) {
+          return settleFailure()
+        }
+        const allowUndo = !(
+          value &&
+          typeof value === 'object' &&
+          'undoable' in value &&
+          (value as { undoable?: unknown }).undoable === false
+        )
+        return settleSuccess(allowUndo)
+      }
+
       if (outcome && typeof (outcome as Promise<unknown>).then === 'function') {
         return (outcome as Promise<unknown>).then(
-          (value) => (value === false ? settleFailure() : settleSuccess()),
+          (value) => resolveSaveValue(value),
           (error: unknown) => settleFailure(error)
         )
       }
 
-      return Promise.resolve(outcome === false ? settleFailure() : settleSuccess())
+      return Promise.resolve(resolveSaveValue(outcome))
     },
     [
       controlId,
