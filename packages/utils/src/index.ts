@@ -126,3 +126,4 @@ export type { ComfortRange, ComfortRun, ComfortTolerance } from './comfort-rules
 
 export * from './sample-wardrobe'
 export * from './federated-signin'
+export * from './save-feedback'

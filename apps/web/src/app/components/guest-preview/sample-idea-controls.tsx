@@ -10,6 +10,7 @@ import {
   type SampleStylePreferences,
   type SampleWeatherKey,
 } from '@couture/utils'
+import { SaveActionButton } from '../save-feedback'
 
 type Props = {
   strings: GuestPreviewStrings
@@ -17,12 +18,17 @@ type Props = {
   onPreferences: (preferences: SampleStylePreferences) => void
   bookmarks: SampleBookmark[]
   lookId?: string
-  onSave: () => void
+  onSave: () => unknown
+  onUndoSave?: () => unknown
+  onViewSaved?: () => void
   onOpen: (bookmark: SampleBookmark) => void
   onRemove: (lookId: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
   persistent?: boolean
+  ownerKey?: string | null
+  saveResetKey?: string
+  useSharedFeedback?: boolean
 }
 
 const buttonClass =
@@ -35,35 +41,54 @@ export function SampleIdeaControls({
   bookmarks,
   lookId,
   onSave,
+  onUndoSave,
+  onViewSaved,
   onOpen,
   onRemove,
   weather,
   onWeather,
   persistent = true,
+  ownerKey,
+  saveResetKey,
+  useSharedFeedback = false,
 }: Props) {
   const labels = strings.styleIdeas
   const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
+  const isBookmarked = Boolean(
+    lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
+  )
   return (
     <div className="space-y-4 rounded-lg border border-[#E6E6ED] bg-white p-5 text-sm text-[#111111]">
-      {lookId && (
-        <button
-          type="button"
-          data-testid="sample-save-look"
-          className={buttonClass}
-          onClick={onSave}
-        >
-          {bookmarks.some((bookmark) => bookmark.lookId === lookId)
-            ? labels.update
-            : labels.save}
-        </button>
-      )}
+      {lookId &&
+        (useSharedFeedback ? (
+          <SaveActionButton
+            data-testid="sample-save-look"
+            idleLabel={isBookmarked ? labels.update : labels.save}
+            onSave={onSave}
+            onUndo={onUndoSave}
+            onView={onViewSaved}
+            ownerKey={ownerKey}
+            resetKey={saveResetKey ?? lookId}
+          />
+        ) : (
+          <button
+            type="button"
+            data-testid="sample-save-look"
+            className={buttonClass}
+            onClick={() => {
+              void onSave()
+            }}
+          >
+            {isBookmarked ? labels.update : labels.save}
+          </button>
+        ))}
       {bookmarks.length > 0 && (
         <section
           aria-label={labels.saved}
           data-testid="sample-saved-looks"
           className="space-y-2"
         >
-          <p role="status" className="font-semibold">
+          <p role="status" aria-live="off" className="font-semibold">
             {persistent ? labels.saved : strings.chrome.storageUnavailable}
           </p>
           <ul className="space-y-2">

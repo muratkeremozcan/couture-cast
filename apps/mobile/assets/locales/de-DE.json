@@ -1039,5 +1039,25 @@
       "warm_dry": "Warm und trocken",
       "warm_wet": "Warm und feucht"
     }
+  },
+  "feedback": {
+    "save": "Speichern",
+    "saving": "Wird gespeichert",
+    "stillSaving": "Speichert noch",
+    "saved": "Gespeichert",
+    "failed": "Fehlgeschlagen",
+    "retry": "Erneut",
+    "undo": "Rückgängig",
+    "view": "Ansehen",
+    "dismiss": "Schließen",
+    "savedToLooks": "In deinen Looks gespeichert.",
+    "saveFailed": "Speichern fehlgeschlagen. Versuch es erneut.",
+    "offlineBanner": "Du bist offline",
+    "offlineAction": "Du bist offline. Speichere, wenn du wieder verbunden bist.",
+    "removed": "Entfernt",
+    "undone": "Änderung rückgängig gemacht.",
+    "lookUpdated": "Look aktualisiert.",
+    "pieceSwapped": "Teil getauscht.",
+    "close": "Schließen"
   }
 }

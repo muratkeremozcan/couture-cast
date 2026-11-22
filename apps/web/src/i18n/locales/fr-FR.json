@@ -1295,5 +1295,25 @@
   },
   "session": {
     "retry": "Réessayer"
+  },
+  "feedback": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement",
+    "stillSaving": "Enregistrement en cours",
+    "saved": "Enregistré",
+    "failed": "Échec",
+    "retry": "Réessayer",
+    "undo": "Annuler",
+    "view": "Voir",
+    "dismiss": "Fermer",
+    "savedToLooks": "Enregistré dans vos looks.",
+    "saveFailed": "Échec de l’enregistrement. Réessayez.",
+    "offlineBanner": "Vous êtes hors connexion",
+    "offlineAction": "Vous êtes hors connexion. Enregistrez une fois reconnecté.",
+    "removed": "Supprimé",
+    "undone": "Modification annulée.",
+    "lookUpdated": "Look mis à jour.",
+    "pieceSwapped": "Pièce échangée.",
+    "close": "Fermer"
   }
 }

@@ -1039,5 +1039,25 @@
       "warm_dry": "Sıcak ve kuru",
       "warm_wet": "Sıcak ve nemli"
     }
+  },
+  "feedback": {
+    "save": "Kaydet",
+    "saving": "Kaydediliyor",
+    "stillSaving": "Hâlâ kaydediliyor",
+    "saved": "Kaydedildi",
+    "failed": "Başarısız",
+    "retry": "Tekrar dene",
+    "undo": "Geri al",
+    "view": "Gör",
+    "dismiss": "Kapat",
+    "savedToLooks": "Kombinlerine kaydedildi.",
+    "saveFailed": "Kaydedilemedi. Tekrar dene.",
+    "offlineBanner": "Çevrimdışısın",
+    "offlineAction": "Çevrimdışısın. Bağlanınca kaydet.",
+    "removed": "Kaldırıldı",
+    "undone": "Değişiklik geri alındı.",
+    "lookUpdated": "Kombin güncellendi.",
+    "pieceSwapped": "Parça değiştirildi.",
+    "close": "Kapat"
   }
 }

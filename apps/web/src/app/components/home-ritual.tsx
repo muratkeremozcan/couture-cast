@@ -9,21 +9,31 @@ import {
   type ScenarioOutfit,
 } from '@couture/api-client/contracts/http'
 import {
+  applyBoundedListRemove,
+  applyBoundedListSave,
+  createAnnouncementToken,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   parseSampleBookmarks,
+  popLookUndoSnapshot,
+  pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
   saveSampleBookmark,
   swapMemberSampleGarment,
+  undoBoundedListRemove,
+  undoBoundedListSave,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
+  type BoundedRemoveMutation,
+  type BoundedSaveMutation,
   type GuestPreviewStrings,
   type SampleGarmentCategory,
   type SampleBookmark,
   type SampleOutfitResult,
+  type StatusBarNoticeInput,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { readStorage } from '../../lib/browser-persistence'
@@ -40,6 +50,7 @@ import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
+import { useStatusBar } from './save-feedback'
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
@@ -52,14 +63,19 @@ function resetSampleForOwner(owner: string | null) {
   if (retainedSample?.owner !== owner) retainedSample = undefined
 }
 
-type BookmarkChange = (bookmarks: SampleBookmark[]) => SampleBookmark[]
+type BookmarkChange = (bookmarks: SampleBookmark[]) => SampleBookmark[] | null
 
 function replayBookmarkChanges(
   bookmarks: SampleBookmark[],
   changes: Iterable<BookmarkChange>
-) {
-  for (const change of changes) bookmarks = change(bookmarks)
-  return bookmarks
+): { next: SampleBookmark[]; aborted: boolean } {
+  let current = bookmarks
+  for (const change of changes) {
+    const result = change(current)
+    if (result === null) return { next: current, aborted: true }
+    current = result
+  }
+  return { next: current, aborted: false }
 }
 
 function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
@@ -67,6 +83,7 @@ function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
     <Link
       href="/wardrobe?entry=add"
       data-testid="home-add-garment"
+      data-primary-action="true"
       className={primaryLinkClass}
     >
       {strings.firstUse.addGarment}
@@ -85,6 +102,8 @@ function SampleOutfit({
   strings: GuestPreviewStrings
   actions: ReactNode
 }) {
+  const { t } = useTranslation(undefined, { i18n: getI18n() })
+  const statusBar = useStatusBar()
   const [result, setResult] = useState(() =>
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
@@ -94,11 +113,35 @@ function SampleOutfit({
     parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
   )
   const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
+  const [bookmarkRevision, setBookmarkRevision] = useState(0)
+  const bookmarksRef = useRef(bookmarks)
+  bookmarksRef.current = bookmarks
+  const lastSavedMutationRef = useRef<BoundedSaveMutation<SampleBookmark> | null>(null)
   const storedBookmarks = useRef(bookmarks)
   const pendingBookmarkChanges = useRef(new Map<string, BookmarkChange>())
   const bookmarkOwnerMounted = useRef(true)
+  const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
+  const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
+  const noticeSeqRef = useRef(0)
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
+
+  const dismissOwnedNotices = () => {
+    for (const id of ownedNoticeIdsRef.current) {
+      statusBarRef.current.dismissNotice(id)
+    }
+    ownedNoticeIdsRef.current.clear()
+  }
+
+  const showScopedNotice = (input: StatusBarNoticeInput) => {
+    if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+    const shown = statusBarRef.current.showNotice(input)
+    ownedNoticeIdsRef.current.add(shown.id)
+  }
+
   useEffect(() => {
     bookmarkOwnerMounted.current = true
+    const ownedNotices = ownedNoticeIdsRef.current
     const onStorage = (event: StorageEvent) => {
       if (!isLiveOwner(owner) || (event.key !== null && event.key !== bookmarkKey)) return
       try {
@@ -107,7 +150,9 @@ function SampleOutfit({
         const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
         const pending = pendingBookmarkChanges.current
         storedBookmarks.current = stored
-        setBookmarks(replayBookmarkChanges(stored, pending.values()))
+        const replayed = replayBookmarkChanges(stored, pending.values())
+        bookmarksRef.current = replayed.next
+        setBookmarks(replayed.next)
         setBookmarksPersistent(pending.size === 0)
       } catch {
         setBookmarksPersistent(false)
@@ -117,36 +162,68 @@ function SampleOutfit({
     return () => {
       bookmarkOwnerMounted.current = false
       window.removeEventListener('storage', onStorage)
+      for (const id of ownedNotices) {
+        statusBarRef.current.dismissNotice(id)
+      }
+      ownedNotices.clear()
     }
   }, [bookmarkKey, owner])
 
-  const updateBookmarks = (lookId: string, change: BookmarkChange) => {
-    const apply = () => {
-      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-      // Keep one pending change per catalog look, in the order of the latest actions.
+  const updateBookmarks = (
+    lookId: string,
+    change: BookmarkChange,
+    options?: { allowConflictAbort?: boolean }
+  ): boolean | Promise<boolean> => {
+    const apply = (): boolean => {
+      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+      // Snapshot the prior queue before mutating so conflict aborts or failed undo writes
+      // restore the exact preceding queue order without stranding a failed undo.
       const pending = pendingBookmarkChanges.current
+      const priorQueue = new Map(pending)
       pending.delete(lookId)
       pending.set(lookId, change)
       let next: SampleBookmark[]
+      let aborted = false
+      let failedWrite = false
       try {
         const storage = window.localStorage
         const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
         storedBookmarks.current = stored
-        next = replayBookmarkChanges(stored, pending.values())
-        storage.setItem(bookmarkKey, JSON.stringify(next))
-        storedBookmarks.current = next
-        pending.clear()
+        const replayed = replayBookmarkChanges(stored, pending.values())
+        if (replayed.aborted) {
+          aborted = true
+          pendingBookmarkChanges.current = priorQueue
+          next = replayBookmarkChanges(stored, priorQueue.values()).next
+        } else {
+          next = replayed.next
+          storage.setItem(bookmarkKey, JSON.stringify(next))
+          storedBookmarks.current = next
+          pending.clear()
+        }
       } catch {
-        next = replayBookmarkChanges(storedBookmarks.current, pending.values())
+        failedWrite = true
+        if (options?.allowConflictAbort) {
+          pendingBookmarkChanges.current = priorQueue
+        }
+        const replayed = replayBookmarkChanges(
+          storedBookmarks.current,
+          pendingBookmarkChanges.current.values()
+        )
+        next = replayed.next
       }
+      bookmarksRef.current = next
       setBookmarks(next)
-      setBookmarksPersistent(pending.size === 0)
+      const persisted =
+        !aborted && !failedWrite && pendingBookmarkChanges.current.size === 0
+      if (!aborted) {
+        setBookmarksPersistent(persisted)
+      }
+      return persisted
     }
     if (navigator.locks) {
-      void navigator.locks.request(bookmarkKey, apply).catch(apply)
-    } else {
-      apply()
+      return navigator.locks.request(bookmarkKey, apply).catch(apply)
     }
+    return apply()
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
@@ -154,8 +231,46 @@ function SampleOutfit({
     retainedSample = { owner, result: next }
     setResult(next)
   }
+  const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
+    if (!isLiveOwner(owner) || next === result) return
+    lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
+    update(next)
+    const seq = ++noticeSeqRef.current
+    showScopedNotice({
+      id: `sample-${owner}-${kind}-${seq}`,
+      announcementId: createAnnouncementToken(`sample-${owner}-${kind}`, seq),
+      message,
+      tone: 'neutral',
+      actions: [
+        {
+          id: 'undo',
+          kind: 'undo',
+          label: t('feedback.undo'),
+          onPress: () => {
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            const { snapshot, rest } = popLookUndoSnapshot(lookUndoStackRef.current)
+            lookUndoStackRef.current = rest
+            if (snapshot && isLiveOwner(owner)) {
+              update(snapshot)
+              const undoSeq = ++noticeSeqRef.current
+              showScopedNotice({
+                id: `sample-${owner}-${kind}-undo-${undoSeq}`,
+                announcementId: createAnnouncementToken(
+                  `sample-${owner}-${kind}-undo`,
+                  undoSeq
+                ),
+                message: t('feedback.undone'),
+                tone: 'neutral',
+              })
+            }
+          },
+        },
+      ],
+    })
+  }
   const lookId = result.look?.id
   const currentId = result.garments.find((garment) => garment.category === category)?.id
+  const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
   return (
     <div data-testid="member-sample-outfit" className="space-y-3 text-[#111111]">
       <p className="text-sm text-[color:var(--lookbook-ink)]">
@@ -173,36 +288,201 @@ function SampleOutfit({
           </div>
         }
         noAlternative={result.eligibleLookIds.length < 2}
-        onTryAnother={() => update(rotateMemberSampleOutfit(result))}
+        onTryAnother={() =>
+          pushUndoAndUpdate(
+            rotateMemberSampleOutfit(result),
+            t('feedback.lookUpdated'),
+            'shuffle'
+          )
+        }
         onSwap={(slot, button) => {
           invoker.current = button
           setCategory(slot)
         }}
         onUndoSwaps={() => update(undoMemberSampleSwaps(result))}
-        onReviewChoices={() => update(createMemberSampleOutfit())}
-        onResetChoices={() => update(createMemberSampleOutfit())}
+        onReviewChoices={() => {
+          lookUndoStackRef.current = []
+          dismissOwnedNotices()
+          update(createMemberSampleOutfit())
+        }}
+        onResetChoices={() => {
+          lookUndoStackRef.current = []
+          dismissOwnedNotices()
+          update(createMemberSampleOutfit())
+        }}
       />
       <SampleIdeaControls
         strings={strings}
         preferences={result.input.preferences}
-        onPreferences={(preferences) =>
+        onPreferences={(preferences) => {
+          lookUndoStackRef.current = []
+          dismissOwnedNotices()
           update(updateMemberSampleOutfit(result, { preferences }))
-        }
+        }}
         weather={result.input.weather}
-        onWeather={(weather) => update(updateMemberSampleOutfit(result, { weather }))}
+        onWeather={(weather) => {
+          lookUndoStackRef.current = []
+          dismissOwnedNotices()
+          update(updateMemberSampleOutfit(result, { weather }))
+        }}
         bookmarks={bookmarks}
         persistent={bookmarksPersistent}
         lookId={lookId}
+        ownerKey={owner}
+        useSharedFeedback
+        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${bookmarkRevision}`}
         onSave={() => {
-          if (lookId)
-            updateBookmarks(lookId, (current) => saveSampleBookmark(current, result))
+          if (!lookId) return false
+          lookUndoStackRef.current = []
+          const [entry] = saveSampleBookmark([], result)
+          if (!entry) return false
+          return updateBookmarks(lookId, (current) => {
+            const mutation = applyBoundedListSave({
+              entries: current,
+              entry,
+              getKey: (bookmark) => bookmark.lookId,
+            })
+            lastSavedMutationRef.current = mutation
+            return mutation.next
+          })
         }}
-        onOpen={(bookmark) => update(reopenMemberSampleOutfit(result, bookmark))}
-        onRemove={(id) =>
-          updateBookmarks(id, (current) =>
-            current.filter((bookmark) => bookmark.lookId !== id)
+        onUndoSave={() => {
+          if (!lookId) return false
+          const captured = lastSavedMutationRef.current
+          if (!captured || captured.savedKey !== lookId) return false
+          return updateBookmarks(
+            lookId,
+            (current) => {
+              const undone = undoBoundedListSave({
+                entries: current,
+                mutation: captured,
+                getKey: (bookmark) => bookmark.lookId,
+                isSameEntry: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+              })
+              return undone.ok ? undone.next : null
+            },
+            { allowConflictAbort: true }
           )
-        }
+        }}
+        onViewSaved={() => {
+          document
+            .querySelector<HTMLElement>('[data-testid="sample-saved-looks"]')
+            ?.scrollIntoView?.({ block: 'nearest' })
+        }}
+        onOpen={(bookmark) => {
+          lookUndoStackRef.current = []
+          dismissOwnedNotices()
+          update(reopenMemberSampleOutfit(result, bookmark))
+        }}
+        onRemove={(id) => {
+          const runRemove = () => {
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            let removedMutation: BoundedRemoveMutation<SampleBookmark> | null = null
+            setBookmarkRevision((value) => value + 1)
+            const outcome = updateBookmarks(id, (current) => {
+              removedMutation = applyBoundedListRemove({
+                entries: current,
+                key: id,
+                getKey: (bookmark) => bookmark.lookId,
+              })
+              return removedMutation ? removedMutation.next : current
+            })
+            const handleSettled = (ok: boolean) => {
+              if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+              if (!ok) {
+                const failSeq = ++noticeSeqRef.current
+                showScopedNotice({
+                  id: `sample-${owner}-remove-failed-${failSeq}`,
+                  announcementId: createAnnouncementToken(
+                    `sample-${owner}-remove-failed`,
+                    failSeq
+                  ),
+                  message: t('feedback.saveFailed'),
+                  tone: 'error',
+                  actions: [
+                    {
+                      id: 'retry',
+                      kind: 'retry',
+                      label: t('feedback.retry'),
+                      onPress: () => runRemove(),
+                    },
+                  ],
+                })
+                return
+              }
+              const capturedRemoval = removedMutation
+              if (!capturedRemoval) return
+              const seq = ++noticeSeqRef.current
+              showScopedNotice({
+                id: `sample-${owner}-remove-${seq}`,
+                announcementId: createAnnouncementToken(`sample-${owner}-remove`, seq),
+                message: t('feedback.removed'),
+                tone: 'neutral',
+                actions: [
+                  {
+                    id: 'undo',
+                    kind: 'undo',
+                    label: t('feedback.undo'),
+                    onPress: () => {
+                      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                      const restoreOutcome = updateBookmarks(
+                        id,
+                        (current) => {
+                          const undone = undoBoundedListRemove({
+                            entries: current,
+                            mutation: capturedRemoval,
+                            getKey: (bookmark) => bookmark.lookId,
+                          })
+                          return undone.ok ? undone.next : null
+                        },
+                        { allowConflictAbort: true }
+                      )
+                      const finishUndo = (restoredOk: boolean) => {
+                        if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                        const undoSeq = ++noticeSeqRef.current
+                        if (restoredOk) {
+                          showScopedNotice({
+                            id: `sample-${owner}-remove-undo-${undoSeq}`,
+                            announcementId: createAnnouncementToken(
+                              `sample-${owner}-remove-undo`,
+                              undoSeq
+                            ),
+                            message: t('feedback.undone'),
+                            tone: 'neutral',
+                          })
+                        } else {
+                          showScopedNotice({
+                            id: `sample-${owner}-remove-undo-failed-${undoSeq}`,
+                            announcementId: createAnnouncementToken(
+                              `sample-${owner}-remove-undo-failed`,
+                              undoSeq
+                            ),
+                            message: t('feedback.saveFailed'),
+                            tone: 'error',
+                          })
+                        }
+                      }
+                      if (
+                        restoreOutcome &&
+                        typeof (restoreOutcome as Promise<boolean>).then === 'function'
+                      ) {
+                        void (restoreOutcome as Promise<boolean>).then(finishUndo)
+                      } else {
+                        finishUndo(Boolean(restoreOutcome))
+                      }
+                    },
+                  },
+                ],
+              })
+            }
+            if (outcome && typeof (outcome as Promise<boolean>).then === 'function') {
+              void (outcome as Promise<boolean>).then(handleSettled)
+            } else {
+              handleSettled(Boolean(outcome))
+            }
+          }
+          runRemove()
+        }}
       />
       <GuestPreviewSwapDialog
         category={category}
@@ -213,7 +493,13 @@ function SampleOutfit({
         strings={strings}
         invokerRef={invoker}
         onChoose={(garmentId) => {
-          if (category) update(swapMemberSampleGarment(result, category, garmentId))
+          if (category) {
+            pushUndoAndUpdate(
+              swapMemberSampleGarment(result, category, garmentId),
+              t('feedback.pieceSwapped'),
+              'swap'
+            )
+          }
           setCategory(null)
         }}
         onClose={() => setCategory(null)}
