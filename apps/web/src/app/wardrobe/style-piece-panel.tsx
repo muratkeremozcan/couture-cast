@@ -438,7 +438,6 @@ function StylePieceIdeas({
     if (value === weather) return
     draftRevision.current += 1
     swapUndoStackRef.current = []
-    saveAttemptKeysRef.current.clear()
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
@@ -786,6 +785,7 @@ function StylePieceIdeas({
                           })
                           return
                         }
+                        let alreadyDeleted = false
                         try {
                           const fresh = await verifyAnchorForAction()
                           if (!fresh) return
@@ -798,11 +798,11 @@ function StylePieceIdeas({
                             )
                           } catch (deleteError) {
                             if (
-                              !(
-                                deleteError instanceof SavedLookRequestError &&
-                                deleteError.status === 404
-                              )
+                              deleteError instanceof SavedLookRequestError &&
+                              deleteError.status === 404
                             ) {
+                              alreadyDeleted = true
+                            } else {
                               throw deleteError
                             }
                           }
@@ -859,80 +859,85 @@ function StylePieceIdeas({
                           ),
                           message: t('feedback.removed'),
                           tone: 'neutral',
-                          actions: [
-                            {
-                              id: 'undo',
-                              kind: 'undo',
-                              label: t('feedback.undo'),
-                              onPress: async () => {
-                                if (!readLiveOnline()) {
-                                  const offSeq = ++noticeSeqRef.current
-                                  statusBarRef.current.showNotice({
-                                    id: `style-piece-remove-undo-offline-${offSeq}`,
-                                    announcementId: createAnnouncementToken(
-                                      'style-piece-remove-undo-offline',
-                                      offSeq
-                                    ),
-                                    message: t('feedback.offlineAction'),
-                                    tone: 'offline',
-                                    actions: [],
-                                  })
-                                  return
-                                }
-                                try {
-                                  const fresh = await verifyAnchorForAction()
-                                  if (!fresh) return
-                                  const restored = await restoreSavedLookFromWeb(
-                                    entry.id,
-                                    {
-                                      accessToken: currentWebSessionBearer() ?? undefined,
+                          actions: alreadyDeleted
+                            ? []
+                            : [
+                                {
+                                  id: 'undo',
+                                  kind: 'undo',
+                                  label: t('feedback.undo'),
+                                  onPress: async () => {
+                                    if (!readLiveOnline()) {
+                                      const offSeq = ++noticeSeqRef.current
+                                      statusBarRef.current.showNotice({
+                                        id: `style-piece-remove-undo-offline-${offSeq}`,
+                                        announcementId: createAnnouncementToken(
+                                          'style-piece-remove-undo-offline',
+                                          offSeq
+                                        ),
+                                        message: t('feedback.offlineAction'),
+                                        tone: 'offline',
+                                        actions: [],
+                                      })
+                                      return
                                     }
-                                  )
-                                  if (currentWebSessionOwner() !== owner) return
-                                  setSaved((current) => [
-                                    restored,
-                                    ...current.filter((item) => item.id !== restored.id),
-                                  ])
-                                  onSavedLooksChanged?.()
-                                  notifySavedLooksChanged(owner)
-                                  const undoSeq = ++noticeSeqRef.current
-                                  statusBarRef.current.showNotice({
-                                    id: `style-piece-remove-undo-${undoSeq}`,
-                                    announcementId: createAnnouncementToken(
-                                      'style-piece-remove-undo',
-                                      undoSeq
-                                    ),
-                                    message: t('feedback.undone'),
-                                    tone: 'neutral',
-                                  })
-                                } catch (error) {
-                                  const errSeq = ++noticeSeqRef.current
-                                  if (isOfflineError(error) || !readLiveOnline()) {
-                                    statusBarRef.current.showNotice({
-                                      id: `style-piece-remove-undo-offline-${errSeq}`,
-                                      announcementId: createAnnouncementToken(
-                                        'style-piece-remove-undo-offline',
-                                        errSeq
-                                      ),
-                                      message: t('feedback.offlineAction'),
-                                      tone: 'offline',
-                                      actions: [],
-                                    })
-                                  } else {
-                                    statusBarRef.current.showNotice({
-                                      id: `style-piece-remove-undo-failed-${errSeq}`,
-                                      announcementId: createAnnouncementToken(
-                                        'style-piece-remove-undo-failed',
-                                        errSeq
-                                      ),
-                                      message: t('feedback.saveFailed'),
-                                      tone: 'error',
-                                    })
-                                  }
-                                }
-                              },
-                            },
-                          ],
+                                    try {
+                                      const fresh = await verifyAnchorForAction()
+                                      if (!fresh) return
+                                      const restored = await restoreSavedLookFromWeb(
+                                        entry.id,
+                                        {
+                                          accessToken:
+                                            currentWebSessionBearer() ?? undefined,
+                                        }
+                                      )
+                                      if (currentWebSessionOwner() !== owner) return
+                                      setSaved((current) => [
+                                        restored,
+                                        ...current.filter(
+                                          (item) => item.id !== restored.id
+                                        ),
+                                      ])
+                                      onSavedLooksChanged?.()
+                                      notifySavedLooksChanged(owner)
+                                      const undoSeq = ++noticeSeqRef.current
+                                      statusBarRef.current.showNotice({
+                                        id: `style-piece-remove-undo-${undoSeq}`,
+                                        announcementId: createAnnouncementToken(
+                                          'style-piece-remove-undo',
+                                          undoSeq
+                                        ),
+                                        message: t('feedback.undone'),
+                                        tone: 'neutral',
+                                      })
+                                    } catch (error) {
+                                      const errSeq = ++noticeSeqRef.current
+                                      if (isOfflineError(error) || !readLiveOnline()) {
+                                        statusBarRef.current.showNotice({
+                                          id: `style-piece-remove-undo-offline-${errSeq}`,
+                                          announcementId: createAnnouncementToken(
+                                            'style-piece-remove-undo-offline',
+                                            errSeq
+                                          ),
+                                          message: t('feedback.offlineAction'),
+                                          tone: 'offline',
+                                          actions: [],
+                                        })
+                                      } else {
+                                        statusBarRef.current.showNotice({
+                                          id: `style-piece-remove-undo-failed-${errSeq}`,
+                                          announcementId: createAnnouncementToken(
+                                            'style-piece-remove-undo-failed',
+                                            errSeq
+                                          ),
+                                          message: t('feedback.saveFailed'),
+                                          tone: 'error',
+                                        })
+                                      }
+                                    }
+                                  },
+                                },
+                              ],
                         })
                       }
                       void runRemove()

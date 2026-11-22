@@ -9,12 +9,14 @@ const {
   apiV1WardrobeSavedLooksPost,
   apiV1WardrobeSavedLooksSavedLookIdGet,
   apiV1WardrobeSavedLooksSavedLookIdDelete,
+  apiV1WardrobeSavedLooksSavedLookIdRestorePost,
   resolveMobileAccessToken,
 } = vi.hoisted(() => ({
   apiV1WardrobeSavedLooksGet: vi.fn(),
   apiV1WardrobeSavedLooksPost: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdGet: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdDelete: vi.fn(),
+  apiV1WardrobeSavedLooksSavedLookIdRestorePost: vi.fn(),
   resolveMobileAccessToken: vi.fn<() => Promise<string | null>>(() =>
     Promise.resolve('mobile-token')
   ),
@@ -26,6 +28,7 @@ vi.mock('./api-client', () => ({
     apiV1WardrobeSavedLooksPost,
     apiV1WardrobeSavedLooksSavedLookIdGet,
     apiV1WardrobeSavedLooksSavedLookIdDelete,
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost,
   }),
 }))
 
@@ -39,7 +42,11 @@ import {
   formatSavedLookIfMatch,
   getSavedLookFromMobile,
   listSavedLooksFromMobile,
+  listSavedLooksPageFromMobile,
   MobileSavedLookRequestError,
+  notifyMobileSavedLooksChanged,
+  restoreSavedLookFromMobile,
+  subscribeMobileSavedLooksChanged,
 } from './saved-looks'
 
 const SAMPLE_LOOK: SavedLookContract = {
@@ -117,14 +124,41 @@ describe('mobile saved-looks client', () => {
     expect((await getSavedLookFromMobile('sl-m1')).id).toBe('sl-m1')
 
     apiV1WardrobeSavedLooksSavedLookIdDelete.mockResolvedValueOnce(undefined)
-    await deleteSavedLookFromMobile('sl-m1', formatSavedLookIfMatch('sl-m1', 0))
+    await deleteSavedLookFromMobile('sl-m1', formatSavedLookIfMatch('sl-m1', 0), {
+      accessToken: 'pinned-token',
+    })
     expect(apiV1WardrobeSavedLooksSavedLookIdDelete).toHaveBeenCalledWith(
       { savedLookId: 'sl-m1', ifMatch: '"saved-look:sl-m1:0"' },
       expect.anything()
     )
+
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [SAMPLE_LOOK],
+      total: 51,
+      limit: 50,
+      offset: 0,
+    })
+    const page = await listSavedLooksPageFromMobile({ limit: 50, offset: 0 })
+    expect(page.total).toBe(51)
+    expect(page.data).toEqual([SAMPLE_LOOK])
+
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost.mockResolvedValueOnce({
+      data: { ...SAMPLE_LOOK, revision: 1 },
+    })
+    const restored = await restoreSavedLookFromMobile('sl-m1', {
+      accessToken: 'pinned-token',
+    })
+    expect(restored.revision).toBe(1)
+
+    const events: (string | null)[] = []
+    const unsub = subscribeMobileSavedLooksChanged((owner) => events.push(owner))
+    notifyMobileSavedLooksChanged('user-1')
+    unsub()
+    notifyMobileSavedLooksChanged('user-1')
+    expect(events).toEqual(['user-1'])
   })
 
-  it('throws normalized errors on missing token or API error', async () => {
+  it('throws normalized errors on missing token, non-JSON HTTP error, and generic failures', async () => {
     resolveMobileAccessToken.mockResolvedValueOnce(null)
     await expect(listSavedLooksFromMobile()).rejects.toBeInstanceOf(
       MobileSavedLookRequestError
@@ -132,10 +166,13 @@ describe('mobile saved-looks client', () => {
 
     apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
       new ResponseError(
-        new Response(JSON.stringify({ message: 'GARMENT_NOT_FOUND' }), {
-          status: 404,
-          headers: { 'content-type': 'application/json' },
-        })
+        new Response(
+          JSON.stringify({ message: 'GARMENT_NOT_FOUND', code: 'GARMENT_NOT_FOUND' }),
+          {
+            status: 404,
+            headers: { 'content-type': 'application/json' },
+          }
+        )
       )
     )
     await expect(
@@ -150,7 +187,25 @@ describe('mobile saved-looks client', () => {
       })
     ).rejects.toMatchObject({
       status: 404,
+      code: 'GARMENT_NOT_FOUND',
       message: 'GARMENT_NOT_FOUND',
     })
+
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost.mockRejectedValueOnce(
+      new ResponseError(new Response('bad gateway', { status: 502 }))
+    )
+    await expect(restoreSavedLookFromMobile('sl-m1')).rejects.toMatchObject({
+      status: 502,
+    })
+
+    apiV1WardrobeSavedLooksSavedLookIdGet.mockRejectedValueOnce('raw-error')
+    await expect(getSavedLookFromMobile('sl-m1')).rejects.toThrow(
+      'Unable to open this saved look.'
+    )
+
+    apiV1WardrobeSavedLooksSavedLookIdDelete.mockRejectedValueOnce(
+      new Error('network boom')
+    )
+    await expect(deleteSavedLookFromMobile('sl-m1', '*')).rejects.toThrow('network boom')
   })
 })

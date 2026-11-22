@@ -352,13 +352,26 @@ function ClosetSavedLooksRowInner({
     if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
     const reachable = await ensureMobileOnline(readLiveOnline)
     if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
+    const retryUndo = () => {
+      void runUndoRemove(look, actionOwner, actionEpoch, actionToken)
+    }
     if (!reachable) {
-      showActionError(
-        actionOwner,
-        actionEpoch,
-        'mobile-saved-look-undo',
-        new TypeError('Failed to fetch')
-      )
+      const offSeq = ++noticeSeqRef.current
+      reportNetworkOffline()
+      showOwnedNotice(actionOwner, actionEpoch, {
+        id: `mobile-saved-look-undo-offline-${offSeq}`,
+        announcementId: createAnnouncementToken('mobile-saved-look-undo-offline', offSeq),
+        message: t('feedback.offlineAction'),
+        tone: 'offline',
+        actions: [
+          {
+            id: 'undo',
+            kind: 'undo',
+            label: t('feedback.undo'),
+            onPress: retryUndo,
+          },
+        ],
+      })
       return
     }
     try {
@@ -375,7 +388,26 @@ function ClosetSavedLooksRowInner({
       })
     } catch (undoError) {
       if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
-      showActionError(actionOwner, actionEpoch, 'mobile-saved-look-undo', undoError)
+      const errSeq = ++noticeSeqRef.current
+      const offline = isOfflineError(undoError) || !readLiveOnline()
+      if (offline) reportNetworkOffline()
+      showOwnedNotice(actionOwner, actionEpoch, {
+        id: `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
+        announcementId: createAnnouncementToken(
+          `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}`,
+          errSeq
+        ),
+        message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+        tone: offline ? 'offline' : 'error',
+        actions: [
+          {
+            id: 'retry',
+            kind: 'retry',
+            label: offline ? t('feedback.undo') : t('feedback.retry'),
+            onPress: retryUndo,
+          },
+        ],
+      })
     }
   }
 

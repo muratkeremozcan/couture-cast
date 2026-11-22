@@ -56,6 +56,7 @@ vi.mock('@/src/lib/saved-looks', () => ({
   },
   listSavedLooksFromMobile: mocks.listSavedLooksFromMobile,
   createSavedLookFromMobile: mocks.createSavedLookFromMobile,
+  getSavedLookFromMobile: vi.fn().mockResolvedValue(null),
   deleteSavedLookFromMobile: mocks.deleteSavedLookFromMobile,
   restoreSavedLookFromMobile: vi.fn().mockResolvedValue(null),
   notifyMobileSavedLooksChanged: vi.fn(),

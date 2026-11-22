@@ -2,11 +2,15 @@ import path from 'node:path'
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import {
+  createSavedLookInputSchema,
   federatedSignupStatusResponseSchema,
   garmentListResponseSchema,
+  savedLookListResponseSchema,
+  savedLookResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   type GarmentItemContract,
+  type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import {
   createCompletedOnboardingStateFixture,
@@ -142,6 +146,220 @@ export async function mockStyleWardrobe(
   mockRead('auth/signup/federated', () =>
     federatedSignupStatusResponseSchema.parse({ status: 'complete' })
   )
+
+  // Account-backed saved looks mock (CC-7.2) scoped per authenticated member.
+  let savedLookSeq = 1
+  const savedLooksByOwner = new Map<string, SavedLookContract[]>()
+  const deletedLooksByOwner = new Map<string, Map<string, SavedLookContract>>()
+  const idempotencyKeys = new Map<string, SavedLookContract>()
+
+  const getOwnerList = (owner: string): SavedLookContract[] => {
+    const existing = savedLooksByOwner.get(owner)
+    if (existing) return existing
+    const created: SavedLookContract[] = []
+    savedLooksByOwner.set(owner, created)
+    return created
+  }
+
+  const getDeletedMap = (owner: string): Map<string, SavedLookContract> => {
+    const existing = deletedLooksByOwner.get(owner)
+    if (existing) return existing
+    const created = new Map<string, SavedLookContract>()
+    deletedLooksByOwner.set(owner, created)
+    return created
+  }
+
+  const handleListSavedLooks = async (
+    route: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[0],
+    url: URL,
+    list: SavedLookContract[]
+  ) => {
+    const source = url.searchParams.get('source')
+    const anchorGarmentId = url.searchParams.get('anchorGarmentId')
+    const limit = Number(url.searchParams.get('limit') ?? '50')
+    const offset = Number(url.searchParams.get('offset') ?? '0')
+    const filtered = list.filter(
+      (item) =>
+        (!source || item.source === source) &&
+        (!anchorGarmentId || item.anchorGarmentId === anchorGarmentId)
+    )
+    await route.fulfill({
+      status: 200,
+      json: savedLookListResponseSchema.parse({
+        data: filtered.slice(offset, offset + limit),
+        total: filtered.length,
+        limit,
+        offset,
+      }),
+    })
+  }
+
+  const handleCreateSavedLook = async (
+    route: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[0],
+    request: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[1],
+    owner: string,
+    list: SavedLookContract[],
+    deleted: Map<string, SavedLookContract>
+  ) => {
+    const idemKey = request.headers()['idempotency-key']?.trim()
+    const prior = idemKey ? idempotencyKeys.get(`${owner}:${idemKey}`) : undefined
+    if (prior) {
+      if (deleted.has(prior.id)) {
+        await route.fulfill({
+          status: 409,
+          json: {
+            code: 'SAVED_LOOK_ALREADY_REMOVED',
+            message: 'Saved look was already removed',
+          },
+        })
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        json: savedLookResponseSchema.parse({ data: prior }),
+      })
+      return
+    }
+    const input = createSavedLookInputSchema.parse(request.postDataJSON())
+    const now = new Date().toISOString()
+    const created: SavedLookContract = {
+      id: `saved-look-mock-${savedLookSeq++}`,
+      ownerUserId: owner,
+      source: input.source,
+      lookId: input.lookId,
+      weather: input.weather,
+      title: input.title ?? null,
+      anchorGarmentId: input.anchorGarmentId ?? null,
+      anchorSnapshot: input.anchorSnapshot ?? null,
+      composition: input.composition.map((slot) => ({
+        ...slot,
+        label: slot.label ?? null,
+        missing: false,
+        imageAccess: null,
+      })),
+      swaps: input.swaps ?? {},
+      collection: input.collection ?? null,
+      comfort: input.comfort ?? null,
+      availabilityStatus: 'ready',
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt: now,
+      updatedAt: now,
+    }
+    list.unshift(created)
+    if (idemKey) idempotencyKeys.set(`${owner}:${idemKey}`, created)
+    await route.fulfill({
+      status: 201,
+      headers: { etag: `"saved-look:${created.id}:${created.revision}"` },
+      json: savedLookResponseSchema.parse({ data: created }),
+    })
+  }
+
+  const handleRestoreSavedLook = async (
+    route: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[0],
+    savedLookId: string,
+    list: SavedLookContract[],
+    deleted: Map<string, SavedLookContract>
+  ) => {
+    const active = list.find((item) => item.id === savedLookId)
+    if (active) {
+      await route.fulfill({
+        status: 200,
+        json: savedLookResponseSchema.parse({ data: active }),
+      })
+      return
+    }
+    const softDeleted = deleted.get(savedLookId)
+    if (!softDeleted) {
+      await route.fulfill({ status: 404, json: { message: 'Saved look not found' } })
+      return
+    }
+    deleted.delete(savedLookId)
+    const restored = { ...softDeleted, revision: softDeleted.revision + 1 }
+    list.unshift(restored)
+    await route.fulfill({
+      status: 200,
+      json: savedLookResponseSchema.parse({ data: restored }),
+    })
+  }
+
+  const handleItemSavedLook = async (
+    route: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[0],
+    method: string,
+    suffix: string,
+    list: SavedLookContract[],
+    deleted: Map<string, SavedLookContract>
+  ) => {
+    if (method === 'POST' && suffix.endsWith('/restore')) {
+      return handleRestoreSavedLook(
+        route,
+        suffix.slice(0, -'/restore'.length),
+        list,
+        deleted
+      )
+    }
+    if (method === 'GET') {
+      const found = list.find((item) => item.id === suffix)
+      await route.fulfill(
+        found
+          ? {
+              status: 200,
+              headers: { etag: `"saved-look:${found.id}:${found.revision}"` },
+              json: savedLookResponseSchema.parse({ data: found }),
+            }
+          : { status: 404, json: { message: 'Saved look not found' } }
+      )
+      return
+    }
+    if (method === 'DELETE') {
+      const index = list.findIndex((item) => item.id === suffix)
+      if (index === -1) {
+        await route.fulfill({ status: 404, json: { message: 'Saved look not found' } })
+        return
+      }
+      const [removed] = list.splice(index, 1)
+      if (removed) deleted.set(removed.id, removed)
+      await route.fulfill({ status: 204, body: '' })
+      return
+    }
+    await route.abort()
+  }
+
+  const savedLooksHandler: NonNullable<
+    Parameters<InterceptNetworkCallFn>[0]['handler']
+  > = async (route, request) => {
+    const url = new URL(request.url())
+    if (url.origin !== origin) {
+      await route.abort()
+      return
+    }
+    const owner = members.get(request.headers().authorization ?? '')
+    if (!owner) {
+      await route.fulfill({ status: 401, json: { message: 'Authentication required' } })
+      return
+    }
+    const list = getOwnerList(owner)
+    const deleted = getDeletedMap(owner)
+    const method = request.method()
+    const suffix = url.pathname.replace(/^\/api\/v1\/wardrobe\/saved-looks\/?/, '')
+
+    if (!suffix && method === 'GET') return handleListSavedLooks(route, url, list)
+    if (!suffix && method === 'POST') {
+      return handleCreateSavedLook(route, request, owner, list, deleted)
+    }
+    if (suffix) return handleItemSavedLook(route, method, suffix, list, deleted)
+    await route.abort()
+  }
+
+  void intercept({
+    url: '**/api/v1/wardrobe/saved-looks*',
+    handler: savedLooksHandler,
+  })
+  void intercept({
+    url: '**/api/v1/wardrobe/saved-looks/**',
+    handler: savedLooksHandler,
+  })
 
   // The project-owned neutral PNG is reused for each anonymous garment. The
   // requested URL identifies the row, so substituting a different garment fails.

@@ -409,14 +409,22 @@ describe('ClosetSavedLooksRow (web)', () => {
     expect(screen.getByTestId('saved-look-missing-garment')).toBeInTheDocument()
     expect(screen.getByTestId('saved-look-needs-review')).toBeInTheDocument()
 
-    // Missing garment look supports exact Undo restore on remove.
+    // Missing garment look supports exact Undo restore on remove, and preserves Retry when restore fails.
+    restoreSavedLookFromWeb.mockRejectedValueOnce(new Error('503 temporary'))
     await user.click(screen.getAllByTestId('saved-look-remove')[0]!)
     const undoBtn = await screen.findByRole('button', { name: 'Undo' })
     await user.click(undoBtn)
-    await waitFor(() =>
-      expect(restoreSavedLookFromWeb).toHaveBeenCalledWith('sl-missing', {
-        accessToken: undefined,
-      })
-    )
+    const retryUndoBtn = await screen.findByTestId('status-bar-action-retry')
+    await user.click(retryUndoBtn)
+    await waitFor(() => expect(restoreSavedLookFromWeb).toHaveBeenCalledTimes(2))
+    expect(restoreSavedLookFromWeb).toHaveBeenLastCalledWith('sl-missing', {
+      accessToken: undefined,
+    })
+
+    // Opening missing-garment look renders detail modal with missing notice and close button.
+    await user.click(screen.getAllByTestId('saved-look-reopen')[0]!)
+    expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
   })
 })

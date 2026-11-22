@@ -43,6 +43,7 @@ import {
   createSavedLookFromMobile,
   deleteSavedLookFromMobile,
   formatSavedLookIfMatch,
+  getSavedLookFromMobile,
   listSavedLooksFromMobile,
   MobileSavedLookRequestError,
   notifyMobileSavedLooksChanged,
@@ -62,6 +63,59 @@ function buildMobileSampleAttemptKey(
     ? `${payload.comfort.runsColdWarm}/${payload.comfort.windTolerance}/${payload.comfort.precipPreparedness}`
     : ''
   return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection ?? ''}:${comfortSig}`
+}
+
+function mergeMobileInitialSavedLooks(
+  current: SavedLookContract[],
+  fetched: SavedLookContract[],
+  deletedIds: ReadonlySet<string>
+): SavedLookContract[] {
+  const seen = new Set(current.map((item) => item.id))
+  const merged = [...current]
+  for (const item of fetched) {
+    if (seen.has(item.id) || deletedIds.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+  return merged
+}
+
+async function confirmMobileSavedLookExists(
+  existing: SavedLookContract,
+  accessToken: string | undefined
+): Promise<SavedLookContract | null> {
+  try {
+    return await getSavedLookFromMobile(existing.id, { accessToken })
+  } catch (error) {
+    if (error instanceof MobileSavedLookRequestError && error.status === 404) {
+      return null
+    }
+    throw error
+  }
+}
+
+async function createMobileSavedLookWithKey(
+  payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>,
+  attemptKey: string,
+  attemptKeys: Map<string, string>,
+  accessToken: string | undefined
+): Promise<SavedLookContract | null> {
+  const idempotencyKey = attemptKeys.get(attemptKey) ?? createIdempotencyKey()
+  attemptKeys.set(attemptKey, idempotencyKey)
+  try {
+    const created = await createSavedLookFromMobile(payload, {
+      accessToken,
+      idempotencyKey,
+    })
+    attemptKeys.delete(attemptKey)
+    return created
+  } catch (error) {
+    if (error instanceof MobileSavedLookRequestError && error.status === 409) {
+      attemptKeys.delete(attemptKey)
+      if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return null
+    }
+    throw error
+  }
 }
 
 async function ensureMobileOnlineForAction(
@@ -140,11 +194,19 @@ export function MemberSampleOutfit({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  const saveRunSeqRef = useRef(0)
+  const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
   const noticeSeqRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+  const updateResult = (
+    updater: SampleOutfitResult | ((current: SampleOutfitResult) => SampleOutfitResult)
+  ) => {
+    saveRunSeqRef.current += 1
+    setResult(updater)
+  }
   const readLiveOnline = () => statusBarRef.current.isOnline && getNetworkOnline()
   const isLiveSession = (actionOwner: string | null, actionEpoch: number) =>
     Boolean(
@@ -174,6 +236,8 @@ export function MemberSampleOutfit({
   useEffect(() => {
     statusBarRef.current.dismissNotice()
     saveAttemptKeysRef.current.clear()
+    deletedIdsRef.current.clear()
+    saveRunSeqRef.current += 1
     lastCreatedRef.current = null
     if (!owner) {
       savedLooksRef.current = []
@@ -186,15 +250,19 @@ export function MemberSampleOutfit({
     setBookmarkStorage('loading')
     void listSavedLooksFromMobile({ source: 'home_sample', signal: controller.signal })
       .then((items) => {
-        if (
-          controller.signal.aborted ||
-          mobileApplicationUserId() !== owner ||
-          mutationVersionRef.current !== loadVersion
-        ) {
+        if (controller.signal.aborted || mobileApplicationUserId() !== owner) {
           return
         }
-        savedLooksRef.current = items
-        setSavedLooks(items)
+        const next =
+          mutationVersionRef.current === loadVersion
+            ? items
+            : mergeMobileInitialSavedLooks(
+                savedLooksRef.current,
+                items,
+                deletedIdsRef.current
+              )
+        savedLooksRef.current = next
+        setSavedLooks(next)
         setBookmarkStorage('ready')
       })
       .catch(() => {
@@ -217,7 +285,7 @@ export function MemberSampleOutfit({
   const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
     if (next === result) return
     lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
-    setResult(next)
+    updateResult(next)
     const seq = ++noticeSeqRef.current
     statusBar.showNotice({
       id: `sample-${kind}-${seq}`,
@@ -233,7 +301,7 @@ export function MemberSampleOutfit({
             const { snapshot, rest } = popLookUndoSnapshot(lookUndoStackRef.current)
             lookUndoStackRef.current = rest
             if (snapshot) {
-              setResult(snapshot)
+              updateResult(snapshot)
               const undoSeq = ++noticeSeqRef.current
               statusBar.showNotice({
                 id: `sample-${kind}-undo-${undoSeq}`,
@@ -299,16 +367,16 @@ export function MemberSampleOutfit({
         }
         onSwap={setCategory}
         swapCategory={category}
-        onUndoSwaps={() => setResult(undoMemberSampleSwaps)}
+        onUndoSwaps={() => updateResult(undoMemberSampleSwaps)}
         onReviewChoices={() => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          setResult(createMemberSampleOutfit())
+          updateResult(createMemberSampleOutfit())
         }}
         onResetChoices={() => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          setResult(createMemberSampleOutfit())
+          updateResult(createMemberSampleOutfit())
         }}
       />
       <SampleIdeaControls
@@ -318,13 +386,13 @@ export function MemberSampleOutfit({
         onPreferences={(preferences) => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          setResult((current) => updateMemberSampleOutfit(current, { preferences }))
+          updateResult((current) => updateMemberSampleOutfit(current, { preferences }))
         }}
         weather={result.input.weather}
         onWeather={(weather) => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          setResult((current) => updateMemberSampleOutfit(current, { weather }))
+          updateResult((current) => updateMemberSampleOutfit(current, { weather }))
         }}
         bookmarks={bookmarks}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
@@ -337,19 +405,33 @@ export function MemberSampleOutfit({
         onSave={async () => {
           const actionEpoch = mobileIdentityEpoch()
           if (!lookId || !isLiveSession(owner, actionEpoch) || !owner) return false
+          const saveSeq = ++saveRunSeqRef.current
           lookUndoStackRef.current = []
           const payload = buildHomeSampleSavedLookInput(result)
           if (!payload) return false
+          const actionToken = (await resolveMobileAccessToken()) ?? undefined
+          if (!isLiveSession(owner, actionEpoch)) return false
           const existingMatch = savedLooksRef.current.find((item) =>
             savedLookMatchesHomeSample(item, result)
           )
           if (existingMatch) {
-            lastCreatedRef.current = null
-            setBookmarkStorage('ready')
-            return { saved: true, undoable: false }
+            const verified = await confirmMobileSavedLookExists(
+              existingMatch,
+              actionToken
+            )
+            if (!isLiveSession(owner, actionEpoch)) return false
+            if (verified) {
+              if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              setBookmarkStorage('ready')
+              return { saved: true, undoable: false }
+            }
+            deletedIdsRef.current.add(existingMatch.id)
+            const pruned = savedLooksRef.current.filter(
+              (item) => item.id !== existingMatch.id
+            )
+            savedLooksRef.current = pruned
+            setSavedLooks(pruned)
           }
-          const actionToken = (await resolveMobileAccessToken()) ?? undefined
-          if (!isLiveSession(owner, actionEpoch)) return false
           const attemptKey = buildMobileSampleAttemptKey(
             owner,
             lookId,
@@ -357,26 +439,18 @@ export function MemberSampleOutfit({
             result.input.weather,
             payload
           )
-          const idempotencyKey =
-            saveAttemptKeysRef.current.get(attemptKey) ?? createIdempotencyKey()
-          saveAttemptKeysRef.current.set(attemptKey, idempotencyKey)
-          let created: SavedLookContract
-          try {
-            created = await createSavedLookFromMobile(payload, {
-              accessToken: actionToken,
-              idempotencyKey,
-            })
-          } catch (error) {
-            if (error instanceof MobileSavedLookRequestError && error.status === 409) {
-              saveAttemptKeysRef.current.delete(attemptKey)
-              if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return false
-            }
-            throw error
-          }
-          if (!isLiveSession(owner, actionEpoch)) return false
-          saveAttemptKeysRef.current.delete(attemptKey)
+          const created = await createMobileSavedLookWithKey(
+            payload,
+            attemptKey,
+            saveAttemptKeysRef.current,
+            actionToken
+          )
+          if (!created || !isLiveSession(owner, actionEpoch)) return false
+          deletedIdsRef.current.delete(created.id)
           mutationVersionRef.current += 1
-          lastCreatedRef.current = created
+          if (saveRunSeqRef.current === saveSeq) {
+            lastCreatedRef.current = created
+          }
           const next = [
             created,
             ...savedLooksRef.current.filter((item) => item.id !== created.id),
@@ -405,6 +479,7 @@ export function MemberSampleOutfit({
             }
           }
           if (!isLiveSession(owner, actionEpoch)) return false
+          deletedIdsRef.current.add(created.id)
           mutationVersionRef.current += 1
           lastCreatedRef.current = null
           const next = savedLooksRef.current.filter((item) => item.id !== created.id)
@@ -416,7 +491,7 @@ export function MemberSampleOutfit({
         onOpen={(bookmark) => {
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
-          setResult((current) => reopenMemberSampleOutfit(current, bookmark))
+          updateResult((current) => reopenMemberSampleOutfit(current, bookmark))
         }}
         onRemove={(id) => {
           const runUndoRemove = async (
@@ -496,6 +571,7 @@ export function MemberSampleOutfit({
               }
             }
             if (!isLiveSession(actionOwner, actionEpoch)) return
+            deletedIdsRef.current.add(target.id)
             mutationVersionRef.current += 1
             const next = savedLooksRef.current.filter((item) => item.id !== target.id)
             savedLooksRef.current = next

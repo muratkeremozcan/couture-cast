@@ -348,18 +348,24 @@ describe('ClosetSavedLooksRow (mobile)', () => {
       ],
     })
 
+    const onRetry = vi.fn()
     await render(
-      <ClosetSavedLooksRow
-        owner="user-1"
-        savedLooks={[missingLook, errorPhotoLook]}
-        isLoading={false}
-        loadError={null}
-        garments={[ACTIVE_GARMENT]}
-        onRetry={vi.fn()}
-        onChanged={vi.fn()}
-        onReopenStylePiece={vi.fn()}
-      />
+      <SaveFeedbackProvider>
+        <ClosetSavedLooksRow
+          owner="user-1"
+          savedLooks={[missingLook, errorPhotoLook]}
+          isLoading={false}
+          loadError="network down"
+          garments={[ACTIVE_GARMENT]}
+          onRetry={onRetry}
+          onChanged={vi.fn()}
+          onReopenStylePiece={vi.fn()}
+        />
+      </SaveFeedbackProvider>
     )
+
+    await userEvent.click(screen.getByTestId('saved-looks-retry'))
+    expect(onRetry).toHaveBeenCalledTimes(1)
 
     await userEvent.click(screen.getByTestId('closet-saved-looks-row'))
     expect(screen.getByTestId('saved-look-missing-garment')).toBeInTheDocument()
@@ -372,6 +378,19 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await waitFor(() =>
       expect(screen.getAllByTestId('saved-look-photo-placeholder')).toHaveLength(1)
     )
+
+    // Opening missing-garment detail modal shows missing notice and closes cleanly.
+    await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
+    expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('saved-look-detail-close'))
+    expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+
+    // Failed Undo restore keeps a Retry button so the member can recover the look.
+    restoreSavedLookFromMobile.mockRejectedValueOnce(new Error('503 temporary'))
+    await userEvent.click(screen.getAllByTestId('saved-look-remove')[0]!)
+    await userEvent.click(await screen.findByText('Undo'))
+    await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(restoreSavedLookFromMobile).toHaveBeenCalledTimes(2))
 
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     expect(screen.getByTestId('saved-look-detail-modal')).toBeInTheDocument()

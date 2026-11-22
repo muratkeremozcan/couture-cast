@@ -334,6 +334,82 @@ it('reuses the same Idempotency-Key when retrying a failed Home sample save', as
   }
 })
 
+it('revalidates cached Home looks on re-save after remote deletion and merges slow initial GET with early Save', async () => {
+  const owner = 'revalidate-merge-member'
+  const existingOnServer = {
+    id: 'sl-server-existing',
+    ownerUserId: `bearer-${owner}`,
+    source: 'home_sample' as const,
+    lookId: 'sample:l:silk-midi',
+    weather: 'warm-rainy',
+    title: null,
+    anchorGarmentId: null,
+    anchorSnapshot: null,
+    composition: [
+      {
+        slotIndex: 0,
+        category: 'top' as const,
+        kind: 'catalog' as const,
+        itemId: 'sample:g:knit-tee',
+        label: null,
+        missing: false,
+        imageAccess: null,
+      },
+    ],
+    swaps: {},
+    collection: 'all',
+    comfort: {
+      runsColdWarm: 'neutral' as const,
+      windTolerance: 'medium' as const,
+      precipPreparedness: 'medium' as const,
+    },
+    availabilityStatus: 'ready' as const,
+    missingGarmentIds: [],
+    needsReviewReasons: [],
+    revision: 0,
+    createdAt: '2026-11-22T01:00:00.000Z',
+    updatedAt: '2026-11-22T01:00:00.000Z',
+  }
+  const { store, handlers } = createSavedLooksMswHandlers([existingOnServer])
+  let releaseInitialGet!: () => void
+  let heldOnce = false
+  store.onGet = async (request) => {
+    if (heldOnce || new URL(request.url).pathname !== '/api/v1/wardrobe/saved-looks') {
+      return
+    }
+    heldOnce = true
+    await new Promise<void>((resolve) => {
+      releaseInitialGet = resolve
+    })
+  }
+
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    // Save before the initial GET finishes, then release GET -> both looks are present.
+    const saveButton = await screen.findByRole('button', { name: 'Save example look' })
+    await user.click(saveButton)
+    await waitFor(() => expect(store.items).toHaveLength(2))
+    releaseInitialGet()
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(4)
+    )
+
+    // Remove the newly saved look remotely on another device -> re-saving revalidates (404) and recreates it.
+    const newlyCreatedId = store.items.find((item) => item.id !== existingOnServer.id)!.id
+    store.items = store.items.filter((item) => item.id !== newlyCreatedId)
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(2))
+    expect(store.items.some((item) => item.id !== existingOnServer.id)).toBe(true)
+  } finally {
+    view.unmount()
+  }
+})
+
 it('shows the city and garment entry links beside an editable sample when the member has no city', async () => {
   const user = userEvent.setup()
   const reads = vi.fn()

@@ -41,6 +41,7 @@ import {
   createSavedLookFromWeb,
   deleteSavedLookFromWeb,
   formatSavedLookIfMatch,
+  getSavedLookFromWeb,
   listSavedLooksFromWeb,
   notifySavedLooksChanged,
   restoreSavedLookFromWeb,
@@ -82,6 +83,59 @@ function buildHomeSampleAttemptKey(
   return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection ?? ''}:${comfortSig}`
 }
 
+function mergeInitialSavedLooks(
+  current: SavedLookContract[],
+  fetched: SavedLookContract[],
+  deletedIds: ReadonlySet<string>
+): SavedLookContract[] {
+  const seen = new Set(current.map((item) => item.id))
+  const merged = [...current]
+  for (const item of fetched) {
+    if (seen.has(item.id) || deletedIds.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
+  }
+  return merged
+}
+
+async function confirmWebSavedLookExists(
+  existing: SavedLookContract,
+  accessToken: string | undefined
+): Promise<SavedLookContract | null> {
+  try {
+    return await getSavedLookFromWeb(existing.id, { accessToken })
+  } catch (error) {
+    if (error instanceof SavedLookRequestError && error.status === 404) {
+      return null
+    }
+    throw error
+  }
+}
+
+async function createWebSavedLookWithKey(
+  payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>,
+  attemptKey: string,
+  attemptKeys: Map<string, string>,
+  accessToken: string | undefined
+): Promise<SavedLookContract | null> {
+  const idempotencyKey = attemptKeys.get(attemptKey) ?? createIdempotencyKey()
+  attemptKeys.set(attemptKey, idempotencyKey)
+  try {
+    const created = await createSavedLookFromWeb(payload, {
+      accessToken,
+      idempotencyKey,
+    })
+    attemptKeys.delete(attemptKey)
+    return created
+  } catch (error) {
+    if (error instanceof SavedLookRequestError && error.status === 409) {
+      attemptKeys.delete(attemptKey)
+      if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return null
+    }
+    throw error
+  }
+}
+
 function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
   return (
     <Link
@@ -119,6 +173,8 @@ function SampleOutfit({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  const saveRunSeqRef = useRef(0)
+  const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const bookmarkOwnerMounted = useRef(true)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
@@ -148,6 +204,8 @@ function SampleOutfit({
     bookmarkOwnerMounted.current = true
     const ownedNotices = ownedNoticeIdsRef.current
     saveAttemptKeysRef.current.clear()
+    deletedIdsRef.current.clear()
+    saveRunSeqRef.current += 1
     lastCreatedRef.current = null
     const controller = new AbortController()
     const loadVersion = mutationVersionRef.current
@@ -156,12 +214,15 @@ function SampleOutfit({
         if (
           controller.signal.aborted ||
           !bookmarkOwnerMounted.current ||
-          !isLiveOwner(owner) ||
-          mutationVersionRef.current !== loadVersion
+          !isLiveOwner(owner)
         )
           return
-        savedLooksRef.current = items
-        setSavedLooks(items)
+        const next =
+          mutationVersionRef.current === loadVersion
+            ? items
+            : mergeInitialSavedLooks(savedLooksRef.current, items, deletedIdsRef.current)
+        savedLooksRef.current = next
+        setSavedLooks(next)
         setBookmarksPersistent(true)
       })
       .catch(() => {
@@ -192,6 +253,7 @@ function SampleOutfit({
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
     if (!isLiveOwner(owner)) return
+    saveRunSeqRef.current += 1
     retainedSample = { owner, result: next }
     setResult(next)
   }
@@ -299,18 +361,29 @@ function SampleOutfit({
         onSave={async () => {
           if (!lookId || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
             return false
+          const saveSeq = ++saveRunSeqRef.current
           lookUndoStackRef.current = []
           const payload = buildHomeSampleSavedLookInput(result)
           if (!payload) return false
+          const actionToken = currentWebSessionBearer() ?? undefined
           const existingMatch = savedLooksRef.current.find((item) =>
             savedLookMatchesHomeSample(item, result)
           )
           if (existingMatch) {
-            lastCreatedRef.current = null
-            setBookmarksPersistent(true)
-            return { saved: true, undoable: false }
+            const verified = await confirmWebSavedLookExists(existingMatch, actionToken)
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+            if (verified) {
+              if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              setBookmarksPersistent(true)
+              return { saved: true, undoable: false }
+            }
+            deletedIdsRef.current.add(existingMatch.id)
+            const pruned = savedLooksRef.current.filter(
+              (item) => item.id !== existingMatch.id
+            )
+            savedLooksRef.current = pruned
+            setSavedLooks(pruned)
           }
-          const actionToken = currentWebSessionBearer() ?? undefined
           const attemptKey = buildHomeSampleAttemptKey(
             owner,
             lookId,
@@ -318,26 +391,20 @@ function SampleOutfit({
             result.input.weather,
             payload
           )
-          const idempotencyKey =
-            saveAttemptKeysRef.current.get(attemptKey) ?? createIdempotencyKey()
-          saveAttemptKeysRef.current.set(attemptKey, idempotencyKey)
-          let created: SavedLookContract
-          try {
-            created = await createSavedLookFromWeb(payload, {
-              accessToken: actionToken,
-              idempotencyKey,
-            })
-          } catch (error) {
-            if (error instanceof SavedLookRequestError && error.status === 409) {
-              saveAttemptKeysRef.current.delete(attemptKey)
-              if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return false
-            }
-            throw error
+          const created = await createWebSavedLookWithKey(
+            payload,
+            attemptKey,
+            saveAttemptKeysRef.current,
+            actionToken
+          )
+          if (!created || !bookmarkOwnerMounted.current || !isLiveOwner(owner)) {
+            return false
           }
-          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
-          saveAttemptKeysRef.current.delete(attemptKey)
+          deletedIdsRef.current.delete(created.id)
           mutationVersionRef.current += 1
-          lastCreatedRef.current = created
+          if (saveRunSeqRef.current === saveSeq) {
+            lastCreatedRef.current = created
+          }
           const next = [
             created,
             ...savedLooksRef.current.filter((item) => item.id !== created.id),
@@ -365,6 +432,7 @@ function SampleOutfit({
             }
           }
           if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+          deletedIdsRef.current.add(created.id)
           mutationVersionRef.current += 1
           lastCreatedRef.current = null
           const next = savedLooksRef.current.filter((item) => item.id !== created.id)
@@ -440,6 +508,7 @@ function SampleOutfit({
               }
             }
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            deletedIdsRef.current.add(target.id)
             mutationVersionRef.current += 1
             const next = savedLooksRef.current.filter((item) => item.id !== target.id)
             savedLooksRef.current = next

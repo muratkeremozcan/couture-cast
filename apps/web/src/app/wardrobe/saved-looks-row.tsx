@@ -381,6 +381,70 @@ function ClosetSavedLooksRowInner({
     notifySavedLooksChanged(actionOwner)
 
     let undoInFlight = false
+    const runUndo = async () => {
+      if (undoInFlight || !isActiveOwnerSession(actionOwner)) return
+      if (!readLiveOnline()) {
+        const offSeq = ++noticeSeqRef.current
+        showOwnedNotice(actionOwner, {
+          id: `closet-saved-look-undo-offline-${offSeq}`,
+          announcementId: createAnnouncementToken(
+            'closet-saved-look-undo-offline',
+            offSeq
+          ),
+          message: t('feedback.offlineAction'),
+          tone: 'offline',
+          actions: [
+            {
+              id: 'undo',
+              kind: 'undo',
+              label: t('feedback.undo'),
+              onPress: () => void runUndo(),
+            },
+          ],
+        })
+        return
+      }
+      undoInFlight = true
+      try {
+        await restoreSavedLookFromWeb(look.id, {
+          accessToken: actionToken,
+        })
+        if (!isActiveOwnerSession(actionOwner)) return
+        onChanged()
+        notifySavedLooksChanged(actionOwner)
+        const undoSeq = ++noticeSeqRef.current
+        showOwnedNotice(actionOwner, {
+          id: `closet-saved-look-undo-${undoSeq}`,
+          announcementId: createAnnouncementToken('closet-saved-look-undo', undoSeq),
+          message: t('feedback.undone'),
+          tone: 'neutral',
+        })
+      } catch (undoError) {
+        if (!isActiveOwnerSession(actionOwner)) return
+        const errSeq = ++noticeSeqRef.current
+        const offline = isOfflineError(undoError) || !readLiveOnline()
+        showOwnedNotice(actionOwner, {
+          id: `closet-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
+          announcementId: createAnnouncementToken(
+            `closet-saved-look-undo-${offline ? 'offline' : 'failed'}`,
+            errSeq
+          ),
+          message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+          tone: offline ? 'offline' : 'error',
+          actions: [
+            {
+              id: 'retry',
+              kind: 'retry',
+              label: offline ? t('feedback.undo') : t('feedback.retry'),
+              onPress: () => void runUndo(),
+            },
+          ],
+        })
+      } finally {
+        undoInFlight = false
+      }
+    }
+
     const seq = ++noticeSeqRef.current
     showOwnedNotice(actionOwner, {
       id: `closet-saved-look-remove-${seq}`,
@@ -394,60 +458,7 @@ function ClosetSavedLooksRowInner({
               id: 'undo',
               kind: 'undo',
               label: t('feedback.undo'),
-              onPress: async () => {
-                if (undoInFlight || !isActiveOwnerSession(actionOwner)) return
-                if (!readLiveOnline()) {
-                  const offSeq = ++noticeSeqRef.current
-                  showOwnedNotice(actionOwner, {
-                    id: `closet-saved-look-undo-offline-${offSeq}`,
-                    announcementId: createAnnouncementToken(
-                      'closet-saved-look-undo-offline',
-                      offSeq
-                    ),
-                    message: t('feedback.offlineAction'),
-                    tone: 'offline',
-                    actions: [],
-                  })
-                  return
-                }
-                undoInFlight = true
-                try {
-                  await restoreSavedLookFromWeb(look.id, {
-                    accessToken: actionToken,
-                  })
-                  if (!isActiveOwnerSession(actionOwner)) return
-                  onChanged()
-                  notifySavedLooksChanged(actionOwner)
-                  const undoSeq = ++noticeSeqRef.current
-                  showOwnedNotice(actionOwner, {
-                    id: `closet-saved-look-undo-${undoSeq}`,
-                    announcementId: createAnnouncementToken(
-                      'closet-saved-look-undo',
-                      undoSeq
-                    ),
-                    message: t('feedback.undone'),
-                    tone: 'neutral',
-                  })
-                } catch (undoError) {
-                  if (!isActiveOwnerSession(actionOwner)) return
-                  const errSeq = ++noticeSeqRef.current
-                  const offline = isOfflineError(undoError) || !readLiveOnline()
-                  showOwnedNotice(actionOwner, {
-                    id: `closet-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
-                    announcementId: createAnnouncementToken(
-                      `closet-saved-look-undo-${offline ? 'offline' : 'failed'}`,
-                      errSeq
-                    ),
-                    message: offline
-                      ? t('feedback.offlineAction')
-                      : t('feedback.saveFailed'),
-                    tone: offline ? 'offline' : 'error',
-                    actions: [],
-                  })
-                } finally {
-                  undoInFlight = false
-                }
-              },
+              onPress: runUndo,
             },
           ],
     })

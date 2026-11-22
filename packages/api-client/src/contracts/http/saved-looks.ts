@@ -60,9 +60,12 @@ function graphemeBoundedTitle(maxGraphemes: number) {
         })
       }
     })
+    .openapi({
+      description: `Trimmed and NFC-normalized title bounded to ${maxGraphemes} extended grapheme clusters without null bytes.`,
+    })
     .transform((value) => (value.length === 0 ? null : value))
     .openapi({
-      description: `Trimmed and NFC-normalized title bounded to ${maxGraphemes} extended grapheme clusters.`,
+      description: `Trimmed and NFC-normalized title bounded to ${maxGraphemes} extended grapheme clusters; blank strings normalize to null.`,
     })
 }
 
@@ -121,7 +124,7 @@ export const createSavedLookInputSchema = z
     source: savedLookSourceEnum,
     lookId: nonEmptyStringSchema.max(64),
     weather: nonEmptyStringSchema.max(32),
-    title: graphemeBoundedTitle(80).nullable().optional(),
+    title: graphemeBoundedTitle(MAX_TITLE_GRAPHEMES).nullable().optional(),
     anchorGarmentId: nonEmptyStringSchema.max(128).nullable().optional(),
     anchorSnapshot: savedLookAnchorSnapshotSchema.nullable().optional(),
     composition: z.array(savedLookCompositionSlotInputSchema).min(1).max(12),
@@ -208,6 +211,10 @@ export const createSavedLookInputSchema = z
       }
     }
   })
+  .openapi({
+    description:
+      'Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots.',
+  })
 
 export const savedLookSchema = z
   .object({
@@ -216,13 +223,10 @@ export const savedLookSchema = z
     source: savedLookSourceEnum,
     lookId: nonEmptyStringSchema.max(64),
     weather: nonEmptyStringSchema.max(32),
-    title: z
-      .string()
-      .max(MAX_TITLE_UTF16)
-      .refine((value) => countGraphemes(value) <= MAX_TITLE_GRAPHEMES, {
-        message: `must be at most ${MAX_TITLE_GRAPHEMES} characters`,
-      })
-      .nullable(),
+    // Server enforces the 80-grapheme bound on write via Node ICU Intl.Segmenter.
+    // Response parsing checks UTF-16 length only so Hermes (which lacks Intl.Segmenter)
+    // never rejects an API-approved title containing multi-codepoint emoji clusters.
+    title: z.string().max(MAX_TITLE_UTF16).nullable(),
     anchorGarmentId: nonEmptyStringSchema.max(128).nullable(),
     anchorSnapshot: savedLookAnchorSnapshotSchema.nullable(),
     composition: z.array(savedLookCompositionSlotSchema).min(1).max(12),

@@ -9,6 +9,7 @@ const {
   apiV1WardrobeSavedLooksPost,
   apiV1WardrobeSavedLooksSavedLookIdGet,
   apiV1WardrobeSavedLooksSavedLookIdDelete,
+  apiV1WardrobeSavedLooksSavedLookIdRestorePost,
   currentWebSessionBearer,
   readStorage,
 } = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const {
   apiV1WardrobeSavedLooksPost: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdGet: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdDelete: vi.fn(),
+  apiV1WardrobeSavedLooksSavedLookIdRestorePost: vi.fn(),
   currentWebSessionBearer: vi.fn<() => string | null>(() => 'verified-token'),
   readStorage: vi.fn<() => string | null>(() => null),
 }))
@@ -26,6 +28,7 @@ vi.mock('./api-client', () => ({
     apiV1WardrobeSavedLooksPost,
     apiV1WardrobeSavedLooksSavedLookIdGet,
     apiV1WardrobeSavedLooksSavedLookIdDelete,
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost,
   }),
 }))
 
@@ -44,7 +47,11 @@ import {
   formatSavedLookIfMatch,
   getSavedLookFromWeb,
   listSavedLooksFromWeb,
+  listSavedLooksPageFromWeb,
+  notifySavedLooksChanged,
+  restoreSavedLookFromWeb,
   SavedLookRequestError,
+  subscribeSavedLooksChanged,
 } from './saved-looks'
 
 const SAMPLE_LOOK: SavedLookContract = {
@@ -129,11 +136,37 @@ describe('web saved-looks client', () => {
     expect(single.id).toBe('sl-1')
 
     apiV1WardrobeSavedLooksSavedLookIdDelete.mockResolvedValueOnce(undefined)
-    await deleteSavedLookFromWeb('sl-1', formatSavedLookIfMatch('sl-1', 0))
+    await deleteSavedLookFromWeb('sl-1', formatSavedLookIfMatch('sl-1', 0), {
+      accessToken: 'pinned-token',
+    })
     expect(apiV1WardrobeSavedLooksSavedLookIdDelete).toHaveBeenCalledWith(
       { savedLookId: 'sl-1', ifMatch: '"saved-look:sl-1:0"' },
       expect.anything()
     )
+
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [SAMPLE_LOOK],
+      total: 52,
+      limit: 50,
+      offset: 0,
+    })
+    const page = await listSavedLooksPageFromWeb({ limit: 50, offset: 0 })
+    expect(page.total).toBe(52)
+
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost.mockResolvedValueOnce({
+      data: { ...SAMPLE_LOOK, revision: 1 },
+    })
+    const restored = await restoreSavedLookFromWeb('sl-1', {
+      accessToken: 'pinned-token',
+    })
+    expect(restored.revision).toBe(1)
+
+    const seen: (string | null)[] = []
+    const unsub = subscribeSavedLooksChanged((owner) => seen.push(owner))
+    notifySavedLooksChanged('user-1')
+    unsub()
+    notifySavedLooksChanged('user-1')
+    expect(seen).toEqual(['user-1'])
   })
 
   it('falls back to stored session token and normalizes API & signed-out errors', async () => {
@@ -163,5 +196,10 @@ describe('web saved-looks client', () => {
     await expect(deleteSavedLookFromWeb('sl-1', '*')).rejects.toMatchObject({
       status: 502,
     })
+
+    apiV1WardrobeSavedLooksSavedLookIdRestorePost.mockRejectedValueOnce('raw-failure')
+    await expect(restoreSavedLookFromWeb('sl-1')).rejects.toThrow(
+      'Unable to restore this saved look.'
+    )
   })
 })

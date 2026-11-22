@@ -279,7 +279,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
 
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
+  const savedLooksLoadEpochRef = useRef(0)
+
   useEffect(() => {
+    const loadEpoch = ++savedLooksLoadEpochRef.current
+    setSavedLooksLoadingMore(false)
     if (!owner) {
       setSavedLooks([])
       setSavedLooksTotal(0)
@@ -291,20 +295,30 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     setSavedLooksLoading(true)
     void listSavedLooksPageFromWeb({ limit: 50, offset: 0, signal: controller.signal })
       .then((page) => {
-        if (controller.signal.aborted || currentWebSessionOwner() !== owner) return
+        if (
+          controller.signal.aborted ||
+          savedLooksLoadEpochRef.current !== loadEpoch ||
+          currentWebSessionOwner() !== owner
+        ) {
+          return
+        }
         setSavedLooks(page.data)
         setSavedLooksTotal(page.total)
         setSavedLooksError(null)
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || savedLooksLoadEpochRef.current !== loadEpoch) {
+          return
+        }
         setSavedLooksError(
           error instanceof Error ? error.message : 'Unable to load your saved looks.'
         )
         missedSession()
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSavedLooksLoading(false)
+        if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
+          setSavedLooksLoading(false)
+        }
       })
     return () => controller.abort()
   }, [owner, sessionAttempt, missedSession, savedLooksAttempt])
@@ -322,9 +336,15 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     if (!owner || savedLooksLoadingMore || savedLooks.length >= savedLooksTotal) return
     setSavedLooksLoadingMore(true)
     const offset = savedLooks.length
+    const startLoadEpoch = savedLooksLoadEpochRef.current
     void listSavedLooksPageFromWeb({ limit: 50, offset })
       .then((page) => {
-        if (currentWebSessionOwner() !== owner) return
+        if (
+          savedLooksLoadEpochRef.current !== startLoadEpoch ||
+          currentWebSessionOwner() !== owner
+        ) {
+          return
+        }
         setSavedLooks((current) => {
           const seen = new Set(current.map((item) => item.id))
           return [...current, ...page.data.filter((item) => !seen.has(item.id))]
@@ -333,7 +353,9 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       })
       .catch(() => undefined)
       .finally(() => {
-        setSavedLooksLoadingMore(false)
+        if (savedLooksLoadEpochRef.current === startLoadEpoch) {
+          setSavedLooksLoadingMore(false)
+        }
       })
   }, [owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
 

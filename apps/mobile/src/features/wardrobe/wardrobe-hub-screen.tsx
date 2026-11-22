@@ -226,7 +226,11 @@ function MemberWardrobeHub({
     [epoch, refreshGarmentList]
   )
 
+  const savedLooksLoadEpochRef = useRef(0)
+
   useEffect(() => {
+    const loadEpoch = ++savedLooksLoadEpochRef.current
+    setSavedLooksLoadingMore(false)
     if (!owner) {
       setSavedLooks([])
       setSavedLooksTotal(0)
@@ -238,19 +242,29 @@ function MemberWardrobeHub({
     setSavedLooksLoading(true)
     void listSavedLooksPageFromMobile({ limit: 50, offset: 0, signal: controller.signal })
       .then((page) => {
-        if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
+        if (
+          controller.signal.aborted ||
+          savedLooksLoadEpochRef.current !== loadEpoch ||
+          epoch !== mobileIdentityEpoch()
+        ) {
+          return
+        }
         setSavedLooks(page.data)
         setSavedLooksTotal(page.total)
         setSavedLooksError(null)
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || savedLooksLoadEpochRef.current !== loadEpoch) {
+          return
+        }
         setSavedLooksError(
           error instanceof Error ? error.message : 'Unable to load your saved looks.'
         )
       })
       .finally(() => {
-        if (!controller.signal.aborted) setSavedLooksLoading(false)
+        if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
+          setSavedLooksLoading(false)
+        }
       })
     return () => controller.abort()
   }, [epoch, owner, savedLooksAttempt])
@@ -269,9 +283,15 @@ function MemberWardrobeHub({
     setSavedLooksLoadingMore(true)
     const offset = savedLooks.length
     const startEpoch = epoch
+    const startLoadEpoch = savedLooksLoadEpochRef.current
     void listSavedLooksPageFromMobile({ limit: 50, offset })
       .then((page) => {
-        if (startEpoch !== mobileIdentityEpoch()) return
+        if (
+          savedLooksLoadEpochRef.current !== startLoadEpoch ||
+          startEpoch !== mobileIdentityEpoch()
+        ) {
+          return
+        }
         setSavedLooks((current) => {
           const seen = new Set(current.map((item) => item.id))
           return [...current, ...page.data.filter((item) => !seen.has(item.id))]
@@ -280,7 +300,9 @@ function MemberWardrobeHub({
       })
       .catch(() => undefined)
       .finally(() => {
-        setSavedLooksLoadingMore(false)
+        if (savedLooksLoadEpochRef.current === startLoadEpoch) {
+          setSavedLooksLoadingMore(false)
+        }
       })
   }, [epoch, owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
 
