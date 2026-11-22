@@ -393,6 +393,7 @@ function StylePieceIdeas({
           localStorage.setItem(key, JSON.stringify(next.map(({ recipe }) => recipe)))
         else localStorage.removeItem(key)
         setSaved(next)
+        setStorage('ready')
         return true
       } catch {
         setStorage('unavailable')

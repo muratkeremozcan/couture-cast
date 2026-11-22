@@ -142,13 +142,21 @@ export function createStylePieceRefresh({
   let flight:
     | { controller: AbortController; result: Promise<StylePiecePhotoAnchor | null> }
     | undefined
+  let requestSeq = 0
+  let latestAuthoritativeSeq = 0
   const actionControllers = new Set<AbortController>()
   const active = () => !stopped && interval !== undefined && isCurrent()
 
   const currentValidAnchor = () =>
     active() && latest && Date.parse(latest.photo.expiresAt) > Date.now() ? latest : null
 
-  const publish = (anchor: StylePiecePhotoAnchor | null) => {
+  const publish = (anchor: StylePiecePhotoAnchor | null, seq?: number) => {
+    if (seq !== undefined) {
+      if (seq < latestAuthoritativeSeq) return
+      latestAuthoritativeSeq = seq
+    } else {
+      latestAuthoritativeSeq = ++requestSeq
+    }
     latest = anchor
     cancelExpiry?.()
     cancelExpiry = anchor
@@ -162,6 +170,7 @@ export function createStylePieceRefresh({
   const refresh = () => {
     if (!active()) return Promise.resolve(null)
     if (flight) return flight.result
+    const seq = ++requestSeq
     const controller = new AbortController()
     const valid = () => !controller.signal.aborted && active()
     const result = Promise.resolve()
@@ -170,11 +179,12 @@ export function createStylePieceRefresh({
           if (!valid()) return null
           const items = await load(controller.signal)
           if (!valid()) return null
+          if (seq < latestAuthoritativeSeq) return currentValidAnchor()
           const anchor = items ? selectStylePieceAnchor(items, garmentId) : null
-          publish(anchor)
+          publish(anchor, seq)
           return anchor
         } catch {
-          if (valid()) publish(null)
+          if (valid() && seq >= latestAuthoritativeSeq) publish(null, seq)
           return null
         }
       })
@@ -191,23 +201,33 @@ export function createStylePieceRefresh({
       publish(null)
       return { status: 'revoked' }
     }
+    const seq = ++requestSeq
     const controller = new AbortController()
     actionControllers.add(controller)
     const valid = () => !controller.signal.aborted && active()
     try {
       const items = await load(controller.signal)
       if (!valid()) return { status: 'revoked' }
+      if (seq < latestAuthoritativeSeq) {
+        const authoritative = currentValidAnchor()
+        return authoritative
+          ? { status: 'ok', anchor: authoritative }
+          : { status: 'revoked' }
+      }
       const anchor = items ? selectStylePieceAnchor(items, garmentId) : null
       if (!anchor) {
-        publish(null)
+        publish(null, seq)
         return { status: 'revoked' }
       }
-      publish(anchor)
+      publish(anchor, seq)
       return { status: 'ok', anchor }
     } catch (error) {
       if (!valid()) return { status: 'revoked' }
+      if (seq < latestAuthoritativeSeq) {
+        return currentValidAnchor() ? { status: 'error', error } : { status: 'revoked' }
+      }
       if (isAuthOrDeadlineRevocationError(error) || !currentValidAnchor()) {
-        publish(null)
+        publish(null, seq)
         return { status: 'revoked' }
       }
       // Transient transport or 5xx error while the anchor is still valid & unexpired:
@@ -219,6 +239,7 @@ export function createStylePieceRefresh({
   }
 
   const pause = () => {
+    latestAuthoritativeSeq = ++requestSeq
     clearInterval(interval)
     interval = undefined
     flight?.controller.abort()

@@ -283,28 +283,62 @@ export function useSaveAction({
     [clearStandaloneNoticeTimer, emitAnnouncement, showStatusBar]
   )
 
+  const matchesOrigin = useCallback(
+    (origin?: {
+      ownerKey: string | null | undefined
+      resetKey: string | number | undefined
+      expectedRunId?: number
+    }): boolean => {
+      if (!origin) return true
+      return (
+        ownerKeyRef.current === origin.ownerKey &&
+        resetKeyRef.current === origin.resetKey &&
+        (origin.expectedRunId === undefined || runIdRef.current === origin.expectedRunId)
+      )
+    },
+    []
+  )
+
+  const showUndoOffline = useCallback(
+    (id: number) => {
+      presentNotice({
+        id: `undo-offline-${controlId}-${id}`,
+        announcementId: createAnnouncementToken(`${controlId}:offline`, id),
+        message: labelsRef.current.offlineMessage,
+        tone: 'offline',
+        actions: [],
+      })
+    },
+    [controlId, presentNotice]
+  )
+
+  const showUndoFailed = useCallback(
+    (id: number) => {
+      presentNotice({
+        id: `undo-failed-${controlId}-${id}`,
+        announcementId: createAnnouncementToken(`${controlId}:undo-failed`, id),
+        message: labelsRef.current.failedMessage,
+        tone: 'error',
+      })
+    },
+    [controlId, presentNotice]
+  )
+
   const triggerUndo = useCallback(
     async (origin?: {
       ownerKey: string | null | undefined
       resetKey: string | number | undefined
+      expectedRunId?: number
     }) => {
-      if (!mountedRef.current) return false
       if (
-        origin &&
-        (ownerKeyRef.current !== origin.ownerKey ||
-          resetKeyRef.current !== origin.resetKey)
+        !mountedRef.current ||
+        isSaveFeedbackBusy(stateRef.current) ||
+        !matchesOrigin(origin)
       ) {
         return false
       }
       if (requiresNetwork && !readLiveOnline()) {
-        const offlineRunId = ++runIdRef.current
-        presentNotice({
-          id: `undo-offline-${controlId}-${offlineRunId}`,
-          announcementId: createAnnouncementToken(`${controlId}:offline`, offlineRunId),
-          message: labelsRef.current.offlineMessage,
-          tone: 'offline',
-          actions: [],
-        })
+        showUndoOffline(++runIdRef.current)
         return false
       }
       const undoHandler = onUndoRef.current
@@ -320,19 +354,9 @@ export function useSaveAction({
 
       try {
         const result = await undoHandler()
-        if (!isUndoStillCurrent()) {
-          return false
-        }
+        if (!isUndoStillCurrent()) return false
         if (result === false) {
-          presentNotice({
-            id: `undo-failed-${controlId}-${undoRunId}`,
-            announcementId: createAnnouncementToken(
-              `${controlId}:undo-failed`,
-              undoRunId
-            ),
-            message: labelsRef.current.failedMessage,
-            tone: 'error',
-          })
+          showUndoFailed(undoRunId)
           return false
         }
         stateRef.current = 'idle'
@@ -348,25 +372,22 @@ export function useSaveAction({
       } catch (error) {
         if (!isUndoStillCurrent()) return false
         if (requiresNetwork && (isOfflineError(error) || !readLiveOnline())) {
-          presentNotice({
-            id: `undo-offline-${controlId}-${undoRunId}`,
-            announcementId: createAnnouncementToken(`${controlId}:offline`, undoRunId),
-            message: labelsRef.current.offlineMessage,
-            tone: 'offline',
-            actions: [],
-          })
+          showUndoOffline(undoRunId)
           return false
         }
-        presentNotice({
-          id: `undo-failed-${controlId}-${undoRunId}`,
-          announcementId: createAnnouncementToken(`${controlId}:undo-failed`, undoRunId),
-          message: labelsRef.current.failedMessage,
-          tone: 'error',
-        })
+        showUndoFailed(undoRunId)
         return false
       }
     },
-    [controlId, presentNotice, readLiveOnline, requiresNetwork]
+    [
+      controlId,
+      matchesOrigin,
+      presentNotice,
+      readLiveOnline,
+      requiresNetwork,
+      showUndoFailed,
+      showUndoOffline,
+    ]
   )
 
   const triggerSave = useCallback(
@@ -387,6 +408,8 @@ export function useSaveAction({
       if (isSaveFeedbackBusy(stateRef.current)) {
         return Promise.resolve(false)
       }
+
+      dismissActiveNotice()
 
       if (requiresNetwork && !readLiveOnline()) {
         const offlineRunId = ++runIdRef.current
@@ -471,7 +494,11 @@ export function useSaveAction({
             kind: 'undo',
             label: labelsRef.current.undo,
             onPress: () =>
-              void triggerUndo({ ownerKey: startOwner, resetKey: startReset }),
+              void triggerUndo({
+                ownerKey: startOwner,
+                resetKey: startReset,
+                expectedRunId: runId,
+              }),
           })
         }
         if (extraActionsRef.current?.length) {
@@ -551,6 +578,7 @@ export function useSaveAction({
     },
     [
       controlId,
+      dismissActiveNotice,
       emitAnnouncement,
       presentNotice,
       readLiveOnline,

@@ -438,6 +438,7 @@ function StylePieceIdeas({
       if (next === null) return false
       store.write(JSON.stringify(next.map(({ recipe }) => recipe)))
       setSaved(next)
+      setStorage('ready')
       return true
     } catch {
       setStorage('unavailable')

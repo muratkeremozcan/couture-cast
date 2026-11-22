@@ -8,13 +8,19 @@ export type NetworkConnectivityProbe = (signal: AbortSignal) => Promise<boolean>
 const PROBE_TIMEOUT_MS = 4_000
 const OFFLINE_RECOVERY_POLL_MS = 10_000
 
+type ActiveProbe = {
+  controller: AbortController
+  promise: Promise<boolean>
+  waiters: number
+}
+
 let currentOnline = readBrowserOnline()
 const listeners = new Set<Listener>()
 let windowListenersBound = false
 let customProbe: NetworkConnectivityProbe | null = null
-let inFlightProbe: Promise<boolean> | null = null
+let inFlightProbe: ActiveProbe | null = null
 
-function readBrowserOnline(): boolean {
+export function readBrowserOnline(): boolean {
   if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') {
     return navigator.onLine
   }
@@ -74,7 +80,10 @@ export function setNetworkConnectivityProbe(
   probe: NetworkConnectivityProbe | null
 ): void {
   customProbe = probe
-  inFlightProbe = null
+  if (inFlightProbe) {
+    inFlightProbe.controller.abort()
+    inFlightProbe = null
+  }
 }
 
 export function getNetworkOnline(): boolean {
@@ -100,45 +109,75 @@ export function subscribeNetworkStatus(listener: Listener): () => void {
 
 export function probeNetworkConnectivity(externalSignal?: AbortSignal): Promise<boolean> {
   if (externalSignal?.aborted) return Promise.resolve(false)
-  if (inFlightProbe) return inFlightProbe
 
-  const probe = resolveProbe()
-  if (!probe) {
-    if (hasReliableBrowserOnline()) {
-      const online = readBrowserOnline()
-      notify(online)
-      return Promise.resolve(online)
+  let entry = inFlightProbe
+  if (!entry) {
+    const probe = resolveProbe()
+    if (!probe) {
+      if (hasReliableBrowserOnline()) {
+        const online = readBrowserOnline()
+        notify(online)
+        return Promise.resolve(online)
+      }
+      return Promise.resolve(currentOnline)
     }
-    return Promise.resolve(currentOnline)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+    const activeEntry: ActiveProbe = {
+      controller,
+      waiters: 0,
+      promise: Promise.resolve(false),
+    }
+
+    activeEntry.promise = (async () => {
+      try {
+        const reachable = await probe(controller.signal)
+        if (controller.signal.aborted) return false
+        if (reachable) {
+          reportNetworkOnline()
+          return true
+        }
+        return false
+      } catch {
+        return false
+      }
+    })().finally(() => {
+      clearTimeout(timeout)
+      if (inFlightProbe === activeEntry) {
+        inFlightProbe = null
+      }
+    })
+
+    inFlightProbe = activeEntry
+    entry = activeEntry
   }
 
-  const controller = new AbortController()
-  const onExternalAbort = () => controller.abort()
-  externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
-  const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
+  const shared = entry
+  shared.waiters += 1
 
-  const run = (async () => {
-    try {
-      const reachable = await probe(controller.signal)
-      if (externalSignal?.aborted) return false
-      if (reachable) {
-        reportNetworkOnline()
-        return true
+  if (!externalSignal) {
+    return shared.promise.finally(() => {
+      shared.waiters = Math.max(0, shared.waiters - 1)
+    })
+  }
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const settle = (value: boolean, cancelledByCaller: boolean) => {
+      if (settled) return
+      settled = true
+      externalSignal.removeEventListener('abort', onAbort)
+      shared.waiters = Math.max(0, shared.waiters - 1)
+      if (cancelledByCaller && shared.waiters === 0) {
+        shared.controller.abort()
       }
-      return false
-    } catch {
-      return false
+      resolve(value)
     }
-  })().finally(() => {
-    clearTimeout(timeout)
-    externalSignal?.removeEventListener('abort', onExternalAbort)
-    if (inFlightProbe === run) {
-      inFlightProbe = null
-    }
+    const onAbort = () => settle(false, true)
+    externalSignal.addEventListener('abort', onAbort, { once: true })
+    void shared.promise.then((value) => settle(value, false))
   })
-
-  inFlightProbe = run
-  return run
 }
 
 /**
@@ -162,7 +201,10 @@ export async function checkNetworkOnlineForAction(): Promise<boolean> {
 /** Resets store state and custom probe cleanly between tests. */
 export function resetNetworkStatusForTests(online: boolean = readBrowserOnline()): void {
   customProbe = null
-  inFlightProbe = null
+  if (inFlightProbe) {
+    inFlightProbe.controller.abort()
+    inFlightProbe = null
+  }
   currentOnline = online
   listeners.forEach((listener) => listener(currentOnline))
 }

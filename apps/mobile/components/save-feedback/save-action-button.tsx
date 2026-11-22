@@ -29,6 +29,7 @@ import {
   checkNetworkOnlineForAction,
   getNetworkOnline,
   hasReliableBrowserOnline,
+  readBrowserOnline,
   reportNetworkOffline,
   reportNetworkOnline,
 } from './network-status'
@@ -116,6 +117,8 @@ export function useSaveAction({
 
   const runIdRef = useRef(0)
   const mountedRef = useRef(true)
+  const probeAttemptRef = useRef<number | null>(null)
+  const probeSeqRef = useRef(0)
   const activeTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const standaloneNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeNoticeIdRef = useRef<string | null>(null)
@@ -179,6 +182,7 @@ export function useSaveAction({
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      probeAttemptRef.current = null
       clearAllSlowTimers()
       clearStandaloneNoticeTimer()
       dismissActiveNotice()
@@ -192,6 +196,7 @@ export function useSaveAction({
     }
     prevResetPairRef.current = { resetKey, ownerKey }
     resetKeyRef.current = resetKey
+    probeAttemptRef.current = null
     clearAllSlowTimers()
     dismissActiveNotice()
     runIdRef.current += 1
@@ -297,18 +302,6 @@ export function useSaveAction({
     [controlId, presentNotice]
   )
 
-  const ensureOnlineForUndo = useCallback(async (): Promise<boolean> => {
-    if (!requiresNetwork || readLiveOnline()) return true
-    const reachable = hasReliableBrowserOnline()
-      ? false
-      : await checkNetworkOnlineForAction()
-    if (!reachable) {
-      showOfflineNotice('undo', ++runIdRef.current)
-      return false
-    }
-    return true
-  }, [readLiveOnline, requiresNetwork, showOfflineNotice])
-
   const reportUndoFailure = useCallback(
     (undoRunId: number) => {
       presentNotice({
@@ -321,25 +314,78 @@ export function useSaveAction({
     [controlId, presentNotice]
   )
 
+  const matchesOrigin = useCallback(
+    (origin?: {
+      ownerKey: string | null | undefined
+      resetKey: string | number | undefined
+      expectedRunId?: number
+    }): boolean => {
+      if (!origin) return true
+      return (
+        ownerKeyRef.current === origin.ownerKey &&
+        resetKeyRef.current === origin.resetKey &&
+        (origin.expectedRunId === undefined || runIdRef.current === origin.expectedRunId)
+      )
+    },
+    []
+  )
+
+  const canRunUndo = useCallback(
+    (
+      startOwner: string | null | undefined,
+      startReset: string | number | undefined,
+      expectedRunId: number
+    ) =>
+      mountedRef.current &&
+      ownerKeyRef.current === startOwner &&
+      resetKeyRef.current === startReset &&
+      runIdRef.current === expectedRunId &&
+      !isSaveFeedbackBusy(stateRef.current) &&
+      probeAttemptRef.current === null,
+    []
+  )
+
+  const ensureOnlineForUndo = useCallback(
+    async (
+      startOwner: string | null | undefined,
+      startReset: string | number | undefined,
+      preProbeRunId: number
+    ): Promise<boolean> => {
+      if (!requiresNetwork || readLiveOnline()) return true
+      const reachable = hasReliableBrowserOnline()
+        ? readBrowserOnline()
+        : await checkNetworkOnlineForAction()
+      if (!canRunUndo(startOwner, startReset, preProbeRunId)) return false
+      if (!reachable) {
+        showOfflineNotice('undo', ++runIdRef.current)
+        return false
+      }
+      return true
+    },
+    [canRunUndo, readLiveOnline, requiresNetwork, showOfflineNotice]
+  )
+
   const triggerUndo = useCallback(
     async (origin?: {
       ownerKey: string | null | undefined
       resetKey: string | number | undefined
+      expectedRunId?: number
     }) => {
-      if (!mountedRef.current) return false
-      if (
-        origin &&
-        (ownerKeyRef.current !== origin.ownerKey ||
-          resetKeyRef.current !== origin.resetKey)
-      ) {
-        return false
-      }
-      if (!(await ensureOnlineForUndo())) return false
-      const undoHandler = onUndoRef.current
-      if (!undoHandler) return false
-      const undoRunId = ++runIdRef.current
       const startOwner = ownerKeyRef.current
       const startReset = resetKeyRef.current
+      const preProbeRunId = runIdRef.current
+      if (!canRunUndo(startOwner, startReset, preProbeRunId) || !matchesOrigin(origin)) {
+        return false
+      }
+
+      // Capture the original operation and identity before any async connectivity probe.
+      const undoHandler = onUndoRef.current
+      if (!undoHandler) return false
+      if (!(await ensureOnlineForUndo(startOwner, startReset, preProbeRunId))) {
+        return false
+      }
+
+      const undoRunId = ++runIdRef.current
       const stillCurrent = () =>
         mountedRef.current &&
         runIdRef.current === undoRunId &&
@@ -375,8 +421,10 @@ export function useSaveAction({
       }
     },
     [
+      canRunUndo,
       controlId,
       ensureOnlineForUndo,
+      matchesOrigin,
       presentNotice,
       readLiveOnline,
       reportUndoFailure,
@@ -456,7 +504,11 @@ export function useSaveAction({
             kind: 'undo',
             label: labelsRef.current.undo,
             onPress: () =>
-              void triggerUndo({ ownerKey: startOwner, resetKey: startReset }),
+              void triggerUndo({
+                ownerKey: startOwner,
+                resetKey: startReset,
+                expectedRunId: runId,
+              }),
           })
         }
         if (extraActionsRef.current?.length) {
@@ -558,36 +610,17 @@ export function useSaveAction({
       ) {
         return Promise.resolve(false)
       }
-      if (isSaveFeedbackBusy(stateRef.current)) {
+      if (isSaveFeedbackBusy(stateRef.current) || probeAttemptRef.current !== null) {
         return Promise.resolve(false)
       }
 
+      dismissActiveNotice()
       const startOwner = ownerKeyRef.current
       const startReset = resetKeyRef.current
 
       if (requiresNetwork && !readLiveOnline()) {
         if (hasReliableBrowserOnline()) {
-          const offlineRunId = ++runIdRef.current
-          stateRef.current = 'offline'
-          dispatch({ type: 'offline', runId: offlineRunId })
-          presentNotice({
-            id: `save-offline-${controlId}-${offlineRunId}`,
-            announcementId: createAnnouncementToken(`${controlId}:offline`, offlineRunId),
-            message: labelsRef.current.offlineMessage,
-            tone: 'offline',
-            actions: [],
-          })
-          return Promise.resolve(false)
-        }
-        return checkNetworkOnlineForAction().then((reachable) => {
-          if (
-            !mountedRef.current ||
-            ownerKeyRef.current !== startOwner ||
-            resetKeyRef.current !== startReset
-          ) {
-            return false
-          }
-          if (!reachable) {
+          if (!readBrowserOnline()) {
             const offlineRunId = ++runIdRef.current
             stateRef.current = 'offline'
             dispatch({ type: 'offline', runId: offlineRunId })
@@ -601,15 +634,63 @@ export function useSaveAction({
               tone: 'offline',
               actions: [],
             })
-            return false
+            return Promise.resolve(false)
           }
           return executeSave(startOwner, startReset)
-        })
+        }
+        const attemptId = ++probeSeqRef.current
+        probeAttemptRef.current = attemptId
+        return checkNetworkOnlineForAction().then(
+          (reachable) => {
+            if (probeAttemptRef.current !== attemptId) {
+              return false
+            }
+            probeAttemptRef.current = null
+            if (
+              !mountedRef.current ||
+              ownerKeyRef.current !== startOwner ||
+              resetKeyRef.current !== startReset ||
+              isSaveFeedbackBusy(stateRef.current)
+            ) {
+              return false
+            }
+            if (!reachable) {
+              const offlineRunId = ++runIdRef.current
+              stateRef.current = 'offline'
+              dispatch({ type: 'offline', runId: offlineRunId })
+              presentNotice({
+                id: `save-offline-${controlId}-${offlineRunId}`,
+                announcementId: createAnnouncementToken(
+                  `${controlId}:offline`,
+                  offlineRunId
+                ),
+                message: labelsRef.current.offlineMessage,
+                tone: 'offline',
+                actions: [],
+              })
+              return false
+            }
+            return executeSave(startOwner, startReset)
+          },
+          () => {
+            if (probeAttemptRef.current === attemptId) {
+              probeAttemptRef.current = null
+            }
+            return false
+          }
+        )
       }
 
       return executeSave(startOwner, startReset)
     },
-    [controlId, executeSave, presentNotice, readLiveOnline, requiresNetwork]
+    [
+      controlId,
+      dismissActiveNotice,
+      executeSave,
+      presentNotice,
+      readLiveOnline,
+      requiresNetwork,
+    ]
   )
 
   const triggerSaveRef = useRef(triggerSave)
@@ -617,6 +698,7 @@ export function useSaveAction({
 
   const reset = useCallback(
     (nextState: 'idle' | 'saved' = 'idle') => {
+      probeAttemptRef.current = null
       clearAllSlowTimers()
       runIdRef.current += 1
       stateRef.current = nextState

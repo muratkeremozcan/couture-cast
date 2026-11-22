@@ -1461,11 +1461,281 @@ describe('web save-feedback components', () => {
       await waitFor(() =>
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
       )
+
+      // Failed Undo write must NOT strand the failed undo in pendingBookmarkChanges
+      setItemSpy.mockImplementationOnce(() => {
+        throw new Error('QuotaExceededError')
+      })
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+      // Storage is still empty (0 items), not poisoned by the failed undo
+      expect(JSON.parse(localStorage.getItem(key) ?? '[]')).toHaveLength(0)
     } finally {
       setItemSpy.mockRestore()
       sessionMock.owner = null
       sessionStorage.clear()
       localStorage.removeItem(key)
+    }
+  })
+
+  it('guards stale expectedRunId Undo and busy Undo on web SaveActionButton, and covers StylePiecePanel swap/save/remove/undo/offline/retry paths', async () => {
+    const user = userEvent.setup()
+
+    // 1. Starting a new Save dismisses prior notice and blocks stale expectedRunId or busy Undo
+    const pendingSecondSave = Promise.withResolvers<boolean>()
+    const onSave = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingSecondSave.promise)
+    const onUndo = vi.fn(() => Promise.resolve(true))
+    let ctrlRef: ReturnType<typeof useSaveAction> | null = null
+
+    function GuardHarness() {
+      const controller = useSaveAction({
+        onSave,
+        onUndo,
+        ownerKey: 'w1',
+        resetKey: 'r1',
+      })
+      ctrlRef = controller
+      return <span data-testid="w-guard-state">{controller.state}</span>
+    }
+
+    const guardView = render(
+      <SaveFeedbackProvider>
+        <GuardHarness />
+      </SaveFeedbackProvider>
+    )
+    await act(async () => {
+      expect(await ctrlRef!.triggerSave()).toBe(true)
+    })
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Saved to your looks.'
+    )
+    let activeSave!: Promise<boolean>
+    act(() => {
+      activeSave = ctrlRef!.triggerSave()
+    })
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    expect(
+      await ctrlRef!.triggerUndo({ ownerKey: 'w1', resetKey: 'r1', expectedRunId: 1 })
+    ).toBe(false)
+    await act(async () => {
+      pendingSecondSave.resolve(true)
+      expect(await activeSave).toBe(true)
+    })
+    expect(
+      await ctrlRef!.triggerUndo({ ownerKey: 'w1', resetKey: 'r1', expectedRunId: 1 })
+    ).toBe(false)
+    expect(onUndo).not.toHaveBeenCalled()
+    guardView.unmount()
+
+    // 2. StylePiecePanel full swap/save/view/undo/remove/offline/retry coverage
+    const owner = 'style-panel-cov-owner'
+    const garment = createReadyGarmentFixture({
+      id: 'style-panel-cov-garment',
+      imageAccess: {
+        url: 'https://photos.example.test/top.png',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    })
+    const loadInventory = vi.fn<() => Promise<(typeof garment)[]>>()
+    loadInventory.mockResolvedValue([garment])
+
+    sessionMock.owner = owner
+    sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, owner)
+    window.dispatchEvent(new Event('couture:session'))
+    const invokerRef = createRef<HTMLButtonElement>()
+    try {
+      render(
+        <SaveFeedbackProvider>
+          <button ref={invokerRef} type="button">
+            Open
+          </button>
+          <StylePiecePanel
+            selection={{
+              id: garment.id,
+              category: garment.category ?? 'top',
+              comfortRange: garment.comfortRange ?? 'mild',
+            }}
+            inWardrobe
+            loadInventory={loadInventory}
+            owner={owner}
+            locale="en-US"
+            invoker={invokerRef}
+            onClose={vi.fn()}
+          />
+        </SaveFeedbackProvider>
+      )
+
+      const panel = await screen.findByTestId('style-piece-panel')
+      await within(panel).findByRole('heading', { name: 'Look 1' })
+
+      // Swap a companion -> Undo Swap
+      const swapButtons = within(panel)
+        .getAllByRole('button')
+        .filter((btn) => btn.getAttribute('data-testid')?.startsWith('style-piece-swap-'))
+      if (swapButtons[0]) {
+        await user.click(swapButtons[0])
+        const optionButtons = within(panel)
+          .getAllByRole('button')
+          .filter((btn) =>
+            btn.getAttribute('data-testid')?.startsWith('style-piece-option-')
+          )
+        if (optionButtons[0]) {
+          await user.click(optionButtons[0])
+          await waitFor(() =>
+            expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+              'Piece swapped.'
+            )
+          )
+          await user.click(within(panel).getByTestId('status-bar-action-undo'))
+          await waitFor(() =>
+            expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+              'Change undone.'
+            )
+          )
+        }
+      }
+
+      // Save look -> click View -> Save look again -> click Undo Save
+      const firstSave = within(panel).getAllByTestId('style-piece-save')[0]!
+      await user.click(firstSave)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Saved to your looks.'
+        )
+      )
+      await user.click(within(panel).getByTestId('status-bar-action-view'))
+
+      await user.click(firstSave)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-bar-action-undo')).toBeInTheDocument()
+      )
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      )
+
+      // Save again so we have a saved item for Remove flows
+      await user.click(firstSave)
+      const removeBtn = await within(panel).findByTestId('style-piece-remove')
+
+      // Remove while offline -> offline notice without calling loadInventory
+      const callsBeforeOfflineRemove = loadInventory.mock.calls.length
+      act(() => {
+        setNavigatorOnline(false)
+        window.dispatchEvent(new Event('offline'))
+      })
+      await user.click(removeBtn)
+      expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+      expect(loadInventory).toHaveBeenCalledTimes(callsBeforeOfflineRemove)
+      act(() => {
+        setNavigatorOnline(true)
+        window.dispatchEvent(new Event('online'))
+      })
+
+      // Remove fails with 503 -> Failed + Retry -> Retry hits offline error -> Retry succeeds
+      loadInventory
+        .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce([garment])
+      await user.click(removeBtn)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+      await user.click(within(panel).getByTestId('status-bar-action-retry'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'You are offline. Save when you reconnect.'
+        )
+      )
+
+      // Remove succeeds -> Undo Remove while offline -> offline notice
+      await user.click(removeBtn)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Removed'
+        )
+      )
+      act(() => {
+        setNavigatorOnline(false)
+        window.dispatchEvent(new Event('offline'))
+      })
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+      act(() => {
+        setNavigatorOnline(true)
+        window.dispatchEvent(new Event('online'))
+      })
+
+      // Save, Remove -> Undo Remove hits 503 (Failed); Save, Remove -> Undo Remove hits offline error; Save, Remove -> Undo Remove succeeds
+      await user.click(within(panel).getAllByTestId('style-piece-save')[0]!)
+      await user.click(await within(panel).findByTestId('style-piece-remove'))
+      loadInventory.mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+
+      await user.click(within(panel).getAllByTestId('style-piece-save')[0]!)
+      await user.click(await within(panel).findByTestId('style-piece-remove'))
+      loadInventory.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'You are offline. Save when you reconnect.'
+        )
+      )
+
+      await user.click(within(panel).getAllByTestId('style-piece-save')[0]!)
+      await user.click(await within(panel).findByTestId('style-piece-remove'))
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      )
+      // Storage error on Remove surfaces Failed + Retry, and Retry recovers storage
+      const removeItemSpy = vi
+        .spyOn(Storage.prototype, 'removeItem')
+        .mockImplementationOnce(() => {
+          throw new Error('QuotaExceededError')
+        })
+      try {
+        await user.click(await within(panel).findByTestId('style-piece-remove'))
+        await waitFor(() =>
+          expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+            'Could not save. Try again.'
+          )
+        )
+        await user.click(within(panel).getByTestId('status-bar-action-retry'))
+        await waitFor(() =>
+          expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+            'Removed'
+          )
+        )
+      } finally {
+        removeItemSpy.mockRestore()
+      }
+    } finally {
+      sessionMock.owner = null
+      sessionStorage.clear()
+      localStorage.clear()
     }
   })
 })

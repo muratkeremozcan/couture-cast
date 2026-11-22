@@ -731,4 +731,127 @@ describe('style piece inventory refresh', () => {
       vi.useRealTimers()
     }
   })
+
+  it('orders refresh() and refreshForAction() monotonically so older in-flight loads cannot overwrite newer revocations or updates', async () => {
+    const pieceV1 = {
+      ...piece,
+      imageAccess: {
+        url: 'https://example.test/private-v1',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    }
+    const pieceV2 = {
+      ...piece,
+      imageAccess: {
+        url: 'https://example.test/private-v2',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    }
+    const load = vi.fn<(_signal: AbortSignal) => Promise<(typeof pieceV1)[] | null>>()
+    const onAnchor = vi.fn()
+    const inventory = createStylePieceRefresh({
+      garmentId: piece.id,
+      load,
+      onAnchor,
+      isCurrent: () => true,
+    })
+
+    try {
+      // Seed initial anchor
+      load.mockResolvedValueOnce([pieceV1])
+      inventory.setVisible(true)
+      expect(await inventory.refresh()).toMatchObject({ photo: pieceV1.imageAccess })
+      onAnchor.mockClear()
+
+      // 1. Older periodic refresh() starts, then newer refreshForAction() revokes ([])
+      const stalePeriodic = pendingInventory()
+      const newerRevoke = pendingInventory()
+      load.mockReturnValueOnce(stalePeriodic.promise)
+      const periodicPromise = inventory.refresh()
+      await Promise.resolve()
+      load.mockReturnValueOnce(newerRevoke.promise)
+      const revokePromise = inventory.refreshForAction()
+
+      newerRevoke.resolve([])
+      expect(await revokePromise).toEqual({ status: 'revoked' })
+      expect(inventory.currentAnchor()).toBeNull()
+
+      stalePeriodic.resolve([pieceV1])
+      expect(await periodicPromise).toBeNull()
+      expect(inventory.currentAnchor()).toBeNull()
+      expect(onAnchor).toHaveBeenCalledTimes(1)
+      expect(onAnchor).toHaveBeenCalledWith(null)
+
+      // 2. Re-seed anchor, start older refreshForAction(), then newer periodic refresh() revokes ([])
+      load.mockResolvedValueOnce([pieceV1])
+      await inventory.refresh()
+      onAnchor.mockClear()
+
+      const staleActionOk = pendingInventory()
+      const staleActionErr = pendingInventory()
+      const newerPeriodicRevoke = pendingInventory()
+      load.mockReturnValueOnce(staleActionOk.promise)
+      const staleActionOkPromise = inventory.refreshForAction()
+      load.mockReturnValueOnce(staleActionErr.promise)
+      const staleActionErrPromise = inventory.refreshForAction()
+      load.mockReturnValueOnce(newerPeriodicRevoke.promise)
+      const newerPeriodicPromise = inventory.refresh()
+      await Promise.resolve()
+
+      newerPeriodicRevoke.resolve([])
+      expect(await newerPeriodicPromise).toBeNull()
+      expect(inventory.currentAnchor()).toBeNull()
+
+      staleActionOk.resolve([pieceV1])
+      expect(await staleActionOkPromise).toEqual({ status: 'revoked' })
+      staleActionErr.reject(new TypeError('Failed to fetch'))
+      expect(await staleActionErrPromise).toEqual({ status: 'revoked' })
+      expect(inventory.currentAnchor()).toBeNull()
+      expect(onAnchor).toHaveBeenCalledTimes(1)
+      expect(onAnchor).toHaveBeenCalledWith(null)
+
+      // 3. Newer refreshForAction() publishes pieceV2; older refreshForAction() (ok & error) and older refresh() (error) do not clobber pieceV2
+      load.mockResolvedValueOnce([pieceV1])
+      await inventory.refresh()
+      onAnchor.mockClear()
+
+      const olderPeriodicFail = pendingInventory()
+      const olderActionV1 = pendingInventory()
+      const olderActionErr = pendingInventory()
+      const newerActionV2 = pendingInventory()
+      load.mockReturnValueOnce(olderPeriodicFail.promise)
+      const olderPeriodicFailPromise = inventory.refresh()
+      await Promise.resolve()
+      load.mockReturnValueOnce(olderActionV1.promise)
+      const olderActionV1Promise = inventory.refreshForAction()
+      load.mockReturnValueOnce(olderActionErr.promise)
+      const olderActionErrPromise = inventory.refreshForAction()
+      load.mockReturnValueOnce(newerActionV2.promise)
+      const newerActionV2Promise = inventory.refreshForAction()
+
+      newerActionV2.resolve([pieceV2])
+      expect(await newerActionV2Promise).toMatchObject({
+        status: 'ok',
+        anchor: { photo: pieceV2.imageAccess },
+      })
+
+      olderActionV1.resolve([pieceV1])
+      expect(await olderActionV1Promise).toMatchObject({
+        status: 'ok',
+        anchor: { photo: pieceV2.imageAccess },
+      })
+      const transientErr = new Error('503')
+      olderActionErr.reject(transientErr)
+      expect(await olderActionErrPromise).toEqual({
+        status: 'error',
+        error: transientErr,
+      })
+      olderPeriodicFail.reject(new Error('503'))
+      expect(await olderPeriodicFailPromise).toBeNull()
+      expect(inventory.currentAnchor()).toMatchObject({ photo: pieceV2.imageAccess })
+      expect(onAnchor).toHaveBeenCalledTimes(1)
+    } finally {
+      inventory.stop()
+    }
+  })
 })

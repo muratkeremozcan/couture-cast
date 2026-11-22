@@ -176,23 +176,24 @@ function SampleOutfit({
   ): boolean | Promise<boolean> => {
     const apply = (): boolean => {
       if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
-      // Keep one pending change per catalog look, in the order of the latest actions.
+      // Snapshot the prior queue before mutating so conflict aborts or failed undo writes
+      // restore the exact preceding queue order without stranding a failed undo.
       const pending = pendingBookmarkChanges.current
-      const previousPending = pending.get(lookId)
+      const priorQueue = new Map(pending)
       pending.delete(lookId)
       pending.set(lookId, change)
       let next: SampleBookmark[]
       let aborted = false
+      let failedWrite = false
       try {
         const storage = window.localStorage
         const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
         storedBookmarks.current = stored
         const replayed = replayBookmarkChanges(stored, pending.values())
-        if (replayed.aborted && options?.allowConflictAbort) {
+        if (replayed.aborted) {
           aborted = true
-          pending.delete(lookId)
-          if (previousPending) pending.set(lookId, previousPending)
-          next = stored
+          pendingBookmarkChanges.current = priorQueue
+          next = replayBookmarkChanges(stored, priorQueue.values()).next
         } else {
           next = replayed.next
           storage.setItem(bookmarkKey, JSON.stringify(next))
@@ -200,12 +201,20 @@ function SampleOutfit({
           pending.clear()
         }
       } catch {
-        const replayed = replayBookmarkChanges(storedBookmarks.current, pending.values())
+        failedWrite = true
+        if (options?.allowConflictAbort) {
+          pendingBookmarkChanges.current = priorQueue
+        }
+        const replayed = replayBookmarkChanges(
+          storedBookmarks.current,
+          pendingBookmarkChanges.current.values()
+        )
         next = replayed.next
       }
       bookmarksRef.current = next
       setBookmarks(next)
-      const persisted = !aborted && pending.size === 0
+      const persisted =
+        !aborted && !failedWrite && pendingBookmarkChanges.current.size === 0
       if (!aborted) {
         setBookmarksPersistent(persisted)
       }

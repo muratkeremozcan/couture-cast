@@ -363,7 +363,10 @@ describe('mobile save-feedback components', () => {
 
     expect(screen.queryByTestId('offline-status-line')).toBeNull()
 
-    act(() => reportNetworkOffline())
+    act(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      reportNetworkOffline()
+    })
     const lines = screen.getAllByTestId('offline-status-line')
     expect(lines).toHaveLength(1)
     expect(lines[0]).toHaveTextContent('You are offline')
@@ -376,7 +379,10 @@ describe('mobile save-feedback components', () => {
       'You are offline. Save when you reconnect.'
     )
 
-    act(() => reportNetworkOnline())
+    act(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+      reportNetworkOnline()
+    })
     expect(screen.queryByTestId('offline-status-line')).toBeNull()
 
     fireEvent.click(screen.getByTestId('save-btn'))
@@ -778,7 +784,10 @@ describe('mobile save-feedback components', () => {
         'Could not save. Try again.'
       )
     )
-    act(() => reportNetworkOffline())
+    act(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      reportNetworkOffline()
+    })
     fireEvent.click(screen.getByTestId('status-bar-action-retry'))
     expect(onRetrySave).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
@@ -1072,10 +1081,13 @@ describe('mobile save-feedback components', () => {
       </SaveFeedbackProvider>
     )
 
-    // 1. Web offline blocks Undo
+    // 1. Web offline blocks Undo when navigator.onLine is false
     fireEvent.click(screen.getByTestId('m-save'))
     await waitFor(() => expect(screen.getByTestId('m-state')).toHaveTextContent('saved'))
-    act(() => reportNetworkOffline())
+    act(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      reportNetworkOffline()
+    })
     fireEvent.click(screen.getByTestId('status-bar-action-undo'))
     await waitFor(() =>
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
@@ -1154,5 +1166,231 @@ describe('mobile save-feedback components', () => {
     await busyView.unmount()
     expect(await busyCtrl!.triggerSave()).toBe(false)
     expect(await busyCtrl!.triggerUndo()).toBe(false)
+  })
+
+  it('keeps shared probe alive when one waiter cancels, prevents double-save during native probe, guards stale Undo after probe/runId change, allows Expo web recovery, and re-enables StylePiecePanel storage on Retry', async () => {
+    // 1. Shared probe waiter isolation: cancelling caller A does NOT abort caller B
+    setPlatformOS('ios')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: undefined })
+    const sharedDeferred = deferred<boolean>()
+    let underlyingSignal: AbortSignal | undefined
+    setNetworkConnectivityProbe((signal) => {
+      underlyingSignal = signal
+      return sharedDeferred.promise
+    })
+    reportNetworkOffline()
+
+    const callerA = new AbortController()
+    const callerB = new AbortController()
+    const waitA = probeNetworkConnectivity(callerA.signal)
+    const waitB = probeNetworkConnectivity(callerB.signal)
+    callerA.abort()
+    expect(await waitA).toBe(false)
+    expect(underlyingSignal?.aborted).toBe(false)
+    sharedDeferred.resolve(true)
+    expect(await waitB).toBe(true)
+    expect(getNetworkOnline()).toBe(true)
+
+    // 2. Rapid double-tap during a pending native probe invokes onSave only once
+    reportNetworkOffline()
+    const saveProbe = deferred<boolean>()
+    setNetworkConnectivityProbe(() => saveProbe.promise)
+    const doubleTapSave = vi.fn(() => Promise.resolve(true))
+    const doubleTapView = await render(
+      <SaveFeedbackProvider>
+        <SaveActionButton
+          testID="double-tap-save"
+          requiresNetwork
+          onSave={doubleTapSave}
+        />
+      </SaveFeedbackProvider>
+    )
+    fireEvent.click(screen.getByTestId('double-tap-save'))
+    fireEvent.click(screen.getByTestId('double-tap-save'))
+    await act(async () => {
+      saveProbe.resolve(true)
+      await saveProbe.promise
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('double-tap-save')).toHaveTextContent('Saved')
+    )
+    expect(doubleTapSave).toHaveBeenCalledTimes(1)
+    await doubleTapView.unmount()
+
+    // 3. Stale Undo after owner switch during pending native probe does NOT invoke undoHandler or post offline notice
+    //    AND starting a new Save dismisses prior notice & stale expectedRunId cannot orphan active Save
+    const undoProbe = deferred<boolean>()
+    setNetworkConnectivityProbe(() => undoProbe.promise)
+    const undoSpy = vi.fn(() => Promise.resolve(true))
+    const pendingSecondSave = deferred<boolean>()
+    const saveSpy = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(pendingSecondSave.promise)
+    let ctrlRef: ReturnType<typeof useSaveAction> | null = null
+
+    function GuardHarness({ owner }: { owner: string }) {
+      const controller = useSaveAction({
+        onSave: saveSpy,
+        onUndo: undoSpy,
+        requiresNetwork: true,
+        ownerKey: owner,
+        resetKey: 'r1',
+      })
+      ctrlRef = controller
+      return <Text testID="guard-state">{controller.state}</Text>
+    }
+
+    const guardView = await render(
+      <SaveFeedbackProvider>
+        <GuardHarness owner="owner-a" />
+      </SaveFeedbackProvider>
+    )
+    await act(async () => {
+      expect(await ctrlRef!.triggerSave()).toBe(true)
+    })
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Saved to your looks.'
+    )
+
+    // Starting a new Save dismisses the prior success notice and blocks Undo while busy or with stale expectedRunId
+    let activeSave!: Promise<boolean>
+    act(() => {
+      activeSave = ctrlRef!.triggerSave()
+    })
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    expect(
+      await ctrlRef!.triggerUndo({
+        ownerKey: 'owner-a',
+        resetKey: 'r1',
+        expectedRunId: 1,
+      })
+    ).toBe(false)
+    expect(undoSpy).not.toHaveBeenCalled()
+    await act(async () => {
+      pendingSecondSave.resolve(true)
+      expect(await activeSave).toBe(true)
+    })
+    // Stale expectedRunId (from save #1) rejected even when idle/saved
+    expect(
+      await ctrlRef!.triggerUndo({
+        ownerKey: 'owner-a',
+        resetKey: 'r1',
+        expectedRunId: 1,
+      })
+    ).toBe(false)
+
+    // Now go offline, start native Undo probe, switch owner before probe resolves -> no undo call, no offline notice
+    act(() => reportNetworkOffline())
+    let pendingUndo!: Promise<boolean>
+    act(() => {
+      pendingUndo = ctrlRef!.triggerUndo()
+    })
+    await guardView.rerender(
+      <SaveFeedbackProvider>
+        <GuardHarness owner="owner-b" />
+      </SaveFeedbackProvider>
+    )
+    await act(async () => {
+      undoProbe.resolve(false)
+      expect(await pendingUndo).toBe(false)
+    })
+    expect(undoSpy).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    await guardView.unmount()
+
+    // 4. Expo web transport failure while navigator.onLine === true does NOT permanently block retry
+    setPlatformOS('web')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    resetNetworkStatusForTests(true)
+    const webRecoverSave = vi
+      .fn<() => Promise<boolean>>()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(true)
+    const webView = await render(
+      <SaveFeedbackProvider>
+        <SaveActionButton
+          testID="expo-web-save"
+          requiresNetwork
+          onSave={webRecoverSave}
+        />
+      </SaveFeedbackProvider>
+    )
+    fireEvent.click(screen.getByTestId('expo-web-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    expect(getNetworkOnline()).toBe(false)
+    // Browser still reports navigator.onLine === true, so explicit retry runs and recovers online!
+    fireEvent.click(screen.getByTestId('expo-web-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('expo-web-save')).toHaveTextContent('Saved')
+    )
+    expect(webRecoverSave).toHaveBeenCalledTimes(2)
+    expect(getNetworkOnline()).toBe(true)
+    await webView.unmount()
+
+    // 5. Mobile StylePiecePanel re-enables Save after storage write failure is retried successfully
+    setMobileApplicationUserId('mobile-storage-retry-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'mobile-storage-garment',
+      imageAccess: {
+        url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    })
+    const originalSet = mockRecipeStore.set.bind(mockRecipeStore)
+    let failNextWrite = true
+    const setSpy = vi.spyOn(mockRecipeStore, 'set').mockImplementation((key, value) => {
+      if (failNextWrite) {
+        failNextWrite = false
+        throw new Error('ENOSPC')
+      }
+      return originalSet(key, value)
+    })
+    try {
+      const panelView = await render(
+        <SaveFeedbackProvider>
+          <StylePiecePanel
+            selection={{
+              id: garment.id,
+              category: garment.category ?? 'top',
+              comfortRange: garment.comfortRange ?? 'mild',
+            }}
+            inWardrobe
+            loadInventory={() => Promise.resolve([garment])}
+            visible
+            owner="mobile-storage-retry-owner"
+            epoch={mobileIdentityEpoch()}
+            locale="en-US"
+            onClose={vi.fn()}
+            onDismiss={vi.fn()}
+          />
+        </SaveFeedbackProvider>
+      )
+      const panel = await screen.findByTestId('style-piece-panel')
+      const saveBtn = (await within(panel).findAllByTestId('style-piece-save'))[0]!
+      await waitFor(() => expect(saveBtn).not.toBeDisabled())
+
+      // First save fails storage write -> shows Failed + Retry and temporarily disables button
+      fireEvent.click(saveBtn)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+      expect(saveBtn).toBeDisabled()
+
+      // Clicking Retry succeeds and calls setStorage('ready'), re-enabling Save
+      fireEvent.click(within(panel).getByTestId('status-bar-action-retry'))
+      await waitFor(() => expect(saveBtn).toHaveTextContent('Saved'))
+      expect(saveBtn).not.toBeDisabled()
+      await panelView.unmount()
+    } finally {
+      setSpy.mockRestore()
+      setMobileApplicationUserId(null)
+    }
   })
 })
