@@ -1,4 +1,6 @@
 // Learning path Step 40: Community screening release gate and hosted worker.
+// Learning path Step 62: Community post edits persist.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
@@ -18,6 +20,7 @@ import {
   decodeCommunityFeedCursor,
   editCommunityPostTextInputSchema,
   encodeCommunityFeedCursor,
+  reconcileCommunityPostText,
   safeDecodeCommunityFeedCursor,
 } from '../src/contracts/http'
 import { failureMessageOf, withoutKey } from './community-contract-support'
@@ -60,6 +63,55 @@ describe('community HTTP contracts', () => {
         editCommunityPostTextInputSchema.safeParse({ ...edit, ownerId: 'another-member' })
           .success
       ).toBe(false)
+    })
+
+    it('reconciles post text monotonically so stale reads never overwrite a newer revision', () => {
+      const newer = {
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+        extra: 'old-extra',
+      }
+      const stale = {
+        id: 'post-1',
+        title: 'Old title',
+        caption: 'Old caption',
+        textRevision: 1,
+        extra: 'fresh-extra',
+      }
+      expect(reconcileCommunityPostText(stale, newer)).toEqual({
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+        extra: 'fresh-extra',
+      })
+      const missingRevision = {
+        id: 'post-1',
+        title: 'Legacy read',
+        caption: 'Legacy caption',
+        textRevision: undefined,
+      }
+      expect(reconcileCommunityPostText(missingRevision, newer)).toEqual({
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+      })
+      const advance = {
+        id: 'post-1',
+        title: 'Newest title',
+        caption: 'Newest caption',
+        textRevision: 3,
+      }
+      expect(reconcileCommunityPostText(advance, newer)).toEqual(advance)
+      expect(
+        reconcileCommunityPostText(
+          { id: 'post-2', title: 'Other', caption: null, textRevision: 0 },
+          newer
+        )
+      ).toEqual({ id: 'post-2', title: 'Other', caption: null, textRevision: 0 })
     })
   })
 

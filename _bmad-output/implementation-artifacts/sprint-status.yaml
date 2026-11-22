@@ -126,8 +126,8 @@ development_status:
   epic-7: in-progress
   7-1-shared-save-undo-status-feedback: done
   7-2-saved-looks-follow-account: done
-  7-3-import-device-saved-looks-same-member: review
-  7-4-community-post-edits-persist: backlog
+  7-3-import-device-saved-looks-same-member: done
+  7-4-community-post-edits-persist: review
   7-5-garment-detail-tag-edit: backlog
   7-6-garment-delete: backlog
   7-7-signed-in-shell-without-flashes: backlog

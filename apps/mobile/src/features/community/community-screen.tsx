@@ -79,6 +79,7 @@ import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   type CommunityBannedError,
   communityModerationReasonCategories,
+  reconcileCommunityPostText,
   type CommunityReactionSummary,
   type ClimateBand,
   type CommunityAuthorPostState,
@@ -849,7 +850,9 @@ export function CommunityScreen() {
           const read = reactionState.read(post, readTicket)
           // Normalized as the state commits, so a newer answer recorded in the
           // meantime wins over this response's own block.
-          setDeepLinkPost(() => (read ? sponsorships.apply(read) : read))
+          setDeepLinkPost((current) =>
+            read ? reconcileCommunityPostText(sponsorships.apply(read), current) : read
+          )
         }
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
@@ -929,6 +932,7 @@ export function CommunityScreen() {
               return current ? [current] : []
             })
             setItems((previous) => {
+              const previousById = new Map(previous.map((item) => [item.id, item]))
               const seen = new Set(previous.map((item) => item.id))
               // Normalized as the state commits: a page whose read started
               // before the latest recorded answer never shows its own block.
@@ -936,7 +940,12 @@ export function CommunityScreen() {
                 isAppend
                   ? [...previous, ...page.filter((item) => !seen.has(item.id))]
                   : page
-              ).map((post) => sponsorships.apply(reactionState.current(post)))
+              ).map((post) =>
+                reconcileCommunityPostText(
+                  sponsorships.apply(reactionState.current(post)),
+                  previousById.get(post.id)
+                )
+              )
             })
             setDeepLinkPost((post) =>
               post ? sponsorships.apply(reactionState.current(post)) : null
@@ -1238,7 +1247,9 @@ export function CommunityScreen() {
           // Story 6.7b: a resolved copy carries no sponsorship answer (the route
           // takes no opt-in), so each copy takes the latest live answer.
           const replace = <T extends CommunityFeedItem>(item: T) =>
-            item.id === target.post.id ? sponsorships.apply(updated) : item
+            item.id === target.post.id
+              ? reconcileCommunityPostText(sponsorships.apply(updated) as T, item)
+              : item
           newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
           setItems((previous) => previous.map(replace))
@@ -1920,6 +1931,8 @@ export function CommunityScreen() {
       post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
         ? { ...post, ...text }
         : post
+    newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
+    setNewLooks(newLooksRef.current)
     setItems((previous) => previous.map((item) => update(item)!))
     setDeepLinkPost(update)
     spotlight.applyText(postId, text)

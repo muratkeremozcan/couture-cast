@@ -1,8 +1,35 @@
 import { createHash } from 'node:crypto'
 import { ServiceUnavailableException } from '@nestjs/common'
+import { COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE } from '@couture/api-client/contracts/http'
 import type { CommunityTextScreener } from './community-text-screener.js'
 
 let screener: Promise<CommunityTextScreener> | undefined
+
+export interface NormalizedPostText {
+  readonly title: string | null
+  readonly caption: string | null
+  readonly textFingerprint: string
+}
+
+export interface ScreenedPostTextDecision {
+  readonly passed: boolean
+  readonly policyVersion: string
+  readonly textFingerprint?: string
+  readonly locale?: string | null
+}
+
+export function normalizePostText(
+  title: string | null | undefined,
+  caption: string | null | undefined
+): NormalizedPostText {
+  const normalizedTitle = title?.trim() || null
+  const normalizedCaption = caption?.trim() || null
+  return {
+    title: normalizedTitle,
+    caption: normalizedCaption,
+    textFingerprint: postTextFingerprint(normalizedTitle, normalizedCaption),
+  }
+}
 
 export function postTextFingerprint(
   title: string | null,
@@ -40,18 +67,29 @@ export async function screenPostText(
   title: string | null,
   caption: string | null,
   locale: string | null
-): Promise<{ passed: boolean; policyVersion: string }> {
+): Promise<Required<ScreenedPostTextDecision>> {
+  const normalized = normalizePostText(title, caption)
   try {
     const textScreener = await requestTextScreener()
-    const titleResult = textScreener.screen({ text: title, field: 'title', locale })
-    const captionResult = textScreener.screen({ text: caption, field: 'caption', locale })
+    const titleResult = textScreener.screen({
+      text: normalized.title,
+      field: 'title',
+      locale,
+    })
+    const captionResult = textScreener.screen({
+      text: normalized.caption,
+      field: 'caption',
+      locale,
+    })
     return {
       passed: titleResult.disposition === 'pass' && captionResult.disposition === 'pass',
       policyVersion: titleResult.policyVersion,
+      textFingerprint: normalized.textFingerprint,
+      locale,
     }
   } catch {
     throw new ServiceUnavailableException(
-      'Community text screening is temporarily unavailable.'
+      COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE
     )
   }
 }

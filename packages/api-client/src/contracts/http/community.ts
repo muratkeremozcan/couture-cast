@@ -388,6 +388,11 @@ export const COMMUNITY_POST_TITLE_MAX_LENGTH = 80
 export const COMMUNITY_POST_TEXT_HEADER = 'x-couture-post-text'
 export const COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE =
   'You have reached the hourly post edit limit.'
+export const COMMUNITY_POST_TEXT_CONFLICT_MESSAGE = 'Community post text has changed.'
+export const COMMUNITY_POST_TEXT_REJECTED_MESSAGE =
+  'Community post text could not be approved.'
+export const COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE =
+  'Community text screening is temporarily unavailable.'
 
 export const communityPostTitleSchema = z
   .string()
@@ -670,6 +675,27 @@ export function reconcileCommunityReactionItem(
       previous.reactions.generation > incoming.reactions.generation)
   )
     return { ...incoming, reactions: previous.reactions }
+  return incoming
+}
+/** Older reads cannot overwrite a newer confirmed post text revision. */
+export function reconcileCommunityPostText<
+  T extends Pick<CommunityFeedItem, 'id' | 'title' | 'caption' | 'textRevision'>,
+>(
+  incoming: T,
+  previous?: Pick<CommunityFeedItem, 'id' | 'title' | 'caption' | 'textRevision'> | null
+): T {
+  if (
+    previous?.id === incoming.id &&
+    previous.textRevision !== undefined &&
+    (incoming.textRevision === undefined || previous.textRevision > incoming.textRevision)
+  ) {
+    return {
+      ...incoming,
+      title: previous.title,
+      caption: previous.caption,
+      textRevision: previous.textRevision,
+    }
+  }
   return incoming
 }
 export const communityReactionFeedSchema = communityFeedSchema

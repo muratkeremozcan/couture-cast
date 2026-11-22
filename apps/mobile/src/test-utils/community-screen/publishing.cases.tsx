@@ -1,3 +1,5 @@
+// Learning path Step 62: Community post edits persist.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
 import {
   UPLOAD_URL,
   PIXEL,
@@ -84,6 +86,12 @@ export function registerCommunityPublishingCases() {
     )
     expect(screen.getByTestId('community-card-caption-own-text')).toHaveTextContent(
       updated.caption
+    )
+    expect(screen.getByTestId('community-card-edited-own-text')).toHaveTextContent(
+      enUS.community.card.edited
+    )
+    expect(screen.getByTestId('community-edit-status')).toHaveTextContent(
+      enUS.community.compose.editSaved
     )
     expect(screen.queryByTestId('community-edit-form')).toBeNull()
   })

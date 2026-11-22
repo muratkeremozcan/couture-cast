@@ -21,6 +21,8 @@ import {
   COMMUNITY_NOT_POST_AUTHOR_MESSAGE,
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
   COMMUNITY_POST_NOT_WITHDRAWABLE_MESSAGE,
+  COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
+  COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
   COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
   COMMUNITY_POST_RATE_LIMITED_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
@@ -75,7 +77,11 @@ import {
   classifyClimateBand,
   parseCommunityObjectPath,
 } from '@couture/utils'
-import { postTextFingerprint, screenPostText } from './community-post-text.js'
+import {
+  normalizePostText,
+  postTextFingerprint,
+  screenPostText,
+} from './community-post-text.js'
 import type { LookbookPost, Prisma } from '@prisma/client'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { GuardianService } from '../guardian/guardian.service.js'
@@ -1297,19 +1303,18 @@ export class CommunityService {
     if (!post || post.user_id !== userId || !isPubliclyVisiblePost(post))
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
     if (post.text_revision !== input.baseRevision)
-      throw new ConflictException('Community post text has changed.')
+      throw new ConflictException(COMMUNITY_POST_TEXT_CONFLICT_MESSAGE)
 
-    const caption = input.caption?.trim() || null
+    const normalized = normalizePostText(input.title, input.caption)
     const edited = await this.repository.editPublishedPostText({
       userId,
       postId,
       baseRevision: input.baseRevision,
-      title: input.title,
-      caption,
-      screen: () => screenPostText(input.title, caption, post.locale),
+      title: normalized.title,
+      caption: normalized.caption,
+      screen: ({ title, caption, locale }) => screenPostText(title, caption, locale),
     })
-    if (!edited)
-      throw new BadRequestException('Community post text could not be approved.')
+    if (!edited) throw new BadRequestException(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)
     return edited
   }
 

@@ -1,9 +1,16 @@
+// Learning path Step 62: Community post edits persist.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
-import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
+  type CommunityFeedItem,
+} from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
+import { SaveFeedbackProvider } from './save-feedback'
 import {
   errorBody,
   feedHandler,
@@ -92,9 +99,14 @@ describe('Community look text editing', () => {
     expect(await screen.findByRole('dialog', { name: 'Winter layers' })).toBeVisible()
     expect(requests).toEqual([{ baseRevision: 4, title: 'Winter layers', caption: null }])
     expect(edit()).toHaveFocus()
+    expect(detail.getByTestId('community-detail-edited')).toHaveTextContent('Edited')
+    expect(detail.getByTestId('community-edit-status')).toHaveTextContent(
+      'Changes saved.'
+    )
     expect(detail.queryByText(description)).toBeNull()
     await user.keyboard('{Escape}')
     expect(screen.getByTestId('title-post-1')).toHaveTextContent('Winter layers')
+    expect(screen.getByTestId('edited-badge-post-1')).toHaveTextContent('Edited')
   })
 
   it('updates both cards when the owner edits a look from City Spotlight', async () => {
@@ -278,5 +290,186 @@ describe('Community look text editing', () => {
     } finally {
       response.resolve(lateChange)
     }
+  })
+
+  it.each([
+    [
+      400,
+      COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+      'These changes weren’t approved by our community guidelines. Edit the wording and try again.',
+    ],
+    [
+      503,
+      COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
+      'Text screening is temporarily unavailable. Your draft is still here—try again shortly.',
+    ],
+  ])(
+    'shows distinct outcome copy for %s screening error while preserving approved text and draft',
+    async (status, serverMessage, expectedCopy) => {
+      signIn()
+      const user = userEvent.setup()
+      mockApi(http.patch(EDIT_PATH, () => errorBody(status, serverMessage, 'Error')))
+      const detail = await openDetail(user)
+      await user.click(detail.getByRole('button', { name: EDIT }))
+      const title = detail.getByRole('textbox', { name: 'Title (optional)' })
+      await user.clear(title)
+      await user.type(title, 'Attempted draft')
+      await user.click(detail.getByRole('button', { name: SAVE }))
+
+      expect(await detail.findByRole('alert')).toHaveTextContent(expectedCopy)
+      expect(screen.getByRole('dialog', { name: original })).toBeVisible()
+      expect(detail.getByTestId('community-detail-caption')).toHaveTextContent(
+        description
+      )
+      expect(title).toHaveValue('Attempted draft')
+    }
+  )
+
+  it('shows "No changes" and keeps textRevision unchanged for an unchanged payload', async () => {
+    signIn()
+    const user = userEvent.setup()
+    mockApi(
+      http.patch(EDIT_PATH, () =>
+        HttpResponse.json({
+          data: { title: original, caption: description, textRevision: 0 },
+        })
+      )
+    )
+    const unedited = ownedPost({ textRevision: 0 })
+    const detail = await openDetail(user, unedited)
+    expect(detail.queryByTestId('community-detail-edited')).toBeNull()
+
+    await user.click(detail.getByRole('button', { name: EDIT }))
+    await user.click(detail.getByRole('button', { name: SAVE }))
+
+    expect(await detail.findByTestId('community-edit-status')).toHaveTextContent(
+      'No changes'
+    )
+    expect(detail.queryByTestId('community-detail-edited')).toBeNull()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('edited-badge-post-1')).toBeNull()
+  })
+
+  it('announces saved feedback through SaveFeedbackProvider when mounted inside it', async () => {
+    signIn()
+    const user = userEvent.setup()
+    mockApi(
+      http.patch(EDIT_PATH, () =>
+        HttpResponse.json({
+          data: { title: 'Updated look', caption: description, textRevision: 1 },
+        })
+      )
+    )
+    const onSaved = vi.fn()
+    render(
+      <SaveFeedbackProvider>
+        <CommunityPostTextEditor
+          item={ownedPost({ textRevision: 0 })}
+          enabled
+          onSaved={onSaved}
+          t={(key) => getI18n().t(key)}
+        />
+      </SaveFeedbackProvider>
+    )
+    await user.click(screen.getByRole('button', { name: EDIT }))
+    const title = screen.getByRole('textbox', { name: 'Title (optional)' })
+    await user.clear(title)
+    await user.type(title, 'Updated look')
+    await user.click(screen.getByRole('button', { name: SAVE }))
+
+    expect(await screen.findByTestId('community-edit-status')).toHaveTextContent(
+      'Changes saved.'
+    )
+    expect(onSaved).toHaveBeenCalledWith('post-1', {
+      title: 'Updated look',
+      caption: description,
+      textRevision: 1,
+    })
+  })
+
+  it('does not let a stale targets/resolve read overwrite a newer saved text revision', async () => {
+    signIn()
+    const user = userEvent.setup()
+    const stalePost = ownedPost({ textRevision: 0 })
+    const releaseResolve = Promise.withResolvers<Response>()
+    let resolveCalled = false
+    mockApi(
+      feedHandler({ items: [stalePost] }),
+      http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
+      http.post('*/api/v1/community/targets/resolve', () => {
+        if (!resolveCalled) {
+          resolveCalled = true
+          return releaseResolve.promise
+        }
+        return HttpResponse.json({
+          data: {
+            targets: [
+              {
+                key: stalePost.id,
+                status: 'available',
+                communityRevision: '1',
+                post: stalePost,
+                comment: null,
+                parent: null,
+                pageCursor: null,
+                parentPageCursor: null,
+                threadPosition: null,
+              },
+            ],
+          },
+        })
+      }),
+      http.patch(EDIT_PATH, () =>
+        HttpResponse.json({
+          data: {
+            title: 'Saved newer title',
+            caption: 'Saved newer caption',
+            textRevision: 1,
+          },
+        })
+      )
+    )
+    renderGrid()
+    await user.click(await screen.findByTestId(`lookbook-open-${stalePost.id}`))
+    const detail = within(await screen.findByRole('dialog'))
+    await user.click(detail.getByRole('button', { name: EDIT }))
+    const title = detail.getByRole('textbox', { name: 'Title (optional)' })
+    const caption = detail.getByRole('textbox', { name: 'Description (optional)' })
+    await user.clear(title)
+    await user.type(title, 'Saved newer title')
+    await user.clear(caption)
+    await user.type(caption, 'Saved newer caption')
+    await user.click(detail.getByRole('button', { name: SAVE }))
+    expect(await screen.findByRole('dialog', { name: 'Saved newer title' })).toBeVisible()
+
+    // Release the older resolve that captured textRevision: 0 before the edit saved.
+    await act(async () => {
+      releaseResolve.resolve(
+        HttpResponse.json({
+          data: {
+            targets: [
+              {
+                key: stalePost.id,
+                status: 'available',
+                communityRevision: '1',
+                post: stalePost,
+                comment: null,
+                parent: null,
+                pageCursor: null,
+                parentPageCursor: null,
+                threadPosition: null,
+              },
+            ],
+          },
+        })
+      )
+      await releaseResolve.promise
+    })
+
+    expect(screen.getByRole('dialog', { name: 'Saved newer title' })).toBeVisible()
+    expect(detail.getByTestId('community-detail-caption')).toHaveTextContent(
+      'Saved newer caption'
+    )
+    expect(detail.getByTestId('community-detail-edited')).toHaveTextContent('Edited')
   })
 })

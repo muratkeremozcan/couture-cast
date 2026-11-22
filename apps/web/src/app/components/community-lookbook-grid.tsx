@@ -116,6 +116,7 @@ import {
   communityPostCaptionSchema,
   communityPostTitleSchema,
   COMMUNITY_POST_TITLE_MAX_LENGTH,
+  reconcileCommunityPostText,
   type EditCommunityPostTextResponse,
   communityReportReasonSchema,
   defaultSupportedLocale,
@@ -829,12 +830,22 @@ function LookbookCardContent({
         <h3 id={`${scope}lookbook-card-title-${item.id}`} className="sr-only">
           {item.title || t('community.card.label', { author: authorName })}
         </h3>
-        <span
-          data-testid={`${scope}author-name-${item.id}`}
-          className="lookbook-metrics block text-xs font-semibold text-[color:var(--theme-card-text)]"
-        >
-          {authorName}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            data-testid={`${scope}author-name-${item.id}`}
+            className="lookbook-metrics block text-xs font-semibold text-[color:var(--theme-card-text)]"
+          >
+            {authorName}
+          </span>
+          {(item.textRevision ?? 0) > 0 && (
+            <span
+              data-testid={`${scope}edited-badge-${item.id}`}
+              className="lookbook-metrics text-[11px] font-medium text-[color:var(--lookbook-ink-muted)]"
+            >
+              {t('community.card.edited')}
+            </span>
+          )}
+        </div>
 
         {item.title && (
           <p
@@ -1070,6 +1081,7 @@ interface LookbookDetailDialogProps {
   /** Where focus goes after close when the control that opened the detail is gone. */
   restoreFocus: { opener: string | undefined; final: string }
   onTextSaved: (postId: string, text: EditCommunityPostTextResponse['data']) => void
+  onTextStatus: (key: string) => void
   onClose: () => void
 }
 
@@ -1094,6 +1106,7 @@ function LookbookDetailDialog({
   restoreFocus,
   onClose,
   onTextSaved,
+  onTextStatus,
   reactionControls,
   commentTarget,
 }: LookbookDetailDialogProps) {
@@ -1153,6 +1166,14 @@ function LookbookDetailDialog({
           >
             {authorName}
           </span>
+          {(item.textRevision ?? 0) > 0 && (
+            <span
+              data-testid="community-detail-edited"
+              className="lookbook-metrics text-[11px] font-medium text-[color:var(--lookbook-ink-muted)]"
+            >
+              {t('community.card.edited')}
+            </span>
+          )}
           {item.sponsorship && (
             <span
               data-testid={`community-detail-sponsored-${item.id}`}
@@ -1181,6 +1202,7 @@ function LookbookDetailDialog({
           item={item}
           enabled={canAct && !suspended}
           onSaved={onTextSaved}
+          onStatus={onTextStatus}
           t={t}
         />
         {canAct && item.sponsorship && (
@@ -2846,10 +2868,22 @@ export function CommunityLookbookGrid({
           if (!isCurrent()) return
           applyLiveSponsorship([post], stamp)
           const read = reactionState.read(post, readTicket)
-          const live = () => (read ? withLiveSponsorship(read, liveSponsorships) : read)
+          const live = read ? withLiveSponsorship(read, liveSponsorships) : read
           if (target === highlightedIdRef.current)
-            setDeepLinkedItem(() => (loadedIds.has(target) ? null : live()))
-          setOpenedItem((opened) => (opened?.id === target ? live() : opened))
+            setDeepLinkedItem((current) =>
+              loadedIds.has(target)
+                ? null
+                : live
+                  ? reconcileCommunityPostText(live, current)
+                  : live
+            )
+          setOpenedItem((opened) =>
+            opened?.id === target
+              ? live
+                ? reconcileCommunityPostText(live, opened)
+                : live
+              : opened
+          )
         } catch (error: unknown) {
           if (isCurrent() && communityFailureReason(error) === 'not_found') {
             reactionState.evict(target)
@@ -2955,11 +2989,16 @@ export function CommunityLookbookGrid({
         setDeepLinkedItem((post) =>
           post && !loadedIds.has(post.id) ? live(reactionState.current(post)) : null
         )
-        setItems((previous) =>
-          (append && !restarted ? mergeFeedPages(previous, page) : page).map((post) =>
-            live(reactionState.current(post))
+        setItems((previous) => {
+          const previousById = new Map(previous.map((item) => [item.id, item]))
+          return (append && !restarted ? mergeFeedPages(previous, page) : page).map(
+            (post) =>
+              reconcileCommunityPostText(
+                live(reactionState.current(post)),
+                previousById.get(post.id)
+              )
           )
-        )
+        })
         announceFeed(
           {
             key:
@@ -3248,12 +3287,10 @@ export function CommunityLookbookGrid({
         // post carries the latest live answer for it, block or absence, on
         // every copy, the New looks buffer included.
         const updated = withLiveSponsorship(resolved, liveSponsorships)
-        newLooksRef.current = newLooksRef.current.map((item) =>
-          item.id === target.post.id ? updated : item
-        )
-        setNewLooks(newLooksRef.current)
         const update = (item: CommunityFeedItem | null) =>
-          item?.id === target.post.id ? updated : item
+          item?.id === target.post.id ? reconcileCommunityPostText(updated, item) : item
+        newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
+        setNewLooks(newLooksRef.current)
         setItems((previous) => previous.map((item) => update(item)!))
         setOpenedItem(update)
         setDeepLinkedItem(update)
@@ -4278,10 +4315,16 @@ export function CommunityLookbookGrid({
                 post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
                   ? { ...post, ...text }
                   : post
+              newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
+              setNewLooks(newLooksRef.current)
               setItems((previous) => previous.map((item) => update(item)!))
               setOpenedItem(update)
               setDeepLinkedItem(update)
               applySpotlight(update)
+            }}
+            onTextStatus={(key) => {
+              const id = ++reactionAnnouncementId.current
+              setReactionFeedback({ key, id })
             }}
             onClose={() => {
               notificationIntentRef.current++

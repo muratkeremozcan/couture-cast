@@ -1,13 +1,14 @@
 // Story 6.6 owner: the mobile City Spotlight's paging and reaction state.
 // Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`
 import type { CommunityReactionState } from '@couture/api-client'
-import type {
-  EditCommunityPostTextResponse,
-  CommunityBannedError,
-  CommunityReactionFeedItem,
-  CommunityReactionSpotlightItem,
-  CommunityReactionSummary,
-  CommunitySpotlightLevel,
+import {
+  reconcileCommunityPostText,
+  type EditCommunityPostTextResponse,
+  type CommunityBannedError,
+  type CommunityReactionFeedItem,
+  type CommunityReactionSpotlightItem,
+  type CommunityReactionSummary,
+  type CommunitySpotlightLevel,
 } from '@couture/api-client/contracts/http'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -339,14 +340,7 @@ export function useCommunitySpotlight({
         return previous.map((item) =>
           item.id === post.id
             ? {
-                ...sponsorships.apply(post),
-                ...((item.textRevision ?? -1) > (post.textRevision ?? -1)
-                  ? {
-                      title: item.title,
-                      caption: item.caption,
-                      textRevision: item.textRevision,
-                    }
-                  : {}),
+                ...reconcileCommunityPostText(sponsorships.apply(post), item),
                 rank: item.rank,
               }
             : item

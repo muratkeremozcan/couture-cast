@@ -15,11 +15,12 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  CommunityBannedError,
-  CommunitySponsoredFeedItem as CommunityFeedItem,
-  CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
-  CommunitySpotlightLevel,
+import {
+  reconcileCommunityPostText,
+  type CommunityBannedError,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
+  type CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
+  type CommunitySpotlightLevel,
 } from '@couture/api-client/contracts/http'
 import {
   communityFailureReason,
@@ -296,7 +297,13 @@ export function useCommunitySpotlight<Token = number>({
           post.status === 'published'
             ? (reconcileRef.current([{ ...post, rank: shown.rank }], ticket)[0] ?? null)
             : null
-        apply((item) => (item?.id === postId ? fresh : item))
+        apply((item) =>
+          item?.id === postId
+            ? fresh
+              ? reconcileCommunityPostText(fresh, item)
+              : null
+            : item
+        )
       } catch (error: unknown) {
         if (controller.signal.aborted) return
         if (communityFailureReason(error) === 'not_found')
