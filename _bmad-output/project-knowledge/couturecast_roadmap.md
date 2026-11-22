@@ -4,6 +4,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false, "MD060": false} -->
 
+Updated: 2026-11-21: add planning Epic 7 (first-use clarity) ahead of Phase 4
 Updated: 2026-09-05 — align Epic 6 Community Beta phase labels and release authority
 Updated: 2026-02-28 — sync with brief governance and clarified activation thresholds
 
@@ -34,6 +35,8 @@ Version: 1.3 — BMAD Integration + GitHub Preservation
 | **Phase 2 — Community Beta**                  | +6 weeks    | Social features + moderation + compliance readiness               | BMAD Workflow docs for Epic 6, moderation policy + ops staffing plan, age-gate/privacy readiness sign-off before beta opening. Beta opens only on signed evidence for all eight gate items: moderation staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback. Production read and write rollout controls stay off until every one is signed. |
 | **Phase 3 — Monetization + Wardrobe Uploads** | +4 weeks    | Subscription system + wardrobe uploads                            | BMAD finance/commerce module spec; wardrobe integration plan                                                                                                                                                                                                                                                                                                                     |
 | **Phase 4 — Expansion & Jr. Planning**        | +6 weeks    | Begin COPPA-safe app for U13                                      | BMAD compliance + educational UX deliverables preserved in repo                                                                                                                                                                                                                                                                                                                  |
+
+📌 **First-use clarity:** planning Epic 7 (calm navigation, reliable saves, looks before the first upload) runs after Phase 3 and before Phase 4, driven by teen and adult phone tests.
 
 📌 **Sequencing rule:** This phase order is the roadmap source of truth; prioritization, KPI targets, and launch gates follow this sequence.
 

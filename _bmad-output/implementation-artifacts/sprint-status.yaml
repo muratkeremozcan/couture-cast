@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-11-15
+last_updated: 2026-11-21
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -120,3 +120,41 @@ development_status:
   6-16-guest-wardrobe-outfit-preview: done
   # Google sign-in on web, iOS and Android; age gate and guardian consent unchanged.
   6-17-google-sign-in: done
+
+  # Epic 7: First-use clarity and member reliability
+  # Created 2026-11-21 from tester and owner feedback; product context in epic-7-context.md.
+  epic-7: backlog
+  7-1-shared-save-undo-status-feedback: backlog
+  7-2-saved-looks-follow-account: backlog
+  7-3-import-device-saved-looks-same-member: backlog
+  7-4-community-post-edits-persist: backlog
+  7-5-garment-detail-tag-edit: backlog
+  7-6-garment-delete: backlog
+  7-7-signed-in-shell-without-flashes: backlog
+  7-8-teen-adult-usability-studies: backlog
+  7-9-one-app-shell-visual-system: backlog
+  7-10-screen-budget-guard: backlog
+  7-11-five-tab-navigation-back-pattern: backlog
+  7-12-looks-tab-saved-looks-ideas-plans: backlog
+  7-13-calm-today-one-primary-job: backlog
+  7-14-todays-outfit-as-picture: backlog
+  7-15-calm-community-empty-state: backlog
+  7-16-calm-closet-profile: backlog
+  7-17-teen-voice-copy: backlog
+  7-18-find-mini-skirts-tights-socks: backlog
+  7-19-garment-subtypes: backlog
+  7-20-account-style-profile: backlog
+  7-21-first-run-look-first-account-save: backlog
+  7-22-lookbook-shuffle-pinned-pieces: backlog
+  7-23-ai-written-look-ideas: backlog
+  7-24-photo-ai-consent-processor-approval: backlog
+  7-25-suggested-community-descriptions: backlog
+  7-26-clean-garment-cutouts: backlog
+  7-27-suggested-tags-that-are-right: backlog
+  7-28-add-several-photos-once: backlog
+  7-29-several-garments-from-one-flat-lay-photo: backlog
+  7-30-style-this-piece-my-own-garments: backlog
+  7-31-wear-log: backlog
+  7-32-closet-insights: backlog
+  7-33-trips: backlog
+  7-34-packing-list: backlog
