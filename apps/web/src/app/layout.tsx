@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { SkipToContent } from './components/skip-to-content'
+import { SaveFeedbackProvider } from './components/save-feedback'
 import { blockedStorageFallbackScript } from '../lib/browser-persistence'
 import { landingSessionScript } from '../lib/landing-session'
 
@@ -48,7 +49,7 @@ export default function RootLayout({
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SkipToContent />
-        {children}
+        <SaveFeedbackProvider>{children}</SaveFeedbackProvider>
         {/* Last, so its effect switches to the browser language after every component in the page
             has subscribed to the change; placed first, the switch fired before they listened and
             the sign-in doors stayed English (TEA sign-off N-1). */}

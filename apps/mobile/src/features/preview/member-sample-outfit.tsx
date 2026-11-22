@@ -3,9 +3,12 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
+  createAnnouncementToken,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   parseSampleBookmarks,
+  popLookUndoSnapshot,
+  pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
@@ -16,8 +19,10 @@ import {
   updateMemberSampleOutfit,
   type SampleBookmark,
   type SampleGarmentCategory,
+  type SampleOutfitResult,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useStatusBar } from '@/components/save-feedback'
 import { mobileApplicationUserId } from '@/src/lib/mobile-auth'
 import { sampleRecipeStorage } from '@/src/lib/sample-recipe-storage'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
@@ -64,18 +69,32 @@ export function MemberSampleOutfit({
   busy: boolean
   onRetry: () => void
 }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const statusBar = useStatusBar()
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
   const palette = useHeroPalette()
   const [result, setResult] = useState(createMemberSampleOutfit)
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
   const [bookmarks, setBookmarks] = useState<SampleBookmark[]>([])
+  const [bookmarkRevision, setBookmarkRevision] = useState(0)
   const [bookmarkStorage, setBookmarkStorage] = useState<
     'loading' | 'ready' | 'unavailable'
   >('loading')
+  const bookmarksRef = useRef<SampleBookmark[]>([])
+  bookmarksRef.current = bookmarks
+  const lastSavedBeforeRef = useRef<{
+    lookId: string
+    previous: SampleBookmark | undefined
+    previousIndex: number
+  } | null>(null)
   const bookmarkWriter = useRef<((value: string) => void) | null>(null)
+  const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
+  const noticeSeqRef = useRef(0)
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
   useEffect(() => {
+    statusBarRef.current.dismissNotice()
     if (!owner) return
     let active = true
     void sampleRecipeStorage(
@@ -84,7 +103,9 @@ export function MemberSampleOutfit({
       .then(({ read, write }) => {
         if (!active || mobileApplicationUserId() !== owner) return
         bookmarkWriter.current = write
-        setBookmarks(parseSampleBookmarks(read(), SAMPLE_CATALOG))
+        const loaded = parseSampleBookmarks(read(), SAMPLE_CATALOG)
+        bookmarksRef.current = loaded
+        setBookmarks(loaded)
         setBookmarkStorage('ready')
       })
       .catch(() => {
@@ -93,22 +114,70 @@ export function MemberSampleOutfit({
     return () => {
       active = false
       bookmarkWriter.current = null
+      statusBarRef.current.dismissNotice()
     }
   }, [owner])
-  const updateBookmarks = (next: SampleBookmark[]) => {
+  const updateBookmarks = (
+    next: SampleBookmark[],
+    options?: { keepInMemoryOnError?: boolean }
+  ): boolean => {
     if (!owner || mobileApplicationUserId() !== owner || bookmarkStorage === 'loading')
-      return
-    setBookmarks(next)
-    try {
-      if (!bookmarkWriter.current) return
-      bookmarkWriter.current(JSON.stringify(next))
-      setBookmarkStorage('ready')
-    } catch {
+      return false
+    if (!bookmarkWriter.current) {
       setBookmarkStorage('unavailable')
+      return false
     }
+    try {
+      bookmarkWriter.current(JSON.stringify(next))
+      bookmarksRef.current = next
+      setBookmarks(next)
+      setBookmarkStorage('ready')
+      return true
+    } catch {
+      if (options?.keepInMemoryOnError) {
+        bookmarksRef.current = next
+        setBookmarks(next)
+      }
+      setBookmarkStorage('unavailable')
+      return false
+    }
+  }
+  const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
+    if (next === result) return
+    lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
+    setResult(next)
+    const seq = ++noticeSeqRef.current
+    statusBar.showNotice({
+      id: `sample-${kind}-${seq}`,
+      announcementId: createAnnouncementToken(`sample-${kind}`, seq),
+      message,
+      tone: 'neutral',
+      actions: [
+        {
+          id: 'undo',
+          kind: 'undo',
+          label: t('feedback.undo'),
+          onPress: () => {
+            const { snapshot, rest } = popLookUndoSnapshot(lookUndoStackRef.current)
+            lookUndoStackRef.current = rest
+            if (snapshot) {
+              setResult(snapshot)
+              const undoSeq = ++noticeSeqRef.current
+              statusBar.showNotice({
+                id: `sample-${kind}-undo-${undoSeq}`,
+                announcementId: createAnnouncementToken(`sample-${kind}-undo`, undoSeq),
+                message: t('feedback.undone'),
+                tone: 'neutral',
+              })
+            }
+          },
+        },
+      ],
+    })
   }
   const lookId = result.look?.id
   const currentId = result.garments.find((garment) => garment.category === category)?.id
+  const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
 
   return (
     <View testID="member-sample-outfit" style={styles.sample}>
@@ -149,35 +218,148 @@ export function MemberSampleOutfit({
           </>
         }
         noAlternative={result.eligibleLookIds.length < 2}
-        onTryAnother={() => setResult(rotateMemberSampleOutfit)}
+        onTryAnother={() =>
+          pushUndoAndUpdate(
+            rotateMemberSampleOutfit(result),
+            t('feedback.lookUpdated'),
+            'shuffle'
+          )
+        }
         onSwap={setCategory}
         swapCategory={category}
         onUndoSwaps={() => setResult(undoMemberSampleSwaps)}
-        onReviewChoices={() => setResult(createMemberSampleOutfit())}
-        onResetChoices={() => setResult(createMemberSampleOutfit())}
+        onReviewChoices={() => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          setResult(createMemberSampleOutfit())
+        }}
+        onResetChoices={() => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          setResult(createMemberSampleOutfit())
+        }}
       />
       <SampleIdeaControls
         strings={strings}
         palette={palette}
         preferences={result.input.preferences}
-        onPreferences={(preferences) =>
+        onPreferences={(preferences) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
           setResult((current) => updateMemberSampleOutfit(current, { preferences }))
-        }
+        }}
         weather={result.input.weather}
-        onWeather={(weather) =>
+        onWeather={(weather) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
           setResult((current) => updateMemberSampleOutfit(current, { weather }))
-        }
+        }}
         bookmarks={bookmarks}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
         persistent={bookmarkStorage === 'ready'}
         showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}
-        onSave={() => updateBookmarks(saveSampleBookmark(bookmarks, result))}
-        onOpen={(bookmark) =>
+        ownerKey={owner}
+        saveResetKey={`${owner ?? 'anon'}:${lookId ?? 'none'}:${garmentsSignature}:${bookmarkRevision}`}
+        onSave={() => {
+          if (!lookId) return false
+          lookUndoStackRef.current = []
+          const currentList = bookmarksRef.current
+          const previousIndex = currentList.findIndex(
+            (bookmark) => bookmark.lookId === lookId
+          )
+          lastSavedBeforeRef.current = {
+            lookId,
+            previous: previousIndex >= 0 ? currentList[previousIndex] : undefined,
+            previousIndex,
+          }
+          return updateBookmarks(saveSampleBookmark(currentList, result))
+        }}
+        onUndoSave={() => {
+          if (!lookId) return false
+          const captured = lastSavedBeforeRef.current
+          const without = bookmarksRef.current.filter(
+            (bookmark) => bookmark.lookId !== lookId
+          )
+          const next =
+            captured && captured.lookId === lookId && captured.previous
+              ? [
+                  ...without.slice(
+                    0,
+                    Math.min(Math.max(captured.previousIndex, 0), without.length)
+                  ),
+                  captured.previous,
+                  ...without.slice(
+                    Math.min(Math.max(captured.previousIndex, 0), without.length)
+                  ),
+                ]
+              : without
+          return updateBookmarks(next)
+        }}
+        onOpen={(bookmark) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
           setResult((current) => reopenMemberSampleOutfit(current, bookmark))
-        }
-        onRemove={(id) =>
-          updateBookmarks(bookmarks.filter((bookmark) => bookmark.lookId !== id))
-        }
+        }}
+        onRemove={(id) => {
+          const currentList = bookmarksRef.current
+          const removedIndex = currentList.findIndex((bookmark) => bookmark.lookId === id)
+          const removedBookmark =
+            removedIndex >= 0 ? currentList[removedIndex] : undefined
+          setBookmarkRevision((value) => value + 1)
+          const ok = updateBookmarks(
+            currentList.filter((bookmark) => bookmark.lookId !== id),
+            { keepInMemoryOnError: true }
+          )
+          if (ok && removedBookmark) {
+            const seq = ++noticeSeqRef.current
+            statusBar.showNotice({
+              id: `sample-remove-${seq}`,
+              announcementId: createAnnouncementToken('sample-remove', seq),
+              message: t('feedback.removed'),
+              tone: 'neutral',
+              actions: [
+                {
+                  id: 'undo',
+                  kind: 'undo',
+                  label: t('feedback.undo'),
+                  onPress: () => {
+                    const latest = bookmarksRef.current.filter(
+                      (bookmark) => bookmark.lookId !== id
+                    )
+                    const idx = Math.min(Math.max(removedIndex, 0), latest.length)
+                    const restored = updateBookmarks([
+                      ...latest.slice(0, idx),
+                      removedBookmark,
+                      ...latest.slice(idx),
+                    ])
+                    const undoSeq = ++noticeSeqRef.current
+                    if (restored) {
+                      statusBar.showNotice({
+                        id: `sample-remove-undo-${undoSeq}`,
+                        announcementId: createAnnouncementToken(
+                          'sample-remove-undo',
+                          undoSeq
+                        ),
+                        message: t('feedback.undone'),
+                        tone: 'neutral',
+                      })
+                    } else {
+                      statusBar.showNotice({
+                        id: `sample-remove-undo-failed-${undoSeq}`,
+                        announcementId: createAnnouncementToken(
+                          'sample-remove-undo-failed',
+                          undoSeq
+                        ),
+                        message: t('feedback.saveFailed'),
+                        tone: 'error',
+                      })
+                    }
+                  },
+                },
+              ],
+            })
+          }
+        }}
       />
       <PreviewSwapSheet
         category={category}
@@ -188,8 +370,13 @@ export function MemberSampleOutfit({
         strings={strings}
         palette={palette}
         onChoose={(id) => {
-          if (category)
-            setResult((current) => swapMemberSampleGarment(current, category, id))
+          if (category) {
+            pushUndoAndUpdate(
+              swapMemberSampleGarment(result, category, id),
+              t('feedback.pieceSwapped'),
+              'swap'
+            )
+          }
           setCategory(null)
         }}
         onClose={() => setCategory(null)}

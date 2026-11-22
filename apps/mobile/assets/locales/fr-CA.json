@@ -1039,5 +1039,25 @@
       "warm_dry": "Chaud et sec",
       "warm_wet": "Chaud et humide"
     }
+  },
+  "feedback": {
+    "save": "Enregistrer",
+    "saving": "Enregistrement",
+    "stillSaving": "Toujours en cours",
+    "saved": "Enregistré",
+    "failed": "Échec",
+    "retry": "Réessayer",
+    "undo": "Annuler",
+    "view": "Voir",
+    "dismiss": "Fermer",
+    "savedToLooks": "Enregistré dans vos looks.",
+    "saveFailed": "Impossible d’enregistrer. Réessayez.",
+    "offlineBanner": "Vous êtes hors ligne",
+    "offlineAction": "Vous êtes hors ligne. Enregistrez une fois reconnecté.",
+    "removed": "Retiré",
+    "undone": "Modification annulée.",
+    "lookUpdated": "Look mis à jour.",
+    "pieceSwapped": "Pièce remplacée.",
+    "close": "Fermer"
   }
 }

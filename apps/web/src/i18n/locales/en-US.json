@@ -1295,5 +1295,25 @@
   },
   "session": {
     "retry": "Try again"
+  },
+  "feedback": {
+    "save": "Save",
+    "saving": "Saving",
+    "stillSaving": "Still saving",
+    "saved": "Saved",
+    "failed": "Failed",
+    "retry": "Retry",
+    "undo": "Undo",
+    "view": "View",
+    "dismiss": "Dismiss",
+    "savedToLooks": "Saved to your looks.",
+    "saveFailed": "Could not save. Try again.",
+    "offlineBanner": "You are offline",
+    "offlineAction": "You are offline. Save when you reconnect.",
+    "removed": "Removed",
+    "undone": "Change undone.",
+    "lookUpdated": "Look updated.",
+    "pieceSwapped": "Piece swapped.",
+    "close": "Close"
   }
 }

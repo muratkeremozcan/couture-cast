@@ -123,6 +123,7 @@ export function GuestPreviewOutfit({
           type="button"
           onClick={onTryAnother}
           data-testid="guest-preview-try-another"
+          data-primary-action="true"
           className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
         >
           {strings.outfit.tryAnother}

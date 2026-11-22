@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-19.
-Added Steps 40 to 58:
+Updated: 2026-11-21.
+Added Steps 40 to 59:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -21,10 +21,9 @@ Added Steps 40 to 58:
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
-- Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
-  - Production follow-ups after the project close: Jade's profile and location fix (PR #257), and the Settings sections that follow the verified session, on `fix/settings-session-race`.
-  - Production follow-up after the project close, in review: image uploads straight to storage, on `fix/garment-upload`.
-  - Production follow-up after the project close, in progress: hosted wardrobe workers and manual tagging, on `feat/hosted-wardrobe-workers`.
+- Step 58: production status and nightly health, the project close on 2026-11-19, with no story, merged on `main`.
+  - Production follow-ups after the project close, merged on `main`: Jade's profile and location fix (PR #257), Settings session follow-up, image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week race fixes, and production profile/location checks.
+- Step 59: Story 7.1, shared save, undo and status feedback, in review on `feat/epic7-story-7-1-shared-save-undo-status-feedback`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -32,6 +31,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 59 for Story CC-7.1 (shared save, undo and status feedback) while its PR is in review, and moved Step 58 and its production follow-ups to merged.
 Added Step 58's production profile and location checks, run in the daily production run as the synthetic member, while its PR is in review.
 Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
 Added Step 58's production follow-up, hosted wardrobe workers and manual tagging, while its change is in progress.
@@ -144,13 +144,14 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 58, production status and nightly health, the project close on 2026-11-19.
+- Latest step: Step 59, Story CC-7.1, shared save, undo and status feedback, status `review` on `feat/epic7-story-7-1-shared-save-undo-status-feedback`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-1-shared-save-undo-status-feedback.md`.
+  Step 59 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+  `epic-7` is `in-progress` in `sprint-status.yaml`.
+- Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
-  Delivery is done: `6-15b-expo-sdk-55-58-upgrade` stays `backlog`, so `epic-6` stays `in-progress`.
+  Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
 - Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
-  In review under Step 58: production follow-up, image uploads straight to storage, on `fix/garment-upload`; its plan is `_bmad-output/plan-upload-direct-storage.md`.
-  In progress under Step 58: production follow-up, hosted wardrobe workers and manual tagging, on `feat/hosted-wardrobe-workers`; its plan is `_bmad-output/plan-hosted-wardrobe-workers.md`.
-  In review under Step 58: production follow-up, advisor erase and planner week races, on `fix/advisor-erase-planner-week`; its plan is `_bmad-output/plan-advisor-erase-planner-week.md`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -315,6 +316,7 @@ Read it before changing or adding a numbered step.
 |   56 | Let visitors try a sample closet first. Save only comfort, and only on yes.  |
 |   57 | Sign in with Google. Ask a new person only their birthdate.                  |
 |   58 | Check production every day. Make every red night say why.                    |
+|   59 | Tell members when a save works, fails, is offline, or can be undone.         |
 
 ## Special feature: AI garment tagging
 
@@ -20886,3 +20888,143 @@ Test per report:
   the browser's permission refused, expects the reason and a working city search, and that no
   coordinates were sent. The allowed path writes a location, so it stays on the local lane
   (`location-use-my-location.spec.ts` UL-1).
+
+## Step 59: Shared save, undo and status feedback
+
+User/business impact:
+
+Before this step, saving a look in Style this piece on web wrote only to an `sr-only` status node,
+Home sample bookmarks had no saving, failure, or undo status bar, and neither platform had a shared
+offline banner under the top bar. Members could not tell whether a save succeeded, stalled, failed,
+or could be reversed. Story CC-7.1 introduces one shared save-and-status feedback state machine and
+UI kit on web and mobile (with all ten locales) so every save, remove, swap, and shuffle reports
+clear state transitions, offers Undo or Retry in a 5-second non-overlapping bottom status bar, and
+shows a single offline line under the top bar until connectivity returns.
+
+Key takeaways:
+
+1. **One pure state machine drives both platforms.**
+   `packages/utils/src/save-feedback/index.ts` owns the `idle -> saving -> still-saving -> saved | failed | offline`
+   transitions, timing constants (100 ms response bar, 1,000 ms slow-commit threshold, 5,000 ms
+   status bar, <= 200 ms transition), the 2-action clamp (`View`, `Undo`, `Retry`), bounded look
+   undo stacks, and unique `announcementId` tokens. Web and mobile cannot drift on state rules.
+2. **Never claim `Saved` before commit, and never drop on-screen work on failure or offline.**
+   `SaveActionButton` enters `saving` synchronously on click, promotes to `still-saving` at 1,000 ms
+   if unsettled, and enters `saved` with a check icon only after the promise resolves. Failures and
+   offline attempts keep the member's look intact on screen.
+3. **One live announcement per transition, placed where assistive tech can actually reach it.**
+   Web modals mark background nodes `inert` and `aria-hidden="true"`, so an inline modal provider
+   mounts its own keyed live announcer inside the dialog rather than forwarding to an inert root
+   region. Mobile dispatches each unique `announcementId` immediately without an 80 ms debounce
+   dropping fast-commit `Saving` states or suppressing consecutive identical notices.
+4. **Status bars must clear navigation and primary actions dynamically.**
+   Web `StatusFeedbackBar` measures `[data-testid="sticky-bottom-nav"]` and
+   `[data-primary-action="true"]` rects to shift above any obstacle, and mobile subscribes to the
+   Dynamic Type tab bar height from `apps/mobile/app/(tabs)/_layout.tsx` plus safe-area insets.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- Mounting the root web live region outside `AccessibleModal` silenced every announcement inside
+  Style this piece because `modal-stack.ts` sets `inert` on non-overlay children of `document.body`.
+  Giving inline modal providers their own keyed `<span key={announcement.id}>` live region fixes
+  both modal accessibility and repeated identical notices (two shuffles or swaps in a row).
+- On native iOS/Android where `navigator.onLine` and browser `online` events do not exist,
+  short-circuiting every `requiresNetwork` save once `reportNetworkOffline()` fired caused a
+  permanent offline deadlock because `reportNetworkOnline()` could never run. Adding an abortable
+  connectivity probe on `AppState` foreground and retry lets native recover automatically.
+- `StylePieceIdeas.updateSaved` calls `inventory.refresh()` (a network GET) before writing local
+  recipes. Leaving `requiresNetwork` off caused an offline Save click to clear `anchor` and wipe
+  the look list into `StylePieceUnavailable`; gating both Save and Remove on connectivity keeps
+  the member's look on screen.
+- Updating an already-saved look and tapping Undo must restore the prior saved entry at its
+  previous index rather than deleting the look, and `SaveActionButton`'s `resetKey` must include
+  garment swaps and removal revisions so the button leaves `Saved` as soon as the look changes or
+  is removed.
+
+Story/Task mapping:
+
+- Story CC-7.1 (`7-1-shared-save-undo-status-feedback`): shared save, undo, offline, and status
+  feedback across `@couture/utils`, `apps/web`, `apps/mobile`, and all ten locale catalogs.
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md`, `Story CC-7.1: Shared save, undo and status feedback`.
+- `_bmad-output/implementation-artifacts/spec-7-1-shared-save-undo-status-feedback.md`.
+
+Cross-links:
+
+- Step 24 provides web and mobile accessibility focus, reduced motion, and contrast tokens.
+- Step 56 provides the sample wardrobe outfit preview and Style this piece flows wired here.
+- Step 60 (CC-7.2) builds account-backed saved-look persistence on top of this shared save control.
+
+Sequence to follow:
+
+1. `packages/utils/src/save-feedback/index.ts` and `packages/utils/src/index.ts`.
+2. `apps/web/src/i18n/locales/*.json` and `apps/mobile/assets/locales/*.json` (`feedback` keys).
+3. `apps/web/src/app/components/save-feedback/save-feedback-context.tsx`,
+   `apps/web/src/app/components/save-feedback/save-action-button.tsx`, and
+   `apps/web/src/app/layout.tsx`.
+4. `apps/web/src/app/wardrobe/style-piece-panel.tsx`,
+   `apps/web/src/app/components/home-ritual.tsx`,
+   `apps/web/src/app/components/guest-preview/guest-preview-outfit.tsx`, and
+   `apps/web/src/app/components/guest-preview/sample-idea-controls.tsx`.
+5. `apps/mobile/components/save-feedback/network-status.ts`,
+   `apps/mobile/components/save-feedback/save-feedback-context.tsx`,
+   `apps/mobile/components/save-feedback/save-action-button.tsx`,
+   `apps/mobile/app/_layout.tsx`, and `apps/mobile/app/(tabs)/_layout.tsx`.
+6. `apps/mobile/src/features/wardrobe/style-piece-panel.tsx`,
+   `apps/mobile/src/features/preview/member-sample-outfit.tsx`, and
+   `apps/mobile/src/features/preview/sample-idea-controls.tsx`.
+
+Task owner map:
+
+- Step 59 step 1 owner: shared pure save/undo/status state machine in
+  `packages/utils/src/save-feedback/index.ts`.
+- Step 59 step 2 owner: ten-locale `feedback` strings in `apps/web/src/i18n/locales/*.json` and
+  `apps/mobile/assets/locales/*.json`.
+- Step 59 step 3 owner: web `SaveFeedbackProvider`, `OfflineStatusLine`, `StatusFeedbackBar`, and
+  `SaveActionButton` in `apps/web/src/app/components/save-feedback/`, mounted in
+  `apps/web/src/app/layout.tsx` and wired into `style-piece-panel.tsx` and `home-ritual.tsx`.
+- Step 59 step 4 owner: mobile `network-status.ts`, `SaveFeedbackProvider`, `OfflineStatusLine`,
+  `StatusFeedbackBar`, and `SaveActionButton` in `apps/mobile/components/save-feedback/`, mounted
+  in `apps/mobile/app/_layout.tsx`, tab-height wired in `apps/mobile/app/(tabs)/_layout.tsx`, and
+  integrated into `style-piece-panel.tsx` and `member-sample-outfit.tsx`.
+
+Tests that cover this step:
+
+Shared utils, Vitest:
+
+- [`packages/utils/src/save-feedback/save-feedback.test.ts`](../../packages/utils/src/save-feedback/save-feedback.test.ts):
+  proves all state transitions (`idle`, `saving`, `still-saving`, `saved`, `failed`, `offline`,
+  `undo`), timing constants, 2-action clamping, stale-run rejection, bounded undo stack, and
+  offline error classification.
+
+Web unit and locale parity, Vitest:
+
+- [`apps/web/src/app/components/save-feedback/save-feedback.test.tsx`](../../apps/web/src/app/components/save-feedback/save-feedback.test.tsx):
+  proves fast/slow commits, failure with Retry, offline banner and offline save protection, Undo
+  for save/unsave/swap/shuffle, single screen-reader announcement per state (including inline modal
+  and consecutive identical messages), notice dismissal on unmount/owner switch, non-overlap rect
+  avoidance, and StylePiecePanel offline protection.
+- [`apps/web/src/i18n/save-feedback-locales.spec.ts`](../../apps/web/src/i18n/save-feedback-locales.spec.ts):
+  proves all 18 `feedback.*` keys exist in all ten web locales, are translated outside English, and
+  keep English button labels to three words or fewer.
+
+Mobile unit and locale parity, Vitest:
+
+- [`apps/mobile/components/save-feedback/save-feedback.test.tsx`](../../apps/mobile/components/save-feedback/save-feedback.test.tsx):
+  proves mobile fast/slow commits, failure with Retry, native offline recovery without deadlock,
+  offline banner under top bar, Undo for save/unsave/swap/shuffle, immediate single announcement
+  without 80 ms debounce drop, reduced motion, dynamic tab-bar clearance, and StylePiecePanel
+  offline protection.
+- [`apps/mobile/src/i18n/save-feedback-locales.spec.ts`](../../apps/mobile/src/i18n/save-feedback-locales.spec.ts):
+  proves mobile ten-locale parity with web `feedback.*` keys and short English labels.
+
+Evidence boundaries:
+
+- Targeted Vitest suites across `@couture/utils` (10 tests), `apps/web` (84 tests across 5 files),
+  and `apps/mobile` (92 tests across 6 files), plus `tsc --noEmit` in `@couture/utils`, `web`, and
+  `mobile`, and `eslint --max-warnings=0` ran locally.
+- Full workspace suites, Playwright E2E, and native device lanes run in CI on the PR.
+- Real-device VoiceOver/TalkBack announcement cadence and physical-device iOS/Android safe-area
+  visual alignment are not proved by headless Vitest runs.

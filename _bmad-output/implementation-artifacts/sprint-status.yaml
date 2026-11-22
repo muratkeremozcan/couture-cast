@@ -123,8 +123,8 @@ development_status:
 
   # Epic 7: First-use clarity and member reliability
   # Created 2026-11-21 from tester and owner feedback; product context in epic-7-context.md.
-  epic-7: backlog
-  7-1-shared-save-undo-status-feedback: backlog
+  epic-7: in-progress
+  7-1-shared-save-undo-status-feedback: review
   7-2-saved-looks-follow-account: backlog
   7-3-import-device-saved-looks-same-member: backlog
   7-4-community-post-edits-persist: backlog

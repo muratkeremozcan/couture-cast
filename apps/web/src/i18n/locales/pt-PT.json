@@ -1295,5 +1295,25 @@
   },
   "session": {
     "retry": "Tentar novamente"
+  },
+  "feedback": {
+    "save": "Guardar",
+    "saving": "A guardar",
+    "stillSaving": "Ainda a guardar",
+    "saved": "Guardado",
+    "failed": "Falhou",
+    "retry": "Tentar novamente",
+    "undo": "Anular",
+    "view": "Ver",
+    "dismiss": "Dispensar",
+    "savedToLooks": "Guardado nos seus looks.",
+    "saveFailed": "Não foi possível guardar. Tente novamente.",
+    "offlineBanner": "Está offline",
+    "offlineAction": "Está offline. Guarde quando voltar a ligar-se.",
+    "removed": "Removido",
+    "undone": "Alteração anulada.",
+    "lookUpdated": "Look atualizado.",
+    "pieceSwapped": "Peça trocada.",
+    "close": "Fechar"
   }
 }

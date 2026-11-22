@@ -7,6 +7,7 @@ import {
   type Ref,
   type RefObject,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
   AccessibilityInfo,
@@ -20,6 +21,7 @@ import {
   View,
 } from 'react-native'
 import {
+  createAnnouncementToken,
   createStylePieceRefresh,
   formatPreviewString,
   formatSampleTemperature,
@@ -28,6 +30,8 @@ import {
   initialStylePieceWeather,
   isStylePieceTagged,
   parseStylePieceRecipes,
+  popLookUndoSnapshot,
+  pushLookUndoSnapshot,
   sampleGarmentText,
   SAMPLE_WEATHER,
   STYLE_PIECE_WEATHER_KEYS,
@@ -48,6 +52,11 @@ import {
 } from '@couture/utils'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import {
+  SaveActionButton,
+  SaveFeedbackProvider,
+  useStatusBar,
+} from '@/components/save-feedback'
 import { useSchemeColors } from '@/components/themed'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
@@ -253,20 +262,22 @@ export function StylePiecePanel({
             buttonRef={closeButton}
           />
         </View>
-        <StylePieceIdeas
-          key={JSON.stringify([selection.id, piece.category, piece.comfortRange])}
-          anchor={inWardrobe ? anchor : null}
-          piece={piece}
-          restoreWeatherFocus={restoreWeatherFocus}
-          refreshRef={refreshRef}
-          closeButton={closeButton}
-          owner={owner}
-          garmentId={selection.id}
-          locale={locale}
-          labels={labels}
-          samples={samples}
-          palette={palette}
-        />
+        <SaveFeedbackProvider inline renderOfflineLine={false}>
+          <StylePieceIdeas
+            key={JSON.stringify([selection.id, piece.category, piece.comfortRange])}
+            anchor={inWardrobe ? anchor : null}
+            piece={piece}
+            restoreWeatherFocus={restoreWeatherFocus}
+            refreshRef={refreshRef}
+            closeButton={closeButton}
+            owner={owner}
+            garmentId={selection.id}
+            locale={locale}
+            labels={labels}
+            samples={samples}
+            palette={palette}
+          />
+        </SaveFeedbackProvider>
       </View>
     </EdgeToEdgeModal>
   )
@@ -334,6 +345,8 @@ function StylePieceIdeas({
   samples: SampleLabels
   palette: PreviewPalette
 }) {
+  const { t } = useTranslation()
+  const statusBar = useStatusBar()
   const { category, comfortRange } = piece
   const photo = anchor?.photo
   const key = stylePieceStorageKey(owner, garmentId)
@@ -344,15 +357,20 @@ function StylePieceIdeas({
   const [reopened, setReopened] = useState<string>()
   const [latestEdit, setLatestEdit] = useState<string>()
   const [saved, setSaved] = useState<StylePieceLook[]>([])
+  const [savedResetNonce, setSavedResetNonce] = useState(0)
   const [storage, setStorage] = useState<'loading' | 'ready' | 'unavailable'>('loading')
   const [failedPhotoUrl, setFailedPhotoUrl] = useState<string>()
   const photoFailed = failedPhotoUrl !== undefined && failedPhotoUrl === photo?.url
   const [retrying, setRetrying] = useState(false)
   const authorized = Boolean(anchor) && !photoFailed
-  const [notice, setNotice] = useState('')
   const adapter = useRef<Awaited<ReturnType<typeof sampleRecipeStorage>> | null>(null)
   const scroll = useRef<ScrollView | null>(null)
   const selectedWeather = useRef<ComponentRef<typeof Pressable> | null>(null)
+  const swapUndoStackRef = useRef<Record<string, StylePieceRecipe>[]>([])
+  const lastSavedBeforeRef = useRef<
+    Record<string, { previous: StylePieceLook | undefined; previousIndex: number }>
+  >({})
+  const noticeSeqRef = useRef(0)
   const reopenAction = useRef(0)
 
   useEffect(() => {
@@ -422,11 +440,12 @@ function StylePieceIdeas({
   const changeWeather = (value: StylePieceWeatherKey) => {
     if (value === weather) return
     reopenAction.current++
+    swapUndoStackRef.current = []
     setWeather(value)
     setEdits({})
     setLatestEdit(undefined)
     setReopened(undefined)
-    setNotice('')
+    statusBar.dismissNotice()
   }
 
   const openSaved = async (entry: StylePieceLook) => {
@@ -445,6 +464,8 @@ function StylePieceIdeas({
       setStorage('unavailable')
     }
     if (!recipe) return
+    swapUndoStackRef.current = []
+    statusBar.dismissNotice()
     setWeather(recipe.weather)
     setEdits({ [recipe.lookId]: recipe })
     setReopened(recipe.lookId)
@@ -537,37 +558,111 @@ function StylePieceIdeas({
         </View>
       )}
 
-      {looks.map((look, index) => (
-        <StylePieceCard
-          key={stylePieceRecipeKey(look.recipe)}
-          look={look}
-          index={index}
-          anchorPhoto={anchorPhoto}
-          labels={labels}
-          samples={samples}
-          palette={palette}
-          canSave={storage === 'ready'}
-          onSave={() => {
-            void updateSaved((current) => saveStylePieceRecipe(current, look)).then(
-              (saved) => {
-                if (saved) setNotice(labels.saved)
+      {looks.map((look, index) => {
+        const recipeKey = stylePieceRecipeKey(look.recipe)
+        return (
+          <StylePieceCard
+            key={recipeKey}
+            look={look}
+            index={index}
+            owner={owner}
+            resetNonce={savedResetNonce}
+            anchorPhoto={anchorPhoto}
+            labels={labels}
+            samples={samples}
+            palette={palette}
+            canSave={storage === 'ready'}
+            onSave={async () => {
+              const savedOk = await updateSaved((current) => {
+                const previousIndex = current.findIndex(
+                  (item) => stylePieceRecipeKey(item.recipe) === recipeKey
+                )
+                lastSavedBeforeRef.current[recipeKey] = {
+                  previous: previousIndex >= 0 ? current[previousIndex] : undefined,
+                  previousIndex,
+                }
+                return saveStylePieceRecipe(current, look)
+              })
+              if (savedOk) {
+                swapUndoStackRef.current = []
               }
-            )
-          }}
-          onSwap={(category, id) => {
-            reopenAction.current++
-            setLatestEdit(look.recipe.lookId)
-            setEdits((current) => ({
-              ...current,
-              [look.recipe.lookId]: {
-                ...look.recipe,
-                swaps: { ...look.recipe.swaps, [category]: id },
-              },
-            }))
-            setNotice('')
-          }}
-        />
-      ))}
+              return savedOk
+            }}
+            onUndoSave={() =>
+              updateSaved((current) => {
+                const without = current.filter(
+                  ({ recipe }) => stylePieceRecipeKey(recipe) !== recipeKey
+                )
+                const captured = lastSavedBeforeRef.current[recipeKey]
+                if (captured?.previous) {
+                  const idx = Math.min(
+                    Math.max(captured.previousIndex, 0),
+                    without.length
+                  )
+                  return [
+                    ...without.slice(0, idx),
+                    captured.previous,
+                    ...without.slice(idx),
+                  ]
+                }
+                return without
+              })
+            }
+            onViewSaved={() => {
+              scroll.current?.scrollToEnd?.({ animated: false })
+            }}
+            onSwap={(category, id) => {
+              reopenAction.current++
+              swapUndoStackRef.current = pushLookUndoSnapshot(
+                swapUndoStackRef.current,
+                edits
+              )
+              setLatestEdit(look.recipe.lookId)
+              setEdits((current) => ({
+                ...current,
+                [look.recipe.lookId]: {
+                  ...look.recipe,
+                  swaps: { ...look.recipe.swaps, [category]: id },
+                },
+              }))
+              const seq = ++noticeSeqRef.current
+              statusBar.showNotice({
+                id: `style-piece-swap-${seq}`,
+                announcementId: createAnnouncementToken('style-piece-swap', seq),
+                message: t('feedback.pieceSwapped'),
+                tone: 'neutral',
+                actions: [
+                  {
+                    id: 'undo',
+                    kind: 'undo',
+                    label: t('feedback.undo'),
+                    onPress: () => {
+                      const { snapshot, rest } = popLookUndoSnapshot(
+                        swapUndoStackRef.current
+                      )
+                      swapUndoStackRef.current = rest
+                      if (snapshot !== undefined) {
+                        reopenAction.current++
+                        setEdits(snapshot)
+                        const undoSeq = ++noticeSeqRef.current
+                        statusBar.showNotice({
+                          id: `style-piece-swap-undo-${undoSeq}`,
+                          announcementId: createAnnouncementToken(
+                            'style-piece-swap-undo',
+                            undoSeq
+                          ),
+                          message: t('feedback.undone'),
+                          tone: 'neutral',
+                        })
+                      }
+                    },
+                  },
+                ],
+              })
+            }}
+          />
+        )
+      })}
 
       {storage === 'unavailable' && (
         <Text accessibilityRole="alert" style={text}>
@@ -576,12 +671,8 @@ function StylePieceIdeas({
       )}
       {saved.length > 0 && (
         <View style={styles.group}>
-          <Text
-            accessibilityRole="header"
-            accessibilityLiveRegion="polite"
-            style={[styles.label, text]}
-          >
-            {notice || labels.saved}
+          <Text accessibilityRole="header" style={[styles.label, text]}>
+            {labels.saved}
           </Text>
           {saved.map((entry) => {
             const id = stylePieceRecipeKey(entry.recipe)
@@ -607,13 +698,85 @@ function StylePieceIdeas({
                     palette={palette}
                     disabled={storage !== 'ready'}
                     onPress={() => {
+                      if (!statusBar.isOnline) {
+                        const seq = ++noticeSeqRef.current
+                        statusBar.showNotice({
+                          id: `style-piece-remove-offline-${seq}`,
+                          announcementId: createAnnouncementToken(
+                            'style-piece-remove-offline',
+                            seq
+                          ),
+                          message: t('feedback.offlineAction'),
+                          tone: 'offline',
+                          actions: [],
+                        })
+                        return
+                      }
                       void updateSaved((current) =>
                         current.filter(({ recipe }) => stylePieceRecipeKey(recipe) !== id)
                       ).then((removed) => {
                         if (!removed) return
-                        setNotice('')
+                        setSavedResetNonce((value) => value + 1)
                         scroll.current?.scrollTo({ y: 0, animated: false })
                         focusStylePieceControl(selectedWeather.current)
+                        const seq = ++noticeSeqRef.current
+                        statusBar.showNotice({
+                          id: `style-piece-remove-${seq}`,
+                          announcementId: createAnnouncementToken(
+                            'style-piece-remove',
+                            seq
+                          ),
+                          message: t('feedback.removed'),
+                          tone: 'neutral',
+                          actions: [
+                            {
+                              id: 'undo',
+                              kind: 'undo',
+                              label: t('feedback.undo'),
+                              onPress: async () => {
+                                if (!statusBar.isOnline) {
+                                  const offSeq = ++noticeSeqRef.current
+                                  statusBar.showNotice({
+                                    id: `style-piece-remove-undo-offline-${offSeq}`,
+                                    announcementId: createAnnouncementToken(
+                                      'style-piece-remove-undo-offline',
+                                      offSeq
+                                    ),
+                                    message: t('feedback.offlineAction'),
+                                    tone: 'offline',
+                                    actions: [],
+                                  })
+                                  return
+                                }
+                                const restored = await updateSaved((current) =>
+                                  saveStylePieceRecipe(current, entry)
+                                )
+                                const undoSeq = ++noticeSeqRef.current
+                                if (restored) {
+                                  statusBar.showNotice({
+                                    id: `style-piece-remove-undo-${undoSeq}`,
+                                    announcementId: createAnnouncementToken(
+                                      'style-piece-remove-undo',
+                                      undoSeq
+                                    ),
+                                    message: t('feedback.undone'),
+                                    tone: 'neutral',
+                                  })
+                                } else {
+                                  statusBar.showNotice({
+                                    id: `style-piece-remove-undo-failed-${undoSeq}`,
+                                    announcementId: createAnnouncementToken(
+                                      'style-piece-remove-undo-failed',
+                                      undoSeq
+                                    ),
+                                    message: t('feedback.saveFailed'),
+                                    tone: 'error',
+                                  })
+                                }
+                              },
+                            },
+                          ],
+                        })
                       })
                     }}
                   />
@@ -630,27 +793,36 @@ function StylePieceIdeas({
 function StylePieceCard({
   look,
   index,
+  owner,
+  resetNonce,
   anchorPhoto,
   labels,
   samples,
   palette,
   canSave,
   onSave,
+  onUndoSave,
+  onViewSaved,
   onSwap,
 }: {
   look: StylePieceLook
   index: number
+  owner: string
+  resetNonce: number
   anchorPhoto: React.ReactNode
   labels: Labels
   samples: SampleLabels
   palette: PreviewPalette
   canSave: boolean
-  onSave: () => void
+  onSave: () => Promise<boolean>
+  onUndoSave: () => Promise<boolean>
+  onViewSaved: () => void
   onSwap: (category: SampleGarmentCategory, id: string) => void
 }) {
   const [editing, setEditing] = useState<SampleGarmentCategory | null>(null)
   const swapInvoker = useRef<ComponentRef<typeof Pressable> | null>(null)
   const text = { color: palette.text }
+  const recipeKey = stylePieceRecipeKey(look.recipe)
 
   return (
     <View
@@ -712,12 +884,17 @@ function StylePieceCard({
           })}
         </View>
       </View>
-      <PreviewButton
-        label={labels.save}
+      <SaveActionButton
+        idleLabel={labels.save}
         testID="style-piece-save"
-        palette={palette}
         disabled={!canSave}
-        onPress={onSave}
+        requiresNetwork
+        ownerKey={owner}
+        resetKey={`${recipeKey}:${resetNonce}`}
+        onSave={onSave}
+        onUndo={onUndoSave}
+        onView={onViewSaved}
+        barPlacement="inline"
       />
     </View>
   )

@@ -11,6 +11,7 @@ import {
   type SampleWeatherKey,
 } from '@couture/utils'
 import { PreviewButton, type PreviewPalette } from './guest-preview-parts'
+import { SaveActionButton } from '@/components/save-feedback'
 
 export function SampleIdeaControls({
   strings,
@@ -20,12 +21,16 @@ export function SampleIdeaControls({
   bookmarks,
   lookId,
   onSave,
+  onUndoSave,
+  onViewSaved,
   onOpen,
   onRemove,
   weather,
   onWeather,
   persistent = true,
   showStorageFailureWhenEmpty = false,
+  ownerKey,
+  saveResetKey,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
@@ -33,29 +38,35 @@ export function SampleIdeaControls({
   onPreferences: (preferences: SampleStylePreferences) => void
   bookmarks: SampleBookmark[]
   lookId?: string
-  onSave: () => void
+  onSave: () => unknown
+  onUndoSave?: () => unknown
+  onViewSaved?: () => void
   onOpen: (bookmark: SampleBookmark) => void
   onRemove: (lookId: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
   persistent?: boolean
   showStorageFailureWhenEmpty?: boolean
+  ownerKey?: string | null
+  saveResetKey?: string
 }) {
   const [expanded, setExpanded] = useState(false)
   const labels = strings.styleIdeas
   const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
+  const isBookmarked = Boolean(
+    lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
+  )
   return (
     <View style={[styles.card, { borderColor: palette.divider }]}>
       {lookId && (
-        <PreviewButton
+        <SaveActionButton
           testID="sample-save-look"
-          label={
-            bookmarks.some((bookmark) => bookmark.lookId === lookId)
-              ? labels.update
-              : labels.save
-          }
-          onPress={onSave}
-          palette={palette}
+          idleLabel={isBookmarked ? labels.update : labels.save}
+          onSave={onSave}
+          onUndo={onUndoSave}
+          onView={onViewSaved}
+          ownerKey={ownerKey}
+          resetKey={saveResetKey ?? lookId}
         />
       )}
       {onWeather && (
@@ -83,7 +94,7 @@ export function SampleIdeaControls({
         >
           <Text
             accessibilityRole={bookmarks.length > 0 ? 'header' : undefined}
-            accessibilityLiveRegion="polite"
+            accessibilityLiveRegion="none"
             style={{ color: palette.text }}
           >
             {persistent ? labels.saved : strings.chrome.storageUnavailable}

@@ -9,9 +9,12 @@ import {
   type ScenarioOutfit,
 } from '@couture/api-client/contracts/http'
 import {
+  createAnnouncementToken,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
   parseSampleBookmarks,
+  popLookUndoSnapshot,
+  pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
@@ -40,6 +43,7 @@ import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
+import { useStatusBar } from './save-feedback'
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
@@ -67,6 +71,7 @@ function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
     <Link
       href="/wardrobe?entry=add"
       data-testid="home-add-garment"
+      data-primary-action="true"
       className={primaryLinkClass}
     >
       {strings.firstUse.addGarment}
@@ -85,6 +90,8 @@ function SampleOutfit({
   strings: GuestPreviewStrings
   actions: ReactNode
 }) {
+  const { t } = useTranslation(undefined, { i18n: getI18n() })
+  const statusBar = useStatusBar()
   const [result, setResult] = useState(() =>
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
@@ -94,9 +101,21 @@ function SampleOutfit({
     parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
   )
   const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
+  const [bookmarkRevision, setBookmarkRevision] = useState(0)
+  const bookmarksRef = useRef(bookmarks)
+  bookmarksRef.current = bookmarks
+  const lastSavedBeforeRef = useRef<{
+    lookId: string
+    previous: SampleBookmark | undefined
+    previousIndex: number
+  } | null>(null)
   const storedBookmarks = useRef(bookmarks)
   const pendingBookmarkChanges = useRef(new Map<string, BookmarkChange>())
   const bookmarkOwnerMounted = useRef(true)
+  const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
+  const noticeSeqRef = useRef(0)
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
   useEffect(() => {
     bookmarkOwnerMounted.current = true
     const onStorage = (event: StorageEvent) => {
@@ -107,7 +126,9 @@ function SampleOutfit({
         const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
         const pending = pendingBookmarkChanges.current
         storedBookmarks.current = stored
-        setBookmarks(replayBookmarkChanges(stored, pending.values()))
+        const next = replayBookmarkChanges(stored, pending.values())
+        bookmarksRef.current = next
+        setBookmarks(next)
         setBookmarksPersistent(pending.size === 0)
       } catch {
         setBookmarksPersistent(false)
@@ -117,12 +138,16 @@ function SampleOutfit({
     return () => {
       bookmarkOwnerMounted.current = false
       window.removeEventListener('storage', onStorage)
+      statusBarRef.current.dismissNotice()
     }
   }, [bookmarkKey, owner])
 
-  const updateBookmarks = (lookId: string, change: BookmarkChange) => {
-    const apply = () => {
-      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+  const updateBookmarks = (
+    lookId: string,
+    change: BookmarkChange
+  ): boolean | Promise<boolean> => {
+    const apply = (): boolean => {
+      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
       // Keep one pending change per catalog look, in the order of the latest actions.
       const pending = pendingBookmarkChanges.current
       pending.delete(lookId)
@@ -139,14 +164,16 @@ function SampleOutfit({
       } catch {
         next = replayBookmarkChanges(storedBookmarks.current, pending.values())
       }
+      bookmarksRef.current = next
       setBookmarks(next)
-      setBookmarksPersistent(pending.size === 0)
+      const persisted = pending.size === 0
+      setBookmarksPersistent(persisted)
+      return persisted
     }
     if (navigator.locks) {
-      void navigator.locks.request(bookmarkKey, apply).catch(apply)
-    } else {
-      apply()
+      return navigator.locks.request(bookmarkKey, apply).catch(apply)
     }
+    return apply()
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
@@ -154,8 +181,42 @@ function SampleOutfit({
     retainedSample = { owner, result: next }
     setResult(next)
   }
+  const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
+    if (!isLiveOwner(owner) || next === result) return
+    lookUndoStackRef.current = pushLookUndoSnapshot(lookUndoStackRef.current, result)
+    update(next)
+    const seq = ++noticeSeqRef.current
+    statusBar.showNotice({
+      id: `sample-${kind}-${seq}`,
+      announcementId: createAnnouncementToken(`sample-${kind}`, seq),
+      message,
+      tone: 'neutral',
+      actions: [
+        {
+          id: 'undo',
+          kind: 'undo',
+          label: t('feedback.undo'),
+          onPress: () => {
+            const { snapshot, rest } = popLookUndoSnapshot(lookUndoStackRef.current)
+            lookUndoStackRef.current = rest
+            if (snapshot && isLiveOwner(owner)) {
+              update(snapshot)
+              const undoSeq = ++noticeSeqRef.current
+              statusBar.showNotice({
+                id: `sample-${kind}-undo-${undoSeq}`,
+                announcementId: createAnnouncementToken(`sample-${kind}-undo`, undoSeq),
+                message: t('feedback.undone'),
+                tone: 'neutral',
+              })
+            }
+          },
+        },
+      ],
+    })
+  }
   const lookId = result.look?.id
   const currentId = result.garments.find((garment) => garment.category === category)?.id
+  const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
   return (
     <div data-testid="member-sample-outfit" className="space-y-3 text-[#111111]">
       <p className="text-sm text-[color:var(--lookbook-ink)]">
@@ -173,36 +234,156 @@ function SampleOutfit({
           </div>
         }
         noAlternative={result.eligibleLookIds.length < 2}
-        onTryAnother={() => update(rotateMemberSampleOutfit(result))}
+        onTryAnother={() =>
+          pushUndoAndUpdate(
+            rotateMemberSampleOutfit(result),
+            t('feedback.lookUpdated'),
+            'shuffle'
+          )
+        }
         onSwap={(slot, button) => {
           invoker.current = button
           setCategory(slot)
         }}
         onUndoSwaps={() => update(undoMemberSampleSwaps(result))}
-        onReviewChoices={() => update(createMemberSampleOutfit())}
-        onResetChoices={() => update(createMemberSampleOutfit())}
+        onReviewChoices={() => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          update(createMemberSampleOutfit())
+        }}
+        onResetChoices={() => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          update(createMemberSampleOutfit())
+        }}
       />
       <SampleIdeaControls
         strings={strings}
         preferences={result.input.preferences}
-        onPreferences={(preferences) =>
+        onPreferences={(preferences) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
           update(updateMemberSampleOutfit(result, { preferences }))
-        }
+        }}
         weather={result.input.weather}
-        onWeather={(weather) => update(updateMemberSampleOutfit(result, { weather }))}
+        onWeather={(weather) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          update(updateMemberSampleOutfit(result, { weather }))
+        }}
         bookmarks={bookmarks}
         persistent={bookmarksPersistent}
         lookId={lookId}
+        ownerKey={owner}
+        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${bookmarkRevision}`}
         onSave={() => {
-          if (lookId)
-            updateBookmarks(lookId, (current) => saveSampleBookmark(current, result))
+          if (!lookId) return false
+          lookUndoStackRef.current = []
+          const previousIndex = bookmarksRef.current.findIndex(
+            (bookmark) => bookmark.lookId === lookId
+          )
+          lastSavedBeforeRef.current = {
+            lookId,
+            previous:
+              previousIndex >= 0 ? bookmarksRef.current[previousIndex] : undefined,
+            previousIndex,
+          }
+          return updateBookmarks(lookId, (current) => saveSampleBookmark(current, result))
         }}
-        onOpen={(bookmark) => update(reopenMemberSampleOutfit(result, bookmark))}
-        onRemove={(id) =>
-          updateBookmarks(id, (current) =>
+        onUndoSave={() => {
+          if (!lookId) return false
+          const captured = lastSavedBeforeRef.current
+          return updateBookmarks(lookId, (current) => {
+            const without = current.filter((bookmark) => bookmark.lookId !== lookId)
+            if (captured && captured.lookId === lookId && captured.previous) {
+              const index = Math.min(Math.max(captured.previousIndex, 0), without.length)
+              return [
+                ...without.slice(0, index),
+                captured.previous,
+                ...without.slice(index),
+              ]
+            }
+            return without
+          })
+        }}
+        onViewSaved={() => {
+          document
+            .querySelector<HTMLElement>('[data-testid="sample-saved-looks"]')
+            ?.scrollIntoView?.({ block: 'nearest' })
+        }}
+        onOpen={(bookmark) => {
+          lookUndoStackRef.current = []
+          statusBar.dismissNotice()
+          update(reopenMemberSampleOutfit(result, bookmark))
+        }}
+        onRemove={(id) => {
+          const removedIndex = bookmarksRef.current.findIndex(
+            (bookmark) => bookmark.lookId === id
+          )
+          const removedBookmark =
+            removedIndex >= 0 ? bookmarksRef.current[removedIndex] : undefined
+          setBookmarkRevision((value) => value + 1)
+          const outcome = updateBookmarks(id, (current) =>
             current.filter((bookmark) => bookmark.lookId !== id)
           )
-        }
+          const showRemoved = () => {
+            if (!removedBookmark) return
+            const seq = ++noticeSeqRef.current
+            statusBar.showNotice({
+              id: `sample-remove-${seq}`,
+              announcementId: createAnnouncementToken('sample-remove', seq),
+              message: t('feedback.removed'),
+              tone: 'neutral',
+              actions: [
+                {
+                  id: 'undo',
+                  kind: 'undo',
+                  label: t('feedback.undo'),
+                  onPress: () => {
+                    const restoreOutcome = updateBookmarks(id, (current) => {
+                      const without = current.filter((bookmark) => bookmark.lookId !== id)
+                      const index = Math.min(Math.max(removedIndex, 0), without.length)
+                      return [
+                        ...without.slice(0, index),
+                        removedBookmark,
+                        ...without.slice(index),
+                      ]
+                    })
+                    const announceRestored = () => {
+                      const undoSeq = ++noticeSeqRef.current
+                      statusBar.showNotice({
+                        id: `sample-remove-undo-${undoSeq}`,
+                        announcementId: createAnnouncementToken(
+                          'sample-remove-undo',
+                          undoSeq
+                        ),
+                        message: t('feedback.undone'),
+                        tone: 'neutral',
+                      })
+                    }
+                    if (
+                      restoreOutcome &&
+                      typeof (restoreOutcome as Promise<boolean>).then === 'function'
+                    ) {
+                      void (restoreOutcome as Promise<boolean>).then((ok) => {
+                        if (ok) announceRestored()
+                      })
+                    } else if (restoreOutcome) {
+                      announceRestored()
+                    }
+                  },
+                },
+              ],
+            })
+          }
+          if (outcome && typeof (outcome as Promise<boolean>).then === 'function') {
+            void (outcome as Promise<boolean>).then((ok) => {
+              if (ok) showRemoved()
+            })
+          } else if (outcome) {
+            showRemoved()
+          }
+        }}
       />
       <GuestPreviewSwapDialog
         category={category}
@@ -213,7 +394,13 @@ function SampleOutfit({
         strings={strings}
         invokerRef={invoker}
         onChoose={(garmentId) => {
-          if (category) update(swapMemberSampleGarment(result, category, garmentId))
+          if (category) {
+            pushUndoAndUpdate(
+              swapMemberSampleGarment(result, category, garmentId),
+              t('feedback.pieceSwapped'),
+              'swap'
+            )
+          }
           setCategory(null)
         }}
         onClose={() => setCategory(null)}

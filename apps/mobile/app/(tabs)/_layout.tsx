@@ -1,5 +1,9 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { useAndroidNavigationIntent } from '@/components/android-share-card-presentation'
+import {
+  DEFAULT_MOBILE_TAB_BAR_HEIGHT,
+  setMobileTabBarHeight,
+} from '@/components/save-feedback'
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
@@ -50,6 +54,12 @@ export default function TabLayout() {
   const { t } = useTranslation()
   // Story 6.15 F-00i: each label reports its height and the bar grows by what the text grew.
   const { growth, indicatorDrop, onLabelHeight, tallestLabel } = useTabBarSizing()
+  useEffect(() => {
+    setMobileTabBarHeight(DEFAULT_MOBILE_TAB_BAR_HEIGHT + growth)
+    return () => {
+      setMobileTabBarHeight(DEFAULT_MOBILE_TAB_BAR_HEIGHT)
+    }
+  }, [growth])
   const tabLabels = {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
