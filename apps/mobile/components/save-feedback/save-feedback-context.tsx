@@ -156,9 +156,11 @@ export function useStatusBar() {
 
 export function OfflineStatusLine({
   online,
+  inline = false,
   headerOffset,
 }: {
   online?: boolean
+  inline?: boolean
   headerOffset?: number
 }) {
   const { t } = useTranslation()
@@ -177,10 +179,11 @@ export function OfflineStatusLine({
       testID="offline-status-line"
       accessibilityLiveRegion="none"
       style={[
-        styles.offlineLine,
+        inline ? styles.offlineLineInline : styles.offlineLine,
+        !inline ? { top: topOffset } : undefined,
         {
-          top: topOffset,
           backgroundColor: colors.noticeSurface,
+          borderColor: colors.noticeBorder,
           borderBottomColor: colors.noticeBorder,
         },
       ]}
@@ -416,7 +419,7 @@ export function SaveFeedbackProvider({
   )
 
   useEffect(() => {
-    if (parent && initialOnline === undefined) return
+    if (forwardAnnounceToParent && initialOnline === undefined) return
     const prev = prevOnlineRef.current
     prevOnlineRef.current = isOnline
     if (!isOnline && prev !== false) {
@@ -426,7 +429,7 @@ export function SaveFeedbackProvider({
         urgency: 'assertive',
       })
     }
-  }, [announce, initialOnline, isOnline, parent, t])
+  }, [announce, forwardAnnounceToParent, initialOnline, isOnline, t])
 
   const dismissNotice = useCallback(
     (noticeId?: string) => {
@@ -473,8 +476,11 @@ export function SaveFeedbackProvider({
 
   return (
     <SaveFeedbackContext.Provider value={value}>
+      {inline && renderOfflineLine && (
+        <OfflineStatusLine online={isOnline} inline headerOffset={headerOffset} />
+      )}
       {children}
-      {renderOfflineLine && (
+      {!inline && renderOfflineLine && (
         <OfflineStatusLine online={isOnline} headerOffset={headerOffset} />
       )}
       <StatusFeedbackBar
@@ -510,6 +516,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  offlineLineInline: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   offlineText: {
     fontSize: 12,
     fontWeight: '700',
@@ -524,6 +540,7 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 10,
@@ -539,13 +556,15 @@ const styles = StyleSheet.create({
   },
   barMessage: {
     flex: 1,
+    minWidth: 140,
     fontSize: 14,
     fontWeight: '600',
   },
   barActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
   },
   barActionButton: {
     minHeight: 44,

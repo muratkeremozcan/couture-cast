@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -27,6 +27,7 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useSchemeColors } from '@/components/themed'
 import {
   checkNetworkOnlineForAction,
+  getNetworkOnline,
   hasReliableBrowserOnline,
   reportNetworkOffline,
   reportNetworkOnline,
@@ -80,6 +81,7 @@ export function useSaveAction({
   labels: labelOverrides,
   onAnnounce,
 }: UseSaveActionOptions) {
+  const controlId = useId()
   const { t } = useTranslation()
   const statusBar = useStatusBar()
 
@@ -114,7 +116,7 @@ export function useSaveAction({
 
   const runIdRef = useRef(0)
   const mountedRef = useRef(true)
-  const stillSavingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const standaloneNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activeNoticeIdRef = useRef<string | null>(null)
   const standaloneAnnouncedIdsRef = useRef<Set<string>>(new Set())
@@ -124,6 +126,8 @@ export function useSaveAction({
   resetKeyRef.current = resetKey
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+  const isOnlineRef = useRef(statusBar.isOnline)
+  isOnlineRef.current = statusBar.isOnline
   const prevResetPairRef = useRef<{
     resetKey: string | number | undefined
     ownerKey: string | null | undefined
@@ -143,11 +147,11 @@ export function useSaveAction({
   const onAnnounceRef = useRef(onAnnounce)
   onAnnounceRef.current = onAnnounce
 
-  const clearStillSavingTimer = useCallback(() => {
-    if (stillSavingTimerRef.current !== null) {
-      clearTimeout(stillSavingTimerRef.current)
-      stillSavingTimerRef.current = null
+  const clearAllSlowTimers = useCallback(() => {
+    for (const timer of activeTimersRef.current) {
+      clearTimeout(timer)
     }
+    activeTimersRef.current.clear()
   }, [])
 
   const clearStandaloneNoticeTimer = useCallback(() => {
@@ -169,15 +173,17 @@ export function useSaveAction({
     }
   }, [clearStandaloneNoticeTimer])
 
+  const readLiveOnline = useCallback(() => isOnlineRef.current && getNetworkOnline(), [])
+
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
-      clearStillSavingTimer()
+      clearAllSlowTimers()
       clearStandaloneNoticeTimer()
       dismissActiveNotice()
     }
-  }, [clearStandaloneNoticeTimer, clearStillSavingTimer, dismissActiveNotice])
+  }, [clearAllSlowTimers, clearStandaloneNoticeTimer, dismissActiveNotice])
 
   useEffect(() => {
     const prev = prevResetPairRef.current
@@ -186,16 +192,20 @@ export function useSaveAction({
     }
     prevResetPairRef.current = { resetKey, ownerKey }
     resetKeyRef.current = resetKey
-    clearStillSavingTimer()
+    clearAllSlowTimers()
     dismissActiveNotice()
     runIdRef.current += 1
-    dispatch({ type: 'reset', nextState: initialSaved ? 'saved' : 'idle' })
-  }, [clearStillSavingTimer, dismissActiveNotice, initialSaved, ownerKey, resetKey])
+    const nextState = initialSaved ? 'saved' : 'idle'
+    stateRef.current = nextState
+    dispatch({ type: 'reset', nextState })
+  }, [clearAllSlowTimers, dismissActiveNotice, initialSaved, ownerKey, resetKey])
 
   useEffect(() => {
     if (statusBar.isOnline && stateRef.current === 'offline') {
       runIdRef.current += 1
-      dispatch({ type: 'reset', nextState: initialSaved ? 'saved' : 'idle' })
+      const nextState = initialSaved ? 'saved' : 'idle'
+      stateRef.current = nextState
+      dispatch({ type: 'reset', nextState })
     }
   }, [initialSaved, snapshot.state, statusBar.isOnline])
 
@@ -206,8 +216,8 @@ export function useSaveAction({
     ) => {
       const trimmed = message.trim()
       if (!trimmed) return
-      if (statusBar.hasProvider) {
-        statusBar.announce(trimmed, options)
+      if (statusBarRef.current.hasProvider) {
+        statusBarRef.current.announce(trimmed, options)
         return
       }
       if (standaloneAnnouncedIdsRef.current.has(options.announcementId)) return
@@ -225,7 +235,7 @@ export function useSaveAction({
       dispatchMobileAnnouncement(trimmed, urgency)
       onAnnounceRef.current?.(entry)
     },
-    [statusBar]
+    []
   )
 
   const dismissStandaloneNotice = useCallback(
@@ -250,8 +260,8 @@ export function useSaveAction({
         })
         return
       }
-      if (statusBar.hasProvider) {
-        const shown = statusBar.showNotice(input)
+      if (statusBarRef.current.hasProvider) {
+        const shown = statusBarRef.current.showNotice(input)
         activeNoticeIdRef.current = shown.id
         return
       }
@@ -271,7 +281,44 @@ export function useSaveAction({
         urgency: normalized.urgency,
       })
     },
-    [clearStandaloneNoticeTimer, emitAnnouncement, showStatusBar, statusBar]
+    [clearStandaloneNoticeTimer, emitAnnouncement, showStatusBar]
+  )
+
+  const showOfflineNotice = useCallback(
+    (prefix: 'save' | 'undo', id: number) => {
+      presentNotice({
+        id: `${prefix}-offline-${controlId}-${id}`,
+        announcementId: createAnnouncementToken(`${controlId}:offline`, id),
+        message: labelsRef.current.offlineMessage,
+        tone: 'offline',
+        actions: [],
+      })
+    },
+    [controlId, presentNotice]
+  )
+
+  const ensureOnlineForUndo = useCallback(async (): Promise<boolean> => {
+    if (!requiresNetwork || readLiveOnline()) return true
+    const reachable = hasReliableBrowserOnline()
+      ? false
+      : await checkNetworkOnlineForAction()
+    if (!reachable) {
+      showOfflineNotice('undo', ++runIdRef.current)
+      return false
+    }
+    return true
+  }, [readLiveOnline, requiresNetwork, showOfflineNotice])
+
+  const reportUndoFailure = useCallback(
+    (undoRunId: number) => {
+      presentNotice({
+        id: `undo-failed-${controlId}-${undoRunId}`,
+        announcementId: createAnnouncementToken(`${controlId}:undo-failed`, undoRunId),
+        message: labelsRef.current.failedMessage,
+        tone: 'error',
+      })
+    },
+    [controlId, presentNotice]
   )
 
   const triggerUndo = useCallback(
@@ -287,62 +334,64 @@ export function useSaveAction({
       ) {
         return false
       }
+      if (!(await ensureOnlineForUndo())) return false
       const undoHandler = onUndoRef.current
       if (!undoHandler) return false
+      const undoRunId = ++runIdRef.current
       const startOwner = ownerKeyRef.current
       const startReset = resetKeyRef.current
+      const stillCurrent = () =>
+        mountedRef.current &&
+        runIdRef.current === undoRunId &&
+        ownerKeyRef.current === startOwner &&
+        resetKeyRef.current === startReset
+
       try {
         const result = await undoHandler()
-        if (
-          !mountedRef.current ||
-          ownerKeyRef.current !== startOwner ||
-          resetKeyRef.current !== startReset
-        ) {
-          return false
-        }
+        if (!stillCurrent()) return false
         if (result === false) {
-          const failRunId = ++runIdRef.current
-          presentNotice({
-            id: `undo-failed-${failRunId}`,
-            announcementId: createAnnouncementToken('undo-failed', failRunId),
-            message: labelsRef.current.failedMessage,
-            tone: 'error',
-          })
+          reportUndoFailure(undoRunId)
           return false
         }
-        const undoRunId = ++runIdRef.current
+        stateRef.current = 'idle'
         dispatch({ type: 'undo', runId: undoRunId })
         presentNotice({
-          id: `undo-${undoRunId}`,
-          announcementId: createAnnouncementToken('undo', undoRunId),
+          id: `undo-${controlId}-${undoRunId}`,
+          announcementId: createAnnouncementToken(`${controlId}:undo`, undoRunId),
           message: labelsRef.current.undoneMessage,
           tone: 'neutral',
           actions: [],
         })
         return true
-      } catch {
-        if (!mountedRef.current || ownerKeyRef.current !== startOwner) return false
-        const failRunId = ++runIdRef.current
-        presentNotice({
-          id: `undo-failed-${failRunId}`,
-          announcementId: createAnnouncementToken('undo-failed', failRunId),
-          message: labelsRef.current.failedMessage,
-          tone: 'error',
-        })
+      } catch (error) {
+        if (!stillCurrent()) return false
+        if (requiresNetwork && (isOfflineError(error) || !readLiveOnline())) {
+          reportNetworkOffline()
+          showOfflineNotice('undo', undoRunId)
+          return false
+        }
+        reportUndoFailure(undoRunId)
         return false
       }
     },
-    [presentNotice]
+    [
+      controlId,
+      ensureOnlineForUndo,
+      presentNotice,
+      readLiveOnline,
+      reportUndoFailure,
+      requiresNetwork,
+      showOfflineNotice,
+    ]
   )
 
   const executeSave = useCallback(
     (startOwner: string | null | undefined, startReset: string | number | undefined) => {
       const runId = ++runIdRef.current
-      clearStillSavingTimer()
       stateRef.current = 'saving'
       dispatch({ type: 'start', runId })
       emitAnnouncement(labelsRef.current.saving, {
-        announcementId: createAnnouncementToken('saving', runId),
+        announcementId: createAnnouncementToken(`${controlId}:saving`, runId),
         urgency: getSaveFeedbackUrgency('saving'),
       })
 
@@ -352,21 +401,36 @@ export function useSaveAction({
         ownerKeyRef.current !== startOwner ||
         resetKeyRef.current !== startReset
 
-      stillSavingTimerRef.current = setTimeout(() => {
+      let runTimer: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        if (runTimer !== null) {
+          activeTimersRef.current.delete(runTimer)
+          runTimer = null
+        }
         if (isStale()) return
+        stateRef.current = 'still-saving'
         dispatch({ type: 'slow', runId })
         emitAnnouncement(labelsRef.current.stillSaving, {
-          announcementId: createAnnouncementToken('still-saving', runId),
+          announcementId: createAnnouncementToken(`${controlId}:still-saving`, runId),
           urgency: getSaveFeedbackUrgency('still-saving'),
         })
       }, SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs)
+      activeTimersRef.current.add(runTimer)
+
+      const clearRunTimer = () => {
+        if (runTimer !== null) {
+          clearTimeout(runTimer)
+          activeTimersRef.current.delete(runTimer)
+          runTimer = null
+        }
+      }
 
       const settleSuccess = () => {
-        clearStillSavingTimer()
+        clearRunTimer()
         if (isStale()) return false
         if (requiresNetwork) {
           reportNetworkOnline()
         }
+        stateRef.current = 'saved'
         dispatch({ type: 'succeed', runId })
         const actions: StatusBarAction[] = []
         if (onViewRef.current) {
@@ -399,8 +463,8 @@ export function useSaveAction({
           actions.push(...extraActionsRef.current)
         }
         presentNotice({
-          id: `save-success-${runId}`,
-          announcementId: createAnnouncementToken('saved', runId),
+          id: `save-success-${controlId}-${runId}`,
+          announcementId: createAnnouncementToken(`${controlId}:saved`, runId),
           message: labelsRef.current.savedMessage,
           tone: 'success',
           actions: clampStatusBarActions(actions),
@@ -409,32 +473,31 @@ export function useSaveAction({
       }
 
       const settleFailure = (error?: unknown) => {
-        clearStillSavingTimer()
+        clearRunTimer()
         if (isStale()) return false
-        if (
-          requiresNetwork &&
-          (isOfflineError(error) || !statusBarRef.current.isOnline)
-        ) {
+        if (requiresNetwork && (isOfflineError(error) || !readLiveOnline())) {
           reportNetworkOffline()
           const offlineRunId = ++runIdRef.current
+          stateRef.current = 'offline'
           dispatch({ type: 'offline', runId: offlineRunId })
           presentNotice({
-            id: `save-offline-${offlineRunId}`,
-            announcementId: createAnnouncementToken('offline', offlineRunId),
+            id: `save-offline-${controlId}-${offlineRunId}`,
+            announcementId: createAnnouncementToken(`${controlId}:offline`, offlineRunId),
             message: labelsRef.current.offlineMessage,
             tone: 'offline',
             actions: [],
           })
           return false
         }
+        stateRef.current = 'failed'
         dispatch({
           type: 'fail',
           runId,
           errorMessage: labelsRef.current.failedMessage,
         })
         presentNotice({
-          id: `save-failed-${runId}`,
-          announcementId: createAnnouncementToken('failed', runId),
+          id: `save-failed-${controlId}-${runId}`,
+          announcementId: createAnnouncementToken(`${controlId}:failed`, runId),
           message: labelsRef.current.failedMessage,
           tone: 'error',
           actions: [
@@ -470,7 +533,14 @@ export function useSaveAction({
 
       return Promise.resolve(outcome === false ? settleFailure() : settleSuccess())
     },
-    [clearStillSavingTimer, emitAnnouncement, presentNotice, requiresNetwork, triggerUndo]
+    [
+      controlId,
+      emitAnnouncement,
+      presentNotice,
+      readLiveOnline,
+      requiresNetwork,
+      triggerUndo,
+    ]
   )
 
   const triggerSave = useCallback(
@@ -495,21 +565,20 @@ export function useSaveAction({
       const startOwner = ownerKeyRef.current
       const startReset = resetKeyRef.current
 
-      if (requiresNetwork && !statusBar.isOnline) {
+      if (requiresNetwork && !readLiveOnline()) {
         if (hasReliableBrowserOnline()) {
           const offlineRunId = ++runIdRef.current
+          stateRef.current = 'offline'
           dispatch({ type: 'offline', runId: offlineRunId })
           presentNotice({
-            id: `save-offline-${offlineRunId}`,
-            announcementId: createAnnouncementToken('offline', offlineRunId),
+            id: `save-offline-${controlId}-${offlineRunId}`,
+            announcementId: createAnnouncementToken(`${controlId}:offline`, offlineRunId),
             message: labelsRef.current.offlineMessage,
             tone: 'offline',
             actions: [],
           })
           return Promise.resolve(false)
         }
-        // On native without navigator.onLine, re-check connectivity on explicit user tap
-        // so the app cannot permanently deadlock offline after a transient failure.
         return checkNetworkOnlineForAction().then((reachable) => {
           if (
             !mountedRef.current ||
@@ -520,10 +589,14 @@ export function useSaveAction({
           }
           if (!reachable) {
             const offlineRunId = ++runIdRef.current
+            stateRef.current = 'offline'
             dispatch({ type: 'offline', runId: offlineRunId })
             presentNotice({
-              id: `save-offline-${offlineRunId}`,
-              announcementId: createAnnouncementToken('offline', offlineRunId),
+              id: `save-offline-${controlId}-${offlineRunId}`,
+              announcementId: createAnnouncementToken(
+                `${controlId}:offline`,
+                offlineRunId
+              ),
               message: labelsRef.current.offlineMessage,
               tone: 'offline',
               actions: [],
@@ -536,7 +609,7 @@ export function useSaveAction({
 
       return executeSave(startOwner, startReset)
     },
-    [executeSave, presentNotice, requiresNetwork, statusBar.isOnline]
+    [controlId, executeSave, presentNotice, readLiveOnline, requiresNetwork]
   )
 
   const triggerSaveRef = useRef(triggerSave)
@@ -544,11 +617,12 @@ export function useSaveAction({
 
   const reset = useCallback(
     (nextState: 'idle' | 'saved' = 'idle') => {
-      clearStillSavingTimer()
+      clearAllSlowTimers()
       runIdRef.current += 1
+      stateRef.current = nextState
       dispatch({ type: 'reset', nextState })
     },
-    [clearStillSavingTimer]
+    [clearAllSlowTimers]
   )
 
   return {
@@ -674,7 +748,7 @@ export function SaveActionButton({
           },
         ]}
         onPress={() => {
-          if (disabled || busy) return
+          if (disabled) return
           void controller.triggerSave()
         }}
       >

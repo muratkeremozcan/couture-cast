@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { withRequestDeadline } from '@couture/api-client'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
+  applyBoundedListRemove,
+  applyBoundedListSave,
   createAnnouncementToken,
   createStylePieceRefresh,
   formatPreviewString,
@@ -12,6 +14,7 @@ import {
   getGuestPreviewStrings,
   getStylePieceStrings,
   initialStylePieceWeather,
+  isOfflineError,
   isStylePieceTagged,
   parseStylePieceRecipes,
   popLookUndoSnapshot,
@@ -19,13 +22,16 @@ import {
   sampleGarmentText,
   SAMPLE_WEATHER,
   STYLE_PIECE_WEATHER_KEYS,
-  saveStylePieceRecipe,
   stylePieceAnchor,
   stylePieceLooks,
   stylePieceRecipeKey,
   stylePieceStorageKey,
   stylePieceSwapOptions,
+  undoBoundedListRemove,
+  undoBoundedListSave,
   visibleStylePieceLooks,
+  type BoundedRemoveMutation,
+  type BoundedSaveMutation,
   type SampleGarmentCategory,
   type StylePieceWeatherKey,
   type StylePieceLook,
@@ -227,7 +233,7 @@ export function StylePiecePanel({
           if (event.target === event.currentTarget) restoreFocus.current = null
         }}
       >
-        <SaveFeedbackProvider inline renderOfflineLine={false}>
+        <SaveFeedbackProvider inline renderOfflineLine>
           <StylePieceIdeas
             key={JSON.stringify([selection.id, piece.category, piece.comfortRange])}
             anchor={inWardrobe ? anchor : null}
@@ -321,12 +327,18 @@ function StylePieceIdeas({
   const currentLookHeading = useRef<HTMLHeadingElement | null>(null)
   const savedSectionRef = useRef<HTMLElement | null>(null)
   const swapUndoStackRef = useRef<Record<string, StylePieceRecipe>[]>([])
-  const lastSavedBeforeRef = useRef<
-    Record<string, { previous: StylePieceLook | undefined; previousIndex: number }>
+  const swapRevisionRef = useRef(0)
+  const lastSavedMutationRef = useRef<
+    Record<string, BoundedSaveMutation<StylePieceLook>>
   >({})
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
   const noticeSeqRef = useRef(0)
   const draftRevision = useRef(0)
   const focusAfterRetry = useRef(false)
+  const readLiveOnline = () =>
+    statusBarRef.current.isOnline &&
+    (typeof navigator === 'undefined' || navigator.onLine !== false)
 
   useLayoutEffect(() => {
     if (retrying || !focusAfterRetry.current) return
@@ -363,15 +375,20 @@ function StylePieceIdeas({
       : null
   }
 
-  const updateSaved = async (update: (entries: StylePieceLook[]) => StylePieceLook[]) => {
+  const updateSaved = async (
+    update: (entries: StylePieceLook[]) => StylePieceLook[] | null
+  ) => {
     const inventory = refreshRef.current
-    if (!(await inventory?.refresh())) return false
+    const refreshResult = await inventory?.refreshForAction()
+    if (!refreshResult || refreshResult.status === 'revoked') return false
+    if (refreshResult.status === 'error') throw refreshResult.error
     const apply = () => {
       const fresh = currentPiece(inventory)
       if (!fresh) return false
       try {
         const current = parseStylePieceRecipes(localStorage.getItem(key), fresh)
         const next = update(current)
+        if (next === null) return false
         if (next.length)
           localStorage.setItem(key, JSON.stringify(next.map(({ recipe }) => recipe)))
         else localStorage.removeItem(key)
@@ -524,12 +541,16 @@ function StylePieceIdeas({
 
       {looks.map((look, index) => {
         const recipeKey = stylePieceRecipeKey(look.recipe)
+        const compositionKey = look.companions
+          .map((item) => `${item.category}=${item.id}`)
+          .join(',')
         return (
           <StylePieceCard
             key={recipeKey}
             look={look}
             index={index}
             owner={owner}
+            compositionKey={compositionKey}
             resetNonce={savedResetNonce}
             headingRef={index === 0 ? currentLookHeading : undefined}
             anchorPhoto={anchorPhoto}
@@ -537,47 +558,47 @@ function StylePieceIdeas({
             samples={samples}
             canSave={storage === 'ready'}
             onSave={async () => {
+              const startSwapRevision = swapRevisionRef.current
+              let captured: BoundedSaveMutation<StylePieceLook> | undefined
               const savedOk = await updateSaved((current) => {
-                const previousIndex = current.findIndex(
-                  (item) => stylePieceRecipeKey(item.recipe) === recipeKey
-                )
-                lastSavedBeforeRef.current[recipeKey] = {
-                  previous: previousIndex >= 0 ? current[previousIndex] : undefined,
-                  previousIndex,
-                }
-                return saveStylePieceRecipe(current, look)
+                captured = applyBoundedListSave({
+                  entries: current,
+                  entry: look,
+                  getKey: (item) => stylePieceRecipeKey(item.recipe),
+                })
+                return captured.next
               })
               if (savedOk) {
-                swapUndoStackRef.current = []
+                if (captured) {
+                  lastSavedMutationRef.current[recipeKey] = captured
+                }
+                if (swapRevisionRef.current === startSwapRevision) {
+                  swapUndoStackRef.current = []
+                }
               }
               return savedOk
             }}
-            onUndoSave={() =>
-              updateSaved((current) => {
-                const without = current.filter(
-                  ({ recipe }) => stylePieceRecipeKey(recipe) !== recipeKey
-                )
-                const captured = lastSavedBeforeRef.current[recipeKey]
-                if (captured?.previous) {
-                  const idx = Math.min(
-                    Math.max(captured.previousIndex, 0),
-                    without.length
-                  )
-                  return [
-                    ...without.slice(0, idx),
-                    captured.previous,
-                    ...without.slice(idx),
-                  ]
-                }
-                return without
+            onUndoSave={() => {
+              const captured = lastSavedMutationRef.current[recipeKey]
+              if (!captured) return Promise.resolve(false)
+              return updateSaved((current) => {
+                const undone = undoBoundedListSave({
+                  entries: current,
+                  mutation: captured,
+                  getKey: (item) => stylePieceRecipeKey(item.recipe),
+                  isSameEntry: (a, b) =>
+                    JSON.stringify(a.recipe) === JSON.stringify(b.recipe),
+                })
+                return undone.ok ? undone.next : null
               })
-            }
+            }}
             onViewSaved={() => {
               savedSectionRef.current?.scrollIntoView?.({ block: 'nearest' })
               savedSectionRef.current?.focus()
             }}
             onSwap={(category, id) => {
               draftRevision.current += 1
+              swapRevisionRef.current += 1
               swapUndoStackRef.current = pushLookUndoSnapshot(
                 swapUndoStackRef.current,
                 edits
@@ -608,9 +629,10 @@ function StylePieceIdeas({
                       swapUndoStackRef.current = rest
                       if (snapshot !== undefined) {
                         draftRevision.current += 1
+                        swapRevisionRef.current += 1
                         setEdits(snapshot)
                         const undoSeq = ++noticeSeqRef.current
-                        statusBar.showNotice({
+                        statusBarRef.current.showNotice({
                           id: `style-piece-swap-undo-${undoSeq}`,
                           announcementId: createAnnouncementToken(
                             'style-piece-swap-undo',
@@ -671,28 +693,99 @@ function StylePieceIdeas({
                     aria-label={`${labels.remove}: ${description}`}
                     disabled={storage !== 'ready'}
                     onClick={() => {
-                      if (!statusBar.isOnline) {
-                        const seq = ++noticeSeqRef.current
-                        statusBar.showNotice({
-                          id: `style-piece-remove-offline-${seq}`,
-                          announcementId: createAnnouncementToken(
-                            'style-piece-remove-offline',
-                            seq
-                          ),
-                          message: t('feedback.offlineAction'),
-                          tone: 'offline',
-                          actions: [],
-                        })
-                        return
-                      }
-                      void updateSaved((current) =>
-                        current.filter(({ recipe }) => stylePieceRecipeKey(recipe) !== id)
-                      ).then((removed) => {
-                        if (!removed) return
+                      const runRemove = async () => {
+                        if (!readLiveOnline()) {
+                          const seq = ++noticeSeqRef.current
+                          statusBarRef.current.showNotice({
+                            id: `style-piece-remove-offline-${seq}`,
+                            announcementId: createAnnouncementToken(
+                              'style-piece-remove-offline',
+                              seq
+                            ),
+                            message: t('feedback.offlineAction'),
+                            tone: 'offline',
+                            actions: [],
+                          })
+                          return
+                        }
+                        let removedMutation: BoundedRemoveMutation<StylePieceLook> | null =
+                          null
+                        let removed = false
+                        try {
+                          removed = await updateSaved((current) => {
+                            removedMutation = applyBoundedListRemove({
+                              entries: current,
+                              key: id,
+                              getKey: (item) => stylePieceRecipeKey(item.recipe),
+                            })
+                            return removedMutation ? removedMutation.next : null
+                          })
+                        } catch (error) {
+                          const errSeq = ++noticeSeqRef.current
+                          if (isOfflineError(error) || !readLiveOnline()) {
+                            statusBarRef.current.showNotice({
+                              id: `style-piece-remove-offline-${errSeq}`,
+                              announcementId: createAnnouncementToken(
+                                'style-piece-remove-offline',
+                                errSeq
+                              ),
+                              message: t('feedback.offlineAction'),
+                              tone: 'offline',
+                              actions: [],
+                            })
+                          } else {
+                            statusBarRef.current.showNotice({
+                              id: `style-piece-remove-failed-${errSeq}`,
+                              announcementId: createAnnouncementToken(
+                                'style-piece-remove-failed',
+                                errSeq
+                              ),
+                              message: t('feedback.saveFailed'),
+                              tone: 'error',
+                              actions: [
+                                {
+                                  id: 'retry',
+                                  kind: 'retry',
+                                  label: t('feedback.retry'),
+                                  onPress: () => {
+                                    void runRemove()
+                                  },
+                                },
+                              ],
+                            })
+                          }
+                          return
+                        }
+                        if (!removed) {
+                          if (refreshRef.current?.currentAnchor()) {
+                            const failSeq = ++noticeSeqRef.current
+                            statusBarRef.current.showNotice({
+                              id: `style-piece-remove-failed-${failSeq}`,
+                              announcementId: createAnnouncementToken(
+                                'style-piece-remove-failed',
+                                failSeq
+                              ),
+                              message: t('feedback.saveFailed'),
+                              tone: 'error',
+                              actions: [
+                                {
+                                  id: 'retry',
+                                  kind: 'retry',
+                                  label: t('feedback.retry'),
+                                  onPress: () => {
+                                    void runRemove()
+                                  },
+                                },
+                              ],
+                            })
+                          }
+                          return
+                        }
                         setSavedResetNonce((value) => value + 1)
                         weatherRef.current?.focus()
+                        const capturedRemoval = removedMutation
                         const seq = ++noticeSeqRef.current
-                        statusBar.showNotice({
+                        statusBarRef.current.showNotice({
                           id: `style-piece-remove-${seq}`,
                           announcementId: createAnnouncementToken(
                             'style-piece-remove',
@@ -700,56 +793,93 @@ function StylePieceIdeas({
                           ),
                           message: t('feedback.removed'),
                           tone: 'neutral',
-                          actions: [
-                            {
-                              id: 'undo',
-                              kind: 'undo',
-                              label: t('feedback.undo'),
-                              onPress: async () => {
-                                if (!statusBar.isOnline) {
-                                  const offSeq = ++noticeSeqRef.current
-                                  statusBar.showNotice({
-                                    id: `style-piece-remove-undo-offline-${offSeq}`,
-                                    announcementId: createAnnouncementToken(
-                                      'style-piece-remove-undo-offline',
-                                      offSeq
-                                    ),
-                                    message: t('feedback.offlineAction'),
-                                    tone: 'offline',
-                                    actions: [],
-                                  })
-                                  return
-                                }
-                                const restored = await updateSaved((current) =>
-                                  saveStylePieceRecipe(current, entry)
-                                )
-                                const undoSeq = ++noticeSeqRef.current
-                                if (restored) {
-                                  statusBar.showNotice({
-                                    id: `style-piece-remove-undo-${undoSeq}`,
-                                    announcementId: createAnnouncementToken(
-                                      'style-piece-remove-undo',
-                                      undoSeq
-                                    ),
-                                    message: t('feedback.undone'),
-                                    tone: 'neutral',
-                                  })
-                                } else {
-                                  statusBar.showNotice({
-                                    id: `style-piece-remove-undo-failed-${undoSeq}`,
-                                    announcementId: createAnnouncementToken(
-                                      'style-piece-remove-undo-failed',
-                                      undoSeq
-                                    ),
-                                    message: t('feedback.saveFailed'),
-                                    tone: 'error',
-                                  })
-                                }
-                              },
-                            },
-                          ],
+                          actions: capturedRemoval
+                            ? [
+                                {
+                                  id: 'undo',
+                                  kind: 'undo',
+                                  label: t('feedback.undo'),
+                                  onPress: async () => {
+                                    if (!readLiveOnline()) {
+                                      const offSeq = ++noticeSeqRef.current
+                                      statusBarRef.current.showNotice({
+                                        id: `style-piece-remove-undo-offline-${offSeq}`,
+                                        announcementId: createAnnouncementToken(
+                                          'style-piece-remove-undo-offline',
+                                          offSeq
+                                        ),
+                                        message: t('feedback.offlineAction'),
+                                        tone: 'offline',
+                                        actions: [],
+                                      })
+                                      return
+                                    }
+                                    let restored = false
+                                    try {
+                                      restored = await updateSaved((current) => {
+                                        const undone = undoBoundedListRemove({
+                                          entries: current,
+                                          mutation: capturedRemoval,
+                                          getKey: (item) =>
+                                            stylePieceRecipeKey(item.recipe),
+                                        })
+                                        return undone.ok ? undone.next : null
+                                      })
+                                    } catch (error) {
+                                      const errSeq = ++noticeSeqRef.current
+                                      if (isOfflineError(error) || !readLiveOnline()) {
+                                        statusBarRef.current.showNotice({
+                                          id: `style-piece-remove-undo-offline-${errSeq}`,
+                                          announcementId: createAnnouncementToken(
+                                            'style-piece-remove-undo-offline',
+                                            errSeq
+                                          ),
+                                          message: t('feedback.offlineAction'),
+                                          tone: 'offline',
+                                          actions: [],
+                                        })
+                                      } else {
+                                        statusBarRef.current.showNotice({
+                                          id: `style-piece-remove-undo-failed-${errSeq}`,
+                                          announcementId: createAnnouncementToken(
+                                            'style-piece-remove-undo-failed',
+                                            errSeq
+                                          ),
+                                          message: t('feedback.saveFailed'),
+                                          tone: 'error',
+                                        })
+                                      }
+                                      return
+                                    }
+                                    const undoSeq = ++noticeSeqRef.current
+                                    if (restored) {
+                                      statusBarRef.current.showNotice({
+                                        id: `style-piece-remove-undo-${undoSeq}`,
+                                        announcementId: createAnnouncementToken(
+                                          'style-piece-remove-undo',
+                                          undoSeq
+                                        ),
+                                        message: t('feedback.undone'),
+                                        tone: 'neutral',
+                                      })
+                                    } else {
+                                      statusBarRef.current.showNotice({
+                                        id: `style-piece-remove-undo-failed-${undoSeq}`,
+                                        announcementId: createAnnouncementToken(
+                                          'style-piece-remove-undo-failed',
+                                          undoSeq
+                                        ),
+                                        message: t('feedback.saveFailed'),
+                                        tone: 'error',
+                                      })
+                                    }
+                                  },
+                                },
+                              ]
+                            : [],
                         })
-                      })
+                      }
+                      void runRemove()
                     }}
                   >
                     {labels.remove}
@@ -768,6 +898,7 @@ function StylePieceCard({
   look,
   index,
   owner,
+  compositionKey,
   resetNonce,
   headingRef,
   anchorPhoto,
@@ -782,6 +913,7 @@ function StylePieceCard({
   look: StylePieceLook
   index: number
   owner: string
+  compositionKey: string
   resetNonce: number
   headingRef?: RefObject<HTMLHeadingElement | null>
   anchorPhoto: React.ReactNode
@@ -883,7 +1015,7 @@ function StylePieceCard({
         requiresNetwork
         data-testid="style-piece-save"
         ownerKey={owner}
-        resetKey={`${recipeKey}:${resetNonce}`}
+        resetKey={`${recipeKey}:${compositionKey}:${resetNonce}`}
         onSave={onSave}
         onUndo={onUndoSave}
         onView={onViewSaved}

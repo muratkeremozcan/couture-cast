@@ -3,7 +3,7 @@ title: 'CC-7.1: Shared save, undo and status feedback'
 type: feature
 ticket: '7.1'
 created: '2026-11-21'
-status: built
+status: done
 baseline_revision: 'abce398ba1f3d0028445ca75fd7b085116525664'
 route: full
 route_source: auto
@@ -12,7 +12,7 @@ review: quick
 review_source: pinned
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: true
+followup_review_recommended: false
 context:
   - /Users/murat/opensource/cc/couture-cast-epic7/AGENTS.md
   - /Users/murat/opensource/cc/couture-cast-epic7/.agents/skills/bmod-tea/knowledge/playwright-utils-mandate.md
@@ -139,6 +139,11 @@ deferred: []
   - `[medium]` `[patch]` `SaveActionButton` stayed in `saved` state after sample garment swap or saved-look removal — included garment signature and removal revision in `resetKey`.
   - `[medium]` `[patch]` Mobile `MemberSampleOutfit.updateBookmarks` mutated React state before storage write — validated writer and completed storage write before updating state on Save/Undo.
   - `[medium]` `[patch]` No-op sample shuffle pushed undo entries, `StylePieceIdeas.openSaved` kept stale swap undo stack/notice, and `onRemove` Undo ignored `false` returns — guarded no-op shuffle, cleared undo stack/notice in `openSaved`, and surfaced failure notice on failed Remove Undo.
+
+### 2026-11-21 — Codex peer review pass (`story-7-1-codex-review.md`)
+
+- verdicts: 13 findings — high 3, medium 8, low 2, security 0
+- resolution: All 13 findings fixed in this branch with focused regression tests (`@couture/utils` 13/13, web 110/110, mobile 97/97) and zero loosened existing assertions.
 
 ## Auto Run Result
 

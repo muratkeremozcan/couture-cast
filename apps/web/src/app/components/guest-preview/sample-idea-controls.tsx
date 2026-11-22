@@ -28,6 +28,7 @@ type Props = {
   persistent?: boolean
   ownerKey?: string | null
   saveResetKey?: string
+  useSharedFeedback?: boolean
 }
 
 const buttonClass =
@@ -49,6 +50,7 @@ export function SampleIdeaControls({
   persistent = true,
   ownerKey,
   saveResetKey,
+  useSharedFeedback = false,
 }: Props) {
   const labels = strings.styleIdeas
   const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
@@ -57,17 +59,29 @@ export function SampleIdeaControls({
   )
   return (
     <div className="space-y-4 rounded-lg border border-[#E6E6ED] bg-white p-5 text-sm text-[#111111]">
-      {lookId && (
-        <SaveActionButton
-          data-testid="sample-save-look"
-          idleLabel={isBookmarked ? labels.update : labels.save}
-          onSave={onSave}
-          onUndo={onUndoSave}
-          onView={onViewSaved}
-          ownerKey={ownerKey}
-          resetKey={saveResetKey ?? lookId}
-        />
-      )}
+      {lookId &&
+        (useSharedFeedback ? (
+          <SaveActionButton
+            data-testid="sample-save-look"
+            idleLabel={isBookmarked ? labels.update : labels.save}
+            onSave={onSave}
+            onUndo={onUndoSave}
+            onView={onViewSaved}
+            ownerKey={ownerKey}
+            resetKey={saveResetKey ?? lookId}
+          />
+        ) : (
+          <button
+            type="button"
+            data-testid="sample-save-look"
+            className={buttonClass}
+            onClick={() => {
+              void onSave()
+            }}
+          >
+            {isBookmarked ? labels.update : labels.save}
+          </button>
+        ))}
       {bookmarks.length > 0 && (
         <section
           aria-label={labels.saved}

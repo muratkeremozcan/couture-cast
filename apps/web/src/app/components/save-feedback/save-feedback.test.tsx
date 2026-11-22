@@ -1,14 +1,24 @@
 // Learning path Step 59: Shared save, undo and status feedback.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-59-shared-save-undo-and-status-feedback
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { HttpResponse, http } from 'msw'
 import { createRef, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
-import { SAVE_FEEDBACK_TIMINGS } from '@couture/utils'
+import {
+  DEFAULT_SAMPLE_COMFORT,
+  SAMPLE_CATALOG,
+  SAMPLE_WEATHER_KEYS,
+  SAVE_FEEDBACK_TIMINGS,
+  selectSampleOutfit,
+  type SampleBookmark,
+} from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
 import type * as WebSession from '../../../lib/web-session'
+import { useMswHandlers } from '../../../test-utils/msw/runtime'
+import { HomeRitual } from '../home-ritual'
 import { StylePiecePanel } from '../../wardrobe/style-piece-panel'
 import {
   computeNonOverlappingBottomOffset,
@@ -636,10 +646,379 @@ describe('web save-feedback components', () => {
       expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
         'You are offline. Save when you reconnect.'
       )
+      // Offline banner is visible inside the open modal too
+      expect(within(dialog).getByTestId('offline-status-line')).toHaveTextContent(
+        'You are offline'
+      )
     } finally {
       sessionMock.owner = null
       sessionStorage.clear()
       localStorage.clear()
+    }
+  })
+
+  it('StylePiecePanel transient refresh failure keeps looks on screen with Failed/Retry, while genuine revocation hides the photo', async () => {
+    const user = userEvent.setup()
+    const garment = createReadyGarmentFixture({
+      id: 'transient-garment',
+      imageAccess: {
+        url: 'https://photos.example.test/transient-top.png',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    })
+    const loadInventory = vi
+      .fn<() => Promise<(typeof garment)[]>>()
+      .mockResolvedValueOnce([garment]) // initial mount
+      .mockRejectedValueOnce(new Error('Wardrobe request failed with status 503')) // transient Save failure
+      .mockResolvedValueOnce([garment]) // Retry succeeds
+      .mockResolvedValueOnce([]) // genuine deletion/revocation
+    const invoker = createRef<HTMLElement>()
+    sessionMock.owner = 'transient-owner'
+    sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'transient-owner')
+    window.dispatchEvent(new Event('couture:session'))
+
+    try {
+      render(
+        <SaveFeedbackProvider>
+          <StylePiecePanel
+            selection={{
+              id: garment.id,
+              category: garment.category ?? 'top',
+              comfortRange: garment.comfortRange ?? 'mild',
+            }}
+            inWardrobe
+            loadInventory={loadInventory}
+            owner="transient-owner"
+            locale="en-US"
+            invoker={invoker}
+            onClose={vi.fn()}
+          />
+        </SaveFeedbackProvider>
+      )
+
+      const dialog = await screen.findByRole('dialog', { name: 'Style this piece' })
+      await within(dialog).findByRole('heading', { name: 'Look 1' })
+
+      // Transient 503 on Save keeps look on screen and offers Retry
+      const [firstSave] = within(dialog).getAllByTestId('style-piece-save')
+      await user.click(firstSave!)
+      expect(within(dialog).getByRole('heading', { name: 'Look 1' })).toBeVisible()
+      expect(firstSave).toHaveTextContent('Failed')
+      const retry = within(dialog).getByTestId('status-bar-action-retry')
+
+      // Retry succeeds
+      await user.click(retry)
+      await waitFor(() => expect(firstSave).toHaveTextContent('Saved'))
+
+      // Swap companion resets button out of Saved
+      const firstArticle = within(dialog).getAllByTestId('style-piece-look')[0]!
+      await user.click(within(firstArticle).getByTestId('style-piece-swap-shoes'))
+      const swapOptions = within(firstArticle).getAllByTestId(/^style-piece-option-/)
+      await user.click(swapOptions[0]!)
+      expect(within(firstArticle).getByTestId('style-piece-save')).toHaveTextContent(
+        'Save look'
+      )
+
+      // Genuine revocation (empty inventory) still hides the photo
+      await user.click(within(firstArticle).getByTestId('style-piece-save'))
+      expect(await within(dialog).findByTestId('style-piece-unavailable')).toBeVisible()
+    } finally {
+      sessionMock.owner = null
+      sessionStorage.clear()
+      localStorage.clear()
+    }
+  })
+
+  it('sibling SaveActionButton controls do not collide on announcement or notice IDs', async () => {
+    const user = userEvent.setup()
+    const announcements: AnnouncementEntry[] = []
+
+    const view = render(
+      <SaveFeedbackProvider onAnnounce={(entry) => announcements.push(entry)}>
+        <SaveActionButton
+          key="save-a"
+          data-testid="save-a"
+          onSave={() => Promise.resolve(true)}
+          onUndo={() => true}
+        />
+        <SaveActionButton
+          key="save-b"
+          data-testid="save-b"
+          onSave={() => Promise.resolve(true)}
+          onUndo={() => true}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    await user.click(screen.getByTestId('save-a'))
+    await user.click(screen.getByTestId('save-b'))
+
+    // Both first saves announced both Saving and Saved to your looks.
+    expect(announcements.map((a) => a.message)).toEqual([
+      'Saving',
+      'Saved to your looks.',
+      'Saving',
+      'Saved to your looks.',
+    ])
+
+    // Unmounting control A must NOT dismiss control B's live notice
+    view.rerender(
+      <SaveFeedbackProvider onAnnounce={(entry) => announcements.push(entry)}>
+        {null}
+        <SaveActionButton
+          key="save-b"
+          data-testid="save-b"
+          onSave={() => Promise.resolve(true)}
+          onUndo={() => true}
+        />
+      </SaveFeedbackProvider>
+    )
+    expect(screen.getByTestId('status-feedback-bar')).toBeInTheDocument()
+  })
+
+  it('superseded Save settling does not cancel a newer Save slow timer, and deferred Undo does not suppress a newer Save', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const run1 = Promise.withResolvers<boolean>()
+    const run2 = Promise.withResolvers<boolean>()
+    const onSave = vi
+      .fn<() => Promise<boolean>>()
+      .mockReturnValueOnce(run1.promise)
+      .mockReturnValueOnce(run2.promise)
+
+    const view = render(
+      <SaveFeedbackProvider>
+        <SaveActionButton data-testid="save-btn" ownerKey="owner-1" onSave={onSave} />
+      </SaveFeedbackProvider>
+    )
+
+    fireEvent.click(screen.getByTestId('save-btn'))
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saving')
+
+    // Switch owner and start run 2
+    view.rerender(
+      <SaveFeedbackProvider>
+        <SaveActionButton data-testid="save-btn" ownerKey="owner-2" onSave={onSave} />
+      </SaveFeedbackProvider>
+    )
+    fireEvent.click(screen.getByTestId('save-btn'))
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saving')
+
+    // Stale run 1 settles at 200 ms — must NOT cancel run 2's 1,000 ms slow timer
+    await act(async () => {
+      vi.advanceTimersByTime(200)
+      run1.resolve(true)
+      await run1.promise
+    })
+    act(() => {
+      vi.advanceTimersByTime(SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs - 200)
+    })
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Still saving')
+
+    await act(async () => {
+      run2.resolve(true)
+      await run2.promise
+    })
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saved')
+
+    // Deferred Undo followed by a newer Save: Undo settling must not suppress the newer Save
+    vi.useRealTimers()
+    const deferredUndo = Promise.withResolvers<boolean>()
+    const saveAfterUndo = Promise.withResolvers<boolean>()
+    const onSave2 = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(true)
+      .mockReturnValueOnce(saveAfterUndo.promise)
+
+    view.rerender(
+      <SaveFeedbackProvider>
+        <SaveActionButton
+          data-testid="save-btn"
+          ownerKey="owner-3"
+          onSave={onSave2}
+          onUndo={() => deferredUndo.promise}
+        />
+      </SaveFeedbackProvider>
+    )
+    fireEvent.click(screen.getByTestId('save-btn'))
+    await waitFor(() => expect(screen.getByTestId('save-btn')).toHaveTextContent('Saved'))
+    fireEvent.click(screen.getByTestId('status-bar-action-undo'))
+    // Start a fresh Save while Undo is still pending
+    fireEvent.click(screen.getByTestId('save-btn'))
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saving')
+    await act(async () => {
+      deferredUndo.resolve(true)
+      await deferredUndo.promise
+    })
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saving')
+    await act(async () => {
+      saveAfterUndo.resolve(true)
+      await saveAfterUndo.promise
+    })
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saved')
+  })
+
+  it('Retry button reads live connectivity and refuses to call network after going offline, then succeeds on reconnect', async () => {
+    const user = userEvent.setup()
+    const onSave = vi
+      .fn<() => Promise<boolean>>()
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      .mockResolvedValueOnce(true)
+
+    render(
+      <SaveFeedbackProvider>
+        <SaveActionButton data-testid="save-btn" requiresNetwork onSave={onSave} />
+      </SaveFeedbackProvider>
+    )
+
+    await user.click(screen.getByTestId('save-btn'))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Could not save. Try again.'
+    )
+
+    // Go offline AFTER the Failed/Retry bar is already mounted
+    act(() => {
+      setNavigatorOnline(false)
+      window.dispatchEvent(new Event('offline'))
+    })
+    await user.click(screen.getByTestId('status-bar-action-retry'))
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'You are offline. Save when you reconnect.'
+    )
+
+    // Reconnect and click button to retry cleanly
+    act(() => {
+      setNavigatorOnline(true)
+      window.dispatchEvent(new Event('online'))
+    })
+    await user.click(screen.getByTestId('save-btn'))
+    expect(onSave).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('save-btn')).toHaveTextContent('Saved')
+  })
+
+  it('Web Home old-session deferred lock Remove never posts a notice onto the next member, and multi-tab refill to 8 blocks corrupting Undo', async () => {
+    const user = userEvent.setup()
+    const ownerA = 'lock-owner-a'
+    const ownerB = 'lock-owner-b'
+    const keyA = `couturecast.member-sample-bookmarks.${ownerA}`
+    const validBookmarks: SampleBookmark[] = []
+    for (const look of SAMPLE_CATALOG.looks) {
+      const matchingWeather = SAMPLE_WEATHER_KEYS.find(
+        (weather) =>
+          selectSampleOutfit(
+            {
+              weather,
+              collection: 'all',
+              comfort: DEFAULT_SAMPLE_COMFORT,
+              selectedLookId: look.id,
+              votes: {},
+              swaps: {},
+            },
+            SAMPLE_CATALOG
+          ).look?.id === look.id
+      )
+      if (matchingWeather) {
+        validBookmarks.push({
+          lookId: look.id,
+          weather: matchingWeather,
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        })
+      }
+      if (validBookmarks.length >= 9) break
+    }
+    expect(validBookmarks.length).toBeGreaterThanOrEqual(9)
+    const eightBookmarks = validBookmarks.slice(0, 8)
+    const ninthBookmark = validBookmarks[8]!
+    localStorage.setItem(keyA, JSON.stringify(eightBookmarks))
+
+    useMswHandlers(
+      http.get('/api/v1/ritual', () =>
+        HttpResponse.json(
+          { message: 'No location preferences found for user' },
+          { status: 400 }
+        )
+      )
+    )
+
+    const locksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
+    const deferredLock = Promise.withResolvers<void>()
+    let interceptLock = false
+    Object.defineProperty(navigator, 'locks', {
+      configurable: true,
+      value: {
+        request: async (_name: string, apply: () => boolean) => {
+          if (interceptLock) {
+            await deferredLock.promise
+          }
+          return apply()
+        },
+      },
+    })
+
+    sessionMock.owner = ownerA
+    sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${ownerA}`)
+    window.dispatchEvent(new Event('couture:session'))
+
+    try {
+      render(
+        <SaveFeedbackProvider>
+          <HomeRitual demo={null} />
+        </SaveFeedbackProvider>
+      )
+
+      const savedRegion = await screen.findByTestId('sample-saved-looks')
+      const removeButtons = within(savedRegion).getAllByRole('button', {
+        name: /^Remove /,
+      })
+      // Remove first bookmark (drops from 8 -> 7)
+      await user.click(removeButtons[0]!)
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+
+      // Simulate another tab refilling to 8 bookmarks before member clicks Undo
+      const afterRemove = JSON.parse(
+        localStorage.getItem(keyA) ?? '[]'
+      ) as SampleBookmark[]
+      expect(afterRemove).toHaveLength(7)
+      const refilled: SampleBookmark[] = [ninthBookmark, ...afterRemove]
+      localStorage.setItem(keyA, JSON.stringify(refilled))
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      const storedAfterConflict = JSON.parse(
+        localStorage.getItem(keyA) ?? '[]'
+      ) as SampleBookmark[]
+      expect(storedAfterConflict).toHaveLength(8)
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+
+      // Now test old-session deferred lock Remove resolving after member B takes over
+      interceptLock = true
+      const nextRemoveButtons = within(
+        screen.getByTestId('sample-saved-looks')
+      ).getAllByRole('button', { name: /^Remove / })
+      await user.click(nextRemoveButtons[0]!)
+
+      // Switch to member B before member A's lock resolves
+      act(() => {
+        sessionMock.owner = ownerB
+        sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${ownerB}`)
+        window.dispatchEvent(new Event('couture:session'))
+      })
+      await screen.findByTestId('member-sample-outfit')
+      await act(async () => {
+        deferredLock.resolve()
+        await deferredLock.promise
+      })
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    } finally {
+      deferredLock.resolve()
+      if (locksDescriptor) Object.defineProperty(navigator, 'locks', locksDescriptor)
+      else Reflect.deleteProperty(navigator, 'locks')
+      sessionMock.owner = null
+      sessionStorage.clear()
+      localStorage.removeItem(keyA)
     }
   })
 })

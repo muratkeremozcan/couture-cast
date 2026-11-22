@@ -168,9 +168,11 @@ const ACTION_CLASSES: Record<StatusBarNotice['tone'], string> = {
 
 export function OfflineStatusLine({
   online,
+  inline = false,
   className = '',
 }: {
   online?: boolean
+  inline?: boolean
   className?: string
 }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
@@ -179,7 +181,7 @@ export function OfflineStatusLine({
   const [headerOffset, setHeaderOffset] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    if (isOnline || typeof document === 'undefined') {
+    if (inline || isOnline || typeof document === 'undefined') {
       setHeaderOffset(null)
       return
     }
@@ -203,19 +205,22 @@ export function OfflineStatusLine({
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure)
     }
-  }, [isOnline])
+  }, [inline, isOnline])
 
   if (isOnline) return null
 
-  const positionClass =
-    headerOffset !== null ? 'fixed left-0 right-0 z-30' : 'sticky top-0 z-30'
+  const positionClass = inline
+    ? 'mb-3 rounded-lg border'
+    : headerOffset !== null
+      ? 'fixed left-0 right-0 z-30 border-b'
+      : 'sticky top-0 z-30 border-b'
 
   return (
     <div
       data-testid="offline-status-line"
       data-offline="true"
-      style={headerOffset !== null ? { top: `${headerOffset}px` } : undefined}
-      className={`${positionClass} w-full border-b border-amber-300 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-950 transition-opacity duration-150 motion-reduce:transition-none dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 ${className}`.trim()}
+      style={!inline && headerOffset !== null ? { top: `${headerOffset}px` } : undefined}
+      className={`${positionClass} w-full border-amber-300 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-950 transition-opacity duration-150 motion-reduce:transition-none dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 ${className}`.trim()}
     >
       {t('feedback.offlineBanner')}
     </div>
@@ -309,11 +314,11 @@ export function StatusFeedbackBar({
           ? { bottom: `${bottomPx}px` }
           : undefined
       }
-      className={`${placementClasses} flex items-center justify-between gap-2 rounded-xl border px-3.5 py-2 shadow-lg transition-opacity duration-150 motion-reduce:transition-none ${TONE_CLASSES[notice.tone]}`}
+      className={`${placementClasses} flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 shadow-lg transition-opacity duration-150 motion-reduce:transition-none ${TONE_CLASSES[notice.tone]}`}
     >
       <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{notice.message}</p>
       {actions.length > 0 && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {actions.map((action) => (
             <button
               key={action.id}
@@ -440,7 +445,7 @@ export function SaveFeedbackProvider({
   )
 
   useEffect(() => {
-    if (parent && initialOnline === undefined) return
+    if (forwardAnnounceToParent && initialOnline === undefined) return
     const previous = prevOnlineRef.current
     prevOnlineRef.current = isOnline
     if (!isOnline && previous !== false) {
@@ -453,7 +458,7 @@ export function SaveFeedbackProvider({
         urgency: 'assertive',
       })
     }
-  }, [announce, initialOnline, isOnline, parent, t])
+  }, [announce, forwardAnnounceToParent, initialOnline, isOnline, t])
 
   const dismissNotice = useCallback(
     (noticeId?: string) => {
@@ -500,7 +505,7 @@ export function SaveFeedbackProvider({
 
   return (
     <SaveFeedbackContext.Provider value={value}>
-      {renderOfflineLine && <OfflineStatusLine online={isOnline} />}
+      {renderOfflineLine && <OfflineStatusLine online={isOnline} inline={inline} />}
       {children}
       <StatusFeedbackBar
         notice={notice}

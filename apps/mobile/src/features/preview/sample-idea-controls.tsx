@@ -31,6 +31,7 @@ export function SampleIdeaControls({
   showStorageFailureWhenEmpty = false,
   ownerKey,
   saveResetKey,
+  useSharedFeedback = false,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
@@ -49,6 +50,7 @@ export function SampleIdeaControls({
   showStorageFailureWhenEmpty?: boolean
   ownerKey?: string | null
   saveResetKey?: string
+  useSharedFeedback?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const labels = strings.styleIdeas
@@ -58,17 +60,27 @@ export function SampleIdeaControls({
   )
   return (
     <View style={[styles.card, { borderColor: palette.divider }]}>
-      {lookId && (
-        <SaveActionButton
-          testID="sample-save-look"
-          idleLabel={isBookmarked ? labels.update : labels.save}
-          onSave={onSave}
-          onUndo={onUndoSave}
-          onView={onViewSaved}
-          ownerKey={ownerKey}
-          resetKey={saveResetKey ?? lookId}
-        />
-      )}
+      {lookId &&
+        (useSharedFeedback ? (
+          <SaveActionButton
+            testID="sample-save-look"
+            idleLabel={isBookmarked ? labels.update : labels.save}
+            onSave={onSave}
+            onUndo={onUndoSave}
+            onView={onViewSaved}
+            ownerKey={ownerKey}
+            resetKey={saveResetKey ?? lookId}
+          />
+        ) : (
+          <PreviewButton
+            testID="sample-save-look"
+            label={isBookmarked ? labels.update : labels.save}
+            onPress={() => {
+              void onSave()
+            }}
+            palette={palette}
+          />
+        ))}
       {onWeather && (
         <View style={styles.group}>
           <Text style={{ color: palette.text }}>{strings.preferences.weather}</Text>

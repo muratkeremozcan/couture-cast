@@ -2,11 +2,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-59-shared-save-undo-and-status-feedback
 import { describe, expect, it, vi } from 'vitest'
 import {
+  applyBoundedListRemove,
+  applyBoundedListSave,
   clampStatusBarActions,
   createAnnouncementToken,
   createSaveFeedbackSnapshot,
   createStatusBarNotice,
   DEFAULT_MAX_LOOK_UNDO_DEPTH,
+  DEFAULT_MAX_SAVED_ENTRIES,
   getSaveFeedbackUrgency,
   isOfflineError,
   isSaveFeedbackBusy,
@@ -15,6 +18,8 @@ import {
   pushLookUndoSnapshot,
   reduceSaveFeedback,
   SAVE_FEEDBACK_TIMINGS,
+  undoBoundedListRemove,
+  undoBoundedListSave,
   type StatusBarAction,
 } from './index'
 
@@ -207,5 +212,111 @@ describe('save-feedback state machine and helpers', () => {
     expect(isOfflineError(new Error('QuotaExceededError'))).toBe(false)
     expect(isOfflineError(null)).toBe(false)
     expect(isOfflineError(42)).toBe(false)
+  })
+
+  it('restores evicted 8th entry when undoing a save into a full 8-entry list', () => {
+    type Item = { id: string; rev: number }
+    const initial: Item[] = Array.from({ length: DEFAULT_MAX_SAVED_ENTRIES }, (_, i) => ({
+      id: `look-${i + 1}`,
+      rev: 1,
+    }))
+    const getKey = (item: Item) => item.id
+    const isSame = (a: Item, b: Item) => a.id === b.id && a.rev === b.rev
+
+    const mutation = applyBoundedListSave({
+      entries: initial,
+      entry: { id: 'look-9', rev: 1 },
+      getKey,
+    })
+    expect(mutation.next).toHaveLength(8)
+    expect(mutation.next[0]).toEqual({ id: 'look-9', rev: 1 })
+    expect(mutation.evictedEntry).toEqual({ id: 'look-8', rev: 1 })
+
+    const undone = undoBoundedListSave({
+      entries: mutation.next,
+      mutation,
+      getKey,
+      isSameEntry: isSame,
+    })
+    expect(undone.ok).toBe(true)
+    expect(undone.next).toEqual(initial)
+  })
+
+  it('rejects Undo Save on concurrent overwrite and restores prior entry on update Undo', () => {
+    type Item = { id: string; rev: number }
+    const initial: Item[] = [
+      { id: 'look-1', rev: 1 },
+      { id: 'look-2', rev: 1 },
+    ]
+    const getKey = (item: Item) => item.id
+    const isSame = (a: Item, b: Item) => a.id === b.id && a.rev === b.rev
+
+    const updateMutation = applyBoundedListSave({
+      entries: initial,
+      entry: { id: 'look-2', rev: 2 },
+      getKey,
+    })
+    expect(updateMutation.next).toEqual([
+      { id: 'look-2', rev: 2 },
+      { id: 'look-1', rev: 1 },
+    ])
+
+    // Concurrent edit changes look-2 to rev 3 -> Undo detects conflict and preserves fresh list
+    const concurrentFresh: Item[] = [
+      { id: 'look-2', rev: 3 },
+      { id: 'look-1', rev: 1 },
+    ]
+    const conflict = undoBoundedListSave({
+      entries: concurrentFresh,
+      mutation: updateMutation,
+      getKey,
+      isSameEntry: isSame,
+    })
+    expect(conflict).toEqual({ ok: false, conflict: true, next: concurrentFresh })
+
+    // Without conflict, Undo restores look-2 rev 1 at its prior index
+    const cleanUndo = undoBoundedListSave({
+      entries: updateMutation.next,
+      mutation: updateMutation,
+      getKey,
+      isSameEntry: isSame,
+    })
+    expect(cleanUndo).toEqual({ ok: true, next: initial })
+  })
+
+  it('refuses Undo Remove when another tab refilled the list to capacity (8 entries)', () => {
+    type Item = { id: string }
+    const initial: Item[] = Array.from({ length: 8 }, (_, i) => ({
+      id: `look-${i + 1}`,
+    }))
+    const getKey = (item: Item) => item.id
+
+    const removed = applyBoundedListRemove({
+      entries: initial,
+      key: 'look-3',
+      getKey,
+    })
+    expect(removed).not.toBeNull()
+    expect(removed!.next).toHaveLength(7)
+
+    // Another tab adds look-9, refilling to 8 entries
+    const refilled: Item[] = [{ id: 'look-9' }, ...removed!.next]
+    expect(refilled).toHaveLength(8)
+
+    const conflict = undoBoundedListRemove({
+      entries: refilled,
+      mutation: removed!,
+      getKey,
+    })
+    expect(conflict).toEqual({ ok: false, conflict: true, next: refilled })
+    expect(conflict.next).toHaveLength(8)
+
+    // When space exists (< 8), Undo restores look-3 at its prior index
+    const restored = undoBoundedListRemove({
+      entries: removed!.next,
+      mutation: removed!,
+      getKey,
+    })
+    expect(restored).toEqual({ ok: true, next: initial })
   })
 })

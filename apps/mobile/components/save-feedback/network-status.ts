@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AppState, Platform } from 'react-native'
+import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 
 type Listener = (online: boolean) => void
 export type NetworkConnectivityProbe = (signal: AbortSignal) => Promise<boolean>
@@ -11,6 +12,7 @@ let currentOnline = readBrowserOnline()
 const listeners = new Set<Listener>()
 let windowListenersBound = false
 let customProbe: NetworkConnectivityProbe | null = null
+let inFlightProbe: Promise<boolean> | null = null
 
 function readBrowserOnline(): boolean {
   if (typeof navigator !== 'undefined' && typeof navigator.onLine === 'boolean') {
@@ -28,12 +30,18 @@ export function hasReliableBrowserOnline(): boolean {
 
 function getDefaultNativeProbe(): NetworkConnectivityProbe | null {
   if (Platform.OS === 'web') return null
-  const apiUrl =
-    typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : undefined
-  if (!apiUrl || typeof fetch !== 'function') return null
-  const healthUrl = `${apiUrl.replace(/\/$/, '')}/api/health`
+  if (typeof fetch !== 'function') return null
+  let baseUrl: string
+  try {
+    baseUrl = resolveMobileApiBaseUrl()
+  } catch {
+    return null
+  }
+  const healthUrl = `${baseUrl}/api/health`
   return async (signal) => {
     try {
+      // Any HTTP response (including 503) proves network connectivity; only a transport
+      // exception indicates the device is offline.
       await fetch(healthUrl, { method: 'HEAD', signal })
       return true
     } catch {
@@ -66,6 +74,7 @@ export function setNetworkConnectivityProbe(
   probe: NetworkConnectivityProbe | null
 ): void {
   customProbe = probe
+  inFlightProbe = null
 }
 
 export function getNetworkOnline(): boolean {
@@ -89,18 +98,18 @@ export function subscribeNetworkStatus(listener: Listener): () => void {
   }
 }
 
-export async function probeNetworkConnectivity(
-  externalSignal?: AbortSignal
-): Promise<boolean> {
-  if (externalSignal?.aborted) return false
+export function probeNetworkConnectivity(externalSignal?: AbortSignal): Promise<boolean> {
+  if (externalSignal?.aborted) return Promise.resolve(false)
+  if (inFlightProbe) return inFlightProbe
+
   const probe = resolveProbe()
   if (!probe) {
     if (hasReliableBrowserOnline()) {
       const online = readBrowserOnline()
       notify(online)
-      return online
+      return Promise.resolve(online)
     }
-    return currentOnline
+    return Promise.resolve(currentOnline)
   }
 
   const controller = new AbortController()
@@ -108,27 +117,35 @@ export async function probeNetworkConnectivity(
   externalSignal?.addEventListener('abort', onExternalAbort, { once: true })
   const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
 
-  try {
-    const reachable = await probe(controller.signal)
-    if (externalSignal?.aborted) return false
-    if (reachable) {
-      reportNetworkOnline()
-      return true
+  const run = (async () => {
+    try {
+      const reachable = await probe(controller.signal)
+      if (externalSignal?.aborted) return false
+      if (reachable) {
+        reportNetworkOnline()
+        return true
+      }
+      return false
+    } catch {
+      return false
     }
-    return false
-  } catch {
-    return false
-  } finally {
+  })().finally(() => {
     clearTimeout(timeout)
     externalSignal?.removeEventListener('abort', onExternalAbort)
-  }
+    if (inFlightProbe === run) {
+      inFlightProbe = null
+    }
+  })
+
+  inFlightProbe = run
+  return run
 }
 
 /**
  * Checks connectivity before running a network-backed save action.
  * On web / browsers with `navigator.onLine`, offline strictly short-circuits.
- * On native without `navigator.onLine`, runs the configured probe (if any) or allows
- * an explicit user retry to attempt the request so the app never deadlocks offline.
+ * On native without `navigator.onLine`, shares the single in-flight probe (if configured)
+ * or allows an explicit user retry to attempt the request so the app never deadlocks offline.
  */
 export async function checkNetworkOnlineForAction(): Promise<boolean> {
   if (getNetworkOnline()) return true
@@ -145,6 +162,7 @@ export async function checkNetworkOnlineForAction(): Promise<boolean> {
 /** Resets store state and custom probe cleanly between tests. */
 export function resetNetworkStatusForTests(online: boolean = readBrowserOnline()): void {
   customProbe = null
+  inFlightProbe = null
   currentOnline = online
   listeners.forEach((listener) => listener(currentOnline))
 }

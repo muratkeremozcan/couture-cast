@@ -23,6 +23,7 @@ export const SAVE_FEEDBACK_TIMINGS = {
 
 export const MAX_STATUS_BAR_ACTIONS = 2
 export const DEFAULT_MAX_LOOK_UNDO_DEPTH = 10
+export const DEFAULT_MAX_SAVED_ENTRIES = 8
 
 export interface StatusBarAction {
   id: string
@@ -218,6 +219,125 @@ export function popLookUndoSnapshot<T>(stack: readonly T[]): {
     snapshot: stack[stack.length - 1],
     rest: stack.slice(0, -1),
   }
+}
+
+export interface BoundedSaveMutation<T> {
+  next: T[]
+  savedKey: string
+  savedEntry: T
+  previousEntry: T | undefined
+  previousIndex: number
+  evictedEntry: T | undefined
+}
+
+export interface BoundedRemoveMutation<T> {
+  next: T[]
+  removedKey: string
+  removedEntry: T
+  removedIndex: number
+}
+
+export type BoundedUndoResult<T> =
+  | { ok: true; next: T[] }
+  | { ok: false; conflict: true; next: T[] }
+
+export function applyBoundedListSave<T>(options: {
+  entries: readonly T[]
+  entry: T
+  getKey: (item: T) => string
+  maxEntries?: number
+}): BoundedSaveMutation<T> {
+  const { entries, entry, getKey, maxEntries = DEFAULT_MAX_SAVED_ENTRIES } = options
+  const savedKey = getKey(entry)
+  const previousIndex = entries.findIndex((item) => getKey(item) === savedKey)
+  const previousEntry = previousIndex >= 0 ? entries[previousIndex] : undefined
+  const remaining = entries.filter((item) => getKey(item) !== savedKey)
+  const combined = [entry, ...remaining]
+  const next = combined.slice(0, maxEntries)
+  const evictedEntry = combined.length > maxEntries ? combined[maxEntries] : undefined
+  return {
+    next,
+    savedKey,
+    savedEntry: entry,
+    previousEntry,
+    previousIndex,
+    evictedEntry,
+  }
+}
+
+export function undoBoundedListSave<T>(options: {
+  entries: readonly T[]
+  mutation: BoundedSaveMutation<T>
+  getKey: (item: T) => string
+  isSameEntry: (a: T, b: T) => boolean
+  maxEntries?: number
+}): BoundedUndoResult<T> {
+  const {
+    entries,
+    mutation,
+    getKey,
+    isSameEntry,
+    maxEntries = DEFAULT_MAX_SAVED_ENTRIES,
+  } = options
+  const currentMatch = entries.find((item) => getKey(item) === mutation.savedKey)
+  if (!currentMatch || !isSameEntry(currentMatch, mutation.savedEntry)) {
+    return { ok: false, conflict: true, next: [...entries] }
+  }
+  const without = entries.filter((item) => getKey(item) !== mutation.savedKey)
+  let next: T[]
+  if (mutation.previousEntry !== undefined) {
+    const idx = Math.min(Math.max(mutation.previousIndex, 0), without.length)
+    next = [...without.slice(0, idx), mutation.previousEntry, ...without.slice(idx)]
+  } else {
+    next = [...without]
+    if (
+      mutation.evictedEntry !== undefined &&
+      !next.some((item) => getKey(item) === getKey(mutation.evictedEntry!)) &&
+      next.length < maxEntries
+    ) {
+      next.push(mutation.evictedEntry)
+    }
+  }
+  if (next.length > maxEntries) {
+    return { ok: false, conflict: true, next: [...entries] }
+  }
+  return { ok: true, next }
+}
+
+export function applyBoundedListRemove<T>(options: {
+  entries: readonly T[]
+  key: string
+  getKey: (item: T) => string
+}): BoundedRemoveMutation<T> | null {
+  const { entries, key, getKey } = options
+  const removedIndex = entries.findIndex((item) => getKey(item) === key)
+  if (removedIndex < 0) return null
+  const removedEntry = entries[removedIndex]!
+  const next = entries.filter((item) => getKey(item) !== key)
+  return {
+    next,
+    removedKey: key,
+    removedEntry,
+    removedIndex,
+  }
+}
+
+export function undoBoundedListRemove<T>(options: {
+  entries: readonly T[]
+  mutation: BoundedRemoveMutation<T>
+  getKey: (item: T) => string
+  maxEntries?: number
+}): BoundedUndoResult<T> {
+  const { entries, mutation, getKey, maxEntries = DEFAULT_MAX_SAVED_ENTRIES } = options
+  if (entries.some((item) => getKey(item) === mutation.removedKey)) {
+    return { ok: false, conflict: true, next: [...entries] }
+  }
+  if (entries.length >= maxEntries) {
+    return { ok: false, conflict: true, next: [...entries] }
+  }
+  const idx = Math.min(Math.max(mutation.removedIndex, 0), entries.length)
+  const next = [...entries.slice(0, idx), mutation.removedEntry, ...entries.slice(idx)]
+  return { ok: true, next }
 }
 
 const OFFLINE_ERROR_CODES = new Set([

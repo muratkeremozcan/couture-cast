@@ -88,6 +88,42 @@ export function scheduleStylePiecePhotoExpiry(expiresAt: number, onExpiry: () =>
 
 const STYLE_PIECE_REFRESH_MS = 60_000
 
+export type StylePieceActionRefreshResult =
+  | { status: 'ok'; anchor: StylePiecePhotoAnchor }
+  | { status: 'revoked' }
+  | { status: 'error'; error: unknown }
+
+function isAuthOrDeadlineRevocationError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const candidate = error as {
+    name?: unknown
+    status?: unknown
+    message?: unknown
+    response?: { status?: unknown }
+    cause?: unknown
+  }
+  if (candidate.name === 'AbortError' || candidate.name === 'TimeoutError') return true
+  const status =
+    typeof candidate.status === 'number'
+      ? candidate.status
+      : typeof candidate.response?.status === 'number'
+        ? candidate.response.status
+        : undefined
+  if (status === 401 || status === 403) return true
+  if (
+    typeof candidate.message === 'string' &&
+    /\b(401|403|unauthorized|forbidden|session expired|sign in again)\b/i.test(
+      candidate.message
+    )
+  ) {
+    return true
+  }
+  if (candidate.cause && candidate.cause !== error) {
+    return isAuthOrDeadlineRevocationError(candidate.cause)
+  }
+  return false
+}
+
 export function createStylePieceRefresh({
   garmentId,
   load,
@@ -106,7 +142,11 @@ export function createStylePieceRefresh({
   let flight:
     | { controller: AbortController; result: Promise<StylePiecePhotoAnchor | null> }
     | undefined
+  const actionControllers = new Set<AbortController>()
   const active = () => !stopped && interval !== undefined && isCurrent()
+
+  const currentValidAnchor = () =>
+    active() && latest && Date.parse(latest.photo.expiresAt) > Date.now() ? latest : null
 
   const publish = (anchor: StylePiecePhotoAnchor | null) => {
     latest = anchor
@@ -145,11 +185,46 @@ export function createStylePieceRefresh({
     return result
   }
 
+  const refreshForAction = async (): Promise<StylePieceActionRefreshResult> => {
+    if (!active()) return { status: 'revoked' }
+    if (!currentValidAnchor()) {
+      publish(null)
+      return { status: 'revoked' }
+    }
+    const controller = new AbortController()
+    actionControllers.add(controller)
+    const valid = () => !controller.signal.aborted && active()
+    try {
+      const items = await load(controller.signal)
+      if (!valid()) return { status: 'revoked' }
+      const anchor = items ? selectStylePieceAnchor(items, garmentId) : null
+      if (!anchor) {
+        publish(null)
+        return { status: 'revoked' }
+      }
+      publish(anchor)
+      return { status: 'ok', anchor }
+    } catch (error) {
+      if (!valid()) return { status: 'revoked' }
+      if (isAuthOrDeadlineRevocationError(error) || !currentValidAnchor()) {
+        publish(null)
+        return { status: 'revoked' }
+      }
+      // Transient transport or 5xx error while the anchor is still valid & unexpired:
+      // preserve the on-screen look so the caller can show Failed/Retry or Offline.
+      return { status: 'error', error }
+    } finally {
+      actionControllers.delete(controller)
+    }
+  }
+
   const pause = () => {
     clearInterval(interval)
     interval = undefined
     flight?.controller.abort()
     flight = undefined
+    for (const controller of actionControllers) controller.abort()
+    actionControllers.clear()
     cancelExpiry?.()
     cancelExpiry = undefined
     latest = null
@@ -157,10 +232,9 @@ export function createStylePieceRefresh({
 
   return {
     refresh,
+    refreshForAction,
     currentAnchor() {
-      return active() && latest && Date.parse(latest.photo.expiresAt) > Date.now()
-        ? latest
-        : null
+      return currentValidAnchor()
     },
     setVisible(visible: boolean) {
       if (stopped || !isCurrent()) return

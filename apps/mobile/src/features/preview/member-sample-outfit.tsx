@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
+  applyBoundedListRemove,
+  applyBoundedListSave,
   createAnnouncementToken,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
@@ -15,14 +17,17 @@ import {
   SAMPLE_CATALOG,
   saveSampleBookmark,
   swapMemberSampleGarment,
+  undoBoundedListRemove,
+  undoBoundedListSave,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
+  type BoundedSaveMutation,
   type SampleBookmark,
   type SampleGarmentCategory,
   type SampleOutfitResult,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
-import { useStatusBar } from '@/components/save-feedback'
+import { setMobilePrimaryActionClearance, useStatusBar } from '@/components/save-feedback'
 import { mobileApplicationUserId } from '@/src/lib/mobile-auth'
 import { sampleRecipeStorage } from '@/src/lib/sample-recipe-storage'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
@@ -32,14 +37,25 @@ export function HomeAddGarment() {
   const { i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
   const palette = useHeroPalette()
+  useEffect(() => () => setMobilePrimaryActionClearance(0), [])
   return (
-    <PreviewButton
-      label={strings.firstUse.addGarment}
-      testID="home-add-garment"
-      palette={palette}
-      onPress={() => router.navigate('/wardrobe?entry=add')}
-      primary
-    />
+    <View
+      testID="home-add-garment-container"
+      onLayout={(event) => {
+        const height = Math.ceil(event.nativeEvent.layout.height)
+        if (height > 0) {
+          setMobilePrimaryActionClearance(height + 8)
+        }
+      }}
+    >
+      <PreviewButton
+        label={strings.firstUse.addGarment}
+        testID="home-add-garment"
+        palette={palette}
+        onPress={() => router.navigate('/wardrobe?entry=add')}
+        primary
+      />
+    </View>
   )
 }
 
@@ -83,11 +99,7 @@ export function MemberSampleOutfit({
   >('loading')
   const bookmarksRef = useRef<SampleBookmark[]>([])
   bookmarksRef.current = bookmarks
-  const lastSavedBeforeRef = useRef<{
-    lookId: string
-    previous: SampleBookmark | undefined
-    previousIndex: number
-  } | null>(null)
+  const lastSavedMutationRef = useRef<BoundedSaveMutation<SampleBookmark> | null>(null)
   const bookmarkWriter = useRef<((value: string) => void) | null>(null)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
   const noticeSeqRef = useRef(0)
@@ -259,41 +271,36 @@ export function MemberSampleOutfit({
         persistent={bookmarkStorage === 'ready'}
         showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}
         ownerKey={owner}
+        useSharedFeedback
         saveResetKey={`${owner ?? 'anon'}:${lookId ?? 'none'}:${garmentsSignature}:${bookmarkRevision}`}
         onSave={() => {
           if (!lookId) return false
           lookUndoStackRef.current = []
-          const currentList = bookmarksRef.current
-          const previousIndex = currentList.findIndex(
-            (bookmark) => bookmark.lookId === lookId
-          )
-          lastSavedBeforeRef.current = {
-            lookId,
-            previous: previousIndex >= 0 ? currentList[previousIndex] : undefined,
-            previousIndex,
+          const [entry] = saveSampleBookmark([], result)
+          if (!entry) return false
+          const mutation = applyBoundedListSave({
+            entries: bookmarksRef.current,
+            entry,
+            getKey: (bookmark) => bookmark.lookId,
+          })
+          const ok = updateBookmarks(mutation.next)
+          if (ok) {
+            lastSavedMutationRef.current = mutation
           }
-          return updateBookmarks(saveSampleBookmark(currentList, result))
+          return ok
         }}
         onUndoSave={() => {
           if (!lookId) return false
-          const captured = lastSavedBeforeRef.current
-          const without = bookmarksRef.current.filter(
-            (bookmark) => bookmark.lookId !== lookId
-          )
-          const next =
-            captured && captured.lookId === lookId && captured.previous
-              ? [
-                  ...without.slice(
-                    0,
-                    Math.min(Math.max(captured.previousIndex, 0), without.length)
-                  ),
-                  captured.previous,
-                  ...without.slice(
-                    Math.min(Math.max(captured.previousIndex, 0), without.length)
-                  ),
-                ]
-              : without
-          return updateBookmarks(next)
+          const captured = lastSavedMutationRef.current
+          if (!captured || captured.savedKey !== lookId) return false
+          const undone = undoBoundedListSave({
+            entries: bookmarksRef.current,
+            mutation: captured,
+            getKey: (bookmark) => bookmark.lookId,
+            isSameEntry: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+          })
+          if (!undone.ok) return false
+          return updateBookmarks(undone.next)
         }}
         onOpen={(bookmark) => {
           lookUndoStackRef.current = []
@@ -301,64 +308,92 @@ export function MemberSampleOutfit({
           setResult((current) => reopenMemberSampleOutfit(current, bookmark))
         }}
         onRemove={(id) => {
-          const currentList = bookmarksRef.current
-          const removedIndex = currentList.findIndex((bookmark) => bookmark.lookId === id)
-          const removedBookmark =
-            removedIndex >= 0 ? currentList[removedIndex] : undefined
+          const removedMutation = applyBoundedListRemove({
+            entries: bookmarksRef.current,
+            key: id,
+            getKey: (bookmark) => bookmark.lookId,
+          })
+          if (!removedMutation) return
           setBookmarkRevision((value) => value + 1)
-          const ok = updateBookmarks(
-            currentList.filter((bookmark) => bookmark.lookId !== id),
-            { keepInMemoryOnError: true }
-          )
-          if (ok && removedBookmark) {
-            const seq = ++noticeSeqRef.current
-            statusBar.showNotice({
-              id: `sample-remove-${seq}`,
-              announcementId: createAnnouncementToken('sample-remove', seq),
-              message: t('feedback.removed'),
-              tone: 'neutral',
+          const ok = updateBookmarks(removedMutation.next, {
+            keepInMemoryOnError: true,
+          })
+          if (!ok) {
+            const failSeq = ++noticeSeqRef.current
+            statusBarRef.current.showNotice({
+              id: `sample-remove-failed-${failSeq}`,
+              announcementId: createAnnouncementToken('sample-remove-failed', failSeq),
+              message: t('feedback.saveFailed'),
+              tone: 'error',
               actions: [
                 {
-                  id: 'undo',
-                  kind: 'undo',
-                  label: t('feedback.undo'),
+                  id: 'retry',
+                  kind: 'retry',
+                  label: t('feedback.retry'),
                   onPress: () => {
-                    const latest = bookmarksRef.current.filter(
-                      (bookmark) => bookmark.lookId !== id
+                    const retryOk = updateBookmarks(
+                      bookmarksRef.current.filter((bookmark) => bookmark.lookId !== id),
+                      { keepInMemoryOnError: true }
                     )
-                    const idx = Math.min(Math.max(removedIndex, 0), latest.length)
-                    const restored = updateBookmarks([
-                      ...latest.slice(0, idx),
-                      removedBookmark,
-                      ...latest.slice(idx),
-                    ])
-                    const undoSeq = ++noticeSeqRef.current
-                    if (restored) {
-                      statusBar.showNotice({
-                        id: `sample-remove-undo-${undoSeq}`,
-                        announcementId: createAnnouncementToken(
-                          'sample-remove-undo',
-                          undoSeq
-                        ),
-                        message: t('feedback.undone'),
+                    if (retryOk) {
+                      const okSeq = ++noticeSeqRef.current
+                      statusBarRef.current.showNotice({
+                        id: `sample-remove-${okSeq}`,
+                        announcementId: createAnnouncementToken('sample-remove', okSeq),
+                        message: t('feedback.removed'),
                         tone: 'neutral',
-                      })
-                    } else {
-                      statusBar.showNotice({
-                        id: `sample-remove-undo-failed-${undoSeq}`,
-                        announcementId: createAnnouncementToken(
-                          'sample-remove-undo-failed',
-                          undoSeq
-                        ),
-                        message: t('feedback.saveFailed'),
-                        tone: 'error',
                       })
                     }
                   },
                 },
               ],
             })
+            return
           }
+          const seq = ++noticeSeqRef.current
+          statusBarRef.current.showNotice({
+            id: `sample-remove-${seq}`,
+            announcementId: createAnnouncementToken('sample-remove', seq),
+            message: t('feedback.removed'),
+            tone: 'neutral',
+            actions: [
+              {
+                id: 'undo',
+                kind: 'undo',
+                label: t('feedback.undo'),
+                onPress: () => {
+                  const undone = undoBoundedListRemove({
+                    entries: bookmarksRef.current,
+                    mutation: removedMutation,
+                    getKey: (bookmark) => bookmark.lookId,
+                  })
+                  const restored = undone.ok && updateBookmarks(undone.next)
+                  const undoSeq = ++noticeSeqRef.current
+                  if (restored) {
+                    statusBarRef.current.showNotice({
+                      id: `sample-remove-undo-${undoSeq}`,
+                      announcementId: createAnnouncementToken(
+                        'sample-remove-undo',
+                        undoSeq
+                      ),
+                      message: t('feedback.undone'),
+                      tone: 'neutral',
+                    })
+                  } else {
+                    statusBarRef.current.showNotice({
+                      id: `sample-remove-undo-failed-${undoSeq}`,
+                      announcementId: createAnnouncementToken(
+                        'sample-remove-undo-failed',
+                        undoSeq
+                      ),
+                      message: t('feedback.saveFailed'),
+                      tone: 'error',
+                    })
+                  }
+                },
+              },
+            ],
+          })
         }}
       />
       <PreviewSwapSheet

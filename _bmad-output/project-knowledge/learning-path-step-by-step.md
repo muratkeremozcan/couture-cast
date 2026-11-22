@@ -20893,13 +20893,14 @@ Test per report:
 
 User/business impact:
 
-Before this step, saving a look in Style this piece on web wrote only to an `sr-only` status node,
-Home sample bookmarks had no saving, failure, or undo status bar, and neither platform had a shared
-offline banner under the top bar. Members could not tell whether a save succeeded, stalled, failed,
-or could be reversed. Story CC-7.1 introduces one shared save-and-status feedback state machine and
-UI kit on web and mobile (with all ten locales) so every save, remove, swap, and shuffle reports
-clear state transitions, offers Undo or Retry in a 5-second non-overlapping bottom status bar, and
-shows a single offline line under the top bar until connectivity returns.
+Before this step, Style this piece saved device-local recipes and exposed confirmation through a
+screen-reader-only status, Home sample bookmarks had no saving, failure, or undo status bar, and
+neither platform had a shared offline banner under the top bar. Members could not tell whether a
+save succeeded, stalled, failed, or could be reversed. Story CC-7.1 introduces one shared
+save-and-status feedback state machine and UI kit on web and mobile (with all ten locales) so every
+save, remove, swap, and shuffle reports clear state transitions, offers Undo or Retry in a 5-second
+non-overlapping bottom status bar, and shows a single offline line under the top bar until
+connectivity returns.
 
 Key takeaways:
 
@@ -20950,12 +20951,13 @@ Story reference:
 
 - `_bmad-output/planning-artifacts/epics.md`, `Story CC-7.1: Shared save, undo and status feedback`.
 - `_bmad-output/implementation-artifacts/spec-7-1-shared-save-undo-status-feedback.md`.
+- [`_bmad-output/plan-style-one-piece.md`](../plan-style-one-piece.md) (Style this piece surface baseline).
 
 Cross-links:
 
-- Step 24 provides web and mobile accessibility focus, reduced motion, and contrast tokens.
-- Step 56 provides the sample wardrobe outfit preview and Style this piece flows wired here.
-- Step 60 (CC-7.2) builds account-backed saved-look persistence on top of this shared save control.
+- Step 28 provides web and mobile accessibility focus, reduced motion, and contrast tokens.
+- Step 56 provides the sample wardrobe guest preview baseline.
+- Planned CC-7.2 builds account-backed saved-look persistence on top of this shared save control.
 
 Sequence to follow:
 
@@ -20995,36 +20997,49 @@ Tests that cover this step:
 Shared utils, Vitest:
 
 - [`packages/utils/src/save-feedback/save-feedback.test.ts`](../../packages/utils/src/save-feedback/save-feedback.test.ts):
-  proves all state transitions (`idle`, `saving`, `still-saving`, `saved`, `failed`, `offline`,
-  `undo`), timing constants, 2-action clamping, stale-run rejection, bounded undo stack, and
-  offline error classification.
+  unit tests for state transitions (`idle`, `saving`, `still-saving`, `saved`, `failed`, `offline`,
+  `undo`), timing constants, 2-action clamping, stale-run rejection, bounded undo stack,
+  bounded-list Save/Remove Undo with eviction and capacity conflict handling, and offline error
+  classification.
 
-Web unit and locale parity, Vitest:
+Web unit, surface, and locale parity, Vitest:
 
 - [`apps/web/src/app/components/save-feedback/save-feedback.test.tsx`](../../apps/web/src/app/components/save-feedback/save-feedback.test.tsx):
-  proves fast/slow commits, failure with Retry, offline banner and offline save protection, Undo
-  for save/unsave/swap/shuffle, single screen-reader announcement per state (including inline modal
-  and consecutive identical messages), notice dismissal on unmount/owner switch, non-overlap rect
-  avoidance, and StylePiecePanel offline protection.
+  unit/harness proofs for fast/slow commits, failure with Retry, offline banner and reconnect,
+  offline Retry guard, sibling control isolation, superseded Save/Undo timer and epoch guards,
+  inline modal announcer and keyed consecutive announcements, notice dismissal on unmount/owner
+  switch, non-overlap rect avoidance, plus integrated `StylePiecePanel` transient failure,
+  revocation, offline save, companion swap reset, and `HomeRitual` full-capacity Undo and
+  old-session Web Lock notice isolation tests.
 - [`apps/web/src/i18n/save-feedback-locales.spec.ts`](../../apps/web/src/i18n/save-feedback-locales.spec.ts):
-  proves all 18 `feedback.*` keys exist in all ten web locales, are translated outside English, and
-  keep English button labels to three words or fewer.
+  ten-locale parity for all 18 `feedback.*` keys, non-English translation checks, and concise
+  English button labels (<= 3 words).
+- Existing integrated web suites verified without loosening assertions:
+  `apps/web/src/app/wardrobe/page.styling.test.tsx`,
+  `apps/web/src/app/components/home-ritual.test.tsx`, and
+  `apps/web/src/app/components/guest-preview/` (`guest-preview.test.tsx`,
+  `guest-preview-review.test.tsx`, `guest-preview-entry.test.tsx`).
 
-Mobile unit and locale parity, Vitest:
+Mobile unit, surface, and locale parity, Vitest:
 
 - [`apps/mobile/components/save-feedback/save-feedback.test.tsx`](../../apps/mobile/components/save-feedback/save-feedback.test.tsx):
-  proves mobile fast/slow commits, failure with Retry, native offline recovery without deadlock,
-  offline banner under top bar, Undo for save/unsave/swap/shuffle, immediate single announcement
-  without 80 ms debounce drop, reduced motion, dynamic tab-bar clearance, and StylePiecePanel
-  offline protection.
+  unit/harness proofs for fast/slow commits, failure with Retry, default `EXPO_PUBLIC_API_BASE_URL`
+  native probe disconnect/reconnect, offline Retry guard, sibling control isolation, superseded
+  Save/Undo guards, immediate single announcement without 80 ms debounce drop or repeat-text
+  suppression, reduced motion, dynamic tab-bar and `onLayout` primary-action clearance, plus
+  integrated native `StylePiecePanel` transport failure / offline / reconnect tests.
 - [`apps/mobile/src/i18n/save-feedback-locales.spec.ts`](../../apps/mobile/src/i18n/save-feedback-locales.spec.ts):
-  proves mobile ten-locale parity with web `feedback.*` keys and short English labels.
+  ten-locale parity with web `feedback.*` keys and short English labels.
+- Existing integrated mobile suites verified without loosening assertions:
+  `apps/mobile/src/screens/root-layout-startup.test.tsx`,
+  `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx`,
+  `apps/mobile/src/screens/hero-identity-cache.test.tsx`, and
+  `apps/mobile/src/features/preview/guest-preview-screen.test.tsx`.
 
 Evidence boundaries:
 
-- Targeted Vitest suites across `@couture/utils` (10 tests), `apps/web` (84 tests across 5 files),
-  and `apps/mobile` (92 tests across 6 files), plus `tsc --noEmit` in `@couture/utils`, `web`, and
-  `mobile`, and `eslint --max-warnings=0` ran locally.
+- Targeted Vitest suites across `@couture/utils`, `apps/web`, and `apps/mobile`, plus `tsc --noEmit`
+  in `@couture/utils`, `web`, and `mobile`, and `eslint --max-warnings=0` ran locally.
 - Full workspace suites, Playwright E2E, and native device lanes run in CI on the PR.
-- Real-device VoiceOver/TalkBack announcement cadence and physical-device iOS/Android safe-area
-  visual alignment are not proved by headless Vitest runs.
+- Real-device VoiceOver/TalkBack announcement cadence, real phone viewport geometry, and physical
+  iOS/Android safe-area visual alignment are not proved by headless Vitest runs.
