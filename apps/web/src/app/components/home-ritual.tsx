@@ -647,6 +647,7 @@ function SampleOutfitInner({
                             accessToken: actionToken,
                           })
                           if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                          deletedIdsRef.current.delete(restored.id)
                           mutationVersionRef.current += 1
                           const restoredList = [
                             restored,

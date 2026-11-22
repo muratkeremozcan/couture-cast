@@ -588,6 +588,7 @@ export function MemberSampleOutfit({
                 accessToken: actionToken,
               })
               if (!isLiveSession(actionOwner, actionEpoch)) return
+              deletedIdsRef.current.delete(restored.id)
               mutationVersionRef.current += 1
               const restoredList = [
                 restored,
