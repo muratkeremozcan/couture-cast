@@ -12,6 +12,7 @@ import type { GuardianConsentStateService } from '../../../../apps/api/src/modul
 export function createIdentityDoubles() {
   const guardianConsentStateService = {
     canTeenAccess: () => Promise.resolve(true),
+    canTeenAccessNonUploadSurface: () => Promise.resolve(true),
   } as unknown as GuardianConsentStateService
   const accessTokenIdentityService = {
     resolveIdentity(token: string) {

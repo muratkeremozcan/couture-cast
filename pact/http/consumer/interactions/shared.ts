@@ -178,6 +178,10 @@ export type ContractApiClient = Pick<
   | 'apiV1LocationsLocationIdPrimaryPost'
   | 'apiV1LocationsLocationIdPatch'
   | 'apiV1LocationsLocationIdDelete'
+  // Story 7.2 account-backed saved looks.
+  | 'apiV1WardrobeSavedLooksGet'
+  | 'apiV1WardrobeSavedLooksPost'
+  | 'apiV1WardrobeSavedLooksSavedLookIdDelete'
 >
 
 export type CreateClient = (mockServer: V3MockServer) => ContractApiClient

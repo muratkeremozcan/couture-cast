@@ -97,6 +97,12 @@ enum CapsuleOccasion {
   home
 }
 
+/// Story CC-7.2: origin surface for an account-backed saved look.
+enum SavedLookSource {
+  style_piece
+  home_sample
+}
+
 enum GarmentUploadStatus {
   pending_upload
   bytes_uploaded
@@ -320,6 +326,7 @@ model User {
   capsules                            OutfitCapsule[]
   capsule_garments                    OutfitCapsuleGarment[]
   capsule_telemetry_claims            CapsuleTelemetryClaim[]
+  saved_looks                         SavedLook[]
   wardrobe_onboarding_state           WardrobeOnboardingState?
   silhouette_profile                  SilhouetteProfile?
   commerce_preference                 CommercePreference?
@@ -2363,4 +2370,37 @@ model CommunityPostSponsorship {
   @@index([offer_id])
   @@index([created_by_id])
   @@index([ended_by_id])
+}
+
+/// Story CC-7.2: Account-backed saved looks from Style this piece and Home sample.
+/// Intentionally carries no FK to GarmentItem so deleting a garment preserves the
+/// saved look and surfaces the explicit missing-piece placeholder instead of silently
+/// dropping the look. Ownership is enforced via user_id FK (ON DELETE CASCADE) + RLS
+/// and strict API owner scoping on every garment lookup.
+model SavedLook {
+  id                       String          @id @default(cuid())
+  user                     User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                  String
+  source                   SavedLookSource
+  look_id                  String
+  weather                  String
+  title                    String?
+  anchor_garment_id        String?
+  anchor_snapshot          Json?
+  composition              Json
+  swaps                    Json
+  collection               String?
+  comfort                  Json?
+  revision                 Int             @default(0)
+  idempotency_key          String?
+  idempotency_payload_hash String?
+  deleted_at               DateTime?
+  created_at               DateTime        @default(now())
+  updated_at               DateTime        @updatedAt
+
+  @@unique([id, user_id])
+  @@unique([user_id, idempotency_key])
+  @@index([user_id, deleted_at, updated_at(sort: Desc), id(sort: Asc)])
+  @@index([user_id, source, anchor_garment_id])
+  @@map("SavedLook")
 }

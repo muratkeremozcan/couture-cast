@@ -1059,5 +1059,26 @@
     "lookUpdated": "Look updated.",
     "pieceSwapped": "Piece swapped.",
     "close": "Close"
+  },
+  "savedLooks": {
+    "title": "Saved looks",
+    "count": "{{count}} saved",
+    "empty": "No saved looks yet.",
+    "reopen": "Reopen",
+    "remove": "Remove",
+    "missingPiece": "Missing piece",
+    "missingPieceDetail": "A garment from this saved look is no longer in your closet.",
+    "needsReview": "Needs review",
+    "needsReviewDetail": "You changed tags on a piece in this look. Review it to make sure it still fits.",
+    "photoUnavailable": "Photo unavailable",
+    "loadFailed": "Could not load your saved looks.",
+    "retry": "Retry",
+    "detailTitle": "Saved look",
+    "sourceStylePiece": "From your piece",
+    "sourceHomeSample": "From sample idea",
+    "slotOrderLabel": "Pieces in this look",
+    "close": "Close",
+    "showList": "Show saved looks",
+    "hideList": "Hide saved looks"
   }
 }

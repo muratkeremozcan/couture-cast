@@ -1315,5 +1315,26 @@
     "lookUpdated": "Look atualizado.",
     "pieceSwapped": "Peça trocada.",
     "close": "Fechar"
+  },
+  "savedLooks": {
+    "title": "Looks salvos",
+    "count": "{{count}} salvos",
+    "empty": "Nenhum look salvo ainda.",
+    "reopen": "Reabrir",
+    "remove": "Remover",
+    "missingPiece": "Peça ausente",
+    "missingPieceDetail": "Uma peça deste look salvo não está mais no seu closet.",
+    "needsReview": "Precisa de revisão",
+    "needsReviewDetail": "Você alterou as tags de uma peça neste look. Revise para confirmar que ainda combina.",
+    "photoUnavailable": "Foto indisponível",
+    "loadFailed": "Não foi possível carregar seus looks salvos.",
+    "retry": "Tentar novamente",
+    "detailTitle": "Look salvo",
+    "sourceStylePiece": "Da sua peça",
+    "sourceHomeSample": "De uma ideia de exemplo",
+    "slotOrderLabel": "Peças neste look",
+    "close": "Fechar",
+    "showList": "Mostrar looks salvos",
+    "hideList": "Ocultar looks salvos"
   }
 }

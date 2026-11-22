@@ -1315,5 +1315,26 @@
     "lookUpdated": "Kombin güncellendi.",
     "pieceSwapped": "Parça değiştirildi.",
     "close": "Kapat"
+  },
+  "savedLooks": {
+    "title": "Kaydedilen kombinler",
+    "count": "{{count}} kayıtlı",
+    "empty": "Henüz kaydedilen kombin yok.",
+    "reopen": "Tekrar aç",
+    "remove": "Kaldır",
+    "missingPiece": "Eksik parça",
+    "missingPieceDetail": "Bu kayıtlı kombindeki bir parça artık dolabında değil.",
+    "needsReview": "Gözden geçir",
+    "needsReviewDetail": "Bu kombindeki bir parçanın etiketlerini değiştirdin. Hâlâ uyumlu olduğundan emin olmak için gözden geçir.",
+    "photoUnavailable": "Fotoğraf kullanılamıyor",
+    "loadFailed": "Kaydedilen kombinlerin yüklenemedi.",
+    "retry": "Tekrar dene",
+    "detailTitle": "Kaydedilen kombin",
+    "sourceStylePiece": "Senin parçandan",
+    "sourceHomeSample": "Örnek fikirden",
+    "slotOrderLabel": "Bu kombindeki parçalar",
+    "close": "Kapat",
+    "showList": "Kaydedilen kombinleri göster",
+    "hideList": "Kaydedilen kombinleri gizle"
   }
 }

@@ -1,7 +1,10 @@
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import 'reflect-metadata'
-import { API_TRANSACTIONAL_CONSENT_KEY } from './security.decorators'
+import {
+  API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+  API_TRANSACTIONAL_CONSENT_KEY,
+} from './security.decorators'
 import {
   ForbiddenException,
   UnauthorizedException,
@@ -34,11 +37,16 @@ function createExecutionContext(headers: Record<string, string>) {
 
 function createGuard(
   identity: AccessTokenIdentity = { userId: 'guardian-1', role: 'guardian' },
-  teenAccessAllowed = true
+  teenAccessAllowed = true,
+  teenNonUploadAccessAllowed = true
 ) {
   const canTeenAccess = vi.fn().mockResolvedValue(teenAccessAllowed)
+  const canTeenAccessNonUploadSurface = vi
+    .fn()
+    .mockResolvedValue(teenNonUploadAccessAllowed)
   const guardianConsentStateService = {
     canTeenAccess,
+    canTeenAccessNonUploadSurface,
   } as unknown as GuardianConsentStateService
   const resolveIdentity = vi.fn().mockResolvedValue(identity)
   const accessTokenIdentityService = {
@@ -47,6 +55,7 @@ function createGuard(
 
   return {
     canTeenAccess,
+    canTeenAccessNonUploadSurface,
     guard: new RequestAuthGuard(guardianConsentStateService, accessTokenIdentityService),
     resolveIdentity,
   }
@@ -144,5 +153,39 @@ describe('Story 6.3 consent-loss retractions', () => {
     request.body.selection = null
     Reflect.deleteMetadata(API_TRANSACTIONAL_CONSENT_KEY, handler)
     await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException)
+  })
+
+  it('allows guardian-pending teen on non-upload surfaces while still blocking suspended teens', async () => {
+    const handler = () => undefined
+    Reflect.defineMetadata(API_ALLOW_PENDING_GUARDIAN_TEEN_KEY, true, handler)
+    const request = { headers: { authorization: 'Bearer teen-token' } }
+    const context = {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => handler,
+      getClass: () => class DummyController {},
+    } as unknown as ExecutionContext
+
+    const pendingAllowed = createGuard(
+      { userId: 'teen-pending', role: 'teen' },
+      false,
+      true
+    )
+    await expect(pendingAllowed.guard.canActivate(context)).resolves.toBe(true)
+    expect(pendingAllowed.canTeenAccessNonUploadSurface).toHaveBeenCalledWith(
+      'teen-pending'
+    )
+    expect(pendingAllowed.canTeenAccess).not.toHaveBeenCalled()
+
+    const suspendedBlocked = createGuard(
+      { userId: 'teen-suspended', role: 'teen' },
+      false,
+      false
+    )
+    await expect(suspendedBlocked.guard.canActivate(context)).rejects.toThrow(
+      ForbiddenException
+    )
+    expect(suspendedBlocked.canTeenAccessNonUploadSurface).toHaveBeenCalledWith(
+      'teen-suspended'
+    )
   })
 })

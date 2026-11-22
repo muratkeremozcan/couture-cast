@@ -6,29 +6,27 @@ import { useTranslation } from 'react-i18next'
 import {
   garmentCategoryEnum,
   type RitualResponse,
+  type SavedLookContract,
   type ScenarioOutfit,
 } from '@couture/api-client/contracts/http'
 import {
-  applyBoundedListRemove,
-  applyBoundedListSave,
+  buildHomeSampleSavedLookInput,
   createAnnouncementToken,
+  createIdempotencyKey,
   createMemberSampleOutfit,
   getGuestPreviewStrings,
-  parseSampleBookmarks,
+  isOfflineError,
   popLookUndoSnapshot,
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
-  saveSampleBookmark,
+  savedLookMatchesHomeSample,
+  savedLookToSampleBookmark,
   swapMemberSampleGarment,
-  undoBoundedListRemove,
-  undoBoundedListSave,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
-  type BoundedRemoveMutation,
-  type BoundedSaveMutation,
   type GuestPreviewStrings,
   type SampleGarmentCategory,
   type SampleBookmark,
@@ -36,10 +34,19 @@ import {
   type StatusBarNoticeInput,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
-import { readStorage } from '../../lib/browser-persistence'
 import { formatPlannerTemperature } from '../../lib/planner'
 import { captureLocationCredentials, listLocationsFromWeb } from '../../lib/locations'
 import { getRitualFromWeb, ritualFailure, SET_CITY_FROM_HOME } from '../../lib/ritual'
+import {
+  createSavedLookFromWeb,
+  deleteSavedLookFromWeb,
+  formatSavedLookIfMatch,
+  getSavedLookFromWeb,
+  listSavedLooksFromWeb,
+  notifySavedLooksChanged,
+  restoreSavedLookFromWeb,
+  SavedLookRequestError,
+} from '../../lib/saved-looks'
 import {
   currentWebSessionBearer,
   isLiveOwner,
@@ -50,7 +57,7 @@ import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
-import { useStatusBar } from './save-feedback'
+import { SaveFeedbackProvider, useStatusBar } from './save-feedback'
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
@@ -63,19 +70,74 @@ function resetSampleForOwner(owner: string | null) {
   if (retainedSample?.owner !== owner) retainedSample = undefined
 }
 
-type BookmarkChange = (bookmarks: SampleBookmark[]) => SampleBookmark[] | null
+function buildHomeSampleAttemptKey(
+  owner: string,
+  lookId: string,
+  garmentsSignature: string,
+  weather: string,
+  payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>
+): string {
+  const comfort = payload.comfort!
+  const comfortSig = `${comfort.runsColdWarm}/${comfort.windTolerance}/${comfort.precipPreparedness}`
+  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection!}:${comfortSig}:${JSON.stringify(payload.swaps)}`
+}
 
-function replayBookmarkChanges(
-  bookmarks: SampleBookmark[],
-  changes: Iterable<BookmarkChange>
-): { next: SampleBookmark[]; aborted: boolean } {
-  let current = bookmarks
-  for (const change of changes) {
-    const result = change(current)
-    if (result === null) return { next: current, aborted: true }
-    current = result
+function mergeInitialSavedLooks(
+  current: SavedLookContract[],
+  fetched: SavedLookContract[],
+  deletedIds: ReadonlySet<string>
+): SavedLookContract[] {
+  const seen = new Set(current.map((item) => item.id))
+  const merged = [...current]
+  for (const item of fetched) {
+    if (seen.has(item.id) || deletedIds.has(item.id)) continue
+    seen.add(item.id)
+    merged.push(item)
   }
-  return { next: current, aborted: false }
+  return merged
+}
+
+async function confirmWebSavedLookExists(
+  existing: SavedLookContract,
+  accessToken: string | undefined,
+  deletedIds: ReadonlySet<string>,
+  onVerifiedUnchanged: (verified: SavedLookContract) => void
+): Promise<boolean> {
+  try {
+    const record = await getSavedLookFromWeb(existing.id, { accessToken })
+    if (deletedIds.has(record.id)) return false
+    onVerifiedUnchanged(record)
+    return true
+  } catch (error) {
+    if (error instanceof SavedLookRequestError && error.status === 404) {
+      return false
+    }
+    throw error
+  }
+}
+
+async function createWebSavedLookWithKey(
+  payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>,
+  attemptKey: string,
+  attemptKeys: Map<string, string>,
+  accessToken: string | undefined
+): Promise<SavedLookContract | null> {
+  const idempotencyKey = attemptKeys.get(attemptKey) ?? createIdempotencyKey()
+  attemptKeys.set(attemptKey, idempotencyKey)
+  try {
+    const created = await createSavedLookFromWeb(payload, {
+      accessToken,
+      idempotencyKey,
+    })
+    attemptKeys.delete(attemptKey)
+    return created
+  } catch (error) {
+    if (error instanceof SavedLookRequestError && error.status === 409) {
+      attemptKeys.delete(attemptKey)
+      if (error.code === 'SAVED_LOOK_ALREADY_REMOVED') return null
+    }
+    throw error
+  }
 }
 
 function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
@@ -91,7 +153,22 @@ function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
   )
 }
 
-function SampleOutfit({
+function SampleOutfit(props: {
+  owner: string
+  locale: string
+  strings: GuestPreviewStrings
+  actions: ReactNode
+}) {
+  const { hasProvider } = useStatusBar()
+  if (hasProvider) return <SampleOutfitInner {...props} />
+  return (
+    <SaveFeedbackProvider inline renderOfflineLine={false}>
+      <SampleOutfitInner {...props} />
+    </SaveFeedbackProvider>
+  )
+}
+
+function SampleOutfitInner({
   owner,
   locale,
   strings,
@@ -108,23 +185,26 @@ function SampleOutfit({
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
   )
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
-  const bookmarkKey = `couturecast.member-sample-bookmarks.${owner}`
-  const [bookmarks, setBookmarks] = useState(() =>
-    parseSampleBookmarks(readStorage('local', bookmarkKey), SAMPLE_CATALOG)
-  )
+  const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
   const [bookmarksPersistent, setBookmarksPersistent] = useState(true)
   const [bookmarkRevision, setBookmarkRevision] = useState(0)
-  const bookmarksRef = useRef(bookmarks)
-  bookmarksRef.current = bookmarks
-  const lastSavedMutationRef = useRef<BoundedSaveMutation<SampleBookmark> | null>(null)
-  const storedBookmarks = useRef(bookmarks)
-  const pendingBookmarkChanges = useRef(new Map<string, BookmarkChange>())
+  const savedLooksRef = useRef<SavedLookContract[]>([])
+  savedLooksRef.current = savedLooks
+  const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
+  const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  const saveRunSeqRef = useRef(0)
+  const deletedIdsRef = useRef<Set<string>>(new Set())
+  const mutationVersionRef = useRef(0)
   const bookmarkOwnerMounted = useRef(true)
   const lookUndoStackRef = useRef<SampleOutfitResult[]>([])
   const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
   const noticeSeqRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+
+  const readLiveOnline = () =>
+    statusBarRef.current.isOnline &&
+    (typeof navigator === 'undefined' || navigator.onLine !== false)
 
   const dismissOwnedNotices = () => {
     for (const id of ownedNoticeIdsRef.current) {
@@ -142,92 +222,57 @@ function SampleOutfit({
   useEffect(() => {
     bookmarkOwnerMounted.current = true
     const ownedNotices = ownedNoticeIdsRef.current
-    const onStorage = (event: StorageEvent) => {
-      if (!isLiveOwner(owner) || (event.key !== null && event.key !== bookmarkKey)) return
-      try {
-        const storage = window.localStorage
-        if (event.storageArea !== storage) return
-        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
-        const pending = pendingBookmarkChanges.current
-        storedBookmarks.current = stored
-        const replayed = replayBookmarkChanges(stored, pending.values())
-        bookmarksRef.current = replayed.next
-        setBookmarks(replayed.next)
-        setBookmarksPersistent(pending.size === 0)
-      } catch {
-        setBookmarksPersistent(false)
-      }
-    }
-    window.addEventListener('storage', onStorage)
+    saveAttemptKeysRef.current.clear()
+    deletedIdsRef.current.clear()
+    saveRunSeqRef.current += 1
+    lastCreatedRef.current = null
+    const controller = new AbortController()
+    const loadVersion = mutationVersionRef.current
+    void listSavedLooksFromWeb({ source: 'home_sample', signal: controller.signal })
+      .then((items) => {
+        if (
+          controller.signal.aborted ||
+          !bookmarkOwnerMounted.current ||
+          !isLiveOwner(owner)
+        )
+          return
+        const next =
+          mutationVersionRef.current === loadVersion
+            ? items
+            : mergeInitialSavedLooks(savedLooksRef.current, items, deletedIdsRef.current)
+        savedLooksRef.current = next
+        setSavedLooks(next)
+        setBookmarksPersistent(true)
+      })
+      .catch(() => {
+        if (
+          !controller.signal.aborted &&
+          bookmarkOwnerMounted.current &&
+          mutationVersionRef.current === loadVersion
+        ) {
+          setBookmarksPersistent(false)
+        }
+      })
     return () => {
       bookmarkOwnerMounted.current = false
-      window.removeEventListener('storage', onStorage)
+      controller.abort()
       for (const id of ownedNotices) {
         statusBarRef.current.dismissNotice(id)
       }
       ownedNotices.clear()
     }
-  }, [bookmarkKey, owner])
+  }, [owner])
 
-  const updateBookmarks = (
-    lookId: string,
-    change: BookmarkChange,
-    options?: { allowConflictAbort?: boolean }
-  ): boolean | Promise<boolean> => {
-    const apply = (): boolean => {
-      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
-      // Snapshot the prior queue before mutating so conflict aborts or failed undo writes
-      // restore the exact preceding queue order without stranding a failed undo.
-      const pending = pendingBookmarkChanges.current
-      const priorQueue = new Map(pending)
-      pending.delete(lookId)
-      pending.set(lookId, change)
-      let next: SampleBookmark[]
-      let aborted = false
-      let failedWrite = false
-      try {
-        const storage = window.localStorage
-        const stored = parseSampleBookmarks(storage.getItem(bookmarkKey), SAMPLE_CATALOG)
-        storedBookmarks.current = stored
-        const replayed = replayBookmarkChanges(stored, pending.values())
-        if (replayed.aborted) {
-          aborted = true
-          pendingBookmarkChanges.current = priorQueue
-          next = replayBookmarkChanges(stored, priorQueue.values()).next
-        } else {
-          next = replayed.next
-          storage.setItem(bookmarkKey, JSON.stringify(next))
-          storedBookmarks.current = next
-          pending.clear()
-        }
-      } catch {
-        failedWrite = true
-        if (options?.allowConflictAbort) {
-          pendingBookmarkChanges.current = priorQueue
-        }
-        const replayed = replayBookmarkChanges(
-          storedBookmarks.current,
-          pendingBookmarkChanges.current.values()
-        )
-        next = replayed.next
-      }
-      bookmarksRef.current = next
-      setBookmarks(next)
-      const persisted =
-        !aborted && !failedWrite && pendingBookmarkChanges.current.size === 0
-      if (!aborted) {
-        setBookmarksPersistent(persisted)
-      }
-      return persisted
-    }
-    if (navigator.locks) {
-      return navigator.locks.request(bookmarkKey, apply).catch(apply)
-    }
-    return apply()
+  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
+  for (const saved of savedLooks) {
+    const bookmark = savedLookToSampleBookmark(saved)
+    if (!bookmark) continue
+    bookmarks.push({ ...bookmark, savedLookId: saved.id })
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
     if (!isLiveOwner(owner)) return
+    saveRunSeqRef.current += 1
     retainedSample = { owner, result: next }
     setResult(next)
   }
@@ -330,39 +375,104 @@ function SampleOutfit({
         lookId={lookId}
         ownerKey={owner}
         useSharedFeedback
-        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${bookmarkRevision}`}
-        onSave={() => {
-          if (!lookId) return false
+        requiresNetwork
+        saveResetKey={`${owner}:${lookId ?? 'none'}:${garmentsSignature}:${result.input.weather}:${JSON.stringify(result.input.preferences)}:${bookmarkRevision}`}
+        onSave={async () => {
+          if (!lookId || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
+            return false
+          const saveSeq = ++saveRunSeqRef.current
           lookUndoStackRef.current = []
-          const [entry] = saveSampleBookmark([], result)
-          if (!entry) return false
-          return updateBookmarks(lookId, (current) => {
-            const mutation = applyBoundedListSave({
-              entries: current,
-              entry,
-              getKey: (bookmark) => bookmark.lookId,
-            })
-            lastSavedMutationRef.current = mutation
-            return mutation.next
-          })
-        }}
-        onUndoSave={() => {
-          if (!lookId) return false
-          const captured = lastSavedMutationRef.current
-          if (!captured || captured.savedKey !== lookId) return false
-          return updateBookmarks(
-            lookId,
-            (current) => {
-              const undone = undoBoundedListSave({
-                entries: current,
-                mutation: captured,
-                getKey: (bookmark) => bookmark.lookId,
-                isSameEntry: (a, b) => JSON.stringify(a) === JSON.stringify(b),
-              })
-              return undone.ok ? undone.next : null
-            },
-            { allowConflictAbort: true }
+          const payload = buildHomeSampleSavedLookInput(result)
+          if (!payload) return false
+          const actionToken = currentWebSessionBearer() ?? undefined
+          const existingMatch = savedLooksRef.current.find((item) =>
+            savedLookMatchesHomeSample(item, result)
           )
+          if (existingMatch) {
+            const checkVersion = mutationVersionRef.current
+            const verified = await confirmWebSavedLookExists(
+              existingMatch,
+              actionToken,
+              deletedIdsRef.current,
+              (record) => {
+                if (mutationVersionRef.current !== checkVersion) return
+                const refreshed = [
+                  record,
+                  ...savedLooksRef.current.filter((item) => item.id !== record.id),
+                ]
+                savedLooksRef.current = refreshed
+                setSavedLooks(refreshed)
+              }
+            )
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+            if (verified) {
+              if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              setBookmarksPersistent(true)
+              return { saved: true, undoable: false }
+            }
+            deletedIdsRef.current.add(existingMatch.id)
+            const pruned = savedLooksRef.current.filter(
+              (item) => item.id !== existingMatch.id
+            )
+            savedLooksRef.current = pruned
+            setSavedLooks(pruned)
+          }
+          const attemptKey = buildHomeSampleAttemptKey(
+            owner,
+            lookId,
+            garmentsSignature,
+            result.input.weather,
+            payload
+          )
+          const created = await createWebSavedLookWithKey(
+            payload,
+            attemptKey,
+            saveAttemptKeysRef.current,
+            actionToken
+          )
+          if (!created || !bookmarkOwnerMounted.current || !isLiveOwner(owner)) {
+            return false
+          }
+          deletedIdsRef.current.delete(created.id)
+          mutationVersionRef.current += 1
+          if (saveRunSeqRef.current === saveSeq) {
+            lastCreatedRef.current = created
+          }
+          const next = [
+            created,
+            ...savedLooksRef.current.filter((item) => item.id !== created.id),
+          ]
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          setBookmarksPersistent(true)
+          notifySavedLooksChanged(owner)
+          return true
+        }}
+        onUndoSave={async () => {
+          const created = lastCreatedRef.current
+          if (!created || !bookmarkOwnerMounted.current || !isLiveOwner(owner))
+            return false
+          const actionToken = currentWebSessionBearer() ?? undefined
+          try {
+            await deleteSavedLookFromWeb(
+              created.id,
+              formatSavedLookIfMatch(created.id, created.revision),
+              { accessToken: actionToken }
+            )
+          } catch (error) {
+            if (!(error instanceof SavedLookRequestError && error.status === 404)) {
+              throw error
+            }
+          }
+          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
+          deletedIdsRef.current.add(created.id)
+          mutationVersionRef.current += 1
+          lastCreatedRef.current = null
+          const next = savedLooksRef.current.filter((item) => item.id !== created.id)
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          notifySavedLooksChanged(owner)
+          return true
         }}
         onViewSaved={() => {
           document
@@ -375,72 +485,117 @@ function SampleOutfit({
           update(reopenMemberSampleOutfit(result, bookmark))
         }}
         onRemove={(id) => {
-          const runRemove = () => {
+          const handleRemoveError = (
+            kind: 'remove' | 'remove-undo',
+            error: unknown,
+            retry?: () => void
+          ) => {
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-            let removedMutation: BoundedRemoveMutation<SampleBookmark> | null = null
-            setBookmarkRevision((value) => value + 1)
-            const outcome = updateBookmarks(id, (current) => {
-              removedMutation = applyBoundedListRemove({
-                entries: current,
-                key: id,
-                getKey: (bookmark) => bookmark.lookId,
-              })
-              return removedMutation ? removedMutation.next : current
+            const failSeq = ++noticeSeqRef.current
+            const offline = isOfflineError(error) || !readLiveOnline()
+            showScopedNotice({
+              id: `sample-${owner}-${kind}-${offline ? 'offline' : 'failed'}-${failSeq}`,
+              announcementId: createAnnouncementToken(
+                `sample-${owner}-${kind}-${offline ? 'offline' : 'failed'}`,
+                failSeq
+              ),
+              message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+              tone: offline ? 'offline' : 'error',
+              actions:
+                !offline && retry
+                  ? [
+                      {
+                        id: 'retry',
+                        kind: 'retry',
+                        label: t('feedback.retry'),
+                        onPress: retry,
+                      },
+                    ]
+                  : [],
             })
-            const handleSettled = (ok: boolean) => {
-              if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-              if (!ok) {
-                const failSeq = ++noticeSeqRef.current
-                showScopedNotice({
-                  id: `sample-${owner}-remove-failed-${failSeq}`,
-                  announcementId: createAnnouncementToken(
-                    `sample-${owner}-remove-failed`,
-                    failSeq
-                  ),
-                  message: t('feedback.saveFailed'),
-                  tone: 'error',
-                  actions: [
-                    {
-                      id: 'retry',
-                      kind: 'retry',
-                      label: t('feedback.retry'),
-                      onPress: () => runRemove(),
-                    },
-                  ],
+          }
+          const runRemove = async () => {
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            const actionToken = currentWebSessionBearer() ?? undefined
+            if (!readLiveOnline()) {
+              handleRemoveError('remove', new TypeError('Failed to fetch'))
+              return
+            }
+            const target = savedLooksRef.current.find(
+              (item) => item.id === id || item.lookId === id
+            )
+            if (!target) return
+            setBookmarkRevision((value) => value + 1)
+            let alreadyDeleted = false
+            try {
+              await deleteSavedLookFromWeb(
+                target.id,
+                formatSavedLookIfMatch(target.id, target.revision),
+                { accessToken: actionToken }
+              )
+            } catch (error) {
+              if (error instanceof SavedLookRequestError && error.status === 404) {
+                alreadyDeleted = true
+              } else {
+                handleRemoveError('remove', error, () => {
+                  void runRemove()
                 })
                 return
               }
-              const capturedRemoval = removedMutation
-              if (!capturedRemoval) return
-              const seq = ++noticeSeqRef.current
-              showScopedNotice({
-                id: `sample-${owner}-remove-${seq}`,
-                announcementId: createAnnouncementToken(`sample-${owner}-remove`, seq),
-                message: t('feedback.removed'),
-                tone: 'neutral',
-                actions: [
-                  {
-                    id: 'undo',
-                    kind: 'undo',
-                    label: t('feedback.undo'),
-                    onPress: () => {
-                      if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-                      const restoreOutcome = updateBookmarks(
-                        id,
-                        (current) => {
-                          const undone = undoBoundedListRemove({
-                            entries: current,
-                            mutation: capturedRemoval,
-                            getKey: (bookmark) => bookmark.lookId,
+            }
+            if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+            deletedIdsRef.current.add(target.id)
+            mutationVersionRef.current += 1
+            const next = savedLooksRef.current.filter((item) => item.id !== target.id)
+            savedLooksRef.current = next
+            setSavedLooks(next)
+            notifySavedLooksChanged(owner)
+            let undoInFlight = false
+            const seq = ++noticeSeqRef.current
+            showScopedNotice({
+              id: `sample-${owner}-remove-${seq}`,
+              announcementId: createAnnouncementToken(`sample-${owner}-remove`, seq),
+              message: t('feedback.removed'),
+              tone: 'neutral',
+              actions: alreadyDeleted
+                ? []
+                : [
+                    {
+                      id: 'undo',
+                      kind: 'undo',
+                      label: t('feedback.undo'),
+                      onPress: async () => {
+                        if (
+                          undoInFlight ||
+                          !bookmarkOwnerMounted.current ||
+                          !isLiveOwner(owner)
+                        ) {
+                          return
+                        }
+                        if (!readLiveOnline()) {
+                          handleRemoveError(
+                            'remove-undo',
+                            new TypeError('Failed to fetch')
+                          )
+                          return
+                        }
+                        undoInFlight = true
+                        try {
+                          const restored = await restoreSavedLookFromWeb(target.id, {
+                            accessToken: actionToken,
                           })
-                          return undone.ok ? undone.next : null
-                        },
-                        { allowConflictAbort: true }
-                      )
-                      const finishUndo = (restoredOk: boolean) => {
-                        if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-                        const undoSeq = ++noticeSeqRef.current
-                        if (restoredOk) {
+                          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                          mutationVersionRef.current += 1
+                          const restoredList = [
+                            restored,
+                            ...savedLooksRef.current.filter(
+                              (item) => item.id !== restored.id
+                            ),
+                          ]
+                          savedLooksRef.current = restoredList
+                          setSavedLooks(restoredList)
+                          notifySavedLooksChanged(owner)
+                          const undoSeq = ++noticeSeqRef.current
                           showScopedNotice({
                             id: `sample-${owner}-remove-undo-${undoSeq}`,
                             announcementId: createAnnouncementToken(
@@ -450,38 +605,17 @@ function SampleOutfit({
                             message: t('feedback.undone'),
                             tone: 'neutral',
                           })
-                        } else {
-                          showScopedNotice({
-                            id: `sample-${owner}-remove-undo-failed-${undoSeq}`,
-                            announcementId: createAnnouncementToken(
-                              `sample-${owner}-remove-undo-failed`,
-                              undoSeq
-                            ),
-                            message: t('feedback.saveFailed'),
-                            tone: 'error',
-                          })
+                        } catch (undoError) {
+                          handleRemoveError('remove-undo', undoError)
+                        } finally {
+                          undoInFlight = false
                         }
-                      }
-                      if (
-                        restoreOutcome &&
-                        typeof (restoreOutcome as Promise<boolean>).then === 'function'
-                      ) {
-                        void (restoreOutcome as Promise<boolean>).then(finishUndo)
-                      } else {
-                        finishUndo(Boolean(restoreOutcome))
-                      }
+                      },
                     },
-                  },
-                ],
-              })
-            }
-            if (outcome && typeof (outcome as Promise<boolean>).then === 'function') {
-              void (outcome as Promise<boolean>).then(handleSettled)
-            } else {
-              handleSettled(Boolean(outcome))
-            }
+                  ],
+            })
           }
-          runRemove()
+          void runRemove()
         }}
       />
       <GuestPreviewSwapDialog

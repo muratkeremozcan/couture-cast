@@ -1,3 +1,5 @@
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import {
   act,
   cleanup,
@@ -21,6 +23,10 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import {
+  createSavedLooksMswHandlers,
+  type SavedLooksMswStore,
+} from '../../test-utils/saved-looks-msw'
 import { HomeRitual } from '../components/home-ritual'
 import WardrobePage from './page'
 
@@ -76,26 +82,10 @@ const defaultRecipe = {
   weather: 'mild-dry',
   swaps: {},
 } satisfies StylePieceRecipe
-const otherRecipe = {
-  lookId: 'sample:l:office-oxford',
-  weather: 'mild-dry',
-  swaps: {},
-} satisfies StylePieceRecipe
 
 const inventory = vi.fn<(request: Request) => Response | Promise<Response>>()
 const list = (...items: (typeof garment)[]) => HttpResponse.json({ data: items })
-const locksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
-type RequestLock = (
-  key: string,
-  apply: () => boolean | Promise<boolean>
-) => Promise<boolean>
-
-function setLocks(request?: RequestLock) {
-  Object.defineProperty(navigator, 'locks', {
-    configurable: true,
-    value: request ? { request } : undefined,
-  })
-}
+let savedLooksStore!: SavedLooksMswStore
 
 function publishOwner(member: string | null) {
   act(() => {
@@ -107,7 +97,13 @@ function publishOwner(member: string | null) {
 }
 
 function readRecipes() {
-  return JSON.parse(localStorage.getItem(storageKey) ?? '[]') as unknown
+  return savedLooksStore.items
+    .filter((item) => item.source === 'style_piece' && item.anchorGarmentId === garmentId)
+    .map((item) => ({
+      lookId: item.lookId,
+      weather: item.weather,
+      swaps: item.swaps,
+    }))
 }
 
 async function completeRead(reply: PromiseWithResolvers<Response>, response: Response) {
@@ -115,10 +111,6 @@ async function completeRead(reply: PromiseWithResolvers<Response>, response: Res
     reply.resolve(response)
     await reply.promise
   })
-}
-
-function storageEvent(key: string | null) {
-  fireEvent(window, new StorageEvent('storage', { key, storageArea: localStorage }))
 }
 
 const dialogName = { name: 'Style this piece' }
@@ -141,9 +133,11 @@ function firstLook(dialog: HTMLElement) {
 beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', api.slice(0, -'/api/v1'.length))
   inventory.mockReset().mockImplementation(() => list(garment))
-  setLocks()
+  const savedLooksMsw = createSavedLooksMswHandlers([], `${api}/wardrobe/saved-looks`)
+  savedLooksStore = savedLooksMsw.store
   useMswHandlers(
     http.get(`${api}/wardrobe/garments`, ({ request }) => inventory(request)),
+    ...savedLooksMsw.handlers,
     http.get(`${api}/wardrobe/onboarding`, () =>
       HttpResponse.json({ data: createCompletedOnboardingStateFixture() })
     ),
@@ -172,8 +166,6 @@ afterEach(() => {
   sessionStorage.clear()
   localStorage.clear()
   vi.unstubAllEnvs()
-  if (locksDescriptor) Object.defineProperty(navigator, 'locks', locksDescriptor)
-  else Reflect.deleteProperty(navigator, 'locks')
 })
 
 describe('Wardrobe styling', () => {
@@ -215,9 +207,7 @@ describe('Wardrobe styling', () => {
     ).toHaveLength(3)
   })
 
-  it('edits a sample companion, saves through Web Locks, and restores the look, weather and focus', async () => {
-    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
-    setLocks(requestLock)
+  it('edits a sample companion, saves to the account API, and restores the look, weather and focus', async () => {
     publishOwner(owner)
     render(<WardrobePage />)
     const opener = await openButton()
@@ -247,7 +237,6 @@ describe('Wardrobe styling', () => {
     expect(
       await within(dialog).findByRole('region', { name: 'Saved on this device' })
     ).toBeVisible()
-    expect(requestLock).toHaveBeenCalledExactlyOnceWith(storageKey, expect.any(Function))
     expect(readRecipes()).toEqual([
       {
         lookId: 'sample:l:silk-midi',
@@ -279,56 +268,44 @@ describe('Wardrobe styling', () => {
         within(reopened).queryByRole('button', { name: /open saved look/i })
       ).toBeNull()
     )
-    expect(requestLock).toHaveBeenCalledTimes(2)
-    expect(localStorage.getItem(storageKey)).toBeNull()
+    expect(readRecipes()).toEqual([])
     expect(selectedWeather).toHaveFocus()
   })
 
-  it.each(['missing', 'rejected'] as const)(
-    'merges the latest recipes and syncs storage events when Web Locks is %s',
-    async (mode) => {
-      const requestLock = vi
-        .fn<RequestLock>()
-        .mockRejectedValue(new Error('Lock unavailable'))
-      if (mode === 'rejected') setLocks(requestLock)
+  it('reuses the same Idempotency-Key on retry and saves even when localStorage is blocked', async () => {
+    const blockedStorage = vi
+      .spyOn(window, 'localStorage', 'get')
+      .mockImplementation(() => {
+        throw new DOMException('Storage blocked', 'SecurityError')
+      })
+    const seenKeys: string[] = []
+    let failOnce = true
+    savedLooksStore.onPost = (request) => {
+      const key = request.headers.get('Idempotency-Key')
+      if (key) seenKeys.push(key)
+    }
+    savedLooksStore.nextPostError = () => {
+      if (!failOnce) return null
+      failOnce = false
+      return HttpResponse.json({ message: 'Transient error' }, { status: 503 })
+    }
+    try {
       publishOwner(owner)
       render(<WardrobePage />)
       const { user, dialog } = await startStyling()
+      const saveButton = firstLook(dialog).getByTestId('style-piece-save')
+      await user.click(saveButton)
+      await waitFor(() => expect(seenKeys).toHaveLength(1))
+      expect(readRecipes()).toEqual([])
 
-      // Another tab changed disk after hydration. The in-memory list is still empty.
-      localStorage.setItem(storageKey, JSON.stringify([otherRecipe]))
-      storageEvent('other-owner')
-      expect(
-        within(dialog).queryByRole('button', { name: /open saved look/i })
-      ).toBeNull()
-      await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
-      await waitFor(() => expect(readRecipes()).toEqual([defaultRecipe, otherRecipe]))
-      expect(
-        within(dialog).getAllByRole('button', { name: /open saved look/i })
-      ).toHaveLength(2)
-
-      await user.click(
-        within(dialog).getByRole('button', { name: /open saved look.*Dark jeans/i })
-      )
-      await waitFor(() => expect(firstLook(dialog).getByText('Dark jeans')).toBeVisible())
-      await user.click(
-        within(dialog).getByRole('button', { name: /remove saved look.*Dark jeans/i })
-      )
+      await user.click(saveButton)
       await waitFor(() => expect(readRecipes()).toEqual([defaultRecipe]))
-      expect(requestLock).toHaveBeenCalledTimes(mode === 'rejected' ? 2 : 0)
-
-      localStorage.setItem(storageKey, JSON.stringify([otherRecipe]))
-      storageEvent(storageKey)
-      expect(
-        within(dialog).getByRole('button', { name: /open saved look.*Dark jeans/i })
-      ).toBeVisible()
-      localStorage.clear()
-      storageEvent(null)
-      expect(
-        within(dialog).queryByRole('button', { name: /open saved look/i })
-      ).toBeNull()
+      expect(seenKeys).toHaveLength(2)
+      expect(seenKeys[0]).toBe(seenKeys[1])
+    } finally {
+      blockedStorage.mockRestore()
     }
-  )
+  })
 
   it.each(['expired', 'absent'] as const)(
     'refreshes a ready card with an %s photo',
@@ -553,46 +530,22 @@ describe('Wardrobe styling', () => {
     expect(inventory).toHaveBeenCalledTimes(2)
   })
 
-  it('recovers recipe reads after storage denial and reports a failed write', async () => {
-    localStorage.setItem(storageKey, JSON.stringify([otherRecipe]))
-    const unavailable = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
-      throw new Error('Storage denied')
-    })
+  it('surfaces a load alert when saved looks fail to load and still allows saving once API recovers', async () => {
+    let failGet = true
+    savedLooksStore.nextGetError = () =>
+      failGet ? HttpResponse.json({ message: 'Unavailable' }, { status: 503 }) : null
     publishOwner(owner)
     render(<WardrobePage />)
     const { user, dialog } = await startStyling()
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Saved looks are unavailable on this device.'
+      'Could not load your saved looks.'
     )
     const save = firstLook(dialog).getByRole('button', { name: 'Save look' })
-    expect(save).toBeDisabled()
-
-    unavailable.mockRestore()
-    storageEvent(storageKey)
     expect(save).toBeEnabled()
-    const reopen = within(dialog).getByRole('button', {
-      name: /open saved look.*Dark jeans/i,
-    })
-    // The card still shows the old metadata until it reads disk. The removed recipe cannot reopen.
-    localStorage.removeItem(storageKey)
-    inventory.mockImplementationOnce(() => list(renewed))
-    await user.click(reopen)
-    await waitFor(() =>
-      expect(firstLook(dialog).getByRole('img', { name: 'Your piece' })).toHaveAttribute(
-        'src',
-        renewed.imageAccess.url
-      )
-    )
-    expect(firstLook(dialog).getByText('Pleated skirt')).toBeVisible()
 
-    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('Quota exceeded')
-    })
+    failGet = false
     await user.click(save)
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Saved looks are unavailable on this device.'
-    )
-    expect(write).toHaveBeenCalledWith(storageKey, JSON.stringify([defaultRecipe]))
+    await waitFor(() => expect(readRecipes()).toEqual([defaultRecipe]))
   })
 
   it('keeps the original photo and suppresses saves when the weather needs unknown protection', async () => {
@@ -631,9 +584,11 @@ describe('Wardrobe styling', () => {
     )
   })
 
-  it('waits for the wardrobe GET before taking the saved-look lock', async () => {
-    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
-    setLocks(requestLock)
+  it('waits for the wardrobe GET before posting a saved look', async () => {
+    let postCalls = 0
+    savedLooksStore.onPost = () => {
+      postCalls += 1
+    }
     publishOwner(owner)
     render(<WardrobePage />)
     const { user, dialog } = await startStyling()
@@ -642,17 +597,19 @@ describe('Wardrobe styling', () => {
     try {
       await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
       await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
-      expect(requestLock).not.toHaveBeenCalled()
+      expect(postCalls).toBe(0)
     } finally {
       await completeRead(reply, list(renewed))
     }
     await waitFor(() => expect(readRecipes()).toEqual([defaultRecipe]))
-    expect(requestLock).toHaveBeenCalledOnce()
+    expect(postCalls).toBe(1)
   })
 
-  it('aborts a stalled wardrobe GET before taking the saved-look lock', async () => {
-    const requestLock = vi.fn<RequestLock>(async (_key, apply) => apply())
-    setLocks(requestLock)
+  it('aborts a stalled wardrobe GET before posting a saved look', async () => {
+    let postCalls = 0
+    savedLooksStore.onPost = () => {
+      postCalls += 1
+    }
     publishOwner(owner)
     render(<WardrobePage />)
     const { dialog } = await startStyling()
@@ -671,8 +628,8 @@ describe('Wardrobe styling', () => {
           'Your photo is unavailable.'
         )
       )
-      expect(requestLock).not.toHaveBeenCalled()
-      expect(localStorage.getItem(storageKey)).toBeNull()
+      expect(postCalls).toBe(0)
+      expect(readRecipes()).toEqual([])
     } finally {
       await completeRead(pending, list(renewed))
       vi.useRealTimers()
@@ -682,7 +639,42 @@ describe('Wardrobe styling', () => {
   it.each(['weather', 'companion'] as const)(
     'keeps a newer %s edit when an old saved-look request completes',
     async (edit) => {
-      localStorage.setItem(storageKey, JSON.stringify([defaultRecipe]))
+      savedLooksStore.items = [
+        {
+          id: 'seeded-style-1',
+          ownerUserId: owner,
+          source: 'style_piece',
+          lookId: defaultRecipe.lookId,
+          weather: defaultRecipe.weather,
+          title: null,
+          anchorGarmentId: garmentId,
+          anchorSnapshot: {
+            garmentId,
+            category: 'top',
+            comfortRange: 'mild',
+          },
+          composition: [
+            {
+              slotIndex: 0,
+              category: 'top',
+              kind: 'garment',
+              itemId: garmentId,
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+          ],
+          swaps: defaultRecipe.swaps,
+          collection: null,
+          comfort: null,
+          availabilityStatus: 'ready',
+          missingGarmentIds: [],
+          needsReviewReasons: [],
+          revision: 0,
+          createdAt: '2026-11-22T00:00:00.000Z',
+          updatedAt: '2026-11-22T00:00:00.000Z',
+        },
+      ]
       publishOwner(owner)
       render(<WardrobePage />)
       const { user, dialog } = await startStyling()
@@ -721,22 +713,19 @@ describe('Wardrobe styling', () => {
   )
 
   it.each(['account switch', 'page hide'] as const)(
-    'does not write a look when a queued lock acquires after %s',
+    'does not post a saved look when inventory refresh settles after %s',
     async (boundary) => {
-      const lock = Promise.withResolvers<void>()
-      const finished = Promise.withResolvers<boolean>()
-      const requestLock = vi.fn<RequestLock>(async (_key, apply) => {
-        await lock.promise
-        const applied = await apply()
-        finished.resolve(applied)
-        return applied
-      })
-      setLocks(requestLock)
+      let postCalls = 0
+      savedLooksStore.onPost = () => {
+        postCalls += 1
+      }
       publishOwner(owner)
       render(<WardrobePage />)
       const { user, dialog } = await startStyling()
+      const reply = Promise.withResolvers<Response>()
+      inventory.mockReturnValueOnce(reply.promise)
       await user.click(firstLook(dialog).getByRole('button', { name: 'Save look' }))
-      await waitFor(() => expect(requestLock).toHaveBeenCalledOnce())
+      await waitFor(() => expect(inventory).toHaveBeenCalledTimes(3))
 
       if (boundary === 'account switch') {
         inventory.mockImplementation(() => list(renewed))
@@ -746,15 +735,10 @@ describe('Wardrobe styling', () => {
         fireEvent(window, new Event('pagehide'))
         expect(within(dialog).getByText('Checking your photo…')).toBeVisible()
       }
-      await act(async () => {
-        lock.resolve()
-        expect(await finished.promise).toBe(false)
-      })
+      await completeRead(reply, list(renewed))
       if (boundary === 'account switch') expect(await openButton()).toBeVisible()
-      expect(localStorage.getItem(storageKey)).toBeNull()
-      expect(
-        localStorage.getItem(stylePieceStorageKey('different-owner', garmentId))
-      ).toBeNull()
+      expect(postCalls).toBe(0)
+      expect(readRecipes()).toEqual([])
     }
   )
 
@@ -802,5 +786,96 @@ describe('Wardrobe styling', () => {
     await user.click(savedOnHome.getByRole('button', { name: /^Remove / }))
     expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
     expect(readRecipes()).toEqual([defaultRecipe])
+  })
+
+  it('replays a committed Style this piece POST after a lost response without creating a duplicate row', async () => {
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const seenKeys: string[] = []
+    let simulateLostResponse = true
+    savedLooksStore.onPost = async (request) => {
+      const key = request.headers.get('Idempotency-Key')
+      if (key) seenKeys.push(key)
+      if (!simulateLostResponse) return
+      simulateLostResponse = false
+      // Commit on server before simulating a lost HTTP response to the client.
+      const body = (await request.clone().json()) as {
+        source: 'style_piece'
+        lookId: string
+        weather: string
+        anchorGarmentId: string
+        anchorSnapshot: {
+          garmentId: string
+          category: 'top'
+          comfortRange: 'mild'
+        }
+        composition: {
+          slotIndex: number
+          category: 'top' | 'bottom' | 'shoes' | 'outerwear' | 'dress' | 'accessory'
+          kind: 'garment' | 'catalog'
+          itemId: string
+          label?: string | null
+        }[]
+        swaps?: Record<string, string>
+      }
+      const now = new Date().toISOString()
+      const ownerToken =
+        request.headers
+          .get('Authorization')
+          ?.replace(/^Bearer\s+/i, '')
+          .trim() || 'anonymous'
+      const committed = {
+        id: 'saved-look-committed-lost',
+        ownerUserId: ownerToken,
+        source: body.source,
+        lookId: body.lookId,
+        weather: body.weather,
+        title: null,
+        anchorGarmentId: body.anchorGarmentId,
+        anchorSnapshot: body.anchorSnapshot,
+        composition: body.composition.map((s) => ({
+          ...s,
+          label: s.label ?? null,
+          missing: false,
+          imageAccess: null,
+        })),
+        swaps: body.swaps ?? {},
+        collection: null,
+        comfort: null,
+        availabilityStatus: 'ready' as const,
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: now,
+        updatedAt: now,
+      }
+      savedLooksStore.items = [committed]
+      if (key) savedLooksStore.idempotencyKeys.set(`${ownerToken}:${key}`, committed)
+      savedLooksStore.nextPostError = () => {
+        savedLooksStore.nextPostError = undefined
+        return HttpResponse.json({ message: 'Response dropped' }, { status: 503 })
+      }
+    }
+
+    const save = firstLook(dialog).getByRole('button', { name: 'Save look' })
+    await waitFor(() => expect(save).toBeEnabled())
+    await user.click(save)
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+    expect(savedLooksStore.items).toHaveLength(1)
+
+    await user.click(within(dialog).getByTestId('status-bar-action-retry'))
+    await waitFor(() =>
+      expect(within(dialog).getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Saved to your looks.'
+      )
+    )
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toBe(seenKeys[1])
+    expect(savedLooksStore.items).toHaveLength(1)
   })
 })

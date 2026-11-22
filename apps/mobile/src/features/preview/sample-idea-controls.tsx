@@ -13,6 +13,8 @@ import {
 import { PreviewButton, type PreviewPalette } from './guest-preview-parts'
 import { SaveActionButton } from '@/components/save-feedback'
 
+type SampleBookmarkItem = SampleBookmark & { savedLookId?: string }
+
 export function SampleIdeaControls({
   strings,
   palette,
@@ -32,18 +34,19 @@ export function SampleIdeaControls({
   ownerKey,
   saveResetKey,
   useSharedFeedback = false,
+  requiresNetwork = false,
 }: {
   strings: GuestPreviewStrings
   palette: PreviewPalette
   preferences?: SampleStylePreferences
   onPreferences: (preferences: SampleStylePreferences) => void
-  bookmarks: SampleBookmark[]
+  bookmarks: SampleBookmarkItem[]
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
   onViewSaved?: () => void
-  onOpen: (bookmark: SampleBookmark) => void
-  onRemove: (lookId: string) => void
+  onOpen: (bookmark: SampleBookmarkItem) => void
+  onRemove: (id: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
   persistent?: boolean
@@ -51,6 +54,7 @@ export function SampleIdeaControls({
   ownerKey?: string | null
   saveResetKey?: string
   useSharedFeedback?: boolean
+  requiresNetwork?: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const labels = strings.styleIdeas
@@ -70,6 +74,7 @@ export function SampleIdeaControls({
             onView={onViewSaved}
             ownerKey={ownerKey}
             resetKey={saveResetKey ?? lookId}
+            requiresNetwork={requiresNetwork}
           />
         ) : (
           <PreviewButton
@@ -113,8 +118,9 @@ export function SampleIdeaControls({
           </Text>
           {bookmarks.map((bookmark) => {
             const look = sampleLookText({ id: bookmark.lookId }, strings).name
+            const entryId = bookmark.savedLookId ?? bookmark.lookId
             return (
-              <View key={bookmark.lookId} style={styles.row}>
+              <View key={entryId} style={styles.row}>
                 <PreviewButton
                   testID={`sample-open-${bookmark.lookId}`}
                   label={look}
@@ -124,7 +130,7 @@ export function SampleIdeaControls({
                 <PreviewButton
                   testID={`sample-remove-${bookmark.lookId}`}
                   label={formatPreviewString(labels.remove, { look })}
-                  onPress={() => onRemove(bookmark.lookId)}
+                  onPress={() => onRemove(entryId)}
                   palette={palette}
                 />
               </View>

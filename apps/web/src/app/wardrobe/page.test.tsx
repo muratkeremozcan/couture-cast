@@ -91,6 +91,34 @@ vi.mock('../../lib/wardrobe', async () => ({
   generateIdempotencyKey: () => 'test-idempotency-key',
 }))
 
+const savedLooksMocks = vi.hoisted(() => ({
+  listSavedLooksPageFromWeb: vi.fn().mockResolvedValue({
+    data: [],
+    total: 0,
+    limit: 50,
+    offset: 0,
+  }),
+  listeners: new Set<(owner: string | null) => void>(),
+}))
+
+vi.mock('../../lib/saved-looks', () => ({
+  listSavedLooksFromWeb: vi.fn().mockResolvedValue([]),
+  listSavedLooksPageFromWeb: savedLooksMocks.listSavedLooksPageFromWeb,
+  createSavedLookFromWeb: vi.fn(),
+  getSavedLookFromWeb: vi.fn(),
+  deleteSavedLookFromWeb: vi.fn(),
+  restoreSavedLookFromWeb: vi.fn(),
+  notifySavedLooksChanged: vi.fn(),
+  subscribeSavedLooksChanged: (listener: (owner: string | null) => void) => {
+    savedLooksMocks.listeners.add(listener)
+    return () => {
+      savedLooksMocks.listeners.delete(listener)
+    }
+  },
+  formatSavedLookIfMatch: (id: string, revision: number) =>
+    `"saved-look:${id}:${revision}"`,
+}))
+
 import WardrobePage from './page'
 
 beforeEach(stubGarmentPreviewUrl)
@@ -1234,5 +1262,169 @@ describe('WardrobePage commit deduplication', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: '+ Add Garment' })).toHaveFocus()
     )
+  })
+
+  it('loads, paginates, refreshes on change notifications, and retries failed Closet saved looks', async () => {
+    const user = userEvent.setup()
+    verifiedSession.owner = 'member-saved-looks'
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'test-token-member-saved-looks'
+    )
+    window.dispatchEvent(new Event('couture:session'))
+    const anchorGarment: GarmentItemContract = {
+      ...persistedGarment,
+      id: 'garment-anchor-1',
+      status: 'ready',
+      category: 'top',
+      material: 'cotton',
+      comfortRange: 'mild',
+      imageAccess: {
+        url: 'https://example.test/anchor.png',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    }
+    listGarmentsFromWeb.mockResolvedValue([anchorGarment])
+    const { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } = await import(
+      '@couture/utils'
+    )
+    const piece = stylePieceAnchor(anchorGarment)!
+    const exactLook = stylePieceLooks(piece, 'mild-dry', SAMPLE_CATALOG).looks[0]!
+
+    const makeSavedLook = (id: string, isStylePiece = false) =>
+      isStylePiece
+        ? {
+            id,
+            ownerUserId: 'member-saved-looks',
+            source: 'style_piece' as const,
+            lookId: exactLook.recipe.lookId,
+            weather: 'mild-dry',
+            title: `Look ${id}`,
+            anchorGarmentId: anchorGarment.id,
+            anchorSnapshot: {
+              category: 'top' as const,
+              comfortRange: 'mild' as const,
+            },
+            composition: [
+              {
+                slotIndex: 0,
+                category: 'top' as const,
+                kind: 'garment' as const,
+                itemId: anchorGarment.id,
+                label: null,
+                missing: false,
+                imageAccess: anchorGarment.imageAccess,
+              },
+              ...exactLook.companions.map((companion, idx) => ({
+                slotIndex: idx + 1,
+                category: companion.category,
+                kind: 'catalog' as const,
+                itemId: companion.id,
+                label: null,
+                missing: false,
+                imageAccess: null,
+              })),
+            ],
+            swaps: {},
+            collection: null,
+            comfort: null,
+            availabilityStatus: 'ready' as const,
+            missingGarmentIds: [],
+            needsReviewReasons: [],
+            revision: 0,
+            createdAt: '2026-11-22T01:00:00.000Z',
+            updatedAt: '2026-11-22T01:00:00.000Z',
+          }
+        : {
+            id,
+            ownerUserId: 'member-saved-looks',
+            source: 'home_sample' as const,
+            lookId: 'sample:l:silk-midi',
+            weather: 'warm-rainy',
+            title: `Look ${id}`,
+            anchorGarmentId: null,
+            anchorSnapshot: null,
+            composition: [
+              {
+                slotIndex: 0,
+                category: 'top' as const,
+                kind: 'catalog' as const,
+                itemId: 'sample:g:knit-tee',
+                label: null,
+                missing: false,
+                imageAccess: null,
+              },
+            ],
+            swaps: {},
+            collection: 'all',
+            comfort: null,
+            availabilityStatus: 'ready' as const,
+            missingGarmentIds: [],
+            needsReviewReasons: [],
+            revision: 0,
+            createdAt: '2026-11-22T01:00:00.000Z',
+            updatedAt: '2026-11-22T01:00:00.000Z',
+          }
+
+    savedLooksMocks.listSavedLooksPageFromWeb
+      .mockRejectedValueOnce(new Error('Saved looks temporarily unavailable'))
+      .mockResolvedValueOnce({
+        data: [makeSavedLook('sl-1')],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        data: [makeSavedLook('sl-2', true)],
+        total: 2,
+        limit: 50,
+        offset: 1,
+      })
+      .mockResolvedValue({
+        data: [makeSavedLook('sl-1'), makeSavedLook('sl-2', true)],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+
+    try {
+      render(<WardrobePage />)
+      await user.click(await screen.findByTestId('saved-looks-retry'))
+      await waitFor(() =>
+        expect(screen.getByTestId('closet-saved-looks-row')).toHaveTextContent('2')
+      )
+
+      await user.click(screen.getByTestId('closet-saved-looks-row'))
+      await user.click(await screen.findByTestId('saved-looks-load-more'))
+      await waitFor(() => expect(screen.getByText('Look sl-2')).toBeInTheDocument())
+
+      // Reopen exact style_piece look in StylePiecePanel from ClosetSavedLooksRow, then remove a look.
+      const reopenBtns = screen.getAllByTestId('saved-look-reopen')
+      await user.click(reopenBtns[1]!)
+      expect(
+        await screen.findByRole('dialog', { name: 'Style this piece' })
+      ).toBeVisible()
+      await user.click(screen.getAllByTestId('saved-look-remove')[0]!)
+
+      act(() => {
+        for (const listener of savedLooksMocks.listeners) {
+          listener('member-saved-looks')
+        }
+      })
+      await waitFor(() =>
+        expect(
+          savedLooksMocks.listSavedLooksPageFromWeb.mock.calls.length
+        ).toBeGreaterThanOrEqual(4)
+      )
+    } finally {
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      savedLooksMocks.listSavedLooksPageFromWeb.mockReset().mockResolvedValue({
+        data: [],
+        total: 0,
+        limit: 50,
+        offset: 0,
+      })
+    }
   })
 })

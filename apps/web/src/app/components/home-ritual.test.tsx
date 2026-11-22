@@ -1,9 +1,7 @@
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
-import {
-  createMemberSampleOutfit,
-  rotateMemberSampleOutfit,
-  saveSampleBookmark,
-} from '@couture/utils'
+import { createMemberSampleOutfit, rotateMemberSampleOutfit } from '@couture/utils'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
@@ -13,6 +11,7 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { createSavedLooksMswHandlers } from '../../test-utils/saved-looks-msw'
 import { settle } from '../../test-utils/request-barrier'
 import { HomeRitual } from './home-ritual'
 
@@ -137,223 +136,400 @@ beforeEach(async () => {
 
 afterEach(() => window.sessionStorage.clear())
 
-it('merges saves and removals with other tabs and updates when their storage changes', async () => {
+it('persists Home sample saves and removals to the account API across remounts', async () => {
   const owner = 'shared-bookmark-member'
-  const key = `couturecast.member-sample-bookmarks.${owner}`
   const first = createMemberSampleOutfit()
   const second = rotateMemberSampleOutfit(first)
-  const third = rotateMemberSampleOutfit(second)
-  const stored = () =>
-    JSON.parse(localStorage.getItem(key) ?? '[]') as { lookId: string }[]
+  const { store, handlers } = createSavedLooksMswHandlers()
   const user = userEvent.setup()
-  useMswHandlers(http.get('/api/v1/ritual', missingCity))
-  publishMember(owner)
-  const view = renderHome()
-  try {
-    await user.click(await screen.findByRole('button', { name: 'Try another look' }))
-    localStorage.setItem(key, JSON.stringify(saveSampleBookmark([], first)))
-    await user.click(screen.getByRole('button', { name: 'Save example look' }))
-    expect(stored().map(({ lookId }) => lookId)).toEqual([
-      second.look?.id,
-      first.look?.id,
-    ])
-
-    const otherSave = saveSampleBookmark(
-      saveSampleBookmark(saveSampleBookmark([], first), second),
-      third
-    )
-    localStorage.setItem(key, JSON.stringify(otherSave))
-    await user.click(screen.getByRole('button', { name: 'Remove Silk midi' }))
-    expect(stored().map(({ lookId }) => lookId)).toEqual([third.look?.id, first.look?.id])
-
-    const saved = screen.getByRole('region', { name: 'Saved on this device' })
-    localStorage.setItem(key, JSON.stringify(saveSampleBookmark([], first)))
-    act(() => {
-      window.dispatchEvent(
-        new StorageEvent('storage', {
-          key: `${key}.different`,
-          storageArea: localStorage,
-        })
-      )
-      window.dispatchEvent(
-        new StorageEvent('storage', { key, storageArea: sessionStorage })
-      )
-    })
-    expect(within(saved).getAllByRole('button')).toHaveLength(4)
-    act(() => {
-      window.dispatchEvent(
-        new StorageEvent('storage', { key, storageArea: window.localStorage })
-      )
-    })
-    expect(within(saved).getAllByRole('button')).toHaveLength(2)
-    expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
-
-    act(() => {
-      localStorage.removeItem(key)
-      window.dispatchEvent(new StorageEvent('storage', { storageArea: localStorage }))
-    })
-    expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
-  } finally {
-    view.unmount()
-    localStorage.removeItem(key)
-  }
-})
-
-it('serializes bookmark writes by account and drops a queued write after switching members', async () => {
-  const owner = 'locked-bookmark-member'
-  const nextOwner = 'next-bookmark-member'
-  const key = `couturecast.member-sample-bookmarks.${owner}`
-  const nextKey = `couturecast.member-sample-bookmarks.${nextOwner}`
-  const firstLock = Promise.withResolvers<void>()
-  const secondLock = Promise.withResolvers<void>()
-  const request = vi
-    .fn<(name: string, apply: () => void) => Promise<void>>()
-    .mockImplementationOnce((_, apply) => firstLock.promise.then(apply))
-    .mockImplementationOnce((_, apply) => secondLock.promise.then(apply))
-  const originalLocks = Object.getOwnPropertyDescriptor(navigator, 'locks')
-  Object.defineProperty(navigator, 'locks', { configurable: true, value: { request } })
-  const user = userEvent.setup()
-  useMswHandlers(http.get('/api/v1/ritual', missingCity))
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
   publishMember(owner)
   const view = renderHome()
   try {
     await user.click(await screen.findByRole('button', { name: 'Save example look' }))
-    expect(request).toHaveBeenCalledExactlyOnceWith(key, expect.any(Function))
-    expect(localStorage.getItem(key)).toBeNull()
+    await waitFor(() =>
+      expect(store.items.map(({ lookId }) => lookId)).toEqual([first.look?.id])
+    )
+    await user.click(screen.getByRole('button', { name: 'Try another look' }))
+    await user.click(screen.getByRole('button', { name: 'Save example look' }))
+    await waitFor(() =>
+      expect(store.items.map(({ lookId }) => lookId)).toEqual([
+        second.look?.id,
+        first.look?.id,
+      ])
+    )
 
-    const first = createMemberSampleOutfit()
-    const other = rotateMemberSampleOutfit(first)
-    const storedInAnotherTab = saveSampleBookmark([], other)
-    localStorage.setItem(key, JSON.stringify(storedInAnotherTab))
-    await act(async () => {
-      firstLock.resolve()
-      await firstLock.promise
-    })
-    const merged = JSON.stringify(saveSampleBookmark(storedInAnotherTab, first))
-    expect(localStorage.getItem(key)).toBe(merged)
-    expect(
-      await screen.findByRole('button', { name: 'Remove Office oxford' })
-    ).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Remove Silk midi' }))
+    await waitFor(() =>
+      expect(store.items.map(({ lookId }) => lookId)).toEqual([first.look?.id])
+    )
 
-    await user.click(screen.getByRole('button', { name: 'Remove Office oxford' }))
-    expect(request).toHaveBeenNthCalledWith(2, key, expect.any(Function))
+    // Remounting reads the saved look from the account API without localStorage.
+    view.unmount()
+    const remounted = renderHome()
+    try {
+      const saved = await screen.findByRole('region', { name: 'Saved on this device' })
+      expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
+    } finally {
+      remounted.unmount()
+    }
+  } finally {
+    view.unmount()
+  }
+})
+
+it('scopes account saved looks by member and drops late responses after switching members', async () => {
+  const owner = 'locked-bookmark-member'
+  const nextOwner = 'next-bookmark-member'
+  const postStarted = Promise.withResolvers<void>()
+  const delayedPost = Promise.withResolvers<void>()
+  const { store, handlers } = createSavedLooksMswHandlers()
+  store.onPost = async () => {
+    postStarted.resolve()
+    await delayedPost.promise
+  }
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    await user.click(await screen.findByRole('button', { name: 'Save example look' }))
+    await postStarted.promise
     publishMember(nextOwner)
     expect(await screen.findByRole('button', { name: 'Save example look' })).toBeVisible()
     await act(async () => {
-      secondLock.resolve()
-      await secondLock.promise
+      delayedPost.resolve()
+      await delayedPost.promise
     })
-    expect(localStorage.getItem(key)).toBe(merged)
-    expect(localStorage.getItem(nextKey)).toBeNull()
+    await waitFor(() => expect(store.items).toHaveLength(1))
     expect(screen.queryByRole('region', { name: 'Saved on this device' })).toBeNull()
+    expect(store.items[0]?.ownerUserId).toBe(`bearer-${owner}`)
   } finally {
     view.unmount()
-    if (originalLocks) Object.defineProperty(navigator, 'locks', originalLocks)
-    else Reflect.deleteProperty(navigator, 'locks')
-    localStorage.removeItem(key)
-    localStorage.removeItem(nextKey)
   }
 })
 
-it('keeps bookmarks editable in memory when the browser rejects persistence', async () => {
-  const owner = 'no-bookmark-storage-member'
-  const key = `couturecast.member-sample-bookmarks.${owner}`
-  const setItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')!
-    .value as Storage['setItem']
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-    this: Storage,
-    storedKey,
-    value
-  ) {
-    if (storedKey === key)
-      throw new DOMException('Storage unavailable', 'QuotaExceededError')
-    setItem.call(this, storedKey, value)
-  })
+it('blocks signed-in Home Save while offline and prevents a stale GET from overwriting a completed save', async () => {
+  const owner = 'stale-get-member'
+  const delayedGet = Promise.withResolvers<void>()
+  let getCount = 0
+  let postCount = 0
+  const { store, handlers } = createSavedLooksMswHandlers()
+  store.onGet = async () => {
+    getCount += 1
+    if (getCount === 1) await delayedGet.promise
+  }
+  store.onPost = () => {
+    postCount += 1
+  }
   const user = userEvent.setup()
-  useMswHandlers(http.get('/api/v1/ritual', missingCity))
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
   publishMember(owner)
-  renderHome()
-
-  await user.click(await screen.findByRole('button', { name: 'Save example look' }))
-  const saved = screen.getByRole('region', { name: 'Saved on this device' })
-  expect(within(saved).getByRole('status')).toHaveTextContent(
-    'This preview may reset when you close it.'
-  )
-  const weather = screen.getByRole('combobox', { name: 'Sample weather' })
-  await user.selectOptions(weather, 'cool-windy')
-  await user.click(screen.getByText('Style preferences (optional)'))
-  await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
-  await user.click(screen.getByRole('button', { name: 'Try another look' }))
-  await user.click(screen.getByRole('button', { name: 'Save example look' }))
-  expect(within(saved).getAllByRole('button')).toHaveLength(4)
-  expect(localStorage.getItem(key)).toBeNull()
-
-  await user.click(within(saved).getByRole('button', { name: 'Office oxford' }))
-  expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('Office oxford')
-  expect(weather).toHaveValue('mild-dry')
-  await user.click(within(saved).getByRole('button', { name: 'Remove Office oxford' }))
-  expect(within(saved).getAllByRole('button')).toHaveLength(2)
-})
-
-it('replays failed bookmark changes over other tabs’ saves when storage recovers', async () => {
-  const owner = 'recovering-bookmark-member'
-  const key = `couturecast.member-sample-bookmarks.${owner}`
-  const first = createMemberSampleOutfit()
-  const second = rotateMemberSampleOutfit(first)
-  const third = rotateMemberSampleOutfit(second)
-  const fourth = rotateMemberSampleOutfit(third)
-  const setItem = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem')!
-    .value as Storage['setItem']
-  let writeDenied = false
-  const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (
-    this: Storage,
-    storedKey,
-    value
-  ) {
-    if (storedKey === key && writeDenied)
-      throw new DOMException('Storage unavailable', 'QuotaExceededError')
-    setItem.call(this, storedKey, value)
-  })
-  const user = userEvent.setup()
-  useMswHandlers(http.get('/api/v1/ritual', missingCity))
-  publishMember(owner)
-  localStorage.setItem(key, JSON.stringify(saveSampleBookmark([], second)))
   const view = renderHome()
   try {
-    writeDenied = true
-    await user.click(await screen.findByRole('button', { name: 'Save example look' }))
-    const saved = screen.getByRole('region', { name: 'Saved on this device' })
-    expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
-    await user.click(within(saved).getByRole('button', { name: 'Remove Silk midi' }))
-    expect(within(saved).getByRole('status')).toHaveTextContent(
-      'This preview may reset when you close it.'
-    )
-
-    writeDenied = false
-    const otherTab = saveSampleBookmark(saveSampleBookmark([], second), fourth)
-    act(() => {
-      localStorage.setItem(key, JSON.stringify(otherTab))
-      window.dispatchEvent(
-        new StorageEvent('storage', { key, storageArea: localStorage })
-      )
+    // Offline Home Save sends zero POSTs and preserves the outfit.
+    const onlineDescriptor = Object.getOwnPropertyDescriptor(window.navigator, 'onLine')
+    Object.defineProperty(window.navigator, 'onLine', {
+      configurable: true,
+      value: false,
     })
-    expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
-    expect(within(saved).queryByRole('button', { name: 'Silk midi' })).toBeNull()
-    expect(within(saved).getByRole('status')).toHaveTextContent(
-      'This preview may reset when you close it.'
-    )
+    window.dispatchEvent(new Event('offline'))
+    try {
+      await user.click(await screen.findByRole('button', { name: 'Save example look' }))
+      expect(postCount).toBe(0)
+    } finally {
+      if (onlineDescriptor) {
+        Object.defineProperty(window.navigator, 'onLine', onlineDescriptor)
+      } else {
+        Object.defineProperty(window.navigator, 'onLine', {
+          configurable: true,
+          value: true,
+        })
+      }
+      window.dispatchEvent(new Event('online'))
+    }
 
-    await user.click(screen.getByRole('button', { name: 'Try another look' }))
-    await user.click(screen.getByRole('button', { name: 'Try another look' }))
-    await user.click(screen.getByRole('button', { name: 'Save example look' }))
-    expect(JSON.parse(localStorage.getItem(key) ?? '[]')).toEqual(
-      saveSampleBookmark(saveSampleBookmark(saveSampleBookmark([], fourth), first), third)
-    )
-    expect(within(saved).getByRole('status')).toHaveTextContent('Saved on this device')
+    // Reconnect: Save completes before slow initial GET resolves; stale GET must not wipe saved item.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    expect(await screen.findByTestId('sample-saved-looks')).toBeVisible()
+
+    await act(async () => {
+      delayedGet.resolve()
+      await delayedGet.promise
+    })
+    expect(screen.getByTestId('sample-saved-looks')).toBeVisible()
   } finally {
     view.unmount()
-    write.mockRestore()
-    localStorage.removeItem(key)
+  }
+})
+
+it('saves and reopens Home sample looks even when browser localStorage is blocked', async () => {
+  const owner = 'no-bookmark-storage-member'
+  const blockedStorage = vi
+    .spyOn(window, 'localStorage', 'get')
+    .mockImplementation(() => {
+      throw new DOMException('Storage blocked', 'SecurityError')
+    })
+  const { store, handlers } = createSavedLooksMswHandlers()
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  try {
+    renderHome()
+    await user.click(await screen.findByRole('button', { name: 'Save example look' }))
+    const saved = await screen.findByRole('region', { name: 'Saved on this device' })
+    expect(store.items).toHaveLength(1)
+
+    const weather = screen.getByRole('combobox', { name: 'Sample weather' })
+    await user.selectOptions(weather, 'cool-windy')
+    await user.click(screen.getByText('Style preferences (optional)'))
+    await user.selectOptions(screen.getByRole('combobox', { name: /^Style$/ }), 'cozy')
+    await user.click(screen.getByRole('button', { name: 'Try another look' }))
+    await user.click(screen.getByRole('button', { name: 'Save example look' }))
+    await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(4))
+
+    await user.click(within(saved).getByRole('button', { name: 'Office oxford' }))
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
+      'Office oxford'
+    )
+    expect(weather).toHaveValue('mild-dry')
+    await user.click(within(saved).getByRole('button', { name: 'Remove Office oxford' }))
+    await waitFor(() => expect(within(saved).getAllByRole('button')).toHaveLength(2))
+  } finally {
+    blockedStorage.mockRestore()
+  }
+})
+
+it('reuses the same Idempotency-Key when retrying a failed Home sample save', async () => {
+  const owner = 'recovering-bookmark-member'
+  const seenKeys: string[] = []
+  let failOnce = true
+  const { store, handlers } = createSavedLooksMswHandlers()
+  store.onPost = (request) => {
+    const key = request.headers.get('Idempotency-Key')
+    if (key) seenKeys.push(key)
+  }
+  store.nextPostError = () => {
+    if (!failOnce) return null
+    failOnce = false
+    return HttpResponse.json({ message: 'Transient error' }, { status: 503 })
+  }
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    const saveButton = await screen.findByRole('button', { name: 'Save example look' })
+    await user.click(saveButton)
+    await waitFor(() => expect(seenKeys).toHaveLength(1))
+    expect(store.items).toHaveLength(0)
+
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    expect(seenKeys).toHaveLength(2)
+    expect(seenKeys[0]).toBe(seenKeys[1])
+  } finally {
+    view.unmount()
+  }
+})
+
+it('revalidates cached Home looks on re-save after remote deletion and merges slow initial GET with early Save', async () => {
+  const owner = 'revalidate-merge-member'
+  const existingOnServer = {
+    id: 'sl-server-existing',
+    ownerUserId: `bearer-${owner}`,
+    source: 'home_sample' as const,
+    lookId: 'sample:l:silk-midi',
+    weather: 'warm-rainy',
+    title: null,
+    anchorGarmentId: null,
+    anchorSnapshot: null,
+    composition: [
+      {
+        slotIndex: 0,
+        category: 'top' as const,
+        kind: 'catalog' as const,
+        itemId: 'sample:g:knit-tee',
+        label: null,
+        missing: false,
+        imageAccess: null,
+      },
+    ],
+    swaps: {},
+    collection: 'all',
+    comfort: {
+      runsColdWarm: 'neutral' as const,
+      windTolerance: 'medium' as const,
+      precipPreparedness: 'medium' as const,
+    },
+    availabilityStatus: 'ready' as const,
+    missingGarmentIds: [],
+    needsReviewReasons: [],
+    revision: 0,
+    createdAt: '2026-11-22T01:00:00.000Z',
+    updatedAt: '2026-11-22T01:00:00.000Z',
+  }
+  const { store, handlers } = createSavedLooksMswHandlers([existingOnServer])
+  let releaseInitialGet!: () => void
+  let heldOnce = false
+  store.onGet = async (request) => {
+    if (heldOnce || new URL(request.url).pathname !== '/api/v1/wardrobe/saved-looks') {
+      return
+    }
+    heldOnce = true
+    await new Promise<void>((resolve) => {
+      releaseInitialGet = resolve
+    })
+  }
+
+  const user = userEvent.setup()
+  useMswHandlers(http.get('/api/v1/ritual', missingCity), ...handlers)
+  publishMember(owner)
+  const view = renderHome()
+  try {
+    // Save before the initial GET finishes, then release GET -> both looks are present.
+    const saveButton = await screen.findByRole('button', { name: 'Save example look' })
+    await user.click(saveButton)
+    await waitFor(() => expect(store.items).toHaveLength(2))
+    releaseInitialGet()
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(4)
+    )
+
+    // Remove the newly saved look remotely on another device -> re-saving revalidates (404) and recreates it.
+    const newlyCreatedId = store.items.find((item) => item.id !== existingOnServer.id)!.id
+    store.items = store.items.filter((item) => item.id !== newlyCreatedId)
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(2))
+    expect(store.items.some((item) => item.id !== existingOnServer.id)).toBe(true)
+
+    // 404 stale remove cleans up the local list cleanly.
+    store.items = []
+    const removeButtons = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button',
+      { name: /^Remove / }
+    )
+    await user.click(removeButtons[0]!)
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(2)
+    )
+
+    // 409 SAVED_LOOK_ALREADY_REMOVED returns false cleanly without duplicate creation.
+    let return409Once = true
+    store.nextPostError = () => {
+      if (!return409Once) return null
+      return409Once = false
+      return HttpResponse.json(
+        { code: 'SAVED_LOOK_ALREADY_REMOVED', message: 'Already removed' },
+        { status: 409 }
+      )
+    }
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() =>
+      expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Failed')
+    )
+
+    // Save look again -> Undo Save with 404 from server still cleans up local state cleanly.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    let return404OnUndoOnce = true
+    store.nextDeleteError = () => {
+      if (!return404OnUndoOnce) return null
+      return404OnUndoOnce = false
+      return HttpResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    await user.click(await screen.findByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+    )
+    store.items = []
+
+    // Save look again -> View saved -> Reopen saved look -> Re-save hits verified 200 non-destructive refresh.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    const viewSavedBtn = screen.queryByTestId('status-bar-action-view-saved')
+    if (viewSavedBtn) await user.click(viewSavedBtn)
+
+    // Shuffle away and reopen the saved look so saveResetKey resets while matching existingMatch.
+    await user.click(screen.getByRole('button', { name: 'Try another look' }))
+    const openSavedBtns = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button'
+    )
+    await user.click(openSavedBtns[0]!)
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() =>
+      expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Saved')
+    )
+    expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
+
+    // Offline Remove shows offline notice without calling DELETE.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const removeSampleBtns = within(
+      screen.getByTestId('sample-saved-looks')
+    ).getAllByRole('button', { name: /^Remove / })
+    await user.click(removeSampleBtns[0]!)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    Reflect.deleteProperty(navigator, 'onLine')
+
+    // Failed Remove offers Retry, then failed Undo Remove shows error notice.
+    let failDeleteSampleOnce = true
+    store.nextDeleteError = () => {
+      if (!failDeleteSampleOnce) return null
+      failDeleteSampleOnce = false
+      return HttpResponse.json({ message: 'Delete error' }, { status: 503 })
+    }
+    await user.click(removeSampleBtns[0]!)
+    const retryDeleteSample = await screen.findByTestId('status-bar-action-retry')
+    await user.click(retryDeleteSample)
+    await waitFor(() => expect(store.items).toHaveLength(0))
+
+    let failRestoreSampleOnce = true
+    store.nextRestoreError = () => {
+      if (!failRestoreSampleOnce) return null
+      failRestoreSampleOnce = false
+      return HttpResponse.json({ message: 'Restore error' }, { status: 503 })
+    }
+    const undoDeleteSample = await screen.findByTestId('status-bar-action-undo')
+    // First click Undo while offline -> shows offline notice without calling /restore.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await user.click(undoDeleteSample)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    Reflect.deleteProperty(navigator, 'onLine')
+
+    // Re-save and Remove again so Undo is back, then test 503 restore failure.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    const removeAgainBtns = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button',
+      { name: /^Remove / }
+    )
+    await user.click(removeAgainBtns[0]!)
+    await waitFor(() => expect(store.items).toHaveLength(0))
+    const undoDeleteSample2 = await screen.findByTestId('status-bar-action-undo')
+    await user.click(undoDeleteSample2)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+  } finally {
+    Reflect.deleteProperty(navigator, 'onLine')
+    view.unmount()
   }
 })
 

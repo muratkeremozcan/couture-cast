@@ -1315,5 +1315,26 @@
     "lookUpdated": "Look atualizado.",
     "pieceSwapped": "Peça trocada.",
     "close": "Fechar"
+  },
+  "savedLooks": {
+    "title": "Conjuntos guardados",
+    "count": "{{count}} guardados",
+    "empty": "Ainda não existem conjuntos guardados.",
+    "reopen": "Reabrir",
+    "remove": "Remover",
+    "missingPiece": "Peça em falta",
+    "missingPieceDetail": "Uma peça deste conjunto guardado já não está no seu guarda-roupa.",
+    "needsReview": "Requer revisão",
+    "needsReviewDetail": "Alterou as etiquetas de uma peça neste conjunto. Reveja para confirmar que ainda resulta.",
+    "photoUnavailable": "Fotografia indisponível",
+    "loadFailed": "Não foi possível carregar os seus conjuntos guardados.",
+    "retry": "Tentar novamente",
+    "detailTitle": "Conjunto guardado",
+    "sourceStylePiece": "A partir da sua peça",
+    "sourceHomeSample": "A partir de uma ideia de exemplo",
+    "slotOrderLabel": "Peças neste conjunto",
+    "close": "Fechar",
+    "showList": "Mostrar conjuntos guardados",
+    "hideList": "Ocultar conjuntos guardados"
   }
 }

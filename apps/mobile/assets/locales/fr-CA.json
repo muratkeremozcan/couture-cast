@@ -1059,5 +1059,26 @@
     "lookUpdated": "Look mis à jour.",
     "pieceSwapped": "Pièce remplacée.",
     "close": "Fermer"
+  },
+  "savedLooks": {
+    "title": "Tenues enregistrées",
+    "count": "{{count}} enregistrées",
+    "empty": "Aucune tenue enregistrée pour le moment.",
+    "reopen": "Rouvrir",
+    "remove": "Retirer",
+    "missingPiece": "Pièce manquante",
+    "missingPieceDetail": "Un vêtement de cette tenue enregistrée ne figure plus dans ta garde-robe.",
+    "needsReview": "À vérifier",
+    "needsReviewDetail": "Tu as modifié les étiquettes d’un vêtement de cette tenue. Vérifie qu’elle convient toujours.",
+    "photoUnavailable": "Photo indisponible",
+    "loadFailed": "Impossible de charger tes tenues enregistrées.",
+    "retry": "Réessayer",
+    "detailTitle": "Tenue enregistrée",
+    "sourceStylePiece": "À partir de ta pièce",
+    "sourceHomeSample": "À partir d’un exemple",
+    "slotOrderLabel": "Pièces de cette tenue",
+    "close": "Fermer",
+    "showList": "Afficher les tenues enregistrées",
+    "hideList": "Masquer les tenues enregistrées"
   }
 }

@@ -30,6 +30,7 @@ import {
   configureProviderCapsuleState,
   configureProviderCommerceState,
   configureProviderOnboardingState,
+  configureProviderSavedLookState,
   configureProviderSilhouetteState,
   configureProviderSubscriptionState,
   configureProviderPremiumAccessState,
@@ -1144,6 +1145,52 @@ export const stateHandlers: StateHandlers = {
     configureProviderCommunityState({ userId, scenario: 'challenge-overlap' })
     return Promise.resolve({
       description: 'Configured an overlapping active challenge in the same band',
+    })
+  },
+
+  // Story CC-7.2: account-backed saved looks.
+  'Member owns ready anchor garment for saved look creation': (parameters?: unknown) => {
+    const { userId, garmentId } = (parameters ?? {}) as {
+      userId?: string
+      garmentId?: string
+    }
+    configureProviderSavedLookState({
+      scenario: 'ready',
+      ...(userId ? { userId } : {}),
+      ...(garmentId ? { garmentId } : {}),
+    })
+    return Promise.resolve({
+      description: 'Configured ready anchor garment for saved look creation',
+    })
+  },
+
+  'Saved look already exists for idempotency key': (parameters?: unknown) => {
+    const { userId, savedLookId } = (parameters ?? {}) as {
+      userId?: string
+      savedLookId?: string
+    }
+    configureProviderSavedLookState({
+      scenario: 'replay',
+      ...(userId ? { userId } : {}),
+      ...(savedLookId ? { savedLookId } : {}),
+    })
+    return Promise.resolve({
+      description: 'Configured saved look idempotent replay',
+    })
+  },
+
+  'Member has account saved looks': (parameters?: unknown) => {
+    const { userId, savedLookId } = (parameters ?? {}) as {
+      userId?: string
+      savedLookId?: string
+    }
+    configureProviderSavedLookState({
+      scenario: 'ready',
+      ...(userId ? { userId } : {}),
+      ...(savedLookId ? { savedLookId } : {}),
+    })
+    return Promise.resolve({
+      description: 'Configured account saved looks for member',
     })
   },
 }

@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
+  SavedLookContract,
   WardrobeOnboardingStatus,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
@@ -32,7 +33,12 @@ import {
   scheduleStylePiecePhotoExpiry,
   type StylePieceSelection,
 } from '@couture/utils'
+import {
+  listSavedLooksPageFromWeb,
+  subscribeSavedLooksChanged,
+} from '../../lib/saved-looks'
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
+import { ClosetSavedLooksRow } from './saved-looks-row'
 
 export default function WardrobePage() {
   const owner = useWebSessionOwner()
@@ -143,6 +149,13 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
   const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
+  const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
+  const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
+  const [savedLooksTotal, setSavedLooksTotal] = useState(0)
+  const [savedLooksLoading, setSavedLooksLoading] = useState(false)
+  const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
+  const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
+  const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
   const styleInvoker = useRef<HTMLButtonElement | null>(null)
   const styleLabels = getStylePieceStrings(i18n.language)
   const [, updatePhotoClock] = useState(0)
@@ -265,6 +278,98 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   }, [sessionAttempt, missedSession, loadAttempt, loadInventory])
 
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
+
+  const savedLooksLoadEpochRef = useRef(0)
+
+  useEffect(() => {
+    const loadEpoch = ++savedLooksLoadEpochRef.current
+    setSavedLooksLoadingMore(false)
+    if (!owner) {
+      setSavedLooks([])
+      setSavedLooksTotal(0)
+      setSavedLooksError(null)
+      setSavedLooksLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setSavedLooksLoading(true)
+    void listSavedLooksPageFromWeb({ limit: 50, offset: 0, signal: controller.signal })
+      .then((page) => {
+        if (
+          controller.signal.aborted ||
+          savedLooksLoadEpochRef.current !== loadEpoch ||
+          currentWebSessionOwner() !== owner
+        ) {
+          return
+        }
+        setSavedLooks(page.data)
+        setSavedLooksTotal(page.total)
+        setSavedLooksError(null)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || savedLooksLoadEpochRef.current !== loadEpoch) {
+          return
+        }
+        setSavedLooksError(
+          error instanceof Error ? error.message : 'Unable to load your saved looks.'
+        )
+        missedSession()
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
+          setSavedLooksLoading(false)
+        }
+      })
+    return () => controller.abort()
+  }, [owner, sessionAttempt, missedSession, savedLooksAttempt])
+
+  useEffect(() => {
+    if (!owner) return
+    return subscribeSavedLooksChanged((changedOwner) => {
+      if (changedOwner === owner) {
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }
+    })
+  }, [owner])
+
+  const loadMoreSavedLooks = useCallback(() => {
+    if (
+      !owner ||
+      savedLooksLoading ||
+      savedLooksLoadingMore ||
+      savedLooks.length >= savedLooksTotal
+    )
+      return
+    setSavedLooksLoadingMore(true)
+    const offset = savedLooks.length
+    const startLoadEpoch = savedLooksLoadEpochRef.current
+    void listSavedLooksPageFromWeb({ limit: 50, offset })
+      .then((page) => {
+        if (
+          savedLooksLoadEpochRef.current !== startLoadEpoch ||
+          currentWebSessionOwner() !== owner
+        ) {
+          return
+        }
+        setSavedLooks((current) => {
+          const seen = new Set(current.map((item) => item.id))
+          return [...current, ...page.data.filter((item) => !seen.has(item.id))]
+        })
+        setSavedLooksTotal(page.total)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (savedLooksLoadEpochRef.current === startLoadEpoch) {
+          setSavedLooksLoadingMore(false)
+        }
+      })
+  }, [
+    owner,
+    savedLooks.length,
+    savedLooksLoading,
+    savedLooksLoadingMore,
+    savedLooksTotal,
+  ])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -498,6 +603,31 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
             </Link>
           )}
 
+          <ClosetSavedLooksRow
+            owner={owner}
+            savedLooks={savedLooks}
+            totalCount={savedLooksTotal}
+            hasMore={savedLooks.length < savedLooksTotal}
+            isLoadingMore={savedLooksLoadingMore}
+            onLoadMore={loadMoreSavedLooks}
+            isLoading={savedLooksLoading}
+            loadError={savedLooksError}
+            garments={garments}
+            onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+            onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+            onReopenStylePiece={(look, invoker) => {
+              const anchor = garments.find((item) => item.id === look.anchorGarmentId)
+              if (!anchor || !anchor.category || !anchor.comfortRange) return
+              styleInvoker.current = invoker as HTMLButtonElement
+              setInitialSavedLook(look)
+              setStyleSelection({
+                id: anchor.id,
+                category: anchor.category,
+                comfortRange: anchor.comfortRange,
+              })
+            }}
+          />
+
           <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
             <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Your Digital Closet
@@ -649,12 +779,17 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
+          initialSavedLook={initialSavedLook}
           inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
           loadInventory={loadInventory}
           owner={owner}
           locale={i18n.language}
           invoker={styleInvoker}
-          onClose={() => setStyleSelection(null)}
+          onSavedLooksChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+          onClose={() => {
+            setStyleSelection(null)
+            setInitialSavedLook(null)
+          }}
         />
       )}
 

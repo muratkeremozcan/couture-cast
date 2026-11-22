@@ -12,23 +12,26 @@ import {
 } from '@couture/utils'
 import { SaveActionButton } from '../save-feedback'
 
+type SampleBookmarkItem = SampleBookmark & { savedLookId?: string }
+
 type Props = {
   strings: GuestPreviewStrings
   preferences?: SampleStylePreferences
   onPreferences: (preferences: SampleStylePreferences) => void
-  bookmarks: SampleBookmark[]
+  bookmarks: SampleBookmarkItem[]
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
   onViewSaved?: () => void
-  onOpen: (bookmark: SampleBookmark) => void
-  onRemove: (lookId: string) => void
+  onOpen: (bookmark: SampleBookmarkItem) => void
+  onRemove: (id: string) => void
   weather?: SampleWeatherKey
   onWeather?: (weather: SampleWeatherKey) => void
   persistent?: boolean
   ownerKey?: string | null
   saveResetKey?: string
   useSharedFeedback?: boolean
+  requiresNetwork?: boolean
 }
 
 const buttonClass =
@@ -51,6 +54,7 @@ export function SampleIdeaControls({
   ownerKey,
   saveResetKey,
   useSharedFeedback = false,
+  requiresNetwork = false,
 }: Props) {
   const labels = strings.styleIdeas
   const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
@@ -69,6 +73,7 @@ export function SampleIdeaControls({
             onView={onViewSaved}
             ownerKey={ownerKey}
             resetKey={saveResetKey ?? lookId}
+            requiresNetwork={requiresNetwork}
           />
         ) : (
           <button
@@ -94,8 +99,9 @@ export function SampleIdeaControls({
           <ul className="space-y-2">
             {bookmarks.map((bookmark) => {
               const look = sampleLookText({ id: bookmark.lookId }, strings).name
+              const entryId = bookmark.savedLookId ?? bookmark.lookId
               return (
-                <li key={bookmark.lookId} className="flex flex-wrap gap-2">
+                <li key={entryId} className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     className={buttonClass}
@@ -111,7 +117,7 @@ export function SampleIdeaControls({
                   <button
                     type="button"
                     className={buttonClass}
-                    onClick={() => onRemove(bookmark.lookId)}
+                    onClick={() => onRemove(entryId)}
                   >
                     {formatPreviewString(labels.remove, { look })}
                   </button>

@@ -13,6 +13,7 @@ import { TelemetryModule } from '../telemetry/telemetry.module'
 import { WardrobeController } from './wardrobe.controller'
 import { WardrobeCapsuleController } from './wardrobe-capsule.controller'
 import { WardrobeOnboardingController } from './wardrobe-onboarding.controller'
+import { WardrobeSavedLookController } from './wardrobe-saved-look.controller'
 import { WardrobeSilhouetteController } from './wardrobe-silhouette.controller'
 import { WardrobeUploadGuard } from './wardrobe.guard'
 import { WardrobeService } from './wardrobe.service'
@@ -22,6 +23,7 @@ import { CapsuleTelemetryOutbox } from './wardrobe-capsule.outbox'
 import { CapsuleCacheHeadersMiddleware } from './wardrobe-capsule.cache-headers.middleware'
 import { WardrobeCapsuleService } from './wardrobe-capsule.service'
 import { WardrobeOnboardingService } from './wardrobe-onboarding.service'
+import { WardrobeSavedLookService } from './wardrobe-saved-look.service'
 import { WardrobeSilhouetteService } from './wardrobe-silhouette.service'
 import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
@@ -40,6 +42,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     WardrobeController,
     WardrobeCapsuleController,
     WardrobeOnboardingController,
+    WardrobeSavedLookController,
     WardrobeSilhouetteController,
   ],
   providers: [
@@ -48,6 +51,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     WardrobeCapsuleRepository,
     WardrobeCapsuleService,
     WardrobeOnboardingService,
+    WardrobeSavedLookService,
     WardrobeSilhouetteService,
     CapsuleTelemetryOutbox,
     RequestAuthGuard,
@@ -61,6 +65,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
     WardrobeService,
     WardrobeCapsuleService,
     WardrobeOnboardingService,
+    WardrobeSavedLookService,
     WardrobeSilhouetteService,
     WardrobeAccessService,
     CapsuleTelemetryOutbox,
@@ -90,6 +95,10 @@ export class WardrobeModule implements NestModule {
       },
       {
         path: '/api/v1/wardrobe/silhouette{/*path}',
+        method: RequestMethod.ALL,
+      },
+      {
+        path: '/api/v1/wardrobe/saved-looks{/*path}',
         method: RequestMethod.ALL,
       }
     )

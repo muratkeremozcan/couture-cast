@@ -111,19 +111,12 @@ test.describe('Style this piece on a phone', () => {
     })
     const reopen = savedLooks.getByTestId('style-piece-reopen')
     await expect(reopen).toHaveAccessibleName(/^Open saved look\b.*Warm and rainy/)
-    const savedData = await page.evaluate(() =>
-      Object.keys(localStorage)
-        .filter((key) => key.startsWith('couturecast.style-piece.'))
-        .map((key) => localStorage.getItem(key))
+    const localStyleKeys = await page.evaluate(() =>
+      Object.keys(localStorage).filter((key) =>
+        key.startsWith('couturecast.style-piece.')
+      )
     )
-    expect(savedData).toHaveLength(1)
-    expect(JSON.parse(savedData[0] ?? 'null') as unknown).toEqual([
-      {
-        lookId: 'sample:l:silk-midi',
-        weather: 'warm-rainy',
-        swaps: { shoes: 'sample:g:loafers' },
-      },
-    ])
+    expect(localStyleKeys).toEqual([])
 
     await page.reload()
     await openStylePanel(page, garment.id)
@@ -142,7 +135,16 @@ test.describe('Style this piece on a phone', () => {
     await openStylePanel(page, garment.id)
     await expect(panel.getByTestId('style-piece-save').first()).toBeEnabled()
     await expect(reopen).toHaveCount(0)
-    expect(writes, 'Wardrobe styling is local to this device').toEqual([])
+    expect(
+      writes.filter((entry) => !entry.includes('/api/v1/wardrobe/saved-looks')),
+      'Wardrobe styling only writes to account saved looks'
+    ).toEqual([])
+    expect(writes.some((entry) => entry === 'POST /api/v1/wardrobe/saved-looks')).toBe(
+      true
+    )
+    expect(
+      writes.some((entry) => entry.startsWith('DELETE /api/v1/wardrobe/saved-looks/'))
+    ).toBe(true)
   })
 
   test('keeps the edited card and keyboard focus when two swaps duplicate another look', async ({
@@ -584,11 +586,10 @@ test.describe('Style this piece on a phone', () => {
   })
 
   for (const mode of ['available', 'missing', 'rejected'] as const) {
-    test(`preserves saved recipes when Web Locks is ${mode}`, async ({
+    test(`preserves account-backed saved looks when Web Locks is ${mode}`, async ({
       baseURL,
       page,
       interceptNetworkCall,
-      recurse,
     }) => {
       if (mode !== 'available') {
         await page.addInitScript((lockMode) => {
@@ -606,7 +607,6 @@ test.describe('Style this piece on a phone', () => {
                   typeof name === 'string' &&
                   name.startsWith('couturecast.style-piece.')
                 ) {
-                  document.documentElement.dataset.styleTestLockRejected = name
                   return Promise.reject(new Error('Synthetic lock denial'))
                 }
                 return Reflect.apply(target, thisArg, args) as unknown
@@ -626,61 +626,14 @@ test.describe('Style this piece on a phone', () => {
       const saved = panel.getByTestId('style-piece-reopen')
       await looks.nth(0).getByTestId('style-piece-save').click()
       await expect(saved).toHaveCount(1)
-      const key = await page.evaluate(() =>
-        Object.keys(localStorage).find((name) =>
+      await looks.nth(1).getByTestId('style-piece-save').click()
+      await expect(saved).toHaveCount(2)
+      const localStyleKeys = await page.evaluate(() =>
+        Object.keys(localStorage).filter((name) =>
           name.startsWith('couturecast.style-piece.')
         )
       )
-      expect(key).toBeTruthy()
-
-      if (mode === 'available') {
-        await page.evaluate(
-          (name) =>
-            new Promise<void>((held, reject) => {
-              void navigator.locks
-                .request(
-                  name,
-                  () =>
-                    new Promise<void>((release) => {
-                      window.addEventListener('style-test-release', () => release(), {
-                        once: true,
-                      })
-                      held()
-                    })
-                )
-                .catch(reject)
-            }),
-          key!
-        )
-      }
-      try {
-        await looks.nth(1).getByTestId('style-piece-save').click()
-        if (mode === 'available') {
-          await recurse(
-            () =>
-              page.evaluate(
-                async (name) =>
-                  (await navigator.locks.query()).pending?.some(
-                    (lock) => lock.name === name
-                  ) ?? false,
-                key!
-              ),
-            (pending) => pending,
-            { timeout: 5_000 }
-          )
-          await expect(saved).toHaveCount(1)
-        } else if (mode === 'rejected') {
-          await expect(page.locator('html')).toHaveAttribute(
-            'data-style-test-lock-rejected',
-            key!
-          )
-        }
-      } finally {
-        if (mode === 'available') {
-          await page.evaluate(() => window.dispatchEvent(new Event('style-test-release')))
-        }
-      }
-      await expect(saved).toHaveCount(2)
+      expect(localStyleKeys).toEqual([])
       await page.reload()
       await openStylePanel(page, garment.id)
       await expect(saved).toHaveCount(2)

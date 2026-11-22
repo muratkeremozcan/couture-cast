@@ -76,6 +76,8 @@ import { WardrobeCapsuleService } from '../../../apps/api/src/modules/wardrobe/w
 import { CapsuleCacheHeadersMiddleware } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.cache-headers.middleware'
 import { WardrobeOnboardingController } from '../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.controller'
 import { WardrobeOnboardingService } from '../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service'
+import { WardrobeSavedLookController } from '../../../apps/api/src/modules/wardrobe/wardrobe-saved-look.controller'
+import { WardrobeSavedLookService } from '../../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.js'
 import { WardrobeSilhouetteController } from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller'
 import { AffiliateClickController } from '../../../apps/api/src/modules/commerce/affiliate-click.controller'
 import { AffiliateClickService } from '../../../apps/api/src/modules/commerce/affiliate-click.service'
@@ -108,6 +110,11 @@ import { createRitualDoubles } from './doubles/ritual'
 import { createWardrobeDoubles } from './doubles/wardrobe'
 import { createCapsulesDoubles } from './doubles/capsules'
 import { createOnboardingDoubles } from './doubles/onboarding'
+import {
+  configureProviderSavedLookState,
+  createSavedLookDoubles,
+  resetProviderSavedLookState,
+} from './doubles/saved-looks'
 import { createSilhouetteDoubles } from './doubles/silhouette'
 import { createGuardianDoubles } from './doubles/guardian'
 import { createCommerceAffiliateDoubles } from './doubles/commerce-affiliate'
@@ -152,6 +159,7 @@ import {
  * scenario state from this module exactly as before.
  */
 export * from './state'
+export { configureProviderSavedLookState }
 
 export type PactEvent = {
   id: string
@@ -181,6 +189,7 @@ export function resetProviderState() {
   providerEvents = []
   resetProviderWardrobeState()
   resetProviderOnboardingState()
+  resetProviderSavedLookState()
   resetProviderSilhouetteState()
   resetProviderCapsuleState()
   resetProviderCommerceState()
@@ -271,6 +280,7 @@ export async function startLocalPactProvider({
   const { mockWardrobeService, mockWardrobeRetentionService } = createWardrobeDoubles()
   const { mockWardrobeCapsuleService } = createCapsulesDoubles()
   const { mockWardrobeOnboardingService } = createOnboardingDoubles()
+  const { mockWardrobeSavedLookService } = createSavedLookDoubles()
   const { mockWardrobeSilhouetteService } = createSilhouetteDoubles()
   const { mockGuardianService } = createGuardianDoubles()
   const { communitySponsorshipService } = createCommunitySponsorshipDoubles()
@@ -308,6 +318,7 @@ export async function startLocalPactProvider({
       WardrobeController,
       WardrobeCapsuleController,
       WardrobeOnboardingController,
+      WardrobeSavedLookController,
       WardrobeSilhouetteController,
       CommercePreferencesController,
       AffiliateClickController,
@@ -397,6 +408,10 @@ export async function startLocalPactProvider({
       {
         provide: WardrobeOnboardingService,
         useValue: mockWardrobeOnboardingService,
+      },
+      {
+        provide: WardrobeSavedLookService,
+        useValue: mockWardrobeSavedLookService,
       },
       {
         provide: WardrobeSilhouetteService,
@@ -499,7 +514,8 @@ export async function startLocalPactProvider({
     if (
       /^\/[^/]+\/capsules(\/|$|\?)/.test(req.url) ||
       /^\/onboarding(\/|$|\?)/.test(req.url) ||
-      /^\/silhouette(\/|$|\?)/.test(req.url)
+      /^\/silhouette(\/|$|\?)/.test(req.url) ||
+      /^\/saved-looks(\/|$|\?)/.test(req.url)
     ) {
       capsuleCacheHeaders.use(req, res, next)
       return

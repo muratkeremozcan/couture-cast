@@ -1,5 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+// Learning path Step 60: Saved looks follow the account.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Home on a shared device: member A loads today's ritual, then member B signs in within the
 // 15-minute cache window. The identity reload must fetch B's ritual. A's cached location,
 // outfit and alert data are A's personal data and must never render for B.
@@ -22,6 +24,8 @@ import i18n, { initI18n } from '@/src/lib/i18n'
 import { noLocationResponse } from '@/src/test-utils/locations'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
+import { SaveFeedbackProvider } from '@/components/save-feedback'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -73,12 +77,14 @@ describe('TabOneScreen identity change on a shared device', () => {
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() =>
       mobileApplicationUserId() === 'member-b' ? 'token-b' : 'token-a'
     )
+    const { handlers: savedLooksHandlers } = createSavedLooksMswHandlers()
     server.use(
       http.get('*/api/v1/ritual', ({ request }) => {
         const isMemberB = request.headers.get('Authorization') === 'Bearer token-b'
         ritualRequestsBy.push(isMemberB ? 'member-b' : 'member-a')
         return HttpResponse.json(isMemberB ? memberBRitual : mockRitualResponse)
-      })
+      }),
+      ...savedLooksHandlers
     )
     await i18n.changeLanguage('en-US')
   })
@@ -162,44 +168,68 @@ describe('TabOneScreen identity change on a shared device', () => {
     expect(screen.getByTestId('guest-preview-undo-swaps')).toBeVisible()
 
     await userEvent.click(screen.getByTestId('sample-remove-sample:l:office-oxford'))
+    await waitFor(() => expect(screen.queryByTestId('sample-saved-looks')).toBeNull())
     await home.unmount()
     await render(<TabOneScreen />)
     expect(await screen.findByTestId('sample-save-look')).toBeVisible()
     expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
   })
 
-  it('shows failed storage after removing the last saved sample', async () => {
-    server.use(http.get('*/api/v1/ritual', noLocationResponse))
+  it('shows retryable failure after removing a saved sample fails and succeeds on retry', async () => {
+    const { store, handlers } = createSavedLooksMswHandlers()
+    server.use(http.get('*/api/v1/ritual', noLocationResponse), ...handlers)
     setMobileApplicationUserId('member-a')
-    await render(<TabOneScreen />)
+    await render(
+      <SaveFeedbackProvider>
+        <TabOneScreen />
+      </SaveFeedbackProvider>
+    )
     const save = await screen.findByTestId('sample-save-look')
-    expect(screen.queryByText('This preview may reset when you close it.')).toBeNull()
     await userEvent.click(save)
     const remove = await screen.findByTestId('sample-remove-sample:l:office-oxford')
-    const key = 'couturecast.member-sample-bookmarks.member-a'
-    const persisted = localStorage.getItem(key)
-    expect(persisted).not.toBeNull()
+    expect(store.items).toHaveLength(1)
 
-    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
-      throw new Error('Storage unavailable')
-    })
-    try {
-      await userEvent.click(remove)
-      expect(write).toHaveBeenCalledWith(key, '[]')
-      expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
-      expect(screen.getByText('This preview may reset when you close it.')).toBeVisible()
-      expect(localStorage.getItem(key)).toBe(persisted)
-    } finally {
-      write.mockRestore()
+    let failOnce = true
+    store.nextDeleteError = () => {
+      if (!failOnce) return null
+      failOnce = false
+      return HttpResponse.json({ message: 'Server unavailable' }, { status: 503 })
     }
-
-    await userEvent.click(save)
-    await userEvent.click(
-      await screen.findByTestId('sample-remove-sample:l:office-oxford')
+    await userEvent.click(remove)
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent(
+      'Could not save. Try again.'
     )
-    expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
-    expect(screen.queryByText('This preview may reset when you close it.')).toBeNull()
-    expect(localStorage.getItem(key)).toBe('[]')
+    expect(store.items).toHaveLength(1)
+
+    await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(screen.queryByTestId('sample-saved-looks')).toBeNull())
+    expect(store.items).toHaveLength(0)
+
+    // Committed DELETE with lost response: Retry hits 404 and reconciles cleanly without affecting other looks.
+    await userEvent.click(screen.getByTestId('sample-save-look'))
+    await screen.findByTestId('sample-remove-sample:l:office-oxford')
+    expect(store.items).toHaveLength(1)
+    let simulateLostDeleteResponse = true
+    store.onDelete = (_request, id) => {
+      if (!simulateLostDeleteResponse) return
+      simulateLostDeleteResponse = false
+      const target = store.items.find((item) => item.id === id)
+      if (target) {
+        store.deletedItems.set(id, { ...target, revision: target.revision + 1 })
+        store.items = store.items.filter((item) => item.id !== id)
+      }
+      store.nextDeleteError = () => {
+        store.nextDeleteError = undefined
+        return HttpResponse.json({ message: 'Response lost' }, { status: 503 })
+      }
+    }
+    await userEvent.click(screen.getByTestId('sample-remove-sample:l:office-oxford'))
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent(
+      'Could not save. Try again.'
+    )
+    expect(store.items).toHaveLength(0)
+    await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(screen.queryByTestId('sample-saved-looks')).toBeNull())
   })
 
   it('6.5-MOB-HERO-ID-03 never stores a member ritual under the signed-out owner on a cold start', async () => {

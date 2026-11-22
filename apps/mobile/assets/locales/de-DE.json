@@ -1059,5 +1059,26 @@
     "lookUpdated": "Look aktualisiert.",
     "pieceSwapped": "Teil getauscht.",
     "close": "Schließen"
+  },
+  "savedLooks": {
+    "title": "Gespeicherte Looks",
+    "count": "{{count}} gespeichert",
+    "empty": "Noch keine gespeicherten Looks.",
+    "reopen": "Wieder öffnen",
+    "remove": "Entfernen",
+    "missingPiece": "Fehlendes Teil",
+    "missingPieceDetail": "Ein Kleidungsstück aus diesem gespeicherten Look befindet sich nicht mehr in deinem Kleiderschrank.",
+    "needsReview": "Überprüfung nötig",
+    "needsReviewDetail": "Du hast Tags eines Teils in diesem Look geändert. Prüfe, ob der Look noch passt.",
+    "photoUnavailable": "Foto nicht verfügbar",
+    "loadFailed": "Deine gespeicherten Looks konnten nicht geladen werden.",
+    "retry": "Erneut versuchen",
+    "detailTitle": "Gespeicherter Look",
+    "sourceStylePiece": "Aus deinem Kleidungsstück",
+    "sourceHomeSample": "Aus einer Beispielidee",
+    "slotOrderLabel": "Teile in diesem Look",
+    "close": "Schließen",
+    "showList": "Gespeicherte Looks anzeigen",
+    "hideList": "Gespeicherte Looks ausblenden"
   }
 }

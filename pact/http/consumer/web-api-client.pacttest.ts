@@ -111,6 +111,10 @@ import {
   verifyUpdateCapsuleInteraction,
   verifyFavoriteCapsuleInteraction,
   verifyDeleteCapsuleInteraction,
+  verifyCreateSavedLookInteraction,
+  verifySavedLookIdempotentReplayInteraction,
+  verifyListSavedLooksInteraction,
+  verifyDeleteSavedLookInteraction,
   verifyCapsuleErrorInteraction,
   capsuleErrorInteractions,
   verifyOnboardingStateInteraction,
@@ -1052,5 +1056,18 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   })
   it('names the sanction to a banned member reading the feed', async () => {
     await verifyCommunityBannedFeedInteraction(pact)
+  })
+  // Story CC-7.2: account-backed saved looks.
+  it('saves a Style this piece look to the authenticated account', async () => {
+    await verifyCreateSavedLookInteraction(pact, createWebClientForMockServer)
+  })
+  it('replays a retried saved look creation with the same Idempotency-Key', async () => {
+    await verifySavedLookIdempotentReplayInteraction(pact, createWebClientForMockServer)
+  })
+  it('lists account-backed saved looks', async () => {
+    await verifyListSavedLooksInteraction(pact, createWebClientForMockServer)
+  })
+  it('removes a saved look with matching If-Match revision', async () => {
+    await verifyDeleteSavedLookInteraction(pact, createWebClientForMockServer)
   })
 })

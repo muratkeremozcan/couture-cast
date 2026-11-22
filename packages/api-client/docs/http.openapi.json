@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.8.0",
+    "version": "1.9.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -7053,6 +7053,1013 @@
         "required": [
           "statusCode",
           "message"
+        ],
+        "additionalProperties": false
+      },
+      "CreateSavedLookInput": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "style_piece",
+              "home_sample"
+            ]
+          },
+          "lookId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "weather": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Trimmed and NFC-normalized title bounded to 80 extended grapheme clusters; blank strings normalize to null."
+          },
+          "anchorGarmentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "anchorSnapshot": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "garmentId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom",
+                  "outerwear",
+                  "dress",
+                  "shoes",
+                  "accessory"
+                ]
+              },
+              "comfortRange": {
+                "type": "string",
+                "enum": [
+                  "cold",
+                  "cool",
+                  "mild",
+                  "warm",
+                  "hot"
+                ]
+              }
+            },
+            "required": [
+              "garmentId",
+              "category",
+              "comfortRange"
+            ],
+            "additionalProperties": false
+          },
+          "composition": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slotIndex": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 11
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "outerwear",
+                    "dress",
+                    "shoes",
+                    "accessory"
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "garment",
+                    "catalog"
+                  ]
+                },
+                "itemId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 120
+                }
+              },
+              "required": [
+                "slotIndex",
+                "category",
+                "kind",
+                "itemId"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "swaps": {
+            "type": "object",
+            "properties": {
+              "top": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "bottom": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "outerwear": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "dress": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "shoes": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "accessory": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              }
+            },
+            "default": {}
+          },
+          "collection": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "comfort": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "runsColdWarm": {
+                "type": "string",
+                "enum": [
+                  "cold",
+                  "neutral",
+                  "warm"
+                ]
+              },
+              "windTolerance": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              },
+              "precipPreparedness": {
+                "type": "string",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            "required": [
+              "runsColdWarm",
+              "windTolerance",
+              "precipPreparedness"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "source",
+          "lookId",
+          "weather",
+          "composition"
+        ],
+        "additionalProperties": false,
+        "description": "Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots."
+      },
+      "SavedLookResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ownerUserId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "style_piece",
+                  "home_sample"
+                ]
+              },
+              "lookId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "weather": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 320
+              },
+              "anchorGarmentId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 128
+              },
+              "anchorSnapshot": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "garmentId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "top",
+                      "bottom",
+                      "outerwear",
+                      "dress",
+                      "shoes",
+                      "accessory"
+                    ]
+                  },
+                  "comfortRange": {
+                    "type": "string",
+                    "enum": [
+                      "cold",
+                      "cool",
+                      "mild",
+                      "warm",
+                      "hot"
+                    ]
+                  }
+                },
+                "required": [
+                  "garmentId",
+                  "category",
+                  "comfortRange"
+                ],
+                "additionalProperties": false
+              },
+              "composition": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "slotIndex": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 11
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "outerwear",
+                        "dress",
+                        "shoes",
+                        "accessory"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "garment",
+                        "catalog"
+                      ]
+                    },
+                    "itemId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "label": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 120
+                    },
+                    "missing": {
+                      "type": "boolean"
+                    },
+                    "imageAccess": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "slotIndex",
+                    "category",
+                    "kind",
+                    "itemId",
+                    "label",
+                    "missing",
+                    "imageAccess"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1,
+                "maxItems": 12
+              },
+              "swaps": {
+                "type": "object",
+                "properties": {
+                  "top": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "bottom": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "outerwear": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "dress": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "shoes": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "accessory": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                }
+              },
+              "collection": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 32
+              },
+              "comfort": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "runsColdWarm": {
+                    "type": "string",
+                    "enum": [
+                      "cold",
+                      "neutral",
+                      "warm"
+                    ]
+                  },
+                  "windTolerance": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "precipPreparedness": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  }
+                },
+                "required": [
+                  "runsColdWarm",
+                  "windTolerance",
+                  "precipPreparedness"
+                ],
+                "additionalProperties": false
+              },
+              "availabilityStatus": {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "missing_garment",
+                  "needs_review"
+                ]
+              },
+              "missingGarmentIds": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "needsReviewReasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "category_changed",
+                    "comfort_range_changed"
+                  ]
+                }
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "ownerUserId",
+              "source",
+              "lookId",
+              "weather",
+              "title",
+              "anchorGarmentId",
+              "anchorSnapshot",
+              "composition",
+              "swaps",
+              "collection",
+              "comfort",
+              "availabilityStatus",
+              "missingGarmentIds",
+              "needsReviewReasons",
+              "revision",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookListResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ownerUserId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "style_piece",
+                    "home_sample"
+                  ]
+                },
+                "lookId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "weather": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "maxLength": 320
+                },
+                "anchorGarmentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "anchorSnapshot": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "garmentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "top",
+                        "bottom",
+                        "outerwear",
+                        "dress",
+                        "shoes",
+                        "accessory"
+                      ]
+                    },
+                    "comfortRange": {
+                      "type": "string",
+                      "enum": [
+                        "cold",
+                        "cool",
+                        "mild",
+                        "warm",
+                        "hot"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "garmentId",
+                    "category",
+                    "comfortRange"
+                  ],
+                  "additionalProperties": false
+                },
+                "composition": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "slotIndex": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 11
+                      },
+                      "category": {
+                        "type": "string",
+                        "enum": [
+                          "top",
+                          "bottom",
+                          "outerwear",
+                          "dress",
+                          "shoes",
+                          "accessory"
+                        ]
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "garment",
+                          "catalog"
+                        ]
+                      },
+                      "itemId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "label": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "maxLength": 120
+                      },
+                      "missing": {
+                        "type": "boolean"
+                      },
+                      "imageAccess": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "url",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "slotIndex",
+                      "category",
+                      "kind",
+                      "itemId",
+                      "label",
+                      "missing",
+                      "imageAccess"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "maxItems": 12
+                },
+                "swaps": {
+                  "type": "object",
+                  "properties": {
+                    "top": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "bottom": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "outerwear": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "dress": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "shoes": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "accessory": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    }
+                  }
+                },
+                "collection": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 32
+                },
+                "comfort": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "runsColdWarm": {
+                      "type": "string",
+                      "enum": [
+                        "cold",
+                        "neutral",
+                        "warm"
+                      ]
+                    },
+                    "windTolerance": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    },
+                    "precipPreparedness": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "runsColdWarm",
+                    "windTolerance",
+                    "precipPreparedness"
+                  ],
+                  "additionalProperties": false
+                },
+                "availabilityStatus": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "missing_garment",
+                    "needs_review"
+                  ]
+                },
+                "missingGarmentIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "needsReviewReasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "category_changed",
+                      "comfort_range_changed"
+                    ]
+                  }
+                },
+                "revision": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "ownerUserId",
+                "source",
+                "lookId",
+                "weather",
+                "title",
+                "anchorGarmentId",
+                "anchorSnapshot",
+                "composition",
+                "swaps",
+                "collection",
+                "comfort",
+                "availabilityStatus",
+                "missingGarmentIds",
+                "needsReviewReasons",
+                "revision",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookBadRequestError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookNotFoundError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              404
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "SAVED_LOOK_NOT_FOUND",
+              "GARMENT_NOT_FOUND"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Not Found"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookConflictError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              409
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD",
+              "SAVED_LOOK_ALREADY_REMOVED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Conflict"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookPreconditionFailedError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              412
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "SAVED_LOOK_REVISION_MISMATCH"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Failed"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "SavedLookPreconditionRequiredError": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              428
+            ]
+          },
+          "message": {
+            "type": "string",
+            "enum": [
+              "PRECONDITION_REQUIRED"
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Precondition Required"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "error"
         ],
         "additionalProperties": false
       },
@@ -24753,6 +25760,576 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SilhouettePreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/saved-looks": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "List saved looks belonging to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "style_piece",
+                "home_sample"
+              ]
+            },
+            "required": false,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "required": false,
+            "name": "anchorGarmentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            },
+            "required": false,
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of account-backed saved looks.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Save a Style this piece or Home sample look to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i",
+              "description": "UUID v4 idempotency key scoped per account. Replays matching payloads with 200 and rejects mismatched payloads or already-removed rows with 409."
+            },
+            "required": false,
+            "description": "UUID v4 idempotency key scoped per account. Replays matching payloads with 200 and rejects mismatched payloads or already-removed rows with 409.",
+            "name": "idempotency-key",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSavedLookInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay of an existing saved look.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Saved look created.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid saved look payload or Idempotency-Key header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced wardrobe garment was not found for this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookNotFoundError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency-Key reused with a different payload or for an already-removed saved look.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookConflictError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/saved-looks/{savedLookId}": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Get a single saved look belonging to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique saved look ID."
+            },
+            "required": true,
+            "description": "Unique saved look ID.",
+            "name": "savedLookId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved look details.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid savedLookId path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Saved look not found for this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookNotFoundError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Remove a saved look belonging to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique saved look ID."
+            },
+            "required": true,
+            "description": "Unique saved look ID.",
+            "name": "savedLookId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Required strong ETag (\"saved-look:<id>:<revision>\"), comma-separated list of strong ETags, or *."
+            },
+            "required": true,
+            "description": "Required strong ETag (\"saved-look:<id>:<revision>\"), comma-separated list of strong ETags, or *.",
+            "name": "if-match",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Saved look removed.",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid savedLookId path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Saved look not found for this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookNotFoundError"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Stale ETag / saved look revision mismatch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookPreconditionFailedError"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "If-Match header required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookPreconditionRequiredError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/saved-looks/{savedLookId}/restore": {
+      "post": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Restore a recently removed saved look belonging to the authenticated account",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique saved look ID."
+            },
+            "required": true,
+            "description": "Unique saved look ID.",
+            "name": "savedLookId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved look restored (idempotent if already active).",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "description": "Always private, no-store on all responses.",
+                  "example": "private, no-store"
+                },
+                "required": true,
+                "description": "Always private, no-store on all responses."
+              },
+              "ETag": {
+                "schema": {
+                  "type": "string",
+                  "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision.",
+                  "example": "\"saved-look:sl-1:0\""
+                },
+                "required": true,
+                "description": "Strong resource revision tag (\"saved-look:<id>:<revision>\") for optimistic concurrency. Ephemeral signed image URLs rotate per read independently of revision."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid savedLookId path parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account access restricted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Saved look not found for this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedLookNotFoundError"
                 }
               }
             }
