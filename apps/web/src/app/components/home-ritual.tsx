@@ -46,6 +46,7 @@ import {
   notifySavedLooksChanged,
   restoreSavedLookFromWeb,
   SavedLookRequestError,
+  subscribeSavedLooksChanged,
 } from '../../lib/saved-looks'
 import {
   currentWebSessionBearer,
@@ -261,6 +262,36 @@ function SampleOutfitInner({
       }
       ownedNotices.clear()
     }
+  }, [owner])
+
+  useEffect(() => {
+    if (!owner) return
+    return subscribeSavedLooksChanged((changedOwner) => {
+      if (changedOwner !== owner) return
+      const refreshVersion = mutationVersionRef.current
+      void listSavedLooksFromWeb({
+        source: 'home_sample',
+        skipLegacyImport: true,
+      })
+        .then((items) => {
+          if (
+            !bookmarkOwnerMounted.current ||
+            !isLiveOwner(owner) ||
+            mutationVersionRef.current !== refreshVersion
+          ) {
+            return
+          }
+          const next = mergeInitialSavedLooks(
+            savedLooksRef.current,
+            items,
+            deletedIdsRef.current
+          )
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          setBookmarksPersistent(true)
+        })
+        .catch(() => undefined)
+    })
   }, [owner])
 
   const bookmarks: (SampleBookmark & {
@@ -488,6 +519,23 @@ function SampleOutfitInner({
             ?.scrollIntoView?.({ block: 'nearest' })
         }}
         onOpen={(bookmark) => {
+          const matching = savedLooksRef.current.find(
+            (item) => item.lookId === bookmark.lookId
+          )
+          if (matching?.availabilityStatus === 'needs_review') {
+            const seq = ++noticeSeqRef.current
+            showScopedNotice({
+              id: `sample-${owner}-needs-review-${seq}`,
+              announcementId: createAnnouncementToken(
+                `sample-${owner}-needs-review`,
+                seq
+              ),
+              message: t('savedLooks.needsReviewDetail'),
+              tone: 'neutral',
+              actions: [],
+            })
+            return
+          }
           lookUndoStackRef.current = []
           dismissOwnedNotices()
           update(reopenMemberSampleOutfit(result, bookmark))

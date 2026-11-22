@@ -111,7 +111,7 @@ const HOME_SAMPLE_DISPLAY_ORDER: readonly SampleGarmentCategory[] = [
 
 const MEMBER_SAMPLE_BOOKMARKS_PREFIX = 'couturecast.member-sample-bookmarks.'
 const STYLE_PIECE_STORAGE_PREFIX = 'couturecast.style-piece.'
-const MAX_LEGACY_IMPORT_ITEMS = 8
+const MAX_LEGACY_IMPORT_ITEMS = 32
 
 const legacyToleranceSchema = z.enum(['low', 'medium', 'high'])
 
@@ -231,10 +231,17 @@ export function memberSampleBookmarksStorageKeys(owner: string): string[] {
 
 /**
  * Extracts the owner member id from a `couturecast.member-sample-bookmarks.<owner>` key,
- * or returns `null` if the key is not a valid member sample bookmark key.
+ * or returns `null` if the key is not a valid member sample bookmark key. Pass
+ * `{ allowJsonExtension: true }` only at the native document filename boundary.
  */
-export function parseMemberSampleBookmarksStorageKey(storageKey: string): string | null {
-  const normalized = storageKey.endsWith('.json') ? storageKey.slice(0, -5) : storageKey
+export function parseMemberSampleBookmarksStorageKey(
+  storageKey: string,
+  options?: { allowJsonExtension?: boolean }
+): string | null {
+  const normalized =
+    options?.allowJsonExtension && storageKey.endsWith('.json')
+      ? storageKey.slice(0, -5)
+      : storageKey
   if (!normalized.startsWith(MEMBER_SAMPLE_BOOKMARKS_PREFIX)) return null
   const suffix = normalized.slice(MEMBER_SAMPLE_BOOKMARKS_PREFIX.length)
   if (!suffix || suffix.length > 256 || suffix.includes('\u0000')) return null
@@ -262,12 +269,17 @@ function isValidStylePieceScopeTuple(parsed: unknown): parsed is [string, string
 /**
  * Decodes a `couturecast.style-piece.<scope>` storage key into `{ owner, garmentId }`.
  * Verifies canonical round-trip via `stylePieceStorageKey(owner, garmentId)` so malformed
- * or ambiguous keys are never read, imported, or deleted.
+ * or ambiguous keys are never read, imported, or deleted. Pass `{ allowJsonExtension: true }`
+ * only at the native document filename boundary.
  */
 export function parseStylePieceStorageKey(
-  storageKey: string
+  storageKey: string,
+  options?: { allowJsonExtension?: boolean }
 ): { owner: string; garmentId: string } | null {
-  const normalized = storageKey.endsWith('.json') ? storageKey.slice(0, -5) : storageKey
+  const normalized =
+    options?.allowJsonExtension && storageKey.endsWith('.json')
+      ? storageKey.slice(0, -5)
+      : storageKey
   if (!normalized.startsWith(STYLE_PIECE_STORAGE_PREFIX)) return null
   const scope = normalized.slice(STYLE_PIECE_STORAGE_PREFIX.length)
   if (!scope || scope.length > 512) return null
@@ -300,14 +312,6 @@ function cleanSwaps(
     }
   }
   return result
-}
-
-function canonicalSwapsFingerprint(
-  swaps: Readonly<Partial<Record<SampleGarmentCategory, string>>>
-): string {
-  return JSON.stringify(
-    Object.entries(swaps).sort(([left], [right]) => left.localeCompare(right))
-  )
 }
 
 function swapsEqual(
@@ -463,6 +467,17 @@ function buildFallbackHomeSampleComposition(
     byCategory.has(category)
   )
 
+  if (orderedCategories.length === 0 && catalog.garments[0]) {
+    return [
+      {
+        slotIndex: 0,
+        category: catalog.garments[0].category,
+        kind: 'catalog' as const,
+        itemId: catalog.garments[0].id,
+      },
+    ]
+  }
+
   return orderedCategories.map((category, index) => ({
     slotIndex: index,
     category,
@@ -499,11 +514,7 @@ export function parseLegacyHomeSampleBookmarksForImport(
     return { entries: [], hadInvalidEntries: true, malformedPayload: true }
   }
 
-  const arrayParsed = z
-    .array(z.unknown())
-    .max(MAX_LEGACY_IMPORT_ITEMS)
-    .safeParse(parsedJson)
-  if (!arrayParsed.success) {
+  if (!Array.isArray(parsedJson)) {
     return { entries: [], hadInvalidEntries: true, malformedPayload: true }
   }
 
@@ -511,7 +522,11 @@ export function parseLegacyHomeSampleBookmarksForImport(
   const seenLookIds = new Set<string>()
   const entries: LegacySavedLookImportEntry<SampleBookmark>[] = []
 
-  for (const candidate of arrayParsed.data) {
+  for (const candidate of parsedJson) {
+    if (entries.length >= MAX_LEGACY_IMPORT_ITEMS) {
+      hadInvalidEntries = true
+      break
+    }
     const parsedBookmark = legacySampleBookmarkSchema.safeParse(candidate)
     if (!parsedBookmark.success) {
       hadInvalidEntries = true
@@ -561,7 +576,7 @@ export function parseLegacyHomeSampleBookmarksForImport(
 
     const sourceId = `home_sample:${owner}:${bookmark.lookId}`
     const idempotencyKey = createDeterministicIdempotencyKey(
-      `legacy-import:v1:${sourceId}:${bookmark.weather}:${bookmark.collection}:${bookmark.comfort.runsColdWarm}:${bookmark.comfort.windTolerance}:${bookmark.comfort.precipPreparedness}:${canonicalSwapsFingerprint(cleanedSwaps)}`
+      `legacy-import:v1:${sourceId}`
     )
 
     entries.push({
@@ -761,11 +776,7 @@ export function parseLegacyStylePieceRecipesForImport(
     return { entries: [], hadInvalidEntries: true, malformedPayload: true }
   }
 
-  const arrayParsed = z
-    .array(z.unknown())
-    .max(MAX_LEGACY_IMPORT_ITEMS)
-    .safeParse(parsedJson)
-  if (!arrayParsed.success) {
+  if (!Array.isArray(parsedJson)) {
     return { entries: [], hadInvalidEntries: true, malformedPayload: true }
   }
 
@@ -773,7 +784,11 @@ export function parseLegacyStylePieceRecipesForImport(
   const seenRecipeKeys = new Set<string>()
   const entries: LegacySavedLookImportEntry<StylePieceRecipe>[] = []
 
-  for (const candidate of arrayParsed.data) {
+  for (const candidate of parsedJson) {
+    if (entries.length >= MAX_LEGACY_IMPORT_ITEMS) {
+      hadInvalidEntries = true
+      break
+    }
     const parsedRecipe = legacyStylePieceRecipeSchema.safeParse(candidate)
     if (!parsedRecipe.success) {
       hadInvalidEntries = true
@@ -813,9 +828,8 @@ export function parseLegacyStylePieceRecipesForImport(
     })
 
     const sourceId = `style_piece:${owner}:${garmentId}:${recipeKey}`
-    const anchorSig = `${payload.anchorSnapshot!.category}:${payload.anchorSnapshot!.comfortRange}:${payload.composition[0]!.category}`
     const idempotencyKey = createDeterministicIdempotencyKey(
-      `legacy-import:v1:${sourceId}:${canonicalSwapsFingerprint(cleanedSwaps)}:${anchorSig}`
+      `legacy-import:v1:${sourceId}`
     )
 
     entries.push({

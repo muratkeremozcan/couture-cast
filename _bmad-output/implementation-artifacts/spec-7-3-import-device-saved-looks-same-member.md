@@ -3,15 +3,15 @@ title: 'CC-7.3: Import device-saved looks for the same member'
 type: feature
 ticket: 'CC-7.3'
 created: '2026-11-22'
-status: in-progress
+status: built
 baseline_revision: '72b685c266b73cdbd903bfa67fc014c8f9b49c5f'
 route: oneshot
 route_source: auto
 risk: medium
-review: ''
-review_source: ''
-lenses_ran: []
-review_loop_iteration: 0
+review: 'codex-peer'
+review_source: '_bmad-output/implementation-artifacts/reviews/story-7-3-codex-review.md'
+lenses_ran: ['correctness', 'security', 'verification']
+review_loop_iteration: 1
 followup_review_recommended: false
 context:
   - 'AGENTS.md'
@@ -62,7 +62,7 @@ deferred: []
 ## Code Map
 
 - `packages/utils/src/sample-wardrobe/saved-looks.ts` -- Deterministic UUID v4 `createDeterministicIdempotencyKey`, storage key parsers (`parseStylePieceStorageKey`, `memberSampleBookmarksStorageKeys`, `parseMemberSampleBookmarksStorageKey`), resolution checker (`doesSavedLookResolve`), and legacy import builders (`parseLegacyHomeSampleBookmarksForImport`, `parseLegacyStylePieceRecipesForImport`).
-- `apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts` -- Preserve provided `input.anchorSnapshot` on `verifyOwnedGarmentsAndSnapshot` after validating garment ownership, and derive `availabilityStatus: 'needs_review'` in `formatSavedLooks` when `doesSavedLookResolve` is false.
+- `apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts` -- Keep Postgres `anchor_snapshot` authoritative on `verifyOwnedGarmentsAndSnapshot`, derive `availabilityStatus: 'needs_review'` in `formatSavedLooks` when DB snapshot disagrees with live garment tags or `doesSavedLookResolve` is false, and check `deleted_at !== null` before payload hash mismatch in `findIdempotentReplay`.
 - `apps/web/src/lib/saved-looks.ts` -- `importLegacyDeviceSavedLooksFromWeb` (scans `localStorage` for `owner`-scoped legacy keys, imports with pinned token and deterministic `Idempotency-Key`, rewrites/removes keys on ack, deduplicates in-flight runs, and fences on `isLiveOwner`).
 - `apps/mobile/src/lib/sample-recipe-storage.ts` & `apps/mobile/src/lib/saved-looks.ts` -- Extend `sampleRecipeStorage` with `remove()` and key discovery for `owner`, and implement `importLegacyDeviceSavedLooksFromMobile` fenced on `mobileApplicationUserId` + `mobileIdentityEpoch`.
 - `apps/web/src/app/wardrobe/page.tsx`, `apps/web/src/app/components/home-ritual.tsx`, `apps/web/src/app/wardrobe/style-piece-panel.tsx` -- Trigger legacy import on signed-in load before/with saved looks listing and display `"Needs review"` badges on unresolved looks.
@@ -93,6 +93,19 @@ deferred: []
 ## Plan Change Log
 
 ## Review Triage Log
+
+- **Codex Round 1 (`_bmad-output/implementation-artifacts/reviews/story-7-3-codex-review.md`):**
+  - Finding 1 (High, retry key stability): Fixed. Derived deterministic UUID v4 `Idempotency-Key` strictly from legacy source identity (`legacy-import:v1:${sourceId}`), prioritized `SAVED_LOOK_ALREADY_REMOVED` for deleted rows on API, and added `409 IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` reconciliation via filtered account GET so retries after retagging deduplicate with zero duplicates.
+  - Finding 2 (High, native file discovery & inventory cap): Fixed. Added `Directory(Paths.document).list()` native enumeration with per-file `try/catch` in `apps/mobile/src/lib/sample-recipe-storage.ts`, plus removed client-slot category comparison in API `deriveNeedsReviewReasons` so owned garments outside the initial inventory page never trigger false `category_changed`.
+  - Finding 3 (Medium, post-await session fencing): Fixed. Re-checked `isCurrent()` immediately after every `await` and before all storage reads/mutations on web and mobile; updated account-switch tests to verify distinct bearer tokens, untouched member-A keys, and mobile same-member re-entry with a new epoch.
+  - Finding 4 (Medium, exact terminal status/code matching): Fixed. Restricted terminal pruning to `400`, `404 GARMENT_NOT_FOUND`, and `409 SAVED_LOOK_ALREADY_REMOVED`; `409 IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD` reconciles against the account; unrelated 404/409 responses remain retryable.
+  - Finding 5 (Medium, concurrent tab write preservation): Fixed. Re-read current storage bytes before cleanup and re-parse if changed, preserving any entries added or modified while POSTs were in flight.
+  - Finding 6 (Medium, Home unmount aborting startup migration): Fixed. Introduced session-scoped `ensureWebLegacySavedLooksMigration` and `ensureMobileLegacySavedLooksMigration` decoupled from view abort signals, with `HomeRitual` and `MemberSampleOutfit` subscribing to saved-look change notifications.
+  - Finding 7 (Medium, non-blocking reads & work budget): Fixed. First-page list reads start the single in-flight session migration without blocking existing account reads, enforced aggregate key/byte/time budgets (`32` keys, `64 KiB`, `15s`), snapshotted `Object.keys(localStorage)`, and added a 2s timeout on error JSON body parsing.
+  - Finding 8 (Low, canonical browser Style keys): Fixed. Restricted `.json` suffix stripping to `{ allowJsonExtension: true }` at the native file boundary only.
+  - Finding 9 (Low, stale Home bookmark reopen): Fixed. Guarded `onOpen` in `HomeRitual` and `MemberSampleOutfit` so `needs_review` Home bookmarks display review feedback instead of silently opening a substitute outfit.
+  - Finding 10 (Low, over-8 arrays & empty catalog fallback): Fixed. Raised legacy import cap to 32 valid entries without discarding valid siblings when extra/invalid elements exist, and guaranteed `>= 1` slot in `buildFallbackHomeSampleComposition`.
+  - Verification & snapshot contract findings: Fixed. Aligned `spec-7-3`, MSW mocks, and API tests with DB-authoritative `anchorSnapshot`; updated Playwright CC-7.3 E2E to clean up test `SavedLook` rows cleanly in Postgres for retained-DB repeatability, verify settled reloaded account IDs, test a real second member's owned garment (`teen-2-garment-1`), and sign in as `teen-2` to prove untouched isolation.
 
 ## Verification
 

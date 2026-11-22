@@ -30,22 +30,6 @@ export type MobileSavedLooksMswStore = {
   onRestore?: (request: Request, id: string) => void | Promise<void>
 }
 
-function collectMswNeedsReviewReasons(
-  parsed: ReturnType<typeof createSavedLookInputSchema.parse>,
-  anchorCategory: SampleGarmentCategory | null,
-  anchorComfortRange: ComfortRange | null
-): SavedLookNeedsReviewReason[] {
-  if (parsed.source !== 'style_piece' || !parsed.anchorSnapshot) return []
-  const reasons: SavedLookNeedsReviewReason[] = []
-  if (anchorCategory && anchorCategory !== parsed.anchorSnapshot.category) {
-    reasons.push('category_changed')
-  }
-  if (anchorComfortRange && anchorComfortRange !== parsed.anchorSnapshot.comfortRange) {
-    reasons.push('comfort_range_changed')
-  }
-  return reasons
-}
-
 function deriveMswSavedLookAvailability(
   parsed: ReturnType<typeof createSavedLookInputSchema.parse>,
   store: MobileSavedLooksMswStore
@@ -63,11 +47,6 @@ function deriveMswSavedLookAvailability(
     null
   const anchorComfortRange =
     liveTags?.comfortRange ?? parsed.anchorSnapshot?.comfortRange ?? null
-  const needsReviewReasons = collectMswNeedsReviewReasons(
-    parsed,
-    anchorCategory,
-    anchorComfortRange
-  )
   const resolves = doesSavedLookResolve({
     source: parsed.source,
     lookId: parsed.lookId,
@@ -79,9 +58,8 @@ function deriveMswSavedLookAvailability(
     comfort: parsed.comfort ?? null,
   })
   return {
-    availabilityStatus:
-      needsReviewReasons.length > 0 || !resolves ? 'needs_review' : 'ready',
-    needsReviewReasons,
+    availabilityStatus: !resolves ? 'needs_review' : 'ready',
+    needsReviewReasons: [],
   }
 }
 
@@ -95,6 +73,19 @@ function buildMswCreatedSavedLook(
     parsed,
     store
   )
+  const liveTags = parsed.anchorGarmentId
+    ? store.garmentTagsById.get(parsed.anchorGarmentId)
+    : undefined
+  const authoritativeSnapshot =
+    parsed.source === 'style_piece' && parsed.anchorGarmentId
+      ? liveTags
+        ? {
+            garmentId: parsed.anchorGarmentId,
+            category: liveTags.category,
+            comfortRange: liveTags.comfortRange,
+          }
+        : (parsed.anchorSnapshot ?? null)
+      : null
   const now = new Date().toISOString()
   return {
     id,
@@ -104,7 +95,7 @@ function buildMswCreatedSavedLook(
     weather: parsed.weather,
     title: parsed.title ?? null,
     anchorGarmentId: parsed.anchorGarmentId ?? null,
-    anchorSnapshot: parsed.anchorSnapshot ?? null,
+    anchorSnapshot: authoritativeSnapshot,
     composition: parsed.composition.map((slot) => ({
       slotIndex: slot.slotIndex,
       category: slot.category,

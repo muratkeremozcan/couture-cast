@@ -48,6 +48,7 @@ import {
   MobileSavedLookRequestError,
   notifyMobileSavedLooksChanged,
   restoreSavedLookFromMobile,
+  subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
@@ -275,6 +276,35 @@ export function MemberSampleOutfit({
       controller.abort()
       statusBarRef.current.dismissNotice()
     }
+  }, [owner])
+
+  useEffect(() => {
+    if (!owner) return
+    return subscribeMobileSavedLooksChanged((changedOwner) => {
+      if (changedOwner !== owner) return
+      const refreshVersion = mutationVersionRef.current
+      void listSavedLooksFromMobile({
+        source: 'home_sample',
+        skipLegacyImport: true,
+      })
+        .then((items) => {
+          if (
+            mobileApplicationUserId() !== owner ||
+            mutationVersionRef.current !== refreshVersion
+          ) {
+            return
+          }
+          const next = mergeMobileInitialSavedLooks(
+            savedLooksRef.current,
+            items,
+            deletedIdsRef.current
+          )
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          setBookmarkStorage('ready')
+        })
+        .catch(() => undefined)
+    })
   }, [owner])
 
   const bookmarks: (SampleBookmark & {
@@ -509,6 +539,23 @@ export function MemberSampleOutfit({
           return true
         }}
         onOpen={(bookmark) => {
+          const matching = savedLooksRef.current.find(
+            (item) => item.lookId === bookmark.lookId
+          )
+          if (matching?.availabilityStatus === 'needs_review') {
+            const seq = ++noticeSeqRef.current
+            statusBar.showNotice({
+              id: `sample-${owner}-needs-review-${seq}`,
+              announcementId: createAnnouncementToken(
+                `sample-${owner}-needs-review`,
+                seq
+              ),
+              message: t('savedLooks.needsReviewDetail'),
+              tone: 'neutral',
+              actions: [],
+            })
+            return
+          }
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
           updateResult((current) => reopenMemberSampleOutfit(current, bookmark))

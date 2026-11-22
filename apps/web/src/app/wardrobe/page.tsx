@@ -343,11 +343,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   useEffect(() => {
     if (!owner) return
     return subscribeSavedLooksChanged((changedOwner) => {
-      if (changedOwner === owner) {
+      if (changedOwner === owner || changedOwner === effectiveSavedLooksOwner) {
         setSavedLooksAttempt((attempt) => attempt + 1)
       }
     })
-  }, [owner])
+  }, [owner, effectiveSavedLooksOwner])
 
   const loadMoreSavedLooks = useCallback(() => {
     if (

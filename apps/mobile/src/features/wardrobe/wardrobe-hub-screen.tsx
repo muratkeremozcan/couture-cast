@@ -45,7 +45,7 @@ import {
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
 import {
-  importLegacyDeviceSavedLooksFromMobile,
+  ensureMobileLegacySavedLooksMigration,
   listSavedLooksPageFromMobile,
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
@@ -221,14 +221,12 @@ function MemberWardrobeHub({
       if (next) {
         setHasLoaded(true)
         setLoadFailed(false)
-        void importLegacyDeviceSavedLooksFromMobile({
+        void ensureMobileLegacySavedLooksMigration({
           owner: mobileApplicationUserId(),
           epoch,
           accessToken: token,
           garments: next,
-          signal,
-          notify: true,
-        }).catch(() => undefined)
+        })
       }
       return next
     },

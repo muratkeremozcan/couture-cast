@@ -593,6 +593,29 @@ describe('WardrobeSavedLookService', () => {
       '22222222-2222-4222-8222-222222222222'
     )
     expect(importedStyle.data.availabilityStatus).toBe('needs_review')
+    // Server pins authoritative anchorSnapshot from Postgres rather than trusting client-supplied snapshot
+    expect(importedStyle.data.anchorSnapshot).toEqual({
+      garmentId: 'garment-1',
+      category: 'outerwear',
+      comfortRange: 'cold',
+    })
+
+    // Retrying a soft-deleted legacy import key returns 409 SAVED_LOOK_ALREADY_REMOVED even if payload changed after retag
+    prisma.savedLook.findUnique.mockResolvedValueOnce(
+      makeSavedLookRow({
+        id: 'sl-legacy-style',
+        deleted_at: new Date('2026-11-22T02:00:00.000Z'),
+        idempotency_key: '22222222-2222-4222-8222-222222222222',
+        idempotency_payload_hash: 'stale-hash-before-retag',
+      })
+    )
+    await expect(
+      service.createSavedLook(
+        ACTOR,
+        legacyStyleInput,
+        '22222222-2222-4222-8222-222222222222'
+      )
+    ).rejects.toThrow('SAVED_LOOK_ALREADY_REMOVED')
 
     // 2. Legacy home_sample bookmark whose catalog look no longer resolves for the saved weather
     const legacyHomeInput = {

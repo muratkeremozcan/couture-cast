@@ -375,7 +375,6 @@ export class WardrobeSavedLookService {
         row,
         missingCount: missingGarmentIds.size,
         parsedSnapshot,
-        storedSlots,
         anchorLive,
       })
 
@@ -428,10 +427,9 @@ export class WardrobeSavedLookService {
     row: SavedLook
     missingCount: number
     parsedSnapshot: StoredAnchorSnapshot | null
-    storedSlots: readonly StoredSlot[]
     anchorLive: GarmentProjection | undefined
   }): SavedLookNeedsReviewReason[] {
-    const { row, missingCount, parsedSnapshot, storedSlots, anchorLive } = params
+    const { row, missingCount, parsedSnapshot, anchorLive } = params
     if (
       missingCount > 0 ||
       row.source !== 'style_piece' ||
@@ -442,13 +440,7 @@ export class WardrobeSavedLookService {
       return []
     }
     const reasons: SavedLookNeedsReviewReason[] = []
-    const anchorSlot = storedSlots.find(
-      (slot) => slot.kind === 'garment' && slot.itemId === row.anchor_garment_id
-    )
-    if (
-      anchorLive.category !== parsedSnapshot.category ||
-      (anchorSlot !== undefined && anchorLive.category !== anchorSlot.category)
-    ) {
+    if (anchorLive.category !== parsedSnapshot.category) {
       reasons.push('category_changed')
     }
     if (anchorLive.comfort_range !== parsedSnapshot.comfortRange) {
@@ -471,11 +463,11 @@ export class WardrobeSavedLookService {
       },
     })
     if (!existing) return null
-    if (existing.idempotency_payload_hash !== payloadHash) {
-      throw new ConflictException('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD')
-    }
     if (existing.deleted_at !== null) {
       throw new ConflictException('SAVED_LOOK_ALREADY_REMOVED')
+    }
+    if (existing.idempotency_payload_hash !== payloadHash) {
+      throw new ConflictException('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD')
     }
     const [formatted] = await this.formatSavedLooks(actor, [existing])
     return { data: formatted!, isReplay: true }

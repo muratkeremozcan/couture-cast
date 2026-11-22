@@ -79,6 +79,18 @@ vi.mock('expo-image-manipulator', () => ({
 }))
 
 vi.mock('expo-file-system', () => ({
+  Directory: class {
+    uri: string
+    constructor(uri: string) {
+      this.uri = uri
+    }
+    list() {
+      const prefix = `${this.uri}/`
+      return Array.from(nativeStyleRuntime.files.keys())
+        .filter((uri) => uri.startsWith(prefix))
+        .map((uri) => ({ uri, name: uri.slice(prefix.length) }))
+    }
+  },
   File: class {
     uri: string
     constructor(uri: string, name?: string) {
@@ -1436,6 +1448,8 @@ describe('WardrobeHubScreen', () => {
 
     const ownTopUri = `file:///documents/${encodeScope(activeOwner, readyTop.id)}.json`
     const ownChangedUri = `file:///documents/${encodeScope(activeOwner, changedOuterwear.id)}.json`
+    const ownOlderGarmentId = 'garment-older-outside-page'
+    const ownOlderUri = `file:///documents/${encodeScope(activeOwner, ownOlderGarmentId)}.json`
     const otherMemberUri = `file:///documents/${encodeScope('native-import-member-b', readyTop.id)}.json`
 
     nativeStyleRuntime.files.set(
@@ -1459,6 +1473,16 @@ describe('WardrobeHubScreen', () => {
       ])
     )
     nativeStyleRuntime.files.set(
+      ownOlderUri,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+    )
+    nativeStyleRuntime.files.set(
       otherMemberUri,
       JSON.stringify([
         {
@@ -1470,6 +1494,10 @@ describe('WardrobeHubScreen', () => {
     )
 
     const { store, handlers } = createSavedLooksMswHandlers()
+    store.garmentTagsById.set(ownOlderGarmentId, {
+      category: 'top',
+      comfortRange: 'mild',
+    })
     server.use(
       http.get('*/api/v1/wardrobe/garments', () =>
         HttpResponse.json({ data: [readyTop, changedOuterwear] })
@@ -1479,7 +1507,7 @@ describe('WardrobeHubScreen', () => {
 
     renderScreen()
 
-    await waitFor(() => expect(store.items).toHaveLength(2))
+    await waitFor(() => expect(store.items).toHaveLength(3))
     expect(
       store.items.find((item) => item.anchorGarmentId === changedOuterwear.id)
         ?.availabilityStatus
@@ -1487,9 +1515,14 @@ describe('WardrobeHubScreen', () => {
     expect(
       store.items.find((item) => item.anchorGarmentId === readyTop.id)?.availabilityStatus
     ).toBe('ready')
+    // Older owned garment outside Closet inventory page is discovered via Directory.list()
+    expect(
+      store.items.find((item) => item.anchorGarmentId === ownOlderGarmentId)
+        ?.availabilityStatus
+    ).toBe('ready')
 
     const row = await screen.findByTestId('closet-saved-looks-row')
-    await waitFor(() => expect(row).toHaveTextContent('2 saved'))
+    await waitFor(() => expect(row).toHaveTextContent('3 saved'))
     await browserUser.click(row)
     expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
       'Needs review'
@@ -1498,6 +1531,7 @@ describe('WardrobeHubScreen', () => {
     // Active member's native files are deleted after import while other member's file remains intact
     expect(nativeStyleRuntime.files.has(ownTopUri)).toBe(false)
     expect(nativeStyleRuntime.files.has(ownChangedUri)).toBe(false)
+    expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
     expect(nativeStyleRuntime.files.has(otherMemberUri)).toBe(true)
   })
 })

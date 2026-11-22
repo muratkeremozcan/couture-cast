@@ -16,6 +16,7 @@ const {
   apiV1WardrobeSavedLooksSavedLookIdGet,
   apiV1WardrobeSavedLooksSavedLookIdDelete,
   apiV1WardrobeSavedLooksSavedLookIdRestorePost,
+  createMobileApiClientSpy,
   listGarmentsFromMobile,
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -26,6 +27,7 @@ const {
   apiV1WardrobeSavedLooksSavedLookIdGet: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdDelete: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdRestorePost: vi.fn(),
+  createMobileApiClientSpy: vi.fn<(opts?: { accessToken?: string }) => void>(),
   listGarmentsFromMobile: vi.fn<() => Promise<GarmentItemContract[]>>(() =>
     Promise.resolve([])
   ),
@@ -37,13 +39,16 @@ const {
 }))
 
 vi.mock('./api-client', () => ({
-  createMobileApiClient: () => ({
-    apiV1WardrobeSavedLooksGet,
-    apiV1WardrobeSavedLooksPost,
-    apiV1WardrobeSavedLooksSavedLookIdGet,
-    apiV1WardrobeSavedLooksSavedLookIdDelete,
-    apiV1WardrobeSavedLooksSavedLookIdRestorePost,
-  }),
+  createMobileApiClient: (opts?: { accessToken?: string }) => {
+    createMobileApiClientSpy(opts)
+    return {
+      apiV1WardrobeSavedLooksGet,
+      apiV1WardrobeSavedLooksPost,
+      apiV1WardrobeSavedLooksSavedLookIdGet,
+      apiV1WardrobeSavedLooksSavedLookIdDelete,
+      apiV1WardrobeSavedLooksSavedLookIdRestorePost,
+    }
+  },
 }))
 
 vi.mock('./mobile-auth', () => ({
@@ -393,6 +398,9 @@ describe('mobile saved-looks client', () => {
       })
     )
 
+    const migrated = await importLegacyDeviceSavedLooksFromMobile()
+    expect(migrated.pendingKeys).toBe(0)
+    expect(migrated.imported).toHaveLength(3)
     const items = await listSavedLooksFromMobile()
     expect(items).toHaveLength(3)
     expect(
@@ -470,12 +478,17 @@ describe('mobile saved-looks client', () => {
     expect(c2.pendingKeys).toBe(0)
     expect(globalThis.localStorage.getItem(key)).toBeNull()
 
-    // Epoch/account switch mid-import fences the in-flight run
+    // Epoch/account switch mid-import fences the in-flight run with pinned token and leaves storage untouched
     resetMobileLegacySavedLooksImportState()
+    createMobileApiClientSpy.mockClear()
+    resolveMobileAccessToken.mockResolvedValue('mobile-token-user-1')
+    mobileApplicationUserId.mockReturnValue('user-1')
+    mobileIdentityEpoch.mockReturnValue(1)
     globalThis.localStorage.setItem(key, rawBookmarks)
     apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
       mobileApplicationUserId.mockReturnValue('user-2')
       mobileIdentityEpoch.mockReturnValue(2)
+      resolveMobileAccessToken.mockResolvedValue('mobile-token-user-2')
       return Promise.resolve({ data: { ...SAMPLE_LOOK, id: 'm-city-wool' } })
     })
     const switched = await importLegacyDeviceSavedLooksFromMobile({
@@ -484,14 +497,40 @@ describe('mobile saved-looks client', () => {
       notify: true,
     })
     expect(switched.pendingKeys).toBe(1)
+    expect(switched.imported).toEqual([])
+    expect(createMobileApiClientSpy).toHaveBeenCalledWith({
+      accessToken: 'mobile-token-user-1',
+    })
+    expect(createMobileApiClientSpy).not.toHaveBeenCalledWith({
+      accessToken: 'mobile-token-user-2',
+    })
     const remaining = JSON.parse(globalThis.localStorage.getItem(key) ?? '[]') as {
       lookId: string
     }[]
-    expect(remaining.map((b) => b.lookId)).toEqual(['sample:l:office-oxford'])
+    expect(remaining.map((b) => b.lookId)).toEqual([
+      'sample:l:office-oxford',
+      'sample:l:city-wool',
+    ])
+
+    // Same-member re-entry with a new epoch (epoch 3) resumes and completes with idempotent replay
+    mobileApplicationUserId.mockReturnValue('user-1')
+    mobileIdentityEpoch.mockReturnValue(3)
+    resolveMobileAccessToken.mockResolvedValue('mobile-token-user-1-reentry')
+    apiV1WardrobeSavedLooksPost.mockResolvedValue({
+      data: { ...SAMPLE_LOOK, id: 'm-resumed' },
+    })
+    const resumed = await importLegacyDeviceSavedLooksFromMobile({
+      owner: 'user-1',
+      epoch: 3,
+    })
+    expect(resumed.pendingKeys).toBe(0)
+    expect(resumed.imported).toHaveLength(2)
+    expect(globalThis.localStorage.getItem(key)).toBeNull()
 
     // Malformed payload cleanup, signed-out guard, and failed garment load retention
     mobileApplicationUserId.mockReturnValue('user-1')
     mobileIdentityEpoch.mockReturnValue(1)
+    resolveMobileAccessToken.mockResolvedValue('mobile-token')
     expect(await importLegacyDeviceSavedLooksFromMobile({ owner: '' })).toEqual({
       imported: [],
       pendingKeys: 0,

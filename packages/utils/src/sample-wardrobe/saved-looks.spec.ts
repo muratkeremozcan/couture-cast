@@ -212,9 +212,15 @@ describe('saved-looks helpers', () => {
     ).toBe('user-1')
     expect(
       parseMemberSampleBookmarksStorageKey(
-        'couturecast.member-sample-bookmarks.user%3A1.json'
+        'couturecast.member-sample-bookmarks.user%3A1.json',
+        { allowJsonExtension: true }
       )
     ).toBe('user:1')
+    expect(
+      parseMemberSampleBookmarksStorageKey(
+        'couturecast.member-sample-bookmarks.user%3A1.json'
+      )
+    ).toBe('user:1.json')
     expect(
       parseMemberSampleBookmarksStorageKey('couturecast.member-sample-bookmarks.%E0%A4%A')
     ).toBe('%E0%A4%A')
@@ -230,7 +236,11 @@ describe('saved-looks helpers', () => {
       owner: 'member~1%a',
       garmentId: 'garment~2',
     })
-    expect(parseStylePieceStorageKey(`${styleKey}.json`)).toEqual({
+    // Browser localStorage rejects noncanonical .json suffix unless allowJsonExtension is set for native files
+    expect(parseStylePieceStorageKey(`${styleKey}.json`)).toBeNull()
+    expect(
+      parseStylePieceStorageKey(`${styleKey}.json`, { allowJsonExtension: true })
+    ).toEqual({
       owner: 'member~1%a',
       garmentId: 'garment~2',
     })
@@ -425,7 +435,7 @@ describe('saved-looks helpers', () => {
     expect(parsed.entries[0]?.idempotencyKey).toMatch(UUID_V4)
     expect(parsed.entries[0]?.payload.lookId).toBe('sample:l:office-oxford')
 
-    // Canonical swap ordering yields the identical deterministic idempotency key
+    // Source-only deterministic idempotency key stays identical even when swaps or weather edits change
     const reorderedParsed = parseLegacyHomeSampleBookmarksForImport(
       JSON.stringify([validBookmarkReorderedSwaps]),
       'member-a'
@@ -433,6 +443,41 @@ describe('saved-looks helpers', () => {
     expect(reorderedParsed.entries[0]?.idempotencyKey).toBe(
       parsed.entries[0]?.idempotencyKey
     )
+
+    // Arrays longer than 8 entries with invalid siblings still preserve valid entries
+    const overEight = [
+      validBookmark,
+      { invalid: true },
+      { invalid: 2 },
+      { invalid: 3 },
+      { invalid: 4 },
+      { invalid: 5 },
+      { invalid: 6 },
+      { invalid: 7 },
+      unresolvedBookmark,
+    ]
+    const parsedOverEight = parseLegacyHomeSampleBookmarksForImport(
+      JSON.stringify(overEight),
+      'member-a'
+    )
+    expect(parsedOverEight.malformedPayload).toBe(false)
+    expect(parsedOverEight.hadInvalidEntries).toBe(true)
+    expect(parsedOverEight.entries).toHaveLength(2)
+
+    // Retired Home look with empty swaps on a catalog with no eligible looks still emits >= 1 fallback slot
+    const minimalCatalog = {
+      ...SAMPLE_CATALOG,
+      looks: [],
+    }
+    const emptyCatalogParsed = parseLegacyHomeSampleBookmarksForImport(
+      JSON.stringify([retiredLookBookmark]),
+      'member-a',
+      minimalCatalog
+    )
+    expect(emptyCatalogParsed.entries).toHaveLength(1)
+    expect(
+      emptyCatalogParsed.entries[0]?.payload.composition.length
+    ).toBeGreaterThanOrEqual(1)
 
     expect(parsed.entries[1]?.resolvesCleanly).toBe(false)
     expect(parsed.entries[1]?.payload.lookId).toBe('sample:l:summer-linen')
@@ -567,5 +612,22 @@ describe('saved-looks helpers', () => {
     expect(
       parsedUnanchoredRetired.entries[1]?.payload.composition.length
     ).toBeGreaterThanOrEqual(2)
+
+    // Stable source-only idempotency key stays identical even if the anchor garment is retagged between retries
+    const beforeRetag = parseLegacyStylePieceRecipesForImport(
+      JSON.stringify([validRecipe]),
+      'member-a',
+      'g-1',
+      { category: 'top', comfortRange: 'mild' }
+    )
+    const afterRetag = parseLegacyStylePieceRecipesForImport(
+      JSON.stringify([validRecipe]),
+      'member-a',
+      'g-1',
+      { category: 'outerwear', comfortRange: 'cold' }
+    )
+    expect(beforeRetag.entries[0]?.idempotencyKey).toBe(
+      afterRetag.entries[0]?.idempotencyKey
+    )
   })
 })

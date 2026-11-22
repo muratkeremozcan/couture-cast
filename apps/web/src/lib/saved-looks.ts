@@ -30,6 +30,10 @@ import {
 import { listGarmentsFromWeb } from './wardrobe'
 
 const SAVED_LOOK_REQUEST_TIMEOUT_MS = 15_000
+const ERROR_BODY_PARSE_TIMEOUT_MS = 2_000
+const MAX_LEGACY_KEYS_PER_RUN = 32
+const MAX_LEGACY_BYTES_PER_RUN = 64 * 1024
+const MAX_LEGACY_IMPORT_DURATION_MS = 15_000
 
 export class SavedLookRequestError extends Error {
   constructor(
@@ -60,9 +64,14 @@ export type LegacyDeviceSavedLooksImportResult = {
 
 const savedLookChangeListeners = new Set<(owner: string | null) => void>()
 const acknowledgedWebImportKeys = new Set<string>()
+const inFlightWebImportByOwner = new Map<
+  string,
+  Promise<LegacyDeviceSavedLooksImportResult>
+>()
 
 export function resetWebLegacySavedLooksImportState(): void {
   acknowledgedWebImportKeys.clear()
+  inFlightWebImportByOwner.clear()
 }
 
 export function notifySavedLooksChanged(owner: string | null): void {
@@ -94,26 +103,41 @@ function resolveAccessToken(explicitToken?: string): string {
   )
 }
 
+async function readErrorJsonWithTimeout(
+  response: Response
+): Promise<{ message?: string; code?: string } | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const payload = await Promise.race([
+      response.json() as Promise<{ message?: string; code?: string }>,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ERROR_BODY_PARSE_TIMEOUT_MS)
+      }),
+    ])
+    return payload
+  } catch {
+    return null
+  } finally {
+    if (timer !== undefined) clearTimeout(timer)
+  }
+}
+
 async function normalizeSavedLookError(error: unknown, fallback: string): Promise<Error> {
   if (error instanceof SavedLookRequestError) return error
   if (error instanceof ResponseError) {
-    try {
-      const payload = (await error.response.json()) as {
-        message?: string
-        code?: string
-      }
+    const payload = await readErrorJsonWithTimeout(error.response)
+    if (payload) {
       return new SavedLookRequestError(
         payload.message ??
           `Saved looks request failed with status ${error.response.status}`,
         error.response.status,
         payload.code ?? payload.message
       )
-    } catch {
-      return new SavedLookRequestError(
-        `Saved looks request failed with status ${error.response.status}`,
-        error.response.status
-      )
     }
+    return new SavedLookRequestError(
+      `Saved looks request failed with status ${error.response.status}`,
+      error.response.status
+    )
   }
   return error instanceof Error ? error : new Error(fallback)
 }
@@ -147,10 +171,9 @@ function discoverWebStylePieceKeysForOwner(
 ): { key: string; garmentId: string }[] {
   const matches: { key: string; garmentId: string }[] = []
   try {
-    const storage = window.localStorage
-    for (let index = 0; index < storage.length; index += 1) {
-      const key = storage.key(index)
-      if (!key || !key.startsWith('couturecast.style-piece.')) continue
+    const keys = Object.keys(window.localStorage)
+    for (const key of keys) {
+      if (!key.startsWith('couturecast.style-piece.')) continue
       const parsed = parseStylePieceStorageKey(key)
       if (parsed?.owner === owner) {
         matches.push({ key, garmentId: parsed.garmentId })
@@ -163,62 +186,192 @@ function discoverWebStylePieceKeysForOwner(
 }
 
 function isTerminalImportError(error: unknown): boolean {
-  return (
-    error instanceof SavedLookRequestError &&
-    (error.status === 400 || error.status === 404 || error.status === 409)
+  if (!(error instanceof SavedLookRequestError)) return false
+  const tag = error.code ?? error.message
+  if (error.status === 400) return true
+  if (error.status === 404 && tag === 'GARMENT_NOT_FOUND') return true
+  if (error.status === 409 && tag === 'SAVED_LOOK_ALREADY_REMOVED') return true
+  return false
+}
+
+function isPayloadMismatchConflict(error: unknown): boolean {
+  if (!(error instanceof SavedLookRequestError) || error.status !== 409) return false
+  const tag = error.code ?? error.message
+  return tag === 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'
+}
+
+async function reconcileExistingAccountLookFromWeb(params: {
+  payload: CreateSavedLookInput
+  pinnedToken: string
+  signal?: AbortSignal
+  isCurrent: () => boolean
+}): Promise<SavedLookContract | null> {
+  const { payload, pinnedToken, signal, isCurrent } = params
+  try {
+    const page = await listSavedLooksPageFromWeb({
+      accessToken: pinnedToken,
+      source: payload.source,
+      anchorGarmentId: payload.anchorGarmentId ?? undefined,
+      limit: 50,
+      offset: 0,
+      signal,
+      skipLegacyImport: true,
+    })
+    if (!isCurrent()) return null
+    return (
+      page.data.find(
+        (item) =>
+          item.source === payload.source &&
+          item.lookId === payload.lookId &&
+          item.weather === payload.weather &&
+          (item.anchorGarmentId ?? null) === (payload.anchorGarmentId ?? null)
+      ) ?? null
+    )
+  } catch {
+    return null
+  }
+}
+
+function finalizeWebStorageKey<TRaw>(params: {
+  key: string
+  originalRaw: string
+  owner: string
+  parsed: {
+    entries: readonly LegacySavedLookImportEntry<TRaw>[]
+    hadInvalidEntries: boolean
+  }
+  reparse: (raw: string) => {
+    entries: readonly LegacySavedLookImportEntry<TRaw>[]
+    hadInvalidEntries: boolean
+    malformedPayload: boolean
+  }
+  isCurrent: () => boolean
+}): boolean {
+  const { key, originalRaw, owner, parsed, reparse, isCurrent } = params
+  if (!isCurrent()) return true
+
+  const currentRaw = safeReadLocalStorage(key)
+  if (currentRaw === null) return false
+
+  const activeParsed = currentRaw === originalRaw ? parsed : reparse(currentRaw)
+  const remaining = activeParsed.entries.filter(
+    (entry) => !acknowledgedWebImportKeys.has(`${owner}:${entry.idempotencyKey}`)
   )
+
+  if (remaining.length === 0) {
+    if (isCurrent()) safeRemoveLocalStorage(key)
+    return false
+  }
+
+  const changed =
+    currentRaw !== originalRaw ||
+    remaining.length < parsed.entries.length ||
+    activeParsed.hadInvalidEntries
+  if (changed && isCurrent()) {
+    safeWriteLocalStorage(key, JSON.stringify(remaining.map((entry) => entry.rawEntry)))
+  }
+  return true
+}
+
+async function importSingleWebEntry<TRaw>(params: {
+  entry: LegacySavedLookImportEntry<TRaw>
+  owner: string
+  pinnedToken: string
+  signal?: AbortSignal
+  isCurrent: () => boolean
+  imported: SavedLookContract[]
+}): Promise<void> {
+  const { entry, owner, pinnedToken, signal, isCurrent, imported } = params
+  const ackKey = `${owner}:${entry.idempotencyKey}`
+  try {
+    const created = await createSavedLookFromWeb(entry.payload, {
+      accessToken: pinnedToken,
+      idempotencyKey: entry.idempotencyKey,
+      signal,
+    })
+    if (!isCurrent()) return
+    acknowledgedWebImportKeys.add(ackKey)
+    imported.push(created)
+  } catch (error) {
+    if (!isCurrent()) return
+    if (isTerminalImportError(error)) {
+      acknowledgedWebImportKeys.add(ackKey)
+      return
+    }
+    if (isPayloadMismatchConflict(error)) {
+      const existing = await reconcileExistingAccountLookFromWeb({
+        payload: entry.payload,
+        pinnedToken,
+        signal,
+        isCurrent,
+      })
+      if (existing && isCurrent()) {
+        acknowledgedWebImportKeys.add(ackKey)
+        imported.push(existing)
+      }
+    }
+  }
 }
 
 async function importParsedWebStorageKey<TRaw>(params: {
   key: string
+  originalRaw: string
   owner: string
   parsed: {
     entries: readonly LegacySavedLookImportEntry<TRaw>[]
     hadInvalidEntries: boolean
     malformedPayload: boolean
   }
+  reparse: (raw: string) => {
+    entries: readonly LegacySavedLookImportEntry<TRaw>[]
+    hadInvalidEntries: boolean
+    malformedPayload: boolean
+  }
   pinnedToken: string
+  deadlineMs: number
   signal?: AbortSignal
   isCurrent: () => boolean
   imported: SavedLookContract[]
 }): Promise<boolean> {
-  const { key, owner, parsed, pinnedToken, signal, isCurrent, imported } = params
+  const {
+    key,
+    originalRaw,
+    owner,
+    parsed,
+    reparse,
+    pinnedToken,
+    deadlineMs,
+    signal,
+    isCurrent,
+    imported,
+  } = params
   if (parsed.malformedPayload || parsed.entries.length === 0) {
-    if (isCurrent()) safeRemoveLocalStorage(key)
+    if (isCurrent() && safeReadLocalStorage(key) === originalRaw) {
+      safeRemoveLocalStorage(key)
+    }
     return false
   }
 
   for (const entry of [...parsed.entries].reverse()) {
-    if (!isCurrent()) break
-    try {
-      const created = await createSavedLookFromWeb(entry.payload, {
-        accessToken: pinnedToken,
-        idempotencyKey: entry.idempotencyKey,
-        signal,
-      })
-      acknowledgedWebImportKeys.add(`${owner}:${entry.idempotencyKey}`)
-      imported.push(created)
-    } catch (error) {
-      if (isTerminalImportError(error)) {
-        acknowledgedWebImportKeys.add(`${owner}:${entry.idempotencyKey}`)
-      }
-    }
+    if (!isCurrent() || Date.now() > deadlineMs) break
+    await importSingleWebEntry({
+      entry,
+      owner,
+      pinnedToken,
+      signal,
+      isCurrent,
+      imported,
+    })
   }
 
-  const remaining = parsed.entries.filter(
-    (entry) => !acknowledgedWebImportKeys.has(`${owner}:${entry.idempotencyKey}`)
-  )
-  if (remaining.length === 0) {
-    safeRemoveLocalStorage(key)
-    return false
-  }
-  if (
-    (remaining.length < parsed.entries.length || parsed.hadInvalidEntries) &&
-    safeReadLocalStorage(key) !== null
-  ) {
-    safeWriteLocalStorage(key, JSON.stringify(remaining.map((entry) => entry.rawEntry)))
-  }
-  return true
+  return finalizeWebStorageKey({
+    key,
+    originalRaw,
+    owner,
+    parsed,
+    reparse,
+    isCurrent,
+  })
 }
 
 function buildReadyAnchorsById(
@@ -247,40 +400,65 @@ function collectWebLegacyTargets(
 ): {
   homeSampleTargets: { key: string; raw: string }[]
   stylePieceTargets: { key: string; garmentId: string; raw: string }[]
+  deferredCount: number
 } {
   const includeHomeSample = !sources || sources.includes('home_sample')
   const includeStylePiece = !sources || sources.includes('style_piece')
+  const homeSampleTargets: { key: string; raw: string }[] = []
+  const stylePieceTargets: { key: string; garmentId: string; raw: string }[] = []
+  let keysUsed = 0
+  let bytesUsed = 0
+  let deferredCount = 0
 
-  const homeSampleTargets = includeHomeSample
-    ? memberSampleBookmarksStorageKeys(owner)
-        .filter((key) => parseMemberSampleBookmarksStorageKey(key) === owner)
-        .flatMap((key) => {
-          const raw = safeReadLocalStorage(key)
-          return raw !== null ? [{ key, raw }] : []
-        })
-    : []
+  const takeBudget = (rawLength: number): boolean => {
+    if (
+      keysUsed >= MAX_LEGACY_KEYS_PER_RUN ||
+      (bytesUsed + rawLength > MAX_LEGACY_BYTES_PER_RUN && keysUsed > 0)
+    ) {
+      deferredCount += 1
+      return false
+    }
+    keysUsed += 1
+    bytesUsed += rawLength
+    return true
+  }
 
-  const stylePieceTargets = includeStylePiece
-    ? discoverWebStylePieceKeysForOwner(owner).flatMap((candidate) => {
-        const raw = safeReadLocalStorage(candidate.key)
-        return raw !== null ? [{ ...candidate, raw }] : []
-      })
-    : []
+  if (includeHomeSample) {
+    const keys = memberSampleBookmarksStorageKeys(owner).filter(
+      (key) => parseMemberSampleBookmarksStorageKey(key) === owner
+    )
+    for (const key of keys) {
+      const raw = safeReadLocalStorage(key)
+      if (raw !== null && takeBudget(raw.length)) {
+        homeSampleTargets.push({ key, raw })
+      }
+    }
+  }
 
-  return { homeSampleTargets, stylePieceTargets }
+  if (includeStylePiece) {
+    for (const candidate of discoverWebStylePieceKeysForOwner(owner)) {
+      const raw = safeReadLocalStorage(candidate.key)
+      if (raw !== null && takeBudget(raw.length)) {
+        stylePieceTargets.push({ ...candidate, raw })
+      }
+    }
+  }
+
+  return { homeSampleTargets, stylePieceTargets, deferredCount }
 }
 
 async function importWebStylePieceTargets(params: {
   targets: { key: string; garmentId: string; raw: string }[]
   owner: string
   pinnedToken: string
+  deadlineMs: number
   garments?: readonly GarmentItemContract[]
   loadGarments?: (signal?: AbortSignal) => Promise<readonly GarmentItemContract[] | null>
   signal?: AbortSignal
   isCurrent: () => boolean
   imported: SavedLookContract[]
 }): Promise<number> {
-  const { targets, owner, pinnedToken, signal, isCurrent, imported } = params
+  const { targets, owner, pinnedToken, deadlineMs, signal, isCurrent, imported } = params
   let garments: readonly GarmentItemContract[] | null | undefined = params.garments
   if (!garments && isCurrent()) {
     garments = await (
@@ -295,16 +473,21 @@ async function importWebStylePieceTargets(params: {
   const anchorsById = buildReadyAnchorsById(garments)
   let pendingKeys = 0
   for (const target of targets) {
+    if (!isCurrent() || Date.now() > deadlineMs) {
+      pendingKeys += 1
+      continue
+    }
+    const anchor = anchorsById.get(target.garmentId) ?? null
+    const reparse = (raw: string) =>
+      parseLegacyStylePieceRecipesForImport(raw, owner, target.garmentId, anchor)
     const stillPending = await importParsedWebStorageKey({
       key: target.key,
+      originalRaw: target.raw,
       owner,
-      parsed: parseLegacyStylePieceRecipesForImport(
-        target.raw,
-        owner,
-        target.garmentId,
-        anchorsById.get(target.garmentId) ?? null
-      ),
+      parsed: reparse(target.raw),
+      reparse,
       pinnedToken,
+      deadlineMs,
       signal,
       isCurrent,
       imported,
@@ -340,24 +523,33 @@ export async function importLegacyDeviceSavedLooksFromWeb(options: {
     return { imported: [], pendingKeys: 0 }
   }
 
-  const { homeSampleTargets, stylePieceTargets } = collectWebLegacyTargets(
+  const { homeSampleTargets, stylePieceTargets, deferredCount } = collectWebLegacyTargets(
     owner,
     options.sources
   )
   if (homeSampleTargets.length === 0 && stylePieceTargets.length === 0) {
-    return { imported: [], pendingKeys: 0 }
+    return { imported: [], pendingKeys: deferredCount }
   }
 
   const pinnedToken = resolveAccessToken(options.accessToken)
+  const deadlineMs = Date.now() + MAX_LEGACY_IMPORT_DURATION_MS
   const imported: SavedLookContract[] = []
-  let pendingKeys = 0
+  let pendingKeys = deferredCount
 
   for (const target of homeSampleTargets) {
+    if (!isCurrent() || Date.now() > deadlineMs) {
+      pendingKeys += 1
+      continue
+    }
+    const reparse = (raw: string) => parseLegacyHomeSampleBookmarksForImport(raw, owner)
     const stillPending = await importParsedWebStorageKey({
       key: target.key,
+      originalRaw: target.raw,
       owner,
-      parsed: parseLegacyHomeSampleBookmarksForImport(target.raw, owner),
+      parsed: reparse(target.raw),
+      reparse,
       pinnedToken,
+      deadlineMs,
       signal: options.signal,
       isCurrent,
       imported,
@@ -370,6 +562,7 @@ export async function importLegacyDeviceSavedLooksFromWeb(options: {
       targets: stylePieceTargets,
       owner,
       pinnedToken,
+      deadlineMs,
       garments: options.garments,
       loadGarments: options.loadGarments,
       signal: options.signal,
@@ -385,6 +578,42 @@ export async function importLegacyDeviceSavedLooksFromWeb(options: {
   return { imported, pendingKeys }
 }
 
+/**
+ * Starts at most one session-scoped legacy migration per verified owner.
+ * Decoupled from transient component abort signals (e.g. Home replacing sample view)
+ * so switching content does not cancel an in-flight migration.
+ */
+export function ensureWebLegacySavedLooksMigration(options: {
+  owner: string | null | undefined
+  accessToken?: string
+  garments?: readonly GarmentItemContract[]
+}): Promise<LegacyDeviceSavedLooksImportResult> | null {
+  const owner = options.owner?.trim() ?? ''
+  if (!owner || owner === UNVERIFIED_BEARER_OWNER) return null
+  const existing = inFlightWebImportByOwner.get(owner)
+  if (existing) return existing
+
+  const run = importLegacyDeviceSavedLooksFromWeb({
+    owner,
+    accessToken: options.accessToken,
+    garments: options.garments,
+    notify: true,
+    isCurrentOwner: () => {
+      const live = currentWebSessionOwner()
+      return live === owner || live === UNVERIFIED_BEARER_OWNER
+    },
+  })
+    .catch(() => ({ imported: [], pendingKeys: 0 }))
+    .finally(() => {
+      if (inFlightWebImportByOwner.get(owner) === run) {
+        inFlightWebImportByOwner.delete(owner)
+      }
+    })
+
+  inFlightWebImportByOwner.set(owner, run)
+  return run
+}
+
 export async function listSavedLooksPageFromWeb(
   options: {
     owner?: string | null
@@ -395,26 +624,23 @@ export async function listSavedLooksPageFromWeb(
     limit?: number
     offset?: number
     signal?: AbortSignal
+    skipLegacyImport?: boolean
   } = {}
 ): Promise<SavedLookPageResult> {
   try {
     const accessToken = resolveAccessToken(options.accessToken)
     const activeOwner = options.owner ?? currentWebSessionOwner()
     if (
+      !options.skipLegacyImport &&
       activeOwner &&
       activeOwner !== UNVERIFIED_BEARER_OWNER &&
       (options.offset ?? 0) === 0
     ) {
-      await importLegacyDeviceSavedLooksFromWeb({
+      void ensureWebLegacySavedLooksMigration({
         owner: activeOwner,
         accessToken,
         garments: options.garments,
-        signal: options.signal,
-        isCurrentOwner: () => {
-          const live = currentWebSessionOwner()
-          return live === activeOwner || live === UNVERIFIED_BEARER_OWNER
-        },
-      }).catch(() => undefined)
+      })
     }
 
     const client = createWebApiClient({ accessToken })
@@ -448,6 +674,7 @@ export async function listSavedLooksFromWeb(
     limit?: number
     offset?: number
     signal?: AbortSignal
+    skipLegacyImport?: boolean
   } = {}
 ): Promise<SavedLookContract[]> {
   const page = await listSavedLooksPageFromWeb(options)
