@@ -426,5 +426,25 @@ describe('ClosetSavedLooksRow (web)', () => {
     expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+
+    // Failed DELETE offers Retry, and 404 stale DELETE omits Undo.
+    deleteSavedLookFromWeb
+      .mockRejectedValueOnce(new Error('503'))
+      .mockResolvedValueOnce(undefined)
+    await user.click(screen.getAllByTestId('saved-look-remove')[1]!)
+    await user.click(await screen.findByTestId('status-bar-action-retry'))
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    )
+
+    const { SavedLookRequestError } = await import('../../lib/saved-looks')
+    deleteSavedLookFromWeb.mockRejectedValueOnce(
+      new SavedLookRequestError('Not found', 404, 'SAVED_LOOK_NOT_FOUND')
+    )
+    await user.click(screen.getAllByTestId('saved-look-remove')[1]!)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+    )
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
   })
 })

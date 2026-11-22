@@ -91,20 +91,30 @@ vi.mock('../../lib/wardrobe', async () => ({
   generateIdempotencyKey: () => 'test-idempotency-key',
 }))
 
-vi.mock('../../lib/saved-looks', () => ({
-  listSavedLooksFromWeb: vi.fn().mockResolvedValue([]),
+const savedLooksMocks = vi.hoisted(() => ({
   listSavedLooksPageFromWeb: vi.fn().mockResolvedValue({
     data: [],
     total: 0,
     limit: 50,
     offset: 0,
   }),
+  listeners: new Set<(owner: string | null) => void>(),
+}))
+
+vi.mock('../../lib/saved-looks', () => ({
+  listSavedLooksFromWeb: vi.fn().mockResolvedValue([]),
+  listSavedLooksPageFromWeb: savedLooksMocks.listSavedLooksPageFromWeb,
   createSavedLookFromWeb: vi.fn(),
   getSavedLookFromWeb: vi.fn(),
   deleteSavedLookFromWeb: vi.fn(),
   restoreSavedLookFromWeb: vi.fn(),
   notifySavedLooksChanged: vi.fn(),
-  subscribeSavedLooksChanged: vi.fn(() => () => undefined),
+  subscribeSavedLooksChanged: (listener: (owner: string | null) => void) => {
+    savedLooksMocks.listeners.add(listener)
+    return () => {
+      savedLooksMocks.listeners.delete(listener)
+    }
+  },
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
 }))
@@ -1252,5 +1262,96 @@ describe('WardrobePage commit deduplication', () => {
     await waitFor(() =>
       expect(screen.getByRole('button', { name: '+ Add Garment' })).toHaveFocus()
     )
+  })
+
+  it('loads, paginates, refreshes on change notifications, and retries failed Closet saved looks', async () => {
+    const user = userEvent.setup()
+    verifiedSession.owner = 'member-saved-looks'
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'test-token-member-saved-looks'
+    )
+    window.dispatchEvent(new Event('couture:session'))
+    const makeSavedLook = (id: string) => ({
+      id,
+      ownerUserId: 'member-saved-looks',
+      source: 'home_sample' as const,
+      lookId: 'sample:l:silk-midi',
+      weather: 'warm-rainy',
+      title: `Look ${id}`,
+      anchorGarmentId: null,
+      anchorSnapshot: null,
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:knit-tee',
+          label: null,
+          missing: false,
+          imageAccess: null,
+        },
+      ],
+      swaps: {},
+      collection: 'all',
+      comfort: null,
+      availabilityStatus: 'ready' as const,
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt: '2026-11-22T01:00:00.000Z',
+      updatedAt: '2026-11-22T01:00:00.000Z',
+    })
+
+    savedLooksMocks.listSavedLooksPageFromWeb
+      .mockRejectedValueOnce(new Error('Saved looks temporarily unavailable'))
+      .mockResolvedValueOnce({
+        data: [makeSavedLook('sl-1')],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        data: [makeSavedLook('sl-2')],
+        total: 2,
+        limit: 50,
+        offset: 1,
+      })
+      .mockResolvedValue({
+        data: [makeSavedLook('sl-1'), makeSavedLook('sl-2')],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+
+    try {
+      render(<WardrobePage />)
+      await user.click(await screen.findByTestId('saved-looks-retry'))
+      await waitFor(() =>
+        expect(screen.getByTestId('closet-saved-looks-row')).toHaveTextContent('2')
+      )
+
+      await user.click(screen.getByTestId('closet-saved-looks-row'))
+      await user.click(await screen.findByTestId('saved-looks-load-more'))
+      await waitFor(() => expect(screen.getByText('Look sl-2')).toBeInTheDocument())
+
+      act(() => {
+        for (const listener of savedLooksMocks.listeners) {
+          listener('member-saved-looks')
+        }
+      })
+      await waitFor(() =>
+        expect(savedLooksMocks.listSavedLooksPageFromWeb).toHaveBeenCalledTimes(4)
+      )
+    } finally {
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      savedLooksMocks.listSavedLooksPageFromWeb.mockReset().mockResolvedValue({
+        data: [],
+        total: 0,
+        limit: 50,
+        offset: 0,
+      })
+    }
   })
 })

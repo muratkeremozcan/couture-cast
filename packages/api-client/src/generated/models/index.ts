@@ -6609,7 +6609,7 @@ export interface CreateSavedLocationResponse {
   data: ListSavedLocationsResponseDataInner
 }
 /**
- *
+ * Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots.
  * @export
  * @interface CreateSavedLookInput
  */
@@ -6633,7 +6633,7 @@ export interface CreateSavedLookInput {
    */
   weather: string
   /**
-   * Trimmed and NFC-normalized title bounded to 80 extended grapheme clusters.
+   * Trimmed and NFC-normalized title bounded to 80 extended grapheme clusters; blank strings normalize to null.
    * @type {string}
    * @memberof CreateSavedLookInput
    */

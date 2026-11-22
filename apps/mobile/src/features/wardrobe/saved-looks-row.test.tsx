@@ -50,6 +50,7 @@ vi.mock('@/src/lib/saved-looks', () => ({
     `"saved-look:${id}:${revision}"`,
 }))
 
+import { MobileSavedLookRequestError } from '../../lib/saved-looks'
 import { ClosetSavedLooksRow } from './saved-looks-row'
 
 const ACTIVE_GARMENT: GarmentItemContract = {
@@ -392,8 +393,19 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
     await waitFor(() => expect(restoreSavedLookFromMobile).toHaveBeenCalledTimes(2))
 
-    await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
-    expect(screen.getByTestId('saved-look-detail-modal')).toBeInTheDocument()
-    expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
+    // Failed DELETE offers Retry, and 404 stale DELETE omits Undo.
+    deleteSavedLookFromMobile
+      .mockRejectedValueOnce(new Error('503'))
+      .mockResolvedValueOnce(undefined)
+    await userEvent.click(screen.getAllByTestId('saved-look-remove')[1]!)
+    await userEvent.click(await screen.findByTestId('status-bar-action-retry'))
+    await screen.findByText('Undo')
+
+    deleteSavedLookFromMobile.mockRejectedValueOnce(
+      new MobileSavedLookRequestError('Not found', 404, 'SAVED_LOOK_NOT_FOUND')
+    )
+    await userEvent.click(screen.getAllByTestId('saved-look-remove')[1]!)
+    await waitFor(() => expect(screen.queryByText('Undo')).not.toBeInTheDocument())
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
   })
 })

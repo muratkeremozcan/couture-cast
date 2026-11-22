@@ -405,6 +405,34 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
     await user.click(screen.getByTestId('sample-save-look'))
     await waitFor(() => expect(store.items).toHaveLength(2))
     expect(store.items.some((item) => item.id !== existingOnServer.id)).toBe(true)
+
+    // 404 stale remove cleans up the local list cleanly.
+    store.items = []
+    const removeButtons = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button',
+      { name: /^Remove / }
+    )
+    await user.click(removeButtons[0]!)
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(2)
+    )
+
+    // 409 SAVED_LOOK_ALREADY_REMOVED returns false cleanly without duplicate creation.
+    let return409Once = true
+    store.nextPostError = () => {
+      if (!return409Once) return null
+      return409Once = false
+      return HttpResponse.json(
+        { code: 'SAVED_LOOK_ALREADY_REMOVED', message: 'Already removed' },
+        { status: 409 }
+      )
+    }
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() =>
+      expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Failed')
+    )
   } finally {
     view.unmount()
   }
