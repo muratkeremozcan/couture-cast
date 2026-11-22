@@ -434,6 +434,23 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
       expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Failed')
     )
 
+    // Save look again -> Undo Save with 404 from server still cleans up local state cleanly.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    let return404OnUndoOnce = true
+    store.nextDeleteError = () => {
+      if (!return404OnUndoOnce) return null
+      return404OnUndoOnce = false
+      return HttpResponse.json({ message: 'Not found' }, { status: 404 })
+    }
+    await user.click(await screen.findByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+    )
+    store.items = []
+
     // Save look again -> View saved -> Reopen saved look -> Re-save hits verified 200 non-destructive refresh.
     await user.click(screen.getByTestId('sample-save-look'))
     await waitFor(() => expect(store.items).toHaveLength(1))

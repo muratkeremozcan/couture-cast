@@ -1721,6 +1721,37 @@ describe('web save-feedback components', () => {
       await user.click(saveCards[0]!)
       await waitFor(() => expect(saveCards[0]).toHaveTextContent('Saved'))
       expect(within(panel).queryByTestId('status-bar-action-undo')).toBeNull()
+
+      // Switch weather to warm-rainy -> test 409 SAVED_LOOK_ALREADY_REMOVED on Save -> Save succeeds -> View saved -> Undo Save with 404
+      await user.click(within(panel).getByTestId('style-piece-weather-warm-rainy'))
+      let return409StyleOnce = true
+      styleSavedStore.nextPostError = () => {
+        if (!return409StyleOnce) return null
+        return409StyleOnce = false
+        return HttpResponse.json(
+          { code: 'SAVED_LOOK_ALREADY_REMOVED', message: 'Removed' },
+          { status: 409 }
+        )
+      }
+      const warmSaveBtn = within(panel).getAllByTestId('style-piece-save')[0]!
+      await user.click(warmSaveBtn)
+      await waitFor(() => expect(warmSaveBtn).toHaveTextContent('Failed'))
+      await user.click(warmSaveBtn)
+      await waitFor(() => expect(warmSaveBtn).toHaveTextContent('Saved'))
+      const viewSavedBtn = within(panel).queryByTestId('status-bar-action-view-saved')
+      if (viewSavedBtn) await user.click(viewSavedBtn)
+      let return404UndoStyleOnce = true
+      styleSavedStore.nextDeleteError = () => {
+        if (!return404UndoStyleOnce) return null
+        return404UndoStyleOnce = false
+        return HttpResponse.json({ message: 'Not found' }, { status: 404 })
+      }
+      await user.click(await within(panel).findByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      )
       // API error on Remove surfaces Failed + Retry, and Retry succeeds
       let failDeleteOnce = true
       styleSavedStore.nextDeleteError = () => {

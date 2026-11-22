@@ -392,6 +392,7 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     )
 
     // Opening needs-review detail modal shows needs-review notice, and detail-remove closes modal.
+    getSavedLookFromMobile.mockResolvedValueOnce(errorPhotoLook)
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[1]!)
     expect(
       await screen.findByTestId('saved-look-detail-needs-review')

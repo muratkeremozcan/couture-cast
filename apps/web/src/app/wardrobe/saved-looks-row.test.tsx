@@ -352,13 +352,17 @@ describe('ClosetSavedLooksRow (web)', () => {
     fireEvent.error(img)
     expect(screen.getAllByTestId('saved-look-photo-placeholder')).toHaveLength(2)
 
-    // Opening detail modal on expired photo fetches fresh detail.
+    // Opening detail modal on expired photo fetches fresh detail, and handles fetch error cleanly.
     await user.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     await waitFor(() =>
       expect(getSavedLookFromWeb).toHaveBeenCalledWith('sl-expired', {
         accessToken: undefined,
       })
     )
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+    getSavedLookFromWeb.mockRejectedValueOnce(new Error('503'))
+    await user.click(screen.getAllByTestId('saved-look-reopen')[0]!)
+    await waitFor(() => expect(getSavedLookFromWeb).toHaveBeenCalledTimes(2))
 
     await user.click(screen.getByTestId('saved-looks-load-more'))
     expect(onLoadMore).toHaveBeenCalledTimes(1)
