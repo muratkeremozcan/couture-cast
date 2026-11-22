@@ -200,36 +200,97 @@ function isPayloadMismatchConflict(error: unknown): boolean {
   return tag === 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'
 }
 
+function normalizedSwapsEqual(
+  left: Record<string, string> | undefined,
+  right: Record<string, string> | undefined
+): boolean {
+  const leftEntries = Object.entries(left ?? {}).filter(([, value]) => Boolean(value))
+  const rightEntries = Object.entries(right ?? {}).filter(([, value]) => Boolean(value))
+  if (leftEntries.length !== rightEntries.length) return false
+  const rightMap = new Map(rightEntries)
+  return leftEntries.every(([key, value]) => rightMap.get(key) === value)
+}
+
+function savedLookMatchesImportPayload(
+  item: SavedLookContract,
+  payload: CreateSavedLookInput
+): boolean {
+  if (
+    item.source !== payload.source ||
+    item.lookId !== payload.lookId ||
+    item.weather !== payload.weather ||
+    (item.anchorGarmentId ?? null) !== (payload.anchorGarmentId ?? null) ||
+    !normalizedSwapsEqual(item.swaps, payload.swaps)
+  ) {
+    return false
+  }
+  if (payload.source !== 'home_sample') return true
+  return (
+    (item.collection ?? null) === (payload.collection ?? null) &&
+    item.comfort?.runsColdWarm === payload.comfort?.runsColdWarm &&
+    item.comfort?.windTolerance === payload.comfort?.windTolerance &&
+    item.comfort?.precipPreparedness === payload.comfort?.precipPreparedness
+  )
+}
+
+function runWithRemainingDeadline<T>(
+  deadlineMs: number,
+  signal: AbortSignal | undefined,
+  work: (scopedSignal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const remainingMs = deadlineMs - Date.now()
+  if (remainingMs <= 0) {
+    return Promise.reject(
+      new DOMException('Legacy import deadline exceeded', 'AbortError')
+    )
+  }
+  const controller = new AbortController()
+  const onAbort = () => controller.abort()
+  if (signal?.aborted) controller.abort()
+  else signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => controller.abort(), remainingMs)
+  return work(controller.signal).finally(() => {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  })
+}
+
 async function reconcileExistingAccountLookFromWeb(params: {
   payload: CreateSavedLookInput
   pinnedToken: string
+  deadlineMs: number
   signal?: AbortSignal
   isCurrent: () => boolean
 }): Promise<SavedLookContract | null> {
-  const { payload, pinnedToken, signal, isCurrent } = params
+  const { payload, pinnedToken, deadlineMs, signal, isCurrent } = params
+  let offset = 0
   try {
-    const page = await listSavedLooksPageFromWeb({
-      accessToken: pinnedToken,
-      source: payload.source,
-      anchorGarmentId: payload.anchorGarmentId ?? undefined,
-      limit: 50,
-      offset: 0,
-      signal,
-      skipLegacyImport: true,
-    })
-    if (!isCurrent()) return null
-    return (
-      page.data.find(
-        (item) =>
-          item.source === payload.source &&
-          item.lookId === payload.lookId &&
-          item.weather === payload.weather &&
-          (item.anchorGarmentId ?? null) === (payload.anchorGarmentId ?? null)
-      ) ?? null
-    )
+    while (isCurrent() && Date.now() < deadlineMs) {
+      const page = await runWithRemainingDeadline(deadlineMs, signal, (scopedSignal) =>
+        listSavedLooksPageFromWeb({
+          accessToken: pinnedToken,
+          source: payload.source,
+          anchorGarmentId: payload.anchorGarmentId ?? undefined,
+          limit: 50,
+          offset,
+          signal: scopedSignal,
+          skipLegacyImport: true,
+        })
+      )
+      if (!isCurrent()) return null
+      const match = page.data.find((item) => savedLookMatchesImportPayload(item, payload))
+      if (match) return match
+      offset += page.data.length
+      if (page.data.length === 0 || offset >= page.total) return null
+    }
+    return null
   } catch {
     return null
   }
+}
+
+function webAckKey(owner: string, entry: LegacySavedLookImportEntry<unknown>): string {
+  return `${owner}:${entry.idempotencyKey}:${JSON.stringify(entry.rawEntry)}`
 }
 
 function finalizeWebStorageKey<TRaw>(params: {
@@ -255,7 +316,7 @@ function finalizeWebStorageKey<TRaw>(params: {
 
   const activeParsed = currentRaw === originalRaw ? parsed : reparse(currentRaw)
   const remaining = activeParsed.entries.filter(
-    (entry) => !acknowledgedWebImportKeys.has(`${owner}:${entry.idempotencyKey}`)
+    (entry) => !acknowledgedWebImportKeys.has(webAckKey(owner, entry))
   )
 
   if (remaining.length === 0) {
@@ -277,18 +338,21 @@ async function importSingleWebEntry<TRaw>(params: {
   entry: LegacySavedLookImportEntry<TRaw>
   owner: string
   pinnedToken: string
+  deadlineMs: number
   signal?: AbortSignal
   isCurrent: () => boolean
   imported: SavedLookContract[]
 }): Promise<void> {
-  const { entry, owner, pinnedToken, signal, isCurrent, imported } = params
-  const ackKey = `${owner}:${entry.idempotencyKey}`
+  const { entry, owner, pinnedToken, deadlineMs, signal, isCurrent, imported } = params
+  const ackKey = webAckKey(owner, entry)
   try {
-    const created = await createSavedLookFromWeb(entry.payload, {
-      accessToken: pinnedToken,
-      idempotencyKey: entry.idempotencyKey,
-      signal,
-    })
+    const created = await runWithRemainingDeadline(deadlineMs, signal, (scopedSignal) =>
+      createSavedLookFromWeb(entry.payload, {
+        accessToken: pinnedToken,
+        idempotencyKey: entry.idempotencyKey,
+        signal: scopedSignal,
+      })
+    )
     if (!isCurrent()) return
     acknowledgedWebImportKeys.add(ackKey)
     imported.push(created)
@@ -302,6 +366,7 @@ async function importSingleWebEntry<TRaw>(params: {
       const existing = await reconcileExistingAccountLookFromWeb({
         payload: entry.payload,
         pinnedToken,
+        deadlineMs,
         signal,
         isCurrent,
       })
@@ -358,6 +423,7 @@ async function importParsedWebStorageKey<TRaw>(params: {
       entry,
       owner,
       pinnedToken,
+      deadlineMs,
       signal,
       isCurrent,
       imported,
@@ -461,8 +527,11 @@ async function importWebStylePieceTargets(params: {
   const { targets, owner, pinnedToken, deadlineMs, signal, isCurrent, imported } = params
   let garments: readonly GarmentItemContract[] | null | undefined = params.garments
   if (!garments && isCurrent()) {
-    garments = await (
-      params.loadGarments ? params.loadGarments(signal) : listGarmentsFromWeb(signal)
+    if (Date.now() >= deadlineMs) return targets.length
+    garments = await runWithRemainingDeadline(deadlineMs, signal, (scopedSignal) =>
+      params.loadGarments
+        ? params.loadGarments(scopedSignal)
+        : listGarmentsFromWeb(scopedSignal)
     ).catch(() => null)
   }
 
@@ -593,6 +662,12 @@ export function ensureWebLegacySavedLooksMigration(options: {
   const existing = inFlightWebImportByOwner.get(owner)
   if (existing) return existing
 
+  const expectedBearer =
+    options.accessToken?.trim() ||
+    currentWebSessionBearer()?.trim() ||
+    readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ||
+    null
+
   const run = importLegacyDeviceSavedLooksFromWeb({
     owner,
     accessToken: options.accessToken,
@@ -600,7 +675,15 @@ export function ensureWebLegacySavedLooksMigration(options: {
     notify: true,
     isCurrentOwner: () => {
       const live = currentWebSessionOwner()
-      return live === owner || live === UNVERIFIED_BEARER_OWNER
+      if (live === owner) return true
+      if (live === UNVERIFIED_BEARER_OWNER && expectedBearer) {
+        const liveBearer =
+          currentWebSessionBearer()?.trim() ||
+          readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ||
+          null
+        return liveBearer === expectedBearer
+      }
+      return false
     },
   })
     .catch(() => ({ imported: [], pendingKeys: 0 }))

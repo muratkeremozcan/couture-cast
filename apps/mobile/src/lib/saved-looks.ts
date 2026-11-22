@@ -1,5 +1,5 @@
 // Story CC-7.2 & CC-7.3: Mobile client for account-backed saved looks and same-member legacy device import.
-import { ResponseError, withRequestDeadline } from '@couture/api-client'
+import { abortError, ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   savedLookListResponseSchema,
   savedLookResponseSchema,
@@ -21,6 +21,7 @@ import {
   resolveMobileAccessToken,
 } from './mobile-auth'
 import {
+  createMobileDiscoveryBudget,
   discoverMobileHomeSampleStorageForOwner,
   discoverMobileStylePieceStorageForOwner,
   type SampleRecipeStorageHandle,
@@ -156,36 +157,100 @@ function isMobilePayloadMismatchConflict(error: unknown): boolean {
   return tag === 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'
 }
 
+function normalizedMobileSwapsEqual(
+  left: Record<string, string> | undefined,
+  right: Record<string, string> | undefined
+): boolean {
+  const leftEntries = Object.entries(left ?? {}).filter(([, value]) => Boolean(value))
+  const rightEntries = Object.entries(right ?? {}).filter(([, value]) => Boolean(value))
+  if (leftEntries.length !== rightEntries.length) return false
+  const rightMap = new Map(rightEntries)
+  return leftEntries.every(([key, value]) => rightMap.get(key) === value)
+}
+
+function mobileSavedLookMatchesImportPayload(
+  item: SavedLookContract,
+  payload: CreateSavedLookInput
+): boolean {
+  if (
+    item.source !== payload.source ||
+    item.lookId !== payload.lookId ||
+    item.weather !== payload.weather ||
+    (item.anchorGarmentId ?? null) !== (payload.anchorGarmentId ?? null) ||
+    !normalizedMobileSwapsEqual(item.swaps, payload.swaps)
+  ) {
+    return false
+  }
+  if (payload.source !== 'home_sample') return true
+  return (
+    (item.collection ?? null) === (payload.collection ?? null) &&
+    item.comfort?.runsColdWarm === payload.comfort?.runsColdWarm &&
+    item.comfort?.windTolerance === payload.comfort?.windTolerance &&
+    item.comfort?.precipPreparedness === payload.comfort?.precipPreparedness
+  )
+}
+
+function runMobileWithRemainingDeadline<T>(
+  deadlineMs: number,
+  signal: AbortSignal | undefined,
+  work: (scopedSignal: AbortSignal) => Promise<T>
+): Promise<T> {
+  const remainingMs = deadlineMs - Date.now()
+  if (remainingMs <= 0) {
+    return Promise.reject(abortError('Legacy import deadline exceeded'))
+  }
+  const controller = new AbortController()
+  const onAbort = () => controller.abort()
+  if (signal?.aborted) controller.abort()
+  else signal?.addEventListener('abort', onAbort, { once: true })
+  const timer = setTimeout(() => controller.abort(), remainingMs)
+  return work(controller.signal).finally(() => {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
+  })
+}
+
 async function reconcileExistingAccountLookFromMobile(params: {
   payload: CreateSavedLookInput
   pinnedToken: string
+  deadlineMs: number
   signal?: AbortSignal
   isCurrent: () => boolean
 }): Promise<SavedLookContract | null> {
-  const { payload, pinnedToken, signal, isCurrent } = params
+  const { payload, pinnedToken, deadlineMs, signal, isCurrent } = params
+  let offset = 0
   try {
-    const page = await listSavedLooksPageFromMobile({
-      accessToken: pinnedToken,
-      source: payload.source,
-      anchorGarmentId: payload.anchorGarmentId ?? undefined,
-      limit: 50,
-      offset: 0,
-      signal,
-      skipLegacyImport: true,
-    })
-    if (!isCurrent()) return null
-    return (
-      page.data.find(
-        (item) =>
-          item.source === payload.source &&
-          item.lookId === payload.lookId &&
-          item.weather === payload.weather &&
-          (item.anchorGarmentId ?? null) === (payload.anchorGarmentId ?? null)
-      ) ?? null
-    )
+    while (isCurrent() && Date.now() < deadlineMs) {
+      const page = await runMobileWithRemainingDeadline(
+        deadlineMs,
+        signal,
+        (scopedSignal) =>
+          listSavedLooksPageFromMobile({
+            accessToken: pinnedToken,
+            source: payload.source,
+            anchorGarmentId: payload.anchorGarmentId ?? undefined,
+            limit: 50,
+            offset,
+            signal: scopedSignal,
+            skipLegacyImport: true,
+          })
+      )
+      if (!isCurrent()) return null
+      const match = page.data.find((item) =>
+        mobileSavedLookMatchesImportPayload(item, payload)
+      )
+      if (match) return match
+      offset += page.data.length
+      if (page.data.length === 0 || offset >= page.total) return null
+    }
+    return null
   } catch {
     return null
   }
+}
+
+function mobileAckKey(owner: string, entry: LegacySavedLookImportEntry<unknown>): string {
+  return `${owner}:${entry.idempotencyKey}:${JSON.stringify(entry.rawEntry)}`
 }
 
 function finalizeMobileStorageKey<TRaw>(params: {
@@ -211,7 +276,7 @@ function finalizeMobileStorageKey<TRaw>(params: {
 
   const activeParsed = currentRaw === originalRaw ? parsed : reparse(currentRaw)
   const remaining = activeParsed.entries.filter(
-    (entry) => !acknowledgedMobileImportKeys.has(`${owner}:${entry.idempotencyKey}`)
+    (entry) => !acknowledgedMobileImportKeys.has(mobileAckKey(owner, entry))
   )
 
   if (remaining.length === 0) {
@@ -233,18 +298,24 @@ async function importSingleMobileEntry<TRaw>(params: {
   entry: LegacySavedLookImportEntry<TRaw>
   owner: string
   pinnedToken: string
+  deadlineMs: number
   signal?: AbortSignal
   isCurrent: () => boolean
   imported: SavedLookContract[]
 }): Promise<void> {
-  const { entry, owner, pinnedToken, signal, isCurrent, imported } = params
-  const ackKey = `${owner}:${entry.idempotencyKey}`
+  const { entry, owner, pinnedToken, deadlineMs, signal, isCurrent, imported } = params
+  const ackKey = mobileAckKey(owner, entry)
   try {
-    const created = await createSavedLookFromMobile(entry.payload, {
-      accessToken: pinnedToken,
-      idempotencyKey: entry.idempotencyKey,
+    const created = await runMobileWithRemainingDeadline(
+      deadlineMs,
       signal,
-    })
+      (scopedSignal) =>
+        createSavedLookFromMobile(entry.payload, {
+          accessToken: pinnedToken,
+          idempotencyKey: entry.idempotencyKey,
+          signal: scopedSignal,
+        })
+    )
     if (!isCurrent()) return
     acknowledgedMobileImportKeys.add(ackKey)
     imported.push(created)
@@ -258,6 +329,7 @@ async function importSingleMobileEntry<TRaw>(params: {
       const existing = await reconcileExistingAccountLookFromMobile({
         payload: entry.payload,
         pinnedToken,
+        deadlineMs,
         signal,
         isCurrent,
       })
@@ -314,6 +386,7 @@ async function importParsedMobileStorageKey<TRaw>(params: {
       entry,
       owner,
       pinnedToken,
+      deadlineMs,
       signal,
       isCurrent,
       imported,
@@ -367,10 +440,11 @@ async function importMobileStylePieceTargets(params: {
   const { targets, owner, pinnedToken, deadlineMs, signal, isCurrent, imported } = params
   let garments: readonly GarmentItemContract[] | null | undefined = params.garments
   if (!garments && isCurrent()) {
-    garments = await (
+    if (Date.now() >= deadlineMs) return targets.length
+    garments = await runMobileWithRemainingDeadline(deadlineMs, signal, (scopedSignal) =>
       params.loadGarments
-        ? params.loadGarments(pinnedToken, signal)
-        : listGarmentsFromMobile(pinnedToken, signal)
+        ? params.loadGarments(pinnedToken, scopedSignal)
+        : listGarmentsFromMobile(pinnedToken, scopedSignal)
     ).catch(() => null)
   }
 
@@ -415,13 +489,14 @@ async function collectMobileLegacyTargets(params: {
   const { owner, sources, knownGarmentIds, garments, isCurrent } = params
   const includeHomeSample = !sources || sources.includes('home_sample')
   const includeStylePiece = !sources || sources.includes('style_piece')
+  const budget = createMobileDiscoveryBudget()
 
   const homeSampleTargets = includeHomeSample
-    ? await discoverMobileHomeSampleStorageForOwner(owner, isCurrent)
+    ? await discoverMobileHomeSampleStorageForOwner(owner, isCurrent, budget)
     : []
 
   if (!isCurrent()) {
-    return { homeSampleTargets: [], stylePieceTargets: [] }
+    return { homeSampleTargets: [], stylePieceTargets: [], deferredCount: 0 }
   }
 
   const initialKnownIds = [
@@ -429,10 +504,19 @@ async function collectMobileLegacyTargets(params: {
     ...(garments?.map((item) => item.id) ?? []),
   ]
   const stylePieceTargets = includeStylePiece
-    ? await discoverMobileStylePieceStorageForOwner(owner, initialKnownIds, isCurrent)
+    ? await discoverMobileStylePieceStorageForOwner(
+        owner,
+        initialKnownIds,
+        isCurrent,
+        budget
+      )
     : []
 
-  return { homeSampleTargets, stylePieceTargets }
+  return {
+    homeSampleTargets,
+    stylePieceTargets,
+    deferredCount: budget.deferredCount,
+  }
 }
 
 async function importMobileHomeSampleTargets(params: {
@@ -505,13 +589,15 @@ export async function importLegacyDeviceSavedLooksFromMobile(
     return { imported: [], pendingKeys: 0 }
   }
 
-  const { homeSampleTargets, stylePieceTargets } = await collectMobileLegacyTargets({
-    owner,
-    sources: options.sources,
-    knownGarmentIds: options.knownGarmentIds,
-    garments: options.garments,
-    isCurrent,
-  })
+  const deadlineMs = Date.now() + MAX_LEGACY_IMPORT_DURATION_MS
+  const { homeSampleTargets, stylePieceTargets, deferredCount } =
+    await collectMobileLegacyTargets({
+      owner,
+      sources: options.sources,
+      knownGarmentIds: options.knownGarmentIds,
+      garments: options.garments,
+      isCurrent,
+    })
 
   if (
     !isCurrent() ||
@@ -519,7 +605,7 @@ export async function importLegacyDeviceSavedLooksFromMobile(
   ) {
     return {
       imported: [],
-      pendingKeys: homeSampleTargets.length + stylePieceTargets.length,
+      pendingKeys: homeSampleTargets.length + stylePieceTargets.length + deferredCount,
     }
   }
 
@@ -527,21 +613,22 @@ export async function importLegacyDeviceSavedLooksFromMobile(
   if (!isCurrent()) {
     return {
       imported: [],
-      pendingKeys: homeSampleTargets.length + stylePieceTargets.length,
+      pendingKeys: homeSampleTargets.length + stylePieceTargets.length + deferredCount,
     }
   }
 
-  const deadlineMs = Date.now() + MAX_LEGACY_IMPORT_DURATION_MS
   const imported: SavedLookContract[] = []
-  let pendingKeys = await importMobileHomeSampleTargets({
-    targets: homeSampleTargets,
-    owner,
-    pinnedToken,
-    deadlineMs,
-    signal: options.signal,
-    isCurrent,
-    imported,
-  })
+  let pendingKeys =
+    deferredCount +
+    (await importMobileHomeSampleTargets({
+      targets: homeSampleTargets,
+      owner,
+      pinnedToken,
+      deadlineMs,
+      signal: options.signal,
+      isCurrent,
+      imported,
+    }))
 
   if (stylePieceTargets.length > 0) {
     pendingKeys += await importMobileStylePieceTargets({

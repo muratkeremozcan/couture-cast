@@ -460,20 +460,21 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
       })
 
       try {
-        await seedWebSession(importContext, capsuleSession.accessToken)
-        await importContext.addInitScript(
+        const importPage = await importContext.newPage()
+        await seedWebSession(importPage, capsuleSession.accessToken)
+        await importPage.addInitScript(
           (seed) => {
             if (window.location.origin === 'null') return
+            window.sessionStorage.setItem(
+              'couturecast.access-principal',
+              JSON.stringify({ principal: seed.ownerId, member: seed.ownerId })
+            )
+            window.localStorage.setItem(
+              'couturecast.auth-session',
+              JSON.stringify({ user: { id: seed.ownerId } })
+            )
             if (!window.sessionStorage.getItem('__cc73_seeded__')) {
               window.sessionStorage.setItem('__cc73_seeded__', '1')
-              window.sessionStorage.setItem(
-                'couturecast.access-principal',
-                JSON.stringify({ principal: seed.ownerId, member: seed.ownerId })
-              )
-              window.localStorage.setItem(
-                'couturecast.auth-session',
-                JSON.stringify({ user: { id: seed.ownerId } })
-              )
               window.localStorage.setItem(
                 'couturecast.guest-preview.v1',
                 seed.guestPreviewRaw
@@ -510,7 +511,6 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           }
         )
 
-        const importPage = await importContext.newPage()
         const postStatuses: number[] = []
         importPage.on('response', (response) => {
           if (
@@ -525,7 +525,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
 
         await importPage.goto(`${baseURL}/wardrobe`)
         await expect.poll(() => createdIds.size).toBe(3)
-        expect(postStatuses).toContain(404)
+        await expect.poll(() => postStatuses.includes(404)).toBe(true)
 
         const savedLooksRow = importPage.getByTestId('closet-saved-looks-row')
         await expect(savedLooksRow).toBeVisible()
@@ -538,31 +538,34 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         await expect(importPage.getByTestId('saved-look-needs-review')).toBeVisible()
 
         // Same-member device keys are removed while guest preview and teen-2 keys remain byte-for-byte intact
-        const storageSnapshot = await importPage.evaluate(
-          (keys) => ({
-            ownBookmarks: window.localStorage.getItem(keys.ownBookmarksKey),
-            ownValidStyle: window.localStorage.getItem(keys.ownValidStyleKey),
-            ownTamperedStyle: window.localStorage.getItem(keys.ownTamperedStyleKey),
-            guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
-            otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
-            otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
-          }),
-          {
-            ownBookmarksKey,
-            ownValidStyleKey,
-            ownTamperedStyleKey,
-            otherMemberBookmarksKey,
-            otherMemberStyleKey,
-          }
-        )
-        expect(storageSnapshot).toEqual({
-          ownBookmarks: null,
-          ownValidStyle: null,
-          ownTamperedStyle: null,
-          guestPreview: guestPreviewRaw,
-          otherBookmarks: otherMemberBookmarksRaw,
-          otherStyle: otherMemberStyleRaw,
-        })
+        await expect
+          .poll(() =>
+            importPage.evaluate(
+              (keys) => ({
+                ownBookmarks: window.localStorage.getItem(keys.ownBookmarksKey),
+                ownValidStyle: window.localStorage.getItem(keys.ownValidStyleKey),
+                ownTamperedStyle: window.localStorage.getItem(keys.ownTamperedStyleKey),
+                guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
+                otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
+                otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
+              }),
+              {
+                ownBookmarksKey,
+                ownValidStyleKey,
+                ownTamperedStyleKey,
+                otherMemberBookmarksKey,
+                otherMemberStyleKey,
+              }
+            )
+          )
+          .toEqual({
+            ownBookmarks: null,
+            ownValidStyle: null,
+            ownTamperedStyle: null,
+            guestPreview: guestPreviewRaw,
+            otherBookmarks: otherMemberBookmarksRaw,
+            otherStyle: otherMemberStyleRaw,
+          })
 
         // Reloading settles with the exact same 3 account IDs and zero duplicate imports
         const expectedIds = [...createdIds].sort()
@@ -584,7 +587,8 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           expectedIds
         )
 
-        // Signing in as teen-2 on the same device now imports teen-2's previously untouched device looks
+        // Signing in as teen-2 in a fresh tab on the same device (with only teen-2's session initialized)
+        // now imports teen-2's previously untouched device looks
         const member2Page = await importContext.newPage()
         await seedWebSession(member2Page, otherMemberToken)
         await member2Page.addInitScript(
@@ -606,19 +610,22 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         await member2Page.goto(`${baseURL}/wardrobe`)
         await expect.poll(() => otherCreatedIds.size).toBe(2)
 
-        const afterMember2Storage = await member2Page.evaluate(
-          (keys) => ({
-            otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
-            otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
-            guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
-          }),
-          { otherMemberBookmarksKey, otherMemberStyleKey }
-        )
-        expect(afterMember2Storage).toEqual({
-          otherBookmarks: null,
-          otherStyle: null,
-          guestPreview: guestPreviewRaw,
-        })
+        await expect
+          .poll(() =>
+            member2Page.evaluate(
+              (keys) => ({
+                otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
+                otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
+                guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
+              }),
+              { otherMemberBookmarksKey, otherMemberStyleKey }
+            )
+          )
+          .toEqual({
+            otherBookmarks: null,
+            otherStyle: null,
+            guestPreview: guestPreviewRaw,
+          })
       } finally {
         await importContext.close()
         await cleanupCreatedSavedLooks(

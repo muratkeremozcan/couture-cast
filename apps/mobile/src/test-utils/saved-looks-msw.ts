@@ -117,6 +117,41 @@ function buildMswCreatedSavedLook(
   }
 }
 
+function formatMswSavedLookForRead(
+  item: SavedLookContract,
+  store: MobileSavedLooksMswStore
+): SavedLookContract {
+  if (item.availabilityStatus === 'missing_garment') return item
+  const liveTags = item.anchorGarmentId
+    ? store.garmentTagsById.get(item.anchorGarmentId)
+    : undefined
+  if (!liveTags) return item
+  const reasons: SavedLookNeedsReviewReason[] = []
+  if (item.source === 'style_piece' && item.anchorSnapshot) {
+    if (liveTags.category !== item.anchorSnapshot.category) {
+      reasons.push('category_changed')
+    }
+    if (liveTags.comfortRange !== item.anchorSnapshot.comfortRange) {
+      reasons.push('comfort_range_changed')
+    }
+  }
+  const resolves = doesSavedLookResolve({
+    source: item.source,
+    lookId: item.lookId,
+    weather: item.weather,
+    anchorCategory: liveTags.category,
+    anchorComfortRange: liveTags.comfortRange,
+    swaps: item.swaps,
+    collection: item.collection,
+    comfort: item.comfort,
+  })
+  return {
+    ...item,
+    availabilityStatus: reasons.length > 0 || !resolves ? 'needs_review' : 'ready',
+    needsReviewReasons: reasons,
+  }
+}
+
 export function createSavedLooksMswHandlers(
   initial: SavedLookContract[] = [],
   basePattern = '*/api/v1/wardrobe/saved-looks'
@@ -156,7 +191,9 @@ export function createSavedLooksMswHandlers(
           (!source || item.source === source) &&
           (!anchorGarmentId || item.anchorGarmentId === anchorGarmentId)
       )
-      const page = filtered.slice(offset, offset + limit)
+      const page = filtered
+        .slice(offset, offset + limit)
+        .map((item) => formatMswSavedLookForRead(item, store))
       return HttpResponse.json({
         data: page,
         total: filtered.length,
@@ -178,11 +215,12 @@ export function createSavedLooksMswHandlers(
           { status: 404 }
         )
       }
+      const formatted = formatMswSavedLookForRead(found, store)
       return HttpResponse.json(
-        { data: found },
+        { data: formatted },
         {
           status: 200,
-          headers: { ETag: `"saved-look:${found.id}:${found.revision}"` },
+          headers: { ETag: `"saved-look:${formatted.id}:${formatted.revision}"` },
         }
       )
     }),

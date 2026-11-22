@@ -294,11 +294,13 @@ export function MemberSampleOutfit({
           ) {
             return
           }
-          const next = mergeMobileInitialSavedLooks(
-            savedLooksRef.current,
-            items,
-            deletedIdsRef.current
-          )
+          const fetchedById = new Map(items.map((item) => [item.id, item]))
+          const next = [
+            ...items.filter((item) => !deletedIdsRef.current.has(item.id)),
+            ...savedLooksRef.current.filter(
+              (item) => !fetchedById.has(item.id) && !deletedIdsRef.current.has(item.id)
+            ),
+          ]
           savedLooksRef.current = next
           setSavedLooks(next)
           setBookmarkStorage('ready')
@@ -539,10 +541,14 @@ export function MemberSampleOutfit({
           return true
         }}
         onOpen={(bookmark) => {
-          const matching = savedLooksRef.current.find(
-            (item) => item.lookId === bookmark.lookId
-          )
-          if (matching?.availabilityStatus === 'needs_review') {
+          const selected = bookmark as SampleBookmark & {
+            savedLookId?: string
+            needsReview?: boolean
+          }
+          const matching = selected.savedLookId
+            ? savedLooksRef.current.find((item) => item.id === selected.savedLookId)
+            : savedLooksRef.current.find((item) => item.lookId === bookmark.lookId)
+          if (selected.needsReview || matching?.availabilityStatus === 'needs_review') {
             const seq = ++noticeSeqRef.current
             statusBar.showNotice({
               id: `sample-${owner}-needs-review-${seq}`,

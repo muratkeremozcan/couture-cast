@@ -945,9 +945,11 @@ describe('Wardrobe styling', () => {
     expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
       'Needs review'
     )
-    expect(localStorage.getItem(ownValidKey)).toBeNull()
-    expect(localStorage.getItem(ownUnresolvedKey)).toBeNull()
-    expect(localStorage.getItem(ownTamperedKey)).toBeNull()
+    await waitFor(() => {
+      expect(localStorage.getItem(ownValidKey)).toBeNull()
+      expect(localStorage.getItem(ownUnresolvedKey)).toBeNull()
+      expect(localStorage.getItem(ownTamperedKey)).toBeNull()
+    })
     expect(localStorage.getItem('couturecast.guest-preview.v1')).toBe(guestState)
     expect(localStorage.getItem(otherOwnerKey)).not.toBeNull()
   })

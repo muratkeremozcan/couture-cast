@@ -873,5 +873,175 @@ describe('web saved-looks client', () => {
       owner: 'user-1',
     })
     expect(failedReconcile.pendingKeys).toBe(1)
+
+    // 7. Paginated & choice-verified 409 reconciliation, edited-in-flight retention, and bearer-bound unverified owner fencing
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
+    const editedBookmark = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'sample:g:white-sneakers' },
+    }
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    // 409 conflict where page 0 has a look with different swaps -> must NOT prune edited choices
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [
+        {
+          ...SAMPLE_LOOK,
+          id: 'sl-diff-swaps',
+          source: 'home_sample',
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    })
+    const diffSwapsResult = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(diffSwapsResult.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(key)).not.toBeNull()
+
+    // 409 conflict that finds the exact matching look on page 2 -> reconciles and removes key
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'sl-page-1-other',
+            source: 'home_sample',
+            lookId: 'sample:l:city-wool',
+            weather: 'cool-windy',
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'sl-page-2-match',
+            source: 'home_sample',
+            lookId: 'sample:l:office-oxford',
+            weather: 'mild-dry',
+            swaps: { shoes: 'sample:g:white-sneakers' },
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 1,
+      })
+    const paginatedMatch = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(paginatedMatch.pendingKeys).toBe(0)
+    expect(paginatedMatch.imported.map((item) => item.id)).toEqual(['sl-page-2-match'])
+    expect(window.localStorage.getItem(key)).toBeNull()
+
+    // Concurrent edit of the same bookmark's swaps while POST is in flight is retained
+    resetWebLegacySavedLooksImportState()
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const modifiedDuringFlight = {
+      ...editedBookmark,
+      swaps: { shoes: 'sample:g:loafers' },
+    }
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      window.localStorage.setItem(key, JSON.stringify([modifiedDuringFlight]))
+      return Promise.resolve({
+        data: { ...SAMPLE_LOOK, id: 'sl-pre-edit', lookId: 'sample:l:office-oxford' },
+      })
+    })
+    const retainedEdit = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    expect(retainedEdit.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(key)).toBe(JSON.stringify([modifiedDuringFlight]))
+
+    // Bearer-bound unverified owner fencing stops migration if bearer changes
+    resetWebLegacySavedLooksImportState()
+    currentWebSessionOwner.mockReturnValue('bearer')
+    currentWebSessionBearer.mockReturnValue('fixture-token-a')
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      currentWebSessionBearer.mockReturnValue('fixture-token-b')
+      return Promise.resolve({ data: SAMPLE_LOOK })
+    })
+    const fencedUnverified = await ensureWebLegacySavedLooksMigration({
+      owner: 'user-1',
+      accessToken: 'fixture-token-a',
+    })
+    expect(fencedUnverified?.pendingKeys).toBe(1)
+    expect(fencedUnverified?.imported).toEqual([])
+    currentWebSessionOwner.mockReturnValue('user-1')
+    currentWebSessionBearer.mockReturnValue('verified-token')
+
+    // Pre-expired deadline stops garment loading & POSTs cleanly while keeping keys pending
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
+    const styleKeyForDeadline = stylePieceStorageKey('user-1', 'garment-deadline')
+    window.localStorage.setItem(
+      styleKeyForDeadline,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    const nowSpy = vi
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(25_000)
+    const expiredRun = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    nowSpy.mockRestore()
+    expect(expiredRun.pendingKeys).toBe(1)
+
+    // Pre-expired deadline also skips Home targets and Style targets when garments are preloaded
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const nowSpy2 = vi
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(25_000)
+    const expiredBoth = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      garments: [],
+    })
+    nowSpy2.mockRestore()
+    expect(expiredBoth.pendingKeys).toBe(2)
+
+    // Mid-flight AbortSignal cancels remaining deadline scope cleanly
+    const abortCtrl = new AbortController()
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      abortCtrl.abort()
+      return Promise.reject(new Error('aborted'))
+    })
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const abortedRun = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      sources: ['home_sample'],
+      signal: abortCtrl.signal,
+    })
+    expect(abortedRun.pendingKeys).toBe(1)
   })
 })

@@ -1529,9 +1529,11 @@ describe('WardrobeHubScreen', () => {
     )
 
     // Active member's native files are deleted after import while other member's file remains intact
-    expect(nativeStyleRuntime.files.has(ownTopUri)).toBe(false)
-    expect(nativeStyleRuntime.files.has(ownChangedUri)).toBe(false)
-    expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
+    await waitFor(() => {
+      expect(nativeStyleRuntime.files.has(ownTopUri)).toBe(false)
+      expect(nativeStyleRuntime.files.has(ownChangedUri)).toBe(false)
+      expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
+    })
     expect(nativeStyleRuntime.files.has(otherMemberUri)).toBe(true)
   })
 })

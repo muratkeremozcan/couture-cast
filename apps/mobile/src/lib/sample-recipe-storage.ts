@@ -167,9 +167,41 @@ export async function sampleRecipeStorage(
   }
 }
 
+export type MobileDiscoveryBudget = {
+  remainingKeys: number
+  remainingBytes: number
+  deferredCount: number
+}
+
+export function createMobileDiscoveryBudget(): MobileDiscoveryBudget {
+  return {
+    remainingKeys: MAX_DISCOVERY_KEYS,
+    remainingBytes: MAX_DISCOVERY_BYTES,
+    deferredCount: 0,
+  }
+}
+
+function consumeMobileBudget(
+  budget: MobileDiscoveryBudget,
+  rawLength: number,
+  collectedCount: number
+): boolean {
+  if (
+    budget.remainingKeys <= 0 ||
+    (budget.remainingBytes < rawLength && collectedCount > 0)
+  ) {
+    budget.deferredCount += 1
+    return false
+  }
+  budget.remainingKeys -= 1
+  budget.remainingBytes -= rawLength
+  return true
+}
+
 export async function discoverMobileHomeSampleStorageForOwner(
   owner: string,
-  isCurrent: () => boolean = () => true
+  isCurrent: () => boolean = () => true,
+  budget: MobileDiscoveryBudget = createMobileDiscoveryBudget()
 ): Promise<{ key: string; raw: string; handle: SampleRecipeStorageHandle }[]> {
   if (!isCurrent()) return []
   const keys = memberSampleBookmarksStorageKeys(owner).filter(
@@ -183,7 +215,9 @@ export async function discoverMobileHomeSampleStorageForOwner(
       const handle = await sampleRecipeStorage(key)
       if (!isCurrent()) return []
       const raw = handle.read()
-      if (raw !== null) results.push({ key, raw, handle })
+      if (raw !== null && consumeMobileBudget(budget, raw.length, results.length)) {
+        results.push({ key, raw, handle })
+      }
     }
     return results
   }
@@ -197,7 +231,9 @@ export async function discoverMobileHomeSampleStorageForOwner(
     const handle = await sampleRecipeStorage(key)
     if (!isCurrent()) return []
     const raw = handle.read()
-    if (raw !== null) results.push({ key, raw, handle })
+    if (raw !== null && consumeMobileBudget(budget, raw.length, results.length)) {
+      results.push({ key, raw, handle })
+    }
   }
   return results
 }
@@ -205,6 +241,7 @@ export async function discoverMobileHomeSampleStorageForOwner(
 async function readMobileStylePieceCandidates(params: {
   candidates: Map<string, string>
   isCurrent: () => boolean
+  budget: MobileDiscoveryBudget
   fsMod?: ExpoFsModuleLike
 }): Promise<
   {
@@ -214,17 +251,16 @@ async function readMobileStylePieceCandidates(params: {
     handle: SampleRecipeStorageHandle
   }[]
 > {
-  const { candidates, isCurrent, fsMod } = params
+  const { candidates, isCurrent, budget, fsMod } = params
   const results: {
     key: string
     garmentId: string
     raw: string
     handle: SampleRecipeStorageHandle
   }[] = []
-  let totalBytes = 0
 
   for (const [key, garmentId] of candidates) {
-    if (!isCurrent() || results.length >= MAX_DISCOVERY_KEYS) break
+    if (!isCurrent()) break
     if (fsMod) {
       let exists = false
       try {
@@ -238,8 +274,7 @@ async function readMobileStylePieceCandidates(params: {
     if (!isCurrent()) return []
     const raw = handle.read()
     if (raw === null) continue
-    if (totalBytes + raw.length > MAX_DISCOVERY_BYTES && results.length > 0) break
-    totalBytes += raw.length
+    if (!consumeMobileBudget(budget, raw.length, results.length)) continue
     results.push({ key, garmentId, raw, handle })
   }
   return results
@@ -248,7 +283,8 @@ async function readMobileStylePieceCandidates(params: {
 export async function discoverMobileStylePieceStorageForOwner(
   owner: string,
   knownGarmentIds: readonly string[] = [],
-  isCurrent: () => boolean = () => true
+  isCurrent: () => boolean = () => true,
+  budget: MobileDiscoveryBudget = createMobileDiscoveryBudget()
 ): Promise<
   {
     key: string
@@ -260,11 +296,11 @@ export async function discoverMobileStylePieceStorageForOwner(
   if (!isCurrent()) return []
   if (Platform.OS === 'web') {
     const candidates = listWebStylePieceCandidates(owner, knownGarmentIds)
-    return readMobileStylePieceCandidates({ candidates, isCurrent })
+    return readMobileStylePieceCandidates({ candidates, isCurrent, budget })
   }
 
   const fsMod = (await import('expo-file-system')) as unknown as ExpoFsModuleLike
   if (!isCurrent()) return []
   const candidates = listNativeStylePieceCandidates(fsMod, owner, knownGarmentIds)
-  return readMobileStylePieceCandidates({ candidates, isCurrent, fsMod })
+  return readMobileStylePieceCandidates({ candidates, isCurrent, budget, fsMod })
 }
