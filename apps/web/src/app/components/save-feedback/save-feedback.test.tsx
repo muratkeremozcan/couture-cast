@@ -1703,21 +1703,24 @@ describe('web save-feedback components', () => {
       )
 
       // Weather change and Reopen saved look inside StylePiecePanel
-      const weatherButtons = within(panel)
-        .getAllByRole('button')
-        .filter((btn) =>
-          btn.getAttribute('data-testid')?.startsWith('style-piece-weather-')
-        )
-      const otherWeather = weatherButtons.find(
-        (btn) => btn.getAttribute('aria-pressed') !== 'true'
+      await user.click(within(panel).getByTestId('style-piece-weather-warm-rainy'))
+      expect(within(panel).getByTestId('style-piece-weather-warm-rainy')).toHaveAttribute(
+        'aria-pressed',
+        'true'
       )
-      if (otherWeather) await user.click(otherWeather)
       await user.click(await within(panel).findByTestId('style-piece-reopen'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('style-piece-weather-mild-dry')).toHaveAttribute(
+          'aria-pressed',
+          'true'
+        )
+      )
 
-      // Save another look and click View saved + re-save existing look (no-op) + 409 tombstone
-      await user.click(within(panel).getAllByTestId('style-piece-save')[0]!)
-      const viewSavedInPanel = within(panel).queryByTestId('status-bar-action-view-saved')
-      if (viewSavedInPanel) await user.click(viewSavedInPanel)
+      // Re-saving the reopened look exercises existingMatch non-destructive no-op without Undo
+      const saveCards = within(panel).getAllByTestId('style-piece-save')
+      await user.click(saveCards[0]!)
+      await waitFor(() => expect(saveCards[0]).toHaveTextContent('Saved'))
+      expect(within(panel).queryByTestId('status-bar-action-undo')).toBeNull()
       // API error on Remove surfaces Failed + Retry, and Retry succeeds
       let failDeleteOnce = true
       styleSavedStore.nextDeleteError = () => {

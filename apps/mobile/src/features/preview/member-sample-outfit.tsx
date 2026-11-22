@@ -61,7 +61,7 @@ function buildMobileSampleAttemptKey(
 ): string {
   const comfort = payload.comfort!
   const comfortSig = `${comfort.runsColdWarm}/${comfort.windTolerance}/${comfort.precipPreparedness}`
-  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection!}:${comfortSig}`
+  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection!}:${comfortSig}:${JSON.stringify(payload.swaps)}`
 }
 
 function mergeMobileInitialSavedLooks(
@@ -78,13 +78,18 @@ function mergeMobileInitialSavedLooks(
 
 async function confirmMobileSavedLookExists(
   existing: SavedLookContract,
-  accessToken: string | undefined
-): Promise<SavedLookContract | null> {
+  accessToken: string | undefined,
+  deletedIds: ReadonlySet<string>,
+  onVerifiedUnchanged: (verified: SavedLookContract) => void
+): Promise<boolean> {
   try {
-    return await getSavedLookFromMobile(existing.id, { accessToken })
+    const record = await getSavedLookFromMobile(existing.id, { accessToken })
+    if (deletedIds.has(record.id)) return false
+    onVerifiedUnchanged(record)
+    return true
   } catch (error) {
     if (error instanceof MobileSavedLookRequestError && error.status === 404) {
-      return null
+      return false
     }
     throw error
   }
@@ -411,19 +416,24 @@ export function MemberSampleOutfit({
             savedLookMatchesHomeSample(item, result)
           )
           if (existingMatch) {
+            const checkVersion = mutationVersionRef.current
             const verified = await confirmMobileSavedLookExists(
               existingMatch,
-              actionToken
+              actionToken,
+              deletedIdsRef.current,
+              (record) => {
+                if (mutationVersionRef.current !== checkVersion) return
+                const refreshed = [
+                  record,
+                  ...savedLooksRef.current.filter((item) => item.id !== record.id),
+                ]
+                savedLooksRef.current = refreshed
+                setSavedLooks(refreshed)
+              }
             )
             if (!isLiveSession(owner, actionEpoch)) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
-              const refreshed = [
-                verified,
-                ...savedLooksRef.current.filter((item) => item.id !== verified.id),
-              ]
-              savedLooksRef.current = refreshed
-              setSavedLooks(refreshed)
               setBookmarkStorage('ready')
               return { saved: true, undoable: false }
             }

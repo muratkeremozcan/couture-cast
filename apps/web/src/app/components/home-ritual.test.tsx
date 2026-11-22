@@ -463,7 +463,7 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
         'You are offline. Save when you reconnect.'
       )
     )
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    Reflect.deleteProperty(navigator, 'onLine')
 
     // Failed Remove offers Retry, then failed Undo Remove shows error notice.
     let failDeleteSampleOnce = true
@@ -492,7 +492,7 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
         'You are offline. Save when you reconnect.'
       )
     )
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    Reflect.deleteProperty(navigator, 'onLine')
 
     // Re-save and Remove again so Undo is back, then test 503 restore failure.
     await user.click(screen.getByTestId('sample-save-look'))
@@ -511,7 +511,7 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
       )
     )
   } finally {
-    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    Reflect.deleteProperty(navigator, 'onLine')
     view.unmount()
   }
 })

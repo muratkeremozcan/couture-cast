@@ -369,6 +369,7 @@ function StylePieceIdeas({
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
   const deletedIdsRef = useRef<Set<string>>(new Set())
+  const mutationVersionRef = useRef(0)
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
   const noticeSeqRef = useRef(0)
@@ -386,7 +387,7 @@ function StylePieceIdeas({
 
   useEffect(() => {
     if (!authorized) return
-    deletedIdsRef.current.clear()
+    const loadVersion = mutationVersionRef.current
     const controller = new AbortController()
     setSavedState('loading')
     void listSavedLooksFromWeb({
@@ -402,6 +403,7 @@ function StylePieceIdeas({
         )
           return
         setSaved((current) => {
+          if (mutationVersionRef.current === loadVersion) return items
           const seen = new Set(current.map((item) => item.id))
           return [
             ...current,
@@ -603,8 +605,9 @@ function StylePieceIdeas({
                   )
                 })
               })
+              const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
-                delete lastCreatedRef.current[recipeKey]
+                delete lastCreatedRef.current[attemptKey]
                 setSavedState('ready')
                 if (swapRevisionRef.current === startSwapRevision) {
                   swapUndoStackRef.current = []
@@ -612,7 +615,6 @@ function StylePieceIdeas({
                 return { saved: true, undoable: false }
               }
               const actionToken = currentWebSessionBearer() ?? undefined
-              const attemptKey = `${recipeKey}:${compositionKey}`
               let idempotencyKey = saveAttemptKeysRef.current.get(attemptKey)
               if (!idempotencyKey) {
                 idempotencyKey = createIdempotencyKey()
@@ -636,7 +638,8 @@ function StylePieceIdeas({
               if (currentWebSessionOwner() !== owner) return false
               saveAttemptKeysRef.current.delete(attemptKey)
               deletedIdsRef.current.delete(created.id)
-              lastCreatedRef.current[recipeKey] = created
+              mutationVersionRef.current += 1
+              lastCreatedRef.current[attemptKey] = created
               setSaved((current) => [
                 created,
                 ...current.filter((item) => item.id !== created.id),
@@ -650,7 +653,8 @@ function StylePieceIdeas({
               return true
             }}
             onUndoSave={async () => {
-              const created = lastCreatedRef.current[recipeKey]
+              const attemptKey = `${recipeKey}:${compositionKey}`
+              const created = lastCreatedRef.current[attemptKey]
               if (!created) return false
               const fresh = await verifyAnchorForAction()
               if (!fresh) return false
@@ -668,7 +672,8 @@ function StylePieceIdeas({
               }
               if (currentWebSessionOwner() !== owner) return false
               deletedIdsRef.current.add(created.id)
-              delete lastCreatedRef.current[recipeKey]
+              mutationVersionRef.current += 1
+              delete lastCreatedRef.current[attemptKey]
               setSaved((current) => current.filter((item) => item.id !== created.id))
               onSavedLooksChanged?.()
               notifySavedLooksChanged(owner)
@@ -820,6 +825,7 @@ function StylePieceIdeas({
                           }
                           if (currentWebSessionOwner() !== owner) return
                           deletedIdsRef.current.add(entry.id)
+                          mutationVersionRef.current += 1
                           setSaved((current) =>
                             current.filter((item) => item.id !== entry.id)
                           )
@@ -906,6 +912,7 @@ function StylePieceIdeas({
                                       )
                                       if (currentWebSessionOwner() !== owner) return
                                       deletedIdsRef.current.delete(restored.id)
+                                      mutationVersionRef.current += 1
                                       setSaved((current) => [
                                         restored,
                                         ...current.filter(

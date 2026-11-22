@@ -77,10 +77,9 @@ function buildHomeSampleAttemptKey(
   weather: string,
   payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>
 ): string {
-  const comfortSig = payload.comfort
-    ? `${payload.comfort.runsColdWarm}/${payload.comfort.windTolerance}/${payload.comfort.precipPreparedness}`
-    : ''
-  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection ?? ''}:${comfortSig}`
+  const comfort = payload.comfort!
+  const comfortSig = `${comfort.runsColdWarm}/${comfort.windTolerance}/${comfort.precipPreparedness}`
+  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection!}:${comfortSig}:${JSON.stringify(payload.swaps)}`
 }
 
 function mergeInitialSavedLooks(
@@ -100,13 +99,18 @@ function mergeInitialSavedLooks(
 
 async function confirmWebSavedLookExists(
   existing: SavedLookContract,
-  accessToken: string | undefined
-): Promise<SavedLookContract | null> {
+  accessToken: string | undefined,
+  deletedIds: ReadonlySet<string>,
+  onVerifiedUnchanged: (verified: SavedLookContract) => void
+): Promise<boolean> {
   try {
-    return await getSavedLookFromWeb(existing.id, { accessToken })
+    const record = await getSavedLookFromWeb(existing.id, { accessToken })
+    if (deletedIds.has(record.id)) return false
+    onVerifiedUnchanged(record)
+    return true
   } catch (error) {
     if (error instanceof SavedLookRequestError && error.status === 404) {
-      return null
+      return false
     }
     throw error
   }
@@ -385,16 +389,24 @@ function SampleOutfitInner({
             savedLookMatchesHomeSample(item, result)
           )
           if (existingMatch) {
-            const verified = await confirmWebSavedLookExists(existingMatch, actionToken)
+            const checkVersion = mutationVersionRef.current
+            const verified = await confirmWebSavedLookExists(
+              existingMatch,
+              actionToken,
+              deletedIdsRef.current,
+              (record) => {
+                if (mutationVersionRef.current !== checkVersion) return
+                const refreshed = [
+                  record,
+                  ...savedLooksRef.current.filter((item) => item.id !== record.id),
+                ]
+                savedLooksRef.current = refreshed
+                setSavedLooks(refreshed)
+              }
+            )
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
-              const refreshed = [
-                verified,
-                ...savedLooksRef.current.filter((item) => item.id !== verified.id),
-              ]
-              savedLooksRef.current = refreshed
-              setSavedLooks(refreshed)
               setBookmarksPersistent(true)
               return { saved: true, undoable: false }
             }

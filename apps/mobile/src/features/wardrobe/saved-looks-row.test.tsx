@@ -385,13 +385,17 @@ describe('ClosetSavedLooksRow (mobile)', () => {
 
     // Opening missing-garment detail modal shows missing notice and closes cleanly.
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
-    expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
+    expect(await screen.findByTestId('saved-look-detail-missing')).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('saved-look-detail-close'))
-    expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+    )
 
     // Opening needs-review detail modal shows needs-review notice, and detail-remove closes modal.
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[1]!)
-    expect(screen.getByTestId('saved-look-detail-needs-review')).toBeInTheDocument()
+    expect(
+      await screen.findByTestId('saved-look-detail-needs-review')
+    ).toBeInTheDocument()
     await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
     await waitFor(() =>
       expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()

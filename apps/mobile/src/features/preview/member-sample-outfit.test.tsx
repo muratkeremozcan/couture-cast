@@ -334,11 +334,15 @@ describe('MemberSampleOutfit (mobile)', () => {
         />
       </SaveFeedbackProvider>
     )
-    // Wait until onGet is holding, then trigger early Save after bookmarkStorage transitions or via weather change + release.
+    // While initial GET is in flight, Save stays disabled/hidden until loading completes; after release, the existing look appears.
     await waitFor(() => expect(heldGet).toBe(true))
+    expect(screen.queryByTestId('sample-save-look')).not.toBeInTheDocument()
     releaseSlowGet()
+    expect(await screen.findByTestId('sample-save-look')).toBeInTheDocument()
     await waitFor(() =>
-      expect(screen.getByTestId('sample-saved-looks')).toBeInTheDocument()
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(2)
     )
     await view2.unmount()
   })
