@@ -416,6 +416,7 @@ function StylePieceIdeas({
   const swapRevisionRef = useRef(0)
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
+  const deletedIdsRef = useRef<Set<string>>(new Set())
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
   const noticeSeqRef = useRef(0)
@@ -436,6 +437,7 @@ function StylePieceIdeas({
 
   useEffect(() => {
     if (!authorized) return
+    deletedIdsRef.current.clear()
     const controller = new AbortController()
     setSavedState('loading')
     void listSavedLooksFromMobile({
@@ -450,7 +452,15 @@ function StylePieceIdeas({
           !isCurrentSession()
         )
           return
-        setSaved(items)
+        setSaved((current) => {
+          const seen = new Set(current.map((item) => item.id))
+          return [
+            ...current,
+            ...items.filter(
+              (item) => !seen.has(item.id) && !deletedIdsRef.current.has(item.id)
+            ),
+          ]
+        })
         setSavedState('ready')
       })
       .catch(() => {
@@ -679,6 +689,7 @@ function StylePieceIdeas({
               }
               if (!isCurrentSession()) return false
               saveAttemptKeysRef.current.delete(attemptKey)
+              deletedIdsRef.current.delete(created.id)
               lastCreatedRef.current[recipeKey] = created
               setSaved((current) => [
                 created,
@@ -710,6 +721,7 @@ function StylePieceIdeas({
                 }
               }
               if (!isCurrentSession()) return false
+              deletedIdsRef.current.add(created.id)
               delete lastCreatedRef.current[recipeKey]
               setSaved((current) => current.filter((item) => item.id !== created.id))
               onSavedLooksChanged?.()
@@ -858,6 +870,7 @@ function StylePieceIdeas({
                             }
                           }
                           if (!isCurrentSession()) return
+                          deletedIdsRef.current.add(entry.id)
                           setSaved((current) =>
                             current.filter((item) => item.id !== entry.id)
                           )
@@ -946,6 +959,7 @@ function StylePieceIdeas({
                                         entry.id
                                       )
                                       if (!isCurrentSession()) return
+                                      deletedIdsRef.current.delete(restored.id)
                                       setSaved((current) => [
                                         restored,
                                         ...current.filter(

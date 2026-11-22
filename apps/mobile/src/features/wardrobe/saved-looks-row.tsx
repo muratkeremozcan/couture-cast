@@ -269,7 +269,7 @@ function ClosetSavedLooksRowInner({
     }
   }, [owner])
 
-  const readLiveOnline = () => statusBarRef.current.isOnline && getNetworkOnline()
+  const readLiveOnline = () => getNetworkOnline()
 
   const weatherLabel = (weather: string) =>
     samples.values.weather[weather as SampleWeatherKey] ?? weather
@@ -323,7 +323,12 @@ function ClosetSavedLooksRowInner({
     actionEpoch: number,
     kind: string,
     error: unknown,
-    retry?: () => void
+    retry?: {
+      id: 'retry' | 'undo'
+      kind: 'retry' | 'undo'
+      label: string
+      onPress: () => void
+    }
   ) => {
     const seq = ++noticeSeqRef.current
     const offline = isOfflineError(error) || !readLiveOnline()
@@ -336,10 +341,7 @@ function ClosetSavedLooksRowInner({
       ),
       message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
       tone: offline ? 'offline' : 'error',
-      actions:
-        !offline && retry
-          ? [{ id: 'retry', kind: 'retry', label: t('feedback.retry'), onPress: retry }]
-          : [],
+      actions: retry ? [retry] : [],
     })
   }
 
@@ -356,22 +358,13 @@ function ClosetSavedLooksRowInner({
       void runUndoRemove(look, actionOwner, actionEpoch, actionToken)
     }
     if (!reachable) {
-      const offSeq = ++noticeSeqRef.current
-      reportNetworkOffline()
-      showOwnedNotice(actionOwner, actionEpoch, {
-        id: `mobile-saved-look-undo-offline-${offSeq}`,
-        announcementId: createAnnouncementToken('mobile-saved-look-undo-offline', offSeq),
-        message: t('feedback.offlineAction'),
-        tone: 'offline',
-        actions: [
-          {
-            id: 'undo',
-            kind: 'undo',
-            label: t('feedback.undo'),
-            onPress: retryUndo,
-          },
-        ],
-      })
+      showActionError(
+        actionOwner,
+        actionEpoch,
+        'mobile-saved-look-undo',
+        new TypeError('Failed to fetch'),
+        { id: 'undo', kind: 'undo', label: t('feedback.undo'), onPress: retryUndo }
+      )
       return
     }
     try {
@@ -388,25 +381,12 @@ function ClosetSavedLooksRowInner({
       })
     } catch (undoError) {
       if (!isActiveOwnerSession(actionOwner, actionEpoch)) return
-      const errSeq = ++noticeSeqRef.current
       const offline = isOfflineError(undoError) || !readLiveOnline()
-      if (offline) reportNetworkOffline()
-      showOwnedNotice(actionOwner, actionEpoch, {
-        id: `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
-        announcementId: createAnnouncementToken(
-          `mobile-saved-look-undo-${offline ? 'offline' : 'failed'}`,
-          errSeq
-        ),
-        message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
-        tone: offline ? 'offline' : 'error',
-        actions: [
-          {
-            id: 'retry',
-            kind: 'retry',
-            label: offline ? t('feedback.undo') : t('feedback.retry'),
-            onPress: retryUndo,
-          },
-        ],
+      showActionError(actionOwner, actionEpoch, 'mobile-saved-look-undo', undoError, {
+        id: 'retry',
+        kind: 'retry',
+        label: offline ? t('feedback.undo') : t('feedback.retry'),
+        onPress: retryUndo,
       })
     }
   }
@@ -444,14 +424,23 @@ function ClosetSavedLooksRowInner({
       if (error instanceof MobileSavedLookRequestError && error.status === 404) {
         alreadyDeleted = true
       } else {
+        const offline = isOfflineError(error) || !readLiveOnline()
         showActionError(
           actionOwner,
           actionEpoch,
           'mobile-saved-look-remove',
           error,
-          () => {
-            if (isActiveOwnerSession(actionOwner, actionEpoch)) void handleRemove(look)
-          }
+          offline
+            ? undefined
+            : {
+                id: 'retry',
+                kind: 'retry',
+                label: t('feedback.retry'),
+                onPress: () => {
+                  if (isActiveOwnerSession(actionOwner, actionEpoch))
+                    void handleRemove(look)
+                },
+              }
         )
         setRemovingId(null)
         return

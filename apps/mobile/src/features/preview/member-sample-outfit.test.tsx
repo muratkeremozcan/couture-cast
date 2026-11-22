@@ -5,6 +5,8 @@ import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpResponse } from 'msw'
 import {
+  reportNetworkOffline,
+  reportNetworkOnline,
   resetNetworkStatusForTests,
   SaveFeedbackProvider,
 } from '@/components/save-feedback'
@@ -71,9 +73,11 @@ describe('MemberSampleOutfit (mobile)', () => {
       </SaveFeedbackProvider>
     )
 
-    // Planner and location navigation actions work.
+    // Planner, add-garment, and location navigation actions work.
     fireEvent.click(screen.getByTestId('home-plan-week'))
     expect(routerMock.push).toHaveBeenCalledWith('/planner')
+    fireEvent.click(screen.getByTestId('home-add-garment'))
+    expect(routerMock.navigate).toHaveBeenCalledWith('/wardrobe?entry=add')
     fireEvent.click(screen.getByTestId('hero-add-location'))
     expect(routerMock.push).toHaveBeenCalledWith('/locations?guided=1')
 
@@ -164,12 +168,53 @@ describe('MemberSampleOutfit (mobile)', () => {
     fireEvent.click(retryRemove)
     await waitFor(() => expect(store.items).toHaveLength(0))
 
-    // Undo Remove restores via /restore.
+    // Undo Remove restores via /restore, and failed Undo Remove shows error notice.
+    let failRestoreOnce = true
+    store.nextRestoreError = () => {
+      if (!failRestoreOnce) return null
+      failRestoreOnce = false
+      return HttpResponse.json({ message: 'Restore error' }, { status: 503 })
+    }
     const undoRemove = await screen.findByTestId('status-bar-action-undo')
     fireEvent.click(undoRemove)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+
+    // Save one more look, then test offline Remove, online Remove + offline Undo, and 404 stale delete.
+    fireEvent.click(saveBtn)
     await waitFor(() => expect(store.items).toHaveLength(1))
 
-    // 404 stale delete cleans up without offering Undo.
+    reportNetworkOffline()
+    const removeOfflineBtn = within(
+      await screen.findByTestId('sample-saved-looks')
+    ).getByRole('button', { name: /^Remove / })
+    fireEvent.click(removeOfflineBtn)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    reportNetworkOnline()
+
+    // Remove while online, then click Undo while offline -> offline notice.
+    fireEvent.click(removeOfflineBtn)
+    await waitFor(() => expect(store.items).toHaveLength(0))
+    const undoRemove2 = await screen.findByTestId('status-bar-action-undo')
+    reportNetworkOffline()
+    fireEvent.click(undoRemove2)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    reportNetworkOnline()
+
+    // Re-save when online, then 404 stale delete cleans up without offering Undo.
+    fireEvent.click(saveBtn)
+    await waitFor(() => expect(store.items).toHaveLength(1))
     store.items = []
     const removeBtn2 = within(screen.getByTestId('sample-saved-looks')).getByRole(
       'button',
@@ -265,5 +310,36 @@ describe('MemberSampleOutfit (mobile)', () => {
     fireEvent.click(saveBtn)
     await waitFor(() => expect(store.items).toHaveLength(2))
     await view.unmount()
+
+    // Slow initial GET merged with early Save retains both the early-saved look and the server look.
+    let releaseSlowGet!: () => void
+    let heldGet = false
+    store.onGet = async (request) => {
+      if (heldGet || new URL(request.url).pathname !== '/api/v1/wardrobe/saved-looks') {
+        return
+      }
+      heldGet = true
+      await new Promise<void>((resolve) => {
+        releaseSlowGet = resolve
+      })
+    }
+    store.items = [existing]
+    const view2 = await render(
+      <SaveFeedbackProvider>
+        <MemberSampleOutfit
+          owner="mobile-member-1"
+          error={null}
+          busy={false}
+          onRetry={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+    // Wait until onGet is holding, then trigger early Save after bookmarkStorage transitions or via weather change + release.
+    await waitFor(() => expect(heldGet).toBe(true))
+    releaseSlowGet()
+    await waitFor(() =>
+      expect(screen.getByTestId('sample-saved-looks')).toBeInTheDocument()
+    )
+    await view2.unmount()
   })
 })

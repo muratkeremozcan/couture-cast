@@ -59,10 +59,9 @@ function buildMobileSampleAttemptKey(
   weather: string,
   payload: NonNullable<ReturnType<typeof buildHomeSampleSavedLookInput>>
 ): string {
-  const comfortSig = payload.comfort
-    ? `${payload.comfort.runsColdWarm}/${payload.comfort.windTolerance}/${payload.comfort.precipPreparedness}`
-    : ''
-  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection ?? ''}:${comfortSig}`
+  const comfort = payload.comfort!
+  const comfortSig = `${comfort.runsColdWarm}/${comfort.windTolerance}/${comfort.precipPreparedness}`
+  return `${owner}:${lookId}:${garmentsSignature}:${weather}:${payload.collection!}:${comfortSig}`
 }
 
 function mergeMobileInitialSavedLooks(
@@ -71,13 +70,10 @@ function mergeMobileInitialSavedLooks(
   deletedIds: ReadonlySet<string>
 ): SavedLookContract[] {
   const seen = new Set(current.map((item) => item.id))
-  const merged = [...current]
-  for (const item of fetched) {
-    if (seen.has(item.id) || deletedIds.has(item.id)) continue
-    seen.add(item.id)
-    merged.push(item)
-  }
-  return merged
+  return [
+    ...current,
+    ...fetched.filter((item) => !seen.has(item.id) && !deletedIds.has(item.id)),
+  ]
 }
 
 async function confirmMobileSavedLookExists(
@@ -207,7 +203,7 @@ export function MemberSampleOutfit({
     saveRunSeqRef.current += 1
     setResult(updater)
   }
-  const readLiveOnline = () => statusBarRef.current.isOnline && getNetworkOnline()
+  const readLiveOnline = () => getNetworkOnline()
   const isLiveSession = (actionOwner: string | null, actionEpoch: number) =>
     Boolean(
       actionOwner &&
@@ -422,6 +418,12 @@ export function MemberSampleOutfit({
             if (!isLiveSession(owner, actionEpoch)) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              const refreshed = [
+                verified,
+                ...savedLooksRef.current.filter((item) => item.id !== verified.id),
+              ]
+              savedLooksRef.current = refreshed
+              setSavedLooks(refreshed)
               setBookmarkStorage('ready')
               return { saved: true, undoable: false }
             }

@@ -104,6 +104,7 @@ describe('mobile saved-looks client', () => {
     ])
 
     apiV1WardrobeSavedLooksPost.mockResolvedValueOnce({ data: SAMPLE_LOOK })
+    const controller = new AbortController()
     const created = await createSavedLookFromMobile(
       {
         source: 'home_sample',
@@ -116,16 +117,22 @@ describe('mobile saved-looks client', () => {
         collection: 'all',
         comfort: SAMPLE_LOOK.comfort,
       },
-      { idempotencyKey: '11111111-1111-4111-8111-111111111111' }
+      {
+        idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        signal: controller.signal,
+      }
     )
     expect(created.id).toBe('sl-m1')
 
     apiV1WardrobeSavedLooksSavedLookIdGet.mockResolvedValueOnce({ data: SAMPLE_LOOK })
-    expect((await getSavedLookFromMobile('sl-m1')).id).toBe('sl-m1')
+    expect(
+      (await getSavedLookFromMobile('sl-m1', { signal: controller.signal })).id
+    ).toBe('sl-m1')
 
     apiV1WardrobeSavedLooksSavedLookIdDelete.mockResolvedValueOnce(undefined)
     await deleteSavedLookFromMobile('sl-m1', formatSavedLookIfMatch('sl-m1', 0), {
       accessToken: 'pinned-token',
+      signal: controller.signal,
     })
     expect(apiV1WardrobeSavedLooksSavedLookIdDelete).toHaveBeenCalledWith(
       { savedLookId: 'sl-m1', ifMatch: '"saved-look:sl-m1:0"' },
@@ -138,7 +145,11 @@ describe('mobile saved-looks client', () => {
       limit: 50,
       offset: 0,
     })
-    const page = await listSavedLooksPageFromMobile({ limit: 50, offset: 0 })
+    const page = await listSavedLooksPageFromMobile({
+      limit: 50,
+      offset: 0,
+      signal: controller.signal,
+    })
     expect(page.total).toBe(51)
     expect(page.data).toEqual([SAMPLE_LOOK])
 
@@ -147,6 +158,7 @@ describe('mobile saved-looks client', () => {
     })
     const restored = await restoreSavedLookFromMobile('sl-m1', {
       accessToken: 'pinned-token',
+      signal: controller.signal,
     })
     expect(restored.revision).toBe(1)
 
@@ -196,6 +208,19 @@ describe('mobile saved-looks client', () => {
     )
     await expect(restoreSavedLookFromMobile('sl-m1')).rejects.toMatchObject({
       status: 502,
+    })
+
+    apiV1WardrobeSavedLooksSavedLookIdGet.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(JSON.stringify({ code: 'CODE_ONLY' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+    await expect(getSavedLookFromMobile('sl-m1')).rejects.toMatchObject({
+      status: 400,
+      code: 'CODE_ONLY',
     })
 
     apiV1WardrobeSavedLooksSavedLookIdGet.mockRejectedValueOnce('raw-error')

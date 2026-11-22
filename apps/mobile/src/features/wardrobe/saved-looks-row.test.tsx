@@ -9,7 +9,10 @@ import type {
   SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } from '@couture/utils'
-import { SaveFeedbackProvider } from '@/components/save-feedback'
+import {
+  resetNetworkStatusForTests,
+  SaveFeedbackProvider,
+} from '@/components/save-feedback'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { setMobileApplicationUserId } from '@/src/lib/mobile-auth'
 
@@ -415,5 +418,21 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(screen.getAllByTestId('saved-look-remove')[1]!)
     await waitFor(() => expect(screen.queryByText('Undo')).not.toBeInTheDocument())
     expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+
+    // Offline Remove shows offline notice immediately, and offline Undo shows offline Undo action.
+    deleteSavedLookFromMobile.mockResolvedValueOnce(undefined)
+    await userEvent.click(screen.getAllByTestId('saved-look-remove')[0]!)
+    const undoBtn = await screen.findByText('Undo')
+    resetNetworkStatusForTests(false)
+    await userEvent.click(undoBtn)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    deleteSavedLookFromMobile.mockClear()
+    await userEvent.click(screen.getAllByTestId('saved-look-remove')[0]!)
+    expect(deleteSavedLookFromMobile).not.toHaveBeenCalled()
+    resetNetworkStatusForTests(true)
   })
 })

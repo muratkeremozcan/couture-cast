@@ -214,9 +214,11 @@ export async function mockStyleWardrobe(
         })
         return
       }
+      const current = list.find((item) => item.id === prior.id) ?? prior
       await route.fulfill({
         status: 200,
-        json: savedLookResponseSchema.parse({ data: prior }),
+        headers: { etag: `"saved-look:${current.id}:${current.revision}"` },
+        json: savedLookResponseSchema.parse({ data: current }),
       })
       return
     }
@@ -286,6 +288,7 @@ export async function mockStyleWardrobe(
 
   const handleItemSavedLook = async (
     route: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[0],
+    request: Parameters<NonNullable<Parameters<InterceptNetworkCallFn>[0]['handler']>>[1],
     method: string,
     suffix: string,
     list: SavedLookContract[],
@@ -313,9 +316,32 @@ export async function mockStyleWardrobe(
       return
     }
     if (method === 'DELETE') {
+      const ifMatch = request.headers()['if-match']?.trim()
+      if (!ifMatch) {
+        await route.fulfill({
+          status: 428,
+          json: {
+            code: 'PRECONDITION_REQUIRED',
+            message: 'If-Match header is required',
+          },
+        })
+        return
+      }
       const index = list.findIndex((item) => item.id === suffix)
       if (index === -1) {
         await route.fulfill({ status: 404, json: { message: 'Saved look not found' } })
+        return
+      }
+      const target = list[index]!
+      const expectedTag = `"saved-look:${target.id}:${target.revision}"`
+      if (ifMatch !== '*' && ifMatch !== expectedTag) {
+        await route.fulfill({
+          status: 412,
+          json: {
+            code: 'SAVED_LOOK_CONFLICT',
+            message: 'Saved look revision mismatch',
+          },
+        })
         return
       }
       const [removed] = list.splice(index, 1)
@@ -348,7 +374,7 @@ export async function mockStyleWardrobe(
     if (!suffix && method === 'POST') {
       return handleCreateSavedLook(route, request, owner, list, deleted)
     }
-    if (suffix) return handleItemSavedLook(route, method, suffix, list, deleted)
+    if (suffix) return handleItemSavedLook(route, request, method, suffix, list, deleted)
     await route.abort()
   }
 

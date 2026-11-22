@@ -279,7 +279,13 @@ function MemberWardrobeHub({
   }, [owner])
 
   const loadMoreSavedLooks = useCallback(() => {
-    if (!owner || savedLooksLoadingMore || savedLooks.length >= savedLooksTotal) return
+    if (
+      !owner ||
+      savedLooksLoading ||
+      savedLooksLoadingMore ||
+      savedLooks.length >= savedLooksTotal
+    )
+      return
     setSavedLooksLoadingMore(true)
     const offset = savedLooks.length
     const startEpoch = epoch
@@ -304,7 +310,14 @@ function MemberWardrobeHub({
           setSavedLooksLoadingMore(false)
         }
       })
-  }, [epoch, owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
+  }, [
+    epoch,
+    owner,
+    savedLooks.length,
+    savedLooksLoading,
+    savedLooksLoadingMore,
+    savedLooksTotal,
+  ])
 
   useEffect(() => {
     const controller = new AbortController()

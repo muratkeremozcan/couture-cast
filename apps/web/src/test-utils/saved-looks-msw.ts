@@ -38,6 +38,8 @@ export function createSavedLooksMswHandlers(
 
   const handlers = [
     http.get(basePattern, async ({ request }) => {
+      const snapshot = [...store.items]
+      const hadOnGet = Boolean(store.onGet)
       if (store.onGet) await store.onGet(request)
       const errorRes = store.nextGetError?.()
       if (errorRes) return errorRes
@@ -47,7 +49,8 @@ export function createSavedLooksMswHandlers(
       const anchorGarmentId = url.searchParams.get('anchorGarmentId')
       const limit = Number(url.searchParams.get('limit') ?? '50')
       const offset = Number(url.searchParams.get('offset') ?? '0')
-      const filtered = store.items.filter(
+      const sourceItems = hadOnGet ? snapshot : store.items
+      const filtered = sourceItems.filter(
         (item) =>
           item.ownerUserId === owner &&
           (!source || item.source === source) &&

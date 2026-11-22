@@ -333,7 +333,13 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   }, [owner])
 
   const loadMoreSavedLooks = useCallback(() => {
-    if (!owner || savedLooksLoadingMore || savedLooks.length >= savedLooksTotal) return
+    if (
+      !owner ||
+      savedLooksLoading ||
+      savedLooksLoadingMore ||
+      savedLooks.length >= savedLooksTotal
+    )
+      return
     setSavedLooksLoadingMore(true)
     const offset = savedLooks.length
     const startLoadEpoch = savedLooksLoadEpochRef.current
@@ -357,7 +363,13 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
           setSavedLooksLoadingMore(false)
         }
       })
-  }, [owner, savedLooks.length, savedLooksLoadingMore, savedLooksTotal])
+  }, [
+    owner,
+    savedLooks.length,
+    savedLooksLoading,
+    savedLooksLoadingMore,
+    savedLooksTotal,
+  ])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker

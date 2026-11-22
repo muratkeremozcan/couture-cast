@@ -433,7 +433,65 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
     await waitFor(() =>
       expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Failed')
     )
+
+    // Save look again -> View saved -> Reopen saved look -> Re-save hits verified 200 non-destructive refresh.
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    const viewSavedBtn = screen.queryByTestId('status-bar-action-view-saved')
+    if (viewSavedBtn) await user.click(viewSavedBtn)
+
+    // Shuffle away and reopen the saved look so saveResetKey resets while matching existingMatch.
+    await user.click(screen.getByRole('button', { name: 'Try another look' }))
+    const openSavedBtns = within(screen.getByTestId('sample-saved-looks')).getAllByRole(
+      'button'
+    )
+    await user.click(openSavedBtns[0]!)
+    await user.click(screen.getByTestId('sample-save-look'))
+    await waitFor(() =>
+      expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Saved')
+    )
+    expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
+
+    // Offline Remove shows offline notice without calling DELETE.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    const removeSampleBtns = within(
+      screen.getByTestId('sample-saved-looks')
+    ).getAllByRole('button', { name: /^Remove / })
+    await user.click(removeSampleBtns[0]!)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+
+    // Failed Remove offers Retry, then failed Undo Remove shows error notice.
+    let failDeleteSampleOnce = true
+    store.nextDeleteError = () => {
+      if (!failDeleteSampleOnce) return null
+      failDeleteSampleOnce = false
+      return HttpResponse.json({ message: 'Delete error' }, { status: 503 })
+    }
+    await user.click(removeSampleBtns[0]!)
+    const retryDeleteSample = await screen.findByTestId('status-bar-action-retry')
+    await user.click(retryDeleteSample)
+    await waitFor(() => expect(store.items).toHaveLength(0))
+
+    let failRestoreSampleOnce = true
+    store.nextRestoreError = () => {
+      if (!failRestoreSampleOnce) return null
+      failRestoreSampleOnce = false
+      return HttpResponse.json({ message: 'Restore error' }, { status: 503 })
+    }
+    const undoDeleteSample = await screen.findByTestId('status-bar-action-undo')
+    await user.click(undoDeleteSample)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
   } finally {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     view.unmount()
   }
 })

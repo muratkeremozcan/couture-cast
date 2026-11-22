@@ -132,13 +132,21 @@ describe('web saved-looks client', () => {
     )
 
     apiV1WardrobeSavedLooksSavedLookIdGet.mockResolvedValueOnce({ data: SAMPLE_LOOK })
-    const single = await getSavedLookFromWeb('sl-1')
+    const controller = new AbortController()
+    const single = await getSavedLookFromWeb('sl-1', controller.signal)
     expect(single.id).toBe('sl-1')
 
     apiV1WardrobeSavedLooksSavedLookIdDelete.mockResolvedValueOnce(undefined)
     await deleteSavedLookFromWeb('sl-1', formatSavedLookIfMatch('sl-1', 0), {
       accessToken: 'pinned-token',
+      signal: controller.signal,
     })
+    apiV1WardrobeSavedLooksSavedLookIdDelete.mockResolvedValueOnce(undefined)
+    await deleteSavedLookFromWeb(
+      'sl-1',
+      formatSavedLookIfMatch('sl-1', 0),
+      controller.signal
+    )
     expect(apiV1WardrobeSavedLooksSavedLookIdDelete).toHaveBeenCalledWith(
       { savedLookId: 'sl-1', ifMatch: '"saved-look:sl-1:0"' },
       expect.anything()
@@ -150,7 +158,11 @@ describe('web saved-looks client', () => {
       limit: 50,
       offset: 0,
     })
-    const page = await listSavedLooksPageFromWeb({ limit: 50, offset: 0 })
+    const page = await listSavedLooksPageFromWeb({
+      limit: 50,
+      offset: 0,
+      signal: controller.signal,
+    })
     expect(page.total).toBe(52)
 
     apiV1WardrobeSavedLooksSavedLookIdRestorePost.mockResolvedValueOnce({
@@ -158,6 +170,7 @@ describe('web saved-looks client', () => {
     })
     const restored = await restoreSavedLookFromWeb('sl-1', {
       accessToken: 'pinned-token',
+      signal: controller.signal,
     })
     expect(restored.revision).toBe(1)
 

@@ -303,20 +303,42 @@ function ClosetSavedLooksRowInner({
     }
   }
 
+  const showRemoveOrUndoError = (
+    actionOwner: string | null,
+    kind: string,
+    error: unknown,
+    action?: {
+      id: 'retry' | 'undo'
+      kind: 'retry' | 'undo'
+      label: string
+      onPress: () => void
+    }
+  ) => {
+    const seq = ++noticeSeqRef.current
+    const offline = isOfflineError(error) || !readLiveOnline()
+    showOwnedNotice(actionOwner, {
+      id: `${kind}-${offline ? 'offline' : 'failed'}-${seq}`,
+      announcementId: createAnnouncementToken(
+        `${kind}-${offline ? 'offline' : 'failed'}`,
+        seq
+      ),
+      message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+      tone: offline ? 'offline' : 'error',
+      actions: action ? [action] : [],
+    })
+  }
+
   const handleRemove = async (look: SavedLookContract) => {
     const actionOwner = owner
     const actionToken = currentWebSessionBearer() ?? undefined
     if (!isActiveOwnerSession(actionOwner)) return
 
     if (!readLiveOnline()) {
-      const seq = ++noticeSeqRef.current
-      showOwnedNotice(actionOwner, {
-        id: `closet-saved-look-offline-${seq}`,
-        announcementId: createAnnouncementToken('closet-saved-look-offline', seq),
-        message: t('feedback.offlineAction'),
-        tone: 'offline',
-        actions: [],
-      })
+      showRemoveOrUndoError(
+        actionOwner,
+        'closet-saved-look-remove',
+        new TypeError('Failed to fetch')
+      )
       return
     }
 
@@ -333,29 +355,14 @@ function ClosetSavedLooksRowInner({
       if (error instanceof SavedLookRequestError && error.status === 404) {
         alreadyDeleted = true
       } else {
-        const seq = ++noticeSeqRef.current
-        if (isOfflineError(error) || !readLiveOnline()) {
-          showOwnedNotice(actionOwner, {
-            id: `closet-saved-look-remove-offline-${seq}`,
-            announcementId: createAnnouncementToken(
-              'closet-saved-look-remove-offline',
-              seq
-            ),
-            message: t('feedback.offlineAction'),
-            tone: 'offline',
-            actions: [],
-          })
-        } else {
-          showOwnedNotice(actionOwner, {
-            id: `closet-saved-look-remove-failed-${seq}`,
-            announcementId: createAnnouncementToken(
-              'closet-saved-look-remove-failed',
-              seq
-            ),
-            message: t('feedback.saveFailed'),
-            tone: 'error',
-            actions: [
-              {
+        const offline = isOfflineError(error) || !readLiveOnline()
+        showRemoveOrUndoError(
+          actionOwner,
+          'closet-saved-look-remove',
+          error,
+          offline
+            ? undefined
+            : {
                 id: 'retry',
                 kind: 'retry',
                 label: t('feedback.retry'),
@@ -363,10 +370,8 @@ function ClosetSavedLooksRowInner({
                   if (!isActiveOwnerSession(actionOwner)) return
                   void handleRemove(look)
                 },
-              },
-            ],
-          })
-        }
+              }
+        )
         setRemovingId(null)
         return
       }
@@ -384,24 +389,17 @@ function ClosetSavedLooksRowInner({
     const runUndo = async () => {
       if (undoInFlight || !isActiveOwnerSession(actionOwner)) return
       if (!readLiveOnline()) {
-        const offSeq = ++noticeSeqRef.current
-        showOwnedNotice(actionOwner, {
-          id: `closet-saved-look-undo-offline-${offSeq}`,
-          announcementId: createAnnouncementToken(
-            'closet-saved-look-undo-offline',
-            offSeq
-          ),
-          message: t('feedback.offlineAction'),
-          tone: 'offline',
-          actions: [
-            {
-              id: 'undo',
-              kind: 'undo',
-              label: t('feedback.undo'),
-              onPress: () => void runUndo(),
-            },
-          ],
-        })
+        showRemoveOrUndoError(
+          actionOwner,
+          'closet-saved-look-undo',
+          new TypeError('Failed to fetch'),
+          {
+            id: 'undo',
+            kind: 'undo',
+            label: t('feedback.undo'),
+            onPress: () => void runUndo(),
+          }
+        )
         return
       }
       undoInFlight = true
@@ -421,24 +419,12 @@ function ClosetSavedLooksRowInner({
         })
       } catch (undoError) {
         if (!isActiveOwnerSession(actionOwner)) return
-        const errSeq = ++noticeSeqRef.current
         const offline = isOfflineError(undoError) || !readLiveOnline()
-        showOwnedNotice(actionOwner, {
-          id: `closet-saved-look-undo-${offline ? 'offline' : 'failed'}-${errSeq}`,
-          announcementId: createAnnouncementToken(
-            `closet-saved-look-undo-${offline ? 'offline' : 'failed'}`,
-            errSeq
-          ),
-          message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
-          tone: offline ? 'offline' : 'error',
-          actions: [
-            {
-              id: 'retry',
-              kind: 'retry',
-              label: offline ? t('feedback.undo') : t('feedback.retry'),
-              onPress: () => void runUndo(),
-            },
-          ],
+        showRemoveOrUndoError(actionOwner, 'closet-saved-look-undo', undoError, {
+          id: 'retry',
+          kind: 'retry',
+          label: offline ? t('feedback.undo') : t('feedback.retry'),
+          onPress: () => void runUndo(),
         })
       } finally {
         undoInFlight = false

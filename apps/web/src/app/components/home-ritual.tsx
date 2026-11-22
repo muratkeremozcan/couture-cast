@@ -57,7 +57,7 @@ import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
-import { useStatusBar } from './save-feedback'
+import { SaveFeedbackProvider, useStatusBar } from './save-feedback'
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
@@ -149,7 +149,22 @@ function AddGarment({ strings }: { strings: GuestPreviewStrings }) {
   )
 }
 
-function SampleOutfit({
+function SampleOutfit(props: {
+  owner: string
+  locale: string
+  strings: GuestPreviewStrings
+  actions: ReactNode
+}) {
+  const { hasProvider } = useStatusBar()
+  if (hasProvider) return <SampleOutfitInner {...props} />
+  return (
+    <SaveFeedbackProvider inline renderOfflineLine={false}>
+      <SampleOutfitInner {...props} />
+    </SaveFeedbackProvider>
+  )
+}
+
+function SampleOutfitInner({
   owner,
   locale,
   strings,
@@ -374,6 +389,12 @@ function SampleOutfit({
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              const refreshed = [
+                verified,
+                ...savedLooksRef.current.filter((item) => item.id !== verified.id),
+              ]
+              savedLooksRef.current = refreshed
+              setSavedLooks(refreshed)
               setBookmarksPersistent(true)
               return { saved: true, undoable: false }
             }
@@ -452,37 +473,40 @@ function SampleOutfit({
           update(reopenMemberSampleOutfit(result, bookmark))
         }}
         onRemove={(id) => {
-          const handleRemoveError = (error: unknown, retry: () => void) => {
+          const handleRemoveError = (
+            kind: 'remove' | 'remove-undo',
+            error: unknown,
+            retry?: () => void
+          ) => {
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
             const failSeq = ++noticeSeqRef.current
             const offline = isOfflineError(error) || !readLiveOnline()
             showScopedNotice({
-              id: `sample-${owner}-remove-${offline ? 'offline' : 'failed'}-${failSeq}`,
+              id: `sample-${owner}-${kind}-${offline ? 'offline' : 'failed'}-${failSeq}`,
               announcementId: createAnnouncementToken(
-                `sample-${owner}-remove-${offline ? 'offline' : 'failed'}`,
+                `sample-${owner}-${kind}-${offline ? 'offline' : 'failed'}`,
                 failSeq
               ),
               message: offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
               tone: offline ? 'offline' : 'error',
-              actions: offline
-                ? []
-                : [
-                    {
-                      id: 'retry',
-                      kind: 'retry',
-                      label: t('feedback.retry'),
-                      onPress: retry,
-                    },
-                  ],
+              actions:
+                !offline && retry
+                  ? [
+                      {
+                        id: 'retry',
+                        kind: 'retry',
+                        label: t('feedback.retry'),
+                        onPress: retry,
+                      },
+                    ]
+                  : [],
             })
           }
           const runRemove = async () => {
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
             const actionToken = currentWebSessionBearer() ?? undefined
             if (!readLiveOnline()) {
-              handleRemoveError(new TypeError('Failed to fetch'), () => {
-                void runRemove()
-              })
+              handleRemoveError('remove', new TypeError('Failed to fetch'))
               return
             }
             const target = savedLooksRef.current.find(
@@ -501,7 +525,7 @@ function SampleOutfit({
               if (error instanceof SavedLookRequestError && error.status === 404) {
                 alreadyDeleted = true
               } else {
-                handleRemoveError(error, () => {
+                handleRemoveError('remove', error, () => {
                   void runRemove()
                 })
                 return
@@ -537,17 +561,10 @@ function SampleOutfit({
                           return
                         }
                         if (!readLiveOnline()) {
-                          const offSeq = ++noticeSeqRef.current
-                          showScopedNotice({
-                            id: `sample-${owner}-remove-undo-offline-${offSeq}`,
-                            announcementId: createAnnouncementToken(
-                              `sample-${owner}-remove-undo-offline`,
-                              offSeq
-                            ),
-                            message: t('feedback.offlineAction'),
-                            tone: 'offline',
-                            actions: [],
-                          })
+                          handleRemoveError(
+                            'remove-undo',
+                            new TypeError('Failed to fetch')
+                          )
                           return
                         }
                         undoInFlight = true
@@ -577,21 +594,7 @@ function SampleOutfit({
                             tone: 'neutral',
                           })
                         } catch (undoError) {
-                          if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
-                          const undoSeq = ++noticeSeqRef.current
-                          const offline = isOfflineError(undoError) || !readLiveOnline()
-                          showScopedNotice({
-                            id: `sample-${owner}-remove-undo-${offline ? 'offline' : 'failed'}-${undoSeq}`,
-                            announcementId: createAnnouncementToken(
-                              `sample-${owner}-remove-undo-${offline ? 'offline' : 'failed'}`,
-                              undoSeq
-                            ),
-                            message: offline
-                              ? t('feedback.offlineAction')
-                              : t('feedback.saveFailed'),
-                            tone: offline ? 'offline' : 'error',
-                            actions: [],
-                          })
+                          handleRemoveError('remove-undo', undoError)
                         } finally {
                           undoInFlight = false
                         }
