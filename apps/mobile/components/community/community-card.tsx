@@ -312,6 +312,43 @@ function CommunityCardText({
   )
 }
 
+function CommunityCardAuthorMeta({
+  item,
+  authorName,
+}: {
+  item: CommunityFeedItem
+  authorName: string
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  return (
+    <View style={styles.authorMeta}>
+      <Text
+        style={[styles.authorName, { color: palette.text }]}
+        testID={`community-card-author-${item.id}`}
+      >
+        {authorName}
+      </Text>
+      {item.status !== 'published' && (
+        <Text
+          style={[styles.statusBadge, { color: palette.mutedText }]}
+          testID={`community-card-status-${item.id}`}
+        >
+          {t(`community.status.${item.status}`)}
+        </Text>
+      )}
+      {(item.textRevision ?? 0) > 0 && (
+        <Text
+          style={[styles.statusBadge, { color: palette.mutedText }]}
+          testID={`community-card-edited-${item.id}`}
+        >
+          {t('community.card.edited')}
+        </Text>
+      )}
+    </View>
+  )
+}
+
 export function CommunityCard({
   onTextSaved,
   textEditingEnabled,
@@ -497,22 +534,7 @@ export function CommunityCard({
               {authorName.charAt(0).toUpperCase()}
             </Text>
           </View>
-          <View style={styles.authorMeta}>
-            <Text
-              style={[styles.authorName, { color: palette.text }]}
-              testID={`community-card-author-${item.id}`}
-            >
-              {authorName}
-            </Text>
-            {item.status !== 'published' && (
-              <Text
-                style={[styles.statusBadge, { color: palette.mutedText }]}
-                testID={`community-card-status-${item.id}`}
-              >
-                {t(`community.status.${item.status}`)}
-              </Text>
-            )}
-          </View>
+          <CommunityCardAuthorMeta item={item} authorName={authorName} />
         </View>
 
         <View style={styles.headerTags}>

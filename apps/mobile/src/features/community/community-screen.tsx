@@ -78,7 +78,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   type CommunityBannedError,
+  CommunityPostTextLedger,
   communityModerationReasonCategories,
+  reconcileCommunityPostText,
   type CommunityReactionSummary,
   type ClimateBand,
   type CommunityAuthorPostState,
@@ -389,10 +391,12 @@ export function CommunityScreen() {
   )
   // Story 6.7b: the latest live sponsorship answer per post, for every copy.
   const [sponsorships] = useState(() => new LiveCommunitySponsorships())
+  const [postTextLedger] = useState(() => new CommunityPostTextLedger())
   const spotlight = useCommunitySpotlight({
     sessionScope,
     reactionState,
     sponsorships,
+    postTextLedger,
     onBanned: setBannedSanction,
   })
   // Every live read (feed page, rebuild, single post, spotlight) applies its
@@ -592,8 +596,9 @@ export function CommunityScreen() {
       const remaining = deadline - performance.now()
       if (remaining < MINIMUM_TARGET_ATTEMPT_MS) throw new CommunityRequestSuperseded()
       const timeout = Math.min(2000, Math.floor(remaining))
-      return payload.commentId
-        ? withRequestDeadline(timeout, [controller.signal], (signal) =>
+      const textStamp = postTextLedger.begin()
+      const target = payload.commentId
+        ? await withRequestDeadline(timeout, [controller.signal], (signal) =>
             communitySyncFromMobile(token).resolve(
               {
                 targets: [
@@ -608,7 +613,7 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : readTargetPost(timeout, token).then((post) => ({
+        : await readTargetPost(timeout, token).then((post) => ({
             status: 'available' as const,
             post,
             comment: null,
@@ -616,19 +621,20 @@ export function CommunityScreen() {
             pageCursor: null,
             parentPageCursor: null,
           }))
+      return { target, textStamp }
     }
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const targetRequest = async () => {
       do {
         detailGeneration = detailGenerationRef.current
         try {
-          const target = await requestTarget()
+          const attempt = await requestTarget()
           if (
             !active ||
             intent !== notificationIntentRef.current ||
             detailGeneration === detailGenerationRef.current
           )
-            return target
+            return attempt
         } catch (error) {
           if (
             !notificationFailureIsRetryable(error) ||
@@ -670,11 +676,12 @@ export function CommunityScreen() {
       if (realtimeDeepLink.current?.id === targetPostId) realtimeDeepLink.current = null
       newLooksRef.current = newLooksRef.current.filter((item) => item.id !== targetPostId)
       setNewLooks(newLooksRef.current)
+      postTextLedger.evict(targetPostId)
       reactionState.evict(targetPostId)
       comments.evict(targetPostId)
     }
     void Promise.race([targetRequest(), aborted])
-      .then((target) => {
+      .then(({ target, textStamp }) => {
         if (!active || detailGeneration !== detailGenerationRef.current) return
         if (!target || target.status === 'unavailable') {
           if (target?.status === 'unavailable') forgetTarget()
@@ -685,7 +692,11 @@ export function CommunityScreen() {
         // A comment target resolves through the sync route, which carries no
         // sponsorship answer; the latest live one applies.
         const post = reactionState.read(target.post, readTicket)
-        setDeepLinkPost(() => (post ? sponsorships.apply(post) : post))
+        setDeepLinkPost((current) =>
+          post
+            ? postTextLedger.reconcile(sponsorships.apply(post), textStamp, current)
+            : post
+        )
         if (!post) return
         setIsInvalidDeepLink(false)
         reportHandled()
@@ -745,6 +756,7 @@ export function CommunityScreen() {
     focus,
     focusToken,
     analytics,
+    postTextLedger,
     reactionState,
     comments,
   ])
@@ -843,23 +855,29 @@ export function CommunityScreen() {
         detailGeneration === detailGenerationRef.current
       try {
         const stamp = sponsorships.begin()
+        const textStamp = postTextLedger.begin()
         const post = await getCommunityPostFromMobile(target, signal)
         if (isCurrent()) sponsorships.record([post], stamp)
         if (isCurrent()) {
           const read = reactionState.read(post, readTicket)
           // Normalized as the state commits, so a newer answer recorded in the
           // meantime wins over this response's own block.
-          setDeepLinkPost(() => (read ? sponsorships.apply(read) : read))
+          setDeepLinkPost((current) =>
+            read
+              ? postTextLedger.reconcile(sponsorships.apply(read), textStamp, current)
+              : read
+          )
         }
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
+          postTextLedger.evict(target)
           reactionState.evict(target)
           comments.evict(target)
           setIsInvalidDeepLink(true)
         }
       }
     },
-    [reactionState]
+    [postTextLedger, reactionState]
   )
 
   const reportFeedFailure = useCallback((error: unknown, isFirstPage: boolean) => {
@@ -913,6 +931,7 @@ export function CommunityScreen() {
         for (;;) {
           try {
             const stamp = sponsorships.begin()
+            const textStamp = postTextLedger.begin()
             const feed = await getCommunityFeedFromMobile({
               mode: targetMode,
               cursor: pageCursor,
@@ -929,6 +948,7 @@ export function CommunityScreen() {
               return current ? [current] : []
             })
             setItems((previous) => {
+              const previousById = new Map(previous.map((item) => [item.id, item]))
               const seen = new Set(previous.map((item) => item.id))
               // Normalized as the state commits: a page whose read started
               // before the latest recorded answer never shows its own block.
@@ -936,7 +956,13 @@ export function CommunityScreen() {
                 isAppend
                   ? [...previous, ...page.filter((item) => !seen.has(item.id))]
                   : page
-              ).map((post) => sponsorships.apply(reactionState.current(post)))
+              ).map((post) =>
+                postTextLedger.reconcile(
+                  sponsorships.apply(reactionState.current(post)),
+                  textStamp,
+                  previousById.get(post.id)
+                )
+              )
             })
             setDeepLinkPost((post) =>
               post ? sponsorships.apply(reactionState.current(post)) : null
@@ -1000,7 +1026,7 @@ export function CommunityScreen() {
         }
       }
     },
-    [reactionState, revalidateHighlighted]
+    [postTextLedger, reactionState, revalidateHighlighted]
   )
 
   useEffect(() => {
@@ -1018,6 +1044,7 @@ export function CommunityScreen() {
       setActionError(null)
       // A block is per viewer: a new member starts with no live answers.
       sponsorships.clear()
+      postTextLedger.clear()
       commentDrafts.forgetAll()
       feedScopeRef.current++
       requestGenerationRef.current++
@@ -1083,7 +1110,7 @@ export function CommunityScreen() {
       clearInterval(timer)
       comments.reset()
     }
-  }, [commentDrafts, comments, reactionState, loadFeed])
+  }, [commentDrafts, comments, postTextLedger, reactionState, loadFeed])
 
   useEffect(() => {
     void loadFeed(mode)
@@ -1105,7 +1132,9 @@ export function CommunityScreen() {
       generation === detailGenerationRef.current && scope === feedScopeRef.current
     const generation = detailGenerationRef.current
     const ticket = reactionState.beginRead()
+    const textStamp = postTextLedger.begin()
     const buffered = newLooksRef.current
+    const bufferedById = new Map(buffered.map((post) => [post.id, post]))
     setIsInsertingLooks(true)
     try {
       const fresh: CommunityFeedItem[] = []
@@ -1127,11 +1156,21 @@ export function CommunityScreen() {
             if (post) fresh.push(post)
           }
       }
-      setItems((previous) => [
-        ...new Map(
-          [...fresh, ...previous].map((post) => [post.id, sponsorships.apply(post)])
-        ).values(),
-      ])
+      setItems((previous) => {
+        const previousById = new Map(previous.map((post) => [post.id, post]))
+        const reconciledFresh = fresh.map((post) =>
+          postTextLedger.reconcile(
+            sponsorships.apply(post),
+            textStamp,
+            bufferedById.get(post.id) ?? previousById.get(post.id)
+          )
+        )
+        return [
+          ...new Map(
+            [...reconciledFresh, ...previous].map((post) => [post.id, post])
+          ).values(),
+        ]
+      })
       newLooksRef.current = []
       setNewLooks([])
     } catch {
@@ -1147,6 +1186,7 @@ export function CommunityScreen() {
     const refreshFeed = async (signal?: AbortSignal) => {
       const generation = requestGenerationRef.current
       const stamp = sponsorships.begin()
+      const textStamp = postTextLedger.begin()
       const page = await getCommunityFeedFromMobile({
         mode,
         limit: FEED_PAGE_SIZE,
@@ -1173,14 +1213,28 @@ export function CommunityScreen() {
       const ids = new Set(realtimeItems.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !ids.has(item.id))
       if (!realtimeItems.current.length)
-        setItems(() => page.items.map((item) => sponsorships.apply(item)))
+        setItems(() =>
+          page.items.map((item) =>
+            postTextLedger.reconcile(sponsorships.apply(item), textStamp)
+          )
+        )
       else if (incoming.length) {
+        const existingBufferById = new Map(
+          newLooksRef.current.map((item) => [item.id, item])
+        )
+        const reconciledIncoming = incoming.map((item) =>
+          postTextLedger.reconcile(
+            sponsorships.apply(item),
+            textStamp,
+            existingBufferById.get(item.id)
+          )
+        )
         const buffered = [
           ...new Map(
-            [...incoming, ...newLooksRef.current].map((item) => [
-              item.id,
-              sponsorships.apply(item),
-            ])
+            [
+              ...reconciledIncoming,
+              ...newLooksRef.current.map((item) => sponsorships.apply(item)),
+            ].map((item) => [item.id, item])
           ).values(),
         ]
         newLooksRef.current = buffered
@@ -1225,6 +1279,7 @@ export function CommunityScreen() {
             (item) => item.id !== target.key
           )
           setNewLooks(newLooksRef.current)
+          postTextLedger.evict(target.key)
           reactionState.evict(target.key)
           comments.evict(target.key)
           setItems((previous) => previous.filter((item) => item.id !== target.key))
@@ -1235,15 +1290,22 @@ export function CommunityScreen() {
         } else {
           const updated = reactionState.read(target.post, reactionState.beginRead())
           if (!updated) return
+          const merged = postTextLedger.reconcile(
+            sponsorships.apply(updated),
+            postTextLedger.begin()
+          )
+          postTextLedger.record(merged)
           // Story 6.7b: a resolved copy carries no sponsorship answer (the route
           // takes no opt-in), so each copy takes the latest live answer.
           const replace = <T extends CommunityFeedItem>(item: T) =>
-            item.id === target.post.id ? sponsorships.apply(updated) : item
+            item.id === target.post.id
+              ? reconcileCommunityPostText(merged as T, item)
+              : item
           newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
           setItems((previous) => previous.map(replace))
           setDeepLinkPost((item) => (item ? replace(item) : item))
-          spotlightRef.current.applyPost(updated)
+          spotlightRef.current.applyPost(merged)
         }
       },
       changed: async (events, signal) => {
@@ -1287,6 +1349,7 @@ export function CommunityScreen() {
           actionGenerationRef.current++
           comments.reset()
           reactionState.reset()
+          postTextLedger.clear()
           setItems([])
           setNewLooks([])
           setCommentsPostId(null)
@@ -1321,7 +1384,7 @@ export function CommunityScreen() {
       comments.setRealtimeHealthy(false)
       lifecycle.remove()
     }
-  }, [comments, mode, reactionState, sessionScope, syncEpoch])
+  }, [comments, mode, postTextLedger, reactionState, sessionScope, syncEpoch])
 
   const modeLabel = useMemo(
     () =>
@@ -1703,7 +1766,8 @@ export function CommunityScreen() {
     setIsRefreshing(false)
     comments.reset()
     reactionState.reset()
-  }, [bannedSanction, comments, reactionState])
+    postTextLedger.clear()
+  }, [bannedSanction, comments, postTextLedger, reactionState])
 
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
@@ -1916,10 +1980,13 @@ export function CommunityScreen() {
    * rank in the module when they finish.
    */
   const updateSavedText = (postId: string, text: SavedCommunityText) => {
+    postTextLedger.record({ id: postId, ...text, status: 'published' })
     const update = (post: CommunityFeedItem | null) =>
       post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
         ? { ...post, ...text }
         : post
+    newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
+    setNewLooks(newLooksRef.current)
     setItems((previous) => previous.map((item) => update(item)!))
     setDeepLinkPost(update)
     spotlight.applyText(postId, text)

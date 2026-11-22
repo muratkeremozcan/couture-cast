@@ -25,7 +25,8 @@ Added Steps 40 to 61:
   - Production follow-ups after the project close, merged on `main`: Jade's profile and location fix (PR #257), Settings session follow-up, image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week race fixes, and production profile/location checks.
 - Step 59: Story 7.1, shared save, undo and status feedback, `0154d786` (PR #286), merged on 2026-11-21.
 - Step 60: Story 7.2, saved looks follow the account, `72b685c2` (PR #287), merged on 2026-11-22.
-- Step 61: Story 7.3, import device-saved looks for the same member, in review on `feat/epic7-story-7-3-import-device-saved-looks-same-member`.
+- Step 61: Story 7.3, import device-saved looks for the same member, `f65ed8e5` (PR #288), merged on 2026-11-22.
+- Step 62: Story 7.4, community post edits persist, in review on `feat/epic7-story-7-4-community-post-edits-persist`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -33,6 +34,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 62 for Story CC-7.4 (community post edits persist) while its PR is in review, and moved Step 61 to merged (`f65ed8e5`, PR #288).
 Added Step 61 for Story CC-7.3 (import device-saved looks for the same member) while its PR is in review, and moved Step 60 to merged (`72b685c2`, PR #287).
 Added Step 60 for Story CC-7.2 (saved looks follow the account) while its PR is in review, and moved Step 59 to merged (`0154d786`, PR #286).
 Added Step 59 for Story CC-7.1 (shared save, undo and status feedback) while its PR is in review, and moved Step 58 and its production follow-ups to merged.
@@ -21353,4 +21355,147 @@ Evidence boundaries:
 - Targeted Vitest suites (including coverage checks on `@couture/utils`, `apps/web/src/lib/saved-looks.ts`,
   and `apps/mobile/src/lib/saved-looks.ts`), workspace `tsc --noEmit`, ESLint, and isolated-DB
   Playwright E2E ran locally.
+- Full workspace suites, CI coverage gates, and native iOS/Android builds run in CI on the PR.
+
+## Step 62: Community post edits persist
+
+User/business impact:
+
+- Members editing their published Community post title or description at phone width now see
+  distinct, trustworthy feedback for every outcome (`Changes saved.`, `No changes`, screening
+  rejection, screening unavailable, stale revision, and rate limit) while approved copy stays
+  visible and their draft is preserved on any refusal.
+- Edited posts display an immediate `Edited` badge on both card and detail on web and native,
+  persist reliably across reloads and second clients, and never revert when an older background
+  sync or feed read settles after a newer edit.
+
+Technical architecture:
+
+- Shared contract constants (`COMMUNITY_POST_TEXT_CONFLICT_MESSAGE`,
+  `COMMUNITY_POST_TEXT_REJECTED_MESSAGE`, `COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE`) and
+  monotonic `reconcileCommunityPostText(...)` live in
+  `packages/api-client/src/contracts/http/community.ts` so API, web, and mobile agree on error
+  classification and never allow an older read to overwrite a higher `textRevision`.
+- `CommunityRepository.editPublishedPostText` in
+  `apps/api/src/modules/community/community.repository.ts` runs read-only pre-flight checks and
+  bound text screening (`normalizePostText` + `screenPostText` in `community-post-text.ts`) before
+  entering `communityPrivacyTransaction`, so screening never holds `community_member` advisory or
+  `LookbookPost FOR UPDATE` locks under the 7-second timeout. Inside the transaction, all existing
+  locks and checks (subject availability, consent/sanctions via `assertCommunityDatabaseAccess`,
+  ownership, public visibility, `text_revision === baseRevision`, unchanged payload, hourly quota,
+  and screening decision binding to normalized `textFingerprint`, `locale`, and `policyVersion`)
+  recheck atomically before committing.
+- Web (`apps/web/src/app/components/community-post-text-editor.tsx`, `community-lookbook-grid.tsx`,
+  `community-spotlight.tsx`) and mobile (`apps/mobile/components/community/community-post-text-editor.tsx`,
+  `community-card.tsx`, `apps/mobile/src/features/community/community-screen.tsx`,
+  `use-community-spotlight.ts`) classify all five edit outcomes, emit CC-7.1 status bar notices,
+  render localized `Edited` labels across all 10 locales, and apply `reconcileCommunityPostText`
+  across realtime target resolution, feed loads, detail revalidation, and spotlight refreshes.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- Running read-only pre-flight checks (`assertCommunityDatabaseAccess`, ownership/visibility,
+  revision, unchanged check, and `assertPostTextEditBudget`) before screening keeps ineligible,
+  revoked, unchanged, and rate-limited requests from invoking the screener while still avoiding
+  lock contention during screening and rechecking every invariant inside the locked transaction.
+- Keeping `textRevision` owner-only in `projectFeedItem` preserves existing public privacy
+  contracts while letting the author's card, detail, and second client reconcile edits
+  monotonically and render the `Edited` badge immediately when `textRevision > 0`.
+- Matching screening rejection (`400` with `COMMUNITY_POST_TEXT_REJECTED_MESSAGE`) and screening
+  unavailable (`503` with `COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE`) by exact shared
+  constants distinguishes screening outcomes cleanly without colliding with generic validation or
+  transient save failures.
+
+Story/Task mapping:
+
+- Story CC-7.4: Community post edits persist (Epic 7 Lane A reliability).
+- Follows CC-6.1, CC-6.2b, and CC-7.1 (`#step-59-shared-save-undo-and-status-feedback`).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.4: Community post edits persist**`)
+- `_bmad-output/implementation-artifacts/spec-7-4-community-post-edits-persist.md`
+- `_bmad-output/implementation-artifacts/reviews/story-7-4-codex-review.md`
+
+Cross-links:
+
+- Step 59 (`#step-59-shared-save-undo-and-status-feedback`): CC-7.1 shared `SaveFeedbackProvider`
+  and `useStatusBar()` notices used by web and mobile post-text editors.
+- Step 38 (`#step-38-community-feed-by-climate-band`) & Step 40
+  (`#step-40-community-screening-release-gate-and-hosted-worker`): Community feed, text screening,
+  and privacy-locked edit transactions.
+
+Sequence to follow:
+
+1. Reproduce title-only, caption-only, combined, unchanged, second-client, and rejected edits at
+   phone width (`390x844`) and record PATCH status, committed revision, reload readback, and root
+   causes in `spec-7-4-community-post-edits-persist.md`.
+2. Export shared post-text message constants and `reconcileCommunityPostText` in
+   `packages/api-client/src/contracts/http/community.ts` and rebuild `@couture/api-client`.
+3. Update `apps/api/src/modules/community/community-post-text.ts`, `community.service.ts`, and
+   `community.repository.ts` to bind screening to normalized text, locale, and policy version
+   before `communityPrivacyTransaction` and recheck every lock-protected invariant before commit.
+4. Update web and mobile `CommunityPostTextEditor`, card/detail `Edited` badges, monotonic
+   reconciliation across feed/detail/spotlight/sync, and all 20 web/mobile locale files.
+5. Expand contract, API integration (including revocation and competing edit during screening),
+   web/mobile component, and isolated-DB Playwright E2E suites.
+
+Task owner map:
+
+- Step 62 step 1 owner: AC 1 reproduction trace and root-cause record in
+  `_bmad-output/implementation-artifacts/spec-7-4-community-post-edits-persist.md`.
+- Step 62 step 2 owner: shared post-text error constants and `reconcileCommunityPostText` in
+  `packages/api-client/src/contracts/http/community.ts`.
+- Step 62 step 3 owner: pre-transaction bound screening and locked commit rechecks in
+  `apps/api/src/modules/community/community-post-text.ts`, `community.service.ts`, and
+  `community.repository.ts`.
+- Step 62 step 4 owner: distinct outcome feedback, `Edited` labels, and monotonic reconciliation in
+  `apps/web/src/app/components/community-post-text-editor.tsx`, `community-lookbook-grid.tsx`,
+  `community-spotlight.tsx`, `apps/mobile/components/community/community-post-text-editor.tsx`,
+  `community-card.tsx`, `apps/mobile/src/features/community/community-screen.tsx`, and
+  `use-community-spotlight.ts`.
+
+Tests that cover this step:
+
+Shared contracts, Vitest:
+
+- [`packages/api-client/testing/community-contract.spec.ts`](../../packages/api-client/testing/community-contract.spec.ts):
+  `reconcileCommunityPostText` monotonic revision preservation against stale or legacy reads.
+
+API integration, Vitest:
+
+- [`apps/api/integration/community-post-text-http.integration.spec.ts`](../../apps/api/integration/community-post-text-http.integration.spec.ts):
+  title-only, caption-only, combined, and unchanged edits over HTTP, screening rejection (`400`),
+  screening unavailable (`503`), unbound fingerprint refusal, guardian consent revocation during
+  pre-transaction screening (`403`), and competing edit during pre-transaction screening (`409`).
+
+Web component, Vitest:
+
+- [`apps/web/src/app/components/community-lookbook-grid.edit-text.test.tsx`](../../apps/web/src/app/components/community-lookbook-grid.edit-text.test.tsx):
+  immediate `Edited` label on card and detail, `Changes saved.` and `No changes` feedback
+  (including `SaveFeedbackProvider`), distinct `400` screening rejection and `503` screening
+  unavailable alerts, and stale `targets/resolve` reconciliation protection.
+
+Mobile component, Vitest:
+
+- [`apps/mobile/components/community/community-post-text-editor.test.tsx`](../../apps/mobile/components/community/community-post-text-editor.test.tsx):
+  all five distinct outcome messages (`Changes saved.`, `No changes`, screening rejection,
+  screening unavailable, stale revision, and rate limit) with `SaveFeedbackProvider` and draft
+  retention.
+- [`apps/mobile/src/test-utils/community-screen/publishing.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/publishing.cases.tsx):
+  mobile card immediate `Edited` badge and `Changes saved.` status after successful edit.
+
+End-to-end, Playwright:
+
+- [`playwright/tests/community-post-text.spec.ts`](../../playwright/tests/community-post-text.spec.ts):
+  phone-width (`390x844`) title-only, caption-only, combined, and unchanged edits, distinct
+  screening rejection (`400`), screening unavailable (`503`), generic failure, and stale revision
+  (`409`) alerts, immediate `Edited` badges, live second-browser reconciliation, and reload
+  readback from feed and detail at `320 px` with `200%` root font size.
+
+Evidence boundaries:
+
+- Targeted Vitest suites (including per-file coverage checks), API integration tests against
+  isolated Postgres 17 (`127.0.0.1:54361`), workspace `tsc --noEmit`, ESLint `--max-warnings=0`,
+  and isolated-DB Playwright E2E ran locally.
 - Full workspace suites, CI coverage gates, and native iOS/Android builds run in CI on the PR.

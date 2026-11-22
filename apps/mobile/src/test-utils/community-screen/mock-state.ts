@@ -21,6 +21,7 @@ export const imagePicker = {
 export const imageManipulator = { manipulateAsync: vi.fn() }
 export const imageEvents = {
   errors: new Map<string, () => void>(),
+  sources: new Map<string, string>(),
   createElement: null as unknown as typeof createElement,
 }
 /** The list's pull-to-refresh handler, which react-native-web renders no gesture for. */

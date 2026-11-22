@@ -4,7 +4,7 @@
 import { item, errorEnvelope, feedJson, imageEvents, serveFeed } from './harness'
 import { refreshEvents } from './mock-state'
 import { CommunitySyncState } from '@couture/api-client'
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
@@ -826,5 +826,193 @@ export function registerCommunitySpotlightCases() {
     )
     expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
     expect(spotlightReads).toBe(1)
+  })
+
+  it('keeps newer author edits across a delayed Spotlight load and shows Edited in Spotlight detail', async () => {
+    const base = item({
+      id: 'spot-edit',
+      title: 'Initial spotlight title',
+      caption: 'Initial spotlight caption',
+      textRevision: 0,
+      author: { displayName: 'You', isSelf: true },
+      reactions: ZERO,
+    })
+    let releaseSpotlight!: () => void
+    const spotlightHeld = new Promise<void>((resolve) => {
+      releaseSpotlight = resolve
+    })
+    serveFeed(() => feedJson({ items: [base] }))
+    server.use(
+      http.get(SPOTLIGHT_ROUTE, async () => {
+        await spotlightHeld
+        return page({ items: [{ ...base, rank: 1 }] })
+      }),
+      http.patch('*/api/v1/community/posts/spot-edit/text', () =>
+        HttpResponse.json({
+          data: {
+            title: 'Updated spotlight title',
+            caption: 'Updated spotlight caption',
+            textRevision: 1,
+          },
+        })
+      )
+    )
+
+    await render(<CommunityScreen />)
+    expect(await screen.findByTestId('community-card-title-spot-edit')).toHaveTextContent(
+      'Initial spotlight title'
+    )
+    press(screen.getByTestId('community-edit-text'))
+    const titleInput = screen.getByTestId('community-edit-title')
+    const captionInput = screen.getByTestId('community-edit-description')
+    act(() => {
+      titleInput.focus()
+    })
+    fireEvent.change(titleInput, { target: { value: 'Updated spotlight title' } })
+    fireEvent.change(captionInput, { target: { value: 'Updated spotlight caption' } })
+    press(screen.getByTestId('community-edit-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('community-card-title-spot-edit')).toHaveTextContent(
+        'Updated spotlight title'
+      )
+    )
+
+    // Delayed Spotlight first-page response carries stale textRevision: 0.
+    releaseSpotlight()
+    const spotCard = await screen.findByTestId('community-spotlight-item-spot-edit')
+    expect(
+      within(spotCard).getByTestId('community-card-title-spot-edit')
+    ).toHaveTextContent('Updated spotlight title')
+    expect(
+      within(spotCard).getByTestId('community-card-edited-spot-edit')
+    ).toHaveTextContent('Edited')
+
+    // Open Spotlight detail and confirm it renders the updated title and Edited label.
+    press(within(spotCard).getByTestId('community-card-open-spot-edit'))
+    const detail = await screen.findByTestId('community-spotlight-detail')
+    expect(
+      within(detail).getByTestId('community-card-title-spot-edit')
+    ).toHaveTextContent('Updated spotlight title')
+    expect(
+      within(detail).getByTestId('community-card-edited-spot-edit')
+    ).toHaveTextContent('Edited')
+  })
+
+  it('prevents a delayed non-author Spotlight image refresh from overwriting newer realtime text', async () => {
+    const catchUp = captureCatchUp()
+    const base = item({
+      id: 'spot-viewer',
+      title: 'Original viewer title',
+      caption: 'Original viewer caption',
+      author: { displayName: 'Maya', isSelf: false },
+      reactions: ZERO,
+    })
+    delete base.textRevision
+    const realtimeUpdated = {
+      ...base,
+      title: 'Realtime viewer title',
+      caption: 'Realtime viewer caption',
+    }
+    let phase: 'idle' | 'updated' = 'idle'
+    let releaseRefresh!: () => void
+    const refreshHeld = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    let refreshStarted = false
+    serveFeed(() => feedJson({ items: [] }))
+    serveSpotlight(() => page({ items: [{ ...base, rank: 1 }] }))
+    server.use(
+      http.get('*/api/v1/community/posts/spot-viewer', async () => {
+        refreshStarted = true
+        await refreshHeld
+        return HttpResponse.json({
+          data: {
+            ...base,
+            imageAccess: {
+              ...base.imageAccess,
+              url: 'https://fixtures.invalid/refreshed.jpg',
+            },
+          },
+        })
+      }),
+      http.get('*/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events:
+              phase === 'updated'
+                ? [
+                    {
+                      version: 1,
+                      kind: 'post.text_changed',
+                      postId: 'spot-viewer',
+                      communityRevision: '2',
+                    },
+                  ]
+                : [],
+            nextCursor: `cursor-${phase}`,
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      ),
+      http.post('*/api/v1/community/targets/resolve', ({ request }) =>
+        request.json().then((body) => {
+          const { targets } = body as { targets: { key: string; postId: string }[] }
+          return HttpResponse.json({
+            data: {
+              targets: targets.map((target) => ({
+                key: target.key,
+                status: 'available',
+                communityRevision: phase === 'updated' ? '2' : '1',
+                post: phase === 'updated' ? realtimeUpdated : base,
+                comment: null,
+                parent: null,
+                pageCursor: null,
+                parentPageCursor: null,
+                threadPosition: null,
+              })),
+            },
+          })
+        })
+      )
+    )
+
+    await render(<CommunityScreen />)
+    const spotCard = await screen.findByTestId('community-spotlight-item-spot-viewer')
+    await catchUp()
+
+    // Trigger expired-image refresh on Spotlight card.
+    await waitFor(() =>
+      expect(imageEvents.errors.get('community-card-image-spot-viewer')).toBeTypeOf(
+        'function'
+      )
+    )
+    act(() => {
+      imageEvents.errors.get('community-card-image-spot-viewer')!()
+    })
+    await waitFor(() => expect(refreshStarted).toBe(true))
+
+    // Realtime text update lands before the image refresh settles.
+    phase = 'updated'
+    await catchUp()
+    await waitFor(() =>
+      expect(
+        within(spotCard).getByTestId('community-card-title-spot-viewer')
+      ).toHaveTextContent('Realtime viewer title')
+    )
+
+    // Delayed image refresh carries stale text (without owner textRevision).
+    releaseRefresh()
+    await waitFor(() =>
+      expect(imageEvents.sources.get('community-card-image-spot-viewer')).toBe(
+        'https://fixtures.invalid/refreshed.jpg'
+      )
+    )
+    expect(
+      within(spotCard).getByTestId('community-card-title-spot-viewer')
+    ).toHaveTextContent('Realtime viewer title')
+    expect(
+      within(spotCard).getByTestId('community-card-caption-spot-viewer')
+    ).toHaveTextContent('Realtime viewer caption')
   })
 }

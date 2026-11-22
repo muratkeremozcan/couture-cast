@@ -37,6 +37,7 @@ import {
   ConflictException,
   NotFoundException,
   ForbiddenException,
+  ServiceUnavailableException,
 } from '@nestjs/common'
 import {
   Prisma,
@@ -50,11 +51,19 @@ import {
 } from '@prisma/client'
 import type { ClimateBand } from '@couture/utils'
 import { COMMUNITY_CANARY_USER_ID_PREFIX } from './community-analytics.js'
-import { postTextFingerprint } from './community-post-text.js'
+import {
+  expectedPostTextPolicyVersion,
+  normalizePostText,
+  postTextFingerprint,
+  type ScreenedPostTextDecision,
+} from './community-post-text.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   COMMUNITY_POST_EDIT_RATE_LIMITED_MESSAGE,
+  COMMUNITY_POST_TEXT_CONFLICT_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   encodeCommunityFeedCursor,
   type CommunityFeedCursorPayload,
   type CommunityFeedMode,
@@ -237,6 +246,8 @@ function qualifiesForEngagement(
 
 @Injectable()
 export class CommunityRepository {
+  private readonly inFlightTextScreens = new Map<string, number>()
+
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
   assertReadEligibility(member: string, budget: CommunityAuthorizationBudget) {
     return assertCommunityReadEligibility(this.prisma, member, budget)
@@ -828,15 +839,104 @@ export class CommunityRepository {
     })
   }
 
+  private async withInFlightTextScreen<T>(
+    userId: string,
+    work: () => Promise<T>
+  ): Promise<T> {
+    const active = this.inFlightTextScreens.get(userId) ?? 0
+    if (active >= MAX_IN_FLIGHT_TEXT_SCREENS_PER_MEMBER) {
+      throw new CommunityRateLimitException(COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE, 1)
+    }
+    this.inFlightTextScreens.set(userId, active + 1)
+    try {
+      return await work()
+    } finally {
+      const remaining = (this.inFlightTextScreens.get(userId) ?? 1) - 1
+      if (remaining <= 0) this.inFlightTextScreens.delete(userId)
+      else this.inFlightTextScreens.set(userId, remaining)
+    }
+  }
+
+  private async screenPostTextBeforeLock(params: {
+    userId: string
+    postId: string
+    baseRevision: number
+    normalized: ReturnType<typeof normalizePostText>
+    expectedPolicyVersion?: string
+    screen: (context: {
+      title: string | null
+      caption: string | null
+      locale: string | null
+      textFingerprint: string
+    }) => Promise<ScreenedPostTextDecision>
+  }): Promise<{
+    decision: ScreenedPostTextDecision
+    expectedPolicyVersion: string
+  } | null> {
+    const { userId, postId, baseRevision, normalized, screen } = params
+    await assertCommunityDatabaseAccess(this.prisma, userId)
+    const preview = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
+    if (!preview || preview.user_id !== userId || !isPubliclyVisiblePost(preview))
+      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+    if (preview.text_revision !== baseRevision)
+      throw new ConflictException(COMMUNITY_POST_TEXT_CONFLICT_MESSAGE)
+    const stored = normalizePostText(preview.title, preview.caption)
+    if (stored.title === normalized.title && stored.caption === normalized.caption)
+      return null
+    await assertPostTextEditBudget(this.prisma, userId)
+    return this.withInFlightTextScreen(userId, async () => {
+      const expectedPolicyVersion =
+        params.expectedPolicyVersion ?? (await expectedPostTextPolicyVersion())
+      const decision = await screen({
+        title: normalized.title,
+        caption: normalized.caption,
+        locale: preview.locale,
+        textFingerprint: normalized.textFingerprint,
+      })
+      if (
+        !matchesBoundScreeningDecision(
+          decision,
+          expectedPolicyVersion,
+          normalized.textFingerprint,
+          preview.locale
+        )
+      ) {
+        throw new ServiceUnavailableException(
+          COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE
+        )
+      }
+      return { decision, expectedPolicyVersion }
+    })
+  }
+
   async editPublishedPostText(params: {
     userId: string
     postId: string
     baseRevision: number
     title: string | null
     caption: string | null
-    screen: () => Promise<{ passed: boolean; policyVersion: string }>
+    expectedPolicyVersion?: string
+    screen: (context: {
+      title: string | null
+      caption: string | null
+      locale: string | null
+      textFingerprint: string
+    }) => Promise<ScreenedPostTextDecision>
   }) {
     const { userId, postId, baseRevision, title, caption, screen } = params
+    const normalized = normalizePostText(title, caption)
+    // Screen before acquiring privacy/row locks so screening never holds locks or
+    // consumes the 7-second privacy transaction budget. Every invariant is rechecked
+    // under the locks below before committing.
+    const screening = await this.screenPostTextBeforeLock({
+      userId,
+      postId,
+      baseRevision,
+      normalized,
+      expectedPolicyVersion: params.expectedPolicyVersion,
+      screen,
+    })
+
     return communityPrivacyTransaction(this.prisma, async (tx) => {
       // Guardian grant and revocation take this same member lock. Check participation
       // after obtaining it so a revoked grant cannot authorize a later edit.
@@ -850,17 +950,31 @@ export class CommunityRepository {
       if (!post || post.user_id !== userId || !isPubliclyVisiblePost(post))
         throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
       if (post.text_revision !== baseRevision)
-        throw new ConflictException('Community post text has changed.')
-      if (post.title === title && post.caption === caption)
-        return { title, caption, textRevision: post.text_revision }
+        throw new ConflictException(COMMUNITY_POST_TEXT_CONFLICT_MESSAGE)
+      const stored = normalizePostText(post.title, post.caption)
+      if (stored.title === normalized.title && stored.caption === normalized.caption)
+        return {
+          title: stored.title,
+          caption: stored.caption,
+          textRevision: post.text_revision,
+        }
       await assertPostTextEditBudget(tx, userId)
-      const screening = await screen()
-      if (!screening.passed) {
+      if (
+        !screening ||
+        !matchesBoundScreeningDecision(
+          screening.decision,
+          screening.expectedPolicyVersion,
+          normalized.textFingerprint,
+          post.locale
+        )
+      )
+        throw new ConflictException(COMMUNITY_POST_TEXT_CONFLICT_MESSAGE)
+      if (!screening.decision.passed) {
         await tx.moderationEvent.create({
           data: {
             post_id: postId,
             action: 'post_text_withheld',
-            reason: screening.policyVersion,
+            reason: screening.decision.policyVersion,
           },
         })
         return null
@@ -870,8 +984,8 @@ export class CommunityRepository {
       await tx.lookbookPost.update({
         where: { id: postId },
         data: {
-          title,
-          caption,
+          title: normalized.title,
+          caption: normalized.caption,
           text_revision: textRevision,
           original_text_fingerprint:
             post.original_text_fingerprint ??
@@ -882,16 +996,16 @@ export class CommunityRepository {
         data: {
           post_id: postId,
           action: 'post_text_approved',
-          reason: screening.policyVersion,
+          reason: screening.decision.policyVersion,
           image_object_path: post.image_object_path,
           content_snapshot: buildCommunityContentSnapshot(
-            { ...post, title, caption },
+            { ...post, title: normalized.title, caption: normalized.caption },
             new Date()
           ),
         },
       })
       await tx.$executeRaw`SELECT community_record_invalidation('post.text_changed', ${postId})`
-      return { title, caption, textRevision }
+      return { title: normalized.title, caption: normalized.caption, textRevision }
     })
   }
 
@@ -1410,6 +1524,22 @@ function extractSqlState(error: unknown): string | null {
 
 const POST_TEXT_EDIT_CAP = 10
 const POST_TEXT_EDIT_WINDOW_MS = 60 * 60 * 1000
+const MAX_IN_FLIGHT_TEXT_SCREENS_PER_MEMBER = 2
+
+function matchesBoundScreeningDecision(
+  decision: ScreenedPostTextDecision | null | undefined,
+  expectedPolicyVersion: string,
+  expectedFingerprint: string,
+  expectedLocale: string | null
+): decision is ScreenedPostTextDecision {
+  return (
+    decision != null &&
+    typeof decision.passed === 'boolean' &&
+    decision.policyVersion === expectedPolicyVersion &&
+    decision.textFingerprint === expectedFingerprint &&
+    decision.locale === expectedLocale
+  )
+}
 
 async function assertPostTextEditBudget(tx: Prisma.TransactionClient, userId: string) {
   const now = Date.now()

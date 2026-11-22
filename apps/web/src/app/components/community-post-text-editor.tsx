@@ -1,39 +1,74 @@
 'use client'
 
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import {
+  COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   COMMUNITY_POST_TITLE_MAX_LENGTH,
   editCommunityPostTextInputSchema,
   type CommunityFeedItem,
   type EditCommunityPostTextResponse,
 } from '@couture/api-client/contracts/http'
 import { CommunityRequestError, editCommunityPostTextFromWeb } from '../../lib/community'
+import { useStatusBar } from './save-feedback'
 
 type SavedText = EditCommunityPostTextResponse['data']
 type Translator = (key: string) => string
+type OutcomeFeedbackKey = 'editSaved' | 'editNoChanges'
+
 const inputClass =
   'min-h-11 w-full rounded border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2 text-[color:var(--theme-card-text)]'
 const buttonClass =
   'min-h-11 rounded border border-[color:var(--theme-card-border)] px-3 text-sm font-semibold disabled:opacity-50'
 
-function editErrorKey(failure: unknown) {
-  const status = failure instanceof CommunityRequestError ? failure.httpStatus : undefined
+function editErrorKey(failure: unknown): string {
+  if (!(failure instanceof CommunityRequestError)) return 'editFailed'
+  const status = failure.httpStatus
   if (status === 409) return 'editConflict'
-  if (status === 429) return 'editRateLimited'
+  if (status === 429) {
+    return failure.message.includes(COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE)
+      ? 'editScreeningUnavailable'
+      : 'editRateLimited'
+  }
+  if (status === 400 && failure.message.includes(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)) {
+    return 'editRejected'
+  }
+  if (
+    status === 503 &&
+    failure.message.includes(COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE)
+  ) {
+    return 'editScreeningUnavailable'
+  }
   return 'editFailed'
+}
+
+function isUnchangedOutcome(
+  item: CommunityFeedItem,
+  baseRevision: number,
+  result: SavedText
+): boolean {
+  return (
+    result.textRevision === baseRevision &&
+    result.title === (item.title?.trim() || null) &&
+    result.caption === (item.caption?.trim() || null)
+  )
 }
 
 export function CommunityPostTextEditor({
   item,
   enabled,
   onSaved,
+  onStatus,
   t,
 }: {
   item: CommunityFeedItem
   enabled: boolean
   onSaved: (postId: string, text: SavedText) => void
+  onStatus?: (key: string) => void
   t: Translator
 }) {
+  const statusBar = useStatusBar()
   const [draft, setDraft] = useState<{
     title: string
     caption: string
@@ -41,7 +76,10 @@ export function CommunityPostTextEditor({
   } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<OutcomeFeedbackKey | null>(null)
   const request = useRef<AbortController | null>(null)
+  const feedbackId = useId()
+  const feedbackSerial = useRef(0)
   const opener = useRef<HTMLButtonElement>(null)
   const field = useRef<HTMLInputElement>(null)
   const restoreFocus = useRef(false)
@@ -70,6 +108,18 @@ export function CommunityPostTextEditor({
     setDraft(null)
   }
 
+  function reportOutcome(key: OutcomeFeedbackKey) {
+    setFeedback(key)
+    onStatus?.(`community.compose.${key}`)
+    if (statusBar.hasProvider) {
+      statusBar.showNotice({
+        id: `community-edit-${feedbackId}-${++feedbackSerial.current}`,
+        message: t(`community.compose.${key}`),
+        tone: key === 'editSaved' ? 'success' : 'neutral',
+      })
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!draft || request.current || !enabled) return
@@ -93,8 +143,10 @@ export function CommunityPostTextEditor({
         controller.signal
       )
       if (controller.signal.aborted) return
-      onSaved(item.id, text)
+      const unchanged = isUnchangedOutcome(item, draft.revision, text)
+      if (!unchanged) onSaved(item.id, text)
       close()
+      reportOutcome(unchanged ? 'editNoChanges' : 'editSaved')
     } catch (failure) {
       if (!controller.signal.aborted) setError(editErrorKey(failure))
     } finally {
@@ -113,22 +165,33 @@ export function CommunityPostTextEditor({
     return null
   if (!draft)
     return (
-      <button
-        ref={opener}
-        type="button"
-        disabled={!enabled}
-        data-testid="community-edit-text"
-        className={buttonClass}
-        onClick={() =>
-          setDraft({
-            title: item.title ?? '',
-            caption: item.caption ?? '',
-            revision: item.textRevision ?? 0,
-          })
-        }
-      >
-        {t('community.compose.editText')}
-      </button>
+      <div className="space-y-1.5">
+        <button
+          ref={opener}
+          type="button"
+          disabled={!enabled}
+          data-testid="community-edit-text"
+          className={buttonClass}
+          onClick={() => {
+            setFeedback(null)
+            setDraft({
+              title: item.title ?? '',
+              caption: item.caption ?? '',
+              revision: item.textRevision ?? 0,
+            })
+          }}
+        >
+          {t('community.compose.editText')}
+        </button>
+        {feedback && (
+          <p
+            data-testid="community-edit-status"
+            className="text-xs text-[color:var(--lookbook-ink-muted)]"
+          >
+            {t(`community.compose.${feedback}`)}
+          </p>
+        )}
+      </div>
     )
 
   return (

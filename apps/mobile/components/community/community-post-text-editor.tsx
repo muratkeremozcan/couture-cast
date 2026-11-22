@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, type ElementRef } from 'react'
+import React, { useEffect, useId, useRef, useState, type ElementRef } from 'react'
 import {
   AccessibilityInfo,
   Pressable,
@@ -9,12 +9,16 @@ import {
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
+  COMMUNITY_POST_TEXT_REJECTED_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE,
+  COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   COMMUNITY_POST_TITLE_MAX_LENGTH,
   editCommunityPostTextInputSchema,
   type CommunityFeedItem,
   type EditCommunityPostTextResponse,
 } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useStatusBar } from '@/components/save-feedback'
 import { PreviewButton } from '@/src/features/preview/guest-preview-parts'
 import {
   CommunityRequestError,
@@ -27,12 +31,39 @@ import {
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export type SavedCommunityText = EditCommunityPostTextResponse['data']
+type OutcomeFeedbackKey = 'editSaved' | 'editNoChanges'
 
-function editErrorKey(failure: unknown) {
-  const status = failure instanceof CommunityRequestError ? failure.httpStatus : undefined
+function editErrorKey(failure: unknown): string {
+  if (!(failure instanceof CommunityRequestError)) return 'editFailed'
+  const status = failure.httpStatus
   if (status === 409) return 'editConflict'
-  if (status === 429) return 'editRateLimited'
+  if (status === 429) {
+    return failure.message.includes(COMMUNITY_POST_TEXT_SCREENING_BUSY_MESSAGE)
+      ? 'editScreeningUnavailable'
+      : 'editRateLimited'
+  }
+  if (status === 400 && failure.message.includes(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)) {
+    return 'editRejected'
+  }
+  if (
+    status === 503 &&
+    failure.message.includes(COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE)
+  ) {
+    return 'editScreeningUnavailable'
+  }
   return 'editFailed'
+}
+
+function isUnchangedOutcome(
+  item: CommunityFeedItem,
+  baseRevision: number,
+  result: SavedCommunityText
+): boolean {
+  return (
+    result.textRevision === baseRevision &&
+    result.title === (item.title?.trim() || null) &&
+    result.caption === (item.caption?.trim() || null)
+  )
 }
 
 export function CommunityPostTextEditor({
@@ -46,6 +77,7 @@ export function CommunityPostTextEditor({
 }) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const statusBar = useStatusBar()
   const [draft, setDraft] = useState<{
     title: string
     caption: string
@@ -53,7 +85,10 @@ export function CommunityPostTextEditor({
   } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [feedback, setFeedback] = useState<OutcomeFeedbackKey | null>(null)
   const request = useRef<AbortController | null>(null)
+  const feedbackId = useId()
+  const feedbackSerial = useRef(0)
   const field = useRef<TextInput>(null)
   const opener = useRef<ElementRef<typeof Pressable>>(null)
   const restoreFocus = useRef(false)
@@ -75,6 +110,7 @@ export function CommunityPostTextEditor({
       restoreFocus.current = false
       setDraft(null)
       setError(null)
+      setFeedback(null)
       setBusy(false)
     })
     return () => {
@@ -103,6 +139,20 @@ export function CommunityPostTextEditor({
     setError(null)
   }
 
+  function reportOutcome(key: OutcomeFeedbackKey) {
+    setFeedback(key)
+    const message = t(`community.compose.${key}`)
+    if (statusBar.hasProvider) {
+      statusBar.showNotice({
+        id: `community-edit-${feedbackId}-${++feedbackSerial.current}`,
+        message,
+        tone: key === 'editSaved' ? 'success' : 'neutral',
+      })
+    } else {
+      AccessibilityInfo.announceForAccessibility(message)
+    }
+  }
+
   async function save() {
     if (!draft || request.current || !activeRef.current) return
     const input = editCommunityPostTextInputSchema.safeParse({
@@ -128,8 +178,10 @@ export function CommunityPostTextEditor({
         controller.signal
       )
       if (current()) {
-        onSaved(item.id, result)
+        const unchanged = isUnchangedOutcome(item, draft.version, result)
+        if (!unchanged) onSaved(item.id, result)
         close()
+        reportOutcome(unchanged ? 'editNoChanges' : 'editSaved')
       }
     } catch (failure: unknown) {
       if (current()) setError(editErrorKey(failure))
@@ -144,28 +196,39 @@ export function CommunityPostTextEditor({
   if (!canEdit) return null
   if (!draft)
     return (
-      <Pressable
-        ref={opener}
-        accessibilityRole="button"
-        disabled={!active}
-        accessibilityState={{ disabled: !active }}
-        testID="community-edit-text"
-        style={[
-          styles.opener,
-          { borderColor: palette.divider, opacity: active ? 1 : 0.5 },
-        ]}
-        onPress={() =>
-          setDraft({
-            title: item.title ?? '',
-            caption: item.caption ?? '',
-            version: item.textRevision ?? 0,
-          })
-        }
-      >
-        <Text style={{ color: palette.text, textAlign: 'center', fontWeight: '600' }}>
-          {t('community.compose.editText')}
-        </Text>
-      </Pressable>
+      <View style={styles.openerGroup}>
+        <Pressable
+          ref={opener}
+          accessibilityRole="button"
+          disabled={!active}
+          accessibilityState={{ disabled: !active }}
+          testID="community-edit-text"
+          style={[
+            styles.opener,
+            { borderColor: palette.divider, opacity: active ? 1 : 0.5 },
+          ]}
+          onPress={() => {
+            setFeedback(null)
+            setDraft({
+              title: item.title ?? '',
+              caption: item.caption ?? '',
+              version: item.textRevision ?? 0,
+            })
+          }}
+        >
+          <Text style={{ color: palette.text, textAlign: 'center', fontWeight: '600' }}>
+            {t('community.compose.editText')}
+          </Text>
+        </Pressable>
+        {feedback && (
+          <Text
+            testID="community-edit-status"
+            style={[styles.feedback, { color: palette.mutedText }]}
+          >
+            {t(`community.compose.${feedback}`)}
+          </Text>
+        )}
+      </View>
     )
 
   const fieldStyle = [styles.field, { borderColor: palette.divider, color: palette.text }]
@@ -218,6 +281,7 @@ export function CommunityPostTextEditor({
 }
 
 const styles = StyleSheet.create({
+  openerGroup: { gap: 6 },
   opener: {
     borderWidth: 1,
     borderRadius: 8,
@@ -225,6 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
   },
+  feedback: { fontSize: 12 },
   form: { gap: 8 },
   field: { borderWidth: 1, borderRadius: 8, minHeight: 44, padding: 8 },
 })

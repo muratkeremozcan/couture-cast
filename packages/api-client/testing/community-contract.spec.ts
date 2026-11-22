@@ -1,10 +1,13 @@
 // Learning path Step 40: Community screening release gate and hosted worker.
+// Learning path Step 62: Community post edits persist.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_MODERATION_REASON_CATEGORY,
+  CommunityPostTextLedger,
   climateBandSchema,
   communityAuthorPostStateSchema,
   communityFeedAuthorSchema,
@@ -18,6 +21,7 @@ import {
   decodeCommunityFeedCursor,
   editCommunityPostTextInputSchema,
   encodeCommunityFeedCursor,
+  reconcileCommunityPostText,
   safeDecodeCommunityFeedCursor,
 } from '../src/contracts/http'
 import { failureMessageOf, withoutKey } from './community-contract-support'
@@ -60,6 +64,211 @@ describe('community HTTP contracts', () => {
         editCommunityPostTextInputSchema.safeParse({ ...edit, ownerId: 'another-member' })
           .success
       ).toBe(false)
+    })
+
+    it('reconciles post text monotonically so stale reads never overwrite a newer revision', () => {
+      const newer = {
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+        extra: 'old-extra',
+      }
+      const stale = {
+        id: 'post-1',
+        title: 'Old title',
+        caption: 'Old caption',
+        textRevision: 1,
+        extra: 'fresh-extra',
+      }
+      expect(reconcileCommunityPostText(stale, newer)).toEqual({
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+        extra: 'fresh-extra',
+      })
+      const missingRevision = {
+        id: 'post-1',
+        title: 'Legacy read',
+        caption: 'Legacy caption',
+        textRevision: undefined,
+      }
+      expect(reconcileCommunityPostText(missingRevision, newer)).toEqual({
+        id: 'post-1',
+        title: 'Updated title',
+        caption: 'Updated caption',
+        textRevision: 2,
+      })
+      const advance = {
+        id: 'post-1',
+        title: 'Newest title',
+        caption: 'Newest caption',
+        textRevision: 3,
+      }
+      expect(reconcileCommunityPostText(advance, newer)).toEqual(advance)
+      expect(
+        reconcileCommunityPostText(
+          { id: 'post-2', title: 'Other', caption: null, textRevision: 0 },
+          newer
+        )
+      ).toEqual({ id: 'post-2', title: 'Other', caption: null, textRevision: 0 })
+      const withdrawn = {
+        id: 'post-1',
+        title: 'Old title',
+        caption: null,
+        status: 'withdrawn' as const,
+        textRevision: undefined,
+      }
+      expect(reconcileCommunityPostText(withdrawn, newer)).toEqual(withdrawn)
+    })
+
+    it('reconciles owner revisions and non-author realtime fences through CommunityPostTextLedger', () => {
+      const ledger = new CommunityPostTextLedger()
+      const staleRead = ledger.begin()
+
+      ledger.record({
+        id: 'post-1',
+        title: 'Realtime title',
+        caption: 'Realtime caption',
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-1',
+            title: 'Stale non-author title',
+            caption: 'Stale non-author caption',
+            status: 'published',
+          },
+          staleRead
+        )
+      ).toEqual({
+        id: 'post-1',
+        title: 'Realtime title',
+        caption: 'Realtime caption',
+        status: 'published',
+        textRevision: undefined,
+      })
+
+      const freshRead = ledger.begin()
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-1',
+            title: 'Even newer server title',
+            caption: 'Even newer server caption',
+            status: 'published',
+          },
+          freshRead
+        )
+      ).toEqual({
+        id: 'post-1',
+        title: 'Even newer server title',
+        caption: 'Even newer server caption',
+        status: 'published',
+      })
+
+      ledger.record({
+        id: 'post-2',
+        title: 'Owner saved v2',
+        caption: 'Caption v2',
+        textRevision: 2,
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Stale v1',
+            caption: 'Caption v1',
+            textRevision: 1,
+            status: 'published',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Owner saved v2',
+        caption: 'Caption v2',
+        textRevision: 2,
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Flagged',
+            caption: null,
+            status: 'flagged',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Flagged',
+        caption: null,
+        status: 'flagged',
+      })
+
+      ledger.evict('post-2')
+      ledger.clear()
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Fresh viewer v0',
+            caption: null,
+            textRevision: 0,
+            status: 'published',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Fresh viewer v0',
+        caption: null,
+        textRevision: 0,
+        status: 'published',
+      })
+    })
+
+    it.each([false, true])(
+      'keeps the newer revisionless read when it settles first: %s',
+      (newerArrivesFirst) => {
+        const ledger = new CommunityPostTextLedger()
+        const oldRead = ledger.begin()
+        const newRead = ledger.begin()
+        const older = { id: 'post', title: 'Old title', caption: 'Old caption' }
+        const newer = { id: 'post', title: 'New title', caption: 'New caption' }
+
+        if (newerArrivesFirst) {
+          expect(ledger.reconcile(newer, newRead)).toMatchObject(newer)
+          expect(ledger.reconcile(older, oldRead)).toMatchObject(newer)
+        } else {
+          expect(ledger.reconcile(older, oldRead)).toMatchObject(older)
+          expect(ledger.reconcile(newer, newRead)).toMatchObject(newer)
+        }
+      }
+    )
+
+    it('keeps numeric revisions authoritative and clears snapshots on visibility or viewer changes', () => {
+      const ledger = new CommunityPostTextLedger()
+      const post = { id: 'post', caption: null }
+      const inFlight = ledger.begin()
+      ledger.record({ ...post, title: 'Revision 2', textRevision: 2 })
+      const advanced = { ...post, title: 'Revision 3', textRevision: 3 }
+      expect(ledger.reconcile(advanced, inFlight)).toEqual(advanced)
+      expect(
+        ledger.reconcile({ ...post, title: 'Old title', textRevision: 1 }, ledger.begin())
+      ).toEqual(advanced)
+
+      ledger.record({ ...post, status: 'withdrawn' })
+      expect(ledger.reconcile(post, ledger.begin())).toEqual(post)
+      const previousViewer = ledger.begin()
+      ledger.clear()
+      ledger.record(advanced)
+      expect(ledger.reconcile(post, previousViewer)).toEqual(post)
     })
   })
 
