@@ -58,7 +58,7 @@ vi.mock('@/src/lib/saved-looks', () => ({
   createSavedLookFromMobile: mocks.createSavedLookFromMobile,
   getSavedLookFromMobile: vi.fn().mockResolvedValue(null),
   deleteSavedLookFromMobile: mocks.deleteSavedLookFromMobile,
-  restoreSavedLookFromMobile: vi.fn().mockResolvedValue(null),
+  restoreSavedLookFromMobile: vi.fn().mockRejectedValue(new Error('503')),
   notifyMobileSavedLooksChanged: vi.fn(),
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
@@ -1500,6 +1500,26 @@ describe('mobile save-feedback components', () => {
       )
       expect(saveBtn).toHaveTextContent('Saved')
       expect(mocks.createSavedLookFromMobile).toHaveBeenCalledTimes(2)
+
+      // Removing a saved look handles 503 failure -> Retry -> Undo Remove
+      mocks.deleteSavedLookFromMobile
+        .mockRejectedValueOnce(new Error('503'))
+        .mockResolvedValueOnce(undefined)
+      const removeLookBtn = await within(panel).findByTestId('style-piece-remove')
+      fireEvent.click(removeLookBtn)
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-bar-action-retry')).toBeInTheDocument()
+      )
+      fireEvent.click(within(panel).getByTestId('status-bar-action-retry'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-bar-action-undo')).toBeInTheDocument()
+      )
+      fireEvent.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
       await panelView.unmount()
     } finally {
       setMobileApplicationUserId(null)

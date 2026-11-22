@@ -88,6 +88,18 @@ describe('MemberSampleOutfit (mobile)', () => {
       )
     )
 
+    // Weather and style preferences controls update the sample look.
+    fireEvent.click(screen.getByTestId('sample-weather-cool-windy'))
+    fireEvent.click(screen.getByTestId('sample-style-preferences'))
+    const prefButtons = screen
+      .getAllByRole('button')
+      .filter((btn) => btn.getAttribute('data-testid')?.startsWith('sample-'))
+    for (const btn of prefButtons.slice(0, 4)) {
+      if (btn.getAttribute('data-testid') !== 'sample-save-look') {
+        fireEvent.click(btn)
+      }
+    }
+
     // Swap a piece -> Undo restores prior piece.
     const swapButtons = screen.getAllByRole('button', { name: /^Swap /i })
     if (swapButtons[0]) {

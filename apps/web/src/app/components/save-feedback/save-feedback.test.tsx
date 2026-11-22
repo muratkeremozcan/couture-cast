@@ -1720,6 +1720,16 @@ describe('web save-feedback components', () => {
           'Removed'
         )
       )
+
+      // Offline Undo on StylePiecePanel Remove shows offline notice
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      await user.click(within(panel).getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'You are offline. Save when you reconnect.'
+        )
+      )
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
     } finally {
       sessionMock.owner = null
       sessionStorage.clear()

@@ -386,6 +386,14 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(screen.getByTestId('saved-look-detail-close'))
     expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
 
+    // Opening needs-review detail modal shows needs-review notice, and detail-remove closes modal.
+    await userEvent.click(screen.getAllByTestId('saved-look-reopen')[1]!)
+    expect(screen.getByTestId('saved-look-detail-needs-review')).toBeInTheDocument()
+    await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+    )
+
     // Failed Undo restore keeps a Retry button so the member can recover the look.
     restoreSavedLookFromMobile.mockRejectedValueOnce(new Error('503 temporary'))
     await userEvent.click(screen.getAllByTestId('saved-look-remove')[0]!)

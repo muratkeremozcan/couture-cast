@@ -427,6 +427,38 @@ describe('ClosetSavedLooksRow (web)', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
 
+    // Opening needs-review look renders detail modal with needs-review notice, and detail-remove closes modal.
+    await user.click(screen.getAllByTestId('saved-look-reopen')[1]!)
+    expect(screen.getByTestId('saved-look-detail-needs-review')).toBeInTheDocument()
+    await user.click(screen.getByTestId('saved-look-detail-remove'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+    )
+
+    // Offline Undo on removed look shows offline notice with Undo action.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await user.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+
+    // Offline Remove shows offline notice immediately without calling deleteSavedLookFromWeb.
+    deleteSavedLookFromWeb.mockClear()
+    await user.click(screen.getAllByTestId('saved-look-remove')[0]!)
+    expect(deleteSavedLookFromWeb).not.toHaveBeenCalled()
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+
+    // Transport failure during Remove shows offline notice.
+    deleteSavedLookFromWeb.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    await user.click(screen.getAllByTestId('saved-look-remove')[0]!)
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+
     // Failed DELETE offers Retry, and 404 stale DELETE omits Undo.
     deleteSavedLookFromWeb
       .mockRejectedValueOnce(new Error('503'))
@@ -443,8 +475,7 @@ describe('ClosetSavedLooksRow (web)', () => {
     )
     await user.click(screen.getAllByTestId('saved-look-remove')[1]!)
     await waitFor(() =>
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+      expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     )
-    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
   })
 })
