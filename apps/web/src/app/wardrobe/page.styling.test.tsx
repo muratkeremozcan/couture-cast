@@ -1,5 +1,7 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import {
   act,
   cleanup,
@@ -877,5 +879,76 @@ describe('Wardrobe styling', () => {
     expect(seenKeys).toHaveLength(2)
     expect(seenKeys[0]).toBe(seenKeys[1])
     expect(savedLooksStore.items).toHaveLength(1)
+  })
+
+  it('imports pre-CC-7.2 device-saved looks for the active member on Closet load, marks unresolved looks Needs review, and preserves other members and guest storage', async () => {
+    const user = userEvent.setup()
+    const changedGarment = createReadyGarmentFixture({
+      id: 'style-jacket-changed',
+      category: 'outerwear',
+      comfortRange: 'cold',
+      imageAccess: {
+        url: 'https://photos.example.test/style-jacket.png',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    })
+    inventory.mockImplementation(() => list(garment, changedGarment))
+    savedLooksStore.unownedGarmentIds.add('tampered-other-garment')
+
+    const guestState = JSON.stringify({ schemaVersion: 1, weather: 'mild-dry' })
+    const otherOwnerKey = stylePieceStorageKey('other-member', garmentId)
+    const ownValidKey = stylePieceStorageKey(owner, garmentId)
+    const ownUnresolvedKey = stylePieceStorageKey(owner, changedGarment.id)
+    const ownTamperedKey = stylePieceStorageKey(owner, 'tampered-other-garment')
+
+    localStorage.setItem('couturecast.guest-preview.v1', guestState)
+    localStorage.setItem(
+      otherOwnerKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    localStorage.setItem(
+      ownValidKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+      ])
+    )
+    localStorage.setItem(
+      ownUnresolvedKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ])
+    )
+    localStorage.setItem(
+      ownTamperedKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+
+    publishOwner(owner)
+    render(<WardrobePage />)
+
+    const row = await screen.findByTestId('closet-saved-looks-row')
+    await waitFor(() => expect(row).toHaveTextContent('2 saved'))
+    await user.click(row)
+
+    expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
+      'Needs review'
+    )
+    expect(localStorage.getItem(ownValidKey)).toBeNull()
+    expect(localStorage.getItem(ownUnresolvedKey)).toBeNull()
+    expect(localStorage.getItem(ownTamperedKey)).toBeNull()
+    expect(localStorage.getItem('couturecast.guest-preview.v1')).toBe(guestState)
+    expect(localStorage.getItem(otherOwnerKey)).not.toBeNull()
   })
 })

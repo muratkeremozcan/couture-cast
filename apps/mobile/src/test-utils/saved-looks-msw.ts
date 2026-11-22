@@ -1,14 +1,25 @@
-// Story CC-7.2: In-memory MSW handlers for mobile account-backed saved looks tests.
+// Story CC-7.2 & CC-7.3: In-memory MSW handlers for mobile account-backed saved looks tests.
 import { http, HttpResponse } from 'msw'
 import {
   createSavedLookInputSchema,
   type SavedLookContract,
+  type SavedLookNeedsReviewReason,
 } from '@couture/api-client/contracts/http'
+import {
+  doesSavedLookResolve,
+  type ComfortRange,
+  type SampleGarmentCategory,
+} from '@couture/utils'
 
 export type MobileSavedLooksMswStore = {
   items: SavedLookContract[]
   deletedItems: Map<string, SavedLookContract>
   idempotencyKeys: Map<string, SavedLookContract>
+  unownedGarmentIds: Set<string>
+  garmentTagsById: Map<
+    string,
+    { category: SampleGarmentCategory; comfortRange: ComfortRange }
+  >
   nextPostError?: () => Response | null
   nextDeleteError?: () => Response | null
   nextRestoreError?: () => Response | null
@@ -17,6 +28,102 @@ export type MobileSavedLooksMswStore = {
   onPost?: (request: Request) => void | Promise<void>
   onDelete?: (request: Request, id: string) => void | Promise<void>
   onRestore?: (request: Request, id: string) => void | Promise<void>
+}
+
+function collectMswNeedsReviewReasons(
+  parsed: ReturnType<typeof createSavedLookInputSchema.parse>,
+  anchorCategory: SampleGarmentCategory | null,
+  anchorComfortRange: ComfortRange | null
+): SavedLookNeedsReviewReason[] {
+  if (parsed.source !== 'style_piece' || !parsed.anchorSnapshot) return []
+  const reasons: SavedLookNeedsReviewReason[] = []
+  if (anchorCategory && anchorCategory !== parsed.anchorSnapshot.category) {
+    reasons.push('category_changed')
+  }
+  if (anchorComfortRange && anchorComfortRange !== parsed.anchorSnapshot.comfortRange) {
+    reasons.push('comfort_range_changed')
+  }
+  return reasons
+}
+
+function deriveMswSavedLookAvailability(
+  parsed: ReturnType<typeof createSavedLookInputSchema.parse>,
+  store: MobileSavedLooksMswStore
+): {
+  availabilityStatus: 'ready' | 'needs_review'
+  needsReviewReasons: SavedLookNeedsReviewReason[]
+} {
+  const liveTags = parsed.anchorGarmentId
+    ? store.garmentTagsById.get(parsed.anchorGarmentId)
+    : undefined
+  const anchorCategory =
+    liveTags?.category ??
+    parsed.composition.find((slot) => slot.kind === 'garment')?.category ??
+    parsed.anchorSnapshot?.category ??
+    null
+  const anchorComfortRange =
+    liveTags?.comfortRange ?? parsed.anchorSnapshot?.comfortRange ?? null
+  const needsReviewReasons = collectMswNeedsReviewReasons(
+    parsed,
+    anchorCategory,
+    anchorComfortRange
+  )
+  const resolves = doesSavedLookResolve({
+    source: parsed.source,
+    lookId: parsed.lookId,
+    weather: parsed.weather,
+    anchorCategory,
+    anchorComfortRange,
+    swaps: parsed.swaps,
+    collection: parsed.collection ?? null,
+    comfort: parsed.comfort ?? null,
+  })
+  return {
+    availabilityStatus:
+      needsReviewReasons.length > 0 || !resolves ? 'needs_review' : 'ready',
+    needsReviewReasons,
+  }
+}
+
+function buildMswCreatedSavedLook(
+  id: string,
+  owner: string,
+  parsed: ReturnType<typeof createSavedLookInputSchema.parse>,
+  store: MobileSavedLooksMswStore
+): SavedLookContract {
+  const { availabilityStatus, needsReviewReasons } = deriveMswSavedLookAvailability(
+    parsed,
+    store
+  )
+  const now = new Date().toISOString()
+  return {
+    id,
+    ownerUserId: owner,
+    source: parsed.source,
+    lookId: parsed.lookId,
+    weather: parsed.weather,
+    title: parsed.title ?? null,
+    anchorGarmentId: parsed.anchorGarmentId ?? null,
+    anchorSnapshot: parsed.anchorSnapshot ?? null,
+    composition: parsed.composition.map((slot) => ({
+      slotIndex: slot.slotIndex,
+      category: slot.category,
+      kind: slot.kind,
+      itemId: slot.itemId,
+      label: slot.label ?? null,
+      missing: false,
+      imageAccess: null,
+    })),
+    swaps: parsed.swaps ?? {},
+    collection: parsed.collection ?? null,
+    comfort: parsed.comfort ?? null,
+    availabilityStatus,
+    missingGarmentIds: [],
+    needsReviewReasons,
+    revision: 0,
+    createdAt: now,
+    updatedAt: now,
+  }
 }
 
 export function createSavedLooksMswHandlers(
@@ -28,6 +135,8 @@ export function createSavedLooksMswHandlers(
     items: [...initial],
     deletedItems: new Map(),
     idempotencyKeys: new Map(),
+    unownedGarmentIds: new Set(),
+    garmentTagsById: new Map(),
   }
 
   const ownerFromRequest = (request: Request) =>
@@ -114,35 +223,24 @@ export function createSavedLooksMswHandlers(
         )
       }
       const parsed = createSavedLookInputSchema.parse(await request.json())
-      const now = new Date().toISOString()
-      const created: SavedLookContract = {
-        id: `saved-look-m-${seq++}`,
-        ownerUserId: owner,
-        source: parsed.source,
-        lookId: parsed.lookId,
-        weather: parsed.weather,
-        title: parsed.title ?? null,
-        anchorGarmentId: parsed.anchorGarmentId ?? null,
-        anchorSnapshot: parsed.anchorSnapshot ?? null,
-        composition: parsed.composition.map((slot) => ({
-          slotIndex: slot.slotIndex,
-          category: slot.category,
-          kind: slot.kind,
-          itemId: slot.itemId,
-          label: slot.label ?? null,
-          missing: false,
-          imageAccess: null,
-        })),
-        swaps: parsed.swaps ?? {},
-        collection: parsed.collection ?? null,
-        comfort: parsed.comfort ?? null,
-        availabilityStatus: 'ready',
-        missingGarmentIds: [],
-        needsReviewReasons: [],
-        revision: 0,
-        createdAt: now,
-        updatedAt: now,
+      const referencedGarments = [
+        ...(parsed.anchorGarmentId ? [parsed.anchorGarmentId] : []),
+        ...parsed.composition
+          .filter((slot) => slot.kind === 'garment')
+          .map((slot) => slot.itemId),
+      ]
+      if (referencedGarments.some((id) => store.unownedGarmentIds.has(id))) {
+        return HttpResponse.json(
+          { statusCode: 404, message: 'GARMENT_NOT_FOUND', error: 'Not Found' },
+          { status: 404 }
+        )
       }
+      const created = buildMswCreatedSavedLook(
+        `saved-look-m-${seq++}`,
+        owner,
+        parsed,
+        store
+      )
       store.items = [created, ...store.items]
       if (scopedKey) store.idempotencyKeys.set(scopedKey, created)
       return HttpResponse.json(

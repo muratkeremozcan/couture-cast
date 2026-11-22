@@ -263,11 +263,18 @@ function SampleOutfitInner({
     }
   }, [owner])
 
-  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
+  const bookmarks: (SampleBookmark & {
+    savedLookId?: string
+    needsReview?: boolean
+  })[] = []
   for (const saved of savedLooks) {
     const bookmark = savedLookToSampleBookmark(saved)
     if (!bookmark) continue
-    bookmarks.push({ ...bookmark, savedLookId: saved.id })
+    bookmarks.push({
+      ...bookmark,
+      savedLookId: saved.id,
+      needsReview: saved.availabilityStatus === 'needs_review',
+    })
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
@@ -371,6 +378,7 @@ function SampleOutfitInner({
           update(updateMemberSampleOutfit(result, { weather }))
         }}
         bookmarks={bookmarks}
+        needsReviewLabel={t('savedLooks.needsReview')}
         persistent={bookmarksPersistent}
         lookId={lookId}
         ownerKey={owner}

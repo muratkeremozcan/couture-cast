@@ -1,6 +1,9 @@
 // Learning path Step 60: Saved looks follow the account.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import { interceptNetworkCall as interceptOnPage } from '@seontechnologies/playwright-utils/intercept-network-call'
+import { DEFAULT_SAMPLE_COMFORT, stylePieceStorageKey } from '@couture/utils'
 import {
   capsuleTest as test,
   expect,
@@ -307,6 +310,203 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           await secondContext.close()
         }
       } finally {
+        await cleanupCreatedSavedLooks(
+          apiRequest,
+          apiBaseUrl,
+          capsuleSession.accessToken,
+          createdIds
+        )
+      }
+    }
+  )
+
+  test(
+    '[P0] imports pre-CC-7.2 device-saved looks for the same member once per source id, puts unresolved looks into Needs review, rejects tampered garment references, and leaves guest or another member device keys untouched (CC-7.3) @local-lane',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ apiRequest, baseURL, browser, capsuleSession }) => {
+      const apiBaseUrl = wardrobeOnboardingEnvironment.apiBaseUrl
+      const ownerId = capsuleSession.ownerUserId
+      const garmentId = SEEDED_GARMENT_IDS[0]
+      const createdIds = new Set<string>()
+
+      const guestPreviewRaw = JSON.stringify({
+        schemaVersion: 1,
+        weather: 'mild-dry',
+      })
+      const otherMemberBookmarksKey = 'couturecast.member-sample-bookmarks.other-member-2'
+      const otherMemberBookmarksRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+      const otherMemberStyleKey = stylePieceStorageKey(
+        'other-member-2',
+        'other-garment-2'
+      )
+      const otherMemberStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+
+      const ownBookmarksKey = `couturecast.member-sample-bookmarks.${ownerId}`
+      const ownBookmarksRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+        {
+          // Unresolvable bookmark: summer-linen does not resolve in cool-windy -> enters Needs review
+          lookId: 'sample:l:summer-linen',
+          weather: 'cool-windy',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+      const ownValidStyleKey = stylePieceStorageKey(ownerId, garmentId)
+      const ownValidStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ])
+      const ownTamperedStyleKey = stylePieceStorageKey(
+        ownerId,
+        'tampered-unowned-garment-999'
+      )
+      const ownTamperedStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+
+      const importContext = await browser.newContext({
+        viewport: { width: 390, height: 844 },
+      })
+
+      try {
+        await seedWebSession(importContext, capsuleSession.accessToken)
+        await importContext.addInitScript(
+          (seed) => {
+            if (window.location.origin === 'null') return
+            window.sessionStorage.setItem(
+              'couturecast.access-principal',
+              JSON.stringify({ principal: seed.ownerId, member: seed.ownerId })
+            )
+            window.localStorage.setItem(
+              'couturecast.auth-session',
+              JSON.stringify({ user: { id: seed.ownerId } })
+            )
+            window.localStorage.setItem(
+              'couturecast.guest-preview.v1',
+              seed.guestPreviewRaw
+            )
+            window.localStorage.setItem(
+              seed.otherMemberBookmarksKey,
+              seed.otherMemberBookmarksRaw
+            )
+            window.localStorage.setItem(
+              seed.otherMemberStyleKey,
+              seed.otherMemberStyleRaw
+            )
+            if (!window.sessionStorage.getItem('__cc73_seeded__')) {
+              window.sessionStorage.setItem('__cc73_seeded__', '1')
+              window.localStorage.setItem(seed.ownBookmarksKey, seed.ownBookmarksRaw)
+              window.localStorage.setItem(seed.ownValidStyleKey, seed.ownValidStyleRaw)
+              window.localStorage.setItem(
+                seed.ownTamperedStyleKey,
+                seed.ownTamperedStyleRaw
+              )
+            }
+          },
+          {
+            ownerId,
+            guestPreviewRaw,
+            otherMemberBookmarksKey,
+            otherMemberBookmarksRaw,
+            otherMemberStyleKey,
+            otherMemberStyleRaw,
+            ownBookmarksKey,
+            ownBookmarksRaw,
+            ownValidStyleKey,
+            ownValidStyleRaw,
+            ownTamperedStyleKey,
+            ownTamperedStyleRaw,
+          }
+        )
+
+        const importPage = await importContext.newPage()
+        const postStatuses: number[] = []
+        importPage.on('response', (response) => {
+          if (
+            response.request().method() === 'POST' &&
+            response.url().endsWith('/api/v1/wardrobe/saved-looks')
+          ) {
+            postStatuses.push(response.status())
+          }
+        })
+        trackCreatedSavedLookIds(importPage, createdIds)
+        stubReadyGarmentWithPhoto(importPage, garmentId)
+
+        await importPage.goto(`${baseURL}/wardrobe`)
+        await expect.poll(() => createdIds.size).toBe(3)
+        expect(postStatuses).toContain(404)
+
+        const savedLooksRow = importPage.getByTestId('closet-saved-looks-row')
+        await expect(savedLooksRow).toBeVisible()
+        await savedLooksRow.click()
+
+        for (const id of createdIds) {
+          await expect(importPage.getByTestId(`saved-look-card-${id}`)).toBeVisible()
+        }
+        await expect(importPage.getByTestId('saved-look-needs-review')).toBeVisible()
+
+        // Same-member device keys are removed while guest preview and other member keys remain intact
+        const storageSnapshot = await importPage.evaluate(
+          (keys) => ({
+            ownBookmarks: window.localStorage.getItem(keys.ownBookmarksKey),
+            ownValidStyle: window.localStorage.getItem(keys.ownValidStyleKey),
+            ownTamperedStyle: window.localStorage.getItem(keys.ownTamperedStyleKey),
+            guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
+            otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
+            otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
+          }),
+          {
+            ownBookmarksKey,
+            ownValidStyleKey,
+            ownTamperedStyleKey,
+            otherMemberBookmarksKey,
+            otherMemberStyleKey,
+          }
+        )
+        expect(storageSnapshot).toEqual({
+          ownBookmarks: null,
+          ownValidStyle: null,
+          ownTamperedStyle: null,
+          guestPreview: guestPreviewRaw,
+          otherBookmarks: otherMemberBookmarksRaw,
+          otherStyle: otherMemberStyleRaw,
+        })
+
+        // Reloading produces zero duplicate imports
+        await importPage.reload()
+        await importPage.getByTestId('closet-saved-looks-row').click()
+        expect(createdIds.size).toBe(3)
+      } finally {
+        await importContext.close()
         await cleanupCreatedSavedLooks(
           apiRequest,
           apiBaseUrl,

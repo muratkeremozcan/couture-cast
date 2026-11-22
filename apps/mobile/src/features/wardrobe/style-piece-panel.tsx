@@ -821,6 +821,11 @@ function StylePieceIdeas({
                 style={[styles.card, { borderColor: palette.divider }]}
               >
                 <Text style={text}>{description}</Text>
+                {entry.availabilityStatus === 'needs_review' ? (
+                  <Text testID="saved-look-needs-review" style={[styles.label, text]}>
+                    {t('savedLooks.needsReview')}
+                  </Text>
+                ) : null}
                 <View style={styles.row}>
                   <PreviewButton
                     label={labels.reopen}

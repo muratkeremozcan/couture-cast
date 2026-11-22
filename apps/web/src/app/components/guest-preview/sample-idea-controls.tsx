@@ -12,13 +12,17 @@ import {
 } from '@couture/utils'
 import { SaveActionButton } from '../save-feedback'
 
-type SampleBookmarkItem = SampleBookmark & { savedLookId?: string }
+type SampleBookmarkItem = SampleBookmark & {
+  savedLookId?: string
+  needsReview?: boolean
+}
 
 type Props = {
   strings: GuestPreviewStrings
   preferences?: SampleStylePreferences
   onPreferences: (preferences: SampleStylePreferences) => void
   bookmarks: SampleBookmarkItem[]
+  needsReviewLabel?: string
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
@@ -42,6 +46,7 @@ export function SampleIdeaControls({
   preferences,
   onPreferences,
   bookmarks,
+  needsReviewLabel,
   lookId,
   onSave,
   onUndoSave,
@@ -101,7 +106,7 @@ export function SampleIdeaControls({
               const look = sampleLookText({ id: bookmark.lookId }, strings).name
               const entryId = bookmark.savedLookId ?? bookmark.lookId
               return (
-                <li key={entryId} className="flex flex-wrap gap-2">
+                <li key={entryId} className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     className={buttonClass}
@@ -114,6 +119,14 @@ export function SampleIdeaControls({
                   >
                     {look}
                   </button>
+                  {bookmark.needsReview && needsReviewLabel && (
+                    <span
+                      data-testid="saved-look-needs-review"
+                      className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900"
+                    >
+                      {needsReviewLabel}
+                    </span>
+                  )}
                   <button
                     type="button"
                     className={buttonClass}

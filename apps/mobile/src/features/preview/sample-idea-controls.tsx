@@ -13,7 +13,10 @@ import {
 import { PreviewButton, type PreviewPalette } from './guest-preview-parts'
 import { SaveActionButton } from '@/components/save-feedback'
 
-type SampleBookmarkItem = SampleBookmark & { savedLookId?: string }
+type SampleBookmarkItem = SampleBookmark & {
+  savedLookId?: string
+  needsReview?: boolean
+}
 
 export function SampleIdeaControls({
   strings,
@@ -21,6 +24,7 @@ export function SampleIdeaControls({
   preferences,
   onPreferences,
   bookmarks,
+  needsReviewLabel,
   lookId,
   onSave,
   onUndoSave,
@@ -41,6 +45,7 @@ export function SampleIdeaControls({
   preferences?: SampleStylePreferences
   onPreferences: (preferences: SampleStylePreferences) => void
   bookmarks: SampleBookmarkItem[]
+  needsReviewLabel?: string
   lookId?: string
   onSave: () => unknown
   onUndoSave?: () => unknown
@@ -127,6 +132,11 @@ export function SampleIdeaControls({
                   onPress={() => onOpen(bookmark)}
                   palette={palette}
                 />
+                {bookmark.needsReview && needsReviewLabel ? (
+                  <Text testID="saved-look-needs-review" style={{ color: palette.text }}>
+                    {needsReviewLabel}
+                  </Text>
+                ) : null}
                 <PreviewButton
                   testID={`sample-remove-${bookmark.lookId}`}
                   label={formatPreviewString(labels.remove, { look })}

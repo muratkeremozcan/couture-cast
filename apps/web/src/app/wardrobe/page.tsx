@@ -25,7 +25,11 @@ import {
   resolveCurrentUserId,
 } from '../../lib/wardrobe'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
-import { currentWebSessionOwner, useWebSessionOwner } from '../../lib/use-web-session'
+import {
+  currentWebSessionOwner,
+  UNVERIFIED_BEARER_OWNER,
+  useWebSessionOwner,
+} from '../../lib/use-web-session'
 import {
   getGuestPreviewStrings,
   getStylePieceStrings,
@@ -124,6 +128,13 @@ function WardrobeEmptyState({
       </button>
     </div>
   )
+}
+
+function resolveEffectiveSavedLooksOwner(
+  owner: string | null,
+  userId: string | null
+): string | null {
+  return owner && owner !== UNVERIFIED_BEARER_OWNER ? owner : userId
 }
 
 function WardrobeHubView({ owner }: { owner: string | null }) {
@@ -280,6 +291,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
   const savedLooksLoadEpochRef = useRef(0)
+  const effectiveSavedLooksOwner = resolveEffectiveSavedLooksOwner(owner, userId)
 
   useEffect(() => {
     const loadEpoch = ++savedLooksLoadEpochRef.current
@@ -293,7 +305,12 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     }
     const controller = new AbortController()
     setSavedLooksLoading(true)
-    void listSavedLooksPageFromWeb({ limit: 50, offset: 0, signal: controller.signal })
+    void listSavedLooksPageFromWeb({
+      owner: effectiveSavedLooksOwner,
+      limit: 50,
+      offset: 0,
+      signal: controller.signal,
+    })
       .then((page) => {
         if (
           controller.signal.aborted ||
@@ -321,7 +338,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         }
       })
     return () => controller.abort()
-  }, [owner, sessionAttempt, missedSession, savedLooksAttempt])
+  }, [owner, effectiveSavedLooksOwner, sessionAttempt, missedSession, savedLooksAttempt])
 
   useEffect(() => {
     if (!owner) return

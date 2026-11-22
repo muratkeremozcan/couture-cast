@@ -1,13 +1,22 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SAMPLE_CATALOG } from './catalog'
 import { DEFAULT_SAMPLE_COMFORT, selectSampleOutfit } from './selector'
-import { stylePieceLooks } from './style-one-piece'
+import { stylePieceLooks, stylePieceStorageKey } from './style-one-piece'
 import {
   buildHomeSampleSavedLookInput,
   buildStylePieceSavedLookInput,
+  createDeterministicIdempotencyKey,
   createIdempotencyKey,
+  doesSavedLookResolve,
+  memberSampleBookmarksStorageKeys,
+  parseLegacyHomeSampleBookmarksForImport,
+  parseLegacyStylePieceRecipesForImport,
+  parseMemberSampleBookmarksStorageKey,
+  parseStylePieceStorageKey,
   savedLookMatchesHomeSample,
   savedLookMatchesStylePiece,
   savedLookToSampleBookmark,
@@ -181,5 +190,382 @@ describe('saved-looks helpers', () => {
     expect(savedLookToSampleBookmark({ ...savedRow, weather: 'bad' })).toBeNull()
     expect(savedLookToSampleBookmark({ ...savedRow, collection: 'bad' })).toBeNull()
     expect(savedLookToSampleBookmark({ ...savedRow, comfort: null })).toBeNull()
+  })
+
+  it('creates deterministic UUID v4 idempotency keys and parses legacy storage keys strictly', () => {
+    const keyA1 = createDeterministicIdempotencyKey('legacy-import:v1:user-1:look-a')
+    const keyA2 = createDeterministicIdempotencyKey('legacy-import:v1:user-1:look-a')
+    const keyB = createDeterministicIdempotencyKey('legacy-import:v1:user-1:look-b')
+    expect(keyA1).toMatch(UUID_V4)
+    expect(keyA1).toBe(keyA2)
+    expect(keyA1).not.toBe(keyB)
+
+    expect(memberSampleBookmarksStorageKeys('')).toEqual([])
+    expect(memberSampleBookmarksStorageKeys('bad\u0000owner')).toEqual([])
+    expect(memberSampleBookmarksStorageKeys('user:1')).toEqual([
+      'couturecast.member-sample-bookmarks.user:1',
+      'couturecast.member-sample-bookmarks.user%3A1',
+    ])
+
+    expect(
+      parseMemberSampleBookmarksStorageKey('couturecast.member-sample-bookmarks.user-1')
+    ).toBe('user-1')
+    expect(
+      parseMemberSampleBookmarksStorageKey(
+        'couturecast.member-sample-bookmarks.user%3A1.json'
+      )
+    ).toBe('user:1')
+    expect(
+      parseMemberSampleBookmarksStorageKey('couturecast.member-sample-bookmarks.%E0%A4%A')
+    ).toBe('%E0%A4%A')
+    expect(
+      parseMemberSampleBookmarksStorageKey('couturecast.guest-preview.v1')
+    ).toBeNull()
+    expect(
+      parseMemberSampleBookmarksStorageKey('couturecast.member-sample-bookmarks.')
+    ).toBeNull()
+
+    const styleKey = stylePieceStorageKey('member~1%a', 'garment~2')
+    expect(parseStylePieceStorageKey(styleKey)).toEqual({
+      owner: 'member~1%a',
+      garmentId: 'garment~2',
+    })
+    expect(parseStylePieceStorageKey(`${styleKey}.json`)).toEqual({
+      owner: 'member~1%a',
+      garmentId: 'garment~2',
+    })
+    expect(parseStylePieceStorageKey('couturecast.guest-preview.v1')).toBeNull()
+    expect(parseStylePieceStorageKey('couturecast.style-piece.')).toBeNull()
+    expect(parseStylePieceStorageKey('couturecast.style-piece.not-json')).toBeNull()
+    expect(
+      parseStylePieceStorageKey('couturecast.style-piece.%5B%22a%22%2C%22b%22%5D')
+    ).toBeNull()
+    expect(
+      parseStylePieceStorageKey(
+        `couturecast.style-piece.${encodeURIComponent(JSON.stringify(['only-one'])).replaceAll('%', '~')}`
+      )
+    ).toBeNull()
+  })
+
+  it('evaluates doesSavedLookResolve for style_piece, home_sample, and synthetic look IDs', () => {
+    // Non-catalog synthetic look IDs stay ready
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'look-01',
+        weather: 'mild-dry',
+      })
+    ).toBe(true)
+
+    // Resolvable style_piece look
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        anchorCategory: 'top',
+        anchorComfortRange: 'mild',
+        swaps: { shoes: 'sample:g:white-sneakers' },
+      })
+    ).toBe(true)
+
+    // Unresolvable style_piece: missing anchor tags, protection mismatch, unknown swap category, or invalid swap candidate
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        anchorCategory: null,
+        anchorComfortRange: 'mild',
+      })
+    ).toBe(false)
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'sample:l:office-oxford',
+        weather: 'warm-rainy',
+        anchorCategory: 'outerwear',
+        anchorComfortRange: 'cold',
+      })
+    ).toBe(false)
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        anchorCategory: 'top',
+        anchorComfortRange: 'mild',
+        swaps: { dress: 'sample:g:wrap-dress' },
+      })
+    ).toBe(false)
+    expect(
+      doesSavedLookResolve({
+        source: 'style_piece',
+        lookId: 'sample:l:office-oxford',
+        weather: 'cool-windy',
+        anchorCategory: 'top',
+        anchorComfortRange: 'cool',
+        swaps: { shoes: 'sample:g:sandals' },
+      })
+    ).toBe(false)
+
+    // Resolvable vs unresolvable home_sample look
+    expect(
+      doesSavedLookResolve({
+        source: 'home_sample',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: { shoes: 'sample:g:white-sneakers' },
+      })
+    ).toBe(true)
+    expect(
+      doesSavedLookResolve({
+        source: 'home_sample',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: null,
+        comfort: DEFAULT_SAMPLE_COMFORT,
+      })
+    ).toBe(false)
+    expect(
+      doesSavedLookResolve({
+        source: 'home_sample',
+        lookId: 'sample:l:summer-linen',
+        weather: 'cool-windy',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+      })
+    ).toBe(false)
+    expect(
+      doesSavedLookResolve({
+        source: 'home_sample',
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: { shoes: 'sample:g:tailored-shorts' },
+      })
+    ).toBe(false)
+  })
+
+  it('parses legacy home_sample bookmarks preserving unresolved records for Needs review and rejecting tampered entries', () => {
+    expect(parseLegacyHomeSampleBookmarksForImport(null, 'member-a')).toEqual({
+      entries: [],
+      hadInvalidEntries: false,
+      malformedPayload: false,
+    })
+    expect(parseLegacyHomeSampleBookmarksForImport('', 'member-a').malformedPayload).toBe(
+      true
+    )
+    expect(
+      parseLegacyHomeSampleBookmarksForImport('{bad', 'member-a').malformedPayload
+    ).toBe(true)
+    expect(
+      parseLegacyHomeSampleBookmarksForImport('{"not":"array"}', 'member-a')
+        .malformedPayload
+    ).toBe(true)
+
+    const validBookmark = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: {
+        shoes: 'sample:g:white-sneakers',
+        bottom: 'sample:g:dark-jeans',
+      },
+    }
+    const validBookmarkReorderedSwaps = {
+      ...validBookmark,
+      swaps: {
+        bottom: 'sample:g:dark-jeans',
+        shoes: 'sample:g:white-sneakers',
+      },
+    }
+    const unresolvedBookmark = {
+      lookId: 'sample:l:summer-linen',
+      weather: 'cool-windy',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'sample:g:sandals' },
+    }
+    const retiredLookBookmark = {
+      lookId: 'sample:l:retired-legacy-look',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: {},
+    }
+    const tamperedBookmark = {
+      lookId: '../tampered-look',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'javascript:alert(1)' },
+    }
+
+    const parsed = parseLegacyHomeSampleBookmarksForImport(
+      JSON.stringify([
+        validBookmark,
+        validBookmark, // duplicate lookId should be deduplicated
+        unresolvedBookmark,
+        retiredLookBookmark,
+        tamperedBookmark,
+      ]),
+      'member-a'
+    )
+
+    expect(parsed.malformedPayload).toBe(false)
+    expect(parsed.hadInvalidEntries).toBe(true)
+    expect(parsed.entries).toHaveLength(3)
+
+    expect(parsed.entries[0]?.resolvesCleanly).toBe(true)
+    expect(parsed.entries[0]?.idempotencyKey).toMatch(UUID_V4)
+    expect(parsed.entries[0]?.payload.lookId).toBe('sample:l:office-oxford')
+
+    // Canonical swap ordering yields the identical deterministic idempotency key
+    const reorderedParsed = parseLegacyHomeSampleBookmarksForImport(
+      JSON.stringify([validBookmarkReorderedSwaps]),
+      'member-a'
+    )
+    expect(reorderedParsed.entries[0]?.idempotencyKey).toBe(
+      parsed.entries[0]?.idempotencyKey
+    )
+
+    expect(parsed.entries[1]?.resolvesCleanly).toBe(false)
+    expect(parsed.entries[1]?.payload.lookId).toBe('sample:l:summer-linen')
+    expect(parsed.entries[1]?.payload.swaps).toEqual({ shoes: 'sample:g:sandals' })
+    expect(parsed.entries[1]?.payload.composition.length).toBeGreaterThan(0)
+
+    expect(parsed.entries[2]?.resolvesCleanly).toBe(false)
+    expect(parsed.entries[2]?.payload.lookId).toBe('sample:l:retired-legacy-look')
+    expect(parsed.entries[2]?.payload.composition.length).toBeGreaterThan(0)
+  })
+
+  it('parses legacy style_piece recipes preserving unresolved records for Needs review and rejecting tampered entries', () => {
+    expect(parseLegacyStylePieceRecipesForImport(null, 'member-a', 'g-1')).toEqual({
+      entries: [],
+      hadInvalidEntries: false,
+      malformedPayload: false,
+    })
+    expect(
+      parseLegacyStylePieceRecipesForImport('', 'member-a', 'g-1').malformedPayload
+    ).toBe(true)
+    expect(
+      parseLegacyStylePieceRecipesForImport('{bad', 'member-a', 'g-1').malformedPayload
+    ).toBe(true)
+    expect(
+      parseLegacyStylePieceRecipesForImport('{"not":"array"}', 'member-a', 'g-1')
+        .malformedPayload
+    ).toBe(true)
+
+    const validRecipe = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      swaps: { shoes: 'sample:g:white-sneakers' },
+    }
+    const unresolvedSwapRecipe = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'cool-windy',
+      swaps: { shoes: 'sample:g:sandals' },
+    }
+    const retiredRecipe = {
+      lookId: 'sample:l:retired-piece-look',
+      weather: 'warm-rainy',
+      swaps: { accessory: 'sample:g:canvas-tote' },
+    }
+    const tamperedRecipe = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      swaps: { shoes: '../bad-garment' },
+    }
+
+    // Case 1: anchor is ready top/mild -> validRecipe resolves cleanly, others preserve as unresolved
+    const parsedWithMatchingAnchor = parseLegacyStylePieceRecipesForImport(
+      JSON.stringify([
+        validRecipe,
+        validRecipe, // duplicate weather:lookId
+        unresolvedSwapRecipe,
+        retiredRecipe,
+        tamperedRecipe,
+      ]),
+      'member-a',
+      'g-1',
+      { category: 'top', comfortRange: 'mild' }
+    )
+
+    expect(parsedWithMatchingAnchor.malformedPayload).toBe(false)
+    expect(parsedWithMatchingAnchor.hadInvalidEntries).toBe(true)
+    expect(parsedWithMatchingAnchor.entries).toHaveLength(3)
+
+    expect(parsedWithMatchingAnchor.entries[0]?.resolvesCleanly).toBe(true)
+    expect(parsedWithMatchingAnchor.entries[0]?.payload.anchorGarmentId).toBe('g-1')
+    expect(parsedWithMatchingAnchor.entries[0]?.payload.composition[0]).toEqual({
+      slotIndex: 0,
+      category: 'top',
+      kind: 'garment',
+      itemId: 'g-1',
+    })
+
+    expect(parsedWithMatchingAnchor.entries[1]?.resolvesCleanly).toBe(false)
+    expect(parsedWithMatchingAnchor.entries[1]?.payload.swaps).toEqual({
+      shoes: 'sample:g:sandals',
+    })
+
+    expect(parsedWithMatchingAnchor.entries[2]?.resolvesCleanly).toBe(false)
+    expect(parsedWithMatchingAnchor.entries[2]?.payload.lookId).toBe(
+      'sample:l:retired-piece-look'
+    )
+
+    // Case 2: anchor garment tags changed to outerwear/cold -> warm-rainy recipe no longer resolves and records compatible snapshot
+    const parsedWithChangedAnchor = parseLegacyStylePieceRecipesForImport(
+      JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ]),
+      'member-a',
+      'g-1',
+      { category: 'outerwear', comfortRange: 'cold' }
+    )
+    expect(parsedWithChangedAnchor.entries).toHaveLength(1)
+    expect(parsedWithChangedAnchor.entries[0]?.resolvesCleanly).toBe(false)
+    expect(parsedWithChangedAnchor.entries[0]?.payload.composition[0]?.category).toBe(
+      'outerwear'
+    )
+    expect(parsedWithChangedAnchor.entries[0]?.payload.anchorSnapshot?.category).not.toBe(
+      'outerwear'
+    )
+
+    // Case 3: unanchored (null currentAnchor) + empty swaps on retired look falls back to catalog garment companion
+    const parsedUnanchoredRetired = parseLegacyStylePieceRecipesForImport(
+      JSON.stringify([
+        {
+          lookId: 'sample:l:retired-empty-look',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+        {
+          lookId: 'sample:l:summer-linen',
+          weather: 'cool-windy',
+          swaps: {},
+        },
+      ]),
+      'member-a',
+      'g-unanchored',
+      null
+    )
+    expect(parsedUnanchoredRetired.entries).toHaveLength(2)
+    expect(parsedUnanchoredRetired.entries[0]?.resolvesCleanly).toBe(false)
+    expect(
+      parsedUnanchoredRetired.entries[0]?.payload.composition.length
+    ).toBeGreaterThanOrEqual(2)
+    expect(
+      parsedUnanchoredRetired.entries[1]?.payload.composition.length
+    ).toBeGreaterThanOrEqual(2)
   })
 })

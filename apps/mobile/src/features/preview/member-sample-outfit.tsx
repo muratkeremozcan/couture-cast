@@ -277,11 +277,18 @@ export function MemberSampleOutfit({
     }
   }, [owner])
 
-  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
+  const bookmarks: (SampleBookmark & {
+    savedLookId?: string
+    needsReview?: boolean
+  })[] = []
   for (const saved of savedLooks) {
     const bookmark = savedLookToSampleBookmark(saved)
     if (!bookmark) continue
-    bookmarks.push({ ...bookmark, savedLookId: saved.id })
+    bookmarks.push({
+      ...bookmark,
+      savedLookId: saved.id,
+      needsReview: saved.availabilityStatus === 'needs_review',
+    })
   }
   const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
     if (next === result) return
@@ -396,6 +403,7 @@ export function MemberSampleOutfit({
           updateResult((current) => updateMemberSampleOutfit(current, { weather }))
         }}
         bookmarks={bookmarks}
+        needsReviewLabel={t('savedLooks.needsReview')}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
         persistent={bookmarkStorage === 'ready'}
         showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}

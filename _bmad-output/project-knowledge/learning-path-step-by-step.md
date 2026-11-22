@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-22.
-Added Steps 40 to 60:
+Added Steps 40 to 61:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -24,7 +24,8 @@ Added Steps 40 to 60:
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story, merged on `main`.
   - Production follow-ups after the project close, merged on `main`: Jade's profile and location fix (PR #257), Settings session follow-up, image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week race fixes, and production profile/location checks.
 - Step 59: Story 7.1, shared save, undo and status feedback, `0154d786` (PR #286), merged on 2026-11-21.
-- Step 60: Story 7.2, saved looks follow the account, in review on `feat/epic7-story-7-2-saved-looks-follow-account`.
+- Step 60: Story 7.2, saved looks follow the account, `72b685c2` (PR #287), merged on 2026-11-22.
+- Step 61: Story 7.3, import device-saved looks for the same member, in review on `feat/epic7-story-7-3-import-device-saved-looks-same-member`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -32,6 +33,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 61 for Story CC-7.3 (import device-saved looks for the same member) while its PR is in review, and moved Step 60 to merged (`72b685c2`, PR #287).
 Added Step 60 for Story CC-7.2 (saved looks follow the account) while its PR is in review, and moved Step 59 to merged (`0154d786`, PR #286).
 Added Step 59 for Story CC-7.1 (shared save, undo and status feedback) while its PR is in review, and moved Step 58 and its production follow-ups to merged.
 Added Step 58's production profile and location checks, run in the daily production run as the synthetic member, while its PR is in review.
@@ -21205,3 +21207,150 @@ Evidence boundaries:
   determinism (3 runs) + provider verification, targeted web/mobile Vitest suites, workspace
   `tsc --noEmit`, and two-context Playwright E2E ran locally.
 - Full workspace suites and CI coverage gates run on the PR.
+
+## Step 61: Import device-saved looks for the same member
+
+User/business impact:
+
+- Members who bookmarked Home sample looks or saved `Style this piece` recipes in local browser or
+  Expo document storage before CC-7.2 now see those looks automatically move into their
+  account-backed saved looks the next time they sign in on that device, without losing unresolved
+  combinations or duplicating entries across reloads.
+- Guest preview storage (`couturecast.guest-preview.v1`) and legacy keys belonging to any other
+  member who previously used the same device are never read, imported, or deleted.
+
+Key takeaways:
+
+- Legacy imports reuse the CC-7.2 `POST /api/v1/wardrobe/saved-looks` endpoint with a deterministic
+  RFC 4122 UUID v4 `Idempotency-Key` derived from `(owner, source, anchorGarmentId, lookId,
+weather, canonicalSwaps, collection, comfort)` so retries, concurrent mounts, and multi-tab
+  opens never create duplicates.
+- Legacy parsers (`parseLegacyHomeSampleBookmarksForImport` and
+  `parseLegacyStylePieceRecipesForImport`) preserve schema-valid entries whose catalog look, swap,
+  or anchor tags no longer resolve cleanly instead of dropping them, while rejecting malformed or
+  tampered identifiers.
+- `WardrobeSavedLookService.formatSavedLooks` keeps Postgres `anchor_snapshot` authoritative on
+  create and derives `availabilityStatus: 'needs_review'` whenever `anchor_snapshot` disagrees with
+  live garment tags (`category_changed`, `comfort_range_changed`) or `doesSavedLookResolve(...)`
+  detects an unresolved catalog look or swap.
+- Both web (`apps/web/src/lib/saved-looks.ts`) and mobile (`apps/mobile/src/lib/saved-looks.ts`,
+  `apps/mobile/src/lib/sample-recipe-storage.ts`) fence every import pass to the verified
+  authenticated owner, pin the bearer token across requests, retain unacknowledged entries on
+  transient `5xx`/network/abort failures, prune entries only on server acknowledgement or terminal
+  `400`/`404`/`409` rejection, and remove the device key once every entry in it is settled.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- Do not trust client-supplied `anchorSnapshot` in `WardrobeSavedLookService.verifyOwnedGarmentsAndSnapshot`:
+  keeping the DB `anchorRow` tags authoritative protects live saved looks when client stubs or
+  stale UI state differ from the database, while `doesSavedLookResolve(...)` plus live tag
+  comparison in `formatSavedLooks` reliably surfaces `needs_review` for unresolved legacy imports.
+- Key-matching for `couturecast.style-piece.<scope>` must round-trip through
+  `stylePieceStorageKey(owner, garmentId)` (stripping optional `.json` on native Expo document
+  files) so an owner ID containing delimiter characters or URL-encoded sequences can never collide
+  with another member's files.
+- Inline saved-look lists (`StylePiecePanel`, `HomeRitual`, `MemberSampleOutfit`, and
+  `SampleIdeaControls`) must surface the same `Needs review` badge as `ClosetSavedLooksRow` so an
+  imported look whose rules changed is visibly flagged wherever the member inspects it.
+
+Story/Task mapping:
+
+- Story CC-7.3: Import device-saved looks for the same member (Epic 7 Lane A reliability).
+- Follows CC-7.2 (`#step-60-saved-looks-follow-the-account`) and feeds CC-7.12 (Looks tab).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`### CC-7.3: Import device-saved looks for the same member`)
+- `_bmad-output/implementation-artifacts/spec-7-3-import-device-saved-looks-same-member.md`
+- `_bmad-output/implementation-artifacts/reviews/story-7-3-codex-review.md`
+
+Cross-links:
+
+- Step 60 (`#step-60-saved-looks-follow-the-account`): CC-7.2 account-backed `SavedLook` persistence,
+  idempotent `POST /api/v1/wardrobe/saved-looks`, and `ClosetSavedLooksRow`.
+- Step 59 (`#step-59-shared-save-undo-and-status-feedback`): CC-7.1 shared save/undo feedback.
+
+Sequence to follow:
+
+1. Add deterministic UUID v4 idempotency hashing, strict legacy key parsers, `doesSavedLookResolve`,
+   and unresolved-preserving legacy import parsers to
+   `packages/utils/src/sample-wardrobe/saved-looks.ts` and rebuild `@couture/utils`.
+2. Update `WardrobeSavedLookService.formatSavedLooks` in
+   `apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts` to check `category_changed` and
+   `doesSavedLookResolve(...)` against live garment tags and `SAMPLE_CATALOG`.
+3. Implement owner-fenced legacy import on web (`apps/web/src/lib/saved-looks.ts` and
+   `apps/web/src/app/wardrobe/page.tsx`) and mobile (`apps/mobile/src/lib/sample-recipe-storage.ts`,
+   `apps/mobile/src/lib/saved-looks.ts`, and `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.tsx`).
+4. Surface `Needs review` badges on inline saved lists across web and mobile
+   (`style-piece-panel.tsx`, `home-ritual.tsx`, `member-sample-outfit.tsx`, and
+   `sample-idea-controls.tsx`).
+5. Extend MSW helpers, unit/component suites, and the isolated-DB Playwright E2E spec to prove
+   same-member import, `needs_review` retention, tampered-garment rejection, reload idempotency,
+   and untouched guest/other-member storage.
+
+Task owner map:
+
+- Step 61 step 1 owner: deterministic idempotency keys, strict legacy key parsers, and
+  `doesSavedLookResolve` in `packages/utils/src/sample-wardrobe/saved-looks.ts`.
+- Step 61 step 2 owner: `WardrobeSavedLookService.formatSavedLooks` in
+  `apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts`.
+- Step 61 step 3 owner: web legacy importer in `apps/web/src/lib/saved-looks.ts` and mobile
+  web/native document importer in `apps/mobile/src/lib/sample-recipe-storage.ts` and
+  `apps/mobile/src/lib/saved-looks.ts`.
+- Step 61 step 4 owner: inline `Needs review` badges in
+  `apps/web/src/app/wardrobe/style-piece-panel.tsx`,
+  `apps/web/src/app/components/home-ritual.tsx`,
+  `apps/web/src/app/components/guest-preview/sample-idea-controls.tsx`,
+  `apps/mobile/src/features/wardrobe/style-piece-panel.tsx`,
+  `apps/mobile/src/features/preview/member-sample-outfit.tsx`, and
+  `apps/mobile/src/features/preview/sample-idea-controls.tsx`.
+
+Tests that cover this step:
+
+Shared utils, Vitest:
+
+- [`packages/utils/src/sample-wardrobe/saved-looks.spec.ts`](../../packages/utils/src/sample-wardrobe/saved-looks.spec.ts):
+  deterministic UUID v4 idempotency keys (including swap key order independence), strict
+  `member-sample-bookmarks` and `style-piece` key parsing, `doesSavedLookResolve`, and legacy
+  parsers preserving unresolved looks while rejecting tampered records.
+
+API unit, Vitest:
+
+- [`apps/api/src/modules/wardrobe/wardrobe-saved-look.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.spec.ts):
+  `needs_review` derivation for unresolved `home_sample` and `style_piece` looks, `category_changed`
+  detection, and cross-account garment rejection.
+
+Web unit and component, Vitest:
+
+- [`apps/web/src/lib/saved-looks.test.ts`](../../apps/web/src/lib/saved-looks.test.ts):
+  same-member import, `needs_review` preservation, terminal 404 pruning, transient `503` retry
+  retention, concurrent idempotency deduplication, mid-import account-switch fencing, blocked
+  `localStorage` resilience, and untouched guest/other-member keys.
+- [`apps/web/src/app/wardrobe/page.styling.test.tsx`](../../apps/web/src/app/wardrobe/page.styling.test.tsx):
+  Closet load automatically imports legacy member looks, shows `Needs review` badge, deletes
+  member device keys, and leaves guest preview and other-member keys intact.
+
+Mobile unit and component, Vitest:
+
+- [`apps/mobile/src/lib/saved-looks.test.ts`](../../apps/mobile/src/lib/saved-looks.test.ts):
+  same-member web/native import, transient failure retry, account-switch fencing, and isolation of
+  guest and other-member keys.
+- [`apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx`](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx):
+  native Expo `File(Paths.document, ...)` import on Closet load, `Needs review` badge rendering,
+  and cleanup of member files while preserving other-member files.
+
+End-to-end, Playwright:
+
+- [`playwright/tests/saved-looks-follow-account.spec.ts`](../../playwright/tests/saved-looks-follow-account.spec.ts):
+  real browser + NestJS API + isolated Postgres 17 proof that pre-existing same-member
+  `localStorage` bookmarks and `style-piece` recipes import into the account (including an
+  unresolved look marked `Needs review` and a tampered foreign garment reference rejected with
+  `404`), remove the member's device keys, do not duplicate on reload, and leave
+  `couturecast.guest-preview.v1` and another member's keys untouched.
+
+Evidence boundaries:
+
+- Targeted Vitest suites (including coverage checks on `@couture/utils`, `apps/web/src/lib/saved-looks.ts`,
+  and `apps/mobile/src/lib/saved-looks.ts`), workspace `tsc --noEmit`, ESLint, and isolated-DB
+  Playwright E2E ran locally.
+- Full workspace suites, CI coverage gates, and native iOS/Android builds run in CI on the PR.
