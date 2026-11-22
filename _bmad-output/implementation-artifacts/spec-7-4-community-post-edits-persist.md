@@ -3,15 +3,17 @@ title: 'Story CC-7.4: Community post edits persist'
 type: bugfix
 ticket: '7-4-community-post-edits-persist'
 created: '2026-11-22'
-status: in-review
+status: built
 baseline_revision: 'f65ed8e5'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
-review_loop_iteration: 0
+review: thorough
+review_source: auto
+lenses_ran:
+  - codex-correctness
+  - codex-security
+review_loop_iteration: 1
 followup_review_recommended: false
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -44,9 +46,11 @@ Controlled adult account created via `/api/v1/auth/signup` on `/community` at `3
 
 ### Root Causes Scoped to the Reproduced Path
 
-1. **Stale-revision client clobber:** Web (`apps/web/src/app/components/community-lookbook-grid.tsx:3255`, `2951`, `2958`, `2852`; `community-spotlight.tsx:299`) and mobile (`apps/mobile/src/features/community/community-screen.tsx:1240`, `931`, `852`) replaced post objects without checking `textRevision`, allowing an in-flight target resolve or feed read started before a save to revert displayed text back to an older revision.
-2. **Screening inside the 7-second privacy transaction:** `CommunityRepository.editPublishedPostText` (`apps/api/src/modules/community/community.repository.ts:840-896`) awaited `screen()` inside `communityPrivacyTransaction` while holding member advisory and post row locks under the 7s timeout.
-3. **Missing distinct outcome feedback & `"Edited"` label:** Web and mobile `CommunityPostTextEditor` collapsed `400` screening rejection and `503` screening unavailable into `editFailed`, gave no saved confirmation or `"No changes"` feedback on unchanged revision replies, and neither card nor detail rendered an `"Edited"` badge for `textRevision > 0`.
+1. **Observed UI/feedback defects (directly reproduced in the 390x844 baseline trace above):** Missing `"Edited"` label on card & detail (`hasEditedInDetail: 0`, `hasEditedOnCard: 0`), silent unchanged save (`statusText: ""`, no `"No changes"`), missing `"Saved"` confirmation, and collapsed `400` screening-rejection / `503` screening-unavailable errors into generic `editFailed`.
+2. **Code-diagnosed concurrency & lock defects (reproduced & covered via targeted unit/integration regressions):**
+   - **Stale-revision client clobber:** Web (`community-lookbook-grid.tsx`, `community-spotlight.tsx`) and mobile (`community-screen.tsx`, `use-community-spotlight.ts`) replaced post objects across feed, Spotlight, New Looks buffer, and deep-link/notification reads without monotonic `textRevision` / read-start fencing, allowing an in-flight read started before a local save or realtime update to revert displayed text or clear `"Edited"`.
+   - **Screening inside the 7-second privacy transaction:** `CommunityRepository.editPublishedPostText` awaited `screen()` inside `communityPrivacyTransaction` while holding member advisory and post row locks under the 7s timeout.
+   - **Legacy blank caption mismatch:** `publishPost` could store `""` while editors submit `null`, causing unchanged resaves to trigger screening and consume quota.
 
 ## Boundaries & Constraints
 
@@ -97,13 +101,13 @@ Controlled adult account created via `/api/v1/auth/signup` on `/community` at `3
 
 **Execution:**
 
-- [ ] `packages/api-client/src/contracts/http/community.ts` -- export post-text error constants and `reconcileCommunityPostText`, then rebuild `@couture/api-client` dist
-- [ ] `apps/api/src/modules/community/community-post-text.ts`, `community.service.ts`, `community.repository.ts` -- move screening before `communityPrivacyTransaction` with normalized text/locale/policyVersion binding and full locked rechecks
-- [ ] `apps/web/src/app/components/community-post-text-editor.tsx`, `community-lookbook-grid.tsx`, `community-spotlight.tsx` -- add distinct outcome messages, CC-7.1 status bar confirmation, `"Edited"` label on card & detail, and monotonic `textRevision` reconciliation
-- [ ] `apps/mobile/components/community/community-post-text-editor.tsx`, `community-card.tsx`, `apps/mobile/src/features/community/community-screen.tsx`, `use-community-spotlight.ts` -- mirror distinct outcome messages, CC-7.1 status bar feedback, `"Edited"` label, and monotonic `textRevision` reconciliation
-- [ ] `apps/web/src/i18n/locales/*.json`, `apps/mobile/assets/locales/*.json` -- add localized strings across all 10 locales
-- [ ] Tests (`packages/api-client/testing/`, `apps/api/integration/community-post-text-http.integration.spec.ts`, `apps/web/src/app/components/community-lookbook-grid.edit-text.test.tsx`, `apps/mobile/components/community/community-post-text-editor.test.tsx`, `apps/mobile/src/test-utils/community-screen/publishing.cases.tsx`, `playwright/tests/community-post-text.spec.ts`) -- cover all ACs including revocation/competing edit during screening, stale-revision reconciliation, all 5 outcome messages, `"Edited"` label, and phone-width reload readback
-- [ ] `_bmad-output/project-knowledge/learning-path-step-by-step.md` -- move Step 61 to merged and add Step 62 with test cross-links
+- [x] `packages/api-client/src/contracts/http/community.ts` -- export post-text error constants, `reconcileCommunityPostText`, and `CommunityPostTextLedger`, then rebuild `@couture/api-client` dist
+- [x] `apps/api/src/modules/community/community-post-text.ts`, `community.service.ts`, `community.repository.ts` -- move screening before `communityPrivacyTransaction` with strict normalized text/locale/policyVersion binding, normalized stored-text comparison, per-member in-flight screening concurrency cap, and full locked rechecks
+- [x] `apps/web/src/app/components/community-post-text-editor.tsx`, `community-lookbook-grid.tsx`, `community-spotlight.tsx` -- add distinct outcome messages, CC-7.1 status bar confirmation, `"Edited"` label on card & detail, and `CommunityPostTextLedger` monotonic/fenced reconciliation across feed, Spotlight, New Looks buffer, and deep-link/notification reads
+- [x] `apps/mobile/components/community/community-post-text-editor.tsx`, `community-card.tsx`, `apps/mobile/src/features/community/community-screen.tsx`, `use-community-spotlight.ts` -- mirror distinct outcome messages, CC-7.1 status bar feedback, `"Edited"` label, and `CommunityPostTextLedger` reconciliation across feed, Spotlight, New Looks buffer, and deep-link/notification reads
+- [x] `apps/web/src/i18n/locales/*.json`, `apps/mobile/assets/locales/*.json` -- add localized strings across all 10 locales
+- [x] Tests (`packages/api-client/testing/`, `apps/api/integration/community-post-text-http.integration.spec.ts`, `apps/api/integration/community-sync-http.integration.spec.ts`, `apps/web/src/app/components/community-lookbook-grid.edit-text.test.tsx`, `apps/mobile/components/community/community-post-text-editor.test.tsx`, `apps/mobile/src/test-utils/community-screen/publishing.cases.tsx`, `apps/mobile/src/test-utils/community-screen/spotlight.cases.tsx`, `playwright/tests/community-post-text.spec.ts`) -- cover all ACs and Codex review findings
+- [x] `_bmad-output/project-knowledge/learning-path-step-by-step.md` -- move Step 61 to merged and add Step 62 with test cross-links
 
 **Acceptance Criteria:**
 
@@ -118,17 +122,34 @@ Controlled adult account created via `/api/v1/auth/signup` on `/community` at `3
 
 ## Plan Change Log
 
+- Added `CommunityPostTextLedger` in `packages/api-client/src/contracts/http/community.ts` after Codex review so feed, Spotlight, New Looks buffer, and deep-link/notification reads share one per-viewer reconciliation fence for both owner revisions and non-author realtime updates without disclosing owner-only numeric revisions.
+
 ## Review Triage Log
+
+Codex peer review (`_bmad-output/implementation-artifacts/reviews/story-7-4-codex-review.md`) against commit `d580f117` vs `origin/main` (`f65ed8e5`):
+
+| #   | Severity | Finding                                                                     | Resolution                                                                                                                                                                                                                                       |
+| --- | -------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C1  | Medium   | Spotlight first-page & non-author refresh can overwrite newer text          | Fixed via shared `CommunityPostTextLedger` wired into web & mobile Spotlight `load`/`loadMore`/`refreshItem` (plus standalone `textFenceRef` in web Spotlight), preserving owner `textRevision` & non-author realtime text                       |
+| C2  | Medium   | New Looks buffer, reveal, deep-link GET & notification resolve unguarded    | Fixed via `CommunityPostTextLedger` across web & mobile `refreshFeed` buffer dedupe, `insertNewLooks`, deep-link GET, notification target resolve, and `apply`, while preserving eviction on `unavailable`                                       |
+| C3  | Medium   | Blank legacy stored caption (`""`/`"   "`) resaved as `null` counts as edit | Fixed `publishPost` caption normalization (`caption?.trim() \|\| null`), normalized stored-text comparison in preflight + locked transaction, and normalized UI `isUnchangedOutcome` comparison                                                  |
+| C4  | Medium   | Optional fingerprint/locale & unchecked `policyVersion` in decision         | Required all 4 fields on `ScreenedPostTextDecision`, added `expectedPostTextPolicyVersion()`, removed fallback fills, and enforced strict `matchesBoundScreeningDecision` before and inside lock                                                 |
+| S1  | Security | Non-public refreshed item could inherit cached `textRevision`/`Edited`      | Updated `reconcileCommunityPostText` and `CommunityPostTextLedger` to return non-published items unmodified                                                                                                                                      |
+| S2  | Security | Concurrent pre-lock screening flood before lock                             | Added per-member `MAX_IN_FLIGHT_TEXT_SCREENS_PER_MEMBER = 2` semaphore (`withInFlightTextScreen`) returning `429` on excess concurrent screening while preserving competing-edit tests                                                           |
+| V1  | Medium   | Stale `targets/resolve` test passed without running resolve                 | Rewrote test to drive real `CommunitySyncState.catchUp()` with `/events` + delayed `/targets/resolve`, asserting `resolveCount >= 1` and `resolveSettled === true` and verifying card + open detail                                              |
+| V2  | Medium   | Combined editor reload assertion happened after second-client API PATCH     | Added dedicated reload step asserting `updated.title`, `updated.caption`, and `"Edited"` on card & detail BEFORE advancing revision via the second client's API PATCH                                                                            |
+| V3  | Low      | AC 1 trace mixed observed baseline gaps with code-diagnosed races           | Clarified observed baseline trace vs code-diagnosed concurrency/lock defects in Root Causes and fixed vitest config path below to `apps/api/vitest.config.ts`                                                                                    |
+| V4  | Low      | Native Spotlight/detail, status-bar, and binding test gaps                  | Asserted `status-feedback-bar` on web & mobile, added web & mobile delayed Spotlight + non-author refresh + mobile Spotlight detail `"Edited"` tests, and added API tests for blank caption, missing/mismatched binding, and 429 concurrency cap |
 
 ## Verification
 
 **Commands:**
 
 - `npm run build --workspace @couture/api-client` -- expected: clean build
-- `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" INTEGRATION_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" npx vitest run apps/api/integration/community-post-text-http.integration.spec.ts apps/api/integration/community-sync-http.integration.spec.ts --config apps/api/vitest.integration.config.ts` -- expected: all pass
+- `DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" INTEGRATION_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" npx vitest run apps/api/integration/community-post-text-http.integration.spec.ts apps/api/integration/community-sync-http.integration.spec.ts --config apps/api/vitest.config.ts` -- expected: all pass
 - `npx vitest run src/modules/moderation/moderation-sanctions.service.spec.ts src/modules/auth/guardian-lock-route-sweep.spec.ts` (in `apps/api`) -- expected: all pass
 - `npx vitest run testing/community-contract.spec.ts` (in `packages/api-client`) -- expected: all pass
-- `npx vitest run src/app/components/community-lookbook-grid.edit-text.test.tsx` (in `apps/web`, with coverage check) -- expected: all pass
-- `npx vitest run components/community/community-post-text-editor.test.tsx` and mobile community screen publishing test (in `apps/mobile`, with coverage check) -- expected: all pass
+- `npx vitest run src/app/components/community-lookbook-grid.edit-text.test.tsx src/i18n/community-locales.spec.ts` (in `apps/web`, with coverage check) -- expected: all pass
+- `npx vitest run components/community/community-post-text-editor.test.tsx src/screens/community-screen.test.tsx` (in `apps/mobile`, with coverage check) -- expected: all pass
 - `TEST_ENV=local DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" INTEGRATION_TEST_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:54361/postgres" PLAYWRIGHT_SKIP_DB_RESET=true node scripts/run-with-local-db-env.mjs npx playwright test playwright/tests/community-post-text.spec.ts playwright/tests/api/community-post-text.api.spec.ts --reporter=list` -- expected: all pass
-- `tsc --noEmit` in every touched workspace + ESLint `--max-warnings=0` on all touched files -- expected: 0 errors, 0 warnings
+- `tsc --noEmit` in every touched workspace + ESLint `--max-warnings=0` per workspace -- expected: 0 errors, 0 warnings

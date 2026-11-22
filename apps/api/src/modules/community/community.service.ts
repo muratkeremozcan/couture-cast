@@ -78,6 +78,7 @@ import {
   parseCommunityObjectPath,
 } from '@couture/utils'
 import {
+  expectedPostTextPolicyVersion,
   normalizePostText,
   postTextFingerprint,
   screenPostText,
@@ -1312,6 +1313,7 @@ export class CommunityService {
       baseRevision: input.baseRevision,
       title: normalized.title,
       caption: normalized.caption,
+      expectedPolicyVersion: await expectedPostTextPolicyVersion(),
       screen: ({ title, caption, locale }) => screenPostText(title, caption, locale),
     })
     if (!edited) throw new BadRequestException(COMMUNITY_POST_TEXT_REJECTED_MESSAGE)
@@ -1377,7 +1379,7 @@ export class CommunityService {
       cap: DAILY_SUBMISSION_CAP,
       data: {
         altText,
-        caption: input.caption?.trim() ?? null,
+        caption: input.caption?.trim() || null,
         ...(input.title !== undefined ? { title: input.title } : {}),
         climateBand: viewerBand ?? null,
         locale: input.locale,

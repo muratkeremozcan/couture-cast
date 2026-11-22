@@ -2,6 +2,7 @@
 // Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`
 import type { CommunityReactionState } from '@couture/api-client'
 import {
+  CommunityPostTextLedger,
   reconcileCommunityPostText,
   type EditCommunityPostTextResponse,
   type CommunityBannedError,
@@ -106,6 +107,7 @@ export function useCommunitySpotlight({
   sessionScope,
   reactionState,
   sponsorships,
+  postTextLedger,
   onBanned,
 }: {
   /** Story 6.11: a read refused for a ban closes the whole community screen, on any page. */
@@ -115,7 +117,11 @@ export function useCommunitySpotlight({
   reactionState: CommunityReactionState
   /** Story 6.7b: the screen's live sponsorship answers, shared with the feed. */
   sponsorships: LiveCommunitySponsorships
+  /** Shared per-viewer post text reconciliation ledger across feed and Spotlight. */
+  postTextLedger?: CommunityPostTextLedger
 }): CommunitySpotlightView {
+  const [fallbackTextLedger] = useState(() => new CommunityPostTextLedger())
+  const textLedger = postTextLedger ?? fallbackTextLedger
   const [status, setStatus] = useState<SpotlightStatus>('loading')
   const [level, setLevel] = useState<CommunitySpotlightLevel>('none')
   const [label, setLabel] = useState<string | null>(null)
@@ -169,6 +175,7 @@ export function useCommunitySpotlight({
   const load = useCallback(
     async (restarted = false) => {
       const ticket = reactionState.beginRead()
+      const textStamp = textLedger.begin()
       const { controller, isCurrent } = begin()
       loadingMoreRef.current = false
       setIsLoadingMore(false)
@@ -185,7 +192,16 @@ export function useCommunitySpotlight({
         // Normalized as the state commits: a page whose read started before the
         // latest recorded answer (say a newer feed read) never shows its own
         // block, and takes a newer block it lacked.
-        setItems(() => shown.map((item) => sponsorships.apply(item)))
+        setItems((previous) => {
+          const previousById = new Map(previous.map((item) => [item.id, item]))
+          return shown.map((item) =>
+            textLedger.reconcile(
+              sponsorships.apply(item),
+              textStamp,
+              previousById.get(item.id)
+            )
+          )
+        })
         setNextCursor(page.nextCursor)
         if (restarted) {
           focusSerialRef.current += 1
@@ -208,7 +224,7 @@ export function useCommunitySpotlight({
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
       }
     },
-    [begin, reactionState, readItems, setNextCursor, sponsorships]
+    [begin, reactionState, readItems, setNextCursor, sponsorships, textLedger]
   )
 
   // Pull to refresh and Retry read page one only for a signed-in member.
@@ -223,6 +239,7 @@ export function useCommunitySpotlight({
     if (!cursor || loadingMoreRef.current) return
     loadingMoreRef.current = true
     const ticket = reactionState.beginRead()
+    const textStamp = textLedger.begin()
     const { controller, isCurrent } = begin()
     setIsLoadingMore(true)
     setLoadMoreFailed(false)
@@ -232,10 +249,19 @@ export function useCommunitySpotlight({
         if (!isCurrent()) return
         sponsorships.record(page.items, stamp)
         const added = newEntries(itemsRef.current, readItems(page.items, ticket))
-        setItems((previous) => [
-          ...previous,
-          ...newEntries(previous, added).map((item) => sponsorships.apply(item)),
-        ])
+        setItems((previous) => {
+          const previousById = new Map(previous.map((item) => [item.id, item]))
+          return [
+            ...previous,
+            ...newEntries(previous, added).map((item) =>
+              textLedger.reconcile(
+                sponsorships.apply(item),
+                textStamp,
+                previousById.get(item.id)
+              )
+            ),
+          ]
+        })
         // View more stays for the cursor this page returned.
         setNextCursor(page.nextCursor)
         // A page whose posts were all filtered or already shown changes nothing
@@ -273,7 +299,7 @@ export function useCommunitySpotlight({
         loadingMoreRef.current = false
         setIsLoadingMore(false)
       })
-  }, [begin, load, reactionState, readItems, setNextCursor, sponsorships])
+  }, [begin, load, reactionState, readItems, setNextCursor, sponsorships, textLedger])
 
   const abortItemRefreshes = useCallback(() => {
     for (const controller of itemRefreshesRef.current.values()) controller.abort()
@@ -287,6 +313,7 @@ export function useCommunitySpotlight({
   useEffect(() => {
     if (sessionScope === undefined) return
     abortItemRefreshes()
+    if (!postTextLedger) fallbackTextLedger.clear()
     setLevel('none')
     setLabel(null)
     setItems([])
@@ -302,7 +329,14 @@ export function useCommunitySpotlight({
     setIsLoadingMore(false)
     setLoadMoreFailed(false)
     setStatus('idle')
-  }, [abortItemRefreshes, load, sessionScope, setNextCursor])
+  }, [
+    abortItemRefreshes,
+    fallbackTextLedger,
+    load,
+    postTextLedger,
+    sessionScope,
+    setNextCursor,
+  ])
   useEffect(
     () => () => {
       controllerRef.current?.abort()
@@ -332,7 +366,12 @@ export function useCommunitySpotlight({
   )
 
   const applyPost = useCallback(
-    (post: CommunityReactionFeedItem) => {
+    (post: CommunityReactionFeedItem, readStartClock?: number) => {
+      if (post.status !== 'published') {
+        textLedger.evict(post.id)
+      } else if (readStartClock === undefined) {
+        textLedger.record(post)
+      }
       setItems((previous) => {
         if (!previous.some((item) => item.id === post.id)) return previous
         if (post.status !== 'published')
@@ -340,25 +379,31 @@ export function useCommunitySpotlight({
         return previous.map((item) =>
           item.id === post.id
             ? {
-                ...reconcileCommunityPostText(sponsorships.apply(post), item),
+                ...(readStartClock !== undefined
+                  ? textLedger.reconcile(sponsorships.apply(post), readStartClock, item)
+                  : reconcileCommunityPostText(sponsorships.apply(post), item)),
                 rank: item.rank,
               }
             : item
         )
       })
     },
-    [sponsorships]
+    [sponsorships, textLedger]
   )
 
-  const applyText = useCallback((postId: string, text: SavedCommunityText) => {
-    setItems((previous) =>
-      previous.map((item) =>
-        item.id === postId && (item.textRevision ?? 0) <= text.textRevision
-          ? { ...item, ...text }
-          : item
+  const applyText = useCallback(
+    (postId: string, text: SavedCommunityText) => {
+      textLedger.record({ id: postId, ...text, status: 'published' })
+      setItems((previous) =>
+        previous.map((item) =>
+          item.id === postId && (item.textRevision ?? 0) <= text.textRevision
+            ? { ...item, ...text }
+            : item
+        )
       )
-    )
-  }, [])
+    },
+    [textLedger]
+  )
 
   // A live read anywhere on the screen (feed, single post, this module) is the
   // latest word on a post's block, for every spotlight copy of it.
@@ -370,13 +415,17 @@ export function useCommunitySpotlight({
     [sponsorships]
   )
 
-  const evict = useCallback((postId: string) => {
-    setItems((previous) =>
-      previous.some((item) => item.id === postId)
-        ? previous.filter((item) => item.id !== postId)
-        : previous
-    )
-  }, [])
+  const evict = useCallback(
+    (postId: string) => {
+      textLedger.evict(postId)
+      setItems((previous) =>
+        previous.some((item) => item.id === postId)
+          ? previous.filter((item) => item.id !== postId)
+          : previous
+      )
+    },
+    [textLedger]
+  )
 
   const refreshItem = useCallback(
     (postId: string) => {
@@ -386,6 +435,7 @@ export function useCommunitySpotlight({
       const controller = new AbortController()
       refreshes.set(postId, controller)
       const ticket = reactionState.beginRead()
+      const textStamp = textLedger.begin()
       const stamp = sponsorships.begin()
       void getCommunityPostFromMobile(postId, controller.signal)
         .then((post) => {
@@ -393,7 +443,7 @@ export function useCommunitySpotlight({
           sponsorships.record([post], stamp)
           // A null read means the post left the community while this was in flight.
           const fresh = reactionState.read(post, ticket)
-          if (fresh) applyPost(fresh)
+          if (fresh) applyPost(fresh, textStamp)
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return
@@ -403,7 +453,7 @@ export function useCommunitySpotlight({
           if (refreshes.get(postId) === controller) refreshes.delete(postId)
         })
     },
-    [applyPost, evict, reactionState, sponsorships]
+    [applyPost, evict, reactionState, sponsorships, textLedger]
   )
 
   const focusEntry = useCallback((postId: string) => {

@@ -1,6 +1,7 @@
 // Learning path Step 62: Community post edits persist.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { CommunitySyncState } from '@couture/api-client'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
@@ -380,6 +381,9 @@ describe('Community look text editing', () => {
     expect(await screen.findByTestId('community-edit-status')).toHaveTextContent(
       'Changes saved.'
     )
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent(
+      'Changes saved.'
+    )
     expect(onSaved).toHaveBeenCalledWith('post-1', {
       title: 'Updated look',
       caption: description,
@@ -390,15 +394,59 @@ describe('Community look text editing', () => {
   it('does not let a stale targets/resolve read overwrite a newer saved text revision', async () => {
     signIn()
     const user = userEvent.setup()
+    const syncs: CommunitySyncState[] = []
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+      this: CommunitySyncState
+    ) {
+      syncs.push(this)
+    })
+    const reactions = {
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      revision: 0,
+      generation: 0,
+      viewerReaction: null,
+    }
     const stalePost = ownedPost({ textRevision: 0 })
+    const staleTargetPost = { ...stalePost, reactions }
+    const resolveStarted = Promise.withResolvers<void>()
     const releaseResolve = Promise.withResolvers<Response>()
-    let resolveCalled = false
+    let eventsPhase: 'bootstrap' | 'text_changed' = 'bootstrap'
+    let resolveCount = 0
+    let resolveSettled = false
     mockApi(
       feedHandler({ items: [stalePost] }),
       http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
-      http.post('*/api/v1/community/targets/resolve', () => {
-        if (!resolveCalled) {
-          resolveCalled = true
+      http.get('/api/v1/community/posts/post-1/comments', () =>
+        HttpResponse.json({ data: { items: [], nextCursor: null, totalCount: 0 } })
+      ),
+      http.get('/api/v1/community/posts/post-1/comment-submissions', () =>
+        HttpResponse.json({ data: { items: [] } })
+      ),
+      http.get('/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events:
+              eventsPhase === 'text_changed'
+                ? [
+                    {
+                      version: 1,
+                      kind: 'post.text_changed',
+                      postId: stalePost.id,
+                      communityRevision: '2',
+                    },
+                  ]
+                : [],
+            nextCursor: `cursor-${eventsPhase}`,
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      ),
+      http.post('/api/v1/community/targets/resolve', () => {
+        resolveCount += 1
+        if (eventsPhase === 'text_changed') {
+          resolveStarted.resolve()
           return releaseResolve.promise
         }
         return HttpResponse.json({
@@ -408,7 +456,7 @@ describe('Community look text editing', () => {
                 key: stalePost.id,
                 status: 'available',
                 communityRevision: '1',
-                post: stalePost,
+                post: staleTargetPost,
                 comment: null,
                 parent: null,
                 pageCursor: null,
@@ -430,8 +478,15 @@ describe('Community look text editing', () => {
       )
     )
     renderGrid()
+    await screen.findByTestId(`lookbook-card-${stalePost.id}`)
+    await waitFor(() => expect(syncs.length).toBeGreaterThan(0))
+    const sync = syncs.at(-1)!
+    await act(async () => {
+      await sync.catchUp()
+    })
     await user.click(await screen.findByTestId(`lookbook-open-${stalePost.id}`))
     const detail = within(await screen.findByRole('dialog'))
+    // Open the editor and prepare the draft before the stale resolve starts.
     await user.click(detail.getByRole('button', { name: EDIT }))
     const title = detail.getByRole('textbox', { name: 'Title (optional)' })
     const caption = detail.getByRole('textbox', { name: 'Description (optional)' })
@@ -439,6 +494,17 @@ describe('Community look text editing', () => {
     await user.type(title, 'Saved newer title')
     await user.clear(caption)
     await user.type(caption, 'Saved newer caption')
+
+    // Start a realtime target resolve that will return stale textRevision: 0.
+    eventsPhase = 'text_changed'
+    const catchUpPromise = sync.catchUp().then(() => {
+      resolveSettled = true
+    })
+    await resolveStarted.promise
+    expect(resolveCount).toBeGreaterThanOrEqual(1)
+
+    // Save a newer edit (textRevision: 1) while the stale resolve is in flight.
+    await waitFor(() => expect(detail.getByRole('button', { name: SAVE })).toBeEnabled())
     await user.click(detail.getByRole('button', { name: SAVE }))
     expect(await screen.findByRole('dialog', { name: 'Saved newer title' })).toBeVisible()
 
@@ -451,8 +517,8 @@ describe('Community look text editing', () => {
               {
                 key: stalePost.id,
                 status: 'available',
-                communityRevision: '1',
-                post: stalePost,
+                communityRevision: '2',
+                post: staleTargetPost,
                 comment: null,
                 parent: null,
                 pageCursor: null,
@@ -463,13 +529,204 @@ describe('Community look text editing', () => {
           },
         })
       )
-      await releaseResolve.promise
+      await catchUpPromise
     })
+    expect(resolveSettled).toBe(true)
 
     expect(screen.getByRole('dialog', { name: 'Saved newer title' })).toBeVisible()
     expect(detail.getByTestId('community-detail-caption')).toHaveTextContent(
       'Saved newer caption'
     )
     expect(detail.getByTestId('community-detail-edited')).toHaveTextContent('Edited')
+    await user.keyboard('{Escape}')
+    expect(screen.getByTestId(`title-${stalePost.id}`)).toHaveTextContent(
+      'Saved newer title'
+    )
+    expect(screen.getByTestId(`caption-${stalePost.id}`)).toHaveTextContent(
+      'Saved newer caption'
+    )
+    expect(screen.getByTestId(`edited-badge-${stalePost.id}`)).toHaveTextContent('Edited')
+  })
+
+  it('prevents a delayed Spotlight first-page load from reverting a newer author edit', async () => {
+    signIn()
+    const user = userEvent.setup()
+    const base = ownedPost({ textRevision: 0 })
+    const releaseSpotlight = Promise.withResolvers<Response>()
+    mockApi(
+      feedHandler({ items: [base] }),
+      http.get(SPOTLIGHT_PATH, () => releaseSpotlight.promise),
+      http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
+      http.patch(EDIT_PATH, () =>
+        HttpResponse.json({
+          data: {
+            title: 'Fresh Spotlight title',
+            caption: 'Fresh Spotlight caption',
+            textRevision: 1,
+          },
+        })
+      )
+    )
+
+    renderGrid()
+    await user.click(await screen.findByTestId(`lookbook-open-${base.id}`))
+    const detail = within(await screen.findByRole('dialog'))
+    await user.click(detail.getByRole('button', { name: EDIT }))
+    const title = detail.getByRole('textbox', { name: 'Title (optional)' })
+    const caption = detail.getByRole('textbox', { name: 'Description (optional)' })
+    await user.clear(title)
+    await user.type(title, 'Fresh Spotlight title')
+    await user.clear(caption)
+    await user.type(caption, 'Fresh Spotlight caption')
+    await user.click(detail.getByRole('button', { name: SAVE }))
+    expect(
+      await screen.findByRole('dialog', { name: 'Fresh Spotlight title' })
+    ).toBeVisible()
+    await user.keyboard('{Escape}')
+
+    // Now the initial Spotlight request settles with stale textRevision: 0.
+    await act(async () => {
+      releaseSpotlight.resolve(spotlightBody({ items: [ranked(1, base)] }))
+      await releaseSpotlight.promise
+    })
+
+    expect(await screen.findByTestId(`spotlight-title-${base.id}`)).toHaveTextContent(
+      'Fresh Spotlight title'
+    )
+    expect(screen.getByTestId(`spotlight-caption-${base.id}`)).toHaveTextContent(
+      'Fresh Spotlight caption'
+    )
+    expect(screen.getByTestId(`spotlight-edited-badge-${base.id}`)).toHaveTextContent(
+      'Edited'
+    )
+  })
+
+  it('prevents a delayed non-author Spotlight image refresh from overwriting newer realtime text', async () => {
+    signIn()
+    const syncs: CommunitySyncState[] = []
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+      this: CommunitySyncState
+    ) {
+      syncs.push(this)
+    })
+    const reactions = {
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      revision: 0,
+      generation: 0,
+      viewerReaction: null,
+    }
+    const viewerPost = {
+      ...item({
+        id: 'post-1',
+        author: { displayName: 'Maya', isSelf: false },
+        title: 'Original non-author title',
+        caption: 'Original non-author caption',
+      }),
+      reactions,
+    }
+    delete viewerPost.textRevision
+    const realtimePost = {
+      ...viewerPost,
+      title: 'Realtime non-author title',
+      caption: 'Realtime non-author caption',
+    }
+    let phase: 'idle' | 'updated' = 'idle'
+    const refreshStarted = Promise.withResolvers<void>()
+    const releaseRefresh = Promise.withResolvers<Response>()
+    mockApi(
+      feedHandler({ items: [] }),
+      http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1, viewerPost)] })),
+      http.get(POST_PATH, () => {
+        refreshStarted.resolve()
+        return releaseRefresh.promise
+      }),
+      http.get('/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events:
+              phase === 'updated'
+                ? [
+                    {
+                      version: 1,
+                      kind: 'post.text_changed',
+                      postId: viewerPost.id,
+                      communityRevision: '2',
+                    },
+                  ]
+                : [],
+            nextCursor: `cursor-${phase}`,
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      ),
+      http.post('/api/v1/community/targets/resolve', () =>
+        HttpResponse.json({
+          data: {
+            targets: [
+              {
+                key: viewerPost.id,
+                status: 'available',
+                communityRevision: phase === 'updated' ? '2' : '1',
+                post: phase === 'updated' ? realtimePost : viewerPost,
+                comment: null,
+                parent: null,
+                pageCursor: null,
+                parentPageCursor: null,
+                threadPosition: null,
+              },
+            ],
+          },
+        })
+      )
+    )
+
+    renderGrid()
+    expect(
+      await screen.findByTestId(`spotlight-title-${viewerPost.id}`)
+    ).toHaveTextContent('Original non-author title')
+    await waitFor(() => expect(syncs.length).toBeGreaterThan(0))
+    const sync = syncs.at(-1)!
+    await act(async () => {
+      await sync.catchUp()
+    })
+
+    // Trigger image error -> starts Spotlight refreshItem (GET /posts/post-1).
+    const card = screen.getByTestId(`community-spotlight-item-${viewerPost.id}`)
+    fireEvent.error(within(card).getByRole('img'))
+    await refreshStarted.promise
+
+    // Realtime text update lands while refreshItem is in flight.
+    phase = 'updated'
+    await act(async () => {
+      await sync.catchUp()
+    })
+    expect(screen.getByTestId(`spotlight-title-${viewerPost.id}`)).toHaveTextContent(
+      'Realtime non-author title'
+    )
+
+    // Delayed image refresh returns stale text without textRevision.
+    await act(async () => {
+      releaseRefresh.resolve(
+        HttpResponse.json({
+          data: {
+            ...viewerPost,
+            imageAccess: {
+              ...viewerPost.imageAccess,
+              url: 'https://fixtures.invalid/refreshed.jpg',
+            },
+          },
+        })
+      )
+      await releaseRefresh.promise
+    })
+
+    expect(screen.getByTestId(`spotlight-title-${viewerPost.id}`)).toHaveTextContent(
+      'Realtime non-author title'
+    )
+    expect(screen.getByTestId(`spotlight-caption-${viewerPost.id}`)).toHaveTextContent(
+      'Realtime non-author caption'
+    )
   })
 })

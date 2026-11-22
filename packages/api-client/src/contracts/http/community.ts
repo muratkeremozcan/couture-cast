@@ -679,15 +679,22 @@ export function reconcileCommunityReactionItem(
 }
 /** Older reads cannot overwrite a newer confirmed post text revision. */
 export function reconcileCommunityPostText<
-  T extends Pick<CommunityFeedItem, 'id' | 'title' | 'caption' | 'textRevision'>,
+  T extends Pick<CommunityFeedItem, 'id' | 'title' | 'caption' | 'textRevision'> & {
+    status?: CommunityFeedItem['status']
+  },
 >(
   incoming: T,
   previous?: Pick<CommunityFeedItem, 'id' | 'title' | 'caption' | 'textRevision'> | null
 ): T {
+  if (previous?.id !== incoming.id || previous.textRevision === undefined) {
+    return incoming
+  }
+  if (incoming.status !== undefined && incoming.status !== 'published') {
+    return incoming
+  }
   if (
-    previous?.id === incoming.id &&
-    previous.textRevision !== undefined &&
-    (incoming.textRevision === undefined || previous.textRevision > incoming.textRevision)
+    incoming.textRevision === undefined ||
+    previous.textRevision > incoming.textRevision
   ) {
     return {
       ...incoming,
@@ -697,6 +704,129 @@ export function reconcileCommunityPostText<
     }
   }
   return incoming
+}
+
+export interface CommunityPostTextSnapshot {
+  id: string
+  title?: string | null
+  caption: string | null
+  textRevision?: number
+  status?: CommunityFeedItem['status']
+}
+
+interface CommunityPostTextLedgerEntry {
+  title?: string | null
+  caption: string | null
+  textRevision?: number
+  clock: number
+}
+
+function canFenceTextEntry(
+  entry: CommunityPostTextLedgerEntry,
+  result: CommunityPostTextSnapshot,
+  startClock: number
+): boolean {
+  if (entry.clock <= startClock) return false
+  if (result.textRevision === undefined || entry.textRevision === undefined) return true
+  return entry.textRevision >= result.textRevision
+}
+
+/**
+ * Per-viewer post text reconciliation ledger shared across feed, Spotlight,
+ * New Looks buffer, and deep-link reads. Keeps owner `textRevision` monotonic
+ * across surfaces and fences non-author reads started before a newer realtime
+ * text update without disclosing owner-only numeric revisions.
+ */
+export class CommunityPostTextLedger {
+  private readonly entries = new Map<string, CommunityPostTextLedgerEntry>()
+  private clock = 0
+  private clearedAt = 0
+
+  /** Captures the current clock when a read starts. */
+  begin(): number {
+    return this.clock
+  }
+
+  /** Records a confirmed local save or ordered realtime target update. */
+  record(post: CommunityPostTextSnapshot): void {
+    if (post.status !== undefined && post.status !== 'published') {
+      this.entries.delete(post.id)
+      return
+    }
+    const previous = this.entries.get(post.id)
+    const next = previous
+      ? reconcileCommunityPostText(post, { id: post.id, ...previous })
+      : post
+    const changed =
+      !previous ||
+      next.title !== previous.title ||
+      next.caption !== previous.caption ||
+      next.textRevision !== previous.textRevision
+    const clock = changed ? ++this.clock : previous.clock
+    this.entries.set(post.id, {
+      title: next.title,
+      caption: next.caption,
+      textRevision: next.textRevision,
+      clock,
+    })
+  }
+
+  /** Reconciles an incoming read started at `startClock` against newer text. */
+  reconcile<T extends CommunityPostTextSnapshot>(
+    incoming: T,
+    startClock: number,
+    existing?: CommunityPostTextSnapshot | null
+  ): T {
+    if (
+      (incoming.status !== undefined && incoming.status !== 'published') ||
+      startClock < this.clearedAt
+    ) {
+      return incoming
+    }
+    let result = existing ? reconcileCommunityPostText(incoming, existing) : incoming
+    const entry = this.entries.get(incoming.id)
+    if (entry) {
+      result = reconcileCommunityPostText(result, {
+        id: incoming.id,
+        title: entry.title,
+        caption: entry.caption,
+        textRevision: entry.textRevision,
+      })
+      if (canFenceTextEntry(entry, result, startClock)) {
+        return {
+          ...result,
+          title: entry.title,
+          caption: entry.caption,
+          textRevision: entry.textRevision ?? result.textRevision,
+        }
+      }
+    }
+    this.rememberRevision(result, entry)
+    return result
+  }
+
+  private rememberRevision(
+    result: CommunityPostTextSnapshot,
+    entry: CommunityPostTextLedgerEntry | undefined
+  ): void {
+    if (result.textRevision === undefined) return
+    if (entry !== undefined && result.textRevision <= (entry.textRevision ?? -1)) return
+    this.entries.set(result.id, {
+      title: result.title,
+      caption: result.caption,
+      textRevision: result.textRevision,
+      clock: entry?.clock ?? 0,
+    })
+  }
+
+  evict(postId: string): void {
+    this.entries.delete(postId)
+  }
+
+  clear(): void {
+    this.entries.clear()
+    this.clearedAt = ++this.clock
+  }
 }
 export const communityReactionFeedSchema = communityFeedSchema
   .extend({ items: z.array(communityReactionFeedItemSchema) })

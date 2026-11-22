@@ -146,6 +146,32 @@ export function useCommunitySpotlight<Token = number>({
   // Single-post image refreshes run beside paging, so a View more never cancels
   // one. A reset or unmount aborts them all.
   const itemControllersRef = useRef(new Set<AbortController>())
+  const textClockRef = useRef(0)
+  const textFenceRef = useRef(new Map<string, number>())
+
+  const preserveNewerText = useCallback(
+    (
+      incoming: CommunitySpotlightItem,
+      existing: CommunitySpotlightItem | undefined,
+      startClock: number
+    ): CommunitySpotlightItem => {
+      if (!existing) return incoming
+      const reconciled = reconcileCommunityPostText(incoming, existing)
+      if (
+        reconciled.status === 'published' &&
+        (textFenceRef.current.get(incoming.id) ?? 0) > startClock
+      ) {
+        return {
+          ...reconciled,
+          title: existing.title,
+          caption: existing.caption,
+          textRevision: existing.textRevision,
+        }
+      }
+      return reconciled
+    },
+    []
+  )
 
   const begin = useCallback(() => {
     controllerRef.current?.abort()
@@ -161,6 +187,7 @@ export function useCommunitySpotlight<Token = number>({
   const loadFirstPage = useCallback(
     async (restarted = false) => {
       const request = begin()
+      const startClock = textClockRef.current
       setState((previous) => ({
         ...previous,
         status: 'loading',
@@ -173,15 +200,21 @@ export function useCommunitySpotlight<Token = number>({
         const page = await getCommunitySpotlightFromWeb({ signal: request.signal })
         if (!request.current()) return
         const items = reconcileRef.current(page.items, ticket)
-        setState({
-          status: 'ready',
-          level: page.level,
-          label: page.label,
-          items,
-          nextCursor: page.nextCursor,
-          loadingMore: false,
-          moreFailed: false,
-          focusTargetId: restarted ? (items[0]?.id ?? null) : null,
+        setState((previous) => {
+          const previousById = new Map(previous.items.map((item) => [item.id, item]))
+          const merged = items.map((item) =>
+            preserveNewerText(item, previousById.get(item.id), startClock)
+          )
+          return {
+            status: 'ready',
+            level: page.level,
+            label: page.label,
+            items: merged,
+            nextCursor: page.nextCursor,
+            loadingMore: false,
+            moreFailed: false,
+            focusTargetId: restarted ? (merged[0]?.id ?? null) : null,
+          }
         })
         if (restarted)
           announceRef.current({ key: 'community.spotlight.announceRefreshed' })
@@ -192,13 +225,14 @@ export function useCommunitySpotlight<Token = number>({
         setState({ ...IDLE, status: isDisabledRefusal(error) ? 'disabled' : 'error' })
       }
     },
-    [begin]
+    [begin, preserveNewerText]
   )
 
   const loadMore = useCallback(async () => {
     const { nextCursor, loadingMore } = stateRef.current
     if (!nextCursor || loadingMore) return
     const request = begin()
+    const startClock = textClockRef.current
     setState((previous) => ({ ...previous, loadingMore: true, moreFailed: false }))
     try {
       const ticket = beginReadRef.current()
@@ -211,16 +245,22 @@ export function useCommunitySpotlight<Token = number>({
         stateRef.current.items,
         reconcileRef.current(page.items, ticket)
       )
-      setState((current) => ({
-        ...current,
-        status: 'ready',
-        level: page.level,
-        label: page.label,
-        items: [...current.items, ...newEntries(current.items, added)],
-        nextCursor: page.nextCursor,
-        loadingMore: false,
-        focusTargetId: added[0]?.id ?? null,
-      }))
+      setState((current) => {
+        const currentById = new Map(current.items.map((item) => [item.id, item]))
+        const incoming = newEntries(current.items, added).map((item) =>
+          preserveNewerText(item, currentById.get(item.id), startClock)
+        )
+        return {
+          ...current,
+          status: 'ready',
+          level: page.level,
+          label: page.label,
+          items: [...current.items, ...incoming],
+          nextCursor: page.nextCursor,
+          loadingMore: false,
+          focusTargetId: incoming[0]?.id ?? null,
+        }
+      })
       // A page whose posts were all filtered or already shown changes nothing
       // the reader can hear, so it stays silent and View more stays for the
       // cursor it returned.
@@ -246,7 +286,7 @@ export function useCommunitySpotlight<Token = number>({
       setState((current) => ({ ...current, loadingMore: false, moreFailed: true }))
       announceRef.current({ key: 'community.spotlight.error' })
     }
-  }, [begin, loadFirstPage])
+  }, [begin, loadFirstPage, preserveNewerText])
 
   const abortItemRefreshes = useCallback(() => {
     for (const controller of itemControllersRef.current) controller.abort()
@@ -257,6 +297,8 @@ export function useCommunitySpotlight<Token = number>({
     controllerRef.current?.abort()
     abortItemRefreshes()
     generationRef.current++
+    textClockRef.current++
+    textFenceRef.current.clear()
     setState(IDLE)
   }, [abortItemRefreshes])
 
@@ -267,7 +309,17 @@ export function useCommunitySpotlight<Token = number>({
       let changed = false
       const items = previous.items.flatMap((item) => {
         const next = update(item)
-        if (next !== item) changed = true
+        if (next !== item) {
+          changed = true
+          if (
+            next &&
+            (next.title !== item.title ||
+              next.caption !== item.caption ||
+              next.textRevision !== item.textRevision)
+          ) {
+            textFenceRef.current.set(item.id, ++textClockRef.current)
+          }
+        }
         return next ? [{ ...next, rank: item.rank }] : []
       })
       return changed ? { ...previous, items } : previous
@@ -286,6 +338,7 @@ export function useCommunitySpotlight<Token = number>({
       if (!shown) return
       const controller = new AbortController()
       itemControllersRef.current.add(controller)
+      const startClock = textClockRef.current
       try {
         const ticket = beginReadRef.current()
         const post = await getCommunityPostFromWeb(postId, controller.signal)
@@ -300,7 +353,7 @@ export function useCommunitySpotlight<Token = number>({
         apply((item) =>
           item?.id === postId
             ? fresh
-              ? reconcileCommunityPostText(fresh, item)
+              ? preserveNewerText(fresh, item as CommunitySpotlightItem, startClock)
               : null
             : item
         )
@@ -312,7 +365,7 @@ export function useCommunitySpotlight<Token = number>({
         itemControllersRef.current.delete(controller)
       }
     },
-    [apply]
+    [apply, preserveNewerText]
   )
 
   /**

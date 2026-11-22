@@ -104,6 +104,9 @@ it('shows distinct outcome feedback for saved and unchanged edits', async () => 
   expect((await screen.findByTestId('community-edit-status')).textContent).toBe(
     'No changes'
   )
+  expect((await screen.findByTestId('status-feedback-bar')).textContent).toContain(
+    'No changes'
+  )
   expect(onSaved).not.toHaveBeenCalled()
 
   fireEvent.click(screen.getByTestId('community-edit-text'))
@@ -116,6 +119,9 @@ it('shows distinct outcome feedback for saved and unchanged edits', async () => 
   fireEvent.click(screen.getByTestId('community-edit-save'))
 
   expect((await screen.findByTestId('community-edit-status')).textContent).toBe(
+    'Changes saved.'
+  )
+  expect((await screen.findByTestId('status-feedback-bar')).textContent).toContain(
     'Changes saved.'
   )
   expect(onSaved).toHaveBeenCalledWith('look', {

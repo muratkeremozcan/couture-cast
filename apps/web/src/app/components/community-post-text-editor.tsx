@@ -45,8 +45,8 @@ function isUnchangedOutcome(
 ): boolean {
   return (
     result.textRevision === baseRevision &&
-    result.title === (item.title ?? null) &&
-    result.caption === (item.caption ?? null)
+    result.title === (item.title?.trim() || null) &&
+    result.caption === (item.caption?.trim() || null)
   )
 }
 

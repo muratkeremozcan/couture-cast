@@ -221,6 +221,22 @@ test(
         await expect(detail.getByTestId('community-edit-status')).toHaveText('No changes')
       })
 
+      await test.step('Reload proves both combined editor-saved fields persist before advancing revision', async () => {
+        await page.reload()
+        const postSaveFeed = completedCommunityFeed(page, 'all')
+        await page.getByRole('button', { name: 'Every climate', exact: true }).click()
+        expect((await postSaveFeed).status).toBe(200)
+        await expect(card.getByTestId(`title-${postId}`)).toHaveText(updated.title)
+        await expect(card.getByTestId(`caption-${postId}`)).toHaveText(updated.caption)
+        await expect(card.getByTestId(`edited-badge-${postId}`)).toHaveText('Edited')
+        await card.getByTestId(`lookbook-open-${postId}`).click()
+        await expect(detail).toHaveAccessibleName(updated.title)
+        await expect(detail.getByTestId('community-detail-caption')).toHaveText(
+          updated.caption
+        )
+        await expect(detail.getByTestId('community-detail-edited')).toHaveText('Edited')
+      })
+
       await test.step('Already-open second browser client reconciles live edits and surfaces stale revision on conflict', async () => {
         const secondCard = secondPage.getByTestId(`lookbook-card-${postId}`)
         await expect(secondCard.getByTestId(`title-${postId}`)).toHaveText(

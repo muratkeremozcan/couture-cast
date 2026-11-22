@@ -7,6 +7,7 @@ import { CLIMATE_BANDS } from '@couture/utils'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_MODERATION_REASON_CATEGORY,
+  CommunityPostTextLedger,
   climateBandSchema,
   communityAuthorPostStateSchema,
   communityFeedAuthorSchema,
@@ -112,6 +113,124 @@ describe('community HTTP contracts', () => {
           newer
         )
       ).toEqual({ id: 'post-2', title: 'Other', caption: null, textRevision: 0 })
+      const withdrawn = {
+        id: 'post-1',
+        title: 'Old title',
+        caption: null,
+        status: 'withdrawn' as const,
+        textRevision: undefined,
+      }
+      expect(reconcileCommunityPostText(withdrawn, newer)).toEqual(withdrawn)
+    })
+
+    it('reconciles owner revisions and non-author realtime fences through CommunityPostTextLedger', () => {
+      const ledger = new CommunityPostTextLedger()
+      const staleRead = ledger.begin()
+
+      ledger.record({
+        id: 'post-1',
+        title: 'Realtime title',
+        caption: 'Realtime caption',
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-1',
+            title: 'Stale non-author title',
+            caption: 'Stale non-author caption',
+            status: 'published',
+          },
+          staleRead
+        )
+      ).toEqual({
+        id: 'post-1',
+        title: 'Realtime title',
+        caption: 'Realtime caption',
+        status: 'published',
+        textRevision: undefined,
+      })
+
+      const freshRead = ledger.begin()
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-1',
+            title: 'Even newer server title',
+            caption: 'Even newer server caption',
+            status: 'published',
+          },
+          freshRead
+        )
+      ).toEqual({
+        id: 'post-1',
+        title: 'Even newer server title',
+        caption: 'Even newer server caption',
+        status: 'published',
+      })
+
+      ledger.record({
+        id: 'post-2',
+        title: 'Owner saved v2',
+        caption: 'Caption v2',
+        textRevision: 2,
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Stale v1',
+            caption: 'Caption v1',
+            textRevision: 1,
+            status: 'published',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Owner saved v2',
+        caption: 'Caption v2',
+        textRevision: 2,
+        status: 'published',
+      })
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Flagged',
+            caption: null,
+            status: 'flagged',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Flagged',
+        caption: null,
+        status: 'flagged',
+      })
+
+      ledger.evict('post-2')
+      ledger.clear()
+      expect(
+        ledger.reconcile(
+          {
+            id: 'post-2',
+            title: 'Fresh viewer v0',
+            caption: null,
+            textRevision: 0,
+            status: 'published',
+          },
+          ledger.begin()
+        )
+      ).toEqual({
+        id: 'post-2',
+        title: 'Fresh viewer v0',
+        caption: null,
+        textRevision: 0,
+        status: 'published',
+      })
     })
   })
 

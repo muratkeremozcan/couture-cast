@@ -112,6 +112,7 @@ import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
 import { parseDeepLink, CLIMATE_BANDS } from '@couture/utils'
 import {
+  CommunityPostTextLedger,
   communityModerationReasonCategories,
   communityPostCaptionSchema,
   communityPostTitleSchema,
@@ -2573,6 +2574,7 @@ export function CommunityLookbookGrid({
    * consumer settles its post against this ledger when it commits.
    */
   const [liveSponsorships] = useState(() => new LiveSponsorshipLedger())
+  const [postTextLedger] = useState(() => new CommunityPostTextLedger())
   /**
    * Records one live read, started at `stamp`, then settles every copy of each
    * post it carried against the ledger. Call it as the read lands, BEFORE
@@ -2629,6 +2631,7 @@ export function CommunityLookbookGrid({
     (sanction: CommunityBannedError['sanction']) => {
       // A read still in flight was authorized before the ban, so its answer can never land.
       feedGenerationRef.current++
+      postTextLedger.clear()
       setIsLoading(false)
       setIsLoadingMore(false)
       actionControllerRef.current?.abort()
@@ -2650,7 +2653,7 @@ export function CommunityLookbookGrid({
       // The notice mounts with its words, which a screen reader may not hear, so the live region says it.
       setAnnouncement({ key: 'community.error.banned' })
     },
-    [setAnnouncement]
+    [postTextLedger, setAnnouncement]
   )
   /**
    * The feed's own messages. The loading message always starts a fresh list; the completion
@@ -2731,19 +2734,32 @@ export function CommunityLookbookGrid({
   // sponsorship stamp, both taken as the read starts, in the token the hook
   // hands back with the page. Nothing is stored per read, so a failed, aborted
   // or superseded read leaves nothing behind.
-  const spotlight = useCommunitySpotlight<{ ticket: number; stamp: LiveReadStamp }>({
+  const spotlight = useCommunitySpotlight<{
+    ticket: number
+    stamp: LiveReadStamp
+    textStamp: number
+  }>({
     scope: sessionScope,
     onBanned: closeForBan,
     beginRead: () => ({
       ticket: reactionState.beginRead(),
       stamp: liveSponsorships.begin(),
+      textStamp: postTextLedger.begin(),
     }),
-    reconcile: (page, { ticket, stamp }) => {
+    reconcile: (page, { ticket, stamp, textStamp }) => {
       applyLiveSponsorship(page, stamp)
       return page.flatMap((post) => {
         const current = reactionState.read(post, ticket)
         return current
-          ? [{ ...withLiveSponsorship(current, liveSponsorships), rank: post.rank }]
+          ? [
+              {
+                ...postTextLedger.reconcile(
+                  withLiveSponsorship(current, liveSponsorships),
+                  textStamp
+                ),
+                rank: post.rank,
+              },
+            ]
           : []
       })
     },
@@ -2864,6 +2880,7 @@ export function CommunityLookbookGrid({
       for (const target of targets) {
         try {
           const stamp = liveSponsorships.begin()
+          const textStamp = postTextLedger.begin()
           const post = await getCommunityPostFromWeb(target, signal)
           if (!isCurrent()) return
           applyLiveSponsorship([post], stamp)
@@ -2874,25 +2891,26 @@ export function CommunityLookbookGrid({
               loadedIds.has(target)
                 ? null
                 : live
-                  ? reconcileCommunityPostText(live, current)
+                  ? postTextLedger.reconcile(live, textStamp, current)
                   : live
             )
           setOpenedItem((opened) =>
             opened?.id === target
               ? live
-                ? reconcileCommunityPostText(live, opened)
+                ? postTextLedger.reconcile(live, textStamp, opened)
                 : live
               : opened
           )
         } catch (error: unknown) {
           if (isCurrent() && communityFailureReason(error) === 'not_found') {
+            postTextLedger.evict(target)
             reactionState.evict(target)
             comments.evict(target)
           }
         }
       }
     },
-    [applyLiveSponsorship, comments, liveSponsorships, reactionState]
+    [applyLiveSponsorship, comments, liveSponsorships, postTextLedger, reactionState]
   )
 
   /**
@@ -2952,6 +2970,7 @@ export function CommunityLookbookGrid({
       }
 
       const stamp = liveSponsorships.begin()
+      const textStamp = postTextLedger.begin()
       try {
         const { feed, restarted } = await readFeedPage(mode, cursor, controller.signal)
         if (generation !== feedGenerationRef.current) {
@@ -2993,8 +3012,9 @@ export function CommunityLookbookGrid({
           const previousById = new Map(previous.map((item) => [item.id, item]))
           return (append && !restarted ? mergeFeedPages(previous, page) : page).map(
             (post) =>
-              reconcileCommunityPostText(
+              postTextLedger.reconcile(
                 live(reactionState.current(post)),
+                textStamp,
                 previousById.get(post.id)
               )
           )
@@ -3049,6 +3069,7 @@ export function CommunityLookbookGrid({
       applyLiveSponsorship,
       closeForBan,
       liveSponsorships,
+      postTextLedger,
       reactionState,
       reportFeedFailure,
       revalidateHighlighted,
@@ -3066,6 +3087,7 @@ export function CommunityLookbookGrid({
       resetSpotlight()
       // Live answers are per viewer.
       liveSponsorships.clear()
+      postTextLedger.clear()
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
@@ -3119,7 +3141,14 @@ export function CommunityLookbookGrid({
       window.removeEventListener('storage', syncSession)
       window.removeEventListener('couture:session', syncSession)
     }
-  }, [comments, reactionState, loadFeed, resetSpotlight, liveSponsorships])
+  }, [
+    comments,
+    reactionState,
+    loadFeed,
+    resetSpotlight,
+    liveSponsorships,
+    postTextLedger,
+  ])
 
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
@@ -3142,7 +3171,9 @@ export function CommunityLookbookGrid({
       generation === detailGenerationRef.current && scope === feedScopeRef.current
     const generation = detailGenerationRef.current
     const ticket = reactionState.beginRead()
+    const textStamp = postTextLedger.begin()
     const buffered = newLooksRef.current
+    const bufferedById = new Map(buffered.map((post) => [post.id, post]))
     setIsInsertingLooks(true)
     try {
       const fresh: CommunityFeedItem[] = []
@@ -3164,14 +3195,21 @@ export function CommunityLookbookGrid({
       }
       // Story 6.7b: the resolve carries no sponsorship answer, so each revealed
       // look takes the latest live answer at the moment it is inserted.
-      setItems((previous) => [
-        ...new Map(
-          [
-            ...fresh.map((post) => withLiveSponsorship(post, liveSponsorships)),
-            ...previous,
-          ].map((post) => [post.id, post])
-        ).values(),
-      ])
+      setItems((previous) => {
+        const previousById = new Map(previous.map((post) => [post.id, post]))
+        const reconciledFresh = fresh.map((post) =>
+          postTextLedger.reconcile(
+            withLiveSponsorship(post, liveSponsorships),
+            textStamp,
+            bufferedById.get(post.id) ?? previousById.get(post.id)
+          )
+        )
+        return [
+          ...new Map(
+            [...reconciledFresh, ...previous].map((post) => [post.id, post])
+          ).values(),
+        ]
+      })
       newLooksRef.current = []
       setNewLooks([])
     } catch {
@@ -3187,6 +3225,7 @@ export function CommunityLookbookGrid({
     const refreshFeed = async (signal?: AbortSignal) => {
       const generation = feedGenerationRef.current
       const stamp = liveSponsorships.begin()
+      const textStamp = postTextLedger.begin()
       const page = await getCommunityFeedFromWeb({
         mode: currentMode,
         limit: FEED_PAGE_SIZE,
@@ -3216,11 +3255,19 @@ export function CommunityLookbookGrid({
       if (!itemsRef.current.length) {
         // Bootstrap validates targets as soon as this rebuild returns. React may
         // commit the queued render later, so publish its feed snapshot now.
-        const rebuilt = page.items.map(live)
+        const rebuilt = page.items.map((item) =>
+          postTextLedger.reconcile(live(item), textStamp)
+        )
         itemsRef.current = rebuilt
         setItems(rebuilt)
       } else if (incoming.length) {
-        const buffered = mergeFeedPages(incoming, newLooksRef.current).map(live)
+        const existingBufferById = new Map(
+          newLooksRef.current.map((item) => [item.id, item])
+        )
+        const reconciledIncoming = incoming.map((item) =>
+          postTextLedger.reconcile(live(item), textStamp, existingBufferById.get(item.id))
+        )
+        const buffered = mergeFeedPages(reconciledIncoming, newLooksRef.current.map(live))
         newLooksRef.current = buffered
         setNewLooks(buffered)
         setAnnouncement({
@@ -3273,6 +3320,7 @@ export function CommunityLookbookGrid({
             (item) => item.id !== target.key
           )
           setNewLooks(newLooksRef.current)
+          postTextLedger.evict(target.key)
           reactionState.evict(target.key)
           comments.evict(target.key)
           setItems((previous) => previous.filter((item) => item.id !== target.key))
@@ -3286,7 +3334,11 @@ export function CommunityLookbookGrid({
         // Story 6.7b: the target resolve does not opt in to sponsorship, so the
         // post carries the latest live answer for it, block or absence, on
         // every copy, the New looks buffer included.
-        const updated = withLiveSponsorship(resolved, liveSponsorships)
+        const updated = postTextLedger.reconcile(
+          withLiveSponsorship(resolved, liveSponsorships),
+          postTextLedger.begin()
+        )
+        postTextLedger.record(updated)
         const update = (item: CommunityFeedItem | null) =>
           item?.id === target.post.id ? reconcileCommunityPostText(updated, item) : item
         newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
@@ -3340,6 +3392,7 @@ export function CommunityLookbookGrid({
           reactionState.reset()
           resetSpotlight()
           liveSponsorships.clear()
+          postTextLedger.clear()
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
@@ -3421,6 +3474,7 @@ export function CommunityLookbookGrid({
     closeForBan,
     reportFeedFailure,
     liveSponsorships,
+    postTextLedger,
     comments,
     currentMode,
     sessionScope,
@@ -3461,6 +3515,7 @@ export function CommunityLookbookGrid({
     let cancelled = false
     const detailGeneration = ++detailGenerationRef.current
     const readTicket = reactionState.beginRead()
+    const textStamp = postTextLedger.begin()
     if (
       highlightedCardId &&
       !itemsRef.current.some((item) => item.id === highlightedCardId)
@@ -3471,8 +3526,14 @@ export function CommunityLookbookGrid({
           if (!cancelled && detailGeneration === detailGenerationRef.current) {
             applyLiveSponsorship([post], stamp)
             const read = reactionState.read(post, readTicket)
-            setDeepLinkedItem(() =>
-              read ? withLiveSponsorship(read, liveSponsorships) : read
+            setDeepLinkedItem((current) =>
+              read
+                ? postTextLedger.reconcile(
+                    withLiveSponsorship(read, liveSponsorships),
+                    textStamp,
+                    current
+                  )
+                : read
             )
           }
         })
@@ -3483,6 +3544,7 @@ export function CommunityLookbookGrid({
           if (!cancelled && detailGeneration === detailGenerationRef.current) {
             setDeepLinkedItem(null)
             if (communityFailureReason(error) === 'not_found') {
+              postTextLedger.evict(highlightedCardId)
               reactionState.evict(highlightedCardId)
               comments.evict(highlightedCardId)
             }
@@ -3500,6 +3562,7 @@ export function CommunityLookbookGrid({
     comments,
     highlightedCardId,
     liveSponsorships,
+    postTextLedger,
     reactionState,
     sessionScope,
   ])
@@ -3520,6 +3583,7 @@ export function CommunityLookbookGrid({
     const intent = notificationIntentRef.current
     let generation = detailGenerationRef.current
     const readTicket = reactionState.beginRead()
+    const textStamp = postTextLedger.begin()
     const controller = new AbortController()
     const deadline = performance.now() + 10_000
     let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -3594,6 +3658,7 @@ export function CommunityLookbookGrid({
               (item) => item.id !== highlightedCardId
             )
             setNewLooks(newLooksRef.current)
+            postTextLedger.evict(highlightedCardId)
             reactionState.evict(highlightedCardId)
             comments.evict(highlightedCardId)
           }
@@ -3608,7 +3673,13 @@ export function CommunityLookbookGrid({
         setDetailSurface('community_feed')
         clearDetailOpener()
         // A resolve copy: it takes the latest live answer for its post.
-        setOpenedItem(() => withLiveSponsorship(post, liveSponsorships))
+        setOpenedItem((current) =>
+          postTextLedger.reconcile(
+            withLiveSponsorship(post, liveSponsorships),
+            textStamp,
+            current
+          )
+        )
         if (focus)
           setCommentTarget({
             commentId: focus.id,
@@ -3645,6 +3716,7 @@ export function CommunityLookbookGrid({
   }, [
     sessionScope,
     highlightedCardId,
+    postTextLedger,
     reactionState,
     comments,
     liveSponsorships,
@@ -4311,6 +4383,7 @@ export function CommunityLookbookGrid({
             t={t}
             restoreFocus={detailOpener.restoreFocus}
             onTextSaved={(postId, text) => {
+              postTextLedger.record({ id: postId, ...text, status: 'published' })
               const update = (post: CommunityFeedItem | null) =>
                 post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
                   ? { ...post, ...text }

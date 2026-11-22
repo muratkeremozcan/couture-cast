@@ -436,7 +436,14 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
       baseRevision: 0,
       title: 'Evening layers',
       caption: 'A fresh caption',
-      screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+      expectedPolicyVersion: 'fixture',
+      screen: ({ locale, textFingerprint }) =>
+        Promise.resolve({
+          passed: true,
+          policyVersion: 'fixture',
+          locale,
+          textFingerprint,
+        }),
     })
     await drainCommunityOutbox(prisma, streams)
     const legacyPage = await legacy.events('all', legacyHead.nextCursor)
@@ -479,7 +486,14 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         baseRevision: 0,
         title: 'Evening layers',
         caption: null,
-        screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+        expectedPolicyVersion: 'fixture',
+        screen: ({ locale, textFingerprint }) =>
+          Promise.resolve({
+            passed: true,
+            policyVersion: 'fixture',
+            locale,
+            textFingerprint,
+          }),
       })
       await drainCommunityOutbox(prisma, streams)
 
@@ -531,7 +545,14 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         repository.editPublishedPostText({
           ...attempt,
           postId: first.id,
-          screen: () => Promise.resolve({ passed: false, policyVersion: 'fixture' }),
+          expectedPolicyVersion: 'fixture',
+          screen: ({ locale, textFingerprint }) =>
+            Promise.resolve({
+              passed: false,
+              policyVersion: 'fixture',
+              locale,
+              textFingerprint,
+            }),
         })
       ).resolves.toBeNull()
     }
@@ -539,16 +560,30 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
       repository.editPublishedPostText({
         ...attempt,
         postId: second.id,
-        screen: () => Promise.resolve({ passed: true, policyVersion: 'fixture' }),
+        expectedPolicyVersion: 'fixture',
+        screen: ({ locale, textFingerprint }) =>
+          Promise.resolve({
+            passed: true,
+            policyVersion: 'fixture',
+            locale,
+            textFingerprint,
+          }),
       })
     ).resolves.toMatchObject({ textRevision: 1 })
-    const screen = vi.fn(() =>
-      Promise.resolve({ passed: true, policyVersion: 'fixture' })
+    const screen = vi.fn(
+      ({ locale, textFingerprint }: { locale: string | null; textFingerprint: string }) =>
+        Promise.resolve({
+          passed: true,
+          policyVersion: 'fixture',
+          locale,
+          textFingerprint,
+        })
     )
     await expect(
       repository.editPublishedPostText({
         ...attempt,
         postId: first.id,
+        expectedPolicyVersion: 'fixture',
         screen,
       })
     ).rejects.toMatchObject({ status: 429 })
@@ -573,8 +608,14 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         createLookbookPost({ userId: teen.id, status: 'published' })
       ),
     })
-    const screen = vi.fn(() =>
-      Promise.resolve({ passed: true, policyVersion: 'fixture' })
+    const screen = vi.fn(
+      ({ locale, textFingerprint }: { locale: string | null; textFingerprint: string }) =>
+        Promise.resolve({
+          passed: true,
+          policyVersion: 'fixture',
+          locale,
+          textFingerprint,
+        })
     )
     const priorPolicy = process.env.GUARDIAN_CONSENT_POLICY
     process.env.GUARDIAN_CONSENT_POLICY = 'required_13_15'
@@ -586,6 +627,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
           baseRevision: 0,
           title: 'First look',
           caption: null,
+          expectedPolicyVersion: 'fixture',
           screen,
         })
       ).rejects.toMatchObject({ status: 403 })
