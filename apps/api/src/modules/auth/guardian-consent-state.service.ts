@@ -74,6 +74,7 @@ export function requiresGuardianConsent(
 export class GuardianConsentStateService {
   private readonly logger = new Logger(GuardianConsentStateService.name)
   private readonly teenAccessCache = new Map<string, CachedTeenAccessState>()
+  private readonly teenNonUploadAccessCache = new Map<string, CachedTeenAccessState>()
 
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
@@ -104,10 +105,47 @@ export class GuardianConsentStateService {
     return allowed
   }
 
+  /**
+   * Non-upload, non-posting member surfaces (such as account-backed saved looks):
+   * permits active teens and guardian-pending teens while still blocking suspended
+   * or missing-profile accounts.
+   */
+  async canTeenAccessNonUploadSurface(userId: string) {
+    const now = Date.now()
+    const cached = this.teenNonUploadAccessCache.get(userId)
+    if (cached && cached.expiresAt > now) {
+      return cached.allowed
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        profile: {
+          select: {
+            preferences: true,
+          },
+        },
+      },
+    })
+
+    const allowed = this.resolveTeenNonUploadAccess(userId, user)
+    this.teenNonUploadAccessCache.set(userId, {
+      allowed,
+      expiresAt: now + TEEN_ACCESS_CACHE_TTL_MS,
+    })
+
+    return allowed
+  }
+
   markTeenAccessGranted(userId: string) {
+    const expiresAt = Date.now() + TEEN_ACCESS_CACHE_TTL_MS
     this.teenAccessCache.set(userId, {
       allowed: true,
-      expiresAt: Date.now() + TEEN_ACCESS_CACHE_TTL_MS,
+      expiresAt,
+    })
+    this.teenNonUploadAccessCache.set(userId, {
+      allowed: true,
+      expiresAt,
     })
   }
 
@@ -116,14 +154,17 @@ export class GuardianConsentStateService {
       allowed: false,
       expiresAt: Date.now() + TEEN_ACCESS_CACHE_TTL_MS,
     })
+    this.teenNonUploadAccessCache.delete(userId)
   }
 
   invalidateTeenAccess(userId: string) {
     this.teenAccessCache.delete(userId)
+    this.teenNonUploadAccessCache.delete(userId)
   }
 
   clearCache() {
     this.teenAccessCache.clear()
+    this.teenNonUploadAccessCache.clear()
   }
 
   private resolveTeenAccess(userId: string, user: TeenProfileLookup) {
@@ -145,6 +186,34 @@ export class GuardianConsentStateService {
       const { accountStatus } = extractComplianceState(user.profile.preferences)
       this.logger.warn(
         `Blocking teen request for "${userId}" because account status is "${
+          typeof accountStatus === 'string' ? accountStatus : 'unknown'
+        }"`
+      )
+      return false
+    }
+
+    return true
+  }
+
+  private resolveTeenNonUploadAccess(userId: string, user: TeenProfileLookup) {
+    if (!user) {
+      this.logger.warn(
+        `Blocking teen non-upload request for "${userId}" because the user record was not found`
+      )
+      return false
+    }
+
+    if (!user.profile) {
+      this.logger.warn(
+        `Blocking teen non-upload request for "${userId}" because the profile record is missing`
+      )
+      return false
+    }
+
+    if (teenAccessBlocked(user.profile.preferences, 'off')) {
+      const { accountStatus } = extractComplianceState(user.profile.preferences)
+      this.logger.warn(
+        `Blocking teen non-upload request for "${userId}" because account status is "${
           typeof accountStatus === 'string' ? accountStatus : 'unknown'
         }"`
       )

@@ -1059,5 +1059,26 @@
     "lookUpdated": "Look actualizado.",
     "pieceSwapped": "Prenda cambiada.",
     "close": "Cerrar"
+  },
+  "savedLooks": {
+    "title": "Looks guardados",
+    "count": "{{count}} guardados",
+    "empty": "Todavía no hay looks guardados.",
+    "reopen": "Volver a abrir",
+    "remove": "Quitar",
+    "missingPiece": "Prenda faltante",
+    "missingPieceDetail": "Una prenda de este look guardado ya no está en tu clóset.",
+    "needsReview": "Requiere revisión",
+    "needsReviewDetail": "Cambiaste las etiquetas de una prenda de este look. Revísalo para confirmar que aún combina.",
+    "photoUnavailable": "Foto no disponible",
+    "loadFailed": "No se pudieron cargar tus looks guardados.",
+    "retry": "Reintentar",
+    "detailTitle": "Look guardado",
+    "sourceStylePiece": "Desde tu prenda",
+    "sourceHomeSample": "Desde idea de ejemplo",
+    "slotOrderLabel": "Prendas en este look",
+    "close": "Cerrar",
+    "showList": "Mostrar looks guardados",
+    "hideList": "Ocultar looks guardados"
   }
 }

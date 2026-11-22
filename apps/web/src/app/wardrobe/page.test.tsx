@@ -91,6 +91,15 @@ vi.mock('../../lib/wardrobe', async () => ({
   generateIdempotencyKey: () => 'test-idempotency-key',
 }))
 
+vi.mock('../../lib/saved-looks', () => ({
+  listSavedLooksFromWeb: vi.fn().mockResolvedValue([]),
+  createSavedLookFromWeb: vi.fn(),
+  getSavedLookFromWeb: vi.fn(),
+  deleteSavedLookFromWeb: vi.fn(),
+  formatSavedLookIfMatch: (id: string, revision: number) =>
+    `"saved-look:${id}:${revision}"`,
+}))
+
 import WardrobePage from './page'
 
 beforeEach(stubGarmentPreviewUrl)

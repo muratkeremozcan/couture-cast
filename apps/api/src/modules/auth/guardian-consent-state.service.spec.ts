@@ -105,4 +105,83 @@ describe('GuardianConsentStateService', () => {
     await expect(service.canTeenAccess('teen-active')).resolves.toBe(true)
     expect(findUnique).toHaveBeenCalledOnce()
   })
+
+  it('canTeenAccessNonUploadSurface permits pending_guardian_consent even under required_13_15', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+    const { service } = createService({
+      preferences: {
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      },
+    })
+
+    await expect(service.canTeenAccess('teen-pending')).resolves.toBe(false)
+    await expect(service.canTeenAccessNonUploadSurface('teen-pending')).resolves.toBe(
+      true
+    )
+  })
+
+  it('canTeenAccessNonUploadSurface fails closed for suspended, blocked, or missing records', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+    for (const profile of [
+      undefined,
+      null,
+      { preferences: null },
+      { preferences: { compliance: { accountStatus: 'suspended' } } },
+      { preferences: { compliance: { accountStatus: 'blocked_underage' } } },
+    ]) {
+      const { service } = createService(profile)
+      await expect(service.canTeenAccessNonUploadSurface('teen-blocked')).resolves.toBe(
+        false
+      )
+    }
+  })
+
+  it('invalidateTeenAccess, markTeenAccessGranted/Revoked, and clearCache manage both caches', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+    const { findUnique, service } = createService({
+      preferences: {
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      },
+    })
+
+    await expect(service.canTeenAccessNonUploadSurface('teen-pending')).resolves.toBe(
+      true
+    )
+    await expect(service.canTeenAccessNonUploadSurface('teen-pending')).resolves.toBe(
+      true
+    )
+    expect(findUnique).toHaveBeenCalledTimes(1)
+
+    service.invalidateTeenAccess('teen-pending')
+    await expect(service.canTeenAccessNonUploadSurface('teen-pending')).resolves.toBe(
+      true
+    )
+    expect(findUnique).toHaveBeenCalledTimes(2)
+
+    service.markTeenAccessGranted('teen-granted')
+    await expect(service.canTeenAccess('teen-granted')).resolves.toBe(true)
+    await expect(service.canTeenAccessNonUploadSurface('teen-granted')).resolves.toBe(
+      true
+    )
+    expect(findUnique).toHaveBeenCalledTimes(2)
+
+    service.markTeenAccessRevoked('teen-granted')
+    await expect(service.canTeenAccess('teen-granted')).resolves.toBe(false)
+    await expect(service.canTeenAccessNonUploadSurface('teen-granted')).resolves.toBe(
+      true
+    )
+    expect(findUnique).toHaveBeenCalledTimes(3)
+
+    service.clearCache()
+    await expect(service.canTeenAccessNonUploadSurface('teen-pending')).resolves.toBe(
+      true
+    )
+    expect(findUnique).toHaveBeenCalledTimes(4)
+  })
 })

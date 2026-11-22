@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-21.
-Added Steps 40 to 59:
+Updated: 2026-11-22.
+Added Steps 40 to 60:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -23,7 +23,8 @@ Added Steps 40 to 59:
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story, merged on `main`.
   - Production follow-ups after the project close, merged on `main`: Jade's profile and location fix (PR #257), Settings session follow-up, image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week race fixes, and production profile/location checks.
-- Step 59: Story 7.1, shared save, undo and status feedback, in review on `feat/epic7-story-7-1-shared-save-undo-status-feedback`.
+- Step 59: Story 7.1, shared save, undo and status feedback, `0154d786` (PR #286), merged on 2026-11-21.
+- Step 60: Story 7.2, saved looks follow the account, in review on `feat/epic7-story-7-2-saved-looks-follow-account`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -31,6 +32,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 60 for Story CC-7.2 (saved looks follow the account) while its PR is in review, and moved Step 59 to merged (`0154d786`, PR #286).
 Added Step 59 for Story CC-7.1 (shared save, undo and status feedback) while its PR is in review, and moved Step 58 and its production follow-ups to merged.
 Added Step 58's production profile and location checks, run in the daily production run as the synthetic member, while its PR is in review.
 Added Step 58's production member follow-up, the synthetic member the production run signs in as, while its PR is in review.
@@ -21043,3 +21045,158 @@ Evidence boundaries:
 - Full workspace suites, Playwright E2E, and native device lanes run in CI on the PR.
 - Real-device VoiceOver/TalkBack announcement cadence, real phone viewport geometry, and physical
   iOS/Android safe-area visual alignment are not proved by headless Vitest runs.
+
+## Step 60: Saved looks follow the account
+
+User/business impact:
+
+- Signed-in members no longer lose looks saved in Style this piece or Home sample when they switch
+  devices, open a fresh browser context, or browse with browser storage blocked.
+- Every saved look preserves its ordered composition snapshot, weather preset, and swaps on both
+  web and native, and opens from a "Saved looks" row at the top of the Closet screen until the
+  dedicated Looks tab ships in CC-7.12.
+- Deleted garments and edited garment tags never silently drop a saved look: missing pieces render
+  an explicit placeholder, changed anchor tags show a "Needs review" state, and unavailable garment
+  photos fall back cleanly without failing the read.
+
+Key takeaways:
+
+- `SavedLook` stores an intentional non-cascading `anchor_garment_id` reference alongside an
+  authoritative `anchor_snapshot` and ordered `composition` JSON, while cascading strictly on
+  `User(id)` for account erasure and enforcing Postgres RLS + same-owner lookups on every read and
+  write.
+- `POST /api/v1/wardrobe/saved-looks` enforces UUID v4 `Idempotency-Key` replay (`200 OK`) and
+  payload-mismatch conflict (`409 Conflict`), while `DELETE` enforces strong `ETag`/`If-Match`
+  revision checks (`428` / `412`), with `Cache-Control: private, no-store` applied via middleware
+  across both success and error responses.
+- `@AllowPendingGuardianTeen()` lets guardian-pending teens save, read, and remove looks with the
+  same tap counts as approved members while keeping suspended accounts blocked and preserving
+  guardian gates on photo uploads and community posting.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- Reproducing the bug end to end in Playwright before coding proved how completely browser-storage
+  blocking (`SecurityError` on `window.localStorage`) broke saved looks across contexts.
+- Signing garment thumbnails on saved-look reads must check `isOwnGarmentObject` and swallow
+  transient storage-signing failures into `imageAccess: null` so saved looks still render cleanly
+  when object storage is unavailable.
+- Updating `SampleBookmark` / `StylePiecePanel` persistence from `localStorage` and native files to
+  the account API requires reusing a stable `Idempotency-Key` per save attempt across retries and
+  updating legacy localStorage-only unit tests to exercise the real HTTP contract via MSW.
+
+Story/Task mapping:
+
+- Story CC-7.2: Saved looks follow the account (Epic 7 Lane A reliability).
+- Follow-on dependency: CC-7.3 imports legacy device-saved looks for the same member; CC-7.12
+  moves the temporary Closet "Saved looks" row into the dedicated Looks tab.
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`### CC-7.2: Saved looks follow the account`)
+- `_bmad-output/implementation-artifacts/spec-7-2-saved-looks-follow-account.md`
+- `_bmad-output/implementation-artifacts/reviews/story-7-2-codex-review.md`
+
+Cross-links:
+
+- Step 59 (`#step-59-shared-save-undo-and-status-feedback`): CC-7.1 shared `SaveActionButton` and
+  `StatusFeedbackBar` reused for Save, Retry, Remove, and Undo.
+- Step 31 (`#step-31-outfit-capsule-builder`): established the `Idempotency-Key`, strong `ETag` /
+  `If-Match`, and `CapsuleCacheHeadersMiddleware` patterns reused here.
+
+Sequence to follow:
+
+1. Add `SavedLookSource` and `SavedLook` to `packages/db/prisma/schema.prisma` with migration
+   `20261122040000_add_saved_looks`, Postgres RLS, and `ON DELETE CASCADE` on `User(id)`.
+2. Define Zod HTTP contracts and OpenAPI 3.1 paths in
+   `packages/api-client/src/contracts/http/saved-looks.ts`, regenerate the SDK, and verify Optic
+   lint.
+3. Add shared payload/reopen/UUID v4 idempotency helpers in
+   `packages/utils/src/sample-wardrobe/saved-looks.ts`.
+4. Implement `@AllowPendingGuardianTeen()`, `WardrobeSavedLookService`, and
+   `WardrobeSavedLookController` in `apps/api/src/modules/wardrobe/` and wire
+   `CapsuleCacheHeadersMiddleware`.
+5. Add Pact consumer interactions and provider doubles under `pact/http/`.
+6. Wire web and mobile `saved-looks.ts` clients, `StylePiecePanel`, `HomeRitual` /
+   `MemberSampleOutfit`, the temporary Closet `ClosetSavedLooksRow`, and 10-locale `savedLooks.*`
+   strings.
+7. Verify unit, schema/RLS, Pact, and two-context blocked-storage Playwright E2E tests.
+
+Task owner map:
+
+- Step 60 step 1 owner: `SavedLook` Prisma schema, migration `20261122040000_add_saved_looks`, and
+  RLS/cascade spec in `packages/db/`.
+- Step 60 step 2 owner: HTTP contracts and OpenAPI 3.1 registration in
+  `packages/api-client/src/contracts/http/saved-looks.ts` and `openapi.ts`.
+- Step 60 step 3 owner: shared idempotency and composition helpers in
+  `packages/utils/src/sample-wardrobe/saved-looks.ts`.
+- Step 60 step 4 owner: `WardrobeSavedLookService`, `WardrobeSavedLookController`, and
+  `@AllowPendingGuardianTeen()` in `apps/api/src/modules/wardrobe/` and `apps/api/src/modules/auth/`.
+- Step 60 step 5 owner: Pact consumer interactions in
+  `pact/http/consumer/interactions/wardrobe-saved-looks.ts` and provider double in
+  `pact/http/provider/doubles/saved-looks.ts`.
+- Step 60 step 6 owner: web and mobile API clients (`saved-looks.ts`), `ClosetSavedLooksRow`,
+  `StylePiecePanel`, `HomeRitual` / `MemberSampleOutfit`, and 10-locale `savedLooks.*` catalogs.
+
+Tests that cover this step:
+
+Database schema, cascade, and RLS, Vitest:
+
+- [`packages/db/test/saved-looks-schema.spec.ts`](../../packages/db/test/saved-looks-schema.spec.ts):
+  verifies Postgres migration indexes, `ON DELETE CASCADE` on `User`, preservation of `SavedLook`
+  when a referenced `GarmentItem` is deleted, per-owner idempotency uniqueness, and RLS isolation.
+
+Shared utils, Vitest:
+
+- [`packages/utils/src/sample-wardrobe/saved-looks.spec.ts`](../../packages/utils/src/sample-wardrobe/saved-looks.spec.ts):
+  unit tests for UUID v4 idempotency generation, ordered composition builders, recipe/bookmark
+  reopen conversion, and look matching.
+
+API unit and auth guard, Vitest:
+
+- [`apps/api/src/modules/wardrobe/wardrobe-saved-look.service.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.spec.ts):
+  ETag/`If-Match` parsing, canonical payload hashing, idempotent replay/409 conflict, concurrent
+  `P2002` recovery, cross-account garment rejection, derived `missing_garment` / `needs_review`
+  statuses, and resilient photo-signing fallback.
+- [`apps/api/src/modules/wardrobe/wardrobe-saved-look.controller.spec.ts`](../../apps/api/src/modules/wardrobe/wardrobe-saved-look.controller.spec.ts):
+  auth, Zod validation, UUID v4 `Idempotency-Key` validation, `ETag` header, and status codes.
+- [`apps/api/src/modules/auth/security.guards.spec.ts`](../../apps/api/src/modules/auth/security.guards.spec.ts):
+  verifies `@AllowPendingGuardianTeen()` allows guardian-pending teens while blocking suspended
+  teens.
+
+Contract tests, Pact:
+
+- [`pact/http/consumer/interactions/wardrobe-saved-looks.ts`](../../pact/http/consumer/interactions/wardrobe-saved-looks.ts):
+  web and mobile consumer interactions for create (`201`), idempotent replay (`200`), list (`200`),
+  and `If-Match` delete (`204`), verified by `pact/http/provider/api-provider.pacttest.ts`.
+
+Web unit, component, and locale parity, Vitest:
+
+- [`apps/web/src/lib/saved-looks.test.ts`](../../apps/web/src/lib/saved-looks.test.ts)
+- [`apps/web/src/app/wardrobe/saved-looks-row.test.tsx`](../../apps/web/src/app/wardrobe/saved-looks-row.test.tsx)
+- [`apps/web/src/i18n/saved-looks-locales.spec.ts`](../../apps/web/src/i18n/saved-looks-locales.spec.ts)
+- Updated integrated suites: `apps/web/src/app/wardrobe/page.styling.test.tsx`,
+  `apps/web/src/app/components/home-ritual.test.tsx`, and
+  `apps/web/src/app/components/save-feedback/save-feedback.test.tsx`.
+
+Mobile unit, component, and locale parity, Vitest:
+
+- [`apps/mobile/src/lib/saved-looks.test.ts`](../../apps/mobile/src/lib/saved-looks.test.ts)
+- [`apps/mobile/src/features/wardrobe/saved-looks-row.test.tsx`](../../apps/mobile/src/features/wardrobe/saved-looks-row.test.tsx)
+- [`apps/mobile/src/i18n/saved-looks-locales.spec.ts`](../../apps/mobile/src/i18n/saved-looks-locales.spec.ts)
+- Updated integrated suites: `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx`,
+  `apps/mobile/src/screens/hero-identity-cache.test.tsx`, and
+  `apps/mobile/components/save-feedback/save-feedback.test.tsx`.
+
+End-to-end, Playwright:
+
+- [`playwright/tests/saved-looks-follow-account.spec.ts`](../../playwright/tests/saved-looks-follow-account.spec.ts):
+  proves saving a swapped Style this piece look in Context 1, reopening it with exact weather and
+  swaps from Closet "Saved looks" in Context 2 with `localStorage` blocked, removing it across
+  reload, and saving/reopening/removing a Home sample look through the same account list.
+
+Evidence boundaries:
+
+- Isolated PostgreSQL 17 migration/RLS tests, API unit tests, Optic lint, full Pact consumer
+  determinism (3 runs) + provider verification, targeted web/mobile Vitest suites, workspace
+  `tsc --noEmit`, and two-context Playwright E2E ran locally.
+- Full workspace suites and CI coverage gates run on the PR.

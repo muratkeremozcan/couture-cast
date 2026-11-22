@@ -1315,5 +1315,26 @@
     "lookUpdated": "Look aggiornato.",
     "pieceSwapped": "Capo sostituito.",
     "close": "Chiudi"
+  },
+  "savedLooks": {
+    "title": "Look salvati",
+    "count": "{{count}} salvati",
+    "empty": "Nessun look salvato.",
+    "reopen": "Riapri",
+    "remove": "Rimuovi",
+    "missingPiece": "Capo mancante",
+    "missingPieceDetail": "Un capo di questo look salvato non è più nel tuo guardaroba.",
+    "needsReview": "Da rivedere",
+    "needsReviewDetail": "Hai modificato i tag di un capo in questo look. Controlla che funzioni ancora.",
+    "photoUnavailable": "Foto non disponibile",
+    "loadFailed": "Impossibile caricare i tuoi look salvati.",
+    "retry": "Riprova",
+    "detailTitle": "Look salvato",
+    "sourceStylePiece": "Dal tuo capo",
+    "sourceHomeSample": "Da un’idea di esempio",
+    "slotOrderLabel": "Capi in questo look",
+    "close": "Chiudi",
+    "showList": "Mostra look salvati",
+    "hideList": "Nascondi look salvati"
   }
 }

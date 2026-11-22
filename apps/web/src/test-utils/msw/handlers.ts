@@ -59,6 +59,15 @@ export const handlers = [
       nextSince: null,
     })
   ),
+  // Story CC-7.2: default empty saved-looks list for suites that mount Closet or Home.
+  http.get('*/api/v1/wardrobe/saved-looks', () =>
+    HttpResponse.json({
+      data: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+    })
+  ),
   /**
    * Story 6.1. `vitest.setup.ts` throws on any unhandled `/api/` request, so the
    * community routes need defaults even for suites that never assert on them:

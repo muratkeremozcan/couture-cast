@@ -36,6 +36,27 @@ import {
 
 const mocks = vi.hoisted(() => ({
   reducedMotion: true,
+  listSavedLooksFromMobile: vi.fn(),
+  createSavedLookFromMobile: vi.fn(),
+  deleteSavedLookFromMobile: vi.fn(),
+}))
+
+vi.mock('@/src/lib/saved-looks', () => ({
+  MobileSavedLookRequestError: class MobileSavedLookRequestError extends Error {
+    constructor(
+      message: string,
+      readonly status?: number,
+      readonly code?: string
+    ) {
+      super(message)
+      this.name = 'MobileSavedLookRequestError'
+    }
+  },
+  listSavedLooksFromMobile: mocks.listSavedLooksFromMobile,
+  createSavedLookFromMobile: mocks.createSavedLookFromMobile,
+  deleteSavedLookFromMobile: mocks.deleteSavedLookFromMobile,
+  formatSavedLookIfMatch: (id: string, revision: number) =>
+    `"saved-look:${id}:${revision}"`,
 }))
 
 vi.mock('expo-router', () => ({
@@ -621,6 +642,37 @@ describe('mobile save-feedback components', () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    mocks.listSavedLooksFromMobile.mockResolvedValue([])
+    mocks.createSavedLookFromMobile.mockResolvedValue({
+      id: 'sl-mob-1',
+      ownerUserId: 'mobile-style-owner',
+      source: 'style_piece',
+      lookId: 'sample:l:soft-pleats',
+      weather: 'mild-dry',
+      title: null,
+      anchorGarmentId: garment.id,
+      anchorSnapshot: { garmentId: garment.id, category: 'top', comfortRange: 'mild' },
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top',
+          kind: 'garment',
+          itemId: garment.id,
+          label: null,
+          missing: false,
+          imageAccess: null,
+        },
+      ],
+      swaps: {},
+      collection: null,
+      comfort: null,
+      availabilityStatus: 'ready',
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt: '2026-11-22T00:00:00.000Z',
+      updatedAt: '2026-11-22T00:00:00.000Z',
+    })
 
     try {
       await render(
@@ -1332,7 +1384,7 @@ describe('mobile save-feedback components', () => {
     expect(getNetworkOnline()).toBe(true)
     await webView.unmount()
 
-    // 5. Mobile StylePiecePanel re-enables Save after storage write failure is retried successfully
+    // 5. Mobile StylePiecePanel retries API save failure with the same Idempotency-Key
     setMobileApplicationUserId('mobile-storage-retry-owner')
     const garment = createReadyGarmentFixture({
       id: 'mobile-storage-garment',
@@ -1341,15 +1393,39 @@ describe('mobile save-feedback components', () => {
         expiresAt: '2090-01-01T00:00:00.000Z',
       },
     })
-    const originalSet = mockRecipeStore.set.bind(mockRecipeStore)
-    let failNextWrite = true
-    const setSpy = vi.spyOn(mockRecipeStore, 'set').mockImplementation((key, value) => {
-      if (failNextWrite) {
-        failNextWrite = false
-        throw new Error('ENOSPC')
-      }
-      return originalSet(key, value)
-    })
+    mocks.listSavedLooksFromMobile.mockResolvedValue([])
+    mocks.createSavedLookFromMobile
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      .mockResolvedValueOnce({
+        id: 'sl-mob-retry-1',
+        ownerUserId: 'mobile-storage-retry-owner',
+        source: 'style_piece',
+        lookId: 'sample:l:soft-pleats',
+        weather: 'mild-dry',
+        title: null,
+        anchorGarmentId: garment.id,
+        anchorSnapshot: { garmentId: garment.id, category: 'top', comfortRange: 'mild' },
+        composition: [
+          {
+            slotIndex: 0,
+            category: 'top',
+            kind: 'garment',
+            itemId: garment.id,
+            label: null,
+            missing: false,
+            imageAccess: null,
+          },
+        ],
+        swaps: {},
+        collection: null,
+        comfort: null,
+        availabilityStatus: 'ready',
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: '2026-11-22T00:00:00.000Z',
+        updatedAt: '2026-11-22T00:00:00.000Z',
+      })
     try {
       const panelView = await render(
         <SaveFeedbackProvider>
@@ -1374,22 +1450,22 @@ describe('mobile save-feedback components', () => {
       const saveBtn = (await within(panel).findAllByTestId('style-piece-save'))[0]!
       await waitFor(() => expect(saveBtn).not.toBeDisabled())
 
-      // First save fails storage write -> shows Failed + Retry and temporarily disables button
+      // First save fails API write -> shows Failed + Retry
       fireEvent.click(saveBtn)
       await waitFor(() =>
         expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
           'Could not save. Try again.'
         )
       )
-      expect(saveBtn).toBeDisabled()
 
-      // Clicking Retry succeeds and calls setStorage('ready'), re-enabling Save
+      // Clicking Retry succeeds and reuses the exact same Idempotency-Key
       fireEvent.click(within(panel).getByTestId('status-bar-action-retry'))
       await waitFor(() => expect(saveBtn).toHaveTextContent('Saved'))
-      expect(saveBtn).not.toBeDisabled()
+      const calls = mocks.createSavedLookFromMobile.mock.calls.slice(-2)
+      expect(calls[0]?.[1]?.idempotencyKey).toBeTruthy()
+      expect(calls[0]?.[1]?.idempotencyKey).toBe(calls[1]?.[1]?.idempotencyKey)
       await panelView.unmount()
     } finally {
-      setSpy.mockRestore()
       setMobileApplicationUserId(null)
     }
   })

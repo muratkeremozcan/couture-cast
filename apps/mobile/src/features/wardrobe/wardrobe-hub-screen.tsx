@@ -14,7 +14,10 @@ import {
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
-import type { GarmentItemContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  SavedLookContract,
+} from '@couture/api-client/contracts/http'
 import {
   getGuestPreviewStrings,
   getStylePieceStrings,
@@ -41,6 +44,8 @@ import {
   listGarmentsFromMobile,
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
+import { listSavedLooksFromMobile } from '@/src/lib/saved-looks'
+import { ClosetSavedLooksRow } from './saved-looks-row'
 import {
   focusStylePieceControl,
   StylePieceEntry,
@@ -88,6 +93,11 @@ function MemberWardrobeHub({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showOnboardingCard, setShowOnboardingCard] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
+  const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
+  const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
+  const [savedLooksLoading, setSavedLooksLoading] = useState(false)
+  const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
+  const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
   const [styleClosing, setStyleClosing] = useState(false)
   const styleSelectionRef = useRef<StylePieceSelection | null>(null)
   const taggingOpen = useRef(false)
@@ -139,6 +149,7 @@ function MemberWardrobeHub({
     const invoker = styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
     styleSelectionRef.current = null
     setStyleSelection(null)
+    setInitialSavedLook(null)
     setStyleClosing(false)
     const pending = pendingTagging.current
     pendingTagging.current = null
@@ -209,6 +220,33 @@ function MemberWardrobeHub({
     },
     [epoch, refreshGarmentList]
   )
+
+  useEffect(() => {
+    if (!owner) {
+      setSavedLooks([])
+      setSavedLooksError(null)
+      setSavedLooksLoading(false)
+      return
+    }
+    const controller = new AbortController()
+    setSavedLooksLoading(true)
+    void listSavedLooksFromMobile({ signal: controller.signal })
+      .then((items) => {
+        if (controller.signal.aborted || epoch !== mobileIdentityEpoch()) return
+        setSavedLooks(items)
+        setSavedLooksError(null)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        setSavedLooksError(
+          error instanceof Error ? error.message : 'Unable to load your saved looks.'
+        )
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSavedLooksLoading(false)
+      })
+    return () => controller.abort()
+  }, [epoch, owner, savedLooksAttempt])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -400,6 +438,26 @@ function MemberWardrobeHub({
             </Pressable>
           ) : null}
 
+          <ClosetSavedLooksRow
+            owner={owner}
+            savedLooks={savedLooks}
+            isLoading={savedLooksLoading}
+            loadError={savedLooksError}
+            garments={garments}
+            onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+            onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+            onReopenStylePiece={(look) => {
+              const anchor = garments.find((item) => item.id === look.anchorGarmentId)
+              if (!anchor || !anchor.category || !anchor.comfortRange) return
+              setInitialSavedLook(look)
+              openStylePanel({
+                id: anchor.id,
+                category: anchor.category,
+                comfortRange: anchor.comfortRange,
+              })
+            }}
+          />
+
           {errorMessage ? (
             <View
               style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
@@ -557,12 +615,14 @@ function MemberWardrobeHub({
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
+          initialSavedLook={initialSavedLook}
           inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
           loadInventory={loadGarments}
           visible={!styleClosing}
           owner={owner}
           epoch={epoch}
           locale={i18n.language}
+          onSavedLooksChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
           onClose={() => setStyleClosing(true)}
           onDismiss={() => finishStyleDismissal(styleSelection)}
         />

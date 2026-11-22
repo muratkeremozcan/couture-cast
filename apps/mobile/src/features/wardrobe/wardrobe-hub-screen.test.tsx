@@ -174,9 +174,9 @@ import {
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
-import { MAX_SAMPLE_BOOKMARK_BYTES, stylePieceStorageKey } from '@couture/utils'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
+import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -369,13 +369,15 @@ describe('WardrobeHubScreen', () => {
     )
     setMobileApplicationUserId(active)
     nativeModalAccessibility.enabled = true
+    const { handlers: savedLooksHandlers } = createSavedLooksMswHandlers()
     server.use(
       http.get('*/api/v1/wardrobe/garments', ({ request }) => {
         const garment = wardrobeByBearer.get(request.headers.get('Authorization') ?? '')
         return garment
           ? HttpResponse.json({ data: [garment] })
           : new HttpResponse(null, { status: 401 })
-      })
+      }),
+      ...savedLooksHandlers
     )
     renderScreen()
 
@@ -439,15 +441,19 @@ describe('WardrobeHubScreen', () => {
     )
   })
 
-  it('reopens the edited weather and companions from the bounded native recipe file', async () => {
+  it('reopens the edited weather and companions from the account saved looks API', async () => {
     nativeStyleRuntime.enabled = true
     setMobileApplicationUserId('style-native-file-owner')
     const garment = createReadyGarmentFixture({
       id: 'style-native-file-piece',
       imageAccess: fixtureWardrobePhoto('#224466'),
     })
+    const { store, handlers } = createSavedLooksMswHandlers()
     server.use(
-      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garment] })
+      ),
+      ...handlers
     )
     renderScreen()
     await browserUser.click(await screen.findByTestId('style-piece-open'))
@@ -467,23 +473,22 @@ describe('WardrobeHubScreen', () => {
       /Warm and rainy.*Loafers/
     )
 
-    expect(nativeStyleRuntime.files.size).toBe(1)
-    const [uri, saved] = [...nativeStyleRuntime.files][0]!
-    expect(uri).toMatch(/^file:\/\/\/documents\/couturecast\.style-piece\..+\.json$/)
-    expect(JSON.parse(saved) as unknown).toEqual([
-      {
-        lookId: 'sample:l:silk-midi',
-        weather: 'warm-rainy',
-        swaps: { shoes: 'sample:g:loafers' },
-      },
+    expect(store.items).toHaveLength(1)
+    expect(store.items[0]).toMatchObject({
+      source: 'style_piece',
+      lookId: 'sample:l:silk-midi',
+      weather: 'warm-rainy',
+      anchorGarmentId: garment.id,
+      swaps: { shoes: 'sample:g:loafers' },
+    })
+    expect(store.items[0]?.composition.map((slot) => slot.slotIndex)).toEqual([
+      0, 1, 2, 3,
     ])
     await browserUser.click(within(panel).getByTestId('style-piece-close'))
     await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
-    nativeStyleRuntime.read.mockClear()
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const restored = await screen.findByTestId('style-piece-panel')
     await browserUser.click(await within(restored).findByTestId('style-piece-reopen'))
-    expect(nativeStyleRuntime.read).toHaveBeenCalledWith(uri)
     await waitFor(() => {
       const reopened = within(restored).getAllByTestId('style-piece-look')[0]!
       for (const name of ['Rain shell', 'Midi skirt', 'Loafers']) {
@@ -495,19 +500,7 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() =>
       expect(within(restored).queryByTestId('style-piece-reopen')).toBeNull()
     )
-    expect(nativeStyleRuntime.files.get(uri)).toBe('[]')
-
-    await browserUser.click(within(restored).getByTestId('style-piece-close'))
-    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
-    nativeStyleRuntime.files.set(uri, 'x'.repeat(MAX_SAMPLE_BOOKMARK_BYTES + 1))
-    nativeStyleRuntime.read.mockClear()
-    await browserUser.click(await screen.findByTestId('style-piece-open'))
-    const bounded = await screen.findByTestId('style-piece-panel')
-    await waitFor(() =>
-      expect(within(bounded).getAllByTestId('style-piece-save')[0]).toBeEnabled()
-    )
-    expect(within(bounded).queryByTestId('style-piece-reopen')).toBeNull()
-    expect(nativeStyleRuntime.read).not.toHaveBeenCalled()
+    expect(store.items).toHaveLength(0)
   })
 
   it.each(['weather', 'swap'] as const)(
@@ -521,12 +514,42 @@ describe('WardrobeHubScreen', () => {
         imageAccess: fixtureWardrobePhoto('#224466'),
       })
       const renewed = { ...garment, imageAccess: fixtureWardrobePhoto('#663311') }
-      nativeStyleRuntime.files.set(
-        'file:///documents/' + stylePieceStorageKey(owner, garment.id) + '.json',
-        JSON.stringify([
-          { lookId: 'sample:l:silk-midi', weather: 'warm-rainy', swaps: {} },
-        ])
-      )
+      const { handlers } = createSavedLooksMswHandlers([
+        {
+          id: 'seeded-mobile-race-1',
+          ownerUserId: ACCESS_TOKEN,
+          source: 'style_piece',
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          title: null,
+          anchorGarmentId: garment.id,
+          anchorSnapshot: {
+            garmentId: garment.id,
+            category: 'top',
+            comfortRange: 'mild',
+          },
+          composition: [
+            {
+              slotIndex: 0,
+              category: 'top',
+              kind: 'garment',
+              itemId: garment.id,
+              label: null,
+              missing: false,
+              imageAccess: null,
+            },
+          ],
+          swaps: {},
+          collection: null,
+          comfort: null,
+          availabilityStatus: 'ready',
+          missingGarmentIds: [],
+          needsReviewReasons: [],
+          revision: 0,
+          createdAt: '2026-11-22T00:00:00.000Z',
+          updatedAt: '2026-11-22T00:00:00.000Z',
+        },
+      ])
       const verification = deferred()
       const started = deferred()
       let reopenPending = false
@@ -536,7 +559,8 @@ describe('WardrobeHubScreen', () => {
           started.resolve()
           await verification.promise
           return HttpResponse.json({ data: [renewed] })
-        })
+        }),
+        ...handlers
       )
       renderScreen()
       await browserUser.click(await screen.findByTestId('style-piece-open'))
@@ -761,7 +785,7 @@ describe('WardrobeHubScreen', () => {
     }
   })
 
-  it('keeps the photo and swap controls available when the native recipe file cannot be read', async () => {
+  it('keeps the photo and swap controls available when saved looks fail to load', async () => {
     nativeStyleRuntime.enabled = true
     const owner = 'style-native-storage-error'
     setMobileApplicationUserId(owner)
@@ -769,29 +793,27 @@ describe('WardrobeHubScreen', () => {
       id: 'style-native-storage-piece',
       imageAccess: fixtureWardrobePhoto('#225543'),
     })
-    const file = `file:///documents/${stylePieceStorageKey(owner, garment.id)}.json`
-    nativeStyleRuntime.files.set(file, '[]')
-    nativeStyleRuntime.read.mockImplementationOnce(() => {
-      throw new Error('Synthetic file read failure')
-    })
     server.use(
-      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [garment] }))
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garment] })
+      ),
+      http.get('*/api/v1/wardrobe/saved-looks', () =>
+        HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+      )
     )
     renderScreen()
     await browserUser.click(await screen.findByTestId('style-piece-open'))
     const panel = await screen.findByTestId('style-piece-panel')
     expect(await within(panel).findByRole('alert')).toHaveTextContent(
-      'Saved looks are unavailable on this device.'
+      'Could not load your saved looks.'
     )
     const [look] = await within(panel).findAllByTestId('style-piece-look')
     expect(within(look!).getByTestId('style-piece-anchor')).toBeVisible()
-    expect(within(look!).getByTestId('style-piece-save')).toBeDisabled()
     await browserUser.click(within(look!).getByTestId('style-piece-swap-shoes'))
     await browserUser.click(
       within(look!).getByTestId('style-piece-option-sample:g:white-sneakers')
     )
     expect(within(look!).getByText('White sneakers', { exact: true })).toBeVisible()
-    expect(nativeStyleRuntime.files.get(file)).toBe('[]')
   })
 
   it('queues a completed tagging poll until the styling modal is dismissed', async () => {

@@ -14,7 +14,11 @@ import { Reflector } from '@nestjs/core'
 import { updateRequestContext } from '../../logger/request-context'
 import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
-import { API_ROLES_KEY, API_TRANSACTIONAL_CONSENT_KEY } from './security.decorators'
+import {
+  API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+  API_ROLES_KEY,
+  API_TRANSACTIONAL_CONSENT_KEY,
+} from './security.decorators'
 import { type ApiRole, type AuthenticatedRequest } from './security.types'
 
 const normalizeHeaderValue = (
@@ -54,6 +58,37 @@ export class RequestAuthGuard implements CanActivate {
     private readonly accessTokenIdentityService: AccessTokenIdentityService
   ) {}
 
+  private isPendingGuardianTeenAllowed(
+    reflector: Reflector,
+    context: ExecutionContext
+  ): boolean {
+    const targets = [
+      context.getHandler(),
+      ...(typeof context.getClass === 'function' ? [context.getClass()] : []),
+    ]
+    return (
+      reflector.getAllAndOverride<boolean>(
+        API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+        targets
+      ) === true
+    )
+  }
+
+  private async verifyTeenAccess(
+    userId: string,
+    allowPendingGuardianTeen: boolean,
+    budget?: CommunityAuthorizationBudget
+  ): Promise<void> {
+    const checkTeenAccess = () =>
+      allowPendingGuardianTeen
+        ? this.guardianConsentStateService.canTeenAccessNonUploadSurface(userId)
+        : this.guardianConsentStateService.canTeenAccess(userId)
+    const allowed = await (budget ? budget.run(checkTeenAccess) : checkTeenAccess())
+    if (!allowed) {
+      throw new ForbiddenException('Guardian consent required before continuing')
+    }
+  }
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>()
     const token = parseBearerToken(request.headers.authorization)
@@ -84,19 +119,15 @@ export class RequestAuthGuard implements CanActivate {
     request.auth = { token, userId, role }
     updateRequestContext({ userId })
 
+    const reflector = new Reflector()
     const consentCheckedInTransaction =
-      new Reflector().get<boolean>(
-        API_TRANSACTIONAL_CONSENT_KEY,
-        context.getHandler()
-      ) === true
-    if (
-      role === 'teen' &&
-      !consentCheckedInTransaction &&
-      !(await (budget
-        ? budget.run(() => this.guardianConsentStateService.canTeenAccess(userId))
-        : this.guardianConsentStateService.canTeenAccess(userId)))
-    ) {
-      throw new ForbiddenException('Guardian consent required before continuing')
+      reflector.get<boolean>(API_TRANSACTIONAL_CONSENT_KEY, context.getHandler()) === true
+    if (role === 'teen' && !consentCheckedInTransaction) {
+      const allowPendingGuardianTeen = this.isPendingGuardianTeenAllowed(
+        reflector,
+        context
+      )
+      await this.verifyTeenAccess(userId, allowPendingGuardianTeen, budget)
     }
 
     budget?.check()

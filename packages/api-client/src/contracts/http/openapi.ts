@@ -24,6 +24,7 @@ import { registerWeatherContracts } from './weather'
 import { registerRitualContracts } from './ritual'
 import { registerComfortContracts } from './comfort'
 import { registerWardrobeContracts } from './wardrobe'
+import { registerSavedLooksContracts } from './saved-looks'
 import { registerCommerceContracts } from './commerce'
 import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
@@ -82,6 +83,7 @@ export function createHttpOpenApiRegistry() {
   registerRitualContracts(registry, commonSchemas)
   registerComfortContracts(registry, commonSchemas)
   registerWardrobeContracts(registry, commonSchemas)
+  registerSavedLooksContracts(registry, commonSchemas)
   registerCommerceContracts(registry, commonSchemas)
   registerSubscriptionContracts(registry, commonSchemas)
   registerPremiumThemeContracts(registry, commonSchemas)
@@ -167,7 +169,9 @@ export function generateHttpOpenApiDocument() {
       // No existing operation narrows.
       // Story 6.14 bumps the minor: one additive premium access read, and one more
       // documented 409 message on checkout. No existing operation narrows.
-      version: '1.8.0',
+      // Story CC-7.2 bumps the minor: four additive account-backed saved-looks
+      // operations under /api/v1/wardrobe/saved-looks. No existing operation narrows.
+      version: '1.9.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

@@ -6,18 +6,12 @@ import { HttpResponse, http } from 'msw'
 import { createRef, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
-import {
-  DEFAULT_SAMPLE_COMFORT,
-  SAMPLE_CATALOG,
-  SAMPLE_WEATHER_KEYS,
-  SAVE_FEEDBACK_TIMINGS,
-  selectSampleOutfit,
-  type SampleBookmark,
-} from '@couture/utils'
+import { SAVE_FEEDBACK_TIMINGS } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
 import type * as WebSession from '../../../lib/web-session'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
+import { createSavedLooksMswHandlers } from '../../../test-utils/saved-looks-msw'
 import { HomeRitual } from '../home-ritual'
 import { StylePiecePanel } from '../../wardrobe/style-piece-panel'
 import {
@@ -660,6 +654,7 @@ describe('web save-feedback components', () => {
 
   it('StylePiecePanel transient refresh failure keeps looks on screen with Failed/Retry, while genuine revocation hides the photo', async () => {
     const user = userEvent.setup()
+    useMswHandlers(...createSavedLooksMswHandlers().handlers)
     const garment = createReadyGarmentFixture({
       id: 'transient-garment',
       imageAccess: {
@@ -898,42 +893,19 @@ describe('web save-feedback components', () => {
     expect(screen.getByTestId('save-btn')).toHaveTextContent('Saved')
   })
 
-  it('Web Home old-session deferred lock Remove never posts a notice onto the next member, and multi-tab refill to 8 blocks corrupting Undo', async () => {
+  it('Web Home old-session deferred Remove never posts a notice onto the next member, and Undo failure surfaces retryable error', async () => {
     const user = userEvent.setup()
     const ownerA = 'lock-owner-a'
     const ownerB = 'lock-owner-b'
-    const keyA = `couturecast.member-sample-bookmarks.${ownerA}`
-    const validBookmarks: SampleBookmark[] = []
-    for (const look of SAMPLE_CATALOG.looks) {
-      const matchingWeather = SAMPLE_WEATHER_KEYS.find(
-        (weather) =>
-          selectSampleOutfit(
-            {
-              weather,
-              collection: 'all',
-              comfort: DEFAULT_SAMPLE_COMFORT,
-              selectedLookId: look.id,
-              votes: {},
-              swaps: {},
-            },
-            SAMPLE_CATALOG
-          ).look?.id === look.id
-      )
-      if (matchingWeather) {
-        validBookmarks.push({
-          lookId: look.id,
-          weather: matchingWeather,
-          collection: 'all',
-          comfort: DEFAULT_SAMPLE_COMFORT,
-          swaps: {},
-        })
+    const { store, handlers } = createSavedLooksMswHandlers()
+    const deferredDelete = Promise.withResolvers<void>()
+    let holdNextDelete = false
+    store.onDelete = async () => {
+      if (holdNextDelete) {
+        holdNextDelete = false
+        await deferredDelete.promise
       }
-      if (validBookmarks.length >= 9) break
     }
-    expect(validBookmarks.length).toBeGreaterThanOrEqual(9)
-    const eightBookmarks = validBookmarks.slice(0, 8)
-    const ninthBookmark = validBookmarks[8]!
-    localStorage.setItem(keyA, JSON.stringify(eightBookmarks))
 
     useMswHandlers(
       http.get('/api/v1/ritual', () =>
@@ -941,23 +913,9 @@ describe('web save-feedback components', () => {
           { message: 'No location preferences found for user' },
           { status: 400 }
         )
-      )
+      ),
+      ...handlers
     )
-
-    const locksDescriptor = Object.getOwnPropertyDescriptor(navigator, 'locks')
-    const deferredLock = Promise.withResolvers<void>()
-    let interceptLock = false
-    Object.defineProperty(navigator, 'locks', {
-      configurable: true,
-      value: {
-        request: async (_name: string, apply: () => boolean) => {
-          if (interceptLock) {
-            await deferredLock.promise
-          }
-          return apply()
-        },
-      },
-    })
 
     sessionMock.owner = ownerA
     sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${ownerA}`)
@@ -970,38 +928,39 @@ describe('web save-feedback components', () => {
         </SaveFeedbackProvider>
       )
 
+      const saveBtn = await screen.findByTestId('sample-save-look')
+      await user.click(saveBtn)
       const savedRegion = await screen.findByTestId('sample-saved-looks')
-      const removeButtons = within(savedRegion).getAllByRole('button', {
+      const removeBtn = within(savedRegion).getAllByRole('button', {
         name: /^Remove /,
-      })
-      // Remove first bookmark (drops from 8 -> 7)
-      await user.click(removeButtons[0]!)
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
-
-      // Simulate another tab refilling to 8 bookmarks before member clicks Undo
-      const afterRemove = JSON.parse(
-        localStorage.getItem(keyA) ?? '[]'
-      ) as SampleBookmark[]
-      expect(afterRemove).toHaveLength(7)
-      const refilled: SampleBookmark[] = [ninthBookmark, ...afterRemove]
-      localStorage.setItem(keyA, JSON.stringify(refilled))
-      await user.click(screen.getByTestId('status-bar-action-undo'))
-      const storedAfterConflict = JSON.parse(
-        localStorage.getItem(keyA) ?? '[]'
-      ) as SampleBookmark[]
-      expect(storedAfterConflict).toHaveLength(8)
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'Could not save. Try again.'
+      })[0]!
+      await user.click(removeBtn)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
       )
 
-      // Now test old-session deferred lock Remove resolving after member B takes over
-      interceptLock = true
-      const nextRemoveButtons = within(
-        screen.getByTestId('sample-saved-looks')
-      ).getAllByRole('button', { name: /^Remove / })
-      await user.click(nextRemoveButtons[0]!)
+      // Failed Undo POST surfaces error cleanly without corrupting state
+      let failUndoOnce = true
+      store.nextPostError = () => {
+        if (!failUndoOnce) return null
+        failUndoOnce = false
+        return HttpResponse.json({ message: 'Server error' }, { status: 503 })
+      }
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
 
-      // Switch to member B before member A's lock resolves
+      // Save again and start a deferred Remove, then switch to member B before it settles
+      await user.click(screen.getByTestId('sample-save-look'))
+      const nextRegion = await screen.findByTestId('sample-saved-looks')
+      holdNextDelete = true
+      await user.click(
+        within(nextRegion).getAllByRole('button', { name: /^Remove / })[0]!
+      )
+
       act(() => {
         sessionMock.owner = ownerB
         sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${ownerB}`)
@@ -1009,17 +968,14 @@ describe('web save-feedback components', () => {
       })
       await screen.findByTestId('member-sample-outfit')
       await act(async () => {
-        deferredLock.resolve()
-        await deferredLock.promise
+        deferredDelete.resolve()
+        await deferredDelete.promise
       })
       expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
     } finally {
-      deferredLock.resolve()
-      if (locksDescriptor) Object.defineProperty(navigator, 'locks', locksDescriptor)
-      else Reflect.deleteProperty(navigator, 'locks')
+      deferredDelete.resolve()
       sessionMock.owner = null
       sessionStorage.clear()
-      localStorage.removeItem(keyA)
     }
   })
 
@@ -1347,8 +1303,7 @@ describe('web save-feedback components', () => {
   it('covers Web Home shuffle Undo, Save View/Undo, Remove Undo, and Remove failure Retry', async () => {
     const user = userEvent.setup()
     const owner = 'home-flow-owner'
-    const key = `couturecast.member-sample-bookmarks.${owner}`
-    localStorage.removeItem(key)
+    const { store, handlers } = createSavedLooksMswHandlers()
 
     useMswHandlers(
       http.get('/api/v1/ritual', () =>
@@ -1356,14 +1311,13 @@ describe('web save-feedback components', () => {
           { message: 'No location preferences found for user' },
           { status: 400 }
         )
-      )
+      ),
+      ...handlers
     )
 
     sessionMock.owner = owner
     sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${owner}`)
     window.dispatchEvent(new Event('couture:session'))
-
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     try {
       render(
@@ -1443,14 +1397,17 @@ describe('web save-feedback components', () => {
         )
       )
 
-      // Simulate storage write failure on Remove -> shows Failed + Retry, then Retry succeeds
+      // Simulate API failure on Remove -> shows Failed + Retry, then Retry succeeds
       const savedRegion2 = await screen.findByTestId('sample-saved-looks')
       const removeBtn2 = within(savedRegion2).getAllByRole('button', {
         name: /^Remove /,
       })[0]!
-      setItemSpy.mockImplementationOnce(() => {
-        throw new Error('QuotaExceededError')
-      })
+      let failDeleteOnce = true
+      store.nextDeleteError = () => {
+        if (!failDeleteOnce) return null
+        failDeleteOnce = false
+        return HttpResponse.json({ message: 'Server error' }, { status: 503 })
+      }
       await user.click(removeBtn2)
       await waitFor(() =>
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
@@ -1462,23 +1419,23 @@ describe('web save-feedback components', () => {
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
       )
 
-      // Failed Undo write must NOT strand the failed undo in pendingBookmarkChanges
-      setItemSpy.mockImplementationOnce(() => {
-        throw new Error('QuotaExceededError')
-      })
+      // Failed Undo POST leaves store empty cleanly
+      let failPostOnce = true
+      store.nextPostError = () => {
+        if (!failPostOnce) return null
+        failPostOnce = false
+        return HttpResponse.json({ message: 'Server error' }, { status: 503 })
+      }
       await user.click(screen.getByTestId('status-bar-action-undo'))
       await waitFor(() =>
         expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
           'Could not save. Try again.'
         )
       )
-      // Storage is still empty (0 items), not poisoned by the failed undo
-      expect(JSON.parse(localStorage.getItem(key) ?? '[]')).toHaveLength(0)
+      expect(store.items).toHaveLength(0)
     } finally {
-      setItemSpy.mockRestore()
       sessionMock.owner = null
       sessionStorage.clear()
-      localStorage.removeItem(key)
     }
   })
 
@@ -1536,6 +1493,9 @@ describe('web save-feedback components', () => {
 
     // 2. StylePiecePanel full swap/save/view/undo/remove/offline/retry coverage
     const owner = 'style-panel-cov-owner'
+    const { store: styleSavedStore, handlers: styleSavedHandlers } =
+      createSavedLooksMswHandlers()
+    useMswHandlers(...styleSavedHandlers)
     const garment = createReadyGarmentFixture({
       id: 'style-panel-cov-garment',
       imageAccess: {
@@ -1710,28 +1670,25 @@ describe('web save-feedback components', () => {
           'Change undone.'
         )
       )
-      // Storage error on Remove surfaces Failed + Retry, and Retry recovers storage
-      const removeItemSpy = vi
-        .spyOn(Storage.prototype, 'removeItem')
-        .mockImplementationOnce(() => {
-          throw new Error('QuotaExceededError')
-        })
-      try {
-        await user.click(await within(panel).findByTestId('style-piece-remove'))
-        await waitFor(() =>
-          expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
-            'Could not save. Try again.'
-          )
-        )
-        await user.click(within(panel).getByTestId('status-bar-action-retry'))
-        await waitFor(() =>
-          expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
-            'Removed'
-          )
-        )
-      } finally {
-        removeItemSpy.mockRestore()
+      // API error on Remove surfaces Failed + Retry, and Retry succeeds
+      let failDeleteOnce = true
+      styleSavedStore.nextDeleteError = () => {
+        if (!failDeleteOnce) return null
+        failDeleteOnce = false
+        return HttpResponse.json({ message: 'Server error' }, { status: 503 })
       }
+      await user.click(await within(panel).findByTestId('style-piece-remove'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+      await user.click(within(panel).getByTestId('status-bar-action-retry'))
+      await waitFor(() =>
+        expect(within(panel).getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Removed'
+        )
+      )
     } finally {
       sessionMock.owner = null
       sessionStorage.clear()

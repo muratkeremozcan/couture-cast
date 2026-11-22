@@ -6611,6 +6611,301 @@ export interface CreateSavedLocationResponse {
 /**
  *
  * @export
+ * @interface CreateSavedLookInput
+ */
+export interface CreateSavedLookInput {
+  /**
+   *
+   * @type {CreateSavedLookInputSourceEnum}
+   * @memberof CreateSavedLookInput
+   */
+  source: CreateSavedLookInputSourceEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  lookId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  weather: string
+  /**
+   * Trimmed and NFC-normalized title bounded to 80 extended grapheme clusters.
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  title?: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  anchorGarmentId?: string | null
+  /**
+   *
+   * @type {CreateSavedLookInputAnchorSnapshot}
+   * @memberof CreateSavedLookInput
+   */
+  anchorSnapshot?: CreateSavedLookInputAnchorSnapshot | null
+  /**
+   *
+   * @type {Array<CreateSavedLookInputCompositionInner>}
+   * @memberof CreateSavedLookInput
+   */
+  composition: Array<CreateSavedLookInputCompositionInner>
+  /**
+   *
+   * @type {CreateSavedLookInputSwaps}
+   * @memberof CreateSavedLookInput
+   */
+  swaps?: CreateSavedLookInputSwaps
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  collection?: string | null
+  /**
+   *
+   * @type {CreateSavedLookInputComfort}
+   * @memberof CreateSavedLookInput
+   */
+  comfort?: CreateSavedLookInputComfort | null
+}
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputSourceEnum = {
+  style_piece: 'style_piece',
+  home_sample: 'home_sample',
+} as const
+export type CreateSavedLookInputSourceEnum =
+  (typeof CreateSavedLookInputSourceEnum)[keyof typeof CreateSavedLookInputSourceEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateSavedLookInputAnchorSnapshot
+ */
+export interface CreateSavedLookInputAnchorSnapshot {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputAnchorSnapshot
+   */
+  garmentId: string
+  /**
+   *
+   * @type {CreateSavedLookInputAnchorSnapshotCategoryEnum}
+   * @memberof CreateSavedLookInputAnchorSnapshot
+   */
+  category: CreateSavedLookInputAnchorSnapshotCategoryEnum
+  /**
+   *
+   * @type {CreateSavedLookInputAnchorSnapshotComfortRangeEnum}
+   * @memberof CreateSavedLookInputAnchorSnapshot
+   */
+  comfortRange: CreateSavedLookInputAnchorSnapshotComfortRangeEnum
+}
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputAnchorSnapshotCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type CreateSavedLookInputAnchorSnapshotCategoryEnum =
+  (typeof CreateSavedLookInputAnchorSnapshotCategoryEnum)[keyof typeof CreateSavedLookInputAnchorSnapshotCategoryEnum]
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputAnchorSnapshotComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type CreateSavedLookInputAnchorSnapshotComfortRangeEnum =
+  (typeof CreateSavedLookInputAnchorSnapshotComfortRangeEnum)[keyof typeof CreateSavedLookInputAnchorSnapshotComfortRangeEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateSavedLookInputComfort
+ */
+export interface CreateSavedLookInputComfort {
+  /**
+   *
+   * @type {CreateSavedLookInputComfortRunsColdWarmEnum}
+   * @memberof CreateSavedLookInputComfort
+   */
+  runsColdWarm: CreateSavedLookInputComfortRunsColdWarmEnum
+  /**
+   *
+   * @type {CreateSavedLookInputComfortWindToleranceEnum}
+   * @memberof CreateSavedLookInputComfort
+   */
+  windTolerance: CreateSavedLookInputComfortWindToleranceEnum
+  /**
+   *
+   * @type {CreateSavedLookInputComfortPrecipPreparednessEnum}
+   * @memberof CreateSavedLookInputComfort
+   */
+  precipPreparedness: CreateSavedLookInputComfortPrecipPreparednessEnum
+}
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputComfortRunsColdWarmEnum = {
+  cold: 'cold',
+  neutral: 'neutral',
+  warm: 'warm',
+} as const
+export type CreateSavedLookInputComfortRunsColdWarmEnum =
+  (typeof CreateSavedLookInputComfortRunsColdWarmEnum)[keyof typeof CreateSavedLookInputComfortRunsColdWarmEnum]
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputComfortWindToleranceEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type CreateSavedLookInputComfortWindToleranceEnum =
+  (typeof CreateSavedLookInputComfortWindToleranceEnum)[keyof typeof CreateSavedLookInputComfortWindToleranceEnum]
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputComfortPrecipPreparednessEnum = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+} as const
+export type CreateSavedLookInputComfortPrecipPreparednessEnum =
+  (typeof CreateSavedLookInputComfortPrecipPreparednessEnum)[keyof typeof CreateSavedLookInputComfortPrecipPreparednessEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateSavedLookInputCompositionInner
+ */
+export interface CreateSavedLookInputCompositionInner {
+  /**
+   *
+   * @type {number}
+   * @memberof CreateSavedLookInputCompositionInner
+   */
+  slotIndex: number
+  /**
+   *
+   * @type {CreateSavedLookInputCompositionInnerCategoryEnum}
+   * @memberof CreateSavedLookInputCompositionInner
+   */
+  category: CreateSavedLookInputCompositionInnerCategoryEnum
+  /**
+   *
+   * @type {CreateSavedLookInputCompositionInnerKindEnum}
+   * @memberof CreateSavedLookInputCompositionInner
+   */
+  kind: CreateSavedLookInputCompositionInnerKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputCompositionInner
+   */
+  itemId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputCompositionInner
+   */
+  label?: string | null
+}
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputCompositionInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type CreateSavedLookInputCompositionInnerCategoryEnum =
+  (typeof CreateSavedLookInputCompositionInnerCategoryEnum)[keyof typeof CreateSavedLookInputCompositionInnerCategoryEnum]
+
+/**
+ * @export
+ */
+export const CreateSavedLookInputCompositionInnerKindEnum = {
+  garment: 'garment',
+  catalog: 'catalog',
+} as const
+export type CreateSavedLookInputCompositionInnerKindEnum =
+  (typeof CreateSavedLookInputCompositionInnerKindEnum)[keyof typeof CreateSavedLookInputCompositionInnerKindEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateSavedLookInputSwaps
+ */
+export interface CreateSavedLookInputSwaps {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  top?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  bottom?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  outerwear?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  dress?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  shoes?: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLookInputSwaps
+   */
+  accessory?: string
+}
+/**
+ *
+ * @export
  * @interface CreateSilhouetteUploadUrlInput
  */
 export interface CreateSilhouetteUploadUrlInput {
@@ -17774,6 +18069,572 @@ export interface SavedLocationIdPathParams {
    * @memberof SavedLocationIdPathParams
    */
   locationId: string
+}
+/**
+ *
+ * @export
+ * @interface SavedLookBadRequestError
+ */
+export interface SavedLookBadRequestError {
+  /**
+   *
+   * @type {SavedLookBadRequestErrorStatusCodeEnum}
+   * @memberof SavedLookBadRequestError
+   */
+  statusCode: SavedLookBadRequestErrorStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookBadRequestError
+   */
+  message: string
+  /**
+   *
+   * @type {SavedLookBadRequestErrorErrorEnum}
+   * @memberof SavedLookBadRequestError
+   */
+  error: SavedLookBadRequestErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SavedLookBadRequestErrorStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type SavedLookBadRequestErrorStatusCodeEnum =
+  (typeof SavedLookBadRequestErrorStatusCodeEnum)[keyof typeof SavedLookBadRequestErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SavedLookBadRequestErrorErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type SavedLookBadRequestErrorErrorEnum =
+  (typeof SavedLookBadRequestErrorErrorEnum)[keyof typeof SavedLookBadRequestErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookConflictError
+ */
+export interface SavedLookConflictError {
+  /**
+   *
+   * @type {SavedLookConflictErrorStatusCodeEnum}
+   * @memberof SavedLookConflictError
+   */
+  statusCode: SavedLookConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {SavedLookConflictErrorMessageEnum}
+   * @memberof SavedLookConflictError
+   */
+  message: SavedLookConflictErrorMessageEnum
+  /**
+   *
+   * @type {SavedLookConflictErrorErrorEnum}
+   * @memberof SavedLookConflictError
+   */
+  error: SavedLookConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SavedLookConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type SavedLookConflictErrorStatusCodeEnum =
+  (typeof SavedLookConflictErrorStatusCodeEnum)[keyof typeof SavedLookConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SavedLookConflictErrorMessageEnum = {
+  IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD:
+    'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+} as const
+export type SavedLookConflictErrorMessageEnum =
+  (typeof SavedLookConflictErrorMessageEnum)[keyof typeof SavedLookConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SavedLookConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type SavedLookConflictErrorErrorEnum =
+  (typeof SavedLookConflictErrorErrorEnum)[keyof typeof SavedLookConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookListResponse
+ */
+export interface SavedLookListResponse {
+  /**
+   *
+   * @type {Array<SavedLookResponseData>}
+   * @memberof SavedLookListResponse
+   */
+  data: Array<SavedLookResponseData>
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLookListResponse
+   */
+  total: number
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLookListResponse
+   */
+  limit: number
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLookListResponse
+   */
+  offset: number
+}
+/**
+ *
+ * @export
+ * @interface SavedLookNotFoundError
+ */
+export interface SavedLookNotFoundError {
+  /**
+   *
+   * @type {SavedLookNotFoundErrorStatusCodeEnum}
+   * @memberof SavedLookNotFoundError
+   */
+  statusCode: SavedLookNotFoundErrorStatusCodeEnum
+  /**
+   *
+   * @type {SavedLookNotFoundErrorMessageEnum}
+   * @memberof SavedLookNotFoundError
+   */
+  message: SavedLookNotFoundErrorMessageEnum
+  /**
+   *
+   * @type {SavedLookNotFoundErrorErrorEnum}
+   * @memberof SavedLookNotFoundError
+   */
+  error: SavedLookNotFoundErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SavedLookNotFoundErrorStatusCodeEnum = {
+  NUMBER_404: 404,
+} as const
+export type SavedLookNotFoundErrorStatusCodeEnum =
+  (typeof SavedLookNotFoundErrorStatusCodeEnum)[keyof typeof SavedLookNotFoundErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SavedLookNotFoundErrorMessageEnum = {
+  SAVED_LOOK_NOT_FOUND: 'SAVED_LOOK_NOT_FOUND',
+  GARMENT_NOT_FOUND: 'GARMENT_NOT_FOUND',
+} as const
+export type SavedLookNotFoundErrorMessageEnum =
+  (typeof SavedLookNotFoundErrorMessageEnum)[keyof typeof SavedLookNotFoundErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SavedLookNotFoundErrorErrorEnum = {
+  Not_Found: 'Not Found',
+} as const
+export type SavedLookNotFoundErrorErrorEnum =
+  (typeof SavedLookNotFoundErrorErrorEnum)[keyof typeof SavedLookNotFoundErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookPreconditionFailedError
+ */
+export interface SavedLookPreconditionFailedError {
+  /**
+   *
+   * @type {SavedLookPreconditionFailedErrorStatusCodeEnum}
+   * @memberof SavedLookPreconditionFailedError
+   */
+  statusCode: SavedLookPreconditionFailedErrorStatusCodeEnum
+  /**
+   *
+   * @type {SavedLookPreconditionFailedErrorMessageEnum}
+   * @memberof SavedLookPreconditionFailedError
+   */
+  message: SavedLookPreconditionFailedErrorMessageEnum
+  /**
+   *
+   * @type {SavedLookPreconditionFailedErrorErrorEnum}
+   * @memberof SavedLookPreconditionFailedError
+   */
+  error: SavedLookPreconditionFailedErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionFailedErrorStatusCodeEnum = {
+  NUMBER_412: 412,
+} as const
+export type SavedLookPreconditionFailedErrorStatusCodeEnum =
+  (typeof SavedLookPreconditionFailedErrorStatusCodeEnum)[keyof typeof SavedLookPreconditionFailedErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionFailedErrorMessageEnum = {
+  SAVED_LOOK_REVISION_MISMATCH: 'SAVED_LOOK_REVISION_MISMATCH',
+} as const
+export type SavedLookPreconditionFailedErrorMessageEnum =
+  (typeof SavedLookPreconditionFailedErrorMessageEnum)[keyof typeof SavedLookPreconditionFailedErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionFailedErrorErrorEnum = {
+  Precondition_Failed: 'Precondition Failed',
+} as const
+export type SavedLookPreconditionFailedErrorErrorEnum =
+  (typeof SavedLookPreconditionFailedErrorErrorEnum)[keyof typeof SavedLookPreconditionFailedErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookPreconditionRequiredError
+ */
+export interface SavedLookPreconditionRequiredError {
+  /**
+   *
+   * @type {SavedLookPreconditionRequiredErrorStatusCodeEnum}
+   * @memberof SavedLookPreconditionRequiredError
+   */
+  statusCode: SavedLookPreconditionRequiredErrorStatusCodeEnum
+  /**
+   *
+   * @type {SavedLookPreconditionRequiredErrorMessageEnum}
+   * @memberof SavedLookPreconditionRequiredError
+   */
+  message: SavedLookPreconditionRequiredErrorMessageEnum
+  /**
+   *
+   * @type {SavedLookPreconditionRequiredErrorErrorEnum}
+   * @memberof SavedLookPreconditionRequiredError
+   */
+  error: SavedLookPreconditionRequiredErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionRequiredErrorStatusCodeEnum = {
+  NUMBER_428: 428,
+} as const
+export type SavedLookPreconditionRequiredErrorStatusCodeEnum =
+  (typeof SavedLookPreconditionRequiredErrorStatusCodeEnum)[keyof typeof SavedLookPreconditionRequiredErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionRequiredErrorMessageEnum = {
+  PRECONDITION_REQUIRED: 'PRECONDITION_REQUIRED',
+} as const
+export type SavedLookPreconditionRequiredErrorMessageEnum =
+  (typeof SavedLookPreconditionRequiredErrorMessageEnum)[keyof typeof SavedLookPreconditionRequiredErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SavedLookPreconditionRequiredErrorErrorEnum = {
+  Precondition_Required: 'Precondition Required',
+} as const
+export type SavedLookPreconditionRequiredErrorErrorEnum =
+  (typeof SavedLookPreconditionRequiredErrorErrorEnum)[keyof typeof SavedLookPreconditionRequiredErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookResponse
+ */
+export interface SavedLookResponse {
+  /**
+   *
+   * @type {SavedLookResponseData}
+   * @memberof SavedLookResponse
+   */
+  data: SavedLookResponseData
+}
+/**
+ *
+ * @export
+ * @interface SavedLookResponseData
+ */
+export interface SavedLookResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  ownerUserId: string
+  /**
+   *
+   * @type {SavedLookResponseDataSourceEnum}
+   * @memberof SavedLookResponseData
+   */
+  source: SavedLookResponseDataSourceEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  lookId: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  weather: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  title: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  anchorGarmentId: string | null
+  /**
+   *
+   * @type {CreateSavedLookInputAnchorSnapshot}
+   * @memberof SavedLookResponseData
+   */
+  anchorSnapshot: CreateSavedLookInputAnchorSnapshot | null
+  /**
+   *
+   * @type {Array<SavedLookResponseDataCompositionInner>}
+   * @memberof SavedLookResponseData
+   */
+  composition: Array<SavedLookResponseDataCompositionInner>
+  /**
+   *
+   * @type {SavedLookResponseDataSwaps}
+   * @memberof SavedLookResponseData
+   */
+  swaps: SavedLookResponseDataSwaps
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  collection: string | null
+  /**
+   *
+   * @type {CreateSavedLookInputComfort}
+   * @memberof SavedLookResponseData
+   */
+  comfort: CreateSavedLookInputComfort | null
+  /**
+   *
+   * @type {SavedLookResponseDataAvailabilityStatusEnum}
+   * @memberof SavedLookResponseData
+   */
+  availabilityStatus: SavedLookResponseDataAvailabilityStatusEnum
+  /**
+   *
+   * @type {Array<string>}
+   * @memberof SavedLookResponseData
+   */
+  missingGarmentIds: Array<string>
+  /**
+   *
+   * @type {Array<SavedLookResponseDataNeedsReviewReasonsEnum>}
+   * @memberof SavedLookResponseData
+   */
+  needsReviewReasons: Array<SavedLookResponseDataNeedsReviewReasonsEnum>
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLookResponseData
+   */
+  revision: number
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  updatedAt: string
+}
+
+/**
+ * @export
+ */
+export const SavedLookResponseDataSourceEnum = {
+  style_piece: 'style_piece',
+  home_sample: 'home_sample',
+} as const
+export type SavedLookResponseDataSourceEnum =
+  (typeof SavedLookResponseDataSourceEnum)[keyof typeof SavedLookResponseDataSourceEnum]
+
+/**
+ * @export
+ */
+export const SavedLookResponseDataAvailabilityStatusEnum = {
+  ready: 'ready',
+  missing_garment: 'missing_garment',
+  needs_review: 'needs_review',
+} as const
+export type SavedLookResponseDataAvailabilityStatusEnum =
+  (typeof SavedLookResponseDataAvailabilityStatusEnum)[keyof typeof SavedLookResponseDataAvailabilityStatusEnum]
+
+/**
+ * @export
+ */
+export const SavedLookResponseDataNeedsReviewReasonsEnum = {
+  category_changed: 'category_changed',
+  comfort_range_changed: 'comfort_range_changed',
+} as const
+export type SavedLookResponseDataNeedsReviewReasonsEnum =
+  (typeof SavedLookResponseDataNeedsReviewReasonsEnum)[keyof typeof SavedLookResponseDataNeedsReviewReasonsEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookResponseDataCompositionInner
+ */
+export interface SavedLookResponseDataCompositionInner {
+  /**
+   *
+   * @type {number}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  slotIndex: number
+  /**
+   *
+   * @type {SavedLookResponseDataCompositionInnerCategoryEnum}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  category: SavedLookResponseDataCompositionInnerCategoryEnum
+  /**
+   *
+   * @type {SavedLookResponseDataCompositionInnerKindEnum}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  kind: SavedLookResponseDataCompositionInnerKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  itemId: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  label: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  missing: boolean
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof SavedLookResponseDataCompositionInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
+}
+
+/**
+ * @export
+ */
+export const SavedLookResponseDataCompositionInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type SavedLookResponseDataCompositionInnerCategoryEnum =
+  (typeof SavedLookResponseDataCompositionInnerCategoryEnum)[keyof typeof SavedLookResponseDataCompositionInnerCategoryEnum]
+
+/**
+ * @export
+ */
+export const SavedLookResponseDataCompositionInnerKindEnum = {
+  garment: 'garment',
+  catalog: 'catalog',
+} as const
+export type SavedLookResponseDataCompositionInnerKindEnum =
+  (typeof SavedLookResponseDataCompositionInnerKindEnum)[keyof typeof SavedLookResponseDataCompositionInnerKindEnum]
+
+/**
+ *
+ * @export
+ * @interface SavedLookResponseDataSwaps
+ */
+export interface SavedLookResponseDataSwaps {
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  top?: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  bottom?: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  outerwear?: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  dress?: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  shoes?: string
+  /**
+   *
+   * @type {string}
+   * @memberof SavedLookResponseDataSwaps
+   */
+  accessory?: string
 }
 
 /**

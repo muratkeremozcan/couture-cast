@@ -382,6 +382,15 @@ export const handlers = [
       data: { items: [], nextCursor: null },
     })
   ),
+  // Story CC-7.2: default empty saved-looks list for suites that mount Closet or Home.
+  http.get('*/api/v1/wardrobe/saved-looks', () =>
+    HttpResponse.json({
+      data: [],
+      total: 0,
+      limit: 50,
+      offset: 0,
+    })
+  ),
   http.get('*/api/health', () =>
     HttpResponse.json({
       status: 'ok',
