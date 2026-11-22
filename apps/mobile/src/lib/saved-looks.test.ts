@@ -64,6 +64,7 @@ vi.mock('./wardrobe', () => ({
 import {
   createSavedLookFromMobile,
   deleteSavedLookFromMobile,
+  ensureMobileLegacySavedLooksMigration,
   formatSavedLookIfMatch,
   getSavedLookFromMobile,
   importLegacyDeviceSavedLooksFromMobile,
@@ -549,5 +550,245 @@ describe('mobile saved-looks client', () => {
     listGarmentsFromMobile.mockRejectedValueOnce(new Error('offline'))
     expect((await importLegacyDeviceSavedLooksFromMobile()).pendingKeys).toBe(1)
     expect(globalThis.localStorage.getItem(styleKey)).not.toBeNull()
+  })
+
+  it('covers mobile 409 choice reconciliation, concurrent edit retention, deadlines, source filters, and shared key budgets', async () => {
+    const key = 'couturecast.member-sample-bookmarks.user-1'
+    const styleKey = stylePieceStorageKey('user-1', 'garment-custom')
+    const editedBookmark = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'sample:g:white-sneakers' },
+    }
+    const seenOwners: (string | null)[] = []
+    const unsub = subscribeMobileSavedLooksChanged((o) => seenOwners.push(o))
+
+    // 1. Source filtering, custom loadGarments, and notify callback
+    globalThis.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    globalThis.localStorage.setItem(
+      styleKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    apiV1WardrobeSavedLooksPost.mockResolvedValue({ data: SAMPLE_LOOK })
+    const homeOnly = await importLegacyDeviceSavedLooksFromMobile({
+      sources: ['home_sample'],
+      notify: true,
+    })
+    expect(homeOnly.imported).toHaveLength(1)
+    expect(seenOwners).toEqual(['user-1'])
+    expect(globalThis.localStorage.getItem(styleKey)).not.toBeNull()
+
+    const customLoad = vi.fn().mockResolvedValue([
+      {
+        id: 'garment-custom',
+        status: 'ready',
+        retentionStatus: 'active',
+        category: 'top',
+        comfortRange: 'mild',
+        material: 'cotton',
+        tagsConfirmedAt: '2026-11-22T00:00:00.000Z',
+        fileSizeBytes: 1024,
+        mimeType: 'image/png',
+        createdAt: '2026-11-22T00:00:00.000Z',
+        committedAt: '2026-11-22T00:00:00.000Z',
+        imageAccess: null,
+      },
+    ])
+    const styleOnly = await importLegacyDeviceSavedLooksFromMobile({
+      sources: ['style_piece'],
+      loadGarments: customLoad,
+      notify: true,
+    })
+    expect(customLoad).toHaveBeenCalledTimes(1)
+    expect(styleOnly.imported).toHaveLength(1)
+    expect(globalThis.localStorage.getItem(styleKey)).toBeNull()
+    unsub()
+
+    // 2. Unrelated 404 retains entry, while 409 conflict verifies saved choices and paginates across pages
+    resetMobileLegacySavedLooksImportState()
+    globalThis.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(JSON.stringify({ message: 'ROUTE_NOT_FOUND' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+    expect((await importLegacyDeviceSavedLooksFromMobile()).pendingKeys).toBe(1)
+
+    // 409 mismatching swaps -> retained
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [
+        {
+          ...SAMPLE_LOOK,
+          id: 'm-diff-swaps',
+          source: 'home_sample',
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    })
+    expect((await importLegacyDeviceSavedLooksFromMobile()).pendingKeys).toBe(1)
+
+    // 409 paginated match on page 2 -> reconciled & removed
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'm-page-1-other',
+            source: 'home_sample',
+            lookId: 'sample:l:city-wool',
+            weather: 'cool-windy',
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'm-page-2-match',
+            source: 'home_sample',
+            lookId: 'sample:l:office-oxford',
+            weather: 'mild-dry',
+            swaps: { shoes: 'sample:g:white-sneakers' },
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 1,
+      })
+    const reconciled = await importLegacyDeviceSavedLooksFromMobile()
+    expect(reconciled.pendingKeys).toBe(0)
+    expect(reconciled.imported.map((item) => item.id)).toEqual(['m-page-2-match'])
+    expect(globalThis.localStorage.getItem(key)).toBeNull()
+
+    // 409 GET error degrades cleanly
+    resetMobileLegacySavedLooksImportState()
+    globalThis.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockRejectedValueOnce(new Error('offline'))
+    expect((await importLegacyDeviceSavedLooksFromMobile()).pendingKeys).toBe(1)
+
+    // 3. Concurrent edit of same bookmark's swaps during POST retains edited entry
+    resetMobileLegacySavedLooksImportState()
+    const modified = { ...editedBookmark, swaps: { shoes: 'sample:g:loafers' } }
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      globalThis.localStorage.setItem(key, JSON.stringify([modified]))
+      return Promise.resolve({ data: SAMPLE_LOOK })
+    })
+    expect((await importLegacyDeviceSavedLooksFromMobile()).pendingKeys).toBe(1)
+    expect(globalThis.localStorage.getItem(key)).toBe(JSON.stringify([modified]))
+
+    // 4. ensureMobileLegacySavedLooksMigration dedup, error catch, shared 32-key budget, and expired deadline
+    resetMobileLegacySavedLooksImportState()
+    expect(ensureMobileLegacySavedLooksMigration({ owner: '' })).toBeNull()
+    apiV1WardrobeSavedLooksPost.mockResolvedValue({ data: SAMPLE_LOOK })
+    const m1 = ensureMobileLegacySavedLooksMigration({ owner: 'user-1', epoch: 1 })
+    const m2 = ensureMobileLegacySavedLooksMigration({ owner: 'user-1', epoch: 1 })
+    expect(m1).toBe(m2)
+    expect((await m1)?.pendingKeys).toBe(0)
+
+    resolveMobileAccessToken.mockResolvedValueOnce(null)
+    globalThis.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    expect(
+      await ensureMobileLegacySavedLooksMigration({ owner: 'user-1', epoch: 1 })
+    ).toEqual({
+      imported: [],
+      pendingKeys: 0,
+    })
+    resolveMobileAccessToken.mockResolvedValue('mobile-token')
+
+    // Shared 32-key budget across Home (1) + Style (33) defers excess keys
+    for (let i = 0; i < 33; i += 1) {
+      globalThis.localStorage.setItem(
+        stylePieceStorageKey('user-1', `m-budget-${i}`),
+        JSON.stringify([
+          { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+        ])
+      )
+    }
+    const budgetRun = await importLegacyDeviceSavedLooksFromMobile({ garments: [] })
+    expect(budgetRun.pendingKeys).toBeGreaterThanOrEqual(2)
+
+    // Pre-expired deadline stops work cleanly & keeps pending keys
+    globalThis.localStorage.clear()
+    globalThis.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    globalThis.localStorage.setItem(
+      styleKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    const nowSpy = vi
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(25_000)
+    const expired = await importLegacyDeviceSavedLooksFromMobile()
+    nowSpy.mockRestore()
+    expect(expired.pendingKeys).toBe(2)
+
+    // Mid-flight AbortSignal cancels cleanly
+    const abortCtrl = new AbortController()
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      abortCtrl.abort()
+      return Promise.reject(new Error('aborted'))
+    })
+    const aborted = await importLegacyDeviceSavedLooksFromMobile({
+      sources: ['home_sample'],
+      signal: abortCtrl.signal,
+    })
+    expect(aborted.pendingKeys).toBe(1)
+
+    // Blocked localStorage degrades cleanly
+    const getSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked')
+    })
+    expect(await importLegacyDeviceSavedLooksFromMobile()).toEqual({
+      imported: [],
+      pendingKeys: 0,
+    })
+    getSpy.mockRestore()
   })
 })
