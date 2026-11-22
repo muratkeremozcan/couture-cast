@@ -48,6 +48,7 @@ import {
   MobileSavedLookRequestError,
   notifyMobileSavedLooksChanged,
   restoreSavedLookFromMobile,
+  subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
@@ -277,11 +278,49 @@ export function MemberSampleOutfit({
     }
   }, [owner])
 
-  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
+  useEffect(() => {
+    if (!owner) return
+    return subscribeMobileSavedLooksChanged((changedOwner) => {
+      if (changedOwner !== owner) return
+      const refreshVersion = mutationVersionRef.current
+      void listSavedLooksFromMobile({
+        source: 'home_sample',
+        skipLegacyImport: true,
+      })
+        .then((items) => {
+          if (
+            mobileApplicationUserId() !== owner ||
+            mutationVersionRef.current !== refreshVersion
+          ) {
+            return
+          }
+          const fetchedById = new Map(items.map((item) => [item.id, item]))
+          const next = [
+            ...items.filter((item) => !deletedIdsRef.current.has(item.id)),
+            ...savedLooksRef.current.filter(
+              (item) => !fetchedById.has(item.id) && !deletedIdsRef.current.has(item.id)
+            ),
+          ]
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          setBookmarkStorage('ready')
+        })
+        .catch(() => undefined)
+    })
+  }, [owner])
+
+  const bookmarks: (SampleBookmark & {
+    savedLookId?: string
+    needsReview?: boolean
+  })[] = []
   for (const saved of savedLooks) {
     const bookmark = savedLookToSampleBookmark(saved)
     if (!bookmark) continue
-    bookmarks.push({ ...bookmark, savedLookId: saved.id })
+    bookmarks.push({
+      ...bookmark,
+      savedLookId: saved.id,
+      needsReview: saved.availabilityStatus === 'needs_review',
+    })
   }
   const pushUndoAndUpdate = (next: SampleOutfitResult, message: string, kind: string) => {
     if (next === result) return
@@ -396,6 +435,7 @@ export function MemberSampleOutfit({
           updateResult((current) => updateMemberSampleOutfit(current, { weather }))
         }}
         bookmarks={bookmarks}
+        needsReviewLabel={t('savedLooks.needsReview')}
         lookId={owner && bookmarkStorage !== 'loading' ? lookId : undefined}
         persistent={bookmarkStorage === 'ready'}
         showStorageFailureWhenEmpty={bookmarkStorage === 'unavailable'}
@@ -501,6 +541,27 @@ export function MemberSampleOutfit({
           return true
         }}
         onOpen={(bookmark) => {
+          const selected = bookmark as SampleBookmark & {
+            savedLookId?: string
+            needsReview?: boolean
+          }
+          const matching = selected.savedLookId
+            ? savedLooksRef.current.find((item) => item.id === selected.savedLookId)
+            : savedLooksRef.current.find((item) => item.lookId === bookmark.lookId)
+          if (selected.needsReview || matching?.availabilityStatus === 'needs_review') {
+            const seq = ++noticeSeqRef.current
+            statusBar.showNotice({
+              id: `sample-${owner}-needs-review-${seq}`,
+              announcementId: createAnnouncementToken(
+                `sample-${owner}-needs-review`,
+                seq
+              ),
+              message: t('savedLooks.needsReviewDetail'),
+              tone: 'neutral',
+              actions: [],
+            })
+            return
+          }
           lookUndoStackRef.current = []
           statusBar.dismissNotice()
           updateResult((current) => reopenMemberSampleOutfit(current, bookmark))
@@ -527,6 +588,7 @@ export function MemberSampleOutfit({
                 accessToken: actionToken,
               })
               if (!isLiveSession(actionOwner, actionEpoch)) return
+              deletedIdsRef.current.delete(restored.id)
               mutationVersionRef.current += 1
               const restoredList = [
                 restored,

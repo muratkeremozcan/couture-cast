@@ -1,8 +1,14 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ResponseError } from '@couture/api-client'
-import type { SavedLookContract } from '@couture/api-client/contracts/http'
+import type {
+  GarmentItemContract,
+  SavedLookContract,
+} from '@couture/api-client/contracts/http'
+import { DEFAULT_SAMPLE_COMFORT, stylePieceStorageKey } from '@couture/utils'
 
 const {
   apiV1WardrobeSavedLooksGet,
@@ -10,7 +16,10 @@ const {
   apiV1WardrobeSavedLooksSavedLookIdGet,
   apiV1WardrobeSavedLooksSavedLookIdDelete,
   apiV1WardrobeSavedLooksSavedLookIdRestorePost,
+  createWebApiClientSpy,
   currentWebSessionBearer,
+  currentWebSessionOwner,
+  listGarmentsFromWeb,
   readStorage,
 } = vi.hoisted(() => ({
   apiV1WardrobeSavedLooksGet: vi.fn(),
@@ -18,22 +27,38 @@ const {
   apiV1WardrobeSavedLooksSavedLookIdGet: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdDelete: vi.fn(),
   apiV1WardrobeSavedLooksSavedLookIdRestorePost: vi.fn(),
+  createWebApiClientSpy: vi.fn<(opts?: { accessToken?: string }) => void>(),
   currentWebSessionBearer: vi.fn<() => string | null>(() => 'verified-token'),
+  currentWebSessionOwner: vi.fn<() => string | null>(() => 'user-1'),
+  listGarmentsFromWeb: vi.fn<() => Promise<GarmentItemContract[]>>(() =>
+    Promise.resolve([])
+  ),
   readStorage: vi.fn<() => string | null>(() => null),
 }))
 
 vi.mock('./api-client', () => ({
-  createWebApiClient: () => ({
-    apiV1WardrobeSavedLooksGet,
-    apiV1WardrobeSavedLooksPost,
-    apiV1WardrobeSavedLooksSavedLookIdGet,
-    apiV1WardrobeSavedLooksSavedLookIdDelete,
-    apiV1WardrobeSavedLooksSavedLookIdRestorePost,
-  }),
+  createWebApiClient: (opts?: { accessToken?: string }) => {
+    createWebApiClientSpy(opts)
+    return {
+      apiV1WardrobeSavedLooksGet,
+      apiV1WardrobeSavedLooksPost,
+      apiV1WardrobeSavedLooksSavedLookIdGet,
+      apiV1WardrobeSavedLooksSavedLookIdDelete,
+      apiV1WardrobeSavedLooksSavedLookIdRestorePost,
+    }
+  },
 }))
 
 vi.mock('./use-web-session', () => ({
+  UNVERIFIED_BEARER_OWNER: 'bearer',
   currentWebSessionBearer,
+  currentWebSessionOwner,
+  isLiveOwner: (owner: string | null) =>
+    owner !== null && currentWebSessionOwner() === owner,
+}))
+
+vi.mock('./wardrobe', () => ({
+  listGarmentsFromWeb,
 }))
 
 vi.mock('./browser-persistence', () => ({
@@ -44,11 +69,14 @@ vi.mock('./browser-persistence', () => ({
 import {
   createSavedLookFromWeb,
   deleteSavedLookFromWeb,
+  ensureWebLegacySavedLooksMigration,
   formatSavedLookIfMatch,
   getSavedLookFromWeb,
+  importLegacyDeviceSavedLooksFromWeb,
   listSavedLooksFromWeb,
   listSavedLooksPageFromWeb,
   notifySavedLooksChanged,
+  resetWebLegacySavedLooksImportState,
   restoreSavedLookFromWeb,
   SavedLookRequestError,
   subscribeSavedLooksChanged,
@@ -92,7 +120,11 @@ const SAMPLE_LOOK: SavedLookContract = {
 describe('web saved-looks client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
     currentWebSessionBearer.mockReturnValue('verified-token')
+    currentWebSessionOwner.mockReturnValue('user-1')
+    listGarmentsFromWeb.mockResolvedValue([])
     readStorage.mockReturnValue(null)
   })
 
@@ -214,5 +246,802 @@ describe('web saved-looks client', () => {
     await expect(restoreSavedLookFromWeb('sl-1')).rejects.toThrow(
       'Unable to restore this saved look.'
     )
+
+    apiV1WardrobeSavedLooksSavedLookIdGet.mockRejectedValueOnce(new Error('get-failure'))
+    await expect(getSavedLookFromWeb('sl-1')).rejects.toThrow('get-failure')
+  })
+
+  it('handles notify callbacks, source filters, custom loadGarments, and blocked localStorage safely', async () => {
+    const seenOwners: (string | null)[] = []
+    const unsub = subscribeSavedLooksChanged((owner) => seenOwners.push(owner))
+
+    const bookmarkKey = 'couturecast.member-sample-bookmarks.user-1'
+    const styleKey = stylePieceStorageKey('user-1', 'garment-1')
+    window.localStorage.setItem(
+      bookmarkKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+    )
+    window.localStorage.setItem(
+      styleKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+
+    apiV1WardrobeSavedLooksPost.mockResolvedValue({ data: SAMPLE_LOOK })
+
+    // Restrict import to home_sample only with notify: true
+    const homeOnly = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      sources: ['home_sample'],
+      notify: true,
+    })
+    expect(homeOnly.imported).toHaveLength(1)
+    expect(seenOwners).toEqual(['user-1'])
+    expect(window.localStorage.getItem(bookmarkKey)).toBeNull()
+    expect(window.localStorage.getItem(styleKey)).not.toBeNull()
+
+    // Restrict import to style_piece only with custom loadGarments
+    const customLoad = vi.fn().mockResolvedValue([
+      {
+        id: 'garment-1',
+        status: 'ready',
+        retentionStatus: 'active',
+        category: 'top',
+        comfortRange: 'mild',
+        material: 'cotton',
+        tagsConfirmedAt: '2026-11-22T00:00:00.000Z',
+        fileSizeBytes: 1024,
+        mimeType: 'image/png',
+        createdAt: '2026-11-22T00:00:00.000Z',
+        committedAt: '2026-11-22T00:00:00.000Z',
+        imageAccess: null,
+      },
+    ])
+    const styleOnly = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      sources: ['style_piece'],
+      loadGarments: customLoad,
+      notify: true,
+    })
+    expect(customLoad).toHaveBeenCalledTimes(1)
+    expect(styleOnly.imported).toHaveLength(1)
+    expect(seenOwners).toEqual(['user-1', 'user-1'])
+    expect(window.localStorage.getItem(styleKey)).toBeNull()
+
+    unsub()
+
+    // Blocked localStorage (SecurityError on getItem/setItem/removeItem/key) degrades cleanly
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError')
+    })
+    const keySpy = vi.spyOn(Storage.prototype, 'key').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError')
+    })
+    const blockedResult = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(blockedResult).toEqual({ imported: [], pendingKeys: 0 })
+    getItemSpy.mockRestore()
+    keySpy.mockRestore()
+
+    // Blocked removeItem/setItem during cleanup does not throw
+    window.localStorage.setItem(bookmarkKey, '{bad-json')
+    const removeSpy = vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError')
+    })
+    const blockedRemove = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(blockedRemove.pendingKeys).toBe(0)
+    removeSpy.mockRestore()
+    window.localStorage.clear()
+  })
+
+  it('imports same-member device-saved looks once per source id, preserves unresolved looks into needs_review, and leaves guest or other members untouched', async () => {
+    const guestRaw = JSON.stringify({ schemaVersion: 1, weather: 'mild-dry' })
+    const memberBRaw = JSON.stringify([
+      {
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: {},
+      },
+    ])
+    const memberBStyleKey = stylePieceStorageKey('user-2', 'garment-b')
+    window.localStorage.setItem('couturecast.guest-preview.v1', guestRaw)
+    window.localStorage.setItem('couturecast.member-sample-bookmarks.user-2', memberBRaw)
+    window.localStorage.setItem(
+      memberBStyleKey,
+      '[{"lookId":"sample:l:office-oxford","weather":"mild-dry","swaps":{}}]'
+    )
+
+    // Member A (user-1) has 1 valid bookmark, 1 unresolved bookmark, 1 valid style_piece, 1 unresolved style_piece, and 1 tampered style_piece
+    const user1BookmarksKey = 'couturecast.member-sample-bookmarks.user-1'
+    window.localStorage.setItem(
+      user1BookmarksKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+        {
+          lookId: 'sample:l:summer-linen',
+          weather: 'cool-windy',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+    )
+    const user1ValidStyleKey = stylePieceStorageKey('user-1', 'garment-1')
+    const user1ChangedStyleKey = stylePieceStorageKey('user-1', 'garment-changed')
+    const user1TamperedStyleKey = stylePieceStorageKey(
+      'user-1',
+      'garment-belonging-to-user-2'
+    )
+    window.localStorage.setItem(
+      user1ValidStyleKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+      ])
+    )
+    window.localStorage.setItem(
+      user1ChangedStyleKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ])
+    )
+    window.localStorage.setItem(
+      user1TamperedStyleKey,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+    )
+
+    listGarmentsFromWeb.mockResolvedValue([
+      {
+        id: 'garment-1',
+        status: 'ready',
+        retentionStatus: 'active',
+        category: 'top',
+        comfortRange: 'mild',
+        material: 'cotton',
+        tagsConfirmedAt: '2026-11-22T00:00:00.000Z',
+        fileSizeBytes: 1024,
+        mimeType: 'image/png',
+        createdAt: '2026-11-22T00:00:00.000Z',
+        committedAt: '2026-11-22T00:00:00.000Z',
+        imageAccess: null,
+      },
+      {
+        id: 'garment-changed',
+        status: 'ready',
+        retentionStatus: 'active',
+        category: 'outerwear',
+        comfortRange: 'cold',
+        material: 'wool',
+        tagsConfirmedAt: '2026-11-22T00:00:00.000Z',
+        fileSizeBytes: 1024,
+        mimeType: 'image/png',
+        createdAt: '2026-11-22T00:00:00.000Z',
+        committedAt: '2026-11-22T00:00:00.000Z',
+        imageAccess: null,
+      },
+    ])
+
+    const createdRecords: SavedLookContract[] = []
+    apiV1WardrobeSavedLooksPost.mockImplementation(
+      ({
+        idempotencyKey,
+        createSavedLookInput,
+      }: {
+        idempotencyKey?: string
+        createSavedLookInput: {
+          source: 'style_piece' | 'home_sample'
+          lookId: string
+          weather: string
+          anchorGarmentId?: string | null
+          anchorSnapshot?: SavedLookContract['anchorSnapshot']
+          composition: SavedLookContract['composition']
+          swaps?: SavedLookContract['swaps']
+        }
+      }) => {
+        if (createSavedLookInput.anchorGarmentId === 'garment-belonging-to-user-2') {
+          return Promise.reject(
+            new ResponseError(
+              new Response(JSON.stringify({ message: 'GARMENT_NOT_FOUND' }), {
+                status: 404,
+                headers: { 'content-type': 'application/json' },
+              })
+            )
+          )
+        }
+        const isNeedsReview =
+          createSavedLookInput.lookId === 'sample:l:summer-linen' ||
+          createSavedLookInput.anchorGarmentId === 'garment-changed'
+        const record: SavedLookContract = {
+          ...SAMPLE_LOOK,
+          id: `imported-${createdRecords.length + 1}-${idempotencyKey?.slice(0, 8)}`,
+          source: createSavedLookInput.source,
+          lookId: createSavedLookInput.lookId,
+          weather: createSavedLookInput.weather,
+          anchorGarmentId: createSavedLookInput.anchorGarmentId ?? null,
+          anchorSnapshot: createSavedLookInput.anchorSnapshot ?? null,
+          availabilityStatus: isNeedsReview ? 'needs_review' : 'ready',
+          needsReviewReasons:
+            createSavedLookInput.anchorGarmentId === 'garment-changed'
+              ? ['category_changed', 'comfort_range_changed']
+              : [],
+        }
+        createdRecords.push(record)
+        return Promise.resolve({ data: record })
+      }
+    )
+
+    apiV1WardrobeSavedLooksGet.mockImplementation(() =>
+      Promise.resolve({
+        data: createdRecords,
+        total: createdRecords.length,
+        limit: 50,
+        offset: 0,
+      })
+    )
+
+    const getItemSpy = vi.spyOn(Storage.prototype, 'getItem')
+    const importOutcome = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    const readKeys = getItemSpy.mock.calls.map(([k]) => String(k))
+    getItemSpy.mockRestore()
+    expect(readKeys).not.toContain('couturecast.guest-preview.v1')
+    expect(readKeys).not.toContain('couturecast.member-sample-bookmarks.user-2')
+    expect(readKeys).not.toContain(memberBStyleKey)
+
+    expect(importOutcome.pendingKeys).toBe(0)
+    expect(importOutcome.imported).toHaveLength(4)
+    const result = await listSavedLooksFromWeb({ owner: 'user-1' })
+    expect(result).toHaveLength(4)
+    expect(
+      result.find((item) => item.lookId === 'sample:l:summer-linen')?.availabilityStatus
+    ).toBe('needs_review')
+    expect(
+      result.find((item) => item.anchorGarmentId === 'garment-changed')
+        ?.availabilityStatus
+    ).toBe('needs_review')
+    expect(
+      result.find((item) => item.anchorGarmentId === 'garment-belonging-to-user-2')
+    ).toBeUndefined()
+
+    // User 1's device keys are removed after server acknowledgement / terminal 404 rejection
+    expect(window.localStorage.getItem(user1BookmarksKey)).toBeNull()
+    expect(window.localStorage.getItem(user1ValidStyleKey)).toBeNull()
+    expect(window.localStorage.getItem(user1ChangedStyleKey)).toBeNull()
+    expect(window.localStorage.getItem(user1TamperedStyleKey)).toBeNull()
+
+    // Guest preview and user-2 keys are completely untouched
+    expect(window.localStorage.getItem('couturecast.guest-preview.v1')).toBe(guestRaw)
+    expect(
+      window.localStorage.getItem('couturecast.member-sample-bookmarks.user-2')
+    ).toBe(memberBRaw)
+    expect(window.localStorage.getItem(memberBStyleKey)).not.toBeNull()
+  })
+
+  it('keeps unacknowledged entries retryable on transient errors, deduplicates concurrent retries, and fences on account switch', async () => {
+    const key = 'couturecast.member-sample-bookmarks.user-1'
+    const rawBookmarks = JSON.stringify([
+      {
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: {},
+      },
+      {
+        lookId: 'sample:l:city-wool',
+        weather: 'cool-windy',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: {},
+      },
+    ])
+    window.localStorage.setItem(key, rawBookmarks)
+
+    // 1. First attempt: oldest entry (city-wool) succeeds, newest entry (office-oxford) fails with 503
+    const seenIdempotencyKeys: string[] = []
+    apiV1WardrobeSavedLooksPost
+      .mockImplementationOnce(({ idempotencyKey }: { idempotencyKey: string }) => {
+        seenIdempotencyKeys.push(idempotencyKey)
+        return Promise.resolve({
+          data: { ...SAMPLE_LOOK, id: 'sl-city-wool', lookId: 'sample:l:city-wool' },
+        })
+      })
+      .mockImplementationOnce(({ idempotencyKey }: { idempotencyKey: string }) => {
+        seenIdempotencyKeys.push(idempotencyKey)
+        return Promise.reject(
+          new ResponseError(new Response('service unavailable', { status: 503 }))
+        )
+      })
+
+    const firstAttempt = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    expect(firstAttempt.imported).toHaveLength(1)
+    expect(firstAttempt.pendingKeys).toBe(1)
+    // Only the unacknowledged entry remains in localStorage
+    const remainingAfterFailure = JSON.parse(
+      window.localStorage.getItem(key) ?? '[]'
+    ) as { lookId: string }[]
+    expect(remainingAfterFailure.map((b) => b.lookId)).toEqual(['sample:l:office-oxford'])
+
+    // 2. Concurrent retries of the remaining entry reuse the exact same deterministic Idempotency-Key
+    const idempotencyMap = new Map<string, SavedLookContract>()
+    apiV1WardrobeSavedLooksPost.mockImplementation(
+      ({ idempotencyKey }: { idempotencyKey: string }) => {
+        seenIdempotencyKeys.push(idempotencyKey)
+        const existing = idempotencyMap.get(idempotencyKey)
+        if (existing) return Promise.resolve({ data: existing })
+        const created = {
+          ...SAMPLE_LOOK,
+          id: 'sl-office-oxford',
+          lookId: 'sample:l:office-oxford',
+        }
+        idempotencyMap.set(idempotencyKey, created)
+        return Promise.resolve({ data: created })
+      }
+    )
+
+    const [retryA, retryB] = await Promise.all([
+      importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' }),
+      importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' }),
+    ])
+    expect(idempotencyMap.size).toBe(1)
+    expect(seenIdempotencyKeys[1]).toBe(seenIdempotencyKeys[2])
+    expect(seenIdempotencyKeys[2]).toBe(seenIdempotencyKeys[3])
+    expect(retryA.pendingKeys).toBe(0)
+    expect(retryB.pendingKeys).toBe(0)
+    expect(window.localStorage.getItem(key)).toBeNull()
+
+    // 3. Account switch mid-import fences user-1 with pinned token and leaves user-1 storage untouched
+    resetWebLegacySavedLooksImportState()
+    createWebApiClientSpy.mockClear()
+    currentWebSessionBearer.mockReturnValue('token-user-1')
+    currentWebSessionOwner.mockReturnValue('user-1')
+    window.localStorage.setItem(key, rawBookmarks)
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      // Switch active session to user-2 with distinct token while user-1's first POST is in flight
+      currentWebSessionOwner.mockReturnValue('user-2')
+      currentWebSessionBearer.mockReturnValue('token-user-2')
+      return Promise.resolve({ data: { ...SAMPLE_LOOK, id: 'sl-city-wool' } })
+    })
+
+    const switched = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      notify: true,
+    })
+    expect(switched.pendingKeys).toBe(1)
+    expect(switched.imported).toEqual([])
+    expect(createWebApiClientSpy).toHaveBeenCalledWith({ accessToken: 'token-user-1' })
+    expect(createWebApiClientSpy).not.toHaveBeenCalledWith({
+      accessToken: 'token-user-2',
+    })
+    // Late response after switch must NOT prune user-1's storage so user-1 can resume cleanly
+    const remainingAfterSwitch = JSON.parse(window.localStorage.getItem(key) ?? '[]') as {
+      lookId: string
+    }[]
+    expect(remainingAfterSwitch.map((b) => b.lookId)).toEqual([
+      'sample:l:office-oxford',
+      'sample:l:city-wool',
+    ])
+
+    // 4. Unrelated 404 retains entry, concurrent tab write is preserved, and 409 payload mismatch reconciles after retag
+    resetWebLegacySavedLooksImportState()
+    currentWebSessionOwner.mockReturnValue('user-1')
+    currentWebSessionBearer.mockReturnValue('token-user-1')
+    const singleBookmarkRaw = JSON.stringify([
+      {
+        lookId: 'sample:l:office-oxford',
+        weather: 'mild-dry',
+        collection: 'all',
+        comfort: DEFAULT_SAMPLE_COMFORT,
+        swaps: {},
+      },
+    ])
+    window.localStorage.setItem(key, singleBookmarkRaw)
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(JSON.stringify({ message: 'ROUTE_NOT_FOUND' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+    )
+    const unrelated404 = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    expect(unrelated404.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(key)).toBe(singleBookmarkRaw)
+
+    // Concurrent tab adds a second bookmark while POST for first is in flight
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      window.localStorage.setItem(key, rawBookmarks)
+      return Promise.resolve({
+        data: {
+          ...SAMPLE_LOOK,
+          id: 'sl-office-concurrent',
+          lookId: 'sample:l:office-oxford',
+        },
+      })
+    })
+    const concurrentWriteResult = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(concurrentWriteResult.pendingKeys).toBe(1)
+    const survivingFromOtherTab = JSON.parse(
+      window.localStorage.getItem(key) ?? '[]'
+    ) as { lookId: string }[]
+    expect(survivingFromOtherTab.map((b) => b.lookId)).toEqual(['sample:l:city-wool'])
+    window.localStorage.removeItem(key)
+
+    // Lost Style acknowledgement followed by retag -> 409 IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD reconciles via GET with 0 duplicates
+    const retaggedStyleKey = stylePieceStorageKey('user-1', 'garment-retagged')
+    window.localStorage.setItem(
+      retaggedStyleKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+            code: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [
+        {
+          ...SAMPLE_LOOK,
+          id: 'sl-retagged-existing',
+          source: 'style_piece',
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          anchorGarmentId: 'garment-retagged',
+          availabilityStatus: 'needs_review',
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    })
+    const reconciled = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      garments: [
+        {
+          id: 'garment-retagged',
+          status: 'ready',
+          retentionStatus: 'active',
+          category: 'outerwear',
+          comfortRange: 'cold',
+          material: 'wool',
+          tagsConfirmedAt: '2026-11-22T00:00:00.000Z',
+          fileSizeBytes: 1024,
+          mimeType: 'image/png',
+          createdAt: '2026-11-22T00:00:00.000Z',
+          committedAt: '2026-11-22T00:00:00.000Z',
+          imageAccess: null,
+        },
+      ],
+    })
+    expect(reconciled.pendingKeys).toBe(0)
+    expect(reconciled.imported.map((item) => item.id)).toEqual(['sl-retagged-existing'])
+    expect(window.localStorage.getItem(retaggedStyleKey)).toBeNull()
+
+    // 5. Malformed payload removal, unverified/signed-out early exit, and failed garment load fallback
+    currentWebSessionOwner.mockReturnValue('user-1')
+    expect(await importLegacyDeviceSavedLooksFromWeb({ owner: 'bearer' })).toEqual({
+      imported: [],
+      pendingKeys: 0,
+    })
+    window.localStorage.setItem(key, '{malformed-json')
+    const malformedResult = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(malformedResult.pendingKeys).toBe(0)
+    expect(window.localStorage.getItem(key)).toBeNull()
+
+    const styleKey = stylePieceStorageKey('user-1', 'garment-1')
+    window.localStorage.setItem(
+      styleKey,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    listGarmentsFromWeb.mockRejectedValueOnce(new Error('wardrobe offline'))
+    const failedGarmentLoad = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(failedGarmentLoad.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(styleKey)).not.toBeNull()
+
+    // 6. Session-scoped ensureWebLegacySavedLooksMigration deduplicates concurrent callers and enforces work limits
+    resetWebLegacySavedLooksImportState()
+    window.localStorage.clear()
+    expect(ensureWebLegacySavedLooksMigration({ owner: 'bearer' })).toBeNull()
+    window.localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+    )
+    apiV1WardrobeSavedLooksPost.mockResolvedValue({ data: SAMPLE_LOOK })
+    const run1 = ensureWebLegacySavedLooksMigration({ owner: 'user-1' })
+    const run2 = ensureWebLegacySavedLooksMigration({ owner: 'user-1' })
+    expect(run1).toBe(run2)
+    expect((await run1)?.pendingKeys).toBe(0)
+
+    // ensureWebLegacySavedLooksMigration catches unexpected token errors cleanly without rejecting
+    currentWebSessionBearer.mockReturnValue(null)
+    readStorage.mockReturnValue(null)
+    window.localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+    )
+    const caughtRun = await ensureWebLegacySavedLooksMigration({ owner: 'user-1' })
+    expect(caughtRun).toEqual({ imported: [], pendingKeys: 0 })
+    currentWebSessionBearer.mockReturnValue('verified-token')
+    window.localStorage.clear()
+
+    // Key budget caps single migration pass at 32 keys and leaves excess keys pending
+    for (let index = 0; index < 34; index += 1) {
+      window.localStorage.setItem(
+        stylePieceStorageKey('user-1', `budget-garment-${index}`),
+        JSON.stringify([
+          { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+        ])
+      )
+    }
+    const budgetRun = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      garments: [],
+    })
+    expect(budgetRun.pendingKeys).toBeGreaterThanOrEqual(2)
+
+    // 409 conflict reconciliation degrades cleanly if the account GET fails
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
+    window.localStorage.setItem(
+      key,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+    )
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockRejectedValueOnce(new Error('network'))
+    const failedReconcile = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(failedReconcile.pendingKeys).toBe(1)
+
+    // 7. Paginated & choice-verified 409 reconciliation, edited-in-flight retention, and bearer-bound unverified owner fencing
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
+    const editedBookmark = {
+      lookId: 'sample:l:office-oxford',
+      weather: 'mild-dry',
+      collection: 'all',
+      comfort: DEFAULT_SAMPLE_COMFORT,
+      swaps: { shoes: 'sample:g:white-sneakers' },
+    }
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    // 409 conflict where page 0 has a look with different swaps -> must NOT prune edited choices
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet.mockResolvedValueOnce({
+      data: [
+        {
+          ...SAMPLE_LOOK,
+          id: 'sl-diff-swaps',
+          source: 'home_sample',
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ],
+      total: 1,
+      limit: 50,
+      offset: 0,
+    })
+    const diffSwapsResult = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(diffSwapsResult.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(key)).not.toBeNull()
+
+    // 409 conflict that finds the exact matching look on page 2 -> reconciles and removes key
+    apiV1WardrobeSavedLooksPost.mockRejectedValueOnce(
+      new ResponseError(
+        new Response(
+          JSON.stringify({
+            message: 'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD',
+          }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      )
+    )
+    apiV1WardrobeSavedLooksGet
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'sl-page-1-other',
+            source: 'home_sample',
+            lookId: 'sample:l:city-wool',
+            weather: 'cool-windy',
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 0,
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            ...SAMPLE_LOOK,
+            id: 'sl-page-2-match',
+            source: 'home_sample',
+            lookId: 'sample:l:office-oxford',
+            weather: 'mild-dry',
+            swaps: { shoes: 'sample:g:white-sneakers' },
+          },
+        ],
+        total: 2,
+        limit: 50,
+        offset: 1,
+      })
+    const paginatedMatch = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+    })
+    expect(paginatedMatch.pendingKeys).toBe(0)
+    expect(paginatedMatch.imported.map((item) => item.id)).toEqual(['sl-page-2-match'])
+    expect(window.localStorage.getItem(key)).toBeNull()
+
+    // Concurrent edit of the same bookmark's swaps while POST is in flight is retained
+    resetWebLegacySavedLooksImportState()
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const modifiedDuringFlight = {
+      ...editedBookmark,
+      swaps: { shoes: 'sample:g:loafers' },
+    }
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      window.localStorage.setItem(key, JSON.stringify([modifiedDuringFlight]))
+      return Promise.resolve({
+        data: { ...SAMPLE_LOOK, id: 'sl-pre-edit', lookId: 'sample:l:office-oxford' },
+      })
+    })
+    const retainedEdit = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    expect(retainedEdit.pendingKeys).toBe(1)
+    expect(window.localStorage.getItem(key)).toBe(JSON.stringify([modifiedDuringFlight]))
+
+    // Bearer-bound unverified owner fencing stops migration if bearer changes
+    resetWebLegacySavedLooksImportState()
+    currentWebSessionOwner.mockReturnValue('bearer')
+    currentWebSessionBearer.mockReturnValue('fixture-token-a')
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      currentWebSessionBearer.mockReturnValue('fixture-token-b')
+      return Promise.resolve({ data: SAMPLE_LOOK })
+    })
+    const fencedUnverified = await ensureWebLegacySavedLooksMigration({
+      owner: 'user-1',
+      accessToken: 'fixture-token-a',
+    })
+    expect(fencedUnverified?.pendingKeys).toBe(1)
+    expect(fencedUnverified?.imported).toEqual([])
+    currentWebSessionOwner.mockReturnValue('user-1')
+    currentWebSessionBearer.mockReturnValue('verified-token')
+
+    // Pre-expired deadline stops garment loading & POSTs cleanly while keeping keys pending
+    window.localStorage.clear()
+    resetWebLegacySavedLooksImportState()
+    const styleKeyForDeadline = stylePieceStorageKey('user-1', 'garment-deadline')
+    window.localStorage.setItem(
+      styleKeyForDeadline,
+      JSON.stringify([
+        { lookId: 'sample:l:office-oxford', weather: 'mild-dry', swaps: {} },
+      ])
+    )
+    const nowSpy = vi
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(25_000)
+    const expiredRun = await importLegacyDeviceSavedLooksFromWeb({ owner: 'user-1' })
+    nowSpy.mockRestore()
+    expect(expiredRun.pendingKeys).toBe(1)
+
+    // Pre-expired deadline also skips Home targets and Style targets when garments are preloaded
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const nowSpy2 = vi
+      .spyOn(Date, 'now')
+      .mockReturnValueOnce(1_000)
+      .mockReturnValue(25_000)
+    const expiredBoth = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      garments: [],
+    })
+    nowSpy2.mockRestore()
+    expect(expiredBoth.pendingKeys).toBe(2)
+
+    // Mid-flight AbortSignal cancels remaining deadline scope cleanly
+    const abortCtrl = new AbortController()
+    apiV1WardrobeSavedLooksPost.mockImplementationOnce(() => {
+      abortCtrl.abort()
+      return Promise.reject(new Error('aborted'))
+    })
+    window.localStorage.setItem(key, JSON.stringify([editedBookmark]))
+    const abortedRun = await importLegacyDeviceSavedLooksFromWeb({
+      owner: 'user-1',
+      sources: ['home_sample'],
+      signal: abortCtrl.signal,
+    })
+    expect(abortedRun.pendingKeys).toBe(1)
   })
 })

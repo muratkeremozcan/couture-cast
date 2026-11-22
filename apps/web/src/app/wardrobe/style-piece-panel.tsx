@@ -770,7 +770,17 @@ function StylePieceIdeas({
                 key={entry.id}
                 className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
               >
-                <p className="text-sm">{description}</p>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm">{description}</p>
+                  {entry.availabilityStatus === 'needs_review' && (
+                    <span
+                      data-testid="saved-look-needs-review"
+                      className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-200"
+                    >
+                      {t('savedLooks.needsReview')}
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-x-2">
                   <button
                     type="button"

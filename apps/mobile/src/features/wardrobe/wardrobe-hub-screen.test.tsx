@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -77,6 +79,18 @@ vi.mock('expo-image-manipulator', () => ({
 }))
 
 vi.mock('expo-file-system', () => ({
+  Directory: class {
+    uri: string
+    constructor(uri: string) {
+      this.uri = uri
+    }
+    list() {
+      const prefix = `${this.uri}/`
+      return Array.from(nativeStyleRuntime.files.keys())
+        .filter((uri) => uri.startsWith(prefix))
+        .map((uri) => ({ uri, name: uri.slice(prefix.length) }))
+    }
+  },
   File: class {
     uri: string
     constructor(uri: string, name?: string) {
@@ -94,6 +108,9 @@ vi.mock('expo-file-system', () => ({
     }
     write(data: string) {
       nativeStyleRuntime.files.set(this.uri, data)
+    }
+    delete() {
+      nativeStyleRuntime.files.delete(this.uri)
     }
     bytes() {
       return Promise.resolve(new Uint8Array([1, 2, 3, 4]))
@@ -1405,5 +1422,118 @@ describe('WardrobeHubScreen', () => {
     } finally {
       await setViewport(414, 896)
     }
+  })
+
+  it('imports native device-saved files for the active member into Closet Saved looks, marks unresolved looks Needs review, and leaves other accounts untouched', async () => {
+    nativeStyleRuntime.enabled = true
+    const activeOwner = 'native-import-member-a'
+    setMobileApplicationUserId(activeOwner)
+    const readyTop = createReadyGarmentFixture({
+      id: 'native-import-top',
+      category: 'top',
+      comfortRange: 'mild',
+      imageAccess: fixtureWardrobePhoto('#224466'),
+    })
+    const changedOuterwear = createReadyGarmentFixture({
+      id: 'native-import-changed',
+      category: 'outerwear',
+      comfortRange: 'cold',
+      imageAccess: fixtureWardrobePhoto('#446622'),
+    })
+
+    const encodeScope = (o: string, g: string) =>
+      `couturecast.style-piece.${encodeURIComponent(JSON.stringify([o, g]))
+        .replaceAll('~', '%7E')
+        .replaceAll('%', '~')}`
+
+    const ownTopUri = `file:///documents/${encodeScope(activeOwner, readyTop.id)}.json`
+    const ownChangedUri = `file:///documents/${encodeScope(activeOwner, changedOuterwear.id)}.json`
+    const ownOlderGarmentId = 'garment-older-outside-page'
+    const ownOlderUri = `file:///documents/${encodeScope(activeOwner, ownOlderGarmentId)}.json`
+    const otherMemberUri = `file:///documents/${encodeScope('native-import-member-b', readyTop.id)}.json`
+
+    nativeStyleRuntime.files.set(
+      ownTopUri,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+      ])
+    )
+    nativeStyleRuntime.files.set(
+      ownChangedUri,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ])
+    )
+    nativeStyleRuntime.files.set(
+      ownOlderUri,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+    )
+    nativeStyleRuntime.files.set(
+      otherMemberUri,
+      JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+    )
+
+    const { store, handlers } = createSavedLooksMswHandlers()
+    store.garmentTagsById.set(ownOlderGarmentId, {
+      category: 'top',
+      comfortRange: 'mild',
+    })
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [readyTop, changedOuterwear] })
+      ),
+      ...handlers
+    )
+
+    renderScreen()
+
+    await waitFor(() => expect(store.items).toHaveLength(3))
+    expect(
+      store.items.find((item) => item.anchorGarmentId === changedOuterwear.id)
+        ?.availabilityStatus
+    ).toBe('needs_review')
+    expect(
+      store.items.find((item) => item.anchorGarmentId === readyTop.id)?.availabilityStatus
+    ).toBe('ready')
+    // Older owned garment outside Closet inventory page is discovered via Directory.list()
+    expect(
+      store.items.find((item) => item.anchorGarmentId === ownOlderGarmentId)
+        ?.availabilityStatus
+    ).toBe('ready')
+
+    const row = await screen.findByTestId('closet-saved-looks-row')
+    await waitFor(() => expect(row).toHaveTextContent('3 saved'))
+    await browserUser.click(row)
+    expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
+      'Needs review'
+    )
+
+    // Active member's native files are deleted after import while other member's file remains intact
+    await waitFor(() => {
+      expect(nativeStyleRuntime.files.has(ownTopUri)).toBe(false)
+      expect(nativeStyleRuntime.files.has(ownChangedUri)).toBe(false)
+      expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
+    })
+    expect(nativeStyleRuntime.files.has(otherMemberUri)).toBe(true)
   })
 })

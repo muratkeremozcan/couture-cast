@@ -22,6 +22,11 @@ import {
   type SavedLookContract,
   type SavedLookNeedsReviewReason,
 } from '@couture/api-client/contracts/http'
+import {
+  doesSavedLookResolve,
+  type ComfortRange,
+  type SampleGarmentCategory,
+} from '@couture/utils'
 import { z } from 'zod'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
@@ -363,28 +368,35 @@ export class WardrobeSavedLookService {
         }
       }
 
-      const needsReviewReasons: SavedLookNeedsReviewReason[] = []
-      if (
+      const anchorLive = row.anchor_garment_id
+        ? garmentById.get(row.anchor_garment_id)
+        : undefined
+      const needsReviewReasons = this.deriveNeedsReviewReasons({
+        row,
+        missingCount: missingGarmentIds.size,
+        parsedSnapshot,
+        anchorLive,
+      })
+
+      const isUnresolved =
         missingGarmentIds.size === 0 &&
-        row.source === 'style_piece' &&
-        row.anchor_garment_id &&
-        parsedSnapshot
-      ) {
-        const anchorLive = garmentById.get(row.anchor_garment_id)
-        if (anchorLive) {
-          if (anchorLive.category !== parsedSnapshot.category) {
-            needsReviewReasons.push('category_changed')
-          }
-          if (anchorLive.comfort_range !== parsedSnapshot.comfortRange) {
-            needsReviewReasons.push('comfort_range_changed')
-          }
-        }
-      }
+        !doesSavedLookResolve({
+          source: row.source,
+          lookId: row.look_id,
+          weather: row.weather,
+          anchorCategory:
+            (anchorLive?.category as SampleGarmentCategory | null | undefined) ?? null,
+          anchorComfortRange:
+            (anchorLive?.comfort_range as ComfortRange | null | undefined) ?? null,
+          swaps: storedSwaps.success ? storedSwaps.data : {},
+          collection: row.collection,
+          comfort: parsedComfort,
+        })
 
       const availabilityStatus: SavedLookAvailabilityStatus =
         missingGarmentIds.size > 0
           ? 'missing_garment'
-          : needsReviewReasons.length > 0
+          : needsReviewReasons.length > 0 || isUnresolved
             ? 'needs_review'
             : 'ready'
 
@@ -411,6 +423,32 @@ export class WardrobeSavedLookService {
     })
   }
 
+  private deriveNeedsReviewReasons(params: {
+    row: SavedLook
+    missingCount: number
+    parsedSnapshot: StoredAnchorSnapshot | null
+    anchorLive: GarmentProjection | undefined
+  }): SavedLookNeedsReviewReason[] {
+    const { row, missingCount, parsedSnapshot, anchorLive } = params
+    if (
+      missingCount > 0 ||
+      row.source !== 'style_piece' ||
+      !row.anchor_garment_id ||
+      !parsedSnapshot ||
+      !anchorLive
+    ) {
+      return []
+    }
+    const reasons: SavedLookNeedsReviewReason[] = []
+    if (anchorLive.category !== parsedSnapshot.category) {
+      reasons.push('category_changed')
+    }
+    if (anchorLive.comfort_range !== parsedSnapshot.comfortRange) {
+      reasons.push('comfort_range_changed')
+    }
+    return reasons
+  }
+
   private async findIdempotentReplay(
     actor: RequestAuthContext,
     idempotencyKey: string,
@@ -425,11 +463,11 @@ export class WardrobeSavedLookService {
       },
     })
     if (!existing) return null
-    if (existing.idempotency_payload_hash !== payloadHash) {
-      throw new ConflictException('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD')
-    }
     if (existing.deleted_at !== null) {
       throw new ConflictException('SAVED_LOOK_ALREADY_REMOVED')
+    }
+    if (existing.idempotency_payload_hash !== payloadHash) {
+      throw new ConflictException('IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD')
     }
     const [formatted] = await this.formatSavedLooks(actor, [existing])
     return { data: formatted!, isReplay: true }

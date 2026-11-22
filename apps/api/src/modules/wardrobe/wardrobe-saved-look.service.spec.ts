@@ -1,5 +1,7 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 import {
   ConflictException,
   ForbiddenException,
@@ -515,5 +517,161 @@ describe('WardrobeSavedLookService', () => {
     const created = await service.createSavedLook(pendingTeen, parsedInput)
     expect(created.data.title).toBe(emojiTitle)
     expect(created.data.source).toBe('home_sample')
+  })
+
+  it('imports unresolved legacy style_piece and home_sample looks directly into needs_review', async () => {
+    const { prisma, service } = createHarness()
+
+    // 1. Legacy style_piece look imported after the owned garment changed from top/mild to outerwear/cold
+    const legacyStyleInput = {
+      source: 'style_piece' as const,
+      lookId: 'sample:l:silk-midi',
+      weather: 'warm-rainy',
+      anchorGarmentId: 'garment-1',
+      anchorSnapshot: {
+        garmentId: 'garment-1',
+        category: 'top' as const,
+        comfortRange: 'mild' as const,
+      },
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'outerwear' as const,
+          kind: 'garment' as const,
+          itemId: 'garment-1',
+        },
+        {
+          slotIndex: 1,
+          category: 'bottom' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:midi-skirt',
+        },
+        {
+          slotIndex: 2,
+          category: 'shoes' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:loafers',
+        },
+      ],
+      swaps: { shoes: 'sample:g:loafers' },
+    }
+
+    prisma.savedLook.findUnique.mockResolvedValueOnce(null)
+    prisma.garmentItem.findMany
+      .mockResolvedValueOnce([
+        { id: 'garment-1', category: 'outerwear', comfort_range: 'cold' },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'garment-1',
+          user_id: 'user-1',
+          category: 'outerwear',
+          comfort_range: 'cold',
+          upload_status: 'ready',
+          retention_status: 'active',
+          object_path: 'wardrobe/user-1/garment-1.png',
+        },
+      ])
+    prisma.savedLook.create.mockImplementationOnce(
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve(
+          makeSavedLookRow({
+            id: 'sl-legacy-style',
+            look_id: String(data.look_id),
+            weather: String(data.weather),
+            anchor_garment_id: 'garment-1',
+            anchor_snapshot: data.anchor_snapshot as SavedLook['anchor_snapshot'],
+            composition: data.composition as SavedLook['composition'],
+            swaps: data.swaps as SavedLook['swaps'],
+          })
+        )
+    )
+
+    const importedStyle = await service.createSavedLook(
+      ACTOR,
+      legacyStyleInput,
+      '22222222-2222-4222-8222-222222222222'
+    )
+    expect(importedStyle.data.availabilityStatus).toBe('needs_review')
+    // Server pins authoritative anchorSnapshot from Postgres rather than trusting client-supplied snapshot
+    expect(importedStyle.data.anchorSnapshot).toEqual({
+      garmentId: 'garment-1',
+      category: 'outerwear',
+      comfortRange: 'cold',
+    })
+
+    // Retrying a soft-deleted legacy import key returns 409 SAVED_LOOK_ALREADY_REMOVED even if payload changed after retag
+    prisma.savedLook.findUnique.mockResolvedValueOnce(
+      makeSavedLookRow({
+        id: 'sl-legacy-style',
+        deleted_at: new Date('2026-11-22T02:00:00.000Z'),
+        idempotency_key: '22222222-2222-4222-8222-222222222222',
+        idempotency_payload_hash: 'stale-hash-before-retag',
+      })
+    )
+    await expect(
+      service.createSavedLook(
+        ACTOR,
+        legacyStyleInput,
+        '22222222-2222-4222-8222-222222222222'
+      )
+    ).rejects.toThrow('SAVED_LOOK_ALREADY_REMOVED')
+
+    // 2. Legacy home_sample bookmark whose catalog look no longer resolves for the saved weather
+    const legacyHomeInput = {
+      source: 'home_sample' as const,
+      lookId: 'sample:l:summer-linen',
+      weather: 'cool-windy',
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:cotton-tee',
+        },
+        {
+          slotIndex: 1,
+          category: 'bottom' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:linen-trousers',
+        },
+        {
+          slotIndex: 2,
+          category: 'shoes' as const,
+          kind: 'catalog' as const,
+          itemId: 'sample:g:sandals',
+        },
+      ],
+      swaps: {},
+      collection: 'all',
+      comfort: {
+        runsColdWarm: 'neutral' as const,
+        windTolerance: 'medium' as const,
+        precipPreparedness: 'medium' as const,
+      },
+    }
+
+    prisma.savedLook.findUnique.mockResolvedValueOnce(null)
+    prisma.savedLook.create.mockResolvedValueOnce(
+      makeSavedLookRow({
+        id: 'sl-legacy-home',
+        source: 'home_sample',
+        look_id: legacyHomeInput.lookId,
+        weather: legacyHomeInput.weather,
+        anchor_garment_id: null,
+        anchor_snapshot: null,
+        composition: legacyHomeInput.composition.map((s) => ({ ...s, label: null })),
+        swaps: {},
+        collection: 'all',
+        comfort: legacyHomeInput.comfort,
+      })
+    )
+
+    const importedHome = await service.createSavedLook(
+      ACTOR,
+      legacyHomeInput,
+      '33333333-3333-4333-8333-333333333333'
+    )
+    expect(importedHome.data.availabilityStatus).toBe('needs_review')
   })
 })

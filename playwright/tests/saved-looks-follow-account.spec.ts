@@ -1,12 +1,21 @@
 // Learning path Step 60: Saved looks follow the account.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-account
+// Learning path Step 61: Import device-saved looks for the same member.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+import { PrismaClient } from '@prisma/client'
 import { interceptNetworkCall as interceptOnPage } from '@seontechnologies/playwright-utils/intercept-network-call'
+import {
+  createDeterministicIdempotencyKey,
+  DEFAULT_SAMPLE_COMFORT,
+  stylePieceStorageKey,
+} from '@couture/utils'
 import {
   capsuleTest as test,
   expect,
   SEEDED_GARMENT_IDS,
 } from '../support/helpers/capsule-session'
 import { seedWebSession } from '../support/helpers/commerce-session'
+import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
 import { wardrobeOnboardingEnvironment } from '../support/helpers/wardrobe-onboarding-session'
 
 const GARMENT_LIST_URL = '**/api/v1/wardrobe/garments'
@@ -100,6 +109,25 @@ async function cleanupCreatedSavedLooks(
         'If-Match': '*',
       },
     }).catch(() => undefined)
+  }
+}
+
+async function hardDeleteSavedLooksByIdempotencyKeys(
+  keys: readonly { userId: string; idempotencyKey: string }[]
+): Promise<void> {
+  if (!process.env.DATABASE_URL || keys.length === 0) return
+  const prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL })
+  try {
+    await prisma.savedLook.deleteMany({
+      where: {
+        OR: keys.map(({ userId, idempotencyKey }) => ({
+          user_id: userId,
+          idempotency_key: idempotencyKey,
+        })),
+      },
+    })
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
@@ -313,6 +341,306 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           capsuleSession.accessToken,
           createdIds
         )
+      }
+    }
+  )
+
+  test(
+    '[P0] imports pre-CC-7.2 device-saved looks for the same member once per source id, puts unresolved looks into Needs review, rejects tampered garment references, and leaves guest or another member device keys untouched (CC-7.3) @local-lane',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ apiRequest, baseURL, browser, capsuleSession }) => {
+      const apiBaseUrl = wardrobeOnboardingEnvironment.apiBaseUrl
+      const ownerId = capsuleSession.ownerUserId
+      const otherMemberId = 'teen-2'
+      const otherMemberToken = localE2EAccessToken(otherMemberId)
+      const otherMemberGarmentId = `${otherMemberId}-garment-1`
+      const garmentId = SEEDED_GARMENT_IDS[0]
+      const createdIds = new Set<string>()
+      const otherCreatedIds = new Set<string>()
+
+      // Clean only this test's deterministic keys so repeated runs on a retained database start fresh
+      const deterministicImportKeys = [
+        {
+          userId: ownerId,
+          idempotencyKey: createDeterministicIdempotencyKey(
+            `legacy-import:v1:home_sample:${ownerId}:sample:l:office-oxford`
+          ),
+        },
+        {
+          userId: ownerId,
+          idempotencyKey: createDeterministicIdempotencyKey(
+            `legacy-import:v1:home_sample:${ownerId}:sample:l:summer-linen`
+          ),
+        },
+        {
+          userId: ownerId,
+          idempotencyKey: createDeterministicIdempotencyKey(
+            `legacy-import:v1:style_piece:${ownerId}:${garmentId}:warm-rainy:sample:l:silk-midi`
+          ),
+        },
+        {
+          userId: otherMemberId,
+          idempotencyKey: createDeterministicIdempotencyKey(
+            `legacy-import:v1:home_sample:${otherMemberId}:sample:l:office-oxford`
+          ),
+        },
+        {
+          userId: otherMemberId,
+          idempotencyKey: createDeterministicIdempotencyKey(
+            `legacy-import:v1:style_piece:${otherMemberId}:${otherMemberGarmentId}:mild-dry:sample:l:office-oxford`
+          ),
+        },
+      ]
+      await hardDeleteSavedLooksByIdempotencyKeys(deterministicImportKeys)
+
+      const guestPreviewRaw = JSON.stringify({
+        schemaVersion: 1,
+        weather: 'mild-dry',
+      })
+      const otherMemberBookmarksKey = `couturecast.member-sample-bookmarks.${otherMemberId}`
+      const otherMemberBookmarksRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+      const otherMemberStyleKey = stylePieceStorageKey(
+        otherMemberId,
+        otherMemberGarmentId
+      )
+      const otherMemberStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+
+      const ownBookmarksKey = `couturecast.member-sample-bookmarks.${ownerId}`
+      const ownBookmarksRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: { shoes: 'sample:g:white-sneakers' },
+        },
+        {
+          // Unresolvable bookmark: summer-linen does not resolve in cool-windy -> enters Needs review
+          lookId: 'sample:l:summer-linen',
+          weather: 'cool-windy',
+          collection: 'all',
+          comfort: DEFAULT_SAMPLE_COMFORT,
+          swaps: {},
+        },
+      ])
+      const ownValidStyleKey = stylePieceStorageKey(ownerId, garmentId)
+      const ownValidStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:silk-midi',
+          weather: 'warm-rainy',
+          swaps: { shoes: 'sample:g:loafers' },
+        },
+      ])
+      // Tampered reference points to a REAL garment owned by teen-2 in Postgres -> API rejects with 404 GARMENT_NOT_FOUND
+      const ownTamperedStyleKey = stylePieceStorageKey(ownerId, otherMemberGarmentId)
+      const ownTamperedStyleRaw = JSON.stringify([
+        {
+          lookId: 'sample:l:office-oxford',
+          weather: 'mild-dry',
+          swaps: {},
+        },
+      ])
+
+      const importContext = await browser.newContext({
+        viewport: { width: 390, height: 844 },
+      })
+
+      try {
+        const importPage = await importContext.newPage()
+        await seedWebSession(importPage, capsuleSession.accessToken)
+        await importPage.addInitScript(
+          (seed) => {
+            if (window.location.origin === 'null') return
+            window.sessionStorage.setItem(
+              'couturecast.access-principal',
+              JSON.stringify({ principal: seed.ownerId, member: seed.ownerId })
+            )
+            window.localStorage.setItem(
+              'couturecast.auth-session',
+              JSON.stringify({ user: { id: seed.ownerId } })
+            )
+            if (!window.sessionStorage.getItem('__cc73_seeded__')) {
+              window.sessionStorage.setItem('__cc73_seeded__', '1')
+              window.localStorage.setItem(
+                'couturecast.guest-preview.v1',
+                seed.guestPreviewRaw
+              )
+              window.localStorage.setItem(
+                seed.otherMemberBookmarksKey,
+                seed.otherMemberBookmarksRaw
+              )
+              window.localStorage.setItem(
+                seed.otherMemberStyleKey,
+                seed.otherMemberStyleRaw
+              )
+              window.localStorage.setItem(seed.ownBookmarksKey, seed.ownBookmarksRaw)
+              window.localStorage.setItem(seed.ownValidStyleKey, seed.ownValidStyleRaw)
+              window.localStorage.setItem(
+                seed.ownTamperedStyleKey,
+                seed.ownTamperedStyleRaw
+              )
+            }
+          },
+          {
+            ownerId,
+            guestPreviewRaw,
+            otherMemberBookmarksKey,
+            otherMemberBookmarksRaw,
+            otherMemberStyleKey,
+            otherMemberStyleRaw,
+            ownBookmarksKey,
+            ownBookmarksRaw,
+            ownValidStyleKey,
+            ownValidStyleRaw,
+            ownTamperedStyleKey,
+            ownTamperedStyleRaw,
+          }
+        )
+
+        const postStatuses: number[] = []
+        importPage.on('response', (response) => {
+          if (
+            response.request().method() === 'POST' &&
+            response.url().endsWith('/api/v1/wardrobe/saved-looks')
+          ) {
+            postStatuses.push(response.status())
+          }
+        })
+        trackCreatedSavedLookIds(importPage, createdIds)
+        stubReadyGarmentWithPhoto(importPage, garmentId)
+
+        await importPage.goto(`${baseURL}/wardrobe`)
+        await expect.poll(() => createdIds.size).toBe(3)
+        await expect.poll(() => postStatuses.includes(404)).toBe(true)
+
+        const savedLooksRow = importPage.getByTestId('closet-saved-looks-row')
+        await expect(savedLooksRow).toBeVisible()
+        await expect(savedLooksRow).toContainText('3 saved')
+        await savedLooksRow.click()
+
+        for (const id of createdIds) {
+          await expect(importPage.getByTestId(`saved-look-card-${id}`)).toBeVisible()
+        }
+        await expect(importPage.getByTestId('saved-look-needs-review')).toBeVisible()
+
+        // Same-member device keys are removed while guest preview and teen-2 keys remain byte-for-byte intact
+        await expect
+          .poll(() =>
+            importPage.evaluate(
+              (keys) => ({
+                ownBookmarks: window.localStorage.getItem(keys.ownBookmarksKey),
+                ownValidStyle: window.localStorage.getItem(keys.ownValidStyleKey),
+                ownTamperedStyle: window.localStorage.getItem(keys.ownTamperedStyleKey),
+                guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
+                otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
+                otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
+              }),
+              {
+                ownBookmarksKey,
+                ownValidStyleKey,
+                ownTamperedStyleKey,
+                otherMemberBookmarksKey,
+                otherMemberStyleKey,
+              }
+            )
+          )
+          .toEqual({
+            ownBookmarks: null,
+            ownValidStyle: null,
+            ownTamperedStyle: null,
+            guestPreview: guestPreviewRaw,
+            otherBookmarks: otherMemberBookmarksRaw,
+            otherStyle: otherMemberStyleRaw,
+          })
+
+        // Reloading settles with the exact same 3 account IDs and zero duplicate imports
+        const expectedIds = [...createdIds].sort()
+        await importPage.reload()
+        const reloadedRow = importPage.getByTestId('closet-saved-looks-row')
+        await expect(reloadedRow).toContainText('3 saved')
+        await reloadedRow.click()
+        for (const id of expectedIds) {
+          await expect(importPage.getByTestId(`saved-look-card-${id}`)).toBeVisible()
+        }
+        const apiListAfterReload = await apiRequest<{ data: { id: string }[] }>({
+          method: 'GET',
+          path: '/api/v1/wardrobe/saved-looks',
+          baseUrl: apiBaseUrl,
+          headers: { Authorization: `Bearer ${capsuleSession.accessToken}` },
+        })
+        expect(apiListAfterReload.status).toBe(200)
+        expect(apiListAfterReload.body.data.map((item) => item.id).sort()).toEqual(
+          expectedIds
+        )
+
+        // Signing in as teen-2 in a fresh tab on the same device (with only teen-2's session initialized)
+        // now imports teen-2's previously untouched device looks
+        const member2Page = await importContext.newPage()
+        await seedWebSession(member2Page, otherMemberToken)
+        await member2Page.addInitScript(
+          ({ memberId }) => {
+            if (window.location.origin === 'null') return
+            window.sessionStorage.setItem(
+              'couturecast.access-principal',
+              JSON.stringify({ principal: memberId, member: memberId })
+            )
+            window.localStorage.setItem(
+              'couturecast.auth-session',
+              JSON.stringify({ user: { id: memberId } })
+            )
+          },
+          { memberId: otherMemberId }
+        )
+        trackCreatedSavedLookIds(member2Page, otherCreatedIds)
+        stubReadyGarmentWithPhoto(member2Page, otherMemberGarmentId)
+        await member2Page.goto(`${baseURL}/wardrobe`)
+        await expect.poll(() => otherCreatedIds.size).toBe(2)
+
+        await expect
+          .poll(() =>
+            member2Page.evaluate(
+              (keys) => ({
+                otherBookmarks: window.localStorage.getItem(keys.otherMemberBookmarksKey),
+                otherStyle: window.localStorage.getItem(keys.otherMemberStyleKey),
+                guestPreview: window.localStorage.getItem('couturecast.guest-preview.v1'),
+              }),
+              { otherMemberBookmarksKey, otherMemberStyleKey }
+            )
+          )
+          .toEqual({
+            otherBookmarks: null,
+            otherStyle: null,
+            guestPreview: guestPreviewRaw,
+          })
+      } finally {
+        await importContext.close()
+        await cleanupCreatedSavedLooks(
+          apiRequest,
+          apiBaseUrl,
+          capsuleSession.accessToken,
+          createdIds
+        )
+        await cleanupCreatedSavedLooks(
+          apiRequest,
+          apiBaseUrl,
+          otherMemberToken,
+          otherCreatedIds
+        )
+        await hardDeleteSavedLooksByIdempotencyKeys(deterministicImportKeys)
       }
     }
   )

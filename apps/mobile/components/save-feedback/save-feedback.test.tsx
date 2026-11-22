@@ -60,6 +60,8 @@ vi.mock('@/src/lib/saved-looks', () => ({
   deleteSavedLookFromMobile: mocks.deleteSavedLookFromMobile,
   restoreSavedLookFromMobile: vi.fn().mockRejectedValue(new Error('503')),
   notifyMobileSavedLooksChanged: vi.fn(),
+  subscribeMobileSavedLooksChanged: vi.fn(() => vi.fn()),
+  ensureMobileLegacySavedLooksMigration: vi.fn().mockReturnValue(null),
   formatSavedLookIfMatch: (id: string, revision: number) =>
     `"saved-look:${id}:${revision}"`,
 }))

@@ -46,6 +46,7 @@ import {
   notifySavedLooksChanged,
   restoreSavedLookFromWeb,
   SavedLookRequestError,
+  subscribeSavedLooksChanged,
 } from '../../lib/saved-looks'
 import {
   currentWebSessionBearer,
@@ -263,11 +264,50 @@ function SampleOutfitInner({
     }
   }, [owner])
 
-  const bookmarks: (SampleBookmark & { savedLookId?: string })[] = []
+  useEffect(() => {
+    if (!owner) return
+    return subscribeSavedLooksChanged((changedOwner) => {
+      if (changedOwner !== owner) return
+      const refreshVersion = mutationVersionRef.current
+      void listSavedLooksFromWeb({
+        source: 'home_sample',
+        skipLegacyImport: true,
+      })
+        .then((items) => {
+          if (
+            !bookmarkOwnerMounted.current ||
+            !isLiveOwner(owner) ||
+            mutationVersionRef.current !== refreshVersion
+          ) {
+            return
+          }
+          const fetchedById = new Map(items.map((item) => [item.id, item]))
+          const next = [
+            ...items.filter((item) => !deletedIdsRef.current.has(item.id)),
+            ...savedLooksRef.current.filter(
+              (item) => !fetchedById.has(item.id) && !deletedIdsRef.current.has(item.id)
+            ),
+          ]
+          savedLooksRef.current = next
+          setSavedLooks(next)
+          setBookmarksPersistent(true)
+        })
+        .catch(() => undefined)
+    })
+  }, [owner])
+
+  const bookmarks: (SampleBookmark & {
+    savedLookId?: string
+    needsReview?: boolean
+  })[] = []
   for (const saved of savedLooks) {
     const bookmark = savedLookToSampleBookmark(saved)
     if (!bookmark) continue
-    bookmarks.push({ ...bookmark, savedLookId: saved.id })
+    bookmarks.push({
+      ...bookmark,
+      savedLookId: saved.id,
+      needsReview: saved.availabilityStatus === 'needs_review',
+    })
   }
   const invoker = useRef<HTMLElement | null>(null)
   const update = (next: SampleOutfitResult) => {
@@ -371,6 +411,7 @@ function SampleOutfitInner({
           update(updateMemberSampleOutfit(result, { weather }))
         }}
         bookmarks={bookmarks}
+        needsReviewLabel={t('savedLooks.needsReview')}
         persistent={bookmarksPersistent}
         lookId={lookId}
         ownerKey={owner}
@@ -480,6 +521,27 @@ function SampleOutfitInner({
             ?.scrollIntoView?.({ block: 'nearest' })
         }}
         onOpen={(bookmark) => {
+          const selected = bookmark as SampleBookmark & {
+            savedLookId?: string
+            needsReview?: boolean
+          }
+          const matching = selected.savedLookId
+            ? savedLooksRef.current.find((item) => item.id === selected.savedLookId)
+            : savedLooksRef.current.find((item) => item.lookId === bookmark.lookId)
+          if (selected.needsReview || matching?.availabilityStatus === 'needs_review') {
+            const seq = ++noticeSeqRef.current
+            showScopedNotice({
+              id: `sample-${owner}-needs-review-${seq}`,
+              announcementId: createAnnouncementToken(
+                `sample-${owner}-needs-review`,
+                seq
+              ),
+              message: t('savedLooks.needsReviewDetail'),
+              tone: 'neutral',
+              actions: [],
+            })
+            return
+          }
           lookUndoStackRef.current = []
           dismissOwnedNotices()
           update(reopenMemberSampleOutfit(result, bookmark))
@@ -585,6 +647,7 @@ function SampleOutfitInner({
                             accessToken: actionToken,
                           })
                           if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return
+                          deletedIdsRef.current.delete(restored.id)
                           mutationVersionRef.current += 1
                           const restoredList = [
                             restored,

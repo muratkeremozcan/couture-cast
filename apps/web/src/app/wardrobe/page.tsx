@@ -24,8 +24,14 @@ import {
   getOnboardingStateFromWeb,
   resolveCurrentUserId,
 } from '../../lib/wardrobe'
+import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
-import { currentWebSessionOwner, useWebSessionOwner } from '../../lib/use-web-session'
+import {
+  currentWebSessionBearer,
+  currentWebSessionOwner,
+  UNVERIFIED_BEARER_OWNER,
+  useWebSessionOwner,
+} from '../../lib/use-web-session'
 import {
   getGuestPreviewStrings,
   getStylePieceStrings,
@@ -126,6 +132,26 @@ function WardrobeEmptyState({
   )
 }
 
+function readLiveWebBearer(): string | null {
+  return (
+    currentWebSessionBearer() ??
+    readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ??
+    null
+  )
+}
+
+function resolveEffectiveSavedLooksOwner(
+  owner: string | null,
+  profileOwner: { id: string; bearer: string | null } | null,
+  liveBearer: string | null
+): string | null {
+  if (owner && owner !== UNVERIFIED_BEARER_OWNER) return owner
+  if (profileOwner && profileOwner.bearer && profileOwner.bearer === liveBearer) {
+    return profileOwner.id
+  }
+  return null
+}
+
 function WardrobeHubView({ owner }: { owner: string | null }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
@@ -145,6 +171,10 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     useState<WardrobeOnboardingStatus | null>(null)
   const [onboardingStatusError, setOnboardingStatusError] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [profileOwnerBinding, setProfileOwnerBinding] = useState<{
+    id: string
+    bearer: string | null
+  } | null>(null)
   const [userIdError, setUserIdError] = useState(false)
   const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
   const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
@@ -218,10 +248,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
    */
   useEffect(() => {
     const controller = new AbortController()
+    const capturedBearer = readLiveWebBearer()
     setUserIdError(false)
+    setProfileOwnerBinding(null)
     void resolveCurrentUserId()
       .then((id) => {
-        if (!controller.signal.aborted) setUserId(id)
+        if (!controller.signal.aborted) {
+          setUserId(id)
+          const liveBearer = readLiveWebBearer()
+          if (id && capturedBearer && liveBearer === capturedBearer) {
+            setProfileOwnerBinding({ id, bearer: capturedBearer })
+          }
+        }
       })
       .catch(() => {
         if (controller.signal.aborted) return
@@ -280,6 +318,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
 
   const savedLooksLoadEpochRef = useRef(0)
+  const effectiveSavedLooksOwner = resolveEffectiveSavedLooksOwner(
+    owner,
+    profileOwnerBinding,
+    readLiveWebBearer()
+  )
 
   useEffect(() => {
     const loadEpoch = ++savedLooksLoadEpochRef.current
@@ -293,7 +336,12 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     }
     const controller = new AbortController()
     setSavedLooksLoading(true)
-    void listSavedLooksPageFromWeb({ limit: 50, offset: 0, signal: controller.signal })
+    void listSavedLooksPageFromWeb({
+      owner: effectiveSavedLooksOwner,
+      limit: 50,
+      offset: 0,
+      signal: controller.signal,
+    })
       .then((page) => {
         if (
           controller.signal.aborted ||
@@ -321,16 +369,16 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         }
       })
     return () => controller.abort()
-  }, [owner, sessionAttempt, missedSession, savedLooksAttempt])
+  }, [owner, effectiveSavedLooksOwner, sessionAttempt, missedSession, savedLooksAttempt])
 
   useEffect(() => {
     if (!owner) return
     return subscribeSavedLooksChanged((changedOwner) => {
-      if (changedOwner === owner) {
+      if (changedOwner === owner || changedOwner === effectiveSavedLooksOwner) {
         setSavedLooksAttempt((attempt) => attempt + 1)
       }
     })
-  }, [owner])
+  }, [owner, effectiveSavedLooksOwner])
 
   const loadMoreSavedLooks = useCallback(() => {
     if (

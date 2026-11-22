@@ -720,3 +720,56 @@ it('discards a delayed city lookup when another member takes over Home', async (
     city.resolve()
   }
 })
+
+it('shows inline Needs review badge for unresolved Home saved looks and avoids substituting another outfit on click (CC-7.3)', async () => {
+  const user = userEvent.setup()
+  const owner = 'home-review-member'
+  window.localStorage.setItem(
+    `couturecast.member-sample-bookmarks.${owner}`,
+    JSON.stringify([
+      {
+        lookId: 'sample:l:summer-linen',
+        weather: 'cool-windy',
+        collection: 'all',
+        comfort: {
+          runsColdWarm: 'neutral',
+          windTolerance: 'medium',
+          precipPreparedness: 'medium',
+        },
+        swaps: {},
+      },
+    ])
+  )
+  const { store, handlers } = createSavedLooksMswHandlers()
+  useMswHandlers(
+    http.get('/api/v1/ritual', () => missingCity()),
+    ...handlers
+  )
+  publishMember(owner)
+  const view = renderHome()
+
+  try {
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    expect(store.items[0]?.availabilityStatus).toBe('needs_review')
+
+    const savedSection = await screen.findByTestId('sample-saved-looks')
+    const badge = await within(savedSection).findByTestId('saved-look-needs-review')
+    expect(badge).toHaveTextContent('Needs review')
+
+    const beforeLook = screen.getByTestId('guest-preview-look-name').textContent
+    const openBtn = within(savedSection).getAllByRole('button')[0]!
+    await user.click(openBtn)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Review it to make sure it still fits.'
+      )
+    )
+    expect(screen.getByTestId('guest-preview-look-name').textContent).toBe(beforeLook)
+    expect(
+      window.localStorage.getItem(`couturecast.member-sample-bookmarks.${owner}`)
+    ).toBeNull()
+  } finally {
+    view.unmount()
+  }
+})

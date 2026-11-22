@@ -1,12 +1,30 @@
-import type { ComfortRange, ComfortRun, ComfortTolerance } from '../comfort-rules'
-import { type SampleBookmark } from './bookmarks'
+import { z } from 'zod'
+import {
+  COMFORT_RANGES,
+  type ComfortRange,
+  type ComfortRun,
+  type ComfortTolerance,
+} from '../comfort-rules'
+import {
+  MAX_SAMPLE_BOOKMARK_BYTES,
+  openSampleBookmark,
+  type SampleBookmark,
+} from './bookmarks'
+import { SAMPLE_CATALOG } from './catalog'
 import {
   SAMPLE_WEATHER_KEYS,
+  selectSampleOutfit,
   type GuestSampleWeatherKey,
   type SampleOutfitResult,
 } from './selector'
 import {
+  MAX_STYLE_PIECE_STORAGE_BYTES,
   STYLE_PIECE_WEATHER_KEYS,
+  stylePieceLooks,
+  stylePieceRecipeKey,
+  stylePieceStorageKey,
+  stylePieceSwapOptions,
+  type StylePieceAnchor,
   type StylePieceLook,
   type StylePieceRecipe,
   type StylePieceSelection,
@@ -15,6 +33,9 @@ import {
 import {
   SAMPLE_COLLECTION_FILTERS,
   SAMPLE_GARMENT_CATEGORIES,
+  SAMPLE_GARMENT_ID_PATTERN,
+  SAMPLE_LOOK_ID_PATTERN,
+  type SampleCatalog,
   type SampleCollectionFilter,
   type SampleGarmentCategory,
 } from './types'
@@ -66,10 +87,63 @@ export type SavedLookLike = {
   comfort: SavedLookComfortPayload | null
 }
 
+export type LegacySavedLookImportEntry<TRaw> = {
+  sourceId: string
+  idempotencyKey: string
+  payload: CreateSavedLookPayload
+  rawEntry: TRaw
+  resolvesCleanly: boolean
+}
+
 const STYLE_PIECE_WEATHER_SET = new Set<string>(STYLE_PIECE_WEATHER_KEYS)
 const SAMPLE_WEATHER_SET = new Set<string>(SAMPLE_WEATHER_KEYS)
 const SAMPLE_COLLECTION_SET = new Set<string>(SAMPLE_COLLECTION_FILTERS)
 const GARMENT_CATEGORY_SET = new Set<string>(SAMPLE_GARMENT_CATEGORIES)
+
+const HOME_SAMPLE_DISPLAY_ORDER: readonly SampleGarmentCategory[] = [
+  'outerwear',
+  'top',
+  'dress',
+  'bottom',
+  'shoes',
+  'accessory',
+]
+
+const MEMBER_SAMPLE_BOOKMARKS_PREFIX = 'couturecast.member-sample-bookmarks.'
+const STYLE_PIECE_STORAGE_PREFIX = 'couturecast.style-piece.'
+const MAX_LEGACY_IMPORT_ITEMS = 32
+
+const legacyToleranceSchema = z.enum(['low', 'medium', 'high'])
+
+const legacySampleBookmarkSchema = z
+  .object({
+    lookId: z.string().regex(SAMPLE_LOOK_ID_PATTERN),
+    weather: z.enum(SAMPLE_WEATHER_KEYS),
+    collection: z.enum(SAMPLE_COLLECTION_FILTERS),
+    comfort: z
+      .object({
+        runsColdWarm: z.enum(['cold', 'neutral', 'warm']),
+        windTolerance: legacyToleranceSchema,
+        precipPreparedness: legacyToleranceSchema,
+      })
+      .strict(),
+    swaps: z.partialRecord(
+      z.enum(SAMPLE_GARMENT_CATEGORIES),
+      z.string().regex(SAMPLE_GARMENT_ID_PATTERN)
+    ),
+  })
+  .strict()
+
+const legacyStylePieceRecipeSchema = z
+  .object({
+    lookId: z.string().regex(SAMPLE_LOOK_ID_PATTERN),
+    weather: z.enum(STYLE_PIECE_WEATHER_KEYS),
+    swaps: z.partialRecord(
+      z.enum(SAMPLE_GARMENT_CATEGORIES),
+      z.string().regex(SAMPLE_GARMENT_ID_PATTERN)
+    ),
+  })
+  .strict()
 
 function formatUuidFromBytes(bytes: Uint8Array): string {
   const b = new Uint8Array(bytes)
@@ -103,6 +177,126 @@ export function createIdempotencyKey(): string {
   return formatUuidFromBytes(bytes)
 }
 
+function mix32(value: number): number {
+  let h = value | 0
+  h ^= h >>> 16
+  h = Math.imul(h, 0x85ebca6b)
+  h ^= h >>> 13
+  h = Math.imul(h, 0xc2b2ae35)
+  h ^= h >>> 16
+  return h >>> 0
+}
+
+/**
+ * Generates a deterministic RFC 4122 UUID v4 from `seed` so interrupted or concurrent
+ * device-saved look imports reuse the exact same `Idempotency-Key` per stable source id.
+ */
+export function createDeterministicIdempotencyKey(seed: string): string {
+  const input = new TextEncoder().encode(seed)
+  const seeds = [0x811c9dc5, 0x9e3779b9, 0x7f4a7c15, 0x6a09e667] as const
+  const bytes = new Uint8Array(16)
+
+  for (let lane = 0; lane < 4; lane += 1) {
+    let h = seeds[lane]! >>> 0
+    const prime = (0x01000193 + lane * 0x16a) >>> 0
+    for (let i = 0; i < input.length; i += 1) {
+      h ^= (input[i]! + lane * 31 + (i & 0xff)) & 0xff
+      h = Math.imul(h, prime) >>> 0
+    }
+    h = mix32(h ^ input.length)
+    const offset = lane * 4
+    bytes[offset] = (h >>> 24) & 0xff
+    bytes[offset + 1] = (h >>> 16) & 0xff
+    bytes[offset + 2] = (h >>> 8) & 0xff
+    bytes[offset + 3] = h & 0xff
+  }
+
+  return formatUuidFromBytes(bytes)
+}
+
+/**
+ * Returns the candidate device storage keys for a member's pre-CC-7.2 Home sample bookmarks.
+ * Web used the raw owner suffix while mobile used `encodeURIComponent(owner)`.
+ */
+export function memberSampleBookmarksStorageKeys(owner: string): string[] {
+  const trimmed = owner.trim()
+  if (!trimmed || trimmed.includes('\u0000')) return []
+  return Array.from(
+    new Set([
+      `${MEMBER_SAMPLE_BOOKMARKS_PREFIX}${trimmed}`,
+      `${MEMBER_SAMPLE_BOOKMARKS_PREFIX}${encodeURIComponent(trimmed)}`,
+    ])
+  )
+}
+
+/**
+ * Extracts the owner member id from a `couturecast.member-sample-bookmarks.<owner>` key,
+ * or returns `null` if the key is not a valid member sample bookmark key. Pass
+ * `{ allowJsonExtension: true }` only at the native document filename boundary.
+ */
+export function parseMemberSampleBookmarksStorageKey(
+  storageKey: string,
+  options?: { allowJsonExtension?: boolean }
+): string | null {
+  const normalized =
+    options?.allowJsonExtension && storageKey.endsWith('.json')
+      ? storageKey.slice(0, -5)
+      : storageKey
+  if (!normalized.startsWith(MEMBER_SAMPLE_BOOKMARKS_PREFIX)) return null
+  const suffix = normalized.slice(MEMBER_SAMPLE_BOOKMARKS_PREFIX.length)
+  if (!suffix || suffix.length > 256 || suffix.includes('\u0000')) return null
+  try {
+    return decodeURIComponent(suffix)
+  } catch {
+    return suffix
+  }
+}
+
+function isValidStylePieceScopeTuple(parsed: unknown): parsed is [string, string] {
+  if (!Array.isArray(parsed) || parsed.length !== 2) return false
+  const [owner, garmentId] = parsed as [unknown, unknown]
+  return (
+    typeof owner === 'string' &&
+    owner.length > 0 &&
+    !owner.includes('\u0000') &&
+    typeof garmentId === 'string' &&
+    garmentId.length > 0 &&
+    garmentId.length <= 128 &&
+    !garmentId.includes('\u0000')
+  )
+}
+
+/**
+ * Decodes a `couturecast.style-piece.<scope>` storage key into `{ owner, garmentId }`.
+ * Verifies canonical round-trip via `stylePieceStorageKey(owner, garmentId)` so malformed
+ * or ambiguous keys are never read, imported, or deleted. Pass `{ allowJsonExtension: true }`
+ * only at the native document filename boundary.
+ */
+export function parseStylePieceStorageKey(
+  storageKey: string,
+  options?: { allowJsonExtension?: boolean }
+): { owner: string; garmentId: string } | null {
+  const normalized =
+    options?.allowJsonExtension && storageKey.endsWith('.json')
+      ? storageKey.slice(0, -5)
+      : storageKey
+  if (!normalized.startsWith(STYLE_PIECE_STORAGE_PREFIX)) return null
+  const scope = normalized.slice(STYLE_PIECE_STORAGE_PREFIX.length)
+  if (!scope || scope.length > 512) return null
+  try {
+    const decoded = decodeURIComponent(scope.replaceAll('~', '%'))
+    const parsed = JSON.parse(decoded) as unknown
+    if (!isValidStylePieceScopeTuple(parsed)) return null
+    const [owner, garmentId] = parsed
+    if (stylePieceStorageKey(owner, garmentId) !== normalized) {
+      return null
+    }
+    return { owner, garmentId }
+  } catch {
+    return null
+  }
+}
+
 function cleanSwaps(
   swaps: Readonly<Partial<Record<SampleGarmentCategory, string>>> | undefined
 ): Partial<Record<SampleGarmentCategory, string>> {
@@ -133,6 +327,521 @@ function swapsEqual(
     }
   }
   return true
+}
+
+function doesStylePieceLookResolve(
+  input: {
+    lookId: string
+    weather: string
+    anchorCategory?: SampleGarmentCategory | null
+    anchorComfortRange?: ComfortRange | null
+  },
+  swaps: Partial<Record<SampleGarmentCategory, string>>,
+  catalog: SampleCatalog
+): boolean {
+  if (
+    !input.anchorCategory ||
+    !input.anchorComfortRange ||
+    !STYLE_PIECE_WEATHER_SET.has(input.weather)
+  ) {
+    return false
+  }
+  const { looks } = stylePieceLooks(
+    { category: input.anchorCategory, comfortRange: input.anchorComfortRange },
+    input.weather as StylePieceWeatherKey,
+    catalog
+  )
+  const base = looks.find((entry) => entry.recipe.lookId === input.lookId)
+  if (!base) return false
+
+  for (const [category, swapId] of Object.entries(swaps)) {
+    const cat = category as SampleGarmentCategory
+    const baseCompanion = base.companions.find((item) => item.category === cat)
+    if (!baseCompanion) return false
+    if (baseCompanion.id === swapId) continue
+    const allowed = stylePieceSwapOptions(base, cat, catalog).some(
+      (candidate) => candidate.id === swapId
+    )
+    if (!allowed) return false
+  }
+  return true
+}
+
+function doesHomeSampleLookResolve(
+  input: {
+    lookId: string
+    weather: string
+    collection?: string | null
+    comfort?: SavedLookComfortPayload | null
+  },
+  swaps: Partial<Record<SampleGarmentCategory, string>>,
+  catalog: SampleCatalog
+): boolean {
+  if (
+    !SAMPLE_WEATHER_SET.has(input.weather) ||
+    !input.collection ||
+    !SAMPLE_COLLECTION_SET.has(input.collection) ||
+    !input.comfort
+  ) {
+    return false
+  }
+
+  const bookmark: SampleBookmark = {
+    lookId: input.lookId,
+    weather: input.weather as GuestSampleWeatherKey,
+    collection: input.collection as SampleCollectionFilter,
+    comfort: {
+      runsColdWarm: input.comfort.runsColdWarm,
+      windTolerance: input.comfort.windTolerance,
+      precipPreparedness: input.comfort.precipPreparedness,
+    },
+    swaps,
+  }
+  const result = selectSampleOutfit(
+    openSampleBookmark(bookmark, { votes: {}, swaps: {} }),
+    catalog
+  )
+  return (
+    result.look?.id === input.lookId &&
+    !result.explanation.some((item) => item.key === 'swap-ignored') &&
+    Object.entries(swaps).every(([category, swapId]) =>
+      result.garments.some(
+        (garment) => garment.category === category && garment.id === swapId
+      )
+    )
+  )
+}
+
+/**
+ * Checks whether a saved look (`style_piece` or `home_sample`) still resolves cleanly
+ * against the live anchor garment tags and current sample catalog rules.
+ * Non-catalog synthetic look IDs (e.g. unit-test fixtures like `look-01`) return `true`.
+ */
+export function doesSavedLookResolve(
+  input: {
+    source: SavedLookSourceKind
+    lookId: string
+    weather: string
+    anchorCategory?: SampleGarmentCategory | null
+    anchorComfortRange?: ComfortRange | null
+    swaps?: Readonly<Partial<Record<SampleGarmentCategory, string>>> | null
+    collection?: string | null
+    comfort?: SavedLookComfortPayload | null
+  },
+  catalog: SampleCatalog = SAMPLE_CATALOG
+): boolean {
+  if (!SAMPLE_LOOK_ID_PATTERN.test(input.lookId)) {
+    return true
+  }
+  const swaps = cleanSwaps(input.swaps ?? undefined)
+  if (input.source === 'style_piece') {
+    return doesStylePieceLookResolve(input, swaps, catalog)
+  }
+  return doesHomeSampleLookResolve(input, swaps, catalog)
+}
+
+function buildFallbackHomeSampleComposition(
+  bookmark: SampleBookmark,
+  result: SampleOutfitResult,
+  catalog: SampleCatalog
+): SavedLookCompositionSlotPayload[] {
+  const catalogGarments = new Map(catalog.garments.map((item) => [item.id, item]))
+  const byCategory = new Map<SampleGarmentCategory, string>()
+  const catalogLook = catalog.looks.find((look) => look.id === bookmark.lookId)
+  const seedGarments = catalogLook
+    ? catalogLook.core.map((id) => catalogGarments.get(id)!)
+    : result.garments
+
+  for (const garment of seedGarments) {
+    byCategory.set(garment.category, garment.id)
+  }
+
+  for (const [category, swapId] of Object.entries(cleanSwaps(bookmark.swaps)) as [
+    SampleGarmentCategory,
+    string,
+  ][]) {
+    byCategory.set(category, swapId)
+  }
+
+  const orderedCategories = HOME_SAMPLE_DISPLAY_ORDER.filter((category) =>
+    byCategory.has(category)
+  )
+
+  if (orderedCategories.length === 0 && catalog.garments[0]) {
+    return [
+      {
+        slotIndex: 0,
+        category: catalog.garments[0].category,
+        kind: 'catalog' as const,
+        itemId: catalog.garments[0].id,
+      },
+    ]
+  }
+
+  return orderedCategories.map((category, index) => ({
+    slotIndex: index,
+    category,
+    kind: 'catalog' as const,
+    itemId: byCategory.get(category)!,
+  }))
+}
+
+/**
+ * Parses a member's legacy `couturecast.member-sample-bookmarks.<owner>` JSON payload for
+ * account import. Valid legacy records that no longer resolve against current catalog rules
+ * are preserved (with `resolvesCleanly: false`) so they import into `"Needs review"`.
+ */
+export function parseLegacyHomeSampleBookmarksForImport(
+  raw: string | null,
+  owner: string,
+  catalog: SampleCatalog = SAMPLE_CATALOG
+): {
+  entries: LegacySavedLookImportEntry<SampleBookmark>[]
+  hadInvalidEntries: boolean
+  malformedPayload: boolean
+} {
+  if (raw === null) {
+    return { entries: [], hadInvalidEntries: false, malformedPayload: false }
+  }
+  if (raw.length === 0 || raw.length > MAX_SAMPLE_BOOKMARK_BYTES) {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(raw)
+  } catch {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  if (!Array.isArray(parsedJson)) {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  let hadInvalidEntries = false
+  const seenLookIds = new Set<string>()
+  const entries: LegacySavedLookImportEntry<SampleBookmark>[] = []
+
+  for (const candidate of parsedJson) {
+    if (entries.length >= MAX_LEGACY_IMPORT_ITEMS) {
+      hadInvalidEntries = true
+      break
+    }
+    const parsedBookmark = legacySampleBookmarkSchema.safeParse(candidate)
+    if (!parsedBookmark.success) {
+      hadInvalidEntries = true
+      continue
+    }
+    const bookmark = parsedBookmark.data
+    if (seenLookIds.has(bookmark.lookId)) {
+      hadInvalidEntries = true
+      continue
+    }
+    seenLookIds.add(bookmark.lookId)
+
+    const resolvesCleanly = doesSavedLookResolve(
+      {
+        source: 'home_sample',
+        lookId: bookmark.lookId,
+        weather: bookmark.weather,
+        swaps: bookmark.swaps,
+        collection: bookmark.collection,
+        comfort: bookmark.comfort,
+      },
+      catalog
+    )
+    const result = selectSampleOutfit(
+      openSampleBookmark(bookmark, { votes: {}, swaps: {} }),
+      catalog
+    )
+    const cleanedSwaps = cleanSwaps(bookmark.swaps)
+    const payload: CreateSavedLookPayload = resolvesCleanly
+      ? {
+          ...buildHomeSampleSavedLookInput(result)!,
+          swaps: cleanedSwaps,
+        }
+      : {
+          source: 'home_sample',
+          lookId: bookmark.lookId,
+          weather: bookmark.weather,
+          collection: bookmark.collection,
+          comfort: {
+            runsColdWarm: bookmark.comfort.runsColdWarm,
+            windTolerance: bookmark.comfort.windTolerance,
+            precipPreparedness: bookmark.comfort.precipPreparedness,
+          },
+          composition: buildFallbackHomeSampleComposition(bookmark, result, catalog),
+          swaps: cleanedSwaps,
+        }
+
+    const sourceId = `home_sample:${owner}:${bookmark.lookId}`
+    const idempotencyKey = createDeterministicIdempotencyKey(
+      `legacy-import:v1:${sourceId}`
+    )
+
+    entries.push({
+      sourceId,
+      idempotencyKey,
+      payload,
+      rawEntry: bookmark,
+      resolvesCleanly,
+    })
+  }
+
+  return { entries, hadInvalidEntries, malformedPayload: false }
+}
+
+function findCompatibleStylePieceAnchor(
+  recipe: StylePieceRecipe,
+  currentAnchor: StylePieceAnchor | null | undefined,
+  catalog: SampleCatalog
+): { anchor: StylePieceAnchor; base: StylePieceLook } | null {
+  const candidates: StylePieceAnchor[] = []
+  if (currentAnchor) {
+    for (const comfortRange of COMFORT_RANGES) {
+      candidates.push({ category: currentAnchor.category, comfortRange })
+    }
+    for (const category of SAMPLE_GARMENT_CATEGORIES) {
+      if (category !== currentAnchor.category) {
+        candidates.push({ category, comfortRange: currentAnchor.comfortRange })
+      }
+    }
+  }
+  for (const category of SAMPLE_GARMENT_CATEGORIES) {
+    for (const comfortRange of COMFORT_RANGES) {
+      candidates.push({ category, comfortRange })
+    }
+  }
+
+  const checked = new Set<string>()
+  for (const anchor of candidates) {
+    const key = `${anchor.category}:${anchor.comfortRange}`
+    if (checked.has(key)) continue
+    checked.add(key)
+    const { looks } = stylePieceLooks(anchor, recipe.weather, catalog)
+    const base = looks.find((entry) => entry.recipe.lookId === recipe.lookId)
+    if (base) {
+      return { anchor, base }
+    }
+  }
+  return null
+}
+
+function buildFallbackStylePieceCompanions(
+  recipe: StylePieceRecipe,
+  slotZeroCategory: SampleGarmentCategory,
+  base: StylePieceLook | undefined,
+  catalog: SampleCatalog
+): { category: SampleGarmentCategory; id: string }[] {
+  const cleanedSwaps = cleanSwaps(recipe.swaps)
+  const catalogGarments = new Map(catalog.garments.map((item) => [item.id, item]))
+  const catalogLook = catalog.looks.find((look) => look.id === recipe.lookId)
+  const seedCompanions =
+    base?.companions ?? (catalogLook?.core ?? []).map((id) => catalogGarments.get(id)!)
+  const companions = seedCompanions
+    .filter((item) => item.category !== slotZeroCategory)
+    .map((item) => ({
+      category: item.category,
+      id: cleanedSwaps[item.category] ?? item.id,
+    }))
+
+  for (const [category, swapId] of Object.entries(cleanedSwaps) as [
+    SampleGarmentCategory,
+    string,
+  ][]) {
+    if (
+      category !== slotZeroCategory &&
+      !companions.some((item) => item.category === category)
+    ) {
+      companions.push({ category, id: swapId })
+    }
+  }
+
+  if (companions.length === 0) {
+    const fallback = catalog.garments.find((item) => item.category !== slotZeroCategory)!
+    companions.push({ category: fallback.category, id: fallback.id })
+  }
+
+  return companions.slice(0, 11)
+}
+
+function buildLegacyStylePieceImportPayload(params: {
+  recipe: StylePieceRecipe
+  garmentId: string
+  cleanedSwaps: Partial<Record<SampleGarmentCategory, string>>
+  currentAnchor: StylePieceAnchor | null | undefined
+  resolvesCleanly: boolean
+  catalog: SampleCatalog
+}): CreateSavedLookPayload {
+  const { recipe, garmentId, cleanedSwaps, currentAnchor, resolvesCleanly, catalog } =
+    params
+  if (resolvesCleanly && currentAnchor) {
+    const currentBase = stylePieceLooks(
+      currentAnchor,
+      recipe.weather,
+      catalog
+    ).looks.find((entry) => entry.recipe.lookId === recipe.lookId)!
+    const companions = currentBase.companions.map((companion) => {
+      const swapId = cleanedSwaps[companion.category]
+      return swapId ? { ...companion, id: swapId } : companion
+    })
+    return buildStylePieceSavedLookInput(
+      {
+        id: garmentId,
+        category: currentAnchor.category,
+        comfortRange: currentAnchor.comfortRange,
+      },
+      {
+        recipe: { ...currentBase.recipe, swaps: cleanedSwaps },
+        companions,
+      }
+    )
+  }
+
+  const currentBase = currentAnchor
+    ? stylePieceLooks(currentAnchor, recipe.weather, catalog).looks.find(
+        (entry) => entry.recipe.lookId === recipe.lookId
+      )
+    : undefined
+  const compatible = currentBase
+    ? { anchor: currentAnchor!, base: currentBase }
+    : findCompatibleStylePieceAnchor(recipe, currentAnchor, catalog)
+  const snapshotAnchor: StylePieceAnchor = compatible?.anchor ??
+    currentAnchor ?? {
+      category: 'top',
+      comfortRange: 'mild',
+    }
+  const slotZeroCategory = currentAnchor?.category ?? snapshotAnchor.category
+  const companions = buildFallbackStylePieceCompanions(
+    recipe,
+    slotZeroCategory,
+    compatible?.base,
+    catalog
+  )
+  return {
+    source: 'style_piece',
+    lookId: recipe.lookId,
+    weather: recipe.weather,
+    anchorGarmentId: garmentId,
+    anchorSnapshot: {
+      garmentId,
+      category: snapshotAnchor.category,
+      comfortRange: snapshotAnchor.comfortRange,
+    },
+    composition: [
+      {
+        slotIndex: 0,
+        category: slotZeroCategory,
+        kind: 'garment',
+        itemId: garmentId,
+      },
+      ...companions.map((companion, index) => ({
+        slotIndex: index + 1,
+        category: companion.category,
+        kind: 'catalog' as const,
+        itemId: companion.id,
+      })),
+    ],
+    swaps: cleanedSwaps,
+  }
+}
+
+/**
+ * Parses a member's legacy `couturecast.style-piece.<scope>` JSON payload for account import.
+ * Valid legacy recipes that no longer resolve against `currentAnchor` or current catalog rules
+ * are preserved (with `resolvesCleanly: false`) so they import into `"Needs review"`.
+ */
+export function parseLegacyStylePieceRecipesForImport(
+  raw: string | null,
+  owner: string,
+  garmentId: string,
+  currentAnchor?: StylePieceAnchor | null,
+  catalog: SampleCatalog = SAMPLE_CATALOG
+): {
+  entries: LegacySavedLookImportEntry<StylePieceRecipe>[]
+  hadInvalidEntries: boolean
+  malformedPayload: boolean
+} {
+  if (raw === null) {
+    return { entries: [], hadInvalidEntries: false, malformedPayload: false }
+  }
+  if (raw.length === 0 || raw.length > MAX_STYLE_PIECE_STORAGE_BYTES) {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  let parsedJson: unknown
+  try {
+    parsedJson = JSON.parse(raw)
+  } catch {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  if (!Array.isArray(parsedJson)) {
+    return { entries: [], hadInvalidEntries: true, malformedPayload: true }
+  }
+
+  let hadInvalidEntries = false
+  const seenRecipeKeys = new Set<string>()
+  const entries: LegacySavedLookImportEntry<StylePieceRecipe>[] = []
+
+  for (const candidate of parsedJson) {
+    if (entries.length >= MAX_LEGACY_IMPORT_ITEMS) {
+      hadInvalidEntries = true
+      break
+    }
+    const parsedRecipe = legacyStylePieceRecipeSchema.safeParse(candidate)
+    if (!parsedRecipe.success) {
+      hadInvalidEntries = true
+      continue
+    }
+    const recipe = parsedRecipe.data
+    const recipeKey = stylePieceRecipeKey(recipe)
+    if (seenRecipeKeys.has(recipeKey)) {
+      hadInvalidEntries = true
+      continue
+    }
+    seenRecipeKeys.add(recipeKey)
+
+    const cleanedSwaps = cleanSwaps(recipe.swaps)
+    const resolvesCleanly = Boolean(
+      currentAnchor &&
+        doesSavedLookResolve(
+          {
+            source: 'style_piece',
+            lookId: recipe.lookId,
+            weather: recipe.weather,
+            anchorCategory: currentAnchor.category,
+            anchorComfortRange: currentAnchor.comfortRange,
+            swaps: cleanedSwaps,
+          },
+          catalog
+        )
+    )
+
+    const payload = buildLegacyStylePieceImportPayload({
+      recipe,
+      garmentId,
+      cleanedSwaps,
+      currentAnchor,
+      resolvesCleanly,
+      catalog,
+    })
+
+    const sourceId = `style_piece:${owner}:${garmentId}:${recipeKey}`
+    const idempotencyKey = createDeterministicIdempotencyKey(
+      `legacy-import:v1:${sourceId}`
+    )
+
+    entries.push({
+      sourceId,
+      idempotencyKey,
+      payload,
+      rawEntry: recipe,
+      resolvesCleanly,
+    })
+  }
+
+  return { entries, hadInvalidEntries, malformedPayload: false }
 }
 
 /**
