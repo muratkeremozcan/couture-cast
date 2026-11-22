@@ -4,6 +4,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false, "MD060": false} -->
 
+Updated: 2026-11-21: map brief Epic 7 to planning Epic 3; planning Epic 7 is first-use clarity
 Updated: 2026-09-05 — align Epic 6 Community Beta phase labels and release authority
 Updated: 2026-02-28 — align roadmap authority, age policy, and activation metrics
 
@@ -201,6 +202,8 @@ _Planning numbering: this is Epic 5 in `_bmad-output/planning-artifacts/epics.md
   - ✅ AC: Sponsored label; only shown to 18+ users.
 
 ### Epic 7 — Cross-Platform Delivery
+
+_Planning numbering: this is Epic 3 in `_bmad-output/planning-artifacts/epics.md`. Planning Epic 7 is first-use clarity and member reliability._
 
 - **User Story 7.1**: As a user, I can view CoutureCast as a widget (home/lock screen).
   - ✅ AC: Widget displays current temperature, condition icon, and top outfit recommendation, refreshing at least every 30 minutes.

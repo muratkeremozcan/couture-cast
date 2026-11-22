@@ -7,6 +7,8 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-11-21: added Epic 7 from tester and owner feedback._
+
 _Updated: 2026-10-23: moved CC-6.7's sponsored CTA to new CC-6.7b; no post sponsorship model existed._
 
 _Updated: 2026-10-22: added CC-1.2b client location capture, found during CC-6.6 review._
@@ -30,6 +32,7 @@ This document expands the CoutureCast PRD into epics and stories sized for 200k-
 - **Epic 4** deepens wardrobe data once the core loop is stable.
 - **Epic 5** unlocks commerce and premium monetization pathways.
 - **Epic 6** builds the community flywheel and moderation controls.
+- **Epic 7** makes the app calm, reliable and useful before the first upload.
 
 ---
 
@@ -743,6 +746,634 @@ This decision does not block drafting Story 6.2. It must close before Community 
 
 ---
 
+## Epic 7: First-use clarity and member reliability
+
+Make CoutureCast simple enough for a teen to use without help, make every save stick, and fill an
+empty account with useful outfits before the member uploads anything. Evidence, target layout,
+sequencing and guardrails: `_bmad-output/implementation-artifacts/epic-7-context.md`. Reviews:
+`_bmad-output/implementation-artifacts/reviews/epic-7-codex-review.md` and
+`_bmad-output/implementation-artifacts/reviews/epic-7-ux-review.md`.
+
+_Numbering: this planning Epic 7 is unrelated to brief Epic 7 (Cross-Platform Delivery), which
+maps to planning Epic 3. CC-6.15b, CC-6.16 and CC-6.17 live in `sprint-status.yaml` and their
+spec files under `_bmad-output/implementation-artifacts/`._
+
+**Rules for every story in this epic**
+
+1. Web and native ship together unless the story says otherwise.
+2. Phone-width checks use 390 x 844 CSS px on web, with the fold at 390 x 664, and the smallest
+   supported phone on native.
+3. Every member-facing story names the tab and screen it changes and passes the screen budget
+   guard (CC-7.10) and the UX bars below.
+4. A guardian-pending teen can use Today, Looks, Shuffle, Swap and Save with the same tap counts
+   as an approved member. Capture and posting show their pending state only when tapped.
+5. Testers are named by role only. Production evidence is redacted.
+
+**UX bars**
+
+| Bar                                | Threshold                                                                                                                                                |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Time to first outfit, guest        | Median 30 s or less from opening the app, age check included (study)                                                                                     |
+| Time to Today's outfit, member     | Outfit picture visible within 2 s of a cold load at p75 on throttled 4G                                                                                  |
+| Taps to save a look                | 1 from any look surface                                                                                                                                  |
+| Taps to any saved look             | 2 or fewer from any tab                                                                                                                                  |
+| Taps to the camera or file chooser | 1 from Closet, 2 from Today                                                                                                                              |
+| Taps to Plan                       | 1 from Today                                                                                                                                             |
+| Above the fold                     | Today: weather line, outfit picture, primary action. Closet: four tiles or Add. Looks: two saved looks or one idea. Community: first photo within 300 px |
+| Primary actions                    | Exactly one per screen                                                                                                                                   |
+| Interactive targets above the fold | 7 or fewer, excluding the tab bar, garment tiles and look tiles                                                                                          |
+| Chip rows                          | At most one per screen                                                                                                                                   |
+| Container levels                   | Page and card only; no card inside a card                                                                                                                |
+| Paragraphs and labels              | No paragraph over two lines at 390 px; button labels of 3 words or fewer                                                                                 |
+| Screen height                      | Today 1,688 px or less; chrome above the Closet grid 160 px or less                                                                                      |
+| Layout stability                   | Shift score 0.1 or less per tab load and switch; zero shift after a tap                                                                                  |
+| Contrast                           | Text 4.5:1; large text and icons 3:1; light and dark                                                                                                     |
+| Touch targets                      | 44 x 44 CSS px or pt with 8 px spacing                                                                                                                   |
+| Text size                          | Body 16 px; labels 12 px minimum; 200% text at 320 px without clipping                                                                                   |
+| Save feedback                      | State change within 100 ms; Saved within 1 s at p95 or "Still saving"                                                                                    |
+| Reading level                      | US grade 6 or below for English member-facing strings                                                                                                    |
+| Motion                             | 200 ms or less; instant under reduced motion; no autoplay                                                                                                |
+
+**Target layout**
+
+Five tabs in this order on web and native: Today, Closet, Looks, Community, Profile. Today decides
+what to wear. Closet holds the member's pieces. Looks holds saved looks, capsules, ideas and the
+plan. Community holds the feed. Profile holds account, places, style, Premium and sign out. The
+Closet label is confirmed with teens in the CC-7.8 baseline; routes and test ids keep `wardrobe`.
+Wireframes: the UX review.
+
+**Stories**
+
+### Lane A: reliability
+
+**Story CC-7.1: Shared save, undo and status feedback**
+As a member, I want every save, delete and change to tell me clearly what happened, so that I
+trust the app.
+**Acceptance Criteria**
+
+1. One shared component on web and native provides Save, Saving, Saved and Failed states and a
+   bottom status bar with up to two actions (View, Undo, Retry) shown for 5 seconds.
+2. Saving shows within 100 ms. Saved shows only after the server commits; a slower commit shows
+   "Still saving". Failed keeps the content on screen with "Could not save. Try again." and Retry.
+3. Offline, network actions show "You are offline" and keep the content on screen; one offline
+   line sits under the top bar until the connection returns.
+4. Undo is available for save, unsave and swap or shuffle on an unsaved look.
+5. Each state is announced once to screen readers. The bar never covers the primary button or the
+   tab bar.
+   **Prerequisites:** none.
+
+**Story CC-7.2: Saved looks follow the account**
+As a member, I want a look I save to be there on any device after reload, so that saving means
+something.
+**Acceptance Criteria**
+
+1. Style this piece saves, reopens and removes looks through the API with ownership and revision
+   checks. A saved look stores stable slot and item ids, the weather preset and an ordered
+   composition snapshot, so reopening reproduces the saved slot order and swaps on web and native.
+2. Save uses CC-7.1. A retry after a lost response creates one record.
+3. An authenticated member can save and reopen with browser storage unavailable (strict cookie
+   settings, in-app browsers, full storage).
+4. A saved look whose garment is missing shows an explicit placeholder; a look whose garment tags
+   changed shows "Needs review". Neither is dropped silently, and saved looks render when the
+   garment photo is unavailable.
+5. The Home sample "Save" uses the same account list. Until CC-7.12 ships, saved looks open from a
+   "Saved looks" row at the top of the Closet screen.
+6. Playwright proves save, reload, reopen and remove in a second browser context for the same
+   member, including a context with storage blocked. Native tests prove the same against the API
+   contract.
+   **Prerequisites:** CC-7.1, CC-4.3.
+   **Facts:** today the look is written only to `localStorage` by `updateSaved` in the web
+   `style-piece-panel.tsx`, by design in `_bmad-output/plan-style-one-piece.md`. When the app
+   shell's storage probe fails, `layout.tsx` installs an in-memory store, so a save appears to work
+   and is gone on reload. `parseStylePieceRecipes` drops looks whose garment tags changed. Web
+   announces the saved notice to screen readers only. Home sample bookmarks use a second list,
+   `couturecast.member-sample-bookmarks`.
+
+**Story CC-7.3: Import device-saved looks for the same member**
+As a member who saved looks before CC-7.2, I want them in my account, so that I lose nothing.
+**Acceptance Criteria**
+
+1. On signed-in load, looks saved on the device under the same authenticated member import once
+   per stable source id, after server validation of garment ownership. Imports stay retryable until
+   acknowledged and produce no duplicates on concurrent retries.
+2. Valid imported looks that no longer resolve enter the "Needs review" state.
+3. Guest data keeps the reviewed CC-6.16 comfort-only carryover. No guest look or device data from
+   another account imports into the signed-in account.
+4. After a successful import the device lists are removed and saved looks appear only in the
+   account list.
+5. Tests cover tampered references, two accounts on one device, an account switch during import
+   and concurrent retries.
+   **Prerequisites:** CC-7.2.
+
+**Story CC-7.4: Community post edits persist**
+As a member, I want my title and description edits to stay after refresh, so that I can fix my
+posts.
+**Acceptance Criteria**
+
+1. Reproduce first with a controlled account at phone width: title-only, caption-only and combined
+   edits through the editor. Record the PATCH status, the committed revision, and the feed and
+   detail readback after reload. Record the root cause in the story file and scope the fix to the
+   reproduced path.
+2. Title and caption edits persist through the API. Refresh, another browser and native show the
+   edited text, and an already-open second client updates without overwriting a newer revision.
+3. Each outcome has its own message: saved, rejected by screening, screening unavailable, stale
+   revision, and "No changes" for an unchanged payload (which keeps its revision). Rejected or
+   unavailable screening leaves the approved text visible and keeps the attempted text in the
+   editor.
+4. If screening moves before the transaction, the decision binds to the normalized text and policy
+   version, and the existing locks recheck eligibility, sanctions, ownership, visibility, revision
+   and quota before committing. Tests cover revocation and a competing edit during screening.
+5. After a successful edit the card and detail show the new text at once with an "Edited" label.
+6. The end-to-end test edits both fields, reloads and reads them back from the feed and the post
+   detail; an API integration test covers the reproduced failure.
+   **Prerequisites:** CC-6.1, CC-6.2b, CC-7.1.
+   **Facts:** the edit writes through `PATCH /api/v1/community/posts/:postId/text` and updates the
+   screen only on success. Text screening runs inside the 7-second privacy transaction
+   (`community-privacy.ts`). Web and native already apply `post.text_changed` through the shared
+   reconciliation in `packages/api-client/src/community-sync-state.ts`. Playwright already covers
+   editing both fields with reload readback (`playwright/tests/community-post-text.spec.ts`), so the
+   reported failure may come from a stale read, a failed write or failed client reconciliation.
+
+**Story CC-7.5: Garment detail and tag edit**
+As a member, I want to open a garment and fix its tags, so that my closet stays accurate.
+**Acceptance Criteria**
+
+1. Tapping a ready garment opens its detail with a back control, the photo, category, material and
+   comfort range.
+2. The member edits tags; Done saves with CC-7.1 states, and the change shows after reload on web
+   and native.
+3. Garment images use color plus category as alt text ("Blue top").
+4. Style this piece opens from the garment detail.
+   **Prerequisites:** CC-4.2, CC-7.1.
+   **Facts:** the API already exposes tag update and delete routes (`wardrobe.controller.ts`); the
+   gap is web and native management of ready garments.
+
+**Story CC-7.6: Garment delete**
+As a member, I want to remove a garment, so that my closet shows only what I own.
+**Acceptance Criteria**
+
+1. Deleting a piece used by no saved look shows "Deleted" with Undo for 5 seconds. Deleting a
+   piece used by saved looks or capsules asks once and names how many looks it affects.
+2. On success the piece leaves active closet results, capsules keep their current behavior and
+   saved looks show the missing-piece state from CC-7.2.
+3. The member returns to the grid at the same scroll position.
+4. Tests cover retry, legal hold and the asynchronous retention purge.
+   **Prerequisites:** CC-7.2, CC-7.5.
+
+**Story CC-7.7: Signed-in shell without flashes**
+As a member on a phone, I want screens to stay still while they load, so that I do not tap the
+wrong thing.
+**Acceptance Criteria**
+
+1. Signed-in members never see signed-out or sample content before their own. Session resolution
+   shows the fixed app shell with a neutral placeholder.
+2. The tab bar, header and visible controls keep their position until loading completes, on web
+   and native.
+3. A section whose emptiness is unknown at first paint renders nothing until its data arrives,
+   then appears only below the fold or at the end of the screen. No content is inserted above the
+   viewport after the first tap on a screen.
+4. Returning to a tab within the session shows its last content and scroll position at once and
+   refreshes in place.
+5. Rebaseline at 390 x 844 on production. A Chromium check runs cold navigation and scripted tab
+   switches against fixed empty, populated and delayed responses, measures the full transition
+   including shifts after input, and fails above 0.1 in the PR gate. Later stories enforce the
+   budget for each surface in the PR that defines its final layout.
+6. Transitions last 200 ms or less and become instant under reduced motion.
+   **Prerequisites:** CC-3.6.
+   **Facts:** the 2026-11-21 walk at 500 CSS px measured a Home cold-load shift score of 0.574,
+   with the signed-out sample outfit replaced by the member's outfit.
+
+### Lane B: clarity
+
+**Story CC-7.8: Teen and adult usability studies**
+As the product owner, I want proof that teens can use the app unaided, so that Epic 7 ends on
+evidence.
+**Acceptance Criteria**
+
+1. Use the protocol in `_bmad-output/test-artifacts/first-use-phone-study.md` on isolated phone
+   builds with guest, empty-member, populated-member and guardian-pending accounts and pre-approved
+   test posts. Recruit at least three teens aged 13 to 17 (guardian permission and teen assent) and
+   three adults per round. Use a fresh cohort or counterbalance build order.
+2. Keep the existing task cards and add: find a saved look after reopening the app, edit a post's
+   title and caption, and check the Closet tab label.
+3. Run three rounds: baseline on the current build before Lane B changes the tested tasks,
+   midpoint after CC-7.17, and exit after the last member-facing story in the epic.
+4. Midpoint and exit bar: 100% unprompted completion; median time to first outfit under 30 seconds
+   in each cohort; at least five of six participants state the job of Today, Closet, Looks and
+   Community after five seconds; correct first tap on at least 80% of attempts; median ease of 6
+   or higher on a 7-point scale for every task; zero reports of clutter or confusion, each remark
+   recorded with its screen.
+5. Record anonymous results only. Findings that miss the bar become stories before the epic
+   closes.
+   **Prerequisites:** none for the baseline.
+
+**Story CC-7.9: One app shell and visual system**
+As a member, I want every tab to look like the same app, so that I always know where I am.
+**Acceptance Criteria**
+
+1. Every tab and sub-screen uses one page surface, a 56 px top bar with title and optional back,
+   one card level and the shared spacing and type scale, on web and native.
+2. Light and dark follow the system setting on every screen. The dark page framing an inset light
+   card on Home and Community is removed.
+3. Color, type, spacing, radius and elevation tokens are published once and consumed by web and
+   native. Gold appears only on the primary action, focus ring, active tab and Premium marks.
+4. The CC-7.7 session placeholder renders this shell.
+5. Every member-facing string on changed screens comes from the locale catalogs (Wardrobe strings
+   are hard-coded English today).
+6. Visual snapshots of each tab in light and dark at 390 x 844 and the smallest native phone.
+   **Prerequisites:** CC-7.7.
+
+**Story CC-7.10: Screen budget guard**
+As the product owner, I want every screen checked against a clutter budget, so that later stories
+cannot make the app busy again.
+**Acceptance Criteria**
+
+1. An automated check loads each tab at 390 x 844 with empty, populated and guardian-pending
+   fixtures on web, and the matching native screens.
+2. It fails on more than one primary button, more than seven interactive targets above the fold
+   (excluding the tab bar and garment or look tiles), more than one chip row, a card inside a card,
+   a paragraph over two lines, Today over 1,688 px, or chrome above the Closet grid over 160 px.
+3. It fails on any Home or Today control whose only effect is an analytics event.
+4. It runs in the PR gate within the CI time budget. Raising a limit needs a recorded owner
+   decision in the story file.
+   **Prerequisites:** CC-7.9.
+
+**Story CC-7.11: Five-tab navigation and back pattern**
+As a member, I want to reach my clothes and looks immediately, so that I never scroll to find them.
+**Acceptance Criteria**
+
+1. The tab bar shows Today, Closet, Looks, Community and Profile in that order on web and native,
+   with one shared icon set, labels of 12 px or larger in sentence case and an active state that
+   does not rely on color alone.
+2. Each tab opens on its own content within the fold, with no banner, explanation or setup
+   progress first. The Closet tab opens on the garment grid with Add as the one primary button; a
+   populated account shows four tiles at 390 x 664 and an empty account shows Add.
+3. Capsules move to Looks. Silhouette and closet setup move to a More menu and Profile > Style.
+4. Every screen below a tab (garment detail, saved look, post detail, Plan, capsules, setup, each
+   Profile row) shows a top bar with a back arrow and a title. Overlays close with X, Escape,
+   swipe down and system back, and return focus to their opener. Browser back and the native back
+   gesture restore the parent's scroll position; a direct entry without history goes back to the
+   parent tab.
+5. Tests prove each tab's first content above the fold and a working back control on every named
+   sub-screen.
+   **Prerequisites:** CC-7.9, CC-7.10.
+
+**Story CC-7.12: Looks tab for saved looks, ideas and plans**
+As a member, I want one place for every outfit I saved, new ideas and my week, so that I always
+know where a look is.
+**Acceptance Criteria**
+
+1. Looks has Saved, Ideas and Plan segments. It opens on Saved when the member has a saved look
+   and on Ideas otherwise.
+2. Saved lists saved looks and capsules newest first as picture tiles with a name and one state
+   line (saved date, "1 piece missing", "Needs review"). Filters: All, Today, Capsules.
+3. Ideas shows sample looks until CC-7.22 ships the lookbook.
+4. Plan shows the Premium week. Free members see a sample week, one line on what Premium adds and
+   one Upgrade button; no other screen shows a Planner lock. Today's "Plan your week" row opens
+   Plan in one tap for every member.
+5. `/wardrobe/capsules` redirects to Looks with the Capsules filter. Every save confirmation's View
+   opens the saved look in Looks, and the Closet "Saved looks" row from CC-7.2 is removed.
+6. Tests prove each segment's first content above the fold at 390 x 664, deep links to a saved look
+   with back to Saved, and no lock outside Plan for a free account.
+   **Prerequisites:** CC-7.2, CC-7.11, CC-5.5.
+
+**Story CC-7.13: Calm Today with one primary job**
+As a teen member, I want Today to show me what to wear without noise, so that I can decide in
+seconds.
+**Acceptance Criteria**
+
+1. At 390 x 844 Today opens on one weather line, one outfit card and one primary action. Below it
+   show at most a closet strip (recent pieces, or one "Add your first piece" row when empty), a
+   "Plan your week" row and one Community row that hides when no eligible post exists. Any
+   sponsored teaser counts as that Community row and keeps its CC-6.7b disclosure and opt-out.
+2. Remove from Home on web and native: the analytics-only actions ("Preview outfits", "See the
+   planner", "Start wardrobe upload"), the Daily ritual marketing hero and header tagline, the
+   Personal, Community and Sponsored chip row, the embedded Community feed with its climate chips,
+   reactions and Report controls, and the Lookbook Prism heading. Sign out moves to Profile.
+   Native keeps one morning, midday and evening control, shown only when the forecast differs.
+3. If the forecast is unavailable, show a labeled sample look with a weather-setting action.
+4. Today is 1,688 px or less in empty, populated and forecast-unavailable fixtures at default text
+   size. At 320 px and 200% text, scrolling is allowed and every control stays reachable.
+5. Native Today matches the web layout; the hourly ribbon opens from the weather line. A native
+   screenshot at the smallest supported phone is attached to the PR.
+   **Prerequisites:** CC-7.11, CC-7.12.
+
+**Story CC-7.14: Today's outfit as a picture**
+As a teen member, I want to see today's outfit as clothes, so that I can decide at a glance.
+**Acceptance Criteria**
+
+1. Today's outfit renders as a composed picture of its pieces on web and native: the member's
+   garment photos where used and catalog illustrations for the other slots.
+2. The card shows a short look name and one weather reason ("Warm enough for 9 to 14 C"). Comfort
+   notes, badge details and Shop this look move to the look's detail, which keeps the CC-5.1
+   disclosure.
+3. A missing or failed photo shows the catalog illustration for its slot.
+4. The picture reserves its size before images load and passes the CC-7.7 budget.
+5. Each piece is a 44 px target that opens Swap. "Wear this" saves the look for today through
+   CC-7.2.
+6. Visual snapshots cover a full closet, an empty closet, a missing photo and dark mode at
+   390 x 844 and the smallest native phone.
+   **Prerequisites:** CC-7.2, CC-7.13.
+
+**Story CC-7.15: Calm Community with an empty state**
+As a member, I want Community to show looks quickly and tell me when there are none, so that it
+never feels broken.
+**Acceptance Criteria**
+
+1. Community opens on a title row with Post, one "Your climate" filter that opens a sheet with All
+   climates and the six bands (the explainer paragraph moves into the sheet), the weekly challenge
+   as one dismissible row, then the feed. City Spotlight posts join the feed labeled "Near you".
+2. Cards show the photo, title, author and one reaction row; a card opens its detail in one tap.
+   A "..." button on each card offers Report or Withdraw in one tap, preserving the current
+   reporting flow.
+3. With no eligible posts in the member's climate, show "No looks in your climate yet" and one "See
+   all climates" button. Restricted and unavailable feeds keep their own states. Moderation, blocks,
+   age eligibility and rollout gates are unchanged.
+4. Verify zero eligible posts and two approved posts from other synthetic members on isolated
+   builds, with long localized labels and enlarged text.
+   **Prerequisites:** CC-7.11.
+
+**Story CC-7.16: Calm Closet and Profile**
+As a member, I want Closet and Profile to show only what I need, so that the app does not feel
+busy.
+**Acceptance Criteria**
+
+1. Closet shows the title row with Add and More, one category chip row, then the grid. Cards show
+   the photo and short name; a badge appears only when the member must act (Needs tags, Failed,
+   Processing), with text and an icon colored by meaning. Setup progress is one row after the grid
+   until setup completes.
+2. Profile lists Account, Places, Style, Premium, Notifications, Language and About and privacy as
+   one-line rows with their current value, each opening a sub-screen with back, then Sign out.
+   Planner leaves Profile for Looks > Plan; the About button leaves Home's header.
+3. Help text is one line with "Learn more".
+4. Verify 200% text at 320 px with no clipped labels, light and dark, and long localized labels.
+   **Prerequisites:** CC-7.11.
+
+**Story CC-7.17: Teen voice and copy**
+As a teen member, I want the app to talk like me, so that it feels made for me.
+**Acceptance Criteria**
+
+1. A short voice guide in the design system: second person, short sentences, school, weekend and
+   going-out situations, no fashion jargon without a picture, no percentages or match scores.
+2. Every member-facing English string on the five tabs and first run reads at US grade 6 or below,
+   with button labels of three words or fewer.
+3. Commute, office and meeting language leaves Home, the sample catalog descriptions and the share
+   card.
+4. All supported locales receive the new strings; long translations wrap without clipping at
+   320 px.
+   **Prerequisites:** CC-7.9.
+
+### Lane C: fill the empty app
+
+**Story CC-7.18: Find mini skirts, tights and socks**
+As a member, I want to find the pieces I wear in sample looks, so that looks match my style.
+**Acceptance Criteria**
+
+1. In the sample picker with All and Cool or Mild weather, a member can find, preview and swap a
+   mini skirt, tights or socks, then save and reopen the look.
+2. The swap sheet groups options by type, lists weather-appropriate options first and shows at
+   most 12 before "Show more". The current piece is marked; choosing it again closes the sheet.
+   **Prerequisites:** CC-6.16, CC-7.2.
+   **Facts:** the catalog already has `mini-skirt`, `opaque-tights`, `ribbed-socks` and
+   `mini-and-tights` (`packages/utils/src/sample-wardrobe/catalog.ts`); the tester could not find
+   them in the tested build.
+
+**Story CC-7.19: Garment subtypes**
+As a member, I want my pieces tagged by type, so that looks use the right skirt, boots or layer.
+**Acceptance Criteria**
+
+1. Define a short list of subtype ids with sample coverage per look, including mini, midi and maxi
+   skirts; tights, socks and leggings; camisoles, tanks and crop tops; moto, ankle and knee boots;
+   blazers and moto jackets.
+2. Tagging, Closet filters, the swap sheet and the generator use subtypes. Existing garments read
+   with their category and an unset subtype.
+3. The swap sheet lists the member's own pieces first.
+4. Shared utilities tests cover the subtype list, coverage per weather preset and locale strings.
+   **Prerequisites:** CC-7.18, CC-7.5.
+
+**Story CC-7.20: Account style profile**
+As a new member, I want to tell CoutureCast my style quickly, so that suggestions fit me before I
+upload anything.
+**Acceptance Criteria**
+
+1. Style mood is asked inline on the first look as one row of four picture choices. The other
+   questions (colors, textures, fit, pieces to avoid) form an optional "Tune my style" flow of at
+   most three screens, each with Skip, reachable from Today and Profile > Style. No question blocks
+   the first look or sign-up.
+2. Every choice is a picture with a short label; colors are swatches; pieces to avoid are toggles
+   on illustrations. No free text and no body measurements or photos.
+3. Answers save to the account as each screen completes, show after reopening Profile > Style, can
+   be cleared to restore default ranking, and replace the device-only sample preferences.
+4. Today and Looks offer a temporary temperature and mood override for the day.
+5. At least five of six pilot participants who start "Tune my style" finish it within 60 seconds.
+   **Prerequisites:** CC-2.1, CC-6.16.
+
+**Story CC-7.21: First run with the look first and the account on save**
+As a new visitor, I want to see a look I like before I answer questions or sign up, so that I know
+the app is worth it.
+**Acceptance Criteria**
+
+1. Guest Today shows one sample look teaser and "Show me looks" as the only primary action; Sign in
+   and Create account are text links.
+2. After the existing 13+ age check, the visitor sees a complete look with the mood row, Shuffle,
+   Swap and Save, within 30 seconds median of opening the app.
+3. Save opens a sheet asking for a free account. Sign-up reuses the age check's birthdate; cancel
+   returns to the same look.
+4. After sign-up, the CC-6.16 review screen shows the mood and colors chosen as a guest next to the
+   comfort settings, and only confirmed answers carry over. The saved look then appears in Looks >
+   Saved with the CC-7.1 confirmation.
+5. A guardian-pending teen lands in the same place with the same tools.
+6. End-to-end tests cover adult, approved teen and guardian-pending teen paths, cancel at each
+   step and the under-13 block.
+   **Prerequisites:** CC-6.16, CC-7.2, CC-7.12, CC-7.20.
+
+**Story CC-7.22: Lookbook with shuffle and pinned pieces**
+As a member with an empty or small closet, I want complete looks for today's weather in my style,
+so that the app is useful on day one.
+**Acceptance Criteria**
+
+1. Looks > Ideas shows one look at a time for the selected mood, with the member's moods as one
+   chip row. Today shows only the top look as its outfit for an empty or small closet. No other
+   screen embeds lookbook cards.
+2. For an empty account, three complete catalog looks are available, one per mood, built by the
+   rule-based selector from the style profile and weather, each with one weather reason.
+3. Each piece has a pin. Shuffle replaces every unpinned piece and keeps the look weather
+   appropriate. Pinned state survives reload until the look is saved or reset.
+4. Looks save through CC-7.2 in one tap.
+   **Prerequisites:** CC-7.2, CC-7.12, CC-7.18, CC-7.20.
+
+**Story CC-7.23: AI-written look ideas (text only)**
+As a member, I want looks described and ranked by an AI stylist, so that ideas feel personal.
+**Acceptance Criteria**
+
+1. Record the provider decision with a pinned provider, model and version (default: Vercel AI
+   Gateway with a current Claude model), its retention and no-training terms, cost per call, the
+   timeout, per-account quota and total spend cap.
+2. One server module owns model calls: prompts in source control, structured output validation,
+   rate limits, spend caps, timeouts and telemetry. Inputs are enumerated style preferences, coarse
+   weather and catalog ids only; prompts, outputs, account ids and location never enter telemetry
+   or fixtures.
+3. Model output is untrusted: only known slot and item ids and bounded plain text pass; results for
+   an older request, session or account are dropped; body, age, identity and attractiveness
+   inferences are excluded; unsafe suggestions are filtered before display.
+4. The lookbook shows the rule-based look within 1 second. A generated look replaces it only if
+   the member has not touched the look; otherwise "New ideas ready" appears and nothing moves.
+   Timeout or provider failure keeps the rule-based look.
+5. CI covers valid output, invalid output, timeout, unsafe output and cap exhaustion with zero live
+   model calls. p95 generation is 5 seconds or less on the agreed fixture workload.
+   **Prerequisites:** CC-7.22, CC-0.11, CC-1.4.
+
+**Story CC-7.24: Photo AI consent and processor approval**
+As a parent and as a member, I want photos sent to an AI model only with clear permission, so that
+teen data stays safe.
+**Acceptance Criteria**
+
+1. An approved age-by-feature consent matrix covers every photo AI feature before any image call
+   is enabled. External image processing starts off.
+2. Consent is versioned and scoped to feature, input class and provider, with guardian approval
+   where the matrix requires it and teen assent. It is revocable from Profile.
+3. The server checks active consent before dispatch and before saving or returning a result. On
+   revocation, pending dispatch stops, late results are discarded and the documented deletion path
+   runs.
+4. A processor list names every party that receives member data (gateway, model provider, queues,
+   observability) and the permitted fields per feature. Photos are stripped of metadata and read
+   through fresh authorized reads; signed URLs never leave the server.
+5. Every photo feature offers the manual flow with consent off.
+6. Tests cover missing, expired and revoked consent and account switching.
+   **Prerequisites:** CC-7.23, CC-0.11.
+
+**Story CC-7.25: Suggested Community descriptions**
+As a member posting a look, I want a short description suggested for me, so that posting is quick.
+**Acceptance Criteria**
+
+1. After photo selection the composer offers one "Suggest a description" button. For an eligible,
+   consenting member it returns an editable one or two sentence draft within 5 seconds, marked
+   "Suggested" until the member edits or accepts it.
+2. The color-cue or manual path stays available on decline, timeout or invalid output.
+3. A response for an older photo, session or composer revision leaves the current text unchanged.
+4. Publishing applies the existing text and image screening.
+   **Prerequisites:** CC-7.24.
+
+**Story CC-7.26: Clean garment cutouts**
+As a member adding a garment, I want a clean cutout, so that my closet looks good.
+**Acceptance Criteria**
+
+1. On fixed labeled photos of plain, cluttered, pale-on-pale and patterned scenes, accepted masks
+   keep at least 95% of labeled garment pixels and remove at least 90% of labeled background
+   pixels. Otherwise the original photo is kept.
+2. Saved and previewed assets have identical decoded pixels.
+3. An on-device or server model needs no external processor; an external one requires CC-7.24.
+   **Prerequisites:** CC-4.1.
+
+**Story CC-7.27: Suggested tags that are right**
+As a member adding a garment, I want tags filled in correctly, so that capture takes seconds.
+**Acceptance Criteria**
+
+1. On a named held-out set, top-1 accuracy is at least 90% for category and 80% for subtype,
+   counting abstentions as misses.
+2. Only confident, untouched fields are prefilled. One screen shows the cutout and each suggested
+   tag as a selected chip; "Looks right" is the primary button; a low-confidence field shows "Pick
+   one" and blocks "Looks right" until chosen.
+   **Prerequisites:** CC-7.19.
+   **Facts:** web already preselects confident category, material and comfort suggestions when
+   inference returns them (`garment-tagging-modal.tsx`); the tested garment opened with manual
+   selections.
+
+**Story CC-7.28: Add several photos at once**
+As a member, I want to add several garment photos in one go, so that building my closet is not
+tedious.
+**Acceptance Criteria**
+
+1. Select up to five existing garment photos, review each and save the confirmed entries in one
+   action ("Add 4 pieces").
+2. Each item keeps its own status; failed items retry without duplicates.
+3. Cancel or failure clears transient images.
+   **Prerequisites:** CC-7.27.
+
+**Story CC-7.29: Several garments from one flat-lay photo**
+As a member, I want to add a whole outfit laid out on a bed from one photo, so that I add pieces
+faster.
+**Acceptance Criteria**
+
+1. The member picks one flat-lay photo; the app detects each garment and shows the cutouts in a
+   grid, each kept by default with Remove and Edit tags.
+2. Photos with a detected person and uncertain crops are rejected before any external send or
+   durable save.
+3. Staging is private and scoped, purged within 15 minutes on cancel, failure or completion. Only
+   confirmed masks are saved; metadata is stripped; staging never appears in logs.
+4. One successful confirmation creates one garment per kept item; a retry after timeout returns
+   existing successes.
+5. Worn-outfit photos need a separately approved design and stay out of this story.
+   **Prerequisites:** CC-7.24, CC-7.28.
+
+### Lane D: keep members coming back
+
+**Story CC-7.30: Style this piece with my own garments**
+As a member, I want Style this piece to pair my garment with my other clothes, so that the looks
+are ones I can wear today.
+**Acceptance Criteria**
+
+1. Given an eligible anchor and a weather-compatible owned companion, the owned item shows before
+   comparable catalog items. Missing slots fill with catalog pieces; an unavailable photo shows a
+   placeholder.
+2. Looks cover school, weekend and going out for the selected weather.
+3. Verify empty, sparse and populated closets. Save and reopen use CC-7.2.
+   **Prerequisites:** CC-7.2, CC-7.5.
+
+**Story CC-7.31: Wear log**
+As a member, I want to log what I wore, so that the app learns what I use.
+**Acceptance Criteria**
+
+1. "Wear this" on Today and on any saved look logs at most one wear per owned garment per
+   member-local day. Catalog pieces create no wear rows.
+2. The day's logged state shows after reopen, with undo.
+   **Prerequisites:** CC-7.2, CC-7.14.
+
+**Story CC-7.32: Closet insights**
+As a member, I want to see what I wear most and least, so that I use more of what I own.
+**Acceptance Criteria**
+
+1. One collapsed row at the top of Closet ("You wore 40% of your closet this month") opens a
+   sub-screen with most worn and not worn in 30 days. Today shows no statistics.
+2. Closet use = active garments worn at least once in the last 30 local days divided by active
+   garments. A zero denominator shows "No garments yet".
+   **Prerequisites:** CC-7.31.
+
+**Story CC-7.33: Trips**
+As a member traveling, I want a look for each day of a trip, so that I plan the trip in one place.
+**Acceptance Criteria**
+
+1. Trips live in Looks > Plan below the week. A trip covers 1 to 14 destination-local dates.
+2. Forecast shows only for dates with data; others read "Forecast unavailable".
+3. The member saves one chosen look per date. Trip dates and destinations stay private.
+4. The Planner entitlement for trips is decided before drafting.
+   **Prerequisites:** CC-1.1, CC-1.2, CC-7.12, CC-7.22.
+
+**Story CC-7.34: Packing list**
+As a member traveling, I want a packing list from my trip looks, so that I pack only what I need.
+**Acceptance Criteria**
+
+1. The list combines repeated items by stable item id and marks owned items apart from catalog
+   suggestions.
+2. Checklist state persists across reopen and devices.
+   **Prerequisites:** CC-7.33.
+
+### Epic 7 product decisions
+
+1. **Virtual try-on.** It needs body images and teens are the main audience, so it stays outside
+   Epic 7 until the owner decides on a separately gated story.
+2. **Social follow graph.** The Epic 6 refinement decision still applies; Epic 7 adds no following.
+3. **Competitor features.** Adopted: pinned shuffle (CC-7.22), week calendar (Looks > Plan), one
+   piece styled several ways (CC-7.30), chosen palettes (CC-7.20), garments from a flat lay
+   (CC-7.29), trips (CC-7.33). Covered by existing work: Community feed, the Premium week planner
+   and the palette advisor under Profile > Style. Deferred, because each adds a surface Epic 7
+   removes: collage canvas, moodboards, outfit-selfie posts, inferred color season with closet
+   compatibility, and shopping match scores.
+4. **Closet label.** The tab label changes from Wardrobe to Closet only if the CC-7.8 baseline
+   confirms it with teens.
+
+---
+
 ## UX Design alignment updates (2025-11-10)
 
 **New stories added**
@@ -820,11 +1451,11 @@ This decision does not block drafting Story 6.2. It must close before Community 
 
 ## Summary
 
-- **Epics:** 7 (including Epic 0: Platform Foundation)
-- **Stories:** 51 (14 Epic 0 infrastructure + 37 feature stories)
-- **Epic 6 remaining stories:** 12 across four delivery lanes
+- **Epics:** 8 (including Epic 0: Platform Foundation)
+- **Stories:** 90 in this document (14 Epic 0 infrastructure + 76 feature stories, including 34 in Epic 7)
+- **Epic 6 tracker:** one backlog story, CC-6.15b.
 - **Sequential dependency chains:** Epic 0 → all other epics (critical path); Epic 6 chains are listed under Parallelization hints
-- **Estimated cadence:** Sprint 0 and Phases 1 and 3 are complete. Re-estimate Phase 2 after the twelve remaining Epic 6 stories are drafted and sized.
+- **Estimated cadence:** Sprint 0 and Phases 1 to 3 are complete. Size Epic 7 lane by lane as each lane starts.
 - **Total duration:** The original 7-8 sprint estimate is retired because it treated the four former Epic 6 feature packages as single-session stories.
 
 **Epic 0 (Sprint 0) Completion Criteria:**
