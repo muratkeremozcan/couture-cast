@@ -319,4 +319,129 @@ describe('save-feedback state machine and helpers', () => {
     })
     expect(restored).toEqual({ ok: true, next: initial })
   })
+
+  it('covers bounded list conflict edge cases, notice defaults, and cyclic/unrecognized offline errors', () => {
+    // createStatusBarNotice defaults and explicit overrides
+    const defaultNotice = createStatusBarNotice({ id: 'plain', message: 'Updated' })
+    expect(defaultNotice.tone).toBe('neutral')
+    expect(defaultNotice.actions).toEqual([])
+    expect(defaultNotice.durationMs).toBe(5_000)
+
+    const customNotice = createStatusBarNotice({
+      id: 'custom',
+      announcementId: 'explicit:1',
+      message: 'Custom',
+      tone: 'error',
+      urgency: 'polite',
+      durationMs: 2_500,
+    })
+    expect(customNotice.announcementId).toBe('explicit:1')
+    expect(customNotice.urgency).toBe('polite')
+    expect(customNotice.durationMs).toBe(2_500)
+
+    // fail without errorMessage defaults errorMessage to null
+    const saving = reduceSaveFeedback(createSaveFeedbackSnapshot(), {
+      type: 'start',
+      runId: 1,
+    })
+    expect(reduceSaveFeedback(saving, { type: 'fail', runId: 1 }).errorMessage).toBeNull()
+
+    // applyBoundedListRemove missing key returns null
+    type Item = { id: string; rev: number }
+    const getKey = (item: Item) => item.id
+    const isSame = (a: Item, b: Item) => a.id === b.id && a.rev === b.rev
+    expect(
+      applyBoundedListRemove({ entries: [{ id: 'a', rev: 1 }], key: 'missing', getKey })
+    ).toBeNull()
+
+    // undoBoundedListSave when saved key is already removed (!currentMatch)
+    const saved = applyBoundedListSave({
+      entries: [{ id: 'a', rev: 1 }],
+      entry: { id: 'b', rev: 1 },
+      getKey,
+      maxEntries: 2,
+    })
+    expect(
+      undoBoundedListSave({
+        entries: [{ id: 'a', rev: 1 }],
+        mutation: saved,
+        getKey,
+        isSameEntry: isSame,
+        maxEntries: 2,
+      })
+    ).toEqual({ ok: false, conflict: true, next: [{ id: 'a', rev: 1 }] })
+
+    // undoBoundedListSave when next.length > maxEntries (line 302)
+    const oversizedUpdate = applyBoundedListSave({
+      entries: [
+        { id: 'a', rev: 1 },
+        { id: 'b', rev: 1 },
+      ],
+      entry: { id: 'a', rev: 2 },
+      getKey,
+      maxEntries: 2,
+    })
+    expect(
+      undoBoundedListSave({
+        entries: oversizedUpdate.next,
+        mutation: oversizedUpdate,
+        getKey,
+        isSameEntry: isSame,
+        maxEntries: 1,
+      })
+    ).toEqual({ ok: false, conflict: true, next: oversizedUpdate.next })
+
+    // undoBoundedListSave when evictedEntry is already back in fresh entries
+    const evicting = applyBoundedListSave({
+      entries: [
+        { id: 'a', rev: 1 },
+        { id: 'b', rev: 1 },
+      ],
+      entry: { id: 'c', rev: 1 },
+      getKey,
+      maxEntries: 2,
+    })
+    expect(evicting.evictedEntry).toEqual({ id: 'b', rev: 1 })
+    expect(
+      undoBoundedListSave({
+        entries: [
+          { id: 'c', rev: 1 },
+          { id: 'b', rev: 1 },
+        ],
+        mutation: evicting,
+        getKey,
+        isSameEntry: isSame,
+        maxEntries: 2,
+      })
+    ).toEqual({ ok: true, next: [{ id: 'b', rev: 1 }] })
+
+    // undoBoundedListRemove when removedKey was already re-added (line 333)
+    const removed = applyBoundedListRemove({
+      entries: [
+        { id: 'a', rev: 1 },
+        { id: 'b', rev: 1 },
+      ],
+      key: 'a',
+      getKey,
+    })!
+    const readded = [
+      { id: 'a', rev: 2 },
+      { id: 'b', rev: 1 },
+    ]
+    expect(
+      undoBoundedListRemove({
+        entries: readded,
+        mutation: removed,
+        getKey,
+      })
+    ).toEqual({ ok: false, conflict: true, next: readded })
+
+    // isOfflineError cyclic cause, non-offline cause, and unknown error code
+    const cyclic: { cause?: unknown } = {}
+    cyclic.cause = cyclic
+    expect(isOfflineError(cyclic)).toBe(false)
+    expect(isOfflineError({ code: 'EUNKNOWN', cause: new Error('500 error') })).toBe(
+      false
+    )
+  })
 })

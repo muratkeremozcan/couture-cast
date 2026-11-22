@@ -26,6 +26,7 @@ import {
   SaveActionButton,
   SaveFeedbackProvider,
   StatusFeedbackBar,
+  useSaveAction,
   useStatusBar,
   type AnnouncementEntry,
 } from './index'
@@ -1019,6 +1020,452 @@ describe('web save-feedback components', () => {
       sessionMock.owner = null
       sessionStorage.clear()
       localStorage.removeItem(keyA)
+    }
+  })
+
+  it('covers placement edge cases, standalone useStatusBar, nested non-inline forwarding, initialOnline, and async action errors', async () => {
+    const user = userEvent.setup()
+
+    // rectsOverlap zero-size and computeNonOverlappingBottomOffset edge cases
+    expect(
+      rectsOverlap(
+        { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 },
+        { top: 0, bottom: 10, left: 0, right: 10, width: 10, height: 10 }
+      )
+    ).toBe(false)
+    expect(
+      computeNonOverlappingBottomOffset({
+        barRect: { top: 0, bottom: 0, left: 0, right: 100, width: 100, height: 0 },
+        obstacles: [],
+        viewportHeight: 844,
+        baseBottomPx: 20,
+      })
+    ).toBe(20)
+    // Obstacle below the projected bottom so nextBottom <= bottomPx breaks cleanly
+    expect(
+      computeNonOverlappingBottomOffset({
+        barRect: { top: 700, bottom: 750, left: 16, right: 374, width: 358, height: 50 },
+        obstacles: [
+          { top: 830, bottom: 860, left: 16, right: 374, width: 358, height: 30 },
+        ],
+        viewportHeight: 844,
+        baseBottomPx: 100,
+      })
+    ).toBe(100)
+
+    // Standalone useStatusBar outside any provider listens to online/offline events & exposes no-op fallbacks
+    function StandaloneStatusHarness() {
+      const bar = useStatusBar()
+      return (
+        <div>
+          <span data-testid="standalone-online">{String(bar.isOnline)}</span>
+          <button
+            type="button"
+            data-testid="standalone-call"
+            onClick={() => {
+              bar.showNotice({ id: 'noop', message: 'Noop' })
+              bar.dismissNotice('noop')
+              bar.announce('Noop', { announcementId: 'noop:1' })
+            }}
+          >
+            Call
+          </button>
+        </div>
+      )
+    }
+    const standalone = render(<StandaloneStatusHarness />)
+    expect(screen.getByTestId('standalone-online')).toHaveTextContent('true')
+    act(() => {
+      setNavigatorOnline(false)
+      window.dispatchEvent(new Event('offline'))
+    })
+    expect(screen.getByTestId('standalone-online')).toHaveTextContent('false')
+    act(() => {
+      setNavigatorOnline(true)
+      window.dispatchEvent(new Event('online'))
+    })
+    expect(screen.getByTestId('standalone-online')).toHaveTextContent('true')
+    await user.click(screen.getByTestId('standalone-call'))
+    standalone.unmount()
+
+    // Nested non-inline provider forwards announcements to parent; initialOnline controls state; >200 IDs rollover; async rejecting action settles cleanly
+    const parentAnnouncements: AnnouncementEntry[] = []
+    function NestedAnnounceHarness() {
+      const bar = useStatusBar()
+      return (
+        <button
+          type="button"
+          data-testid="nested-trigger"
+          onClick={() => {
+            bar.announce('   ', { announcementId: 'blank:1' })
+            bar.announce('Nested notice', { announcementId: 'nested:1' })
+            bar.announce('Nested notice', { announcementId: 'nested:1' })
+            for (let i = 0; i < 205; i += 1) {
+              bar.announce(`Flood ${i}`, { announcementId: `flood:${i}` })
+            }
+            bar.showNotice({
+              id: 'async-reject-notice',
+              message: 'Try async',
+              tone: 'neutral',
+              actions: [
+                {
+                  id: 'async-act',
+                  kind: 'undo',
+                  label: 'Run async',
+                  onPress: () => Promise.reject(new Error('action boom')),
+                },
+              ],
+            })
+          }}
+        >
+          Trigger
+        </button>
+      )
+    }
+
+    const nested = render(
+      <SaveFeedbackProvider onAnnounce={(entry) => parentAnnouncements.push(entry)}>
+        <SaveFeedbackProvider initialOnline={false}>
+          <NestedAnnounceHarness />
+        </SaveFeedbackProvider>
+      </SaveFeedbackProvider>
+    )
+    expect(screen.getByTestId('offline-status-line')).toHaveTextContent('You are offline')
+    await user.click(screen.getByTestId('nested-trigger'))
+    expect(parentAnnouncements.some((entry) => entry.id === 'nested:1')).toBe(true)
+    expect(parentAnnouncements.filter((entry) => entry.id === 'nested:1')).toHaveLength(1)
+    expect(parentAnnouncements.some((entry) => entry.id === 'blank:1')).toBe(false)
+
+    // Clicking an async rejecting action catches cleanly and dismisses the bar
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() => expect(screen.queryByTestId('status-feedback-bar')).toBeNull())
+
+    // Toggle initialOnline back to true clears offline line
+    nested.rerender(
+      <SaveFeedbackProvider onAnnounce={(entry) => parentAnnouncements.push(entry)}>
+        <SaveFeedbackProvider initialOnline={true}>
+          <NestedAnnounceHarness />
+        </SaveFeedbackProvider>
+      </SaveFeedbackProvider>
+    )
+    expect(screen.queryByTestId('offline-status-line')).toBeNull()
+  })
+
+  it('covers standalone SaveActionButton timer/dismiss, showStatusBar=false, sync throws, onView, extraActions, undo offline/error, and useSaveAction.reset', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const onView = vi.fn()
+    const onExtra = vi.fn()
+    const standaloneAnnounced: AnnouncementEntry[] = []
+
+    // Standalone auto-dismiss, onView, extraActions, and showStatusBar=false
+    const standaloneView = render(
+      <>
+        <SaveActionButton
+          data-testid="standalone-save"
+          onSave={() => true}
+          onView={onView}
+          extraActions={[{ id: 'extra', label: 'Extra', onPress: onExtra }]}
+          onAnnounce={(entry) => standaloneAnnounced.push(entry)}
+        />
+        <SaveActionButton
+          data-testid="silent-bar-save"
+          showStatusBar={false}
+          onSave={() => {
+            throw new Error('sync boom')
+          }}
+        />
+      </>
+    )
+
+    fireEvent.click(screen.getByTestId('standalone-save'))
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Saved to your looks.'
+    )
+    // Clicking View calls onView and dismisses standalone notice
+    fireEvent.click(screen.getByTestId('status-bar-action-view'))
+    expect(onView).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+
+    // Trigger again and let the 5s standalone auto-dismiss timer fire
+    fireEvent.click(screen.getByTestId('standalone-save'))
+    expect(screen.getByTestId('status-feedback-bar')).toBeInTheDocument()
+    act(() => {
+      vi.advanceTimersByTime(SAVE_FEEDBACK_TIMINGS.statusBarDurationMs)
+    })
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+
+    // showStatusBar=false with sync throw enters failed state without rendering a bar
+    fireEvent.click(screen.getByTestId('silent-bar-save'))
+    expect(screen.getByTestId('silent-bar-save')).toHaveTextContent('Failed')
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    standaloneView.unmount()
+    vi.useRealTimers()
+
+    // Provider-backed Undo offline, Undo returning false, Undo throwing offline error, network offline error onSave, disabled click, and reset()
+    const user = userEvent.setup()
+    let controllerRef: ReturnType<typeof useSaveAction> | null = null
+    const onSave = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(true) // 1: save before offline undo
+      .mockResolvedValueOnce(true) // 2: save before undo returns false
+      .mockResolvedValueOnce(true) // 3: save before undo throws offline error
+      .mockRejectedValueOnce(new TypeError('Failed to fetch')) // 4: network error during save
+    const onUndo = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+
+    function ControllerHarness() {
+      const controller = useSaveAction({
+        onSave,
+        onUndo,
+        requiresNetwork: true,
+        ownerKey: 'u1',
+        resetKey: 'r1',
+      })
+      controllerRef = controller
+      return (
+        <div>
+          <button
+            type="button"
+            data-testid="ctrl-save"
+            onClick={() => void controller.triggerSave()}
+          >
+            {controller.state}
+          </button>
+          <button
+            type="button"
+            data-testid="ctrl-reset"
+            onClick={() => controller.reset('saved')}
+          >
+            Reset
+          </button>
+          <SaveActionButton data-testid="disabled-save" disabled onSave={() => true} />
+        </div>
+      )
+    }
+
+    render(
+      <SaveFeedbackProvider>
+        <ControllerHarness />
+      </SaveFeedbackProvider>
+    )
+
+    // Disabled click is a no-op
+    fireEvent.click(screen.getByTestId('disabled-save'))
+    expect(screen.getByTestId('disabled-save')).toHaveTextContent('Save')
+
+    // 1. Save succeeds, then go offline and click Undo -> blocked with offline notice
+    await user.click(screen.getByTestId('ctrl-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('ctrl-save')).toHaveTextContent('saved')
+    )
+    act(() => {
+      setNavigatorOnline(false)
+      window.dispatchEvent(new Event('offline'))
+    })
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'You are offline. Save when you reconnect.'
+    )
+    expect(onUndo).not.toHaveBeenCalled()
+
+    // Reconnect -> 2. Save succeeds, Undo returns false -> shows failed notice
+    act(() => {
+      setNavigatorOnline(true)
+      window.dispatchEvent(new Event('online'))
+    })
+    await user.click(screen.getByTestId('ctrl-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-bar-action-undo')).toBeInTheDocument()
+    )
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Could not save. Try again.'
+    )
+
+    // 3. Save succeeds, Undo throws offline TypeError -> shows offline notice
+    await user.click(screen.getByTestId('ctrl-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-bar-action-undo')).toBeInTheDocument()
+    )
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'You are offline. Save when you reconnect.'
+    )
+
+    // 4. Save rejects with offline TypeError while navigator says online -> shows offline notice
+    await user.click(screen.getByTestId('ctrl-save'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    expect(screen.getByTestId('status-feedback-bar')).toHaveAttribute(
+      'data-tone',
+      'offline'
+    )
+
+    // reset() sets explicit state and mismatched origin triggerSave/triggerUndo return false
+    await user.click(screen.getByTestId('ctrl-reset'))
+    expect(screen.getByTestId('ctrl-save')).toHaveTextContent('saved')
+    expect(await controllerRef!.triggerSave({ ownerKey: 'wrong', resetKey: 'r1' })).toBe(
+      false
+    )
+    expect(await controllerRef!.triggerUndo({ ownerKey: 'wrong', resetKey: 'r1' })).toBe(
+      false
+    )
+
+    // Busy double-tap returns false immediately and triggerSave after unmount returns false
+    const pendingSave = Promise.withResolvers<boolean>()
+    let busyCtrl: ReturnType<typeof useSaveAction> | null = null
+    function BusyHarness() {
+      const controller = useSaveAction({
+        onSave: () => pendingSave.promise,
+        onView,
+        ownerKey: 'b1',
+        resetKey: 'r1',
+      })
+      busyCtrl = controller
+      return <span data-testid="busy-state">{controller.state}</span>
+    }
+    const busyView = render(<BusyHarness />)
+    let firstSavePromise!: Promise<boolean>
+    act(() => {
+      firstSavePromise = busyCtrl!.triggerSave()
+    })
+    expect(await busyCtrl!.triggerSave()).toBe(false)
+    pendingSave.resolve(true)
+    await act(async () => {
+      await firstSavePromise
+    })
+    busyView.unmount()
+    expect(await busyCtrl!.triggerSave()).toBe(false)
+    expect(await busyCtrl!.triggerUndo()).toBe(false)
+  })
+
+  it('covers Web Home shuffle Undo, Save View/Undo, Remove Undo, and Remove failure Retry', async () => {
+    const user = userEvent.setup()
+    const owner = 'home-flow-owner'
+    const key = `couturecast.member-sample-bookmarks.${owner}`
+    localStorage.removeItem(key)
+
+    useMswHandlers(
+      http.get('/api/v1/ritual', () =>
+        HttpResponse.json(
+          { message: 'No location preferences found for user' },
+          { status: 400 }
+        )
+      )
+    )
+
+    sessionMock.owner = owner
+    sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `bearer-${owner}`)
+    window.dispatchEvent(new Event('couture:session'))
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    try {
+      render(
+        <SaveFeedbackProvider>
+          <HomeRitual demo={null} />
+        </SaveFeedbackProvider>
+      )
+
+      await screen.findByTestId('member-sample-outfit')
+
+      // Shuffle ("Try another") -> Undo restores previous look
+      const tryAnother = screen.getByTestId('guest-preview-try-another')
+      await user.click(tryAnother)
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Look updated.')
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+
+      // Swap a garment -> Undo swap restores previous garment
+      const swapButtons = screen.getAllByRole('button', { name: /^Swap /i })
+      if (swapButtons[0]) {
+        await user.click(swapButtons[0])
+        const dialog = screen.getByRole('dialog')
+        const candidateRadio = within(dialog)
+          .getAllByRole('radio')
+          .find((input) => !(input as HTMLInputElement).checked)
+        expect(candidateRadio).toBeDefined()
+        await user.click(candidateRadio!)
+        await waitFor(() =>
+          expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+            'Piece swapped.'
+          )
+        )
+        await user.click(screen.getByTestId('status-bar-action-undo'))
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      }
+
+      // Save -> View -> Undo Save
+      const saveBtn = screen.getByRole('button', { name: /save/i })
+      await user.click(saveBtn)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Saved to your looks.'
+        )
+      )
+      await user.click(screen.getByTestId('status-bar-action-view'))
+
+      // Save again and Undo Save cleanly
+      await user.click(saveBtn)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-bar-action-undo')).toBeInTheDocument()
+      )
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      )
+
+      // Save so we have a saved item, then Remove -> Undo Remove succeeds
+      await user.click(saveBtn)
+      const savedRegion = await screen.findByTestId('sample-saved-looks')
+      const removeBtn = within(savedRegion).getAllByRole('button', {
+        name: /^Remove /,
+      })[0]!
+      await user.click(removeBtn)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+      )
+      await user.click(screen.getByTestId('status-bar-action-undo'))
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Change undone.'
+        )
+      )
+
+      // Simulate storage write failure on Remove -> shows Failed + Retry, then Retry succeeds
+      const savedRegion2 = await screen.findByTestId('sample-saved-looks')
+      const removeBtn2 = within(savedRegion2).getAllByRole('button', {
+        name: /^Remove /,
+      })[0]!
+      setItemSpy.mockImplementationOnce(() => {
+        throw new Error('QuotaExceededError')
+      })
+      await user.click(removeBtn2)
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+          'Could not save. Try again.'
+        )
+      )
+      await user.click(screen.getByTestId('status-bar-action-retry'))
+      await waitFor(() =>
+        expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+      )
+    } finally {
+      setItemSpy.mockRestore()
+      sessionMock.owner = null
+      sessionStorage.clear()
+      localStorage.removeItem(key)
     }
   })
 })

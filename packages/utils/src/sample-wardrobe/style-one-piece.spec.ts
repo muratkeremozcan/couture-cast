@@ -597,4 +597,138 @@ describe('style piece inventory refresh', () => {
       inventory.stop()
     }
   })
+
+  it('refreshForAction preserves the anchor on transient errors and revokes on auth, deadline, expiry, or deletion', async () => {
+    vi.useFakeTimers({ now: 1_000 })
+    const timedPiece = {
+      ...piece,
+      imageAccess: {
+        url: 'https://example.test/private',
+        expiresAt: new Date(60_000).toISOString(),
+      },
+    }
+    const load = vi.fn<(_signal: AbortSignal) => Promise<(typeof timedPiece)[] | null>>()
+    const onAnchor = vi.fn()
+    let current = true
+    const inventory = createStylePieceRefresh({
+      garmentId: timedPiece.id,
+      load,
+      onAnchor,
+      isCurrent: () => current,
+    })
+
+    try {
+      // Inactive before setVisible(true)
+      expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
+
+      // Initial mount returns empty -> no current valid anchor -> revokes cleanly
+      load.mockResolvedValueOnce([])
+      inventory.setVisible(true)
+      expect(await inventory.refresh()).toBeNull()
+      expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
+      expect(onAnchor).toHaveBeenLastCalledWith(null)
+
+      // Establish valid anchor
+      load.mockResolvedValueOnce([timedPiece])
+      const initialAnchor = await inventory.refresh()
+      expect(initialAnchor).not.toBeNull()
+      onAnchor.mockClear()
+
+      // Happy path refreshes anchor
+      load.mockResolvedValueOnce([timedPiece])
+      expect(await inventory.refreshForAction()).toEqual({
+        status: 'ok',
+        anchor: initialAnchor,
+      })
+
+      // Transient network, 5xx, primitive, and cyclic errors preserve anchor without calling onAnchor(null)
+      const cyclic: { cause?: unknown } = {}
+      cyclic.cause = cyclic
+      for (const transientError of [
+        new TypeError('Failed to fetch'),
+        new Error('503 Service Unavailable'),
+        'plain-string-error',
+        cyclic,
+      ]) {
+        load.mockRejectedValueOnce(transientError)
+        expect(await inventory.refreshForAction()).toEqual({
+          status: 'error',
+          error: transientError,
+        })
+        expect(inventory.currentAnchor()).toEqual(initialAnchor)
+        expect(onAnchor).not.toHaveBeenCalledWith(null)
+      }
+
+      // Auth, response status, message, nested cause, AbortError, and TimeoutError all revoke and clear anchor
+      const revokingErrors: unknown[] = [
+        Object.assign(new Error('Unauthorized'), { status: 401 }),
+        { response: { status: 403 } },
+        new Error('Session expired — please sign in again'),
+        { cause: { status: 401 } },
+        Object.assign(new Error('Aborted'), { name: 'AbortError' }),
+        Object.assign(new Error('Timed out'), { name: 'TimeoutError' }),
+      ]
+      for (const revokingError of revokingErrors) {
+        load.mockResolvedValueOnce([timedPiece])
+        await inventory.refresh()
+        onAnchor.mockClear()
+        load.mockRejectedValueOnce(revokingError)
+        expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
+        expect(onAnchor).toHaveBeenLastCalledWith(null)
+        expect(inventory.currentAnchor()).toBeNull()
+      }
+
+      // Null or empty load revokes
+      load.mockResolvedValueOnce([timedPiece])
+      await inventory.refresh()
+      load.mockResolvedValueOnce(null)
+      expect(await inventory.refreshForAction()).toEqual({ status: 'revoked' })
+      expect(inventory.currentAnchor()).toBeNull()
+
+      // Transient error after expiry while load is in-flight revokes because currentValidAnchor() is gone
+      load.mockResolvedValueOnce([timedPiece])
+      await inventory.refresh()
+      const deferredErr = pendingInventory()
+      load.mockReturnValueOnce(deferredErr.promise)
+      const expiringAction = inventory.refreshForAction()
+      vi.setSystemTime(61_000)
+      deferredErr.reject(new Error('503 Service Unavailable'))
+      expect(await expiringAction).toEqual({ status: 'revoked' })
+
+      // Aborted/stopped in-flight refreshForAction (both resolve and reject) returns revoked without publishing
+      vi.setSystemTime(2_000)
+      load.mockResolvedValueOnce([timedPiece])
+      await inventory.refresh()
+      onAnchor.mockClear()
+
+      const pendingResolve = pendingInventory()
+      const pendingReject = pendingInventory()
+      load.mockReturnValueOnce(pendingResolve.promise)
+      const inFlightResolve = inventory.refreshForAction()
+      load.mockReturnValueOnce(pendingReject.promise)
+      const inFlightReject = inventory.refreshForAction()
+      inventory.setVisible(false)
+      expect(load.mock.calls.slice(-2).every(([signal]) => signal.aborted)).toBe(true)
+      pendingResolve.resolve([timedPiece])
+      pendingReject.reject(new Error('Aborted'))
+      expect(await inFlightResolve).toEqual({ status: 'revoked' })
+      expect(await inFlightReject).toEqual({ status: 'revoked' })
+      expect(onAnchor).toHaveBeenCalledWith(undefined)
+      expect(onAnchor).not.toHaveBeenCalledWith(null)
+
+      // Identity switch during refreshForAction also suppresses publication
+      inventory.setVisible(true)
+      load.mockResolvedValueOnce([timedPiece])
+      await inventory.refresh()
+      const switched = pendingInventory()
+      load.mockReturnValueOnce(switched.promise)
+      const switchedAction = inventory.refreshForAction()
+      current = false
+      switched.resolve([timedPiece])
+      expect(await switchedAction).toEqual({ status: 'revoked' })
+    } finally {
+      inventory.stop()
+      vi.useRealTimers()
+    }
+  })
 })

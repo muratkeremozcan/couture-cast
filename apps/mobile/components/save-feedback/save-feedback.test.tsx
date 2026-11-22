@@ -11,7 +11,10 @@ import { mobileIdentityEpoch, setMobileApplicationUserId } from '@/src/lib/mobil
 import { HomeAddGarment } from '@/src/features/preview/member-sample-outfit'
 import { StylePiecePanel } from '@/src/features/wardrobe/style-piece-panel'
 import {
+  checkNetworkOnlineForAction,
   DEFAULT_MOBILE_TAB_BAR_HEIGHT,
+  dispatchMobileAnnouncement,
+  getMobileTabBarHeight,
   getNetworkOnline,
   MOBILE_STATUS_BAR_GAP,
   MOBILE_TAB_BAR_CLEARANCE,
@@ -26,6 +29,7 @@ import {
   setMobilePrimaryActionClearance,
   setMobileTabBarHeight,
   setNetworkConnectivityProbe,
+  useSaveAction,
   useStatusBar,
   type AnnouncementEntry,
 } from './index'
@@ -798,5 +802,357 @@ describe('mobile save-feedback components', () => {
         DEFAULT_MOBILE_TAB_BAR_HEIGHT + MOBILE_STATUS_BAR_GAP
       )
     })
+  })
+
+  it('covers network-status window events, probe aborts/timeouts/errors, unconfigured native fallback, and offline polling', async () => {
+    // Web window offline/online events
+    act(() => {
+      window.dispatchEvent(new Event('offline'))
+    })
+    expect(getNetworkOnline()).toBe(false)
+    expect(await checkNetworkOnlineForAction()).toBe(true) // navigator.onLine is true in test browser
+    act(() => {
+      window.dispatchEvent(new Event('online'))
+    })
+    expect(getNetworkOnline()).toBe(true)
+    expect(await checkNetworkOnlineForAction()).toBe(true)
+
+    // probeNetworkConnectivity with already-aborted signal returns false immediately
+    const aborted = new AbortController()
+    aborted.abort()
+    expect(await probeNetworkConnectivity(aborted.signal)).toBe(false)
+
+    // probeNetworkConnectivity on web with no custom probe reads navigator.onLine
+    expect(await probeNetworkConnectivity()).toBe(true)
+
+    // Native without EXPO_PUBLIC_API_BASE_URL and without navigator.onLine
+    setPlatformOS('ios')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: undefined })
+    const prevBase = process.env.EXPO_PUBLIC_API_BASE_URL
+    const prevApiBase = process.env.API_BASE_URL
+    delete process.env.EXPO_PUBLIC_API_BASE_URL
+    delete process.env.API_BASE_URL
+    try {
+      reportNetworkOffline()
+      expect(await probeNetworkConnectivity()).toBe(false)
+      // Explicit action check falls through to true when no probe is configured so native never deadlocks
+      expect(await checkNetworkOnlineForAction()).toBe(true)
+
+      // Custom probe throwing synchronously/asynchronously returns false cleanly
+      setNetworkConnectivityProbe(() => Promise.reject(new Error('probe boom')))
+      expect(await probeNetworkConnectivity()).toBe(false)
+
+      // External signal aborting mid-flight and timeout aborting slow probe
+      const external = new AbortController()
+      const slow = deferred<boolean>()
+      setNetworkConnectivityProbe(() => slow.promise)
+      const abortedFlight = probeNetworkConnectivity(external.signal)
+      external.abort()
+      slow.resolve(true)
+      expect(await abortedFlight).toBe(false)
+
+      // Timeout abort and offline recovery interval poll
+      vi.useFakeTimers({
+        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+      })
+      let capturedSignal: AbortSignal | undefined
+      const hanging = deferred<boolean>()
+      setNetworkConnectivityProbe((signal) => {
+        capturedSignal = signal
+        return hanging.promise
+      })
+      const timedOut = probeNetworkConnectivity()
+      vi.advanceTimersByTime(4_000)
+      expect(capturedSignal?.aborted).toBe(true)
+      hanging.resolve(false)
+      expect(await timedOut).toBe(false)
+
+      // Offline interval polling while native is offline with a probe
+      const pollProbe = vi.fn(() => Promise.resolve(true))
+      setNetworkConnectivityProbe(pollProbe)
+      const view = await render(
+        <SaveFeedbackProvider>
+          <Text>Online monitor</Text>
+        </SaveFeedbackProvider>
+      )
+      await act(async () => {
+        vi.advanceTimersByTime(10_000)
+        await Promise.resolve()
+      })
+      expect(pollProbe).toHaveBeenCalled()
+      expect(getNetworkOnline()).toBe(true)
+      await view.unmount()
+
+      // Native AppState 'active' with boolean navigator.onLine syncs navigator.onLine
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+      let appStateListener: ((state: string) => void) | undefined
+      vi.spyOn(AppState, 'addEventListener').mockImplementation((_event, listener) => {
+        appStateListener = listener as (state: string) => void
+        return { remove: vi.fn() }
+      })
+      const view2 = await render(
+        <SaveFeedbackProvider>
+          <Text>AppState bool</Text>
+        </SaveFeedbackProvider>
+      )
+      act(() => appStateListener?.('active'))
+      expect(getNetworkOnline()).toBe(false)
+      await view2.unmount()
+      vi.useRealTimers()
+    } finally {
+      if (prevBase !== undefined) process.env.EXPO_PUBLIC_API_BASE_URL = prevBase
+      if (prevApiBase !== undefined) process.env.API_BASE_URL = prevApiBase
+    }
+  })
+
+  it('covers mobile context clamping, Android announcements, standalone useStatusBar, nested forwarding, animations, and standalone/undo SaveActionButton paths', async () => {
+    // Tab bar & primary clearance clamping + getter
+    setMobileTabBarHeight(Number.NaN)
+    expect(getMobileTabBarHeight()).toBe(0)
+    setMobilePrimaryActionClearance(-10)
+    resetMobileTabBarHeightForTests()
+    expect(getMobileTabBarHeight()).toBe(DEFAULT_MOBILE_TAB_BAR_HEIGHT)
+
+    // Android AccessibilityInfo.announceForAccessibility fallback
+    setPlatformOS('android')
+    const announceFallback = vi
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => undefined)
+    dispatchMobileAnnouncement('Android notice', 'assertive')
+    expect(announceFallback).toHaveBeenCalledWith('Android notice')
+    setPlatformOS('web')
+
+    // Standalone useStatusBar fallback
+    function StandaloneStatusHarness() {
+      const bar = useStatusBar()
+      return (
+        <Text
+          testID="standalone-bar-call"
+          onPress={() => {
+            bar.showNotice({ id: 'noop', message: 'Noop' })
+            bar.dismissNotice('noop')
+            bar.announce('Noop', { announcementId: 'noop:1' })
+          }}
+        >
+          {String(bar.hasProvider)}
+        </Text>
+      )
+    }
+    const standaloneBarView = await render(<StandaloneStatusHarness />)
+    expect(screen.getByTestId('standalone-bar-call')).toHaveTextContent('false')
+    fireEvent.click(screen.getByTestId('standalone-bar-call'))
+    await standaloneBarView.unmount()
+
+    // Non-reduced motion animation, nested non-inline forwarding, blank/dup/>200 announcements, and async rejecting bar action
+    mocks.reducedMotion = false
+    const parentAnnouncements: AnnouncementEntry[] = []
+    function NestedHarness() {
+      const bar = useStatusBar()
+      return (
+        <Text
+          testID="nested-mobile-trigger"
+          onPress={() => {
+            bar.announce('   ', { announcementId: 'blank:1' })
+            bar.announce('Nested msg', { announcementId: 'nested:1' })
+            bar.announce('Nested msg', { announcementId: 'nested:1' })
+            for (let i = 0; i < 205; i += 1) {
+              bar.announce(`Flood ${i}`, { announcementId: `flood:${i}` })
+            }
+            bar.showNotice({
+              id: 'mobile-async-reject',
+              message: 'Async action',
+              tone: 'neutral',
+              actions: [
+                {
+                  id: 'async-act',
+                  kind: 'undo',
+                  label: 'Run',
+                  onPress: () => Promise.reject(new Error('boom')),
+                },
+              ],
+            })
+          }}
+        >
+          Run
+        </Text>
+      )
+    }
+    const nestedView = await render(
+      <SaveFeedbackProvider onAnnounce={(entry) => parentAnnouncements.push(entry)}>
+        <SaveFeedbackProvider initialOnline={false}>
+          <NestedHarness />
+        </SaveFeedbackProvider>
+      </SaveFeedbackProvider>
+    )
+    fireEvent.click(screen.getByTestId('nested-mobile-trigger'))
+    expect(parentAnnouncements.filter((entry) => entry.id === 'nested:1')).toHaveLength(1)
+    expect(parentAnnouncements.some((entry) => entry.id === 'blank:1')).toBe(false)
+    fireEvent.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() => expect(screen.queryByTestId('status-feedback-bar')).toBeNull())
+    await nestedView.unmount()
+    mocks.reducedMotion = true
+
+    // Standalone SaveActionButton (auto-dismiss timer, onView, extraActions, showStatusBar=false, sync throw)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const onView = vi.fn()
+    const standaloneSaveView = await render(
+      <View>
+        <SaveActionButton
+          testID="standalone-save"
+          onSave={() => true}
+          onView={onView}
+          extraActions={[{ id: 'extra', label: 'Extra', onPress: vi.fn() }]}
+        />
+        <SaveActionButton
+          testID="silent-save"
+          showStatusBar={false}
+          onSave={() => {
+            throw new Error('sync fail')
+          }}
+        />
+        <SaveActionButton testID="disabled-save" disabled onSave={() => true} />
+      </View>
+    )
+    fireEvent.click(screen.getByTestId('disabled-save'))
+    expect(screen.getByTestId('disabled-save')).toHaveTextContent('Save')
+
+    fireEvent.click(screen.getByTestId('standalone-save'))
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+      'Saved to your looks.'
+    )
+    fireEvent.click(screen.getByTestId('status-bar-action-view'))
+    expect(onView).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('standalone-save'))
+    act(() => {
+      vi.advanceTimersByTime(SAVE_FEEDBACK_TIMINGS.statusBarDurationMs)
+    })
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+
+    fireEvent.click(screen.getByTestId('silent-save'))
+    expect(screen.getByTestId('silent-save')).toHaveTextContent('Failed')
+    await standaloneSaveView.unmount()
+    vi.useRealTimers()
+
+    // useSaveAction Undo offline (web + native probe), Undo false, Undo throwing offline & generic error, and reset()
+    let controllerRef: ReturnType<typeof useSaveAction> | null = null
+    const onSave = vi.fn(() => Promise.resolve(true))
+    const onUndo = vi
+      .fn<() => Promise<boolean>>()
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new TypeError('Network request failed'))
+      .mockRejectedValueOnce(new Error('500'))
+
+    function MobileControllerHarness() {
+      const controller = useSaveAction({
+        onSave,
+        onUndo,
+        requiresNetwork: true,
+        ownerKey: 'o1',
+        resetKey: 'r1',
+      })
+      controllerRef = controller
+      return (
+        <View>
+          <Text testID="m-state">{controller.state}</Text>
+          <Text testID="m-save" onPress={() => void controller.triggerSave()}>
+            Save
+          </Text>
+          <Text testID="m-reset" onPress={() => controller.reset('saved')}>
+            Reset
+          </Text>
+        </View>
+      )
+    }
+
+    await render(
+      <SaveFeedbackProvider>
+        <MobileControllerHarness />
+      </SaveFeedbackProvider>
+    )
+
+    // 1. Web offline blocks Undo
+    fireEvent.click(screen.getByTestId('m-save'))
+    await waitFor(() => expect(screen.getByTestId('m-state')).toHaveTextContent('saved'))
+    act(() => reportNetworkOffline())
+    fireEvent.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+
+    // 2. Native offline Undo runs probe -> unreachable keeps offline, reachable proceeds
+    setPlatformOS('ios')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: undefined })
+    setNetworkConnectivityProbe(() => Promise.resolve(false))
+    await act(async () => {
+      expect(await controllerRef!.triggerUndo()).toBe(false)
+    })
+    setNetworkConnectivityProbe(() => Promise.resolve(true))
+    // onUndo #1 returns false -> failed notice
+    await act(async () => {
+      expect(await controllerRef!.triggerUndo()).toBe(false)
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+
+    // 3. onUndo #2 throws offline error -> reports offline
+    await act(async () => {
+      expect(await controllerRef!.triggerUndo()).toBe(false)
+    })
+    expect(getNetworkOnline()).toBe(false)
+    act(() => reportNetworkOnline())
+
+    // 4. onUndo #3 throws generic error -> failed notice
+    await act(async () => {
+      expect(await controllerRef!.triggerUndo()).toBe(false)
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Could not save. Try again.'
+      )
+    )
+
+    // reset() and mismatched origin guards
+    fireEvent.click(screen.getByTestId('m-reset'))
+    expect(screen.getByTestId('m-state')).toHaveTextContent('saved')
+    expect(await controllerRef!.triggerSave({ ownerKey: 'wrong', resetKey: 'r1' })).toBe(
+      false
+    )
+    expect(await controllerRef!.triggerUndo({ ownerKey: 'wrong', resetKey: 'r1' })).toBe(
+      false
+    )
+
+    // Busy double-tap returns false and triggerSave/triggerUndo after unmount return false
+    const pendingSave = deferred<boolean>()
+    let busyCtrl: ReturnType<typeof useSaveAction> | null = null
+    function MobileBusyHarness() {
+      const controller = useSaveAction({
+        onSave: () => pendingSave.promise,
+        onView,
+        ownerKey: 'mb1',
+        resetKey: 'r1',
+      })
+      busyCtrl = controller
+      return <Text testID="mb-state">{controller.state}</Text>
+    }
+    const busyView = await render(<MobileBusyHarness />)
+    let firstRun!: Promise<boolean>
+    act(() => {
+      firstRun = busyCtrl!.triggerSave()
+    })
+    expect(await busyCtrl!.triggerSave()).toBe(false)
+    pendingSave.resolve(true)
+    await act(async () => {
+      await firstRun
+    })
+    await busyView.unmount()
+    expect(await busyCtrl!.triggerSave()).toBe(false)
+    expect(await busyCtrl!.triggerUndo()).toBe(false)
   })
 })
