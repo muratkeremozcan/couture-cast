@@ -66,15 +66,22 @@ function Harness({
   onBack = vi.fn(),
   onStylePiece = vi.fn(),
   onRefresh = vi.fn(),
+  refreshTo,
   withProvider = true,
 }: {
   initial?: ClosetGarment | null
   onBack?: () => void
   onStylePiece?: (selection: unknown, button: HTMLButtonElement) => void
   onRefresh?: () => void
+  /** What the closet re-read finds; it arrives after the refresh call, as a real read does. */
+  refreshTo?: ClosetGarment
   withProvider?: boolean
 }) {
   const [garment, setGarment] = useState<ClosetGarment | null>(initial)
+  const refresh = () => {
+    onRefresh()
+    if (refreshTo) setTimeout(() => setGarment(refreshTo), 0)
+  }
   const detail = (
     <GarmentDetail
       garment={garment}
@@ -84,7 +91,7 @@ function Harness({
       loading={false}
       onBack={onBack}
       onTagsSaved={setGarment}
-      onRefresh={onRefresh}
+      onRefresh={refresh}
       onStylePiece={onStylePiece}
     />
   )
@@ -278,16 +285,18 @@ describe('GarmentDetail', () => {
     ['tags another device changed', 'GARMENT_TAGS_CHANGED'],
     ['a concurrent update', 'CONCURRENT_TAG_UPDATE'],
   ])(
-    '[P1] [7.5-CMP-009] names %s as a conflict, closes the editor and reads the piece again',
+    '[P1] [7.5-CMP-009] names %s as a conflict, keeps the draft and retries against the re-read tags',
     async (_case, message) => {
       const user = userEvent.setup()
       const onRefresh = vi.fn()
+      // Another device stored linen while this editor was open on cotton.
+      const stored: GarmentWithColor = { ...blueTop, material: 'linen' }
       reply = () =>
         HttpResponse.json(
           { statusCode: 409, message, error: 'Conflict' },
           { status: 409 }
         )
-      render(<Harness onRefresh={onRefresh} />)
+      render(<Harness onRefresh={onRefresh} refreshTo={stored} />)
 
       await editTo(user, { material: 'wool', comfort: 'cold' })
       await user.click(screen.getByTestId('garment-tag-done'))
@@ -297,18 +306,90 @@ describe('GarmentDetail', () => {
       expect(error).toHaveAttribute('data-failure', 'conflict')
       expect(error).toHaveTextContent(copy)
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(copy)
-      // A stale draft is not kept: the editor closes and the closet re-reads the piece.
-      expect(screen.queryByTestId('garment-tag-editor')).toBeNull()
+      // The draft stays open; the closet re-reads the piece once and the rows show what it found.
+      expect(screen.getByTestId('garment-tag-editor')).toBeInTheDocument()
+      expect(screen.getByTestId('garment-tag-option-material-wool')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      expect(screen.getByTestId('garment-tag-option-comfort-cold')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
       expect(onRefresh).toHaveBeenCalledTimes(1)
-      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(
-        /^Cotton$/
+      await waitFor(() =>
+        expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(
+          /^Linen$/
+        )
       )
 
-      // Opening the editor again starts clean.
-      await user.click(screen.getByTestId('garment-edit-tags'))
-      expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+      // Done again is a deliberate retry against the tags the re-read found.
+      reply = acceptTags
+      await user.click(screen.getByTestId('garment-tag-done'))
+      expect(await statusBar()).toHaveTextContent('Saved')
+      expect(patches.map(({ body }) => body)).toEqual([
+        { category: 'top', material: 'wool', comfortRange: 'cold', expected: loaded },
+        {
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+          expected: { ...loaded, material: 'linen' },
+        },
+      ])
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
     }
   )
+
+  it('[P1] [7.5-CMP-009] after a conflict, a draft that matches the re-read tags says No changes', async () => {
+    const user = userEvent.setup()
+    const stored: GarmentWithColor = { ...blueTop, material: 'wool' }
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    render(<Harness refreshTo={stored} />)
+
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await screen.findByTestId('garment-tag-error')
+    await waitFor(() =>
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
+    )
+
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('No changes')
+    )
+    expect(patches).toHaveLength(1)
+  })
+
+  it('[P2] [7.5-CMP-009] closing the editor after a conflict reopens it from the stored tags', async () => {
+    const user = userEvent.setup()
+    const stored: GarmentWithColor = { ...blueTop, material: 'linen' }
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    render(<Harness refreshTo={stored} />)
+
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await screen.findByTestId('garment-tag-error')
+    await waitFor(() =>
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Linen$/)
+    )
+    await user.click(screen.getByTestId('garment-tag-cancel'))
+
+    await user.click(screen.getByTestId('garment-edit-tags'))
+    expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+    expect(screen.getByTestId('garment-tag-option-material-linen')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
 
   it.each([
     [

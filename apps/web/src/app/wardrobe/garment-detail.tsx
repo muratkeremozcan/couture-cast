@@ -179,6 +179,8 @@ function useGarmentTagEditor({
   // The tags the editor opened with. A background closet read can change `saved` while the
   // editor is open; No changes, `expected` and the Undo target all use this snapshot instead.
   const baselineRef = useRef<GarmentTagDraft | null>(null)
+  // Set by a 409: the next closet read is the member's review point, so it becomes the baseline.
+  const rebaseAfterConflictRef = useRef(false)
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
   const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
@@ -206,6 +208,15 @@ function useGarmentTagEditor({
     setFailure(null)
     setSaveState('idle')
   }, [garmentId])
+
+  // After a conflict the editor keeps the draft and the closet is read again. When that read
+  // lands, the rows above show the stored tags and they become the baseline, so the member's
+  // next Done is a deliberate retry against what is stored now.
+  useEffect(() => {
+    if (!rebaseAfterConflictRef.current || !baselineRef.current) return
+    rebaseAfterConflictRef.current = false
+    baselineRef.current = garmentTagDraft(garment)
+  }, [garment])
 
   // Opening the editor moves focus to its first control, the selected category; closing it
   // returns focus to Edit tags.
@@ -337,16 +348,18 @@ function useGarmentTagEditor({
     }
   }
 
-  const closeEditor = (keepFailure = false) => {
+  const closeEditor = () => {
     focusEditAfterCloseRef.current = true
     baselineRef.current = null
+    rebaseAfterConflictRef.current = false
     setDraft(null)
-    if (!keepFailure) setFailure(null)
+    setFailure(null)
   }
 
   const openEditor = () => {
     if (!saved) return
     baselineRef.current = saved
+    rebaseAfterConflictRef.current = false
     setFailure(null)
     setDraft(saved)
   }
@@ -354,10 +367,10 @@ function useGarmentTagEditor({
   const failSave = (actionOwner: string | null, kind: GarmentTagSaveFailure) => {
     setSaveState('idle')
     setFailure(kind)
-    // Another edit landed first: close the editor on its stale tags and read the current ones,
-    // so the member reopens it from what is stored now. The conflict message stays.
+    // Another edit landed first: keep the draft open, read the stored tags again and use them
+    // as the baseline once they land. The conflict message asks the member to check them.
     if (kind === 'conflict') {
-      closeEditor(true)
+      rebaseAfterConflictRef.current = true
       onRefresh()
     }
     showNotice(actionOwner, kind, {

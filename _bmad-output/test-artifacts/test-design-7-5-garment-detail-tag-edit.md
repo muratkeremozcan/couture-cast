@@ -124,7 +124,7 @@ lane).
 | 7.5-UNIT-018     | P1    | One published wire shape with optional colorFamily; generated SDK types keep it optional          |
 | 7.5-INT-004      | P0    | pg17: a Done whose expected tags changed is refused 409 `GARMENT_TAGS_CHANGED`, row untouched     |
 | 7.5-INT-005      | P0    | pg17: a stale Undo is refused; a current Undo applies                                             |
-| 7.5-INT-006      | P1    | pg17: unchanged request answers 200 despite stale expected; no expected applies as before         |
+| 7.5-INT-006      | P1    | pg17: unchanged request with stale expected answers 409; current expected 200; none as before     |
 | 7.5-INT-007      | P0    | pg17: signing fails after the write: 200 with committed tags and `imageAccess: null`              |
 | 7.5-CMP-013      | P0    | Web: Done and Undo send expected; a newer Done retires the older Undo; Undo conflict has no Retry |
 | 7.5-CMP-014      | P1    | Web: Saving, Still saving, Saved; a reopened detail announces again under one provider            |
@@ -136,6 +136,9 @@ lane).
 | 7.5-NAT-011      | P1    | Native hub: a detail save refreshes saved looks                                                   |
 | 7.5-E2E-002      | P1    | Phone: decoded photo (naturalWidth), near-expiry renewal on open, scroll restore, Back/Forward    |
 | 7.5-MAE-001      | P0    | Android fixture lane verifies its member via GET user/profile (native-session fixture branch)     |
+| 7.5-CMP-009      | P1    | Web 409: draft kept, rows re-read once, retry sends expected = re-read tags; match is No changes  |
+| 7.5-NAT-005      | P1    | Native 409: same as CMP-009; Cancel then reopen starts from the stored tags                       |
+| 7.5-E2E-002      | P1    | Phone 409: draft kept, rows show the re-read tags, Done again saves with the re-read expected     |
 
 ## Ownership
 

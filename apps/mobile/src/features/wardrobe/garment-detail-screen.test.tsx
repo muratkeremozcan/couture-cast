@@ -334,7 +334,7 @@ describe('GarmentDetailScreen', () => {
   })
 
   it.each([['GARMENT_TAGS_CHANGED'], ['CONCURRENT_TAG_UPDATE']])(
-    '[P1] [7.5-NAT-005] a %s conflict says so, closes the editor and reads the piece again',
+    '[P1] [7.5-NAT-005] a %s conflict says so, keeps the draft and retries against the re-read tags',
     async (message) => {
       let reads = 0
       server.use(
@@ -349,23 +349,94 @@ describe('GarmentDetailScreen', () => {
           { status: 409 }
         )
       renderDetail()
-      await openEditorAndPick('garment-tag-option-material-wool')
+      await openEditorAndPick(
+        'garment-tag-option-material-wool',
+        'garment-tag-option-comfort-cold'
+      )
       const readsBefore = reads
+      // Another device stored linen while this editor was open on cotton.
+      closet = [{ ...blueTop, material: 'linen' }]
 
       await browserUser.click(tag('garment-tag-done'))
 
       expect(await screen.findByTestId('garment-tag-error')).toHaveTextContent(
         'This piece changed on another device. Check the tags and try again.'
       )
-      expect(screen.queryByTestId('garment-tag-editor')).toBeNull()
+      // The draft stays open; the closet re-reads the piece once and the rows show what it found.
+      expect(tag('garment-tag-editor')).toBeVisible()
+      expect(tag('garment-tag-option-material-wool')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      )
+      expect(tag('garment-tag-option-comfort-cold')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      )
       await waitFor(() => expect(reads).toBe(readsBefore + 1))
-      expect(tag('garment-detail-material').textContent).toBe('Cotton')
+      await waitFor(() =>
+        expect(tag('garment-detail-material').textContent).toBe('Linen')
+      )
 
-      // Opening the editor again starts clean.
-      await browserUser.click(await editTagsButton())
-      expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+      // Done again is a deliberate retry against the tags the re-read found.
+      reply = acceptTags
+      await browserUser.click(tag('garment-tag-done'))
+      await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+      expect(patches.map(({ body }) => body)).toEqual([
+        { category: 'top', material: 'wool', comfortRange: 'cold', expected: loaded },
+        {
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+          expected: { ...loaded, material: 'linen' },
+        },
+      ])
+      expect(tag('garment-detail-material').textContent).toBe('Wool')
     }
   )
+
+  it('[P1] [7.5-NAT-005] after a conflict, a draft that matches the re-read tags says No changes', async () => {
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    closet = [{ ...blueTop, material: 'wool' }]
+
+    await browserUser.click(tag('garment-tag-done'))
+    await screen.findByTestId('garment-tag-error')
+    await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Wool'))
+
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent('No changes')
+    )
+    expect(patches).toHaveLength(1)
+  })
+
+  it('[P2] [7.5-NAT-005] closing the editor after a conflict reopens it from the stored tags', async () => {
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    closet = [{ ...blueTop, material: 'linen' }]
+
+    await browserUser.click(tag('garment-tag-done'))
+    await screen.findByTestId('garment-tag-error')
+    await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Linen'))
+    await browserUser.click(tag('garment-tag-cancel'))
+
+    await browserUser.click(await editTagsButton())
+    expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+    expect(tag('garment-tag-option-material-linen')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+  })
 
   it.each([
     [

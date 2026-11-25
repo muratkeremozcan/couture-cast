@@ -155,6 +155,11 @@ itself.
   "Uploaded garment" became "Top" (legacy fixture, no color); `page.test.tsx` card label
   `top · cotton` became `Top · Cotton`.
 
+- CodeRabbit asked that a 409 reload the stored tags before a retry. Closing the editor on a
+  409 would break the frozen matrix row (keep draft), so the editor keeps the draft, the list is
+  read again, and that read becomes the editor baseline; the next Done is a deliberate retry
+  against the stored tags.
+
 ## Plan Change Log
 
 ## Review Triage Log

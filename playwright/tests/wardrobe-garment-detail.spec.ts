@@ -238,10 +238,10 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
       ...photographedGarment(baseURL, `detail-extra-${index + 1}`),
       colorFamily: 'gray',
     }))
-    const writes = await mockStyleWardrobe(page, baseURL, interceptNetworkCall, {
-      [memberA]: [...others, blueTop],
-    })
-    return { blueTop, writes }
+    // The mock reads this record on every request, so a test can change what is stored.
+    const inventory = { [memberA]: [...others, blueTop] }
+    const writes = await mockStyleWardrobe(page, baseURL, interceptNetworkCall, inventory)
+    return { blueTop, writes, inventory }
   }
 
   test('[P1] [7.5-E2E-002] names the photo "Blue top" and says "No changes" without a request', async ({
@@ -270,32 +270,90 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     expect(writes).toEqual([])
   })
 
-  for (const failure of [
-    {
-      name: 'a concurrent update',
-      status: 409,
-      message: 'CONCURRENT_TAG_UPDATE',
-      copy: 'This piece changed on another device. Check the tags and try again.',
-    },
-    {
-      name: 'a guardian block',
-      status: 403,
-      message: 'GUARDIAN_CONSENT_REQUIRED',
-      copy: 'A guardian has to approve closet changes first.',
-    },
-  ]) {
-    test(`[P1] [7.5-E2E-002] shows ${failure.name} in its own words and keeps the draft`, async ({
-      baseURL,
-      interceptNetworkCall,
-      page,
-    }) => {
+  // The refused PATCH is the state under test, so the network error monitor stays off here.
+  test(
+    '[P1] [7.5-E2E-002] a concurrent update keeps the draft, shows the stored tags and retries against them',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ baseURL, interceptNetworkCall, page }) => {
+      const { blueTop, inventory } = await mockCloset(
+        page,
+        baseURL!,
+        interceptNetworkCall
+      )
+      // Another device stores linen while this editor is open on cotton.
+      const stored: GarmentWithColor = { ...blueTop, material: 'linen' }
+      const patches: unknown[] = []
+      await page.route(
+        `**/api/v1/wardrobe/garments/${blueTop.id}/tags`,
+        async (route) => {
+          if (route.request().method() !== 'PATCH') return route.fallback()
+          const body: unknown = route.request().postDataJSON()
+          patches.push(body)
+          if (patches.length === 1) {
+            return route.fulfill({
+              status: 409,
+              json: { statusCode: 409, message: 'GARMENT_TAGS_CHANGED' },
+            })
+          }
+          const saved: GarmentWithColor = { ...stored, material: 'wool' }
+          inventory[memberA] = [saved]
+          return route.fulfill({ status: 200, json: { data: saved } })
+        }
+      )
+      await page.goto('/wardrobe')
+      await openDetail(page, blueTop.id, 'Blue top')
+
+      await page.getByTestId('garment-edit-tags').click()
+      await page.getByTestId('garment-tag-option-material-wool').click()
+      inventory[memberA] = [stored]
+      const reread = page.waitForRequest(
+        (request) =>
+          request.method() === 'GET' &&
+          new URL(request.url()).pathname === '/api/v1/wardrobe/garments'
+      )
+      await page.getByTestId('garment-tag-done').click()
+      await reread
+
+      await expect(page.getByTestId('garment-tag-error')).toHaveText(
+        'This piece changed on another device. Check the tags and try again.'
+      )
+      await expect(page.getByTestId('garment-tag-option-material-wool')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      // The tag rows show what the re-read found; the editor keeps the member's draft.
+      await expect(page.getByTestId('garment-detail-material')).toHaveText('Linen')
+      expect(patches[0]).toMatchObject({
+        material: 'wool',
+        expected: { category: 'top', material: 'cotton', comfortRange: 'mild' },
+      })
+
+      // Done again is a deliberate retry against the stored tags, so it saves.
+      await page.getByTestId('garment-tag-done').click()
+      await expect(page.getByTestId('status-feedback-bar')).toContainText('Saved')
+      expect(patches).toHaveLength(2)
+      expect(patches[1]).toMatchObject({
+        category: 'top',
+        material: 'wool',
+        comfortRange: 'mild',
+        expected: { category: 'top', material: 'linen', comfortRange: 'mild' },
+      })
+      await expect(page.getByTestId('garment-detail-material')).toHaveText('Wool')
+      await expect(page.getByTestId('garment-tag-error')).toHaveCount(0)
+    }
+  )
+
+  test(
+    '[P1] [7.5-E2E-002] shows a guardian block in its own words and keeps the draft',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ baseURL, interceptNetworkCall, page }) => {
       const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
       const refused = interceptNetworkCall({
         method: 'PATCH',
         url: `**/api/v1/wardrobe/garments/${blueTop.id}/tags`,
         fulfillResponse: {
-          status: failure.status,
-          body: { statusCode: failure.status, message: failure.message },
+          status: 403,
+          body: { statusCode: 403, message: 'GUARDIAN_CONSENT_REQUIRED' },
         },
       })
       await page.goto('/wardrobe')
@@ -304,16 +362,18 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
       await page.getByTestId('garment-edit-tags').click()
       await page.getByTestId('garment-tag-option-material-wool').click()
       await page.getByTestId('garment-tag-done').click()
-      expect((await refused).status).toBe(failure.status)
+      expect((await refused).status).toBe(403)
 
-      await expect(page.getByTestId('garment-tag-error')).toHaveText(failure.copy)
+      await expect(page.getByTestId('garment-tag-error')).toHaveText(
+        'A guardian has to approve closet changes first.'
+      )
       await expect(page.getByTestId('garment-tag-option-material-wool')).toHaveAttribute(
         'aria-pressed',
         'true'
       )
       await expect(page.getByTestId('garment-detail-material')).toHaveText('Cotton')
-    })
-  }
+    }
+  )
 
   test('[P1] [7.5-E2E-002] a dropped connection reads as offline and keeps the draft', async ({
     baseURL,
