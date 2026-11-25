@@ -469,7 +469,8 @@ describe('GarmentDetailScreen', () => {
       fireEvent.click(tag('garment-tag-done'))
     })
     expect(patches).toHaveLength(1)
-    expect(tag('status-feedback-bar')).not.toHaveTextContent('No changes')
+    // The bar may have dismissed the conflict notice by now, so look for the words anywhere.
+    expect(screen.queryByText('No changes')).toBeNull()
 
     const pendingRead = client.reads.at(-1)!
     await act(async () => {

@@ -400,7 +400,8 @@ describe('GarmentDetail', () => {
     await user.click(done)
     // Done waits: no request and no "No changes" against the tags from before the conflict.
     expect(patches).toHaveLength(1)
-    expect(screen.getByTestId('status-feedback-bar')).not.toHaveTextContent('No changes')
+    // The bar may have dismissed the conflict notice by now, so look for the words anywhere.
+    expect(screen.queryByText('No changes')).toBeNull()
     expect(done).toHaveFocus()
 
     await act(async () => {
