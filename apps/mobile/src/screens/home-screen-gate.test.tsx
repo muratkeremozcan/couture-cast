@@ -51,6 +51,9 @@ import {
 } from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { SaveFeedbackProvider } from '@/components/save-feedback'
+import { screenFocus } from '@/src/test-utils/focus-effect'
+import { userEvent } from 'vitest/browser'
 
 /** Ritual answers the test releases by hand, in request order. */
 function heldRitualAnswers() {
@@ -114,6 +117,37 @@ function renderHome() {
   )
 }
 
+/** Home under the root status bar, the floating slot a refresh failure reports in. */
+function renderHomeWithStatusBar() {
+  return render(
+    <SaveFeedbackProvider>
+      <AccessibilityAnnouncerProvider>
+        <TabOneScreen />
+      </AccessibilityAnnouncerProvider>
+    </SaveFeedbackProvider>
+  )
+}
+
+/** A tab switch away from Home and back: the tab stays mounted, only its focus changes. */
+function leaveAndReturn() {
+  act(() => screenFocus.set(false))
+  act(() => screenFocus.set(true))
+}
+
+const warmerRitual = {
+  ...mockRitualResponse,
+  data: {
+    ...mockRitualResponse.data,
+    weather: {
+      ...mockRitualResponse.data.weather,
+      current: {
+        ...mockRitualResponse.data.weather.current,
+        temperature: mockRitualResponse.data.weather.current.temperature + 7,
+      },
+    },
+  },
+}
+
 const placeholder = () => screen.queryByTestId('screen-placeholder')
 const homeGate = () => screen.getByTestId('screen-gate')
 
@@ -136,6 +170,7 @@ describe('Home screen gate (native)', () => {
   afterEach(() => {
     restore?.()
     setMobileApplicationUserId(null)
+    screenFocus.reset()
   })
 
   it('7.7-NAT-002 shows the placeholder, never the member sample, until the ritual and weather read settles', async () => {
@@ -233,5 +268,58 @@ describe('Home screen gate (native)', () => {
     expect(screen.getByTestId('weather-header')).toBeVisible()
     expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
     expect(screen.queryByTestId('hero-error-state')).toBeNull()
+  })
+  it('7.7-NAT-003 a return to Home re-reads the ritual in place, with the outfit and scroll kept', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+    const scrollView = screen.getByTestId('hero-experience-scrollview')
+    const temperature = screen.getByTestId('current-temperature').textContent
+
+    // Leaving reads nothing; the return does.
+    act(() => screenFocus.set(false))
+    expect(ritual.requests()).toBe(1)
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(ritual.requests()).toBe(2))
+
+    // While the read runs: the same mounted scroll view (so its offset), the outfit, and no
+    // placeholder or skeleton.
+    expect(screen.getByTestId('hero-experience-scrollview')).toBe(scrollView)
+    expect(placeholder()).toBeNull()
+    expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
+    expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
+    expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
+
+    // The answer replaces the outfit in place.
+    await ritual.release(1, HttpResponse.json(warmerRitual))
+    await waitFor(() =>
+      expect(screen.getByTestId('current-temperature').textContent).not.toBe(temperature)
+    )
+    expect(screen.getByTestId('hero-experience-scrollview')).toBe(scrollView)
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-004 a failed refresh keeps the outfit and reports in the status bar, with Retry', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHomeWithStatusBar()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+    const header = screen.getByTestId('weather-header')
+    const headerTop = header.getBoundingClientRect().top
+
+    leaveAndReturn()
+    await ritual.release(1, new HttpResponse(null, { status: 503 }))
+
+    const bar = await screen.findByTestId('status-feedback-bar')
+    expect(bar).toHaveTextContent(i18n.t('hero.load_error'))
+    // Nothing was inserted above the outfit: the header did not move, and no inline banner.
+    expect(screen.getByTestId('weather-header')).toBe(header)
+    expect(header.getBoundingClientRect().top).toBe(headerTop)
+    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+    expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
+
+    await userEvent.click(screen.getByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(ritual.requests()).toBe(3))
   })
 })

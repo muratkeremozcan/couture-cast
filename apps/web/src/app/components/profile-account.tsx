@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSession } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
-import { useScreenGateRead } from './screen-gate'
+import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
 interface Account {
   displayName: string | null
@@ -20,32 +20,41 @@ export function ProfileAccount() {
   const { t } = useTranslation()
   const session = useWebSession()
   const owner = session.status === 'signed_in' ? session.owner : null
-  const [account, setAccount] = useState<Account | null>(null)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's account at once
+  // and reads it again in place.
+  const snapshot = useSectionSnapshot<Account>('account', owner)
+  const restoredFor = snapshot.restoredFor
+  const [account, setAccount] = useState<Account | null>(() => snapshot.restored ?? null)
   // The member whose profile read answered, with an account or without one.
-  const [answeredFor, setAnsweredFor] = useState<string | null>(null)
+  const [answeredFor, setAnsweredFor] = useState<string | null>(restoredFor)
   // Story CC-7.7: the account sits at the top of Profile, so the screen gate waits for it.
   useScreenGateRead(
     'account',
     session.status !== 'checking' && (owner === null || answeredFor === owner)
   )
 
-  // One profile request per member, like the Locations list.
+  const { beginRead, remember } = snapshot
+  // One profile request per member, like the Locations list. The restored member's account
+  // stays on screen while it is read again; a failed refresh keeps it.
   useEffect(() => {
-    setAccount(null)
+    if (owner === null || owner !== restoredFor) setAccount(null)
     if (!owner) return
     const controller = new AbortController()
+    beginRead()
     getSignedInUserProfileFromWeb(controller.signal)
       .then(({ user }) => {
         if (controller.signal.aborted) return
-        setAccount({ displayName: user.displayName?.trim() || null, email: user.email })
+        const next = { displayName: user.displayName?.trim() || null, email: user.email }
+        setAccount(next)
         setAnsweredFor(owner)
+        remember(next)
       })
       .catch(() => {
         // The header is a courtesy: every section below reports its own failures.
         if (!controller.signal.aborted) setAnsweredFor(owner)
       })
     return () => controller.abort()
-  }, [owner])
+  }, [owner, restoredFor, beginRead, remember])
 
   if (!account) return null
 

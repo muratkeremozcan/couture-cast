@@ -14,12 +14,16 @@
 //
 // A return to a tab this member already saw in the session (lib/screen-snapshot.ts) opens the
 // gate at once, restores the tab's scroll before paint and lets the sections refresh in place.
+//
+// A gate also opens once `SCREEN_GATE_DEADLINE_MS` passed (Codex review P2-2): one read that
+// never answers must not hide the sections that did, or their errors and Retry.
 'use client'
 
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -31,18 +35,25 @@ import { getI18n } from '../../i18n'
 import { LANDING_SESSION_ATTRIBUTE } from '../../lib/landing-session'
 import { screenSnapshot, type ScreenName } from '../../lib/screen-snapshot'
 import {
-  isLiveOwner,
+  currentWebSessionOwner,
+  currentWebSessionScope,
+  isLiveScope,
   NO_MEMBER_SCOPE,
   useHydrating,
   useWebSession,
-  useWebSessionOwner,
+  useWebSessionScope,
 } from '../../lib/use-web-session'
+
+/** A gate opens after this long even when a read never answered (Codex review P2-2). */
+export const SCREEN_GATE_DEADLINE_MS = 10_000
 
 type ScreenGateContextValue = {
   screen: ScreenName
-  /** The member the gate is waiting for; a read reports again when it changes. */
+  /** The session scope the gate is waiting for; a read reports again when it changes. */
   ownerKey: string
   report: (read: string, settled: boolean) => void
+  /** The body is shown: a one-time focus intent may run now (Codex review P2-8). */
+  open: boolean
 }
 
 const ScreenGateContext = createContext<ScreenGateContextValue | null>(null)
@@ -70,6 +81,70 @@ export function ScreenGateReport({ read, settled }: { read: string; settled: boo
 /** The tab a section renders in, for its snapshot; null outside a gate. */
 export function useScreenGateScreen(): ScreenName | null {
   return useContext(ScreenGateContext)?.screen ?? null
+}
+
+/**
+ * Whether the body around a section is shown; always true outside a gate. A one-time intent
+ * (a deep-link focus, a guided autofocus) waits for it, because focus on a hidden element is
+ * lost and the intent would be spent on nothing (Codex review P2-8).
+ */
+export function useScreenGateOpen(): boolean {
+  return useContext(ScreenGateContext)?.open ?? true
+}
+
+/**
+ * Story CC-7.7 D5 (Codex review P1-2): one section's last settled data on its tab, for a return
+ * in the same session. `restored` is what this mount starts from: undefined on hydration, a
+ * first visit, outside a gate, or for another member. A read calls `beginRead` as it starts,
+ * which captures the session scope its answer belongs to; `remember` stores the data under that
+ * scope (undefined forgets it), and the store drops it if the scope is no longer live.
+ */
+export function useSectionSnapshot<T>(
+  part: string,
+  owner: string | null
+): {
+  restored: T | undefined
+  /** The member `restored` belongs to, or null when nothing was restored. */
+  restoredFor: string | null
+  /** Where the section's state starts: `ready` with restored data, else `checking`. */
+  startState: 'ready' | 'checking'
+  beginRead: () => void
+  remember: (value: T | undefined) => void
+} {
+  const screen = useScreenGateScreen()
+  const hydrating = useHydrating()
+  const [start] = useState(() => {
+    const scope =
+      hydrating || !screen || owner === null || currentWebSessionOwner() !== owner
+        ? null
+        : currentWebSessionScope()
+    return {
+      scope,
+      restored:
+        scope && screen ? screenSnapshot.recall<T>(scope, screen, part) : undefined,
+    }
+  })
+  const scopeRef = useRef<string | null>(start.scope)
+  const beginRead = useCallback(() => {
+    scopeRef.current =
+      owner !== null && currentWebSessionOwner() === owner
+        ? currentWebSessionScope()
+        : null
+  }, [owner])
+  const remember = useCallback(
+    (value: T | undefined) => {
+      if (screen) screenSnapshot.remember(scopeRef.current, screen, part, value)
+    },
+    [part, screen]
+  )
+  const restored = start.restored !== undefined
+  return {
+    restored: start.restored,
+    restoredFor: restored ? owner : null,
+    startState: restored ? 'ready' : 'checking',
+    beginRead,
+    remember,
+  }
 }
 
 /**
@@ -113,23 +188,23 @@ export interface ScreenGateProps {
  */
 function useScreenScroll({
   screen,
-  owner,
+  scope,
   open,
   fromSnapshot,
   hydrating,
 }: {
   screen: ScreenName
-  owner: string | null
+  scope: string | null
   open: boolean
   fromSnapshot: boolean
   hydrating: boolean
 }) {
   const hydratedAtMount = useRef(hydrating)
-  const ownerAtMount = useRef(owner)
+  const scopeAtMount = useRef(scope)
   useLayoutEffect(() => {
     if (hydratedAtMount.current) return
     const offset = fromSnapshot
-      ? (screenSnapshot.recallScroll(ownerAtMount.current, screen) ?? 0)
+      ? (screenSnapshot.recallScroll(scopeAtMount.current, screen) ?? 0)
       : 0
     window.scrollTo(0, offset)
   }, [fromSnapshot, screen])
@@ -137,14 +212,14 @@ function useScreenScroll({
   // A layout effect, so the listener leaves in the commit that removes the tab, before the next
   // tab's own scroll restore can be recorded here.
   useLayoutEffect(() => {
-    if (!open || owner === null) return
+    if (!open || scope === null) return
     let frame = 0
     const record = () => {
       if (frame) return
       frame = window.requestAnimationFrame(() => {
         frame = 0
-        if (isLiveOwner(owner))
-          screenSnapshot.rememberScroll(owner, screen, window.scrollY)
+        // The store drops an offset whose scope is no longer live.
+        screenSnapshot.rememberScroll(scope, screen, window.scrollY)
       })
     }
     window.addEventListener('scroll', record, { passive: true })
@@ -152,7 +227,30 @@ function useScreenScroll({
       if (frame) window.cancelAnimationFrame(frame)
       window.removeEventListener('scroll', record)
     }
-  }, [open, owner, screen])
+  }, [open, scope, screen])
+}
+
+/**
+ * Codex review P2-2: whether the gate is open, which its reads decide (`openFromReads`) or
+ * `SCREEN_GATE_DEADLINE_MS` after the gate started waiting for `ownerKey`. Hydration starts no
+ * timer; another member waits afresh.
+ */
+function useGateOpen(
+  ownerKey: string,
+  hydrating: boolean,
+  openFromReads: boolean
+): boolean {
+  const waiting = !hydrating && !openFromReads
+  const [expiredFor, setExpiredFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (!waiting) return
+    const timer = window.setTimeout(
+      () => setExpiredFor(ownerKey),
+      SCREEN_GATE_DEADLINE_MS
+    )
+    return () => window.clearTimeout(timer)
+  }, [ownerKey, waiting])
+  return openFromReads || expiredFor === ownerKey
 }
 
 /**
@@ -188,13 +286,13 @@ export function ScreenGate({
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const hydrating = useHydrating()
   const session = useWebSession()
-  const owner = useWebSessionOwner()
-  const ownerKey = owner ?? NO_MEMBER_SCOPE
+  const scope = useWebSessionScope()
+  const ownerKey = scope ?? NO_MEMBER_SCOPE
 
   // D5: a tab this member saw settle in this session opens at once. Hydration never does: the
   // snapshot lives in memory, so a document that hydrates has none.
   const [fromSnapshot] = useState(
-    () => !hydrating && owner !== null && screenSnapshot.isSettled(owner, screen)
+    () => !hydrating && scope !== null && screenSnapshot.isSettled(scope, screen)
   )
 
   const { report, readsSettled } = useGateReads(ownerKey, reads, ready)
@@ -204,26 +302,28 @@ export function ScreenGate({
   const [openedFor, setOpenedFor] = useState<string | null>(
     fromSnapshot ? ownerKey : null
   )
-  const open =
+  const openFromReads =
     openedFor === ownerKey ||
     readsSettled ||
     // D3: a signed-out session opens every gate at once, and a session check that failed
     // shows each section's own error and retry.
     session.status === 'signed_out' ||
     session.status === 'unavailable'
+  const open = useGateOpen(ownerKey, hydrating, openFromReads)
 
   useLayoutEffect(() => {
     if (!open) return
     if (openedFor !== ownerKey) setOpenedFor(ownerKey)
-    if (owner !== null && session.status === 'signed_in' && isLiveOwner(owner))
-      screenSnapshot.markSettled(owner, screen)
-  }, [open, openedFor, owner, ownerKey, screen, session.status])
+    // Only reads that settled mark the tab settled: a return after the deadline waits again.
+    if (readsSettled && session.status === 'signed_in' && isLiveScope(scope))
+      screenSnapshot.markSettled(scope, screen)
+  }, [open, readsSettled, openedFor, ownerKey, scope, screen, session.status])
 
-  useScreenScroll({ screen, owner, open, fromSnapshot, hydrating })
+  useScreenScroll({ screen, scope, open, fromSnapshot, hydrating })
 
   const context = useMemo(
-    () => ({ screen, ownerKey, report }),
-    [screen, ownerKey, report]
+    () => ({ screen, ownerKey, report, open }),
+    [screen, ownerKey, report, open]
   )
 
   // Hydration renders exactly what the server did; globals.css decides from `data-session`.

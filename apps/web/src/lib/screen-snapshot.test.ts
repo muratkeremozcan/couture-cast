@@ -3,15 +3,21 @@
 // Story CC-7.7 D5 test owner: the per-member, memory-only tab snapshot.
 // Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md
 // (7.7-UNIT-010 to 7.7-UNIT-012). The Playwright side is 7.7-E2E-008 and 7.7-E2E-009.
+// Codex review of 8327b4fb: 7.7-UNIT-014 pins the session scope (P2-1), 7.7-UNIT-015 the
+// revocation when Community access is lost (P3-1).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 import type * as WebSession from './web-session'
 import {
+  COMMUNITY_GRID_SNAPSHOT_PART,
+  COMMUNITY_SNAPSHOT_PARTS,
   createScreenSnapshotStore,
+  HOME_TEASER_SNAPSHOT_PART,
   SCREEN_SNAPSHOT_CAP,
   screenSnapshot,
   type ScreenName,
 } from './screen-snapshot'
+import { currentWebSessionScope, UNVERIFIED_BEARER_OWNER } from './use-web-session'
 
 const session = vi.hoisted(() => ({ identity: null as string | null }))
 
@@ -84,12 +90,14 @@ describe('screen snapshot', () => {
     expect(screenSnapshot.recall('member-b', 'home', 'ritual')).toBeUndefined()
     expect(screenSnapshot.isSettled('member-b', 'home')).toBe(false)
 
-    // A token refresh for the same member names a new bearer: the snapshot was taken under the
-    // old one, so it goes too (fixture bearers all map to one owner).
+    // A token refresh names a new bearer for the same verified member: their scope is their
+    // owner, so the snapshot stays (Codex review P2-1).
     publish('member-a', 'bearer-a2')
-    expect(screenSnapshot.recall('member-a', 'home', 'ritual')).toBeUndefined()
+    expect(screenSnapshot.recall('member-a', 'home', 'ritual')).toEqual({
+      outfit: 'a-home',
+    })
+    expect(screenSnapshot.isSettled('member-a', 'home')).toBe(true)
 
-    screenSnapshot.remember('member-a', 'home', 'ritual', { outfit: 'a-home' })
     publish('member-b', 'bearer-b')
     expect(screenSnapshot.size()).toBe(0)
     expect(screenSnapshot.recall('member-a', 'home', 'ritual')).toBeUndefined()
@@ -102,16 +110,98 @@ describe('screen snapshot', () => {
   })
 
   it('7.7-UNIT-011 one owner with two bearers never shares a snapshot (E2E fixture members)', () => {
-    let bearer = 'test-token-a'
-    const store = createScreenSnapshotStore(() => bearer)
-    store.remember('bearer', 'home', 'ritual', { outfit: 'fixture-a' })
-    store.markSettled('bearer', 'home')
+    const fixtureA = `${UNVERIFIED_BEARER_OWNER}\u0000test-token-a`
+    const fixtureB = `${UNVERIFIED_BEARER_OWNER}\u0000test-token-b`
+    let live = fixtureA
+    const store = createScreenSnapshotStore(() => live)
+    store.remember(fixtureA, 'home', 'ritual', { outfit: 'fixture-a' })
+    store.markSettled(fixtureA, 'home')
 
-    bearer = 'test-token-b'
-    expect(store.recall('bearer', 'home', 'ritual')).toBeUndefined()
-    expect(store.isSettled('bearer', 'home')).toBe(false)
-    store.follow('bearer')
+    live = fixtureB
+    expect(store.recall(fixtureA, 'home', 'ritual')).toBeUndefined()
+    expect(store.recall(fixtureB, 'home', 'ritual')).toBeUndefined()
+    expect(store.isSettled(fixtureB, 'home')).toBe(false)
+    store.follow()
     expect(store.size()).toBe(0)
+  })
+
+  it('7.7-UNIT-014 the session scope is the verified owner, or the fixture owner with its bearer', () => {
+    // A verified member: the owner alone, whatever bearer the tab holds now.
+    expect(currentWebSessionScope()).toBe('member-a')
+    publish('member-a', 'bearer-a2')
+    expect(currentWebSessionScope()).toBe('member-a')
+
+    // The e2e fixture: one owner for every bearer, so the bearer is part of the scope.
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    publish(null, 'test-token-a')
+    const fixtureA = currentWebSessionScope()
+    publish(null, 'test-token-b')
+    const fixtureB = currentWebSessionScope()
+    vi.unstubAllEnvs()
+
+    expect(fixtureA).toBe(`${UNVERIFIED_BEARER_OWNER}\u0000test-token-a`)
+    expect(fixtureB).toBe(`${UNVERIFIED_BEARER_OWNER}\u0000test-token-b`)
+  })
+
+  it('7.7-UNIT-014 a write captured under a scope that is no longer live is dropped', () => {
+    const fixtureA = `${UNVERIFIED_BEARER_OWNER}\u0000test-token-a`
+    const fixtureB = `${UNVERIFIED_BEARER_OWNER}\u0000test-token-b`
+    let live = fixtureA
+    const store = createScreenSnapshotStore(() => live)
+    store.remember(fixtureA, 'closet', 'closet', { garments: ['a-coat'] })
+
+    // Fixture B is live now; a closet read fixture A started lands late.
+    live = fixtureB
+    store.remember(fixtureA, 'closet', 'closet', { garments: ['a-coat', 'a-scarf'] })
+    store.markSettled(fixtureA, 'closet')
+    store.rememberScroll(fixtureA, 'closet', 300)
+
+    expect(store.recall(fixtureB, 'closet', 'closet')).toBeUndefined()
+    expect(store.isSettled(fixtureB, 'closet')).toBe(false)
+    expect(store.recallScroll(fixtureB, 'closet')).toBeUndefined()
+    // A write nobody captured a scope for is dropped too.
+    store.remember(null, 'closet', 'closet', { garments: [] })
+    expect(store.recall(fixtureB, 'closet', 'closet')).toBeUndefined()
+
+    // B's own read is kept.
+    store.remember(fixtureB, 'closet', 'closet', { garments: ['b-boots'] })
+    expect(store.recall(fixtureB, 'closet', 'closet')).toEqual({ garments: ['b-boots'] })
+  })
+
+  it('7.7-UNIT-015 losing Community access drops its parts, fences pending writes, and a read with access allows them again', () => {
+    screenSnapshot.remember('member-a', 'home', 'ritual', { outfit: 'a-home' })
+    screenSnapshot.remember('member-a', 'home', COMMUNITY_GRID_SNAPSHOT_PART, { rows: 3 })
+    screenSnapshot.remember('member-a', 'home', HOME_TEASER_SNAPSHOT_PART, { teaser: 1 })
+    screenSnapshot.remember('member-a', 'community', COMMUNITY_GRID_SNAPSHOT_PART, {
+      rows: 5,
+    })
+    screenSnapshot.markSettled('member-a', 'community')
+    screenSnapshot.markSettled('member-a', 'home')
+
+    screenSnapshot.revoke(COMMUNITY_SNAPSHOT_PARTS, ['community'])
+
+    for (const tab of ['home', 'community'] as const)
+      for (const part of COMMUNITY_SNAPSHOT_PARTS)
+        expect(screenSnapshot.recall('member-a', tab, part)).toBeUndefined()
+    // The rest of Home stays; a Community return waits for its reads again.
+    expect(screenSnapshot.recall('member-a', 'home', 'ritual')).toEqual({
+      outfit: 'a-home',
+    })
+    expect(screenSnapshot.isSettled('member-a', 'home')).toBe(true)
+    expect(screenSnapshot.isSettled('member-a', 'community')).toBe(false)
+
+    // A teaser read started before the loss answers now: it is not kept.
+    screenSnapshot.remember('member-a', 'home', HOME_TEASER_SNAPSHOT_PART, { teaser: 2 })
+    expect(
+      screenSnapshot.recall('member-a', 'home', HOME_TEASER_SNAPSHOT_PART)
+    ).toBeUndefined()
+
+    // A feed read that answered with access allows the parts again.
+    screenSnapshot.allow(COMMUNITY_SNAPSHOT_PARTS)
+    screenSnapshot.remember('member-a', 'home', HOME_TEASER_SNAPSHOT_PART, { teaser: 3 })
+    expect(screenSnapshot.recall('member-a', 'home', HOME_TEASER_SNAPSHOT_PART)).toEqual({
+      teaser: 3,
+    })
   })
 
   it('7.7-UNIT-012 never writes to localStorage or sessionStorage', () => {
@@ -123,7 +213,9 @@ describe('screen snapshot', () => {
       screenSnapshot.recall('member-a', tab, 'data')
       screenSnapshot.recallScroll('member-a', tab)
     }
-    screenSnapshot.follow('member-a')
+    screenSnapshot.follow()
+    screenSnapshot.revoke(COMMUNITY_SNAPSHOT_PARTS, ['community'])
+    screenSnapshot.allow(COMMUNITY_SNAPSHOT_PARTS)
     screenSnapshot.clear()
 
     expect(setItem).not.toHaveBeenCalled()

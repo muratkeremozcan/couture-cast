@@ -52,7 +52,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead } from './screen-gate'
+import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 
@@ -414,9 +414,22 @@ function MemberSubscriptionSection({
 }) {
   const { t } = useTranslation()
   const { status, owner } = session
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [access, setAccess] = useState<PremiumAccess | null>(null)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's plan at once and
+  // reads it again in place; a failed refresh keeps it.
+  const snapshot = useSectionSnapshot<{
+    subscription: Subscription
+    access: PremiumAccess | null
+  }>('subscription', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [subscription, setSubscription] = useState<Subscription | null>(
+    () => snapshot.restored?.subscription ?? null
+  )
+  const [access, setAccess] = useState<PremiumAccess | null>(
+    () => snapshot.restored?.access ?? null
+  )
   const [activationState, setActivationState] = useState<ActivationState>('idle')
   const [showPortalLagHint, setShowPortalLagHint] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -511,7 +524,9 @@ function MemberSubscriptionSection({
 
     const isPortalReturn = billingReturn === 'portal'
     const isDenial = (error: unknown) => premiumFailureReason(error) === 'signed_out'
-    setSectionState('loading')
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    beginRead()
+    if (!inPlace) setSectionState('loading')
     setShowPortalLagHint(isPortalReturn)
 
     void (async () => {
@@ -568,6 +583,8 @@ function MemberSubscriptionSection({
           setSectionState('signed_out')
           return
         }
+        // A restored plan stays on screen when its refresh fails.
+        if (inPlace) return
         // `status_unavailable` (the 503 ledger pull) and `unknown` both render
         // `errorLoad`, so no reason lookup is needed here — which is what keeps
         // `t` out of this effect and the dependency array down to one value.
@@ -577,7 +594,15 @@ function MemberSubscriptionSection({
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage, claimBillingReturn])
+  }, [status, owner, loadErrorMessage, claimBillingReturn, restoredFor, beginRead])
+
+  // What a return to Profile shows first: the plan once read, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready' && subscription !== null)
+      remember({ subscription, access })
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [access, remember, sectionState, subscription])
 
   /**
    * Turns a rejection into localized copy, or into the signed-out state.

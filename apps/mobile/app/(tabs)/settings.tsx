@@ -1,7 +1,14 @@
 // Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -53,6 +60,7 @@ import {
   PREMIUM_THEME_KEYS,
 } from '@/src/lib/premium-theme'
 import {
+  mobileApplicationUserId,
   resolveMobileAccessToken,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
@@ -148,6 +156,26 @@ function useMemberSignedIn(): boolean | null {
   return signedIn
 }
 
+/**
+ * Story CC-7.7 D5: how many times the member came back to Profile. Tabs stay mounted, so a
+ * return is a focus, never a mount; each one re-reads the sections in place. The first focus
+ * is the mount, whose reads are already running, and counts as zero.
+ */
+function useReturnFocusCount(): number {
+  const [returns, setReturns] = useState(0)
+  const leftRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (leftRef.current) setReturns((count) => count + 1)
+      leftRef.current = false
+      return () => {
+        leftRef.current = true
+      }
+    }, [])
+  )
+  return returns
+}
+
 export default function SettingsScreen() {
   const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
@@ -173,15 +201,21 @@ export default function SettingsScreen() {
   >(null)
   const commerceChangeInFlight = useRef(false)
   const signedIn = useMemberSignedIn()
-  // Story CC-7.7 D3 (amended): the Profile gate waits for the shopping preference, the
-  // subscription and the palette reads, so no section lands late above another.
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  const returns = useReturnFocusCount()
+  // Story CC-7.7 D3 (amended): the Profile gate waits for the account header, the shopping
+  // preference, the subscription with its store availability, and the palette read, so no
+  // section lands late above another.
   const [gateSession] = useMemberSessionState()
+  const [accountSettled, setAccountSettled] = useState(false)
   const [premiumSettled, setPremiumSettled] = useState(false)
   const themeSettled = useAppThemeSettled()
   const commerceSettled = affiliateCtasEnabled !== null || commerceError !== null
   const profileGateReady = profileGateSettled({
     session: gateSession,
     signedIn,
+    accountSettled,
     commerceSettled,
     premiumSettled,
     themeSettled,
@@ -225,6 +259,24 @@ export default function SettingsScreen() {
 
     return () => controller.abort()
   }, [signedIn])
+
+  // Story CC-7.7 D5: a return re-reads the preference in place. The switch keeps its state
+  // until the answer lands; a failed re-read leaves it as it was, and a toggle in flight wins.
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || commerceChangeInFlight.current)
+      return
+    const controller = new AbortController()
+    void getCommercePreferenceFromMobile(controller.signal)
+      .then((preference) => {
+        if (controller.signal.aborted || commerceChangeInFlight.current) return
+        setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+        setCommerceError((current) =>
+          current === 'commerce.settings.loadError' ? null : current
+        )
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
 
   const handleAffiliateCtasToggle = async () => {
     if (commerceChangeInFlight.current || affiliateCtasEnabled === null) {
@@ -427,7 +479,11 @@ export default function SettingsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container} testID="settings-screen">
-            <ProfileAccountHeader signedIn={signedIn} />
+            <ProfileAccountHeader
+              signedIn={signedIn}
+              returns={returns}
+              onSettledChange={setAccountSettled}
+            />
             <View style={styles.settingsSection}>
               <Text style={styles.sectionTitle} testID="settings-language-title">
                 {t('settings.language', { defaultValue: 'Language' })}
@@ -572,10 +628,11 @@ export default function SettingsScreen() {
             </Pressable>
             <PremiumSettingsSection
               signedIn={signedIn}
+              returns={returns}
               onSettledChange={setPremiumSettled}
             />
 
-            <PremiumThemeSection />
+            <PremiumThemeSection returns={returns} />
 
             <PaletteAdvisorLinkRow />
 
@@ -732,27 +789,45 @@ function useReportSettled(
 export function profileGateSettled({
   session,
   signedIn,
+  accountSettled,
   commerceSettled,
   premiumSettled,
   themeSettled,
 }: {
   session: ReturnType<typeof useMemberSessionState>[0]
   signedIn: boolean | null
+  /** The account header's profile read, the first section on screen. */
+  accountSettled: boolean
   commerceSettled: boolean
+  /** The subscription, premium access and, for a store purchaser, store availability. */
   premiumSettled: boolean
+  /** The palette read for the member on screen, not an earlier one. */
   themeSettled: boolean
 }): boolean {
   // An unverifiable session has nothing more to wait for; the sections show their own states.
   if (session === 'unavailable' || signedIn === false) return true
-  return signedIn === true && commerceSettled && premiumSettled && themeSettled
+  return (
+    signedIn === true &&
+    accountSettled &&
+    commerceSettled &&
+    premiumSettled &&
+    themeSettled
+  )
 }
 
 function PremiumSettingsSection({
   signedIn,
+  returns = 0,
   onSettledChange,
 }: {
   signedIn: boolean | null
-  /** Story CC-7.7: reports once the subscription and access reads settled. */
+  /** Story CC-7.7 D5: returns to Profile; each re-reads the subscription in place. */
+  returns?: number
+  /**
+   * Story CC-7.7: reports once the subscription and access reads settled and, unless the access
+   * is complimentary, the store answered whether purchases are available: the subscribe
+   * controls or the unavailable note appear with the section, never after it.
+   */
   onSettledChange?: (settled: boolean) => void
 }) {
   const tone = useSettingsTone()
@@ -770,6 +845,7 @@ function PremiumSettingsSection({
   // the unavailable fallback after would flash a control that cannot work.
   const [purchasesAvailability, setPurchasesAvailability] =
     useState<PurchasesAvailability | null>(null)
+  const [purchasesSettled, setPurchasesSettled] = useState(false)
   const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
   const premiumFlowInFlight = useRef(false)
   const premiumPollAbortRef = useRef<AbortController | null>(null)
@@ -782,9 +858,11 @@ function PremiumSettingsSection({
       // Story 6.14: the next account must never inherit this one's access answer.
       setPremiumAccess(null)
       setAccessSettled(false)
+      setPurchasesSettled(false)
       return
     }
     const controller = new AbortController()
+    setPurchasesSettled(false)
 
     void getSubscriptionFromMobile(controller.signal)
       .then((current) => {
@@ -812,10 +890,17 @@ function PremiumSettingsSection({
         if (controller.signal.aborted) return
         setPremiumAccess(access)
         setAccessSettled(true)
-        if (isComplimentaryAccess(access)) return
-        const availability = await ensurePurchasesConfigured()
-        if (!controller.signal.aborted) {
-          setPurchasesAvailability(availability)
+        if (isComplimentaryAccess(access)) {
+          setPurchasesSettled(true)
+          return
+        }
+        try {
+          const availability = await ensurePurchasesConfigured()
+          if (!controller.signal.aborted) {
+            setPurchasesAvailability(availability)
+          }
+        } finally {
+          if (!controller.signal.aborted) setPurchasesSettled(true)
         }
       })
 
@@ -825,7 +910,34 @@ function PremiumSettingsSection({
     }
   }, [signedIn])
 
-  useReportSettled([subscriptionSettled, accessSettled], onSettledChange)
+  useReportSettled(
+    [subscriptionSettled, accessSettled, purchasesSettled],
+    onSettledChange
+  )
+
+  // Story CC-7.7 D5: a return re-reads the subscription and the access source in place. The
+  // section keeps what it shows until an answer lands; a failed re-read changes nothing, and a
+  // store round trip in flight owns the section until it ends.
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || premiumFlowInFlight.current)
+      return
+    const controller = new AbortController()
+    void getSubscriptionFromMobile(controller.signal)
+      .then((current) => {
+        if (controller.signal.aborted || premiumFlowInFlight.current) return
+        setSubscription(current)
+        setSubscriptionLoadFailed(false)
+      })
+      .catch(() => undefined)
+    void getPremiumAccessFromMobile(controller.signal)
+      .then((access) => {
+        if (!controller.signal.aborted && access) setPremiumAccess(access)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
 
   /**
    * Success-outcome follow-up only: refresh beats webhook latency, then the
@@ -1253,7 +1365,7 @@ function usePaletteNameList(): string {
  * this calls `refresh()` on entry, so opening settings costs one round trip and
  * the applied palette is the same fact here as everywhere else in the app.
  */
-function PremiumThemeSection() {
+function PremiumThemeSection({ returns = 0 }: { returns?: number }) {
   const tone = useSettingsTone()
   const { t } = useTranslation()
   const {
@@ -1278,14 +1390,21 @@ function PremiumThemeSection() {
    */
   const saveControllerRef = useRef<AbortController | null>(null)
 
+  // Story CC-7.7 D3: the member the palette is read for. A sign-in or an account switch with
+  // Profile mounted reads it again, so the Profile gate never opens on another member's answer.
+  const owner = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
   useEffect(() => {
     // Entering settings re-reads the preference. The provider's own read happens
     // once at app launch, and entitlement or the kill switch can have changed in
-    // the hours since. `refresh` is a stable callback, so this runs on entry
-    // rather than on every render.
+    // the hours since. `refresh` is a stable callback, so this runs on entry, on a
+    // member change and on each return to the tab (CC-7.7 D5), never on every render.
     void refresh()
-    return () => saveControllerRef.current?.abort()
-  }, [refresh])
+  }, [refresh, owner, returns])
+  useEffect(() => () => saveControllerRef.current?.abort(), [])
 
   const showGallery = status === 'ready' && isEntitled
   const showLocked = status === 'signed-out' || (status === 'ready' && !isEntitled)
@@ -1586,13 +1705,28 @@ function PaletteAdvisorLinkRow() {
  * under it; otherwise the email alone. Signed out, or until the profile answers,
  * it renders nothing, and a failed read leaves the rest of the screen as it was.
  */
-function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
+function ProfileAccountHeader({
+  signedIn,
+  returns = 0,
+  onSettledChange,
+}: {
+  signedIn: boolean | null
+  /** Story CC-7.7 D5: returns to Profile; each re-reads the profile in place. */
+  returns?: number
+  /** Story CC-7.7 D3: reports once the profile read settled (success or failure). */
+  onSettledChange?: (settled: boolean) => void
+}) {
   const { t } = useTranslation()
   const tone = useSettingsTone()
   const [account, setAccount] = useState<{
     displayName: string | null
     email: string
   } | null>(null)
+  // Signed out there is nothing to read, so nothing to wait for.
+  const [readSettled, setReadSettled] = useState(false)
+  useReportSettled([signedIn === false || readSettled], onSettledChange)
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
   // An account switch keeps `signedIn` true, so the application user is followed too.
   const [userGeneration, setUserGeneration] = useState(0)
 
@@ -1603,7 +1737,29 @@ function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
 
   useEffect(() => {
     setAccount(null)
+    setReadSettled(false)
     if (signedIn !== true) return
+    let active = true
+    void Promise.resolve()
+      .then(() => getUserProfileFromMobile())
+      .then((profile) => {
+        if (!active || !profile) return
+        const displayName = profile.user.displayName?.trim() || null
+        setAccount({ displayName, email: profile.user.email })
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setReadSettled(true)
+      })
+    return () => {
+      active = false
+    }
+  }, [signedIn, userGeneration])
+
+  // Story CC-7.7 D5: a return re-reads the profile with the header still on screen; a failed
+  // re-read keeps it as it was.
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true) return
     let active = true
     void Promise.resolve()
       .then(() => getUserProfileFromMobile())
@@ -1616,7 +1772,7 @@ function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
     return () => {
       active = false
     }
-  }, [signedIn, userGeneration])
+  }, [returns])
 
   if (!account) return null
   return (

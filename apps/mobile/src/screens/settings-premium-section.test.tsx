@@ -21,7 +21,11 @@ import type * as PremiumModule from '../lib/premium'
  * stub it. Navigation itself is not what these suites are about; the row's own
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],

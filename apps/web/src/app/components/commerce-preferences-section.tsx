@@ -11,7 +11,7 @@
 // a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   getCommercePreferenceFromWeb,
@@ -27,7 +27,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead } from './screen-gate'
+import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
 const HELP_ID = 'commerce-affiliate-ctas-help'
@@ -64,8 +64,14 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     markFailed: markRecheckFailed,
     clear: clearRecheck,
   } = recheck
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [enabled, setEnabled] = useState(true)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's setting at once
+  // and reads it again in place; a failed refresh keeps it.
+  const snapshot = useSectionSnapshot<{ enabled: boolean }>('commerce', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [enabled, setEnabled] = useState(() => snapshot.restored?.enabled ?? true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -115,8 +121,10 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    beginRead()
     setError(null)
-    setSectionState('loading')
+    if (!inPlace) setSectionState('loading')
 
     void (async () => {
       try {
@@ -150,6 +158,8 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
           setSectionState('signed_out')
           return
         }
+        // A restored setting stays on screen when its refresh fails.
+        if (inPlace) return
         /*
          * The catalog string, unconditionally — the server's own message is
          * deliberately NOT shown.
@@ -169,7 +179,23 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage, loadAttempt, clearRecheck, markRecheckFailed])
+  }, [
+    status,
+    owner,
+    loadErrorMessage,
+    loadAttempt,
+    clearRecheck,
+    markRecheckFailed,
+    restoredFor,
+    beginRead,
+  ])
+
+  // What a return to Profile shows first: the setting once read, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready') remember({ enabled })
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [enabled, remember, sectionState])
 
   /**
    * Optimistic, and reverted on failure.

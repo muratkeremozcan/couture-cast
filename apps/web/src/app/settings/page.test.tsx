@@ -6,7 +6,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Learning path Step 58: Production follow-ups after the project close.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
+// Learning path Step 65: Signed-in shell without flashes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
+// Story CC-7.7 (Codex review of 8327b4fb): 7.7-CMP-010 pins the prerendered Locations chrome
+// (P2-3) and 7.7-CMP-011 the Profile return from its snapshot (P1-2).
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
 // shape, the bearer header, and the contract parsing are all exercised by the
@@ -14,18 +18,32 @@
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { activateBrowserLocale, getI18n } from '../../i18n'
 import deDE from '../../i18n/locales/de-DE.json'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { screenSnapshot } from '../../lib/screen-snapshot'
+import { currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import SettingsPage from './page'
 
-vi.mock('next/navigation', () => ({
-  usePathname: () => '/settings',
-  useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
-}))
+const navigation = vi.hoisted(() => ({ prerendering: false }))
+
+vi.mock('next/navigation', async () => {
+  const { use } = await import('react')
+  const unanswered = new Promise<never>(() => undefined)
+  return {
+    usePathname: () => '/settings',
+    useRouter: () => ({ push: vi.fn() }),
+    useSearchParams: () => {
+      // A statically rendered page bails out of search params during prerender: the reader
+      // suspends until the client renders it.
+      if (navigation.prerendering) use(unanswered)
+      return new URLSearchParams()
+    },
+  }
+})
 vi.mock('posthog-js', () => ({
   default: { capture: vi.fn() },
 }))
@@ -203,6 +221,8 @@ describe('Web settings page', () => {
   afterEach(async () => {
     vi.unstubAllEnvs()
     window.sessionStorage.clear()
+    // Story CC-7.7: Profile's snapshot lives in module memory; each test starts without one.
+    screenSnapshot.clear()
     await getI18n().changeLanguage('en-US')
   })
 
@@ -614,5 +634,129 @@ describe('Web settings page', () => {
     await screen.findByTestId('locations-signed-out')
     expect(screen.queryByTestId('profile-account')).toBeNull()
     expect(asked).not.toHaveBeenCalled()
+  })
+})
+
+describe('7.7 Profile without flashes', () => {
+  afterEach(() => {
+    navigation.prerendering = false
+    vi.unstubAllEnvs()
+    window.sessionStorage.clear()
+    document.documentElement.removeAttribute('data-session')
+    screenSnapshot.clear()
+    vi.restoreAllMocks()
+  })
+
+  it('7.7-CMP-010 a prerendered signed-out Profile already holds the Locations section above Shopping (Codex review P2-3)', () => {
+    navigation.prerendering = true
+
+    const html = renderToString(<SettingsPage />)
+
+    // Only the guided-entry query waits for the client: the section's chrome and its signed-out
+    // hint are in the first HTML, so nothing is inserted above Shopping when the page hydrates.
+    const locations = html.indexOf('data-testid="locations-section"')
+    expect(locations).toBeGreaterThan(-1)
+    expect(html).toContain('data-testid="locations-signed-out"')
+    expect(locations).toBeLessThan(
+      html.indexOf('data-testid="commerce-preferences-section"')
+    )
+  })
+
+  it('7.7-CMP-011 a return to Profile shows every section from its snapshot in the first frame, at its scroll, while the reads refresh (Codex review P1-2)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    let held = false
+    const never = new Promise<never>(() => undefined)
+    const answered = (body: Parameters<typeof HttpResponse.json>[0]) => async () => {
+      if (held) await never
+      return HttpResponse.json(body)
+    }
+    const savedHome = {
+      id: 'loc-1',
+      label: 'Home',
+      locationKey: 'chicago-illinois-us-41-878n-87-630w',
+      latitude: 41.878,
+      longitude: -87.63,
+      timezone: 'America/Chicago',
+      city: 'Chicago',
+      region: 'Illinois',
+      country: 'US',
+      isPrimary: true,
+      sortOrder: 0,
+      createdAt: '2026-10-22T12:00:00.000Z',
+      updatedAt: '2026-10-22T12:00:00.000Z',
+    }
+    useMswHandlers(
+      http.get(
+        PROFILE_PATH,
+        answered({
+          user: {
+            id: 'member-1',
+            birthdate: null,
+            role: 'guardian',
+            displayName: 'Jade Rivers',
+            email: 'jade@example.test',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      ),
+      http.get('/api/v1/locations', answered({ data: [savedHome] })),
+      http.get(PREFERENCES_PATH, answered({ data: { affiliateCtasEnabled: false } })),
+      http.get(
+        SUBSCRIPTION_PATH,
+        answered({
+          data: {
+            status: 'none',
+            store: null,
+            productId: null,
+            willRenew: null,
+            currentPeriodEnd: null,
+            syncedAt: null,
+            purchasesEnabled: true,
+          },
+        })
+      ),
+      // The access read rides beside the subscription and never holds the section.
+      http.get('/api/v1/commerce/premium/access', () => HttpResponse.error()),
+      http.get(
+        THEME_PATH,
+        answered({ data: { theme: null, isEntitled: false, themesEnabled: true } })
+      )
+    )
+
+    // First visit: every read answers and the gate opens.
+    const firstVisit = render(<SettingsPage />)
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
+      'jade@example.test'
+    )
+    await waitFor(() => expect(toggle()).toBeEnabled())
+    expect(screen.getByTestId('premium-status-line')).toBeVisible()
+    screenSnapshot.rememberScroll(currentWebSessionScope(), 'profile', 640)
+    firstVisit.unmount()
+
+    // The return: every read is held, so whatever shows came from the snapshot.
+    held = true
+    const restoredAt: string[] = []
+    vi.spyOn(window, 'scrollTo').mockImplementation(((x: number, y: number) => {
+      // The body is already there when the scroll is restored, so the offset is not clamped.
+      const email = document.querySelector('[data-testid="profile-account-email"]')
+      restoredAt.push(`${x},${y}:${email?.textContent ?? 'empty'}`)
+    }) as typeof window.scrollTo)
+    render(<SettingsPage />)
+
+    expect(restoredAt).toEqual(['0,640:jade@example.test'])
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+    expect(screen.getByTestId('profile-account-name')).toHaveTextContent('Jade Rivers')
+    expect(screen.getByTestId('locations-section')).toHaveAttribute('data-state', 'ready')
+    expect(screen.getByTestId('location-item-label')).toHaveTextContent('Home')
+    expect(toggle()).toBeEnabled()
+    expect(toggle()).not.toBeChecked()
+    expect(screen.getByTestId('premium-status-line')).toBeVisible()
+    expect(screen.getByTestId('premium-theme-locked')).toBeVisible()
   })
 })

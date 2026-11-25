@@ -247,6 +247,11 @@ export function LookbookPrismLayout() {
     undefined
   )
   const [liveAnnouncement, setLiveAnnouncement] = useState<string | null>(null)
+  // Story CC-7.7 D4: an invalid-link banner or a focused weather alert lands above the prism
+  // grid when the deep link resolves, which can take a network read. Home's gate waits for it,
+  // so neither moves the grid after the body appeared.
+  const [deepLinkSettled, setDeepLinkSettled] = useState(false)
+  useScreenGateRead('deeplink', deepLinkSettled)
 
   const heroRecommendation = HERO_RECOMMENDATIONS[chipCategory]
 
@@ -305,9 +310,12 @@ export function LookbookPrismLayout() {
         setHighlightedCardId,
         setLiveAnnouncement,
         setIsInvalidDeepLink,
-      }).catch(() => setIsInvalidDeepLink(true))
+      })
+        .catch(() => setIsInvalidDeepLink(true))
+        .finally(() => setDeepLinkSettled(true))
     } catch {
       setIsInvalidDeepLink(true)
+      setDeepLinkSettled(true)
     }
   }, [])
 

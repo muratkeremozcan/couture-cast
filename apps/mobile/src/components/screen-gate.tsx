@@ -15,6 +15,13 @@ import {
 
 export type GatedScreen = 'home' | 'closet' | 'community' | 'profile'
 
+/**
+ * Story CC-7.7 (review triage P2-2, as on web): a gate whose reads have not all settled opens
+ * after this long anyway, so one stalled read never hides the sections that answered or their
+ * Retry.
+ */
+export const SCREEN_GATE_DEADLINE_MS = 10_000
+
 export interface ScreenGateProps {
   screen: GatedScreen
   /**
@@ -44,9 +51,10 @@ export function screenGateSettled(session: MemberSessionState, ready: boolean): 
 
 /**
  * Children mount at once, so their reads start beside the placeholder, but they take no
- * layout until the gate opens. Once open for a member the gate stays open (a refresh never
- * closes it again); a different member, or a session restoring again, closes it until the new
- * reads settle, so one member never sees another's content.
+ * layout until the gate opens: when the reads settle, or {@link SCREEN_GATE_DEADLINE_MS} after
+ * it started waiting. Once open for a member the gate stays open (a refresh never closes it
+ * again); a different member, or a session restoring again, closes it until the new reads
+ * settle, so one member never sees another's content.
  */
 export function ScreenGate(props: ScreenGateProps) {
   return props.session === undefined ? (
@@ -85,6 +93,13 @@ function GateFrame({
     if (settled) setOpenedFor(owner)
     else if (current === 'restoring') setOpenedFor(undefined)
   }, [current, owner, settled])
+
+  // The deadline counts from the moment the gate waits on this member's reads.
+  useEffect(() => {
+    if (open || current === 'restoring') return
+    const timer = setTimeout(() => setOpenedFor(owner), SCREEN_GATE_DEADLINE_MS)
+    return () => clearTimeout(timer)
+  }, [current, open, owner])
 
   return (
     <View

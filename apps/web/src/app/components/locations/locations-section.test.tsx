@@ -9,14 +9,17 @@ import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useState } from 'react'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type {
   LocationSearchCandidate,
   SavedLocation,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/wardrobe'
+import { screenSnapshot } from '../../../lib/screen-snapshot'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
+import { ScreenGate, useScreenGateRead } from '../screen-gate'
 import { LocationsSection } from './locations-section'
 
 const push = vi.fn()
@@ -532,6 +535,50 @@ describe('LocationsSection', () => {
     await user.click(await screen.findByRole('button', { name: 'Save location' }))
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/'))
+  })
+
+  // Story CC-7.7, Codex review of 8327b4fb P2-8: the form mounts under Profile's gate while
+  // another section's read is out; focus there would be lost and the guided intent spent.
+  it('7.7-CMP-009 the guided autofocus waits for the Profile gate to open, then lands on search', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    onTestFinished(() => {
+      document.documentElement.removeAttribute('data-session')
+      screenSnapshot.clear()
+    })
+    searchParams = new URLSearchParams('addLocation=1&returnTo=%2F')
+    useMswHandlers(http.get('/api/v1/locations', () => HttpResponse.json({ data: [] })))
+    let answerTheme: () => void = () => undefined
+    /** Another Profile section whose read the gate also waits for. */
+    function ThemeRead() {
+      const [settled, setSettled] = useState(false)
+      answerTheme = () => act(() => setSettled(true))
+      useScreenGateRead('theme', settled)
+      return null
+    }
+    render(
+      <I18nextProvider i18n={getI18n()}>
+        <main>
+          <ScreenGate screen="profile" reads={['locations', 'theme']}>
+            <LocationsSection />
+            <ThemeRead />
+          </ScreenGate>
+        </main>
+      </I18nextProvider>
+    )
+
+    // The list answered and the form mounted, still under the placeholder: no focus yet.
+    const input = await screen.findByRole('combobox', {
+      name: 'Search for a city',
+      hidden: true,
+    })
+    expect(input).not.toBeVisible()
+    expect(input).not.toHaveFocus()
+
+    answerTheme()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(screen.getByTestId('locations-guided-cancel')).toBeVisible()
   })
 
   it('finds a city that was saved before the response failed and returns to Planner on retry', async () => {

@@ -75,13 +75,17 @@ import {
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import {
-  isLiveOwner,
+  currentWebSessionScope,
   useHydrating,
   useMemberSession,
-  useWebSessionOwner,
+  useWebSessionScope,
 } from '../../lib/use-web-session'
-import { screenSnapshot } from '../../lib/screen-snapshot'
-import { useScreenGateRead, useScreenGateScreen } from './screen-gate'
+import {
+  COMMUNITY_GRID_SNAPSHOT_PART,
+  COMMUNITY_SNAPSHOT_PARTS,
+  screenSnapshot,
+} from '../../lib/screen-snapshot'
+import { useScreenGateOpen, useScreenGateRead, useScreenGateScreen } from './screen-gate'
 import { SessionRetryButton } from './session-retry-button'
 import { CommunityPostTextEditor } from './community-post-text-editor'
 import {
@@ -2474,8 +2478,6 @@ type CommunityGridSnapshot = {
   spotlight: CommunitySpotlightState
 }
 
-const GRID_SNAPSHOT_PART = 'community-grid'
-
 /** Where a mount with no matching snapshot starts. */
 const EMPTY_GRID_START: Omit<CommunityGridSnapshot, 'mode' | 'scope' | 'spotlight'> = {
   items: [],
@@ -2491,29 +2493,75 @@ const EMPTY_GRID_START: Omit<CommunityGridSnapshot, 'mode' | 'scope' | 'spotligh
 
 /**
  * Where a mount starts: the snapshot of this tab for this member when it matches the mount's
- * filter and session identity, else nothing loaded.
+ * session identity, else nothing loaded. A grid that owns its filter (the Community tab, no
+ * `onTabChange`) restores the filter the member last chose with its rows (Codex review P2-5);
+ * a grid whose filter its parent holds (Home) restores only a snapshot of the parent's filter.
  */
 function useGridStart(
   activeTab: FilterCategory,
-  initialScope: string | null
+  initialScope: string | null,
+  ownsFilter: boolean
 ): {
   restored: boolean
+  mode: FilterCategory
   start: typeof EMPTY_GRID_START
   spotlight: CommunitySpotlightState | undefined
 } {
   const screen = useScreenGateScreen()
-  const owner = useWebSessionOwner()
   const [start] = useState(() => {
-    const stored =
-      screen && owner
-        ? screenSnapshot.recall<CommunityGridSnapshot>(owner, screen, GRID_SNAPSHOT_PART)
-        : undefined
-    const matches = stored?.mode === activeTab && stored.scope === initialScope
+    const stored = screen
+      ? screenSnapshot.recall<CommunityGridSnapshot>(
+          currentWebSessionScope(),
+          screen,
+          COMMUNITY_GRID_SNAPSHOT_PART
+        )
+      : undefined
+    const matches =
+      stored !== undefined &&
+      stored.scope === initialScope &&
+      (ownsFilter || stored.mode === activeTab)
     return matches
-      ? { restored: true, start: stored, spotlight: stored.spotlight }
-      : { restored: false, start: EMPTY_GRID_START, spotlight: undefined }
+      ? { restored: true, mode: stored.mode, start: stored, spotlight: stored.spotlight }
+      : {
+          restored: false,
+          mode: activeTab,
+          start: EMPTY_GRID_START,
+          spotlight: undefined,
+        }
   })
   return start
+}
+
+/** The rows a feed read leaves on screen: restored, appended to, or replaced by its page. */
+function rowsAfterRead(
+  restored: CommunityFeedItem[] | null,
+  appended: boolean,
+  current: CommunityFeedItem[],
+  page: CommunityFeedItem[]
+): CommunityFeedItem[] {
+  return restored ?? (appended ? mergeFeedPages(current, page) : page)
+}
+
+/**
+ * Codex review P2-5: a return's first page-one read refreshes the restored rows in place. Rows
+ * on that page take its answer where they are, rows it no longer holds stay (the realtime
+ * target check removes any that are gone), and posts that are new since go to the New looks
+ * buffer, so the list never shrinks or grows under the member's scroll position.
+ */
+function refreshRestoredRows<T extends CommunityFeedItem>(
+  previous: CommunityFeedItem[],
+  page: T[],
+  rowFor: (post: T, previous: CommunityFeedItem | undefined) => CommunityFeedItem
+): { rows: CommunityFeedItem[]; incoming: T[] } {
+  const pageById = new Map(page.map((post) => [post.id, post]))
+  const shown = new Set(previous.map((post) => post.id))
+  return {
+    rows: previous.map((post) => {
+      const fresh = pageById.get(post.id)
+      return fresh ? rowFor(fresh, post) : post
+    }),
+    incoming: page.filter((post) => !shown.has(post.id)),
+  }
 }
 
 /** Reports this section's two reads to a screen gate around it, once the session is known. */
@@ -2574,11 +2622,12 @@ export function CommunityLookbookGrid({
   )
   const {
     restored,
+    mode: startMode,
     start,
     spotlight: startSpotlight,
-  } = useGridStart(activeTab, initialScope)
+  } = useGridStart(activeTab, initialScope, onTabChange === undefined)
 
-  const [currentMode, setCurrentMode] = useState<FilterCategory>(activeTab)
+  const [currentMode, setCurrentMode] = useState<FilterCategory>(startMode)
   /**
    * The mode the server said it served, or `null` while the request that would
    * answer that is still in flight. Distinct from `currentMode`, which is what
@@ -2728,13 +2777,35 @@ export function CommunityLookbookGrid({
    * refresh keeps what is on screen until its answer replaces it.
    */
   const [feedSettled, setFeedSettled] = useState(restored)
+  const feedSettledRef = useRef(restored)
   /** A return to the tab refreshes its snapshot without the first load's skeleton. */
   const [restoring, setRestoring] = useState(restored)
-  /** The first page of a read (not an append) answered: the feed counts as settled. */
-  const settleFirstPage = useCallback((append: boolean) => {
-    if (append) return
+  /**
+   * The restored rows still wait for their first page-one refresh, which updates them in place
+   * (`refreshRestoredRows`). A filter change, a member change or that refresh ends it.
+   */
+  const restoringRowsRef = useRef(restored)
+  /** The feed's first answer is in (or a terminal state replaced it): the gate may open. */
+  const markFeedSettled = useCallback(() => {
+    feedSettledRef.current = true
     setFeedSettled(true)
-    setRestoring(false)
+  }, [])
+  /** The first page of a read (not an append) answered: the feed counts as settled. */
+  const settleFirstPage = useCallback(
+    (append: boolean) => {
+      if (append) return
+      markFeedSettled()
+      setRestoring(false)
+    },
+    [markFeedSettled]
+  )
+  /**
+   * Codex review P3-1: Community access was lost (a ban, a refused realtime session, or
+   * verification that lapsed). The rows and teaser kept for a return go, and a write still
+   * pending from before the loss can never put them back, until a read answers with access.
+   */
+  const revokeSnapshot = useCallback(() => {
+    screenSnapshot.revoke(COMMUNITY_SNAPSHOT_PARTS, ['community'])
   }, [])
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
@@ -2767,7 +2838,8 @@ export function CommunityLookbookGrid({
       postTextLedger.clear()
       setIsLoading(false)
       setIsLoadingMore(false)
-      setFeedSettled(true)
+      markFeedSettled()
+      revokeSnapshot()
       actionControllerRef.current?.abort()
       setBannedSanction(sanction)
       setItems([])
@@ -2787,7 +2859,7 @@ export function CommunityLookbookGrid({
       // The notice mounts with its words, which a screen reader may not hear, so the live region says it.
       setAnnouncement({ key: 'community.error.banned' })
     },
-    [postTextLedger, setAnnouncement]
+    [markFeedSettled, postTextLedger, revokeSnapshot, setAnnouncement]
   )
   /**
    * The feed's own messages. The loading message always starts a fresh list; the completion
@@ -2974,7 +3046,13 @@ export function CommunityLookbookGrid({
     itemsRef.current = items
   }, [items])
 
+  // A change of the parent's filter applies; the first run keeps the mode this mount started
+  // with, which a return restores from its snapshot (Codex review P2-5).
+  const syncedTabRef = useRef(activeTab)
   useEffect(() => {
+    if (syncedTabRef.current === activeTab) return
+    syncedTabRef.current = activeTab
+    restoringRowsRef.current = false
     setCurrentMode(activeTab)
   }, [activeTab])
 
@@ -3082,6 +3160,50 @@ export function CommunityLookbookGrid({
     [refuseSession, setAnnouncement]
   )
 
+  /** Codex review P2-5: the restored rows still wait for their page-one refresh. */
+  const restoreRefreshPending = useCallback(
+    (append: boolean) =>
+      !append && restoringRowsRef.current && itemsRef.current.length > 0,
+    []
+  )
+
+  /**
+   * Codex review P2-5: commits a return's page-one refresh in place (`refreshRestoredRows`):
+   * the restored rows take this page's answer where they are, and posts new since go to the
+   * New looks buffer. Returns the rows now shown, or null when this read is not that refresh.
+   */
+  const commitRestoredRefresh = useCallback(
+    (
+      inPlace: boolean,
+      page: CommunityFeedItem[],
+      live: <T extends CommunityFeedItem>(post: T) => T,
+      textStamp: Parameters<typeof postTextLedger.reconcile>[1]
+    ): CommunityFeedItem[] | null => {
+      if (!inPlace) return null
+      const { rows, incoming } = refreshRestoredRows(
+        itemsRef.current,
+        page,
+        (post, previous) =>
+          postTextLedger.reconcile(live(reactionState.current(post)), textStamp, previous)
+      )
+      restoringRowsRef.current = false
+      itemsRef.current = rows
+      if (incoming.length) {
+        const bufferedById = new Map(newLooksRef.current.map((post) => [post.id, post]))
+        const buffered = mergeFeedPages(
+          incoming.map((post) =>
+            postTextLedger.reconcile(live(post), textStamp, bufferedById.get(post.id))
+          ),
+          newLooksRef.current.map(live)
+        )
+        newLooksRef.current = buffered
+        setNewLooks(buffered)
+      }
+      return rows
+    },
+    [postTextLedger, reactionState]
+  )
+
   const loadFeed = useCallback(
     async (mode: CommunityFeedMode, cursor?: string) => {
       const readTicket = reactionState.beginRead()
@@ -3094,13 +3216,15 @@ export function CommunityLookbookGrid({
       // The deep-link effect resolves the highlighted target for the first feed read. A read
       // started after it supersedes that one, finished or not, so it revalidates the target.
       const isFirstRead = feedReadsStartedRef.current++ === 0
+      // A return's first page-one read keeps the restored rows and their cursor (P2-5).
+      const inPlace = restoreRefreshPending(append)
 
       if (append) {
         setIsLoadingMore(true)
       } else {
         setIsLoading(true)
         setFeedError(null)
-        setNextCursor(null)
+        setNextCursor((cursor) => (inPlace ? cursor : null))
         announceFeed({ key: 'community.feed.loading' }, generation, false)
       }
 
@@ -3118,10 +3242,12 @@ export function CommunityLookbookGrid({
         setExperimentVariant(feed.experimentVariant)
         setAuthorStates(feed.authorStates)
         setActiveChallenge(feed.activeChallenge)
-        setNextCursor(feed.nextCursor)
+        setNextCursor((cursor) => (inPlace ? cursor : feed.nextCursor))
         setFeedError(null)
         setRefusedScope(undefined)
         setBannedSanction(null)
+        // A read that answered with access may keep Community content for a return again.
+        screenSnapshot.allow(COMMUNITY_SNAPSHOT_PARTS)
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
         // for the rest of the session.
@@ -3137,13 +3263,20 @@ export function CommunityLookbookGrid({
         const live = <T extends CommunityFeedItem>(post: T): T =>
           withLiveSponsorship(post, liveSponsorships)
         setOpenedItem((post) => (post ? live(reactionState.current(post)) : null))
-        const merged =
-          append && !restarted ? mergeFeedPages(itemsRef.current, page) : page
+        // A return's first page-one read refreshes the restored rows in place (P2-5).
+        const restoredRows = commitRestoredRefresh(inPlace, page, live, textStamp)
+        const merged = rowsAfterRead(
+          restoredRows,
+          append && !restarted,
+          itemsRef.current,
+          page
+        )
         const loadedIds = new Set(merged.map((post) => post.id))
         setDeepLinkedItem((post) =>
           post && !loadedIds.has(post.id) ? live(reactionState.current(post)) : null
         )
         setItems((previous) => {
+          if (restoredRows) return restoredRows
           const previousById = new Map(previous.map((item) => [item.id, item]))
           return (append && !restarted ? mergeFeedPages(previous, page) : page).map(
             (post) =>
@@ -3210,8 +3343,15 @@ export function CommunityLookbookGrid({
       reportFeedFailure,
       revalidateHighlighted,
       settleFirstPage,
+      commitRestoredRefresh,
+      restoreRefreshPending,
     ]
   )
+  /** For the realtime sync, which must not restart whenever `loadFeed` is re-created. */
+  const loadFeedRef = useRef(loadFeed)
+  useEffect(() => {
+    loadFeedRef.current = loadFeed
+  }, [loadFeed])
 
   useEffect(() => {
     const clearScope = () => {
@@ -3236,8 +3376,10 @@ export function CommunityLookbookGrid({
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
+      feedSettledRef.current = false
       setFeedSettled(false)
       setRestoring(false)
+      restoringRowsRef.current = false
       // The band and why it did not resolve describe the member who left; the
       // notice and its add-location action go with them.
       setViewerBand(null)
@@ -3391,6 +3533,10 @@ export function CommunityLookbookGrid({
       setActiveChallenge(page.activeChallenge)
       setIsLoadingMore(false)
       setIsLoading(false)
+      // Codex review P1-1: a rebuild that replaced the first feed read answers for the gate too.
+      markFeedSettled()
+      setRestoring(false)
+      screenSnapshot.allow(COMMUNITY_SNAPSHOT_PARTS)
 
       const existing = new Set(itemsRef.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !existing.has(item.id))
@@ -3427,6 +3573,14 @@ export function CommunityLookbookGrid({
     const hideContent = () => {
       captureScroll(renderedItemsRef.current)
       setCommunityAvailable(false)
+      revokeSnapshot()
+    }
+    /**
+     * Codex review P1-1: realtime cancelled the feed read in flight. Before the first page
+     * answered, nothing else would settle the gate, so a fresh read replaces it.
+     */
+    const replaceCancelledFirstRead = () => {
+      if (!feedSettledRef.current) void loadFeedRef.current(currentMode)
     }
     const verification = new CommunityVerification(() => {
       if (!active) return
@@ -3469,6 +3623,7 @@ export function CommunityLookbookGrid({
           setOpenedItem((item) => (item?.id === target.key ? null : item))
           setDeepLinkedItem((item) => (item?.id === target.key ? null : item))
           applySpotlight((item) => (item?.id === target.key ? null : item))
+          replaceCancelledFirstRead()
           return
         }
         const resolved = reactionState.read(target.post, reactionState.beginRead())
@@ -3496,6 +3651,12 @@ export function CommunityLookbookGrid({
         feedControllerRef.current?.abort()
         setIsLoading(false)
         setIsLoadingMore(false)
+        if (!feedSettledRef.current) {
+          // The first page never answered: a full read (with its own error and Retry) takes
+          // its place, whatever the events were.
+          replaceCancelledFirstRead()
+          return
+        }
         if (events.some((event) => event.kind === 'post.published'))
           await refreshFeed(signal)
       },
@@ -3517,15 +3678,20 @@ export function CommunityLookbookGrid({
             previous?.message.key === 'community.realtime.unavailable' ? null : previous
           )
         else if (state === 'unavailable') setNotice(outage)
+        if (state === 'connected') screenSnapshot.allow(COMMUNITY_SNAPSHOT_PARTS)
         if (state !== 'connected' && state !== 'recovering') {
           feedGenerationRef.current++
           detailGenerationRef.current++
           setIsLoading(false)
           setIsLoadingMore(false)
           feedControllerRef.current?.abort()
+          // Codex review P1-1: the outage notice is what the body shows now. A denial settles
+          // the gate once its probe below answers, with the error and Retry in place.
+          if (state === 'unavailable') markFeedSettled()
         }
         realtimeDeniedRef.current = state === 'denied'
         if (state === 'denied') {
+          revokeSnapshot()
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
           setIsPreparingPhoto(false)
@@ -3540,7 +3706,8 @@ export function CommunityLookbookGrid({
           setNewLooks([])
           // A denied socket says nothing about why. One read asks, so a member banned while
           // the page was open sees the notice. A member already told needs no second answer.
-          if (!bannedRef.current) {
+          if (bannedRef.current) markFeedSettled()
+          else {
             // The answer belongs to the session scope it was asked in, and only while no newer
             // feed read (a Retry) has started since: a newer read speaks for the grid.
             const scope = feedScopeRef.current
@@ -3558,9 +3725,11 @@ export function CommunityLookbookGrid({
                 const message: Message = { key: 'community.error.load' }
                 setFeedError(message)
                 setAnnouncement(message)
+                markFeedSettled()
               },
               (error: unknown) => {
                 if (!probeCurrent()) return
+                markFeedSettled()
                 const sanction = communitySanctionOf(error)
                 if (sanction) {
                   closeForBan(sanction)
@@ -3626,6 +3795,8 @@ export function CommunityLookbookGrid({
     captureScroll,
     setAnnouncement,
     realtimeEpoch,
+    markFeedSettled,
+    revokeSnapshot,
   ])
 
   useEffect(
@@ -3879,22 +4050,28 @@ export function CommunityLookbookGrid({
   )
 
   const focusedTargetRef = useRef<string | null>(null)
+  // Codex review P2-8: the deep-link focus is spent only once the screen gate shows the body and
+  // the card took focus; a card still hidden under the placeholder would drop it.
+  const gateOpen = useScreenGateOpen()
   useEffect(() => {
     if (!highlightedCardId) {
       focusedTargetRef.current = null
       return
     }
-    if (focusedTargetRef.current === highlightedCardId) return
+    if (focusedTargetRef.current === highlightedCardId || !gateOpen) return
     const cardElement = document.getElementById(`lookbook-card-${highlightedCardId}`)
     if (cardElement) {
-      focusedTargetRef.current = highlightedCardId
       cardElement.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
       cardElement.focus()
+      if (document.activeElement !== cardElement) return
+      focusedTargetRef.current = highlightedCardId
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, displayedItems, setAnnouncement])
+  }, [highlightedCardId, displayedItems, setAnnouncement, gateOpen])
 
   const handleModeChange = (mode: FilterCategory) => {
+    // Another filter's first page replaces the restored rows.
+    if (mode !== currentMode) restoringRowsRef.current = false
     setCurrentMode(mode)
     setNotice(null)
     setAnnouncement({ key: 'community.filters.announce', params: { filterMode: mode } })
@@ -4286,12 +4463,15 @@ export function CommunityLookbookGrid({
   })
 
   // Story CC-7.7 D5: what a return to this tab shows first, kept for the member who sees it.
+  // Nothing is kept while Community access is lost (P3-1): the ban, a hidden feed, or a refused
+  // realtime session; the store also refuses the parts until a read answers with access.
   const gateScreen = useScreenGateScreen()
-  const liveOwner = useWebSessionOwner()
+  const snapshotScope = useWebSessionScope()
   useEffect(() => {
-    if (!gateScreen || !liveOwner || !isLiveOwner(liveOwner)) return
+    if (!gateScreen || !snapshotScope) return
     if (!feedSettled || isLoading || banned || spotlightState.status === 'loading') return
-    screenSnapshot.remember(liveOwner, gateScreen, GRID_SNAPSHOT_PART, {
+    if (!communityAvailable || realtimeDeniedRef.current) return
+    screenSnapshot.remember(snapshotScope, gateScreen, COMMUNITY_GRID_SNAPSHOT_PART, {
       mode: currentMode,
       scope: sessionScope,
       items,
@@ -4322,7 +4502,8 @@ export function CommunityLookbookGrid({
     gateScreen,
     isLoading,
     items,
-    liveOwner,
+    communityAvailable,
+    snapshotScope,
     nextCursor,
     servedMode,
     sessionScope,

@@ -3,6 +3,7 @@
 // Story CC-7.7 D1, D3 and D5 test owner: the web screen gate.
 // Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md
 // (7.7-CMP-001, 7.7-CMP-002). The layout-shift budget itself is 7.7-E2E-001 to 7.7-E2E-008.
+// Codex review of 8327b4fb: 7.7-CMP-008 pins the gate deadline (P2-2).
 import { useEffect, useState } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
@@ -11,7 +12,12 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import type * as WebSession from '../../lib/web-session'
-import { ScreenGate, useScreenGateRead } from './screen-gate'
+import {
+  SCREEN_GATE_DEADLINE_MS,
+  ScreenGate,
+  useScreenGateOpen,
+  useScreenGateRead,
+} from './screen-gate'
 
 const session = vi.hoisted(() => ({
   identity: null as string | null,
@@ -73,6 +79,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   session.identity = null
   session.stored = false
@@ -183,5 +190,67 @@ describe('ScreenGate', () => {
     expect(gate()).not.toHaveAttribute('data-ready')
     expect(placeholder()).toBeVisible()
     expect(scrollTo).toHaveBeenCalledExactlyOnceWith(0, 0)
+  })
+
+  it('7.7-CMP-008 a read that never answers opens the gate at the deadline, with a finished section and its Retry shown (Codex review P2-2)', () => {
+    vi.useFakeTimers()
+    signIn('member-1')
+    const openSeen: boolean[] = []
+    /** The account header's profile read, stalled for good. */
+    function StalledAccount() {
+      useScreenGateRead('account', false)
+      openSeen.push(useScreenGateOpen())
+      return <p data-testid="account-pending">Account</p>
+    }
+    /** A section whose read already failed fast, with its Retry. */
+    function FailedLocations() {
+      useScreenGateRead('locations', true)
+      return (
+        <div>
+          <p>Locations failed</p>
+          <button type="button">Retry</button>
+        </div>
+      )
+    }
+    render(
+      <I18nextProvider i18n={getI18n()}>
+        <ScreenGate screen="profile" reads={['account', 'locations']}>
+          <StalledAccount />
+          <FailedLocations />
+        </ScreenGate>
+      </I18nextProvider>
+    )
+    const retry = screen.getByRole('button', { name: 'Retry', hidden: true })
+
+    act(() => {
+      vi.advanceTimersByTime(SCREEN_GATE_DEADLINE_MS - 1)
+    })
+    expect(gate()).not.toHaveAttribute('data-ready')
+    expect(placeholder()).toBeVisible()
+    expect(retry).not.toBeVisible()
+    expect(openSeen.at(-1)).toBe(false)
+
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(gate()).toHaveAttribute('data-ready', 'true')
+    expect(placeholder()).not.toBeVisible()
+    expect(screen.getByText('Locations failed')).toBeVisible()
+    expect(retry).toBeVisible()
+    expect(openSeen.at(-1)).toBe(true)
+    // Only reads that settled mark the tab settled: a return waits for its reads again.
+    expect(screenSnapshot.isSettled('member-1', 'profile')).toBe(false)
+  })
+
+  it('7.7-CMP-008 a gate whose reads settle before the deadline never waits for it', () => {
+    vi.useFakeTimers()
+    signIn('member-1')
+    renderGate()
+    settle('error')
+
+    expect(gate()).toHaveAttribute('data-ready', 'true')
+    expect(screenSnapshot.isSettled('member-1', 'home')).toBe(true)
+    // No timer is left to fire for a gate that opened from its reads.
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

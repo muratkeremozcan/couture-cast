@@ -12,7 +12,7 @@
 // instant apply end to end; a mocked context would prove only that the section calls a
 // setter.
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
@@ -25,7 +25,11 @@ import type * as PremiumModule from '../lib/premium'
  * stub it. Navigation itself is not what these suites are about; the row's own
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -112,7 +116,7 @@ import { server } from '../test-utils/msw/server'
 import { mockSubscriptionNone } from '../test-utils/msw/handlers'
 import { press } from '../test-utils/press'
 import { setMobileAccessTokenResolver } from '../lib/mobile-auth'
-import { AppThemeProvider } from '../theme/theme-context'
+import { AppThemeProvider, useAppTheme } from '../theme/theme-context'
 import SettingsScreen from '../../app/(tabs)/settings'
 
 const THEME_ROUTE = '*/api/v1/commerce/premium/theme'
@@ -441,5 +445,67 @@ describe('SettingsScreen interface palettes section', () => {
     expect(disclosure.textContent).toContain(
       'never changes which outfits are recommended'
     )
+  })
+  // Story CC-7.7 D3 (7.7-NAT-004): the provider answered at launch; Profile opening re-reads
+  // the palette. The gate waits for that read, never the launch answer, so the locked panel
+  // never shows first and turns into the gallery under the member's finger.
+  it('7.7-NAT-004 the Profile gate waits for the palette read it started, not the launch answer', async () => {
+    let themeReads = 0
+    let releaseEntryRead!: () => void
+    const entryReadHeld = new Promise<void>((resolve) => {
+      releaseEntryRead = resolve
+    })
+    server.use(
+      http.get(THEME_ROUTE, async () => {
+        themeReads += 1
+        if (themeReads === 1)
+          return HttpResponse.json(themeResponse({ isEntitled: false }))
+        await entryReadHeld
+        return HttpResponse.json(themeResponse({ isEntitled: true }))
+      }),
+      http.get('*/api/v1/user/profile', () =>
+        HttpResponse.json({
+          user: {
+            id: 'member-1',
+            email: 'jade@example.test',
+            displayName: null,
+            birthdate: null,
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      )
+    )
+    function LaunchStatus() {
+      return <span data-testid="launch-theme-status">{useAppTheme().status}</span>
+    }
+    const view = await render(
+      <AppThemeProvider>
+        <LaunchStatus />
+      </AppThemeProvider>
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('launch-theme-status')).toHaveTextContent('ready')
+    )
+
+    await view.rerender(
+      <AppThemeProvider>
+        <SettingsScreen />
+      </AppThemeProvider>
+    )
+    await waitFor(() => expect(themeReads).toBe(2))
+    // Every other gate read answered; the launch answer (not entitled) is still applied.
+    expect(await screen.findByTestId('profile-account')).not.toBeVisible()
+    expect(await screen.findByTestId('premium-unavailable')).not.toBeVisible()
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
+    expect(screen.getByTestId('premium-theme-locked')).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+
+    act(() => releaseEntryRead())
+
+    expect(await screen.findByTestId('premium-theme-gallery')).toBeVisible()
+    expect(screen.queryByTestId('premium-theme-locked')).toBeNull()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 })

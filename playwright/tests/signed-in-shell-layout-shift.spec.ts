@@ -72,19 +72,38 @@ async function openShell(
     memberId?: string
     /** Members whose Home outfit text the meter watches for in every frame. */
     watchMembers?: string[]
+    /** Other strings the meter watches for in the rendered text every frame. */
+    watchText?: string[]
+    /** Extra delay per read (shell-fixtures `hold`). */
+    hold?: Partial<Record<string, number>>
+    /**
+     * Sign in the way a returning member arrives: a stored session the head script reads as
+     * `pending`, verified by the profile read, instead of the fixture bearer that is a member at
+     * first paint.
+     */
+    storedSession?: boolean
   }
 ) {
   const memberId = options.memberId ?? `shell-${randomUUID()}`
   let active = options.screen
-  const router = createShellRouter({ mode: options.mode, screen: () => active, memberId })
+  const router = createShellRouter({
+    mode: options.mode,
+    screen: () => active,
+    requireBearer: options.signedIn,
+    hold: options.hold,
+  })
   // Declared before navigation: every read the tabs make is served from here.
   void interceptNetworkCall({ url: '**/api/v1/**', handler: router.handler })
   await closeCommunitySocket(page)
   await installMeter(page, {
     ...SHELL_METER_CONFIG,
-    watchText: options.watchMembers?.map(ownerMarker),
+    watchText: [
+      ...(options.watchMembers ?? []).map(ownerMarker),
+      ...(options.watchText ?? []),
+    ],
   })
-  if (options.signedIn) await seedWebSession(page, localE2EAccessToken(memberId))
+  if (options.storedSession) await seedStoredSession(page, memberId)
+  else if (options.signedIn) await seedWebSession(page, localE2EAccessToken(memberId))
   return {
     router,
     memberId,
@@ -92,6 +111,38 @@ async function openShell(
       active = screen
     },
   }
+}
+
+/**
+ * A stored Supabase session in this browser and no verified bearer yet: the shape a returning
+ * member's tab has before the app verifies it (`landing-session.ts` names it `pending`). The
+ * access token is a local fixture bearer, so the profile verification read is served by the
+ * fixtures for this member; it expires in an hour, so no refresh call leaves the browser.
+ */
+async function seedStoredSession(page: Page, memberId: string) {
+  const now = Math.floor(Date.now() / 1000)
+  const session = {
+    access_token: localE2EAccessToken(memberId),
+    token_type: 'bearer',
+    expires_in: 3600,
+    expires_at: now + 3600,
+    refresh_token: `shell-refresh-${memberId}`,
+    user: {
+      id: memberId,
+      aud: 'authenticated',
+      role: 'authenticated',
+      email: 'shell-member@example.test',
+      app_metadata: {},
+      user_metadata: {},
+      created_at: '2026-11-20T12:00:00.000Z',
+    },
+  }
+  await page.addInitScript(
+    ({ key, value }) => {
+      if (window.location.origin !== 'null') window.localStorage.setItem(key, value)
+    },
+    { key: 'couturecast.auth-session', value: JSON.stringify(session) }
+  )
 }
 
 function expectWithinBudget(snapshot: MeterSnapshot, fromMs: number, label: string) {
@@ -118,6 +169,45 @@ function expectUnknownReadsNone(router: ReturnType<typeof createShellRouter>) {
     router.unknown().filter((request) => request.startsWith('GET ')),
     'reads this spec does not stub: add them to helpers/shell-fixtures.ts'
   ).toEqual([])
+  expect(router.unauthenticated(), 'member reads sent without the bearer').toEqual([])
+}
+
+/**
+ * Codex P2-10: a ready gate alone does not prove the member loaded (a failed session also opens
+ * it). Each tab shows content only the member's own stubbed reads produce, and the session
+ * resolved to the member. Fixtures refuse member reads without a bearer, so none of this can
+ * come from a lost session.
+ */
+async function expectMemberContent(
+  page: Page,
+  screen: ShellScreen,
+  mode: ShellMode,
+  memberId: string
+) {
+  await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
+  const empty = mode === 'empty'
+  if (screen === 'home') {
+    if (empty) await expect(page.getByTestId('member-sample-outfit')).toBeVisible()
+    else if (mode === 'ritual-503')
+      await expect(page.getByTestId('home-outfit-retry')).toBeVisible()
+    else
+      await expect(page.getByTestId('home-live-outfit')).toContainText(
+        ownerMarker(memberId)
+      )
+  }
+  if (screen === 'closet') {
+    if (empty)
+      await expect(page.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    else await expect(page.getByTestId('garment-card-shell-garment-1')).toBeVisible()
+  }
+  if (screen === 'community') {
+    if (empty) await expect(page.getByTestId('community-feed-empty')).toBeVisible()
+    else await expect(page.getByTestId('lookbook-card-shell-look-1')).toBeVisible()
+  }
+  if (screen === 'profile')
+    await expect(page.getByTestId('profile-account-email')).toContainText(
+      'shell-member@example.test'
+    )
 }
 
 const firstReadyAt = (snapshot: MeterSnapshot, screen: ShellScreen, fromMs: number) =>
@@ -131,7 +221,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         page,
         interceptNetworkCall,
       }) => {
-        const { router } = await openShell(page, interceptNetworkCall, {
+        const { router, memberId } = await openShell(page, interceptNetworkCall, {
           mode,
           screen,
           signedIn: true,
@@ -172,16 +262,10 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
           )
           expect(readyAt).toBeGreaterThanOrEqual(DELAY_MS)
         }
+        await expectMemberContent(page, screen, mode, memberId)
         if (screen === 'home') {
-          const own = page.getByTestId('home-live-outfit')
-          const sample = page.getByTestId('member-sample-outfit')
-          if (mode === 'empty') {
-            await expect(sample).toBeVisible()
-            expect(sightings(snapshot.frames, ['home-live-outfit'], 0)).toEqual({})
-          } else {
-            await expect(own).toBeVisible()
-            expect(sightings(snapshot.frames, ['member-sample-outfit'], 0)).toEqual({})
-          }
+          const never = mode === 'empty' ? 'home-live-outfit' : 'member-sample-outfit'
+          expect(sightings(snapshot.frames, [never], 0)).toEqual({})
         }
         expectUnknownReadsNone(router)
       })
@@ -196,7 +280,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       type: 'skipNetworkMonitoring',
       description: 'The ritual read answers 503 on purpose (I/O matrix "Ritual fails").',
     })
-    const { router } = await openShell(page, interceptNetworkCall, {
+    const { router, memberId } = await openShell(page, interceptNetworkCall, {
       mode: 'ritual-503',
       screen: 'home',
       signedIn: true,
@@ -213,7 +297,8 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
     expectShellStill(snapshot, 0, 'home ritual-503')
     expect(sightings(snapshot.frames, SIGNED_OUT_CONTENT, 0)).toEqual({})
     // The gate never hides the error and its Retry once the read settled.
-    await expect(page.getByTestId('home-outfit-retry')).toBeVisible()
+    await expectMemberContent(page, 'home', 'ritual-503', memberId)
+    expectUnknownReadsNone(router)
     expect(
       sightingsBeforeReady(snapshot.frames, ['member-sample-outfit'], 'home', 0)
     ).toEqual({})
@@ -253,7 +338,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       page,
       interceptNetworkCall,
     }) => {
-      const { router } = await openShell(page, interceptNetworkCall, {
+      const { router, memberId } = await openShell(page, interceptNetworkCall, {
         mode: 'late',
         screen,
         signedIn: true,
@@ -282,6 +367,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         afterTap,
         `content moved after the first tap:\n${describeShifts(snapshot.shifts, tappedAt).join('\n')}`
       ).toBe(0)
+      await expectMemberContent(page, screen, 'late', memberId)
       expectUnknownReadsNone(router)
     })
   }
@@ -292,11 +378,15 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       interceptNetworkCall,
     }) => {
       test.setTimeout(150_000)
-      const { router, setScreen } = await openShell(page, interceptNetworkCall, {
-        mode,
-        screen: 'home',
-        signedIn: true,
-      })
+      const { router, setScreen, memberId } = await openShell(
+        page,
+        interceptNetworkCall,
+        {
+          mode,
+          screen: 'home',
+          signedIn: true,
+        }
+      )
       await page.goto('/')
       await settleTransition(page, {
         screen: 'home',
@@ -344,6 +434,17 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
           `${label}: header moved`
         ).toBeNull()
         expect(sightings(snapshot.frames, SIGNED_OUT_CONTENT, tappedAt)).toEqual({})
+        await expectMemberContent(page, screen, mode, memberId)
+        if (screen === 'home' && mode !== 'empty') {
+          // Codex P2-4: the first returning Home frame already holds the outfit and the
+          // teaser above the feed; neither lands after the screen is visible.
+          const firstReturn = snapshot.frames.find(
+            (frame) => frame.present.includes('home') && !frame.present.includes(previous)
+          )
+          expect(firstReturn?.visible ?? []).toEqual(
+            expect.arrayContaining(['home-live-outfit', 'home-spotlight-teaser'])
+          )
+        }
         if (screen === 'home') {
           // AC4: the return to a visited tab shows its last content at once, no placeholder.
           expect(sightings(snapshot.frames, ['screen-placeholder'], tappedAt)).toEqual({})
@@ -353,6 +454,40 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       expectUnknownReadsNone(router)
     })
   }
+
+  test('[P0] 7.7-E2E-011 returning member: a stored session held through the first paint shows the placeholder, then only the member', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const { router, memberId } = await openShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'home',
+      signedIn: true,
+      storedSession: true,
+      // The session check (the profile read) answers well after the first paint.
+      hold: { profile: 2500 },
+    })
+
+    await page.goto('/')
+    const snapshot = await settleTransition(page, {
+      screen: 'home',
+      fromMs: 0,
+      inflight: router.inflight,
+    })
+
+    // AC1, D1: while the session resolves, the first Home frame is the shell and the neutral
+    // placeholder; nothing signed-out or sample shows in any frame on the way to the member.
+    const firstHome = snapshot.frames.find((frame) => frame.present.includes('home'))
+    expect(firstHome?.visible ?? []).toContain('screen-placeholder')
+    expect(firstHome?.ready ?? []).not.toContain('home')
+    expect(sightings(snapshot.frames, SIGNED_OUT_CONTENT, 0)).toEqual({})
+    expect(sightings(snapshot.frames, ['member-sample-outfit'], 0)).toEqual({})
+    expect(firstReadyAt(snapshot, 'home', 0)!).toBeGreaterThanOrEqual(2500)
+    expectWithinBudget(snapshot, 0, 'stored session home')
+    expectShellStill(snapshot, 0, 'stored session home')
+    await expectMemberContent(page, 'home', 'populated', memberId)
+    expectUnknownReadsNone(router)
+  })
 
   test('[P0] 7.7-E2E-007 positive control: a block inserted above the content scores above the budget', async ({
     page,
@@ -441,7 +576,11 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
     expectUnknownReadsNone(router)
   })
 
-  for (const path of ['sign-out-then-sign-in', 'bearer-swap'] as const) {
+  for (const path of [
+    'sign-out-then-sign-in',
+    'bearer-swap',
+    'swap-while-reading',
+  ] as const) {
     test(`[P0] 7.7-E2E-009 owner change in one document (${path}): member B never sees member A content`, async ({
       page,
       interceptNetworkCall,
@@ -455,6 +594,8 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         signedIn: true,
         memberId: memberA,
         watchMembers: [memberA, memberB],
+        // Codex P2-1: the third path swaps while member A's ritual read is still in flight.
+        hold: path === 'swap-while-reading' ? { ritual: 2500 } : undefined,
       })
       const go = async (screen: ShellScreen) => {
         setScreen(screen)
@@ -492,27 +633,164 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         },
         { token: localE2EAccessToken(memberB) }
       )
-      if (path === 'sign-out-then-sign-in') await go('closet')
+      if (path === 'swap-while-reading') {
+        // A's late answer lands on the mounted Home after the switch; then a tab round trip
+        // must not bring A back from the snapshot either.
+        await settleTransition(page, {
+          screen: 'home',
+          fromMs: switchedAt,
+          inflight: router.inflight,
+        })
+        await go('closet')
+      } else if (path === 'sign-out-then-sign-in') await go('closet')
       const homeAt = await meterNow(page)
       const snapshot = await go('home')
 
-      // D5 privacy: no frame after the switch shows member A's outfit.
+      // D5 privacy: no frame from the switch on shows member A's outfit, on the mounted Home
+      // or after the round trip (the whole window, not only the last transition).
+      const sinceSwitch = await readMeter(page, switchedAt)
       expect(
-        textSightings(snapshot.frames, [ownerMarker(memberA)], switchedAt),
+        textSightings(sinceSwitch.frames, [ownerMarker(memberA)], switchedAt),
         'member A content shown after the owner changed'
       ).toEqual({})
-      // The remembered Home was dropped: B's Home opens through the gate, not at once.
-      const firstHome = snapshot.frames.find(
-        (frame) => frame.t >= homeAt && frame.present.includes('home')
-      )
-      expect(
-        firstHome?.ready ?? [],
-        'Home opened from a remembered snapshot'
-      ).not.toContain('home')
+      if (path !== 'swap-while-reading') {
+        // A's remembered Home was dropped: B's Home opens through the gate, not at once.
+        const firstHome = snapshot.frames.find(
+          (frame) => frame.t >= homeAt && frame.present.includes('home')
+        )
+        expect(
+          firstHome?.ready ?? [],
+          'Home opened from a remembered snapshot'
+        ).not.toContain('home')
+      }
       await expect(page.getByTestId('home-live-outfit')).toContainText(
         ownerMarker(memberB)
       )
       expect(sightings(snapshot.frames, SIGNED_OUT_CONTENT, homeAt)).toEqual({})
     })
   }
+
+  test('[P0] 7.7-E2E-012 Profile return with delayed reads: the remembered sections and scroll are in the first frame', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    test.setTimeout(90_000)
+    // Codex P1-2: every tab, Profile included, returns with its content, not an empty shell.
+    const { router, setScreen } = await openShell(page, interceptNetworkCall, {
+      mode: 'delayed',
+      screen: 'profile',
+      signedIn: true,
+      watchText: ['shell-member@example.test'],
+    })
+    await page.goto('/settings')
+    await settleTransition(page, {
+      screen: 'profile',
+      fromMs: 0,
+      inflight: router.inflight,
+    })
+    await page.evaluate(() => window.scrollTo(0, 200))
+    await recurse(
+      () => page.evaluate(() => window.scrollY),
+      (scrollY) => scrollY === 200,
+      { timeout: 5000, interval: 50, log: false }
+    )
+
+    setScreen('community')
+    const leftAt = await meterNow(page)
+    await page.getByTestId(TABS.community.nav).click()
+    await settleTransition(page, {
+      screen: 'community',
+      fromMs: leftAt,
+      inflight: router.inflight,
+    })
+    const profileReads = router.calls('profile')
+
+    setScreen('profile')
+    const returnedAt = await meterNow(page)
+    await page.getByTestId(TABS.profile.nav).click()
+    const snapshot = await settleTransition(page, {
+      screen: 'profile',
+      fromMs: returnedAt,
+      inflight: router.inflight,
+    })
+
+    const firstFrame = snapshot.frames.find(
+      (frame) => frame.present.includes('profile') && !frame.present.includes('community')
+    )
+    expect(firstFrame, 'Profile never rendered').toBeDefined()
+    // The refresh is DELAY_MS late, so this content can only come from the snapshot.
+    expect(firstFrame!.ready).toContain('profile')
+    expect(firstFrame!.texts).toContain('shell-member@example.test')
+    expect(Math.abs(firstFrame!.scrollY - 200)).toBeLessThanOrEqual(1)
+    expect(sightings(snapshot.frames, ['screen-placeholder'], returnedAt)).toEqual({})
+    expectWithinBudget(snapshot, returnedAt, 'community > profile return')
+    expect(router.calls('profile')).toBeGreaterThan(profileReads)
+    expectUnknownReadsNone(router)
+  })
+
+  test('[P1] 7.7-E2E-013 Community return keeps a non-default filter and the scroll anchor, also after the refresh', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    test.setTimeout(90_000)
+    // Codex P2-5 (paging across pages is the builder's component case).
+    const { router, setScreen } = await openShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'community',
+      signedIn: true,
+    })
+    await page.goto('/community')
+    await settleTransition(page, {
+      screen: 'community',
+      fromMs: 0,
+      inflight: router.inflight,
+    })
+    const filter = page.getByTestId('community-filter-all')
+    await filter.click()
+    await expect(filter).toHaveAttribute('aria-pressed', 'true')
+    const filteredAt = await meterNow(page)
+    await settleTransition(page, {
+      screen: 'community',
+      fromMs: filteredAt,
+      inflight: router.inflight,
+    })
+    const anchor = page.getByTestId('lookbook-card-shell-look-2')
+    await anchor.scrollIntoViewIfNeeded()
+    const anchorTop = await anchor.evaluate((node) => node.getBoundingClientRect().top)
+
+    setScreen('profile')
+    const leftAt = await meterNow(page)
+    await page.getByTestId(TABS.profile.nav).click()
+    await settleTransition(page, {
+      screen: 'profile',
+      fromMs: leftAt,
+      inflight: router.inflight,
+    })
+
+    setScreen('community')
+    const returnedAt = await meterNow(page)
+    await page.getByTestId(TABS.community.nav).click()
+    const snapshot = await settleTransition(page, {
+      screen: 'community',
+      fromMs: returnedAt,
+      inflight: router.inflight,
+    })
+
+    const firstFrame = snapshot.frames.find(
+      (frame) => frame.present.includes('community') && !frame.present.includes('profile')
+    )
+    expect(firstFrame?.ready ?? []).toContain('community')
+    expect(sightings(snapshot.frames, ['screen-placeholder'], returnedAt)).toEqual({})
+    // After the refresh settled: same filter, and the anchored card where the member left it.
+    await expect(page.getByTestId('community-filter-all')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    const anchorTopAfter = await anchor.evaluate(
+      (node) => node.getBoundingClientRect().top
+    )
+    expect(Math.abs(anchorTopAfter - anchorTop)).toBeLessThanOrEqual(1)
+    expectWithinBudget(snapshot, returnedAt, 'profile > community return')
+    expectUnknownReadsNone(router)
+  })
 })

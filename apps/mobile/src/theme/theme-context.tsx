@@ -68,6 +68,11 @@ export interface AppThemeValue {
   /** The `premium_themes_enabled` kill switch, as the server evaluated it. */
   themesEnabled: boolean
   status: AppThemeStatus
+  /**
+   * Story CC-7.7: a read is in flight. `status` keeps the previous read's answer meanwhile, so
+   * a screen gate waiting for the current reader's palette waits on this too.
+   */
+  reading: boolean
   /** Re-reads the preference. Never rejects; failures land in `status`. */
   refresh: () => Promise<void>
   /**
@@ -107,6 +112,7 @@ const FALLBACK_VALUE: AppThemeValue = Object.freeze({
   isEntitled: false,
   themesEnabled: false,
   status: 'loading' as const,
+  reading: false,
   refresh: () => Promise.resolve(),
   applyResolvedTheme: () => undefined,
   applyFailure: () => 'unknown' as const,
@@ -119,6 +125,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
   const [isEntitled, setIsEntitled] = useState(false)
   const [themesEnabled, setThemesEnabled] = useState(false)
   const [status, setStatus] = useState<AppThemeStatus>('loading')
+  const [reading, setReading] = useState(false)
 
   /**
    * Aborts the in-flight read on unmount, and lets a second `refresh` supersede a first.
@@ -170,6 +177,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
+    setReading(true)
 
     try {
       const next = await getThemeFromMobile(controller.signal)
@@ -183,6 +191,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     } finally {
       if (controllerRef.current === controller) {
         controllerRef.current = null
+        setReading(false)
       }
     }
   }, [applyResolvedTheme, applyFailure])
@@ -199,6 +208,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
       isEntitled,
       themesEnabled,
       status,
+      reading,
       refresh,
       applyResolvedTheme,
       applyFailure,
@@ -208,6 +218,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
       isEntitled,
       themesEnabled,
       status,
+      reading,
       refresh,
       applyResolvedTheme,
       applyFailure,
@@ -229,9 +240,11 @@ export function useAppTheme(): AppThemeValue {
 
 /**
  * Story CC-7.7: whether the reader's palette has an answer to wait for. Without a provider the
- * fallback stays `loading` for good, so a screen gate must not wait on it.
+ * fallback stays `loading` for good, so a screen gate must not wait on it. A read in flight is
+ * not settled: until it lands, `status` is the answer of an earlier read, perhaps for another
+ * member.
  */
 export function useAppThemeSettled(): boolean {
   const context = useContext(AppThemeContext)
-  return context === null || context.status !== 'loading'
+  return context === null || (context.status !== 'loading' && !context.reading)
 }

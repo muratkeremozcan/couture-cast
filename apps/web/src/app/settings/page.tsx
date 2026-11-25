@@ -3,7 +3,6 @@
 // above its sections; the route stays /settings.
 'use client'
 
-import { Suspense } from 'react'
 import Link from 'next/link'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
@@ -57,10 +56,9 @@ export default function SettingsPage() {
             subscription and theme reads have answered; each used to land and push the next. */}
         <ScreenGate screen="profile" reads={PROFILE_GATE_READS}>
           <ProfileAccount />
-          {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
-          <Suspense fallback={null}>
-            <LocationsSection />
-          </Suspense>
+          {/* Rendered in the first HTML: only its guided-entry query reader waits for the
+              client, inside its own boundary (Codex review P2-3). */}
+          <LocationsSection />
           <CommercePreferencesSection />
           <SubscriptionSection />
           <PremiumThemeSection />

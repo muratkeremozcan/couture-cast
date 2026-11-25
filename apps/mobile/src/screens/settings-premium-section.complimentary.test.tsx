@@ -11,7 +11,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PremiumAccess } from '@couture/api-client/contracts/http'
 import type * as PremiumModule from '../lib/premium'
 
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],

@@ -46,6 +46,7 @@ import {
   type LocateFailure,
   type LocationFailureStep,
 } from './location-format'
+import { useScreenGateOpen } from '../screen-gate'
 
 /** Story 1.2b: search waits for 300 ms of quiet typing. */
 export const LOCATION_SEARCH_DEBOUNCE_MS = 300
@@ -136,10 +137,18 @@ export function LocationSearchForm({
   const claimRef = useRef(claim)
   claimRef.current = claim
 
+  // Codex review P2-8: the guided autofocus is spent only once Profile's screen gate shows the
+  // form and the field took focus; focus on a field still hidden under the placeholder is lost.
+  const gateOpen = useScreenGateOpen()
+  const autoFocusedRef = useRef(false)
   useEffect(() => {
+    if (!autoFocus || autoFocusedRef.current || !gateOpen) return
     // Delivered only while the member the section rendered for is still the one signed in.
-    if (autoFocus && claimRef.current()?.current()) searchInputRef.current?.focus()
-  }, [autoFocus])
+    if (!claimRef.current()?.current()) return
+    const input = searchInputRef.current
+    input?.focus()
+    if (input && document.activeElement === input) autoFocusedRef.current = true
+  }, [autoFocus, gateOpen])
 
   // Unmounted (signed out, or another member) means a late save or locate is ignored.
   const mountedRef = useRef(true)

@@ -239,23 +239,53 @@ describe('RootLayout startup', () => {
     }
   )
 
-  it('7.7-NAT-005 gives the root stack 200 ms transitions while motion is on', async () => {
-    await mountLayout()
+  // P2-9: the `default` animation ignores animationDuration (UIKit push on iOS, 450 ms tween
+  // XML on Android API 33+); `fade` ships 150 ms on Android and honors 200 ms on iOS.
+  it.each(['ios', 'android'])(
+    '7.7-NAT-005 gives the %s root stack the bounded fade transition while motion is on',
+    async (os) => {
+      setOS(os)
+      await mountLayout()
 
-    const options = layout.stackOptions.at(-1)
-    expect(options).toMatchObject({ animationDuration: 200 })
-    expect(options).not.toHaveProperty('animation')
-  })
+      expect(layout.stackOptions.at(-1)).toMatchObject({
+        animationDuration: 200,
+        animation: 'fade',
+      })
+    }
+  )
 
-  it('7.7-NAT-005 turns root stack transitions off under reduced motion', async () => {
-    layout.reduceMotion = true
-    await mountLayout()
+  it.each([
+    ['ios', 'default'],
+    ['android', undefined],
+  ])(
+    '7.7-NAT-005 the %s modal route keeps its platform presentation while motion is on',
+    async (os, animation) => {
+      setOS(os)
+      await mountLayout()
 
-    expect(layout.stackOptions.at(-1)).toMatchObject({
-      animationDuration: 200,
-      animation: 'none',
-    })
-  })
+      const modal = layout.screens.filter((screen) => screen.name === 'modal').at(-1)
+      // iOS keeps the system page sheet (D6 exception); `fade` would cross-dissolve it.
+      // Android draws the route as a stack screen and inherits the 150 ms fade.
+      expect(modal).toBeDefined()
+      expect(modal?.options?.animation).toBe(animation)
+    }
+  )
+
+  it.each(['ios', 'android'])(
+    '7.7-NAT-005 turns %s root stack and modal transitions off under reduced motion',
+    async (os) => {
+      setOS(os)
+      layout.reduceMotion = true
+      await mountLayout()
+
+      expect(layout.stackOptions.at(-1)).toMatchObject({
+        animationDuration: 200,
+        animation: 'none',
+      })
+      const modal = layout.screens.filter((screen) => screen.name === 'modal').at(-1)
+      expect(modal?.options).not.toHaveProperty('animation')
+    }
+  )
 
   it('mounts one root status bar that follows the OS scheme', async () => {
     await mountLayout()

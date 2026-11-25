@@ -12,7 +12,7 @@
 import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type {
   GarmentItemContract,
   SilhouetteProfileContract,
@@ -22,6 +22,8 @@ import type {
 } from '@couture/api-client/contracts/http'
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+import { screenSnapshot } from '../../lib/screen-snapshot'
+import { currentWebSessionScope } from '../../lib/use-web-session'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 import type * as WebSession from '../../lib/web-session'
 import { stubGarmentPreviewUrl } from '../../test-utils/garment-capture'
@@ -151,6 +153,8 @@ vi.mock('../../lib/saved-looks', () => ({
 import WardrobePage from './page'
 
 beforeEach(stubGarmentPreviewUrl)
+// Story CC-7.7: the Closet snapshot lives in module memory; each test starts without one.
+beforeEach(() => screenSnapshot.clear())
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -1607,4 +1611,47 @@ describe('WardrobePage screen gate', () => {
       expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
     }
   )
+
+  // Codex review of 8327b4fb, P2-1: the e2e fixture bearers share one owner, so the owner check
+  // alone let a closet read sent with one fixture bearer land for the next.
+  it('7.7-CMP-019 a closet read sent with one fixture bearer never lands for the next, on screen or in the snapshot', async () => {
+    screenSnapshot.clear()
+    onTestFinished(() => {
+      screenSnapshot.clear()
+      vi.unstubAllEnvs()
+    })
+    verifiedSession.owner = null
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-a')
+    window.dispatchEvent(new Event('couture:session'))
+    const fixtureA = garmentFixture('garment-fixture-a', 'ready')
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockResolvedValue([fixtureB])
+    render(<WardrobePage />)
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+
+    // The tab switches fixture members while A's closet read is still out.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([fixtureA])
+      await listForA.promise
+    })
+
+    expect(await screen.findByTestId(`garment-card-${fixtureB.id}`)).toBeInTheDocument()
+    expect(screen.queryByTestId(`garment-card-${fixtureA.id}`)).not.toBeInTheDocument()
+    expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
+    await waitFor(() =>
+      expect(
+        screenSnapshot
+          .recall<{
+            garments: GarmentItemContract[]
+          }>(currentWebSessionScope(), 'closet', 'closet')
+          ?.garments.map((garment) => garment.id)
+      ).toEqual([fixtureB.id])
+    )
+  })
 })

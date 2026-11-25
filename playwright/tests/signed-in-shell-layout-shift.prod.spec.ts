@@ -70,8 +70,10 @@ async function measureColdLoad(context: BrowserContext, tab: (typeof TABS)[numbe
     inflight,
     quietMs: 2000,
   })
+  // A ready gate alone does not prove who loaded (a failed session opens it too, Codex P2-10).
+  const session = await page.locator('html').getAttribute('data-session')
   await page.close()
-  return snapshot
+  return { snapshot, session }
 }
 
 test.describe('7.7-E2E-010 production shell layout shift at 390 x 844', () => {
@@ -87,7 +89,7 @@ test.describe('7.7-E2E-010 production shell layout shift at 390 x 844', () => {
       assertTrustedProdOrigins(webBaseUrl!, apiBaseUrl!)
       const context = await readOnlyContext(browser, webBaseUrl!, null)
       try {
-        const snapshot = await measureColdLoad(context, tab)
+        const { snapshot, session } = await measureColdLoad(context, tab)
         const score = shiftScore(snapshot.shifts, 0)
         await testInfo.attach(`signed-out-${tab.screen}-score`, {
           body: JSON.stringify(
@@ -102,6 +104,7 @@ test.describe('7.7-E2E-010 production shell layout shift at 390 x 844', () => {
           snapshot.frames.some((frame) => frame.visible.includes('screen-placeholder')),
           'a signed-out visitor never sees the member placeholder'
         ).toBe(false)
+        expect(session).toBe('none')
         expect(score, describeShifts(snapshot.shifts, 0).join('\n')).toBeLessThanOrEqual(
           BUDGET
         )
@@ -122,7 +125,7 @@ test.describe('7.7-E2E-010 production shell layout shift at 390 x 844', () => {
       assertTrustedProdOrigins(webBaseUrl!, apiBaseUrl!)
       const context = await readOnlyContext(browser, webBaseUrl!, prodMember)
       try {
-        const snapshot = await measureColdLoad(context, tab)
+        const { snapshot, session } = await measureColdLoad(context, tab)
         const score = shiftScore(snapshot.shifts, 0)
         await testInfo.attach(`member-${tab.screen}-score`, {
           body: JSON.stringify(
@@ -133,6 +136,7 @@ test.describe('7.7-E2E-010 production shell layout shift at 390 x 844', () => {
           contentType: 'application/json',
         })
 
+        expect(session, 'the stored session resolved to the member').toBe('member')
         expect(
           sightings(snapshot.frames, SIGNED_OUT_CONTENT, 0),
           'a member never sees signed-out content, before or after the screen is ready'

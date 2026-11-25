@@ -23,7 +23,11 @@ import type * as PremiumModule from '../lib/premium'
  * stub it. Navigation itself is not what these suites are about; the row's own
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -128,6 +132,7 @@ import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
 import { router } from 'expo-router'
 import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
+import { screenFocus } from '../test-utils/focus-effect'
 
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
 
@@ -190,6 +195,86 @@ describe('SettingsScreen', () => {
   afterEach(() => {
     vi.useRealTimers()
     setMobileAnalyticsDiagnosticsEnabled(false)
+    screenFocus.reset()
+  })
+
+  /** A promise the test answers by hand, so one read can be held while the others settle. */
+  function held<T>() {
+    let release!: (value: T) => void
+    const promise = new Promise<T>((resolve) => {
+      release = resolve
+    })
+    return { promise, release }
+  }
+
+  const placeholder = () => screen.queryByTestId('screen-placeholder')
+
+  it('7.7-NAT-004 the Profile gate waits for the account header read, the first section', async () => {
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    await render(<SettingsScreen />)
+
+    // Every other gate read answered: the preference, the subscription, the store.
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
+    expect(await screen.findByTestId('premium-restore')).not.toBeVisible()
+    expect(placeholder()).toBeVisible()
+    expect(screen.queryByTestId('profile-account')).toBeNull()
+
+    act(() => profile.release(memberProfile('Jade')))
+
+    // The header arrives with the body, so it never pushes the sections below it down.
+    expect(await screen.findByTestId('profile-account-name')).toBeVisible()
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-004 the Profile gate waits for the store to answer whether purchases are available', async () => {
+    const store = held<'ready'>()
+    ensurePurchasesConfiguredMock.mockReturnValue(store.promise)
+    await render(<SettingsScreen />)
+
+    // Every other gate read answered: the header, the preference, the subscription access.
+    expect(await screen.findByTestId('profile-account')).not.toBeVisible()
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
+    await waitFor(() => expect(ensurePurchasesConfiguredMock).toHaveBeenCalled())
+    expect(screen.getByTestId('premium-settings-section')).not.toBeVisible()
+    expect(screen.queryByTestId('premium-restore')).toBeNull()
+    expect(placeholder()).toBeVisible()
+
+    act(() => store.release('ready'))
+
+    // The subscribe controls appear with the section, never under the member's finger.
+    expect(await screen.findByTestId('premium-restore')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-003 a return to Profile re-reads its sections in place', async () => {
+    await render(<SettingsScreen />)
+    const email = await screen.findByTestId('profile-account-email')
+    await waitFor(() => expect(email).toBeVisible())
+    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
+    expect(getCommercePreferenceMock).toHaveBeenCalledTimes(1)
+    expect(getSubscriptionMock).toHaveBeenCalledTimes(1)
+
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    // Leaving reads nothing: only the return does.
+    act(() => screenFocus.set(false))
+    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
+    act(() => screenFocus.set(true))
+
+    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(getSubscriptionMock).toHaveBeenCalledTimes(2))
+    // The header and the sections stay while the reads run: no placeholder, no empty header.
+    expect(placeholder()).toBeNull()
+    expect(screen.getByTestId('profile-account-email')).toBe(email)
+    expect(email).toBeVisible()
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+
+    act(() => profile.release(memberProfile('Jade')))
+    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')
+    expect(placeholder()).toBeNull()
   })
 
   it('6.5-MOB-POLISH-07 keeps API health and wiring notes out of the user build', async () => {

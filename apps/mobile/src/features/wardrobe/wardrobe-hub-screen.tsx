@@ -158,9 +158,17 @@ function useHubGarmentDeletion({
   return pendingIds
 }
 
-/** Story CC-7.7 D3: the Closet gate's reads are the inventory and the onboarding state. */
-function closetGateReady(inventorySettled: boolean, onboardingSettled: boolean) {
-  return inventorySettled && onboardingSettled
+/**
+ * Story CC-7.7 D3, D4: the Closet gate's reads are the inventory, the onboarding state and the
+ * first Saved Looks page. The Saved Looks row and its error with Retry sit above the inventory,
+ * so a page that landed after the gate opened would push the closet down.
+ */
+function closetGateReady(
+  inventorySettled: boolean,
+  onboardingSettled: boolean,
+  savedLooksSettled: boolean
+) {
+  return inventorySettled && onboardingSettled && savedLooksSettled
 }
 
 /** Only the first inventory read shows the spinner, and only over an empty grid. */
@@ -211,6 +219,7 @@ function MemberWardrobeHub({
   // state, so the setup card is already in place when the closet appears.
   const [inventorySettled, setInventorySettled] = useState(false)
   const [onboardingSettled, setOnboardingSettled] = useState(false)
+  const [savedLooksSettled, setSavedLooksSettled] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
@@ -412,6 +421,7 @@ function MemberWardrobeHub({
       setSavedLooksTotal(0)
       setSavedLooksError(null)
       setSavedLooksLoading(false)
+      setSavedLooksSettled(true)
       return
     }
     const controller = new AbortController()
@@ -440,6 +450,7 @@ function MemberWardrobeHub({
       .finally(() => {
         if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
           setSavedLooksLoading(false)
+          setSavedLooksSettled(true)
         }
       })
     return () => controller.abort()
@@ -453,6 +464,24 @@ function MemberWardrobeHub({
       }
     })
   }, [owner])
+
+  // Story CC-7.7 D5: tabs stay mounted, so returning to the Closet is a focus, never a mount.
+  // It reads the inventory and the Saved Looks again in place: the grid, the row and the
+  // scroll position stay, and only the first read ever shows the spinner. The first focus is
+  // the mount, whose reads are already running.
+  const leftClosetRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (leftClosetRef.current && epoch === mobileIdentityEpoch()) {
+        setLoadAttempt((attempt) => attempt + 1)
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }
+      leftClosetRef.current = false
+      return () => {
+        leftClosetRef.current = true
+      }
+    }, [epoch])
+  )
 
   const loadMoreSavedLooks = useCallback(() => {
     if (
@@ -676,7 +705,14 @@ function MemberWardrobeHub({
 
           <ScreenGate
             screen="closet"
-            ready={closetGateReady(inventorySettled, onboardingSettled)}
+            ready={closetGateReady(
+              inventorySettled,
+              onboardingSettled,
+              savedLooksSettled
+            )}
+            // The ScrollView's 24-point gap reaches only its direct children; the gated card,
+            // Saved Looks and inventory keep the same spacing inside the gate body.
+            style={styles.gatedBody}
           >
             {showOnboardingCard ? (
               <Pressable
@@ -701,7 +737,9 @@ function MemberWardrobeHub({
               hasMore={savedLooks.length < savedLooksTotal}
               isLoadingMore={savedLooksLoadingMore}
               onLoadMore={loadMoreSavedLooks}
-              isLoading={savedLooksLoading}
+              // Story CC-7.7 D5: only the first page shows the loading count; a refresh keeps
+              // the count on screen until its answer lands.
+              isLoading={savedLooksLoading && !savedLooksSettled}
               loadError={savedLooksError}
               garments={garments}
               onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
@@ -958,6 +996,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   content: { padding: 20, gap: 24 },
+  gatedBody: { gap: 24 },
   header: { gap: 16 },
   title: { fontSize: 28, fontWeight: '700' },
   subtitle: { marginTop: 6, opacity: 0.7 },

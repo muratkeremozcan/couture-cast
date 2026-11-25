@@ -75,7 +75,8 @@ export function readKey(url: string, method: string) {
  * row sits above the grid.
  */
 export const GATE_READS: Record<ShellScreen, string[]> = {
-  home: ['ritual', 'home-teaser', 'community-spotlight'],
+  // The ritual read counts as settled only once its city line (`locations`) answered too.
+  home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
   closet: ['profile', 'onboarding', 'garments', 'saved-looks'],
   community: ['community-feed', 'community-spotlight'],
   profile: [
@@ -391,26 +392,37 @@ const NO_CITY = {
 export function createShellRouter(options: {
   mode: ShellMode
   screen: () => ShellScreen
-  memberId: string
+  /**
+   * A member run: a stubbed read without a fixture bearer answers 401 instead of member data,
+   * so a member who lost the bearer cannot pass on fixture content (Codex P2-10). A signed-out
+   * run lets bearer-less reads through to the local API, as a visitor's would go.
+   */
+  requireBearer: boolean
+  /** Extra delay for named reads, on top of the mode's (the stored-session case holds `profile`). */
+  hold?: Partial<Record<string, number>>
 }) {
-  const { mode, memberId } = options
+  const { mode } = options
   const populated = mode !== 'empty'
   // Bodies follow the bearer each request carries, so a member switch inside one document
   // (7.7-E2E-009) gets the new member's content and the old member's text tells a leak apart.
   const bodiesByOwner = new Map<string, ReturnType<typeof bodies>>()
   const bodiesFor = (request: Request) => {
-    const owner = fixtureOwner(request.headers()['authorization']) ?? memberId
+    // Only reached with a fixture bearer (the handler refuses the rest), so no fallback owner.
+    const owner = fixtureOwner(request.headers()['authorization'])!
     if (!bodiesByOwner.has(owner)) bodiesByOwner.set(owner, bodies(owner, populated))
     return bodiesByOwner.get(owner)!
   }
   let open = 0
   const calls = new Map<string, number>()
   const unknown = new Set<string>()
+  const unauthenticated = new Set<string>()
 
   const delayFor = (key: string) => {
-    if (mode === 'delayed') return DELAY_MS
-    if (mode === 'late' && !GATE_READS[options.screen()].includes(key)) return DELAY_MS
-    return 0
+    const held = options.hold?.[key] ?? 0
+    if (mode === 'delayed') return DELAY_MS + held
+    if (mode === 'late' && !GATE_READS[options.screen()].includes(key))
+      return DELAY_MS + held
+    return held
   }
 
   const handler = async (route: Route, request: Request) => {
@@ -418,6 +430,18 @@ export function createShellRouter(options: {
     if (key === null) {
       unknown.add(`${request.method()} ${new URL(request.url()).pathname}`)
       await route.fallback()
+      return
+    }
+    if (fixtureOwner(request.headers()['authorization']) === null) {
+      if (options.requireBearer) {
+        unauthenticated.add(`${request.method()} ${new URL(request.url()).pathname}`)
+        await route.fulfill({
+          status: 401,
+          json: { statusCode: 401, message: 'Unauthorized' },
+        })
+      } else {
+        await route.fallback()
+      }
       return
     }
     calls.set(key, (calls.get(key) ?? 0) + 1)
@@ -435,6 +459,11 @@ export function createShellRouter(options: {
           status: 503,
           json: { statusCode: 503, message: 'Unavailable' },
         })
+      } else if (key === 'community-feed') {
+        // The page names the filter it was asked for, as the API does.
+        const feed = json[key] as { data: Record<string, unknown> }
+        const requested = new URL(request.url()).searchParams.get('mode') ?? 'auto'
+        await route.fulfill({ json: { data: { ...feed.data, mode: requested } } })
       } else {
         await route.fulfill({ json: json[key] })
       }
@@ -450,6 +479,8 @@ export function createShellRouter(options: {
     inflight: () => open,
     calls: (key: string) => calls.get(key) ?? 0,
     unknown: () => [...unknown].sort(),
+    /** Member reads that arrived without a fixture bearer and were refused. */
+    unauthenticated: () => [...unauthenticated].sort(),
   }
 }
 

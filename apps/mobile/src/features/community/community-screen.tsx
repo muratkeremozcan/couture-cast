@@ -106,6 +106,7 @@ import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-
 import { LiveCommunitySponsorships } from '@/src/features/community/live-sponsorships'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { ScreenGate } from '@/src/components/screen-gate'
+import { useStatusBar } from '@/components/save-feedback'
 import {
   useCommunitySpotlight,
   type CommunitySpotlightView,
@@ -394,12 +395,30 @@ export function CommunityScreen() {
   // Story 6.7b: the latest live sponsorship answer per post, for every copy.
   const [sponsorships] = useState(() => new LiveCommunitySponsorships())
   const [postTextLedger] = useState(() => new CommunityPostTextLedger())
+  // Story CC-7.7 D4: a Spotlight refresh that failed over shown cards reports in the root
+  // status bar, a floating slot, so the row and the feed below it stay where they are.
+  const statusBar = useStatusBar()
   const spotlight = useCommunitySpotlight({
     sessionScope,
     reactionState,
     sponsorships,
     postTextLedger,
     onBanned: setBannedSanction,
+    onRefreshFailed: (retry) => {
+      statusBar.showNotice({
+        id: 'community-spotlight-refresh-failed',
+        message: t('community.spotlight.error'),
+        tone: 'error',
+        actions: [
+          {
+            id: 'community-spotlight-refresh-retry',
+            kind: 'retry',
+            label: t('community.spotlight.retry'),
+            onPress: retry,
+          },
+        ],
+      })
+    },
   })
   // Every live read (feed page, rebuild, single post, spotlight) applies its
   // sponsorship answers to the copies already on screen.
@@ -1691,6 +1710,9 @@ export function CommunityScreen() {
    * loading module is awaited for at most 10 seconds. The entry, when shown,
    * takes focus with one announcement; every other outcome focuses one notice.
    * Either way the intent is consumed, so a later recovery moves no focus.
+   * Story CC-7.7 D3: the module sits inside the screen gate, which stays closed until the
+   * first feed page settles too. A ready Spotlight behind a closed gate is still waiting, so
+   * the intent is consumed only once the entry is on screen and can take focus.
    */
   const spotlightStatus = spotlight.status
   const focusSpotlightEntry = spotlight.focusEntry
@@ -1707,7 +1729,7 @@ export function CommunityScreen() {
       report('community.spotlight.destinationUnavailable')
       return
     }
-    if (spotlightStatus === 'loading') {
+    if (spotlightStatus === 'loading' || !communityGateReady) {
       const timer = setTimeout(
         () => report('community.spotlight.destinationUnavailable'),
         Math.max(0, spotlightIntent.receivedAt + SPOTLIGHT_FOCUS_WAIT_MS - Date.now())
@@ -1728,6 +1750,7 @@ export function CommunityScreen() {
     report('community.spotlight.targetUnavailable')
   }, [
     communityAvailable,
+    communityGateReady,
     feedListRef,
     focusSpotlightEntry,
     screenFocused,

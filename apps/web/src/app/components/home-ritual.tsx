@@ -50,7 +50,9 @@ import {
 } from '../../lib/saved-looks'
 import {
   currentWebSessionBearer,
+  currentWebSessionScope,
   isLiveOwner,
+  isLiveScope,
   MemberScope,
   type MemberSession,
 } from '../../lib/use-web-session'
@@ -820,58 +822,90 @@ function MemberRitual({ owner }: { owner: string }) {
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
   const screen = useScreenGateScreen()
-  const [snapshot] = useState(() =>
-    screen
-      ? screenSnapshot.recall<RitualSnapshot>(owner, screen, RITUAL_SNAPSHOT_PART)
-      : undefined
-  )
+  const [start] = useState(() => {
+    const scope = currentWebSessionScope()
+    return {
+      scope,
+      snapshot: screen
+        ? screenSnapshot.recall<RitualSnapshot>(scope, screen, RITUAL_SNAPSHOT_PART)
+        : undefined,
+    }
+  })
+  const snapshot = start.snapshot
   const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
   const [city, setCity] = useState<string | undefined>(snapshot?.city)
   const [failure, setFailure] = useState<RitualFailure | null>(snapshot?.failure ?? null)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(true)
+  /** Codex review P2-1: the session scope of the read whose answer this section shows. */
+  const shownScopeRef = useRef<string | null>(start.scope)
+  /**
+   * Codex review P2-4: the city line's read has answered, or none will run. The gate waits for
+   * it too, so the city never lands in the visible outfit's header after the reveal.
+   */
+  const [cityRead, setCityRead] = useState(snapshot !== undefined)
   // Story CC-7.7 D2: the ritual read has answered (an outfit, none, or a failure). Until then
   // nothing renders here, never the sample outfit: a member sees the sample only once their
   // own read settled without a usable outfit.
   const settled = ritual !== null || failure !== null
-  useScreenGateRead('ritual', settled)
+  useScreenGateRead('ritual', failure !== null || (ritual !== null && cityRead))
   useEffect(() => {
-    if (!screen || !settled || !isLiveOwner(owner)) return
-    screenSnapshot.remember(owner, screen, RITUAL_SNAPSHOT_PART, {
+    if (!screen || !settled) return
+    // Stored under the scope its read started in: the store drops it once that scope left.
+    screenSnapshot.remember(shownScopeRef.current, screen, RITUAL_SNAPSHOT_PART, {
       ritual,
       city,
       failure,
     } satisfies RitualSnapshot)
-  }, [city, failure, owner, ritual, screen, settled])
+  }, [city, failure, ritual, screen, settled])
 
   useEffect(() => {
     const token = currentWebSessionBearer()
     if (!token || !isLiveOwner(owner)) return
+    const scope = currentWebSessionScope()
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    /**
+     * Codex review P2-1: e2e fixture bearers share one owner, so the owner check alone would let
+     * an answer read with the last fixture bearer land for the next. Such an answer is dropped
+     * and the ritual is read again with the bearer the tab holds now.
+     */
+    const sameScope = () => {
+      if (isLiveScope(scope)) return true
+      setAttempt((value) => value + 1)
+      return false
+    }
     setBusy(true)
     void getRitualFromWeb(token, locale, controller.signal)
       .then((data) => {
-        if (!current()) return
+        if (!current() || !sameScope()) return
+        shownScopeRef.current = scope
         setRitual(data)
         setFailure(null)
         const credentials = captureLocationCredentials()
-        if (credentials) {
-          void listLocationsFromWeb(controller.signal, credentials)
-            .then((locations) => {
-              if (current())
-                setCity(
-                  locations.find(
-                    (location) => location.locationKey === data.weather.locationKey
-                  )?.label
-                )
-            })
-            .catch(() => undefined)
+        if (!credentials) {
+          setCityRead(true)
+          return
         }
+        void listLocationsFromWeb(controller.signal, credentials)
+          .then((locations) => {
+            if (!current() || !sameScope()) return
+            setCity(
+              locations.find(
+                (location) => location.locationKey === data.weather.locationKey
+              )?.label
+            )
+            setCityRead(true)
+          })
+          .catch(() => {
+            // No city line: the outfit shows without it, as before.
+            if (current()) setCityRead(true)
+          })
       })
       .catch(async (error: unknown) => {
         const kind = await ritualFailure(error)
-        if (!current()) return
+        if (!current() || !sameScope()) return
+        shownScopeRef.current = scope
         if (kind === 'missing-city') {
           setRitual(null)
           setCity(undefined)
@@ -897,15 +931,23 @@ function MemberRitual({ owner }: { owner: string }) {
   )
   if (ritual?.outfits.some(usableOutfit))
     return (
-      <>
+      <div className="relative min-w-0">
+        <LiveOutfit ritual={ritual} city={city} stale={failure === 'failed'} />
+        {/* Codex review P2-4: a refresh that failed keeps the outfit, and its notice and Retry
+            sit over the top of it instead of being inserted above it, so nothing on the
+            visible screen moves (the same overlay rule as Community's new-looks pill, D4). */}
         {failure === 'failed' && (
-          <div className="flex flex-wrap items-center gap-2">
-            <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
-            {retry}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-end">
+            <div
+              data-testid="home-outfit-refresh-failed"
+              className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 text-[color:var(--lookbook-ink)] shadow-md"
+            >
+              <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
+              {retry}
+            </div>
           </div>
         )}
-        <LiveOutfit ritual={ritual} city={city} stale={failure === 'failed'} />
-      </>
+      </div>
     )
 
   if (!settled) return null

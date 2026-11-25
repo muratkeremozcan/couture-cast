@@ -38,7 +38,8 @@ import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 import {
   currentWebSessionBearer,
   currentWebSessionOwner,
-  isLiveOwner,
+  currentWebSessionScope,
+  isLiveScope,
   UNVERIFIED_BEARER_OWNER,
   useHydrating,
   useWebSessionOwner,
@@ -369,18 +370,23 @@ const EMPTY_CLOSET: ClosetSnapshot = {
   savedLooksTotal: 0,
 }
 
-/** Where a Closet mount starts: this member's snapshot on a return, else nothing loaded. */
+/**
+ * Where a Closet mount starts: this member's snapshot on a return, else nothing loaded. `scope`
+ * is the session scope at mount (Codex review P2-1), what a fixture bearer switch is told by.
+ */
 function useClosetStart(owner: string | null): {
   restored: boolean
   start: ClosetSnapshot
+  scope: string | null
 } {
   const hydrating = useHydrating()
   const [start] = useState(() => {
+    const scope = owner ? currentWebSessionScope() : null
     const snapshot =
       hydrating || !owner
         ? undefined
-        : screenSnapshot.recall<ClosetSnapshot>(owner, 'closet', CLOSET_SNAPSHOT_PART)
-    return { restored: snapshot !== undefined, start: snapshot ?? EMPTY_CLOSET }
+        : screenSnapshot.recall<ClosetSnapshot>(scope, 'closet', CLOSET_SNAPSHOT_PART)
+    return { restored: snapshot !== undefined, start: snapshot ?? EMPTY_CLOSET, scope }
   })
   return start
 }
@@ -461,7 +467,9 @@ function ClosetAccountNotices({
 function WardrobeHubView({ owner }: { owner: string | null }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
-  const { restored, start } = useClosetStart(owner)
+  const { restored, start, scope: startScope } = useClosetStart(owner)
+  /** The session scope of the closet read whose garments are on screen (Codex review P2-1). */
+  const shownScopeRef = useRef<string | null>(startScope)
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
   const [garments, setGarments] = useState<ClosetGarment[]>(start.garments)
@@ -514,10 +522,15 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       // Give a superseded request one fresh read, including any missing garments.
       for (let attempt = 0; attempt < 2; attempt++) {
         const version = inventoryVersion.current
+        const scope = currentWebSessionScope()
         const items = await listGarmentsFromWeb(signal)
         if (signal.aborted || currentWebSessionOwner() !== owner) return null
+        // Codex review P2-1: e2e fixture bearers share one owner, so a closet read with the
+        // last fixture bearer is dropped and read again with the bearer the tab holds now.
+        if (!isLiveScope(scope)) continue
         // A completed refresh or local update may be newer than this snapshot.
         if (version !== inventoryVersion.current) continue
+        shownScopeRef.current = scope
         inventoryVersion.current++
         setGarments(items)
         setLoadError(null)
@@ -938,8 +951,9 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
 
   // Story CC-7.7 D5: what a return to the Closet shows first, for this member only.
   useEffect(() => {
-    if (!owner || !hasLoaded || !savedLooksSettled || !isLiveOwner(owner)) return
-    screenSnapshot.remember(owner, 'closet', CLOSET_SNAPSHOT_PART, {
+    if (!owner || !hasLoaded || !savedLooksSettled) return
+    // Under the scope its closet read started in; the store drops it once that scope left.
+    screenSnapshot.remember(shownScopeRef.current, 'closet', CLOSET_SNAPSHOT_PART, {
       garments,
       onboardingStatus,
       onboardingStatusError,

@@ -65,6 +65,7 @@ export const SHELL_METER_CONFIG: MeterConfig = {
     'landing-sign-up',
     'member-sample-outfit',
     'home-live-outfit',
+    'home-spotlight-teaser',
   ],
 }
 
@@ -166,10 +167,10 @@ export function installShellMeter(config: MeterConfig) {
     })
     requestAnimationFrame(sample)
   }
-  // The first frame is the first paint the document gets: rAF callbacks run before paint.
-  const start = () => requestAnimationFrame(sample)
-  if (document.documentElement) start()
-  else document.addEventListener('readystatechange', start, { once: true })
+  // Sampling starts at once, before the parser has built <html>: rAF callbacks run before each
+  // paint, so the first sample precedes the first (server-rendered) paint. Waiting for
+  // readystatechange let a streamed first paint fall outside the sample (Codex P2-10).
+  requestAnimationFrame(sample)
 }
 
 /** 7.7-UNIT-001/002: every entry in the window counts, input or not. */

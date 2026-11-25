@@ -281,6 +281,33 @@ export function currentWebSessionBearer(): string | null {
 }
 
 /**
+ * Story CC-7.7 D5 (Codex P2-1): whose content a read belongs to. A verified member is their
+ * owner alone, so a token refresh keeps their scope (and their tab snapshots). The e2e fixture
+ * bearers all share one owner (`UNVERIFIED_BEARER_OWNER`), so the fixture scope adds the bearer:
+ * a read captures it when it starts, and an answer whose scope is no longer live is dropped.
+ * The scope lives in memory only and is only ever compared.
+ */
+export function currentWebSessionScope(): string | null {
+  const owner = currentWebSessionOwner()
+  if (owner !== UNVERIFIED_BEARER_OWNER) return owner
+  return `${UNVERIFIED_BEARER_OWNER}\u0000${fixtureBearer() ?? ''}`
+}
+
+/** True only while `scope` is the one `currentWebSessionScope` names right now. */
+export function isLiveScope(scope: string | null): scope is string {
+  return scope !== null && currentWebSessionScope() === scope
+}
+
+/** `currentWebSessionScope`, read as an external store like `useWebSessionOwner`. */
+export function useWebSessionScope(): string | null {
+  return useSyncExternalStore(
+    subscribeWebSessionOwner,
+    currentWebSessionScope,
+    () => null
+  )
+}
+
+/**
  * A read was denied and the bridge could not verify the member's session again (a timeout or a
  * 5xx from the profile check). Says nothing about the member: the section shows its load error
  * with a retry, and reads again when the bridge next verifies this member

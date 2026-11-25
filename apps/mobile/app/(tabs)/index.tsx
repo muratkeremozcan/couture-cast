@@ -90,6 +90,7 @@ import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
+import { useStatusBar } from '@/components/save-feedback'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
 import {
   HomeAddGarment,
@@ -324,6 +325,7 @@ export default function TabOneScreen() {
   const palette = useHeroPalette()
   const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
+  const statusBar = useStatusBar()
   const reduceMotion = useReducedMotion()
   const swapModalAnimation = useModalAnimation('slide')
   const latestLoadId = useRef(0)
@@ -415,7 +417,47 @@ export default function TabOneScreen() {
     }
   }
 
-  const loadData = async (forceRefresh = false, allowCacheFallback = true) => {
+  /** A ritual read the member asked for, or the first: counted, and announced on a Retry. */
+  const reportFreshRitual = (data: RitualResponse, forceRefresh: boolean) => {
+    trackMobileRitualCreated(analytics, {
+      userId: analyticsUserId,
+      locationId: data.data.weather.locationKey,
+      ritualType: 'daily_outfit',
+      weatherContext: data.data.weather.current.condition,
+    })
+    if (forceRefresh) {
+      announce(
+        'refresh',
+        t(`hero.conditions.${data.data.weather.current.condition}`, {
+          defaultValue: data.data.weather.current.condition,
+        })
+      )
+    }
+  }
+
+  /** A refresh that failed over a shown outfit: reported with Retry in the root status bar. */
+  const reportRefreshFailure = () => {
+    statusBar.showNotice({
+      id: 'home-ritual-refresh-failed',
+      message: t('hero.load_error'),
+      tone: 'error',
+      actions: [
+        {
+          id: 'home-ritual-refresh-retry',
+          kind: 'retry',
+          label: t('hero.retry'),
+          onPress: () => void latestLoadDataRef.current(true),
+        },
+      ],
+    })
+  }
+
+  const loadData = async (
+    forceRefresh = false,
+    allowCacheFallback = true,
+    // A tab-return refresh: no announcement, and no new ritual counted in analytics.
+    background = false
+  ) => {
     const loadId = ++latestLoadId.current
     const isCurrent = () =>
       loadId === latestLoadId.current && applicationUserId === mobileApplicationUserId()
@@ -465,27 +507,18 @@ export default function TabOneScreen() {
         alertPreferences: fetchedPreferences,
       }).catch(() => undefined)
 
-      trackMobileRitualCreated(analytics, {
-        userId: analyticsUserId,
-        locationId: data.data.weather.locationKey,
-        ritualType: 'daily_outfit',
-        weatherContext: data.data.weather.current.condition,
-      })
-      if (forceRefresh) {
-        announce(
-          'refresh',
-          t(`hero.conditions.${data.data.weather.current.condition}`, {
-            defaultValue: data.data.weather.current.condition,
-          })
-        )
-      }
+      if (!background) reportFreshRitual(data, forceRefresh)
     } catch (loadError) {
       const errorKind = await classifyRitualError(loadError)
       if (!isCurrent()) return
 
       // Story CC-7.7: a refresh that fails keeps the outfit already on screen, and inserts no
-      // banner above it after the member started using the screen.
-      if (inPlace && ritualRef.current !== null) return
+      // banner above it after the member started using the screen. The failure and its Retry
+      // show in the root status bar, a floating slot that moves no content.
+      if (inPlace && ritualRef.current !== null) {
+        reportRefreshFailure()
+        return
+      }
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
         setOwnedRitual({ owner: applicationUserId, data: cached.data })
@@ -505,6 +538,11 @@ export default function TabOneScreen() {
       }
     }
   }
+
+  // The status bar's Retry runs after later renders; it reads with the screen's current
+  // member and locale.
+  const latestLoadDataRef = useRef(loadData)
+  latestLoadDataRef.current = loadData
 
   // Story 1.2b: a saved, switched or deleted location changes the ritual. The
   // previous primary's ritual leaves the screen and the device cache at once, and
@@ -534,6 +572,28 @@ export default function TabOneScreen() {
       unsubscribeWardrobe()
     }
   }, [])
+
+  // Story CC-7.7 D5: tabs stay mounted, so returning to Home is a focus, never a mount. With
+  // the member's outfit on screen the return refreshes it in place: the outfit and the scroll
+  // stay, and the initial loading state never returns. The first focus is the mount, whose
+  // read the effect below already started.
+  const leftHomeRef = useRef(false)
+  const refreshOnReturnRef = useRef<() => void>(() => undefined)
+  refreshOnReturnRef.current = () => {
+    // Past the 15-minute device cache: a cached answer would mark the outfit cache-served and
+    // take its Shop this look away. In the background: unlike Retry, it announces nothing.
+    if (sessionState === 'member' && ritualRef.current !== null)
+      void loadData(true, true, true)
+  }
+  useFocusEffect(
+    useCallback(() => {
+      if (leftHomeRef.current) refreshOnReturnRef.current()
+      leftHomeRef.current = false
+      return () => {
+        leftHomeRef.current = true
+      }
+    }, [])
+  )
 
   useEffect(() => {
     // Track when user views Tab One - top of the engagement funnel

@@ -3,20 +3,31 @@
 // A return to a tab in the same session shows the tab's last settled content and scroll offset in
 // its first frame, then refreshes in place. The snapshot lives in this module's memory only:
 // nothing here touches localStorage, sessionStorage or any other store, so a reload, a new tab or
-// a closed browser starts from nothing. It holds one member at a time: any change of the member
-// the session bridge names (another account, or sign-out), or of the bearer this tab holds,
-// clears it before the next render can read it, so one member's content never reaches another.
-// The bearer matters because the end-to-end fixture bearers all map to one owner
-// (UNVERIFIED_BEARER_OWNER): the owner alone would let one fixture member recall another's.
-// The bearer is only compared, in memory, and never stored anywhere else.
+// a closed browser starts from nothing. It holds one session scope at a time
+// (`currentWebSessionScope`): a verified member's scope is their owner, so a token refresh keeps
+// it; the e2e fixture scope also names the bearer, because every fixture bearer maps to one owner
+// (UNVERIFIED_BEARER_OWNER). Any change of scope (another account, another fixture bearer, or
+// sign-out) clears it before the next render can read it, so one member's content never reaches
+// another. A write carries the scope its read started under and is dropped when that scope is no
+// longer live (Codex review P2-1).
 'use client'
 
-import { currentWebSessionBearer, currentWebSessionOwner } from './use-web-session'
+import { currentWebSessionScope } from './use-web-session'
 
 /** The four signed-in tabs; the snapshot never holds more than these. */
 export type ScreenName = 'home' | 'closet' | 'community' | 'profile'
 
 export const SCREEN_SNAPSHOT_CAP = 4
+
+/** The Community grid's part, on Home and on Community. */
+export const COMMUNITY_GRID_SNAPSHOT_PART = 'community-grid'
+/** The Home Spotlight teaser's part. */
+export const HOME_TEASER_SNAPSHOT_PART = 'teaser'
+/** Every part that holds Community content: losing Community access revokes them (P3-1). */
+export const COMMUNITY_SNAPSHOT_PARTS = [
+  COMMUNITY_GRID_SNAPSHOT_PART,
+  HOME_TEASER_SNAPSHOT_PART,
+] as const
 
 type Entry = {
   /** The tab's body settled at least once in this session (its gate opened from its reads). */
@@ -28,37 +39,57 @@ type Entry = {
 }
 
 export interface ScreenSnapshotStore {
-  /** Stores one named part of a tab's last settled data for `owner`. */
-  remember(owner: string, screen: ScreenName, part: string, value: unknown): void
-  /** The part stored for `owner`, or undefined when another member (or none) owns the snapshot. */
-  recall<T>(owner: string | null, screen: ScreenName, part: string): T | undefined
-  /** Marks the tab settled for `owner`: its next mount opens its gate at once. */
-  markSettled(owner: string, screen: ScreenName): void
-  isSettled(owner: string | null, screen: ScreenName): boolean
-  rememberScroll(owner: string, screen: ScreenName, scrollY: number): void
-  recallScroll(owner: string | null, screen: ScreenName): number | undefined
+  /**
+   * Stores one named part of a tab's last settled data under `scope`, the session scope its read
+   * started under. Dropped when that scope is no longer live, or while the part is revoked.
+   */
+  remember(scope: string | null, screen: ScreenName, part: string, value: unknown): void
+  /** The part stored for `scope`, or undefined when another scope (or none) owns the snapshot. */
+  recall<T>(scope: string | null, screen: ScreenName, part: string): T | undefined
+  /** Marks the tab settled for `scope`: its next mount opens its gate at once. */
+  markSettled(scope: string | null, screen: ScreenName): void
+  isSettled(scope: string | null, screen: ScreenName): boolean
+  rememberScroll(scope: string | null, screen: ScreenName, scrollY: number): void
+  recallScroll(scope: string | null, screen: ScreenName): number | undefined
+  /**
+   * Drops `parts` from every tab and refuses later writes of them until `allow`, and forgets
+   * that `screens` ever settled (Community access lost, P3-1). A write already in flight, read
+   * before the loss, can then never put the content back.
+   */
+  revoke(parts: readonly string[], screens: readonly ScreenName[]): void
+  /** Accepts writes of `parts` again: a read started after the loss answered with access. */
+  allow(parts: readonly string[]): void
   /** Drops everything. */
   clear(): void
-  /** Clears the snapshot unless `liveOwner` and the tab's bearer are the ones it was taken under. */
-  follow(liveOwner: string | null): void
+  /** Clears the snapshot unless the live session scope is the one it was taken under. */
+  follow(): void
   /** Tabs held right now, for tests. */
   size(): number
 }
 
 export function createScreenSnapshotStore(
-  readBearer: () => string | null = currentWebSessionBearer
+  readScope: () => string | null = currentWebSessionScope
 ): ScreenSnapshotStore {
-  let owner: string | null = null
-  let bearer: string | null = null
+  let held: string | null = null
   const entries = new Map<ScreenName, Entry>()
+  const revoked = new Set<string>()
 
-  const entryFor = (member: string, screen: ScreenName): Entry => {
-    const live = readBearer()
-    if (owner !== member || bearer !== live) {
-      entries.clear()
-      owner = member
-      bearer = live
-    }
+  const reset = (scope: string | null) => {
+    held = scope
+    entries.clear()
+    revoked.clear()
+  }
+
+  /** The live scope, adopted (clearing anything held for another), or null when none is live. */
+  const adoptLive = (scope: string | null): string | null => {
+    const live = readScope()
+    if (scope === null || scope !== live) return null
+    if (held !== live) reset(live)
+    return live
+  }
+
+  const entryFor = (scope: string | null, screen: ScreenName): Entry | undefined => {
+    if (adoptLive(scope) === null) return undefined
     let entry = entries.get(screen)
     if (!entry) {
       entry = { settled: false, scrollY: 0, parts: new Map() }
@@ -72,42 +103,59 @@ export function createScreenSnapshotStore(
     return entry
   }
 
-  const read = (member: string | null, screen: ScreenName): Entry | undefined =>
-    member !== null && member === owner && bearer === readBearer()
+  const read = (scope: string | null, screen: ScreenName): Entry | undefined =>
+    scope !== null && scope === held && scope === readScope()
       ? entries.get(screen)
       : undefined
 
   return {
-    remember(member, screen, part, value) {
-      entryFor(member, screen).parts.set(part, value)
+    remember(scope, screen, part, value) {
+      if (held === scope && revoked.has(part)) return
+      const entry = entryFor(scope, screen)
+      if (!entry) return
+      if (value === undefined) entry.parts.delete(part)
+      else entry.parts.set(part, value)
     },
-    recall<T>(member: string | null, screen: ScreenName, part: string) {
-      return read(member, screen)?.parts.get(part) as T | undefined
+    recall<T>(scope: string | null, screen: ScreenName, part: string) {
+      return read(scope, screen)?.parts.get(part) as T | undefined
     },
-    markSettled(member, screen) {
-      entryFor(member, screen).settled = true
+    markSettled(scope, screen) {
+      const entry = entryFor(scope, screen)
+      if (entry) entry.settled = true
     },
-    isSettled(member, screen) {
-      return read(member, screen)?.settled === true
+    isSettled(scope, screen) {
+      return read(scope, screen)?.settled === true
     },
-    rememberScroll(member, screen, scrollY) {
-      entryFor(member, screen).scrollY = scrollY
+    rememberScroll(scope, screen, scrollY) {
+      const entry = entryFor(scope, screen)
+      if (entry) entry.scrollY = scrollY
     },
-    recallScroll(member, screen) {
-      return read(member, screen)?.scrollY
+    recallScroll(scope, screen) {
+      return read(scope, screen)?.scrollY
+    },
+    revoke(parts, screens) {
+      const live = readScope()
+      if (held !== live) reset(live)
+      for (const part of parts) revoked.add(part)
+      for (const entry of entries.values())
+        for (const part of parts) entry.parts.delete(part)
+      for (const screen of screens) {
+        const entry = entries.get(screen)
+        if (entry) {
+          entry.settled = false
+          entry.scrollY = 0
+        }
+      }
+    },
+    allow(parts) {
+      if (held !== readScope()) return
+      for (const part of parts) revoked.delete(part)
     },
     clear() {
-      owner = null
-      bearer = null
-      entries.clear()
+      reset(null)
     },
-    follow(liveOwner) {
-      if (owner === null) return
-      if (liveOwner === null || owner !== liveOwner || bearer !== readBearer()) {
-        owner = null
-        bearer = null
-        entries.clear()
-      }
+    follow() {
+      if (held !== null && held !== readScope()) reset(null)
     },
     size() {
       return entries.size
@@ -124,7 +172,7 @@ export const screenSnapshot = createScreenSnapshotStore()
  * before any component's listener re-renders a tab with another member's snapshot.
  */
 function followSession() {
-  screenSnapshot.follow(currentWebSessionOwner())
+  screenSnapshot.follow()
 }
 
 if (typeof window !== 'undefined') {

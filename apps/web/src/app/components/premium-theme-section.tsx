@@ -51,7 +51,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead } from './screen-gate'
+import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
 const UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
 
@@ -355,8 +355,14 @@ export function PremiumThemeSection() {
 function MemberThemeSection({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
   const { status, owner } = session
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [theme, setTheme] = useState<PremiumTheme | null>(null)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's palettes at once
+  // and reads them again in place; a failed refresh keeps them.
+  const snapshot = useSectionSnapshot<PremiumTheme>('theme', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [theme, setTheme] = useState<PremiumTheme | null>(() => snapshot.restored ?? null)
   /** The `dataTheme` of the card whose save is in flight, or null when idle. */
   const [savingTheme, setSavingTheme] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -405,8 +411,10 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    beginRead()
     setError(null)
-    setSectionState('loading')
+    if (!inPlace) setSectionState('loading')
 
     void (async () => {
       try {
@@ -426,6 +434,8 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         if (!current()) {
           return
         }
+        // A restored palette stays on screen when its refresh fails, unless the member is out.
+        if (inPlace && premiumThemeFailureReason(loadError) !== 'signed_out') return
         /*
          * AC 6: a failed read renders Default with a quiet inline error. It must not
          * block the rest of the settings page, and it must not leave the surface
@@ -445,7 +455,14 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage])
+  }, [status, owner, loadErrorMessage, restoredFor, beginRead])
+
+  // What a return to Profile shows first: the palettes once read, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready' && theme !== null) remember(theme)
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [remember, sectionState, theme])
 
   /**
    * The palette the server last confirmed, which is both what the gallery marks

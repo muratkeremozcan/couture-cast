@@ -109,9 +109,15 @@ export function useCommunitySpotlight({
   sponsorships,
   postTextLedger,
   onBanned,
+  onRefreshFailed,
 }: {
   /** Story 6.11: a read refused for a ban closes the whole community screen, on any page. */
   onBanned?: (sanction: CommunityBannedError['sanction']) => void
+  /**
+   * Story CC-7.7: a refresh in place failed and the row kept its cards. The screen reports it
+   * in a slot that moves no content; the row itself never inserts an error above the feed.
+   */
+  onRefreshFailed?: (retry: () => void) => void
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
   reactionState: CommunityReactionState
@@ -133,6 +139,8 @@ export function useCommunitySpotlight({
   const [loadMoreFailed, setLoadMoreFailed] = useState(false)
   const onBannedRef = useRef(onBanned)
   onBannedRef.current = onBanned
+  const onRefreshFailedRef = useRef(onRefreshFailed)
+  onRefreshFailedRef.current = onRefreshFailed
   const [focusRequest, setFocusRequest] = useState<SpotlightFocusRequest | null>(null)
   // A page settles after later renders, so it compares against the cards shown now.
   const itemsRef = useRef(items)
@@ -144,6 +152,8 @@ export function useCommunitySpotlight({
   const controllerRef = useRef<AbortController | null>(null)
   const loadingMoreRef = useRef(false)
   const focusSerialRef = useRef(0)
+  // The refresh-failure Retry runs after later renders; it reads with the latest reload.
+  const reloadRef = useRef<() => void>(() => undefined)
   // Single-post image refreshes run beside paging, so a View more never cancels
   // one. A session change or unmount aborts them all.
   const itemRefreshesRef = useRef(new Map<string, AbortController>())
@@ -222,7 +232,10 @@ export function useCommunitySpotlight({
         if (!isCurrent()) return
         const sanction = communitySanctionOf(error)
         // A failed refresh keeps the row on screen; a ban or a disabled Spotlight still closes it.
-        if (inPlace && !sanction && !isDisabledRefusal(error)) return
+        if (inPlace && !sanction && !isDisabledRefusal(error)) {
+          onRefreshFailedRef.current?.(() => reloadRef.current())
+          return
+        }
         setItems([])
         setNextCursor(null)
         setFocusRequest(null)
@@ -239,6 +252,7 @@ export function useCommunitySpotlight({
   const reload = useCallback(() => {
     if (sessionScopeRef.current) void load(false, statusRef.current === 'ready')
   }, [load])
+  reloadRef.current = reload
 
   const loadMore = useCallback(() => {
     const cursor = nextCursorRef.current

@@ -1,6 +1,11 @@
 # Test design: Story CC-7.7 signed-in shell without flashes
 
 Updated: 2026-11-25. Initial plan from spec-7-7 (ready-for-dev, baseline 11c26918).
+Updated: 2026-11-25. Codex fixes from the builder: 7.7-UNIT-014..015, 7.7-CMP-010..019,
+7.7-NAT-006; Home gate also waits for the city line (`locations`) and deep-link focus.
+Updated: 2026-11-25. Codex review: member baseline at 390 x 844 recorded before merge (P2-11);
+meter samples from the first frame, every member case proves member content per tab, fixtures
+refuse member reads without a bearer, stored-session case 7.7-E2E-011 (P2-10).
 Updated: 2026-11-25. D3 amended (Profile gate waits for its commerce reads; signed-out Closet and
 Profile in budget): E2E-001 adds a ritual 503 case, E2E-002 covers all four tabs signed out,
 E2E-005 drops Profile (no late reads), E2E-010 is the production lane spec, D8 baseline recorded.
@@ -64,16 +69,16 @@ Owner column: TEA writes and runs in CI; builder writes, TEA reviews.
 
 ### Meter and guards (TEA)
 
-| ID           | Level                                                                                                                                            | Test                                                                                                                                  | Owner |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| 7.7-UNIT-001 | unit                                                                                                                                             | Layout-shift meter sums every entry, `hadRecentInput` included (the standard score drops them)                                        | TEA   |
-| 7.7-UNIT-002 | unit                                                                                                                                             | Meter window: entries before the window start do not count; the transition delta equals entries between start and settle              | TEA   |
-| 7.7-UNIT-003 | unit                                                                                                                                             | Settle rule: quiet period resets on a new shift, a pending stubbed request or a missing `data-ready`; settles only when all are clear | TEA   |
-| 7.7-UNIT-004 | unit                                                                                                                                             | Rect sampler reports the first frame whose header or tab bar rect differs from frame 0, with the delta                                | TEA   |
-| 7.7-UNIT-005 | Fixture router: `readKey` tells the two Spotlight reads apart, serves only the resolve POST, knows every gate read (`shell-fixtures.spec.ts`)    | TEA                                                                                                                                   |
-| 7.7-UNIT-006 | Fixture router: `fixtureOwner` reads the member from a fixture bearer and is null for any other, so E2E-009 serves each member their own content | TEA                                                                                                                                   |
-| 7.7-UNIT-020 | unit                                                                                                                                             | Web motion budget: no CSS animation or transition and no Tailwind `duration-*` above 200 ms in `apps/web/src`                         | TEA   |
-| 7.7-UNIT-021 | unit                                                                                                                                             | Native motion budget: no literal `duration` or `animationDuration` above 200 in `apps/mobile/app`, `src`, `components`                | TEA   |
+| ID           | Level                                                                                                                                             | Test                                                                                                                                  | Owner |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 7.7-UNIT-001 | unit                                                                                                                                              | Layout-shift meter sums every entry, `hadRecentInput` included (the standard score drops them)                                        | TEA   |
+| 7.7-UNIT-002 | unit                                                                                                                                              | Meter window: entries before the window start do not count; the transition delta equals entries between start and settle              | TEA   |
+| 7.7-UNIT-003 | unit                                                                                                                                              | Settle rule: quiet period resets on a new shift, a pending stubbed request or a missing `data-ready`; settles only when all are clear | TEA   |
+| 7.7-UNIT-004 | unit                                                                                                                                              | Rect sampler reports the first frame whose header or tab bar rect differs from frame 0, with the delta                                | TEA   |
+| 7.7-UNIT-005 | Fixture router: `readKey` tells the two Spotlight reads apart, serves only the resolve POST, knows every gate read (`layout-shift-meter.spec.ts`) | TEA                                                                                                                                   |
+| 7.7-UNIT-006 | Fixture router: `fixtureOwner` reads the member from a fixture bearer and is null for any other, so E2E-009 serves each member their own content  | TEA                                                                                                                                   |
+| 7.7-UNIT-020 | unit                                                                                                                                              | Web motion budget: no CSS animation or transition and no Tailwind `duration-*` above 200 ms in `apps/web/src`                         | TEA   |
+| 7.7-UNIT-021 | unit                                                                                                                                              | Native motion budget: no literal `duration` or `animationDuration` above 200 in `apps/mobile/app`, `src`, `components`                | TEA   |
 
 ### Web E2E: `playwright/tests/signed-in-shell-layout-shift.spec.ts` (TEA)
 
@@ -98,18 +103,21 @@ Score: sum of every `layout-shift` entry value, `hadRecentInput` included, from 
 the active screen, no stubbed request in flight, and 1 s without a new shift entry. Above 0.1
 fails and the failure names the shifted nodes (entry `sources`).
 
-| ID          | Test                                                                                                                                                                                                                                                                             | Owner |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| 7.7-E2E-001 | Member cold load of Home, Closet, Community, Profile x empty, populated, delayed (12 cases), plus Home with ritual 503: score at most 0.1; header and tab bar rects constant every frame; Retry visible on 503                                                                   | TEA   |
-| 7.7-E2E-002 | Signed-out cold load of every tab: score at most 0.1; header and tab bar still; no `screen-placeholder` ever visible; `landing-sign-in` visible on Home                                                                                                                          | TEA   |
-| 7.7-E2E-003 | AC1 sampler on every member case of E2E-001: `home-demo-outfit`, `guest-preview-entry`, `landing-sign-in`, `landing-sign-up` never visible in any frame; `member-sample-outfit` only after the ritual read settled (empty and 5xx only)                                          | TEA   |
-| 7.7-E2E-004 | Placeholder shown with `aria-busy` while delayed reads are pending, gone once `data-ready`; body appears once                                                                                                                                                                    | TEA   |
-| 7.7-E2E-005 | Late mode on Home and Community: gate reads at once, every other read 3 s late; tap the header title while a late read is pending; score after the tap is 0 (Closet and Profile have only gate reads)                                                                            | TEA   |
-| 7.7-E2E-006 | Tab switch Home > Closet > Community > Profile > Home x empty, populated, delayed: each transition at most 0.1, shifts after the tap included                                                                                                                                    | TEA   |
-| 7.7-E2E-007 | Positive control: a 300 px block inserted above the content after first paint scores above 0.1 with the same meter (proves R3)                                                                                                                                                   | TEA   |
-| 7.7-E2E-008 | Tab return: scroll Closet, go to Community, back to Closet: first frame shows the grid at the same scroll offset, no placeholder in any frame, refresh request sent                                                                                                              | TEA   |
-| 7.7-E2E-009 | Owner change in one document, two paths: (a) `landing-sign-out`, then member B bearer plus `couture:session`; (b) bearer swap without sign-out. From the switch on, no frame renders member A outfit text; B Home opens through the gate (first frame not ready); B outfit shows | TEA   |
-| 7.7-E2E-010 | Production lane (`signed-in-shell-layout-shift.prod.spec.ts`), read-only, every non-GET aborted: each tab cold, signed out and as the synthetic member, at most 0.1; member never sees signed-out content                                                                        | TEA   |
+| ID          | Test                                                                                                                                                                                                                                                                                                                                                                              | Owner |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 7.7-E2E-001 | Member cold load of Home, Closet, Community, Profile x empty, populated, delayed (12 cases), plus Home with ritual 503: score at most 0.1; header and tab bar rects constant every frame; Retry visible on 503                                                                                                                                                                    | TEA   |
+| 7.7-E2E-002 | Signed-out cold load of every tab: score at most 0.1; header and tab bar still; no `screen-placeholder` ever visible; `landing-sign-in` visible on Home                                                                                                                                                                                                                           | TEA   |
+| 7.7-E2E-003 | AC1 sampler on every member case of E2E-001: `home-demo-outfit`, `guest-preview-entry`, `landing-sign-in`, `landing-sign-up` never visible in any frame; `member-sample-outfit` only after the ritual read settled (empty and 5xx only)                                                                                                                                           | TEA   |
+| 7.7-E2E-004 | Placeholder shown with `aria-busy` while delayed reads are pending, gone once `data-ready`; body appears once                                                                                                                                                                                                                                                                     | TEA   |
+| 7.7-E2E-005 | Late mode on Home and Community: gate reads at once, every other read 3 s late; tap the header title while a late read is pending; score after the tap is 0 (Closet and Profile have only gate reads)                                                                                                                                                                             | TEA   |
+| 7.7-E2E-006 | Tab switch Home > Closet > Community > Profile > Home x empty, populated, delayed: each transition at most 0.1, shifts after the tap included; the first returning Home frame holds the outfit and the teaser (Codex P2-4)                                                                                                                                                        | TEA   |
+| 7.7-E2E-007 | Positive control: a 300 px block inserted above the content after first paint scores above 0.1 with the same meter (proves R3)                                                                                                                                                                                                                                                    | TEA   |
+| 7.7-E2E-008 | Tab return: scroll Closet, go to Community, back to Closet: first frame shows the grid at the same scroll offset, no placeholder in any frame, refresh request sent                                                                                                                                                                                                               | TEA   |
+| 7.7-E2E-009 | Owner change in one document, three paths: (a) `landing-sign-out`, then member B bearer plus `couture:session`; (b) bearer swap from Closet; (c) bearer swap on Home while A's ritual read is still in flight (Codex P2-1). From the switch on, no frame renders member A outfit text, through a later tab round trip; (a) and (b) open B's Home through the gate; B outfit shows | TEA   |
+| 7.7-E2E-011 | Returning member: stored session, no bearer, profile verification held 2.5 s: first Home frame is the placeholder, never signed-out or sample content, then the member outfit; at most 0.1                                                                                                                                                                                        | TEA   |
+| 7.7-E2E-012 | Profile return with delayed reads (Codex P1-2): first Profile frame is ready, shows the member email and the old scroll offset, no placeholder; the refresh read runs                                                                                                                                                                                                             | TEA   |
+| 7.7-E2E-013 | Community return from the `all` filter (Codex P2-5): first frame ready, no placeholder; after the refresh the filter is still selected and the anchored card has not moved                                                                                                                                                                                                        | TEA   |
+| 7.7-E2E-010 | Production lane (`signed-in-shell-layout-shift.prod.spec.ts`), read-only, every non-GET aborted: each tab cold, signed out and as the synthetic member, at most 0.1; member never sees signed-out content                                                                                                                                                                         | TEA   |
 
 ### Web component and unit (builder, vitest)
 
@@ -119,6 +127,8 @@ fails and the failure names the shifted nodes (entry `sources`).
 | 7.7-UNIT-011 | `screen-snapshot`: owner change via `couture:session` clears it; sign-out clears it; recall for another owner returns nothing                                                |
 | 7.7-UNIT-012 | `screen-snapshot`: `Storage.prototype.setItem` never called (no localStorage or sessionStorage)                                                                              |
 | 7.7-UNIT-013 | `use-web-session`: a remount with a known session starts at the member state, never `checking`                                                                               |
+| 7.7-UNIT-014 | Session scope: the verified owner, or the fixture owner with its bearer; a write captured under a scope no longer live is dropped (Codex P2-1)                               |
+| 7.7-UNIT-015 | Losing Community access drops its snapshot parts and fences pending writes; a read with access allows them again (Codex P3-1)                                                |
 | 7.7-CMP-001  | `ScreenGate` with a snapshot: opens at once, `scrollTo` runs before paint (layout effect), refresh shows no placeholder                                                      |
 | 7.7-CMP-002  | `ScreenGate`: placeholder testid, `aria-busy`, one hidden "Loading" label; children mounted while hidden; `data-ready` on success, empty and error; signed-out opens at once |
 | 7.7-CMP-003  | `MemberRitual` never renders `SampleOutfit` while the ritual read is unsettled                                                                                               |
@@ -131,13 +141,14 @@ fails and the failure names the shifted nodes (entry `sources`).
 
 ### Native (builder, jest)
 
-| ID          | Test                                                                                                                                                  |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 7.7-NAT-001 | Tabs shell renders during `restoring` with the placeholder per tab body; tab bar present                                                              |
-| 7.7-NAT-002 | Home never renders the member sample outfit before the ritual and weather reads settle                                                                |
-| 7.7-NAT-003 | Refocus refresh does not set the initial loading state; content stays                                                                                 |
-| 7.7-NAT-004 | Community new-looks pill is an overlay; weather alert and stale banners join the Home gate                                                            |
-| 7.7-NAT-005 | `useModalAnimation`: `none` under reduce motion, `fade` or `slide` otherwise; stack `animationDuration: 200`, `animation: 'none'` under reduce motion |
+| ID          | Test                                                                                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.7-NAT-001 | Tabs shell renders during `restoring` with the placeholder per tab body; tab bar present; the gate opens after the 10 s deadline (never while restoring)                                                   |
+| 7.7-NAT-002 | Home never renders the member sample outfit before the ritual and weather reads settle                                                                                                                     |
+| 7.7-NAT-003 | Refocus refresh does not set the initial loading state; content stays                                                                                                                                      |
+| 7.7-NAT-004 | Community new-looks pill is an overlay; weather alert and stale banners join the Home gate                                                                                                                 |
+| 7.7-NAT-005 | `useModalAnimation`: `none` under reduce motion, `fade` or `slide` otherwise; root stack uses `fade` (Android `rns_fade` 150 ms, iOS `animationDuration: 200`) and `none` under reduce motion (Codex P2-9) |
+| 7.7-NAT-006 | Community Spotlight focus intent waits for the gate: consumed only once the first feed page and Spotlight settled, in both read orders (Codex P2-8, `spotlight-focus.cases.tsx`)                           |
 
 ## Production rebaseline (D8, TEA)
 
@@ -160,11 +171,24 @@ Every recorded entry carried `hadRecentInput: true` although no input was sent, 
 cumulative layout shift would have reported 0 for all of them. This is why the meter sums every
 entry (7.7-UNIT-001).
 
-Decision D8a (TEA, owner delegated): the prod synthetic member password lives only in GitHub
-secrets (`.env.prod` has none), so the member measurement cannot run from a workstation without a
-write to the account. `playwright/tests/signed-in-shell-layout-shift.prod.spec.ts` measures Home
-as the synthetic member, read-only, in the Prod E2E lane that runs after the merge deploys; its
-first run is the member rebaseline and is recorded here.
+Member baseline 2026-11-25 on main `11c26918` (Codex P2-11: recorded before merge). The
+`prod-synthetic-member` environment deploys only to `main`, so the secret-backed lane cannot run
+from this branch. Measured instead in the owner's signed-in Chrome on production: a same-origin
+390 x 844 iframe opened from `/terms`, a buffered `layout-shift` observer attached as the frame
+document appeared, 10 to 12 s per load, the same sum-every-entry rule. Nothing was written; the
+first load refreshed the stored session as any visit does.
+
+| Surface           | Member baseline 390 x 844 (main) | Shifted nodes                                                                                          |
+| ----------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Home, member      | 0.8191, 0.8187, 0.8187           | `lookbook-prism-grid` + `hero-section` 0.51 at about 100 ms; `lookbook-prism-grid` 0.31 at about 0.5 s |
+| Closet, member    | 0, 0                             | none                                                                                                   |
+| Community, member | 0.0393, 0.0393                   | `community-feed-loading` 0.037 at about 0.4 s                                                          |
+| Profile, member   | 0, 0                             | none                                                                                                   |
+
+Home as a member is worse than the 2026-11-21 walk (0.574 at 500 px): the taller phone layout puts
+more of the swapped hero inside the viewport. `signed-in-shell-layout-shift.prod.spec.ts`
+(7.7-E2E-010) repeats the measurement as the synthetic member in the Prod E2E lane after the merge
+deploys, and fails above 0.1.
 
 ## Execution
 

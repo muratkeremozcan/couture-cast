@@ -1,5 +1,5 @@
 // Story 6.7 owner: a Home teaser activation resolved by the mobile Community screen.
-import { item, setMockParams } from './harness'
+import { feedJson, item, serveFeed, setMockParams } from './harness'
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { screenFocus } from '../focus-effect'
 import { mockCapture, routing } from './mock-state'
@@ -106,6 +106,87 @@ async function frames(count: number) {
 }
 
 export function registerCommunitySpotlightFocusCases() {
+  // Story CC-7.7 D3 (review P2-8): the module sits inside the screen gate, which also waits
+  // for the first feed page. The intent is consumed only once the entry is on screen, in
+  // either read order.
+  it('7.7-NAT-006 a Spotlight ready before the first feed page waits for the gate, then takes focus once', async () => {
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    let releaseFeed!: () => void
+    const feedHeld = new Promise<void>((resolve) => {
+      releaseFeed = resolve
+    })
+    onTestFinished(() => releaseFeed())
+    serveFeed(async () => {
+      await feedHeld
+      return feedJson()
+    })
+    serveSpotlight(() => page())
+    setMockParams(teaserIntent('spot-2', 'token-77-spotlight-first'))
+    await render(<CommunityScreen />)
+
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-2')
+    await frames(3)
+    // Ready behind the closed gate: nothing is focused, announced or reported yet.
+    expect(rank).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+
+    act(() => releaseFeed())
+
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    )
+    expect(rank).toBeVisible()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
+
+  it('7.7-NAT-006 a first feed page before the Spotlight waits for the Spotlight, then takes focus once', async () => {
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    let releaseSpotlight!: () => void
+    const spotlightHeld = new Promise<void>((resolve) => {
+      releaseSpotlight = resolve
+    })
+    onTestFinished(() => releaseSpotlight())
+    let feedReads = 0
+    serveFeed(() => {
+      feedReads += 1
+      return feedJson()
+    })
+    serveSpotlight(async () => {
+      await spotlightHeld
+      return page()
+    })
+    setMockParams(teaserIntent('spot-2', 'token-77-feed-first'))
+    await render(<CommunityScreen />)
+
+    await waitFor(() => expect(feedReads).toBe(1))
+    await frames(3)
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+
+    act(() => releaseSpotlight())
+
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-2')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    )
+    expect(rank).toBeVisible()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
+
   it('6.7-MOB-020 an entry present takes focus with one announcement and the params clear', async () => {
     const handles = iosFocusHandles()
     vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()

@@ -3,7 +3,7 @@ title: 'Story CC-7.7: Signed-in shell without flashes'
 type: feature
 ticket: '7-7-signed-in-shell-without-flashes'
 created: '2026-11-25'
-status: in-progress
+status: in-review
 baseline_revision: '11c26918aff1b599c824f39ac2a0945d38abe6fe'
 route: full
 route_source: auto
@@ -137,7 +137,7 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
 - `apps/web/src/app/community/page.tsx` -- Community route; gate wrapper.
 - `apps/web/src/app/wardrobe/page.tsx:96-104,481-540,896-942,1082` -- reads, setup banner (:912),
   gate wrapper, snapshot of inventory and onboarding state.
-- `apps/web/src/app/settings/page.tsx` -- Profile; gate opens at once; scroll snapshot only.
+- `apps/web/src/app/settings/page.tsx` -- Profile; gate waits for its section reads (D3 amendment); each section snapshots its data (P1-2).
 - `apps/web/src/app/components/sticky-bottom-nav.tsx:28-90` -- tab links get `scroll={false}`;
   scroll restore lives in the gate.
 - `apps/web/src/app/components/screen-gate.tsx`, `apps/web/src/lib/screen-snapshot.ts` (new) --
@@ -225,6 +225,17 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
   content that moves.
 
 ## Review Triage Log
+
+- 2026-11-25, Codex review of 8327b4fb (2 P1, 11 P2, 2 P3; 7.7-codex-review.md). Decisions:
+  every gate also opens after a 10 s deadline so one stalled read never hides finished sections
+  or their Retry (P2-2); a verified member's snapshot is keyed by owner and survives a token
+  refresh, while the fixture owner is keyed by the bearer captured when each read started, and a
+  write whose captured scope is no longer live is dropped (P2-1); Profile snapshots its section
+  data like the other tabs (P1-2, replaces the scroll-only note); losing Community access clears
+  the Community and teaser snapshot parts (P3-1); one-time focus intents wait for the gate to
+  open (P2-8); native tab focus runs the in-place refresh (P2-6); native stack uses a transition
+  whose shipped duration is at most 200 ms on Android and iOS (P2-9). TEA owns the meter and
+  fixture findings (P2-10) and the pre-merge production member baseline (P2-11).
 
 ## Design Notes
 

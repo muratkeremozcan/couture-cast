@@ -70,9 +70,10 @@ export default function Home() {
         tabIndex={-1}
         className="max-w-6xl mx-auto flex flex-col gap-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
       >
-        {/* Story CC-7.7 D3: the body appears once the member's outfit (the ritual read), the
-            Spotlight teaser in the hero and the City Spotlight above the feed have answered; the
-            feed is the last section and fills in below them. */}
+        {/* Story CC-7.7 D3: the body appears once the member's outfit (the ritual read with its
+            city line), the Spotlight teaser in the hero, the City Spotlight above the feed and
+            any deep link above the grid have answered; the feed is the last section and fills
+            in below them. */}
         <ScreenGate screen="home" reads={HOME_GATE_READS}>
           <GuestPreviewEntry />
           {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd
@@ -90,7 +91,7 @@ export default function Home() {
   )
 }
 
-const HOME_GATE_READS = ['ritual', 'teaser', 'spotlight'] as const
+const HOME_GATE_READS = ['ritual', 'teaser', 'spotlight', 'deeplink'] as const
 
 function HomeHero() {
   return (

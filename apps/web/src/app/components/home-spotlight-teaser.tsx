@@ -33,8 +33,12 @@ import {
 } from './community-sponsored-cta'
 import type { SpotlightFocusIntent } from './community-lookbook-grid'
 import { useScreenGateScreen } from './screen-gate'
-import { screenSnapshot } from '../../lib/screen-snapshot'
-import { isLiveOwner, useWebSessionOwner } from '../../lib/use-web-session'
+import { HOME_TEASER_SNAPSHOT_PART, screenSnapshot } from '../../lib/screen-snapshot'
+import {
+  currentWebSessionScope,
+  useHydrating,
+  useWebSessionScope,
+} from '../../lib/use-web-session'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -46,10 +50,15 @@ const SESSION_SYNC_MS = 1000
 
 /**
  * The member the grid spotlight reads for: the same session source, the same
- * one-second sync and the same session events. Undefined until mounted.
+ * one-second sync and the same session events. Undefined until mounted while hydrating; a
+ * client-side mount (a return to Home) knows it at once, so its remembered teaser is in the
+ * first frame and the gate never reveals Home before it (CC-7.7, Codex review P2-4).
  */
 function useCommunityMember(): string | null | undefined {
-  const [member, setMember] = useState<string | null | undefined>(undefined)
+  const hydrating = useHydrating()
+  const [member, setMember] = useState<string | null | undefined>(() =>
+    hydrating ? undefined : communityCommentsSessionFromWeb()
+  )
   useEffect(() => {
     const sync = () => setMember(communityCommentsSessionFromWeb())
     sync()
@@ -92,7 +101,6 @@ export interface HomeSpotlightTeaserLifecycle {
 
 /** The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5). */
 type TeaserSnapshot = { memberId: string; value: SpotlightTeaserValue | null }
-const TEASER_SNAPSHOT_PART = 'teaser'
 
 /**
  * Lives in the layout, so the value and its read time survive the teaser's
@@ -108,11 +116,14 @@ export function useHomeSpotlightTeaser({
   // The member each read started for, so a settled read counts only for that member.
   const readingForRef = useRef<string | null | undefined>(undefined)
   const [settledFor, setSettledFor] = useState<string | null | undefined>(undefined)
+  /** The session scope of the read whose answer is shown (Codex review P2-1). */
+  const shownScopeRef = useRef<string | null>(null)
   const [state] = useState(
     () =>
       new SpotlightTeaserState({
         read: (signal) => {
           const readFor = readingForRef.current
+          const readScope = currentWebSessionScope()
           return withRequestDeadline(
             SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS,
             [signal],
@@ -125,7 +136,11 @@ export function useHomeSpotlightTeaser({
           ).finally(() => {
             // After the state stored its answer (it does so as this promise settles), so the
             // gate never opens on the settled flag before the value is there to render.
-            if (!signal.aborted) setTimeout(() => setSettledFor(readFor), 0)
+            if (!signal.aborted)
+              setTimeout(() => {
+                shownScopeRef.current = readScope
+                setSettledFor(readFor)
+              }, 0)
           })
         },
         retryAfterSeconds: communityRetryAfterSeconds,
@@ -139,10 +154,10 @@ export function useHomeSpotlightTeaser({
   // Story CC-7.7 D5: a return to Home shows the teaser it last showed this member (or none)
   // until the teaser's own read answers, then the read's answer, in place.
   const screen = useScreenGateScreen()
-  const owner = useWebSessionOwner()
+  const scope = useWebSessionScope()
   const [snapshot] = useState(() =>
-    screen && owner
-      ? screenSnapshot.recall<TeaserSnapshot>(owner, screen, TEASER_SNAPSHOT_PART)
+    screen && scope
+      ? screenSnapshot.recall<TeaserSnapshot>(scope, screen, HOME_TEASER_SNAPSHOT_PART)
       : undefined
   )
   const [snapshotDropped, setSnapshotDropped] = useState(false)
@@ -161,12 +176,14 @@ export function useHomeSpotlightTeaser({
   }, [state])
 
   useEffect(() => {
-    if (!screen || !owner || !member || !memberSettled || !isLiveOwner(owner)) return
-    screenSnapshot.remember(owner, screen, TEASER_SNAPSHOT_PART, {
+    if (!screen || !scope || !member || !memberSettled) return
+    // Under the scope its read started in; the store drops it once that scope left, and while
+    // Community access is revoked (P3-1).
+    screenSnapshot.remember(shownScopeRef.current, screen, HOME_TEASER_SNAPSHOT_PART, {
       memberId: member,
       value: liveValue,
     } satisfies TeaserSnapshot)
-  }, [liveValue, member, memberSettled, owner, screen])
+  }, [liveValue, member, memberSettled, scope, screen])
 
   useEffect(() => {
     readingForRef.current = member
