@@ -552,23 +552,29 @@ describe('GarmentDetailScreen', () => {
         expiresAt: new Date(Date.now() + 30_000).toISOString(),
       },
     }
-    const held = Promise.withResolvers<void>()
-    const reloadStarted = Promise.withResolvers<void>()
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let markReloadStarted!: () => void
+    const reloadStarted = new Promise<void>((resolve) => {
+      markReloadStarted = resolve
+    })
     let reads = 0
     server.use(
       http.get('*/api/v1/wardrobe/garments', async () => {
         reads += 1
         if (reads === 1) return HttpResponse.json({ data: [expiring] })
-        reloadStarted.resolve()
-        await held.promise
+        markReloadStarted()
+        await held
         return HttpResponse.json({ data: [{ ...blueTop, material: 'linen' }] })
       })
     )
     renderDetail()
-    await reloadStarted.promise
+    await reloadStarted
     await browserUser.click(await editTagsButton())
 
-    held.resolve()
+    release()
     await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Linen'))
     const cold = within(
       screen.getByRole('radiogroup', { name: 'Comfort range' })
