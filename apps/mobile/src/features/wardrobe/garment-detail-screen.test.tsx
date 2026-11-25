@@ -87,6 +87,7 @@ import {
   reportNetworkOffline,
   reportNetworkOnline,
   SaveFeedbackProvider,
+  useStatusBar,
 } from '@/components/save-feedback'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
@@ -605,5 +606,30 @@ describe('GarmentDetailScreen', () => {
       'src',
       blueTop.imageAccess!.url
     )
+  })
+
+  it("[P0] [7.5-NAT-013] shows Saved from the pushed detail's own bar, not the root provider (Android Maestro, 72b7cd7b)", async () => {
+    // The root provider's floating bar never showed over the pushed stack screen on Android:
+    // the save landed but the member saw no Saved and no Undo. The detail owns its bar.
+    function RootNotice() {
+      const { notice } = useStatusBar()
+      return <span data-testid="root-notice">{notice?.message ?? ''}</span>
+    }
+    render(
+      <SaveFeedbackProvider>
+        <GarmentDetailScreen garmentId={garmentId} />
+        <RootNotice />
+      </SaveFeedbackProvider>
+    )
+    await openEditorAndPick('garment-tag-option-material-wool')
+
+    await browserUser.click(tag('garment-tag-done'))
+
+    const bar = await screen.findByTestId('status-feedback-bar')
+    expect(bar).toHaveTextContent('Saved')
+    expect(within(bar).getByTestId('status-bar-action-undo')).toBeVisible()
+    expect(screen.getAllByTestId('status-feedback-bar')).toHaveLength(1)
+    // The root provider holds no notice: the bar shown belongs to the detail screen.
+    expect(screen.getByTestId('root-notice').textContent).toBe('')
   })
 })

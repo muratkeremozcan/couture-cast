@@ -110,12 +110,12 @@ export function GarmentDetailBackButton() {
 
 export function GarmentDetailScreen({ garmentId }: { garmentId: string | undefined }) {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
-  const { hasProvider } = useStatusBar()
-  const detail = <MemberGarmentDetail key={epoch} epoch={epoch} garmentId={garmentId} />
-  if (hasProvider) return detail
+  // The root provider's floating bar sits under a pushed native stack screen on Android, so the
+  // detail always owns its bar. It floats over this screen (the route zeroes the tab bar
+  // clearance) and forwards announcements to the root provider when one is mounted.
   return (
-    <SaveFeedbackProvider inline renderOfflineLine={false}>
-      {detail}
+    <SaveFeedbackProvider renderOfflineLine={false}>
+      <MemberGarmentDetail key={epoch} epoch={epoch} garmentId={garmentId} />
     </SaveFeedbackProvider>
   )
 }
