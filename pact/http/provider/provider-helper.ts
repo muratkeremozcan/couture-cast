@@ -69,6 +69,7 @@ import { WardrobeService } from '../../../apps/api/src/modules/wardrobe/wardrobe
 import { WardrobeRetentionService } from '../../../apps/api/src/modules/wardrobe/wardrobe-retention.service'
 import { WardrobeUploadGuard } from '../../../apps/api/src/modules/wardrobe/wardrobe.guard'
 import { WardrobeCapsuleController } from '../../../apps/api/src/modules/wardrobe/wardrobe-capsule.controller'
+import { WardrobeGarmentRemovalController } from '../../../apps/api/src/modules/wardrobe/wardrobe-garment-removal.controller'
 // The `.js` specifier must match how wardrobe-capsule.controller.ts imports this
 // module. Resolving it both ways yields two distinct class objects, and the
 // controller's injection token then never matches this provider.
@@ -316,6 +317,7 @@ export async function startLocalPactProvider({
       ComfortController,
       UserController,
       WardrobeController,
+      WardrobeGarmentRemovalController,
       WardrobeCapsuleController,
       WardrobeOnboardingController,
       WardrobeSavedLookController,

@@ -12,6 +12,7 @@ import { PersonalizationModule } from '../personalization/personalization.module
 import { TelemetryModule } from '../telemetry/telemetry.module'
 import { WardrobeController } from './wardrobe.controller'
 import { WardrobeCapsuleController } from './wardrobe-capsule.controller'
+import { WardrobeGarmentRemovalController } from './wardrobe-garment-removal.controller'
 import { WardrobeOnboardingController } from './wardrobe-onboarding.controller'
 import { WardrobeSavedLookController } from './wardrobe-saved-look.controller'
 import { WardrobeSilhouetteController } from './wardrobe-silhouette.controller'
@@ -40,6 +41,7 @@ import { WardrobeRetentionService } from './wardrobe-retention.service'
   ],
   controllers: [
     WardrobeController,
+    WardrobeGarmentRemovalController,
     WardrobeCapsuleController,
     WardrobeOnboardingController,
     WardrobeSavedLookController,

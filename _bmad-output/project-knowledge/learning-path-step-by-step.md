@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-25.
-Added Steps 40 to 63:
+Added Steps 40 to 64:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -27,7 +27,8 @@ Added Steps 40 to 63:
 - Step 60: Story 7.2, saved looks follow the account, `72b685c2` (PR #287), merged on 2026-11-22.
 - Step 61: Story 7.3, import device-saved looks for the same member, `f65ed8e5` (PR #288), merged on 2026-11-22.
 - Step 62: Story 7.4, community post edits persist, `ea93273b` (PR #289), merged on 2026-11-22.
-- Step 63: Story 7.5, garment detail and tag edit, in review on `feat/epic7-story-7-5-garment-detail-tag-edit`.
+- Step 63: Story 7.5, garment detail and tag edit, `246577af` (PR #290), merged on 2026-11-25.
+- Step 64: Story 7.6, garment delete, in review on `feat/epic7-story-7-6-garment-delete`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -35,6 +36,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 64 for Story CC-7.6 (garment delete) while its PR is in review, and moved Step 63 to merged (`246577af`, PR #290).
 Added Step 63 for Story CC-7.5 (garment detail and tag edit) while its PR is in review, and moved Step 62 to merged (`ea93273b`, PR #289).
 Added Step 62 for Story CC-7.4 (community post edits persist) while its PR is in review, and moved Step 61 to merged (`f65ed8e5`, PR #288).
 Added Step 61 for Story CC-7.3 (import device-saved looks for the same member) while its PR is in review, and moved Step 60 to merged (`72b685c2`, PR #287).
@@ -21600,4 +21602,102 @@ Evidence boundaries:
 - Locally: `tsc --noEmit` in utils, api-client, apps/api, apps/web and apps/mobile, ESLint
   `--max-warnings=0` on touched files, and an Optic diff of the OpenAPI document against the
   baseline (36 of 36 checks passed).
+- Unit, integration, Playwright, native and Maestro suites run in CI on the PR.
+
+## Step 64: Garment delete
+
+User/business impact:
+
+- Members delete a garment from its detail on web and native. A piece in no saved look or
+  capsule disappears at once with "Deleted" and Undo for 5 seconds; nothing is sent until the
+  window ends, so Undo puts it back exactly where it was.
+- A piece in use asks once and names how many looks it is in (saved looks plus capsules);
+  confirming deletes it at once. Saved looks then show the CC-7.2 missing piece and capsules
+  keep their needs-repair state.
+- A failed delete brings the piece back with "Could not delete" and Retry (offline tone when
+  offline). The member returns to the grid at the same scroll position.
+
+Technical architecture:
+
+- `packages/utils/src/wardrobe/deferred-garment-deletion.ts` is the one platform-free controller
+  (`createDeferredGarmentDeletion`): `schedule`, `commitNow`, `undo`, `flush`, `pendingIds`,
+  `subscribe`, `reset`, with an injectable timer and the window from
+  `SAVE_FEEDBACK_TIMINGS.statusBarDurationMs`. Scheduling a second piece sends the first at once.
+- `GET /api/v1/wardrobe/garments/{garmentId}/usage` (OpenAPI 1.11.0) answers
+  `{ garmentId, savedLookCount, capsuleCount }` for the caller's own ready garment and 404
+  `GARMENT_NOT_FOUND` for anything else, another member's garment included. The saved look count
+  runs in SQL over the anchor and the composition's garment slots.
+- `WardrobeGarmentRemovalController` holds the usage read and the existing `DELETE`; it is
+  guarded by `RequestAuthGuard` only, so a member can always delete their own data (D8).
+- `requestDeletion` records a request under a legal hold without touching the hold; the
+  `garment_hold_release_honours_deletion` trigger turns a later release into
+  `deletion_pending` for the hourly sweep. A purge that throws after the flip logs
+  `wardrobe_retention_purge_deferred` and still answers 204.
+- Web: `garment-deletion.ts` owns the controller per Closet mount and sends pending deletes on
+  `pagehide`, hidden `visibilitychange` and unmount, every send with `keepalive`. Native: a
+  module-level `garmentDeletion` shared by the detail and the hub, which sends pending deletes
+  when the app goes to the background.
+
+Hard-won lessons from the implementation of this story:
+
+- A deferred client commit keeps the server's immediate purge and needs no restore route; the
+  cost is that every way of leaving must flush, which one shared controller makes testable.
+- Readers of active garments are many; a database trigger on hold release keeps a recorded
+  deletion out of all of them without a filter in each.
+
+Story/Task mapping:
+
+- Story CC-7.6: Garment delete (Epic 7 Lane A reliability).
+- Follows CC-7.2 (`#step-60-saved-looks-follow-the-account`) and CC-7.5
+  (`#step-63-garment-detail-and-tag-edit`).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.6: Garment delete**`)
+- `_bmad-output/implementation-artifacts/spec-7-6-garment-delete.md`
+- `_bmad-output/test-artifacts/test-design-7-6-garment-delete.md`
+
+Cross-links:
+
+- Step 59 (`#step-59-shared-save-undo-and-status-feedback`): the status bar, Undo and Retry.
+- Step 63 (`#step-63-garment-detail-and-tag-edit`): the detail that hosts Delete.
+
+Sequence to follow:
+
+1. Add the deferred deletion controller and its spec in `packages/utils/src/wardrobe/`.
+2. Record held requests and defer failed purges in `wardrobe-retention.service.ts`; add the
+   hold-release trigger migration.
+3. Add `countGarmentCapsules` (`wardrobe.service.ts`), `countSavedLooksUsingGarment`
+   (`wardrobe-saved-look.service.ts`) and `wardrobe-garment-removal.controller.ts`.
+4. Publish the usage read and the DELETE in `packages/api-client/src/contracts/http/wardrobe.ts`,
+   bump `openapi.ts` to 1.11.0, regenerate the SDK and rebuild the dist.
+5. Web: `lib/wardrobe.ts`, `garment-detail.tsx`, `garment-deletion.ts`, `page.tsx`.
+6. Native: `src/lib/wardrobe.ts`, `garment-deletion.ts`, `garment-detail-screen.tsx`,
+   `wardrobe-hub-screen.tsx`.
+7. Add the `wardrobe.detail.delete*` keys to the 10 web and 10 mobile locales.
+
+Task owner map:
+
+- Step 64 step 1 owner: `packages/utils/src/wardrobe/deferred-garment-deletion.ts`.
+- Step 64 step 2 owner: `apps/api/src/modules/wardrobe/wardrobe-retention.service.ts` and
+  `packages/db/prisma/migrations/20261125120000_garment_hold_release_honours_deletion/`.
+- Step 64 step 3 owner: `apps/api/src/modules/wardrobe/wardrobe-garment-removal.controller.ts`.
+- Step 64 step 4 owner: `packages/api-client/src/contracts/http/wardrobe.ts`.
+- Step 64 step 5 owner: `apps/web/src/app/wardrobe/garment-deletion.ts`.
+- Step 64 step 6 owner: `apps/mobile/src/features/wardrobe/garment-deletion.ts`.
+
+Tests that cover this step:
+
+- [`packages/utils/src/wardrobe/deferred-garment-deletion.spec.ts`](../../packages/utils/src/wardrobe/deferred-garment-deletion.spec.ts):
+  window, Undo, supersede, flush, failure, Retry and reset rules.
+- [`apps/web/src/i18n/wardrobe-detail-locales.spec.ts`](../../apps/web/src/i18n/wardrobe-detail-locales.spec.ts)
+  and [`apps/mobile/src/i18n/wardrobe-detail-locales.spec.ts`](../../apps/mobile/src/i18n/wardrobe-detail-locales.spec.ts):
+  the `wardrobe.detail.delete*` keys in every locale.
+- The contract, API, integration, Pact, web, native, Playwright and Maestro suites are listed in
+  `_bmad-output/test-artifacts/test-design-7-6-garment-delete.md`.
+
+Evidence boundaries:
+
+- Locally: `tsc --noEmit` in utils, api-client, apps/api, apps/web, apps/mobile and pact, and
+  ESLint `--max-warnings=0` on touched files.
 - Unit, integration, Playwright, native and Maestro suites run in CI on the PR.

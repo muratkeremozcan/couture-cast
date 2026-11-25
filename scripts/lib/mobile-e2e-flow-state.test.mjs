@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import {
+  GARMENT_DELETE_FLOW,
   LOCATION_CAPTURE_FLOW,
   mobileE2EFlowStateHooks,
   USE_MY_LOCATION_DEVICE,
@@ -168,6 +169,95 @@ describe('Use my location flow state hooks', () => {
     assert.equal(
       hooks[USE_MY_LOCATION_FLOW].after.toString(),
       hooks[LOCATION_CAPTURE_FLOW].after.toString()
+    )
+  })
+})
+
+// Story 7.6 test plan 7.6-MAE-001: the garment delete flow deletes its own dress, never a shared
+// seeded garment, and leaves nothing behind for the next attempt or the next flow.
+// Learning path Step 64: Garment delete.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+describe('Garment delete flow state hooks', () => {
+  const recordingPrisma = (existingIds) => {
+    const calls = []
+    const prisma = {
+      garmentItem: {
+        findMany: async (args) => (
+          calls.push(['garmentItem.findMany', args]),
+          existingIds.map((id) => ({ id }))
+        ),
+        deleteMany: (args) => (calls.push(['garmentItem.deleteMany', args]), args),
+        create: async (args) => (
+          calls.push(['garmentItem.create', args.data]),
+          args.data
+        ),
+      },
+      wardrobeObjectDeletion: {
+        deleteMany: (args) => (
+          calls.push(['wardrobeObjectDeletion.deleteMany', args]),
+          args
+        ),
+      },
+      $transaction: async (operations) => operations,
+    }
+    return { prisma, calls }
+  }
+  const hooks = mobileE2EFlowStateHooks({
+    locationSentinelKeySuffix: '-sentinel',
+    cleanupComments: () => Promise.resolve(),
+  })
+
+  test('before seeds one ready dress for the member after clearing a leftover one', async () => {
+    const { prisma, calls } = recordingPrisma(['old-dress'])
+
+    await hooks[GARMENT_DELETE_FLOW].before(prisma, 'member-1')
+
+    assert.deepEqual(calls.slice(0, 3), [
+      [
+        'garmentItem.findMany',
+        { where: { user_id: 'member-1', category: 'dress' }, select: { id: true } },
+      ],
+      [
+        'wardrobeObjectDeletion.deleteMany',
+        { where: { OR: [{ object_path: { contains: 'old-dress' } }] } },
+      ],
+      [
+        'garmentItem.deleteMany',
+        { where: { user_id: 'member-1', id: { in: ['old-dress'] } } },
+      ],
+    ])
+    const [kind, data] = calls[3]
+    assert.equal(kind, 'garmentItem.create')
+    assert.equal(data.user_id, 'member-1')
+    assert.equal(data.category, 'dress')
+    assert.equal(data.upload_status, 'ready')
+    assert.equal(data.retention_status, 'active')
+    assert.equal(data.object_path, `wardrobe/member-1/${data.id}.png`)
+    assert.equal(calls.length, 4)
+  })
+
+  test('after removes only dresses, and does nothing when the flow already left none', async () => {
+    const { prisma, calls } = recordingPrisma([])
+
+    await hooks[GARMENT_DELETE_FLOW].after(prisma, 'member-1')
+
+    assert.deepEqual(calls, [
+      [
+        'garmentItem.findMany',
+        { where: { user_id: 'member-1', category: 'dress' }, select: { id: true } },
+      ],
+    ])
+  })
+
+  test('refuses to run without a member, so it can never match every member', async () => {
+    const { prisma } = recordingPrisma([])
+    await assert.rejects(
+      hooks[GARMENT_DELETE_FLOW].after(prisma, ''),
+      /requires a member ID/
+    )
+    await assert.rejects(
+      hooks[GARMENT_DELETE_FLOW].before(prisma, '  '),
+      /requires a member ID/
     )
   })
 })

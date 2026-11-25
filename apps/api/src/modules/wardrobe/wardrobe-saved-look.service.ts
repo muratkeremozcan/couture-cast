@@ -172,7 +172,10 @@ function isUniqueConstraintError(error: unknown): boolean {
   )
 }
 
-function collectGarmentIdsFromRow(row: SavedLook): string[] {
+/** Every member garment a saved look holds: its anchor plus its composition's garment slots. */
+function collectGarmentIdsFromRow(
+  row: Pick<SavedLook, 'anchor_garment_id' | 'composition'>
+): string[] {
   const ids = new Set<string>()
   if (row.anchor_garment_id) {
     ids.add(row.anchor_garment_id)
@@ -618,6 +621,25 @@ export class WardrobeSavedLookService {
       }
       throw error
     }
+  }
+
+  /**
+   * Story CC-7.6 D2: how many of the member's saved looks (not deleted) hold the garment, as
+   * the anchor or in a composition slot. Read by the garment usage route before a delete.
+   */
+  async countSavedLooksUsingGarment(userId: string, garmentId: string): Promise<number> {
+    // Counted in SQL: a member's saved looks have no cap. Same slots as
+    // `collectGarmentIdsFromRow`: the anchor, or a composition slot of kind `garment` whose
+    // `itemId` is the garment; `swaps` never count. A look holding it twice counts once.
+    const slot = JSON.stringify([{ kind: 'garment', itemId: garmentId }])
+    const rows = await this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*)::bigint AS count
+      FROM "SavedLook"
+      WHERE user_id = ${userId}
+        AND deleted_at IS NULL
+        AND (anchor_garment_id = ${garmentId} OR composition @> ${slot}::jsonb)
+    `)
+    return Number(rows[0]?.count ?? 0)
   }
 
   async listSavedLooks(

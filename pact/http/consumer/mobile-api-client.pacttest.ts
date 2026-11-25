@@ -85,6 +85,8 @@ import {
   verifyUpdateGarmentTagsInteraction,
   verifyListGarmentsWithColorInteraction,
   verifyUpdateGarmentTagsWithColorInteraction,
+  verifyGarmentUsageInteraction,
+  verifyDeleteGarmentInteraction,
   verifyCreateCapsuleInteraction,
   verifyCapsuleIdempotentReplayInteraction,
   verifyListCapsulesInteraction,
@@ -332,6 +334,15 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       pact,
       createMobileClientForMockServer
     )
+  })
+
+  // Story 7.6 test plan 7.6-PACT-001..002: garment delete and the usage read before it.
+  it('reads what deleting a garment affects', async () => {
+    await verifyGarmentUsageInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('deletes a garment', async () => {
+    await verifyDeleteGarmentInteraction(pact, createMobileClientForMockServer)
   })
 
   it('creates an outfit capsule', async () => {

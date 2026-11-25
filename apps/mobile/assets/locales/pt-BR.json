@@ -340,7 +340,16 @@
       "undoFailed": "Não foi possível desfazer. Tente de novo.",
       "missing": "Esta peça não está mais no seu guarda-roupa.",
       "loading": "Carregando a peça...",
-      "loadFailed": "Não foi possível carregar esta peça. Tente de novo."
+      "loadFailed": "Não foi possível carregar esta peça. Tente de novo.",
+      "delete": "Excluir",
+      "deleteConfirmTitle_one": "Excluir esta peça? Ela está em {{count}} look.",
+      "deleteConfirmTitle_other": "Excluir esta peça? Ela está em {{count}} looks.",
+      "deleteConfirmAccept": "Excluir peça",
+      "deleteCancel": "Manter",
+      "deleteSucceeded": "Excluída",
+      "deleteUndone": "Exclusão desfeita",
+      "deleteFailed": "Não foi possível excluir esta peça.",
+      "deleteUsageFailed": "Não foi possível verificar onde esta peça é usada. Tente de novo."
     }
   },
   "commerce": {

@@ -1,4 +1,5 @@
 // Story 6.3 device-reset owner: reset a member's reaction state between flow attempts in `scripts/lib/mobile-e2e-flow-state.mjs` and `scripts/lib/mobile-e2e-flow-retry.mjs`
+import { randomUUID } from 'node:crypto'
 import { fold, reversePlaces } from './weather-provider-double-data.mjs'
 
 // The native harness owns an isolated UUID database, genuine identities and source fixtures.
@@ -239,6 +240,64 @@ export const seedCommunityCommentsLongRoot = async (
 }
 
 /**
+ * Story 7.6 (7.6-MAE-001): `maestro/garment-delete-flow.yaml` deletes one garment for real. The
+ * shared seeded garments (top, bottom, outerwear, shoes) belong to the capsule and tag-edit
+ * flows, so this flow gets its own ready dress before each attempt, a category no other flow
+ * seeds or selects, and the after hook removes whatever is left of it. The row has no stored
+ * photo: the closet lists it with `imageAccess: null` (signing failure is logged, not raised) and
+ * the purge's storage removal of an absent key is a no-op.
+ * Learning path Step 64: Garment delete.
+ * See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+ */
+export const GARMENT_DELETE_FLOW = 'maestro/garment-delete-flow.yaml'
+export const GARMENT_DELETE_TARGET_CATEGORY = 'dress'
+
+export const removeGarmentDeleteTarget = async (prisma, userId) => {
+  if (typeof userId !== 'string' || userId.trim().length === 0) {
+    throw new Error('The garment delete flow state requires a member ID')
+  }
+  const rows = await prisma.garmentItem.findMany({
+    where: { user_id: userId, category: GARMENT_DELETE_TARGET_CATEGORY },
+    select: { id: true },
+  })
+  const ids = rows.map((row) => row.id)
+  if (ids.length === 0) return
+  await prisma.$transaction([
+    // A purge records its object keys in the deletion outbox; the drain must not chase them.
+    prisma.wardrobeObjectDeletion.deleteMany({
+      where: { OR: ids.map((id) => ({ object_path: { contains: id } })) },
+    }),
+    prisma.garmentItem.deleteMany({ where: { user_id: userId, id: { in: ids } } }),
+  ])
+}
+
+export const seedGarmentDeleteTarget = async (
+  prisma,
+  userId,
+  garmentId = randomUUID()
+) => {
+  await removeGarmentDeleteTarget(prisma, userId)
+  const now = new Date()
+  await prisma.garmentItem.create({
+    data: {
+      id: garmentId,
+      user_id: userId,
+      object_path: `wardrobe/${userId}/${garmentId}.png`,
+      mime_type: 'image/png',
+      file_size_bytes: 2048,
+      category: GARMENT_DELETE_TARGET_CATEGORY,
+      material: 'cotton',
+      comfort_range: 'mild',
+      upload_status: 'ready',
+      retention_status: 'active',
+      tags_confirmed_at: now,
+      committed_at: now,
+    },
+  })
+  return garmentId
+}
+
+/**
  * State a flow needs beyond the shared per-flow reset, keyed by flow path.
  * `before` runs ahead of every attempt; `after` runs once the flow finishes,
  * pass or fail, so the flows after it start from the baseline the identity
@@ -271,6 +330,10 @@ export const mobileE2EFlowStateHooks = ({
       seedCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
     after: (prisma) =>
       removeCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
+  },
+  [GARMENT_DELETE_FLOW]: {
+    before: (prisma, userId) => seedGarmentDeleteTarget(prisma, userId),
+    after: (prisma, userId) => removeGarmentDeleteTarget(prisma, userId),
   },
 })
 

@@ -75,6 +75,11 @@ export function createWardrobeDoubles() {
   }
 
   const mockWardrobeService = {
+    // Story 7.6: the configured garment sits in one capsule; any other answers 404.
+    countGarmentCapsules: (userId: string, garmentId: string) => {
+      assertProviderWardrobeState(userId, garmentId)
+      return Promise.resolve({ garmentId, capsuleCount: 1 })
+    },
     suggestGarmentTags: (userId: string, _role: ApiRole, garmentId: string) => {
       assertProviderWardrobeState(userId, garmentId)
       if (getProviderWardrobeState().outcome === 'inference_unavailable') {
@@ -140,7 +145,10 @@ export function createWardrobeDoubles() {
     },
   } as unknown as WardrobeService
 
-  const mockWardrobeRetentionService = {} as unknown as WardrobeRetentionService
+  // Story 7.6: the real route is idempotent and answers 204 for any garment id.
+  const mockWardrobeRetentionService = {
+    requestDeletion: () => Promise.resolve(),
+  } as unknown as WardrobeRetentionService
 
   /**
    * Story 4.3 capsule provider double.

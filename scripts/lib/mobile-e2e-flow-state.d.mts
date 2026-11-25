@@ -54,6 +54,22 @@ export declare const COMMUNITY_COMMENTS_FLOW: 'maestro/community-comments.yaml'
 
 export declare const USE_MY_LOCATION_FLOW: 'maestro/location-use-my-location.yaml'
 
+/** Story 7.6: the flow that deletes its own seeded dress (7.6-MAE-001). */
+export declare const GARMENT_DELETE_FLOW: 'maestro/garment-delete-flow.yaml'
+
+export declare const GARMENT_DELETE_TARGET_CATEGORY: 'dress'
+
+export declare function seedGarmentDeleteTarget(
+  prisma: PrismaClient,
+  userId: string,
+  garmentId?: string
+): Promise<string>
+
+export declare function removeGarmentDeleteTarget(
+  prisma: PrismaClient,
+  userId: string
+): Promise<void>
+
 export declare const USE_MY_LOCATION_DEVICE: Readonly<{
   latitude: number
   longitude: number

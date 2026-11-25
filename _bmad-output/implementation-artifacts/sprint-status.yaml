@@ -128,8 +128,8 @@ development_status:
   7-2-saved-looks-follow-account: done
   7-3-import-device-saved-looks-same-member: done
   7-4-community-post-edits-persist: done
-  7-5-garment-detail-tag-edit: in-progress
-  7-6-garment-delete: backlog
+  7-5-garment-detail-tag-edit: done
+  7-6-garment-delete: in-progress
   7-7-signed-in-shell-without-flashes: backlog
   7-8-teen-adult-usability-studies: backlog
   7-9-one-app-shell-visual-system: backlog

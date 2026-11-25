@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.10.0",
+    "version": "1.11.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -5608,6 +5608,30 @@
           "statusCode",
           "message",
           "error"
+        ],
+        "additionalProperties": false
+      },
+      "GarmentUsageResponse": {
+        "type": "object",
+        "properties": {
+          "garmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "savedLookCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "capsuleCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "garmentId",
+          "savedLookCount",
+          "capsuleCount"
         ],
         "additionalProperties": false
       },
@@ -24288,6 +24312,148 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UploadCommitUnprocessableError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/garments/{garmentId}/usage": {
+      "get": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Count the saved looks and capsules a garment deletion would affect",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique garment item ID."
+            },
+            "required": true,
+            "description": "Unique garment item ID.",
+            "name": "garmentId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved looks (not deleted) holding the garment and capsules containing it. Never cached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentUsageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid garment ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentIdBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentTaggingUnauthorizedError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account blocked from member access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentTaggingForbiddenError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Garment not found, owned by another user, not ready, or already being deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentTaggingNotFoundError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/wardrobe/garments/{garmentId}": {
+      "delete": {
+        "tags": [
+          "wardrobe"
+        ],
+        "summary": "Request deletion of a garment and purge its image",
+        "description": "Idempotent. A garment that does not exist or belongs to another user answers 204 and changes nothing. Under a legal hold the request is recorded and the garment is purged after the hold is released. A purge that cannot finish at once completes in the hourly retention sweep.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "description": "Unique garment item ID."
+            },
+            "required": true,
+            "description": "Unique garment item ID.",
+            "name": "garmentId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deletion requested; the garment no longer appears in the closet."
+          },
+          "400": {
+            "description": "Invalid garment ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentIdBadRequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentTaggingUnauthorizedError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account blocked from member access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GarmentTaggingForbiddenError"
                 }
               }
             }

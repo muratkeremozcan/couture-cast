@@ -95,6 +95,8 @@ function buildContract(): SavedLookContract {
 
 export function createSavedLookDoubles() {
   const mockWardrobeSavedLookService = {
+    // Story 7.6: the garment usage read; the wardrobe double already refused any other garment.
+    countSavedLooksUsingGarment: () => Promise.resolve(1),
     createSavedLook: () =>
       Promise.resolve({
         data: buildContract(),

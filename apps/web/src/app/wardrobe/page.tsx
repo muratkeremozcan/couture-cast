@@ -57,6 +57,8 @@ import {
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 import { ClosetSavedLooksRow } from './saved-looks-row'
 import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-detail'
+import { useGarmentDeletion, type GarmentDeleteMode } from './garment-deletion'
+import { SaveFeedbackProvider, useStatusBar } from '../components/save-feedback'
 
 /** D2: the open garment detail lives in the URL, so a reload reopens it. */
 const GARMENT_DETAIL_PARAM = 'garment'
@@ -95,8 +97,24 @@ export default function WardrobePage() {
   const owner = useWebSessionOwner()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <WardrobeHubView key={owner} owner={owner} />
+      <ClosetStatusBar>
+        <WardrobeHubView key={owner} owner={owner} />
+      </ClosetStatusBar>
     </I18nextProvider>
+  )
+}
+
+/**
+ * The root layout provides the CC-7.1 status bar; a Closet rendered without it (an isolated
+ * mount) brings its own, so the delete's Deleted, Undo and Retry notices always show.
+ */
+function ClosetStatusBar({ children }: { children: React.ReactNode }) {
+  const { hasProvider } = useStatusBar()
+  if (hasProvider) return <>{children}</>
+  return (
+    <SaveFeedbackProvider inline renderOfflineLine={false}>
+      {children}
+    </SaveFeedbackProvider>
   )
 }
 
@@ -225,6 +243,14 @@ function resolveEffectiveSavedLooksOwner(
   return null
 }
 
+function withoutPendingDeletes(
+  garments: ClosetGarment[],
+  pendingIds: ReadonlySet<string>
+): ClosetGarment[] {
+  if (pendingIds.size === 0) return garments
+  return garments.filter((garment) => !pendingIds.has(garment.id))
+}
+
 function findReadyGarment(
   garments: readonly ClosetGarment[],
   garmentId: string | null
@@ -247,6 +273,8 @@ function useGarmentDetailRoute(
   const [detailGarmentId, setDetailGarmentId] = useState<string | null>(null)
   const gridScrollRef = useRef(0)
   const lastDetailIdRef = useRef<string | null>(null)
+  // Story CC-7.6 D7: after a delete the opened card is gone, so focus goes elsewhere.
+  const focusAfterCloseRef = useRef<(() => HTMLElement | null) | null>(null)
 
   const paramSync = (
     <Suspense fallback={null}>
@@ -264,7 +292,12 @@ function useGarmentDetailRoute(
     }
     if (!previous) return
     window.scrollTo(0, gridScrollRef.current)
-    garmentOpenRefs.current.get(previous)?.focus({ preventScroll: true })
+    const focusAfterClose = focusAfterCloseRef.current
+    focusAfterCloseRef.current = null
+    const target = focusAfterClose
+      ? focusAfterClose()
+      : garmentOpenRefs.current.get(previous)
+    target?.focus({ preventScroll: true })
   }, [detailGarmentId, garmentOpenRefs])
 
   const openGarmentDetail = (garmentId: string) => {
@@ -278,11 +311,20 @@ function useGarmentDetailRoute(
     setDetailGarmentId(garmentId)
   }
 
-  const closeGarmentDetail = () => {
+  /**
+   * `focusTarget` (CC-7.6 D7) closes the grid at once and moves focus to what it returns; the
+   * delete passes it because the card the member opened is no longer in the grid.
+   */
+  const closeGarmentDetail = (focusTarget?: () => HTMLElement | null) => {
+    if (focusTarget) {
+      focusAfterCloseRef.current = focusTarget
+    }
     if (readHistoryState()[GARMENT_DETAIL_HISTORY_KEY]) {
       // Back lands on the grid entry; the search param sync closes the detail, so browser Back
-      // and this control agree.
+      // and this control agree. A delete closes at once so the detail never shows the piece
+      // as missing while the history step lands.
       window.history.back()
+      if (focusTarget) setDetailGarmentId(null)
       return
     }
     // A direct link to the detail has no grid entry behind it: replace this one with the grid.
@@ -385,7 +427,41 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     )
   }
 
-  const detailGarment = findReadyGarment(garments, detailGarmentId)
+  const closetHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  const { pendingIds: pendingDeleteIds, requestDelete } = useGarmentDeletion({
+    readBearer: readLiveWebBearer,
+    onCommitted: (garmentId) => {
+      inventoryVersion.current++
+      setGarments((current) => current.filter((item) => item.id !== garmentId))
+      // A saved look holding the piece now shows it as missing (CC-7.2).
+      setSavedLooksAttempt((attempt) => attempt + 1)
+    },
+  })
+  // A piece inside its Undo window, or being sent, is hidden from the grid and the detail.
+  const visibleGarments = withoutPendingDeletes(garments, pendingDeleteIds)
+
+  /**
+   * D7: the detail closes to the grid at its saved scroll position, and focus moves to the next
+   * card, else the previous one, else the grid heading.
+   */
+  const handleDetailDelete = (garmentId: string, mode: GarmentDeleteMode) => {
+    const order = visibleGarments.map((garment) => garment.id)
+    const index = order.indexOf(garmentId)
+    const neighbours =
+      index < 0 ? [] : [...order.slice(index + 1), ...order.slice(0, index).reverse()]
+    requestDelete(garmentId, mode)
+    closeGarmentDetail(() => {
+      for (const id of neighbours) {
+        const button = document
+          .querySelector(`[data-testid="garment-card-${CSS.escape(id)}"]`)
+          ?.querySelector<HTMLButtonElement>('button')
+        if (button) return button
+      }
+      return closetHeadingRef.current
+    })
+  }
+
+  const detailGarment = findReadyGarment(visibleGarments, detailGarmentId)
 
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
@@ -793,7 +869,8 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
               hasLoaded={hasLoaded}
               loadFailed={Boolean(loadError)}
               loading={isLoading}
-              onBack={closeGarmentDetail}
+              onBack={() => closeGarmentDetail()}
+              onDelete={handleDetailDelete}
               onTagSaveStart={() => inventoryVersion.current}
               onTagsSaved={handleDetailTagsSaved}
               onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
@@ -867,7 +944,12 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
             />
 
             <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              <h2
+                ref={closetHeadingRef}
+                tabIndex={-1}
+                data-testid="wardrobe-closet-heading"
+                className="text-lg font-semibold text-zinc-900 outline-none dark:text-zinc-100"
+              >
                 Your Digital Closet
               </h2>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
@@ -877,7 +959,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
 
               <WardrobeLoadError
                 loadError={loadError}
-                hasGarments={garments.length > 0}
+                hasGarments={visibleGarments.length > 0}
                 isLoading={isLoading}
                 strings={strings}
                 onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
@@ -896,7 +978,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
                 </Link>
               )}
 
-              {garments.length === 0 ? (
+              {visibleGarments.length === 0 ? (
                 <WardrobeEmptyState
                   isLoading={isLoading}
                   hasLoaded={hasLoaded}
@@ -905,7 +987,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
                 />
               ) : (
                 <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                  {garments.map((garment) => (
+                  {visibleGarments.map((garment) => (
                     <div
                       key={garment.id}
                       data-testid={`garment-card-${garment.id}`}

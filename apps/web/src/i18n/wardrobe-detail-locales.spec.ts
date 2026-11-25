@@ -1,5 +1,7 @@
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 64: Garment delete (wardrobe.detail.delete* keys).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import fs from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { supportedLocales } from '@couture/api-client/contracts/http'
@@ -23,7 +25,19 @@ const REQUIRED_KEYS = [
   'missing',
   'loading',
   'loadFailed',
+  'delete',
+  'deleteConfirmTitle_one',
+  'deleteConfirmTitle_other',
+  'deleteConfirmAccept',
+  'deleteCancel',
+  'deleteSucceeded',
+  'deleteUndone',
+  'deleteFailed',
+  'deleteUsageFailed',
 ] as const
+
+const PLURAL_KEYS = REQUIRED_KEYS.filter((key) => /_(one|other)$/.test(key))
+const PLAIN_KEYS = REQUIRED_KEYS.filter((key) => !PLURAL_KEYS.includes(key))
 
 const json = (relative: string) =>
   JSON.parse(fs.readFileSync(new URL(relative, import.meta.url), 'utf8')) as {
@@ -57,7 +71,14 @@ describe('wardrobe.detail catalog parity (web)', () => {
         expect(typeof value).toBe('string')
         expect(value!.trim().length).toBeGreaterThan(0)
         expect(value).not.toContain('wardrobe.detail.')
-        expect(value).not.toMatch(/\{\{|\}\}/)
+      }
+      for (const key of PLAIN_KEYS) {
+        expect(web![key]).not.toMatch(/\{\{|\}\}/)
+      }
+      // Plural forms interpolate the count and nothing else.
+      for (const key of PLURAL_KEYS) {
+        expect(web![key]).toContain('{{count}}')
+        expect(web![key]!.replace('{{count}}', '')).not.toMatch(/\{\{|\}\}/)
       }
 
       if (!locale.startsWith('en-')) {

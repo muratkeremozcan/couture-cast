@@ -1,0 +1,133 @@
+# Learning path Step 64: Garment delete.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+# Story 7.6 test plan 7.6-MAE-001: on Android, delete a ready garment from its detail. The hub
+# hides it with Deleted and Undo; Undo brings it back; a second Delete commits once the window
+# ends, and after a relaunch the closet no longer lists it.
+#
+# The garment is this flow's own: `FLOW_STATE_HOOKS` (scripts/lib/mobile-e2e-flow-state.mjs,
+# GARMENT_DELETE_FLOW) seeds one ready dress before every attempt and removes what is left after.
+# No other flow seeds or selects a dress, so the shared top, bottom, outerwear and shoes that the
+# capsule and tag-edit flows use are never touched. The dress has no stored photo, so its card
+# shows the placeholder and is found by its category label. It is the newest garment, so the
+# closet lists it first.
+appId: ${MAESTRO_APP_ID}
+name: 'Garment delete with Undo'
+tags:
+  - e2e
+  - wardrobe
+  - garment-delete
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow: subflows/open-wardrobe-tab.yaml
+
+- scrollUntilVisible:
+    element:
+      id: 'garment-open-.*'
+      text: '.*[Dd]ress.*'
+    direction: DOWN
+    timeout: 20000
+
+- tapOn:
+    id: 'garment-open-.*'
+    text: '.*[Dd]ress.*'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail'
+    timeout: 15000
+- assertVisible:
+    id: 'garment-detail-category'
+    text: 'Dress'
+
+# An unused piece: no prompt, the detail pops back to the hub and the piece is hidden at once.
+- scrollUntilVisible:
+    element:
+      id: 'garment-delete'
+    direction: DOWN
+- tapOn:
+    id: 'garment-delete'
+
+# The bar's container carries the test id and its child Text carries the copy, so the two are
+# asserted separately: one native element never holds both.
+- extendedWaitUntil:
+    visible:
+      id: 'status-bar-action-undo'
+    timeout: 10000
+- assertVisible:
+    id: 'status-feedback-bar'
+- assertVisible:
+    text: 'Deleted'
+- assertNotVisible:
+    id: 'garment-delete-confirm'
+- assertVisible:
+    id: 'wardrobe-screen'
+- assertNotVisible:
+    id: 'garment-open-.*'
+    text: '.*[Dd]ress.*'
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-delete-undo-window
+
+# Undo inside the window: nothing is sent and the piece is back.
+- tapOn:
+    id: 'status-bar-action-undo'
+- extendedWaitUntil:
+    visible:
+      text: 'Undone'
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: 'garment-open-.*'
+      text: '.*[Dd]ress.*'
+    direction: UP
+    timeout: 10000
+
+# Delete again and let the window end: the DELETE is sent and the notice closes.
+- tapOn:
+    id: 'garment-open-.*'
+    text: '.*[Dd]ress.*'
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'garment-delete'
+    direction: DOWN
+- tapOn:
+    id: 'garment-delete'
+- extendedWaitUntil:
+    visible:
+      id: 'status-bar-action-undo'
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      id: 'status-bar-action-undo'
+    timeout: 20000
+- assertNotVisible:
+    text: 'Could not delete this piece.'
+
+# Relaunch and read the closet back from the server: the newest card is no longer the dress.
+- runFlow:
+    file: subflows/relaunch-app.yaml
+    label: 'Relaunch to prove the delete reached the server'
+
+- runFlow: subflows/open-wardrobe-tab.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-open-.*'
+    timeout: 20000
+- assertNotVisible:
+    id: 'garment-open-.*'
+    text: '.*[Dd]ress.*'
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-delete-flow

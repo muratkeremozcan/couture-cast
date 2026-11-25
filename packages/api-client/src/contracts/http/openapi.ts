@@ -175,7 +175,9 @@ export function generateHttpOpenApiDocument() {
       // garment list and tag update adds colorFamily for clients that send it. Responses
       // without the header keep their strict legacy shape. The tag update also takes an
       // optional `expected` and documents one more 409 message, GARMENT_TAGS_CHANGED.
-      version: '1.10.0',
+      // Story CC-7.6 bumps the minor: one additive garment usage read, and the existing
+      // garment DELETE (204) is now published. No existing operation narrows.
+      version: '1.11.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [
