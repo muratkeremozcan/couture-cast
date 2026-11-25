@@ -3,7 +3,7 @@ title: 'Story CC-7.5: Garment detail and tag edit'
 type: feature
 ticket: '7-5-garment-detail-tag-edit'
 created: '2026-11-25'
-status: in-review
+status: built
 baseline_revision: 'ea93273baba410b83b1b77d6abbd71c6d016b089'
 route: full
 route_source: auto
@@ -158,6 +158,22 @@ itself.
 ## Plan Change Log
 
 ## Review Triage Log
+
+Codex peer review (`/Users/murat/opensource/cc/epic7-coord/7.5-codex-review.md`) of `bc7d7bb0`
+against `ea93273b`. Codex Security: 0 findings. Every finding verified and fixed in this branch.
+
+| #    | Verdict | Finding                                                                                                                                      | Resolution                                                                                                                                                                         |
+| ---- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1.1 | high    | Android fixture lane has no owner, so Done and Style this piece never run; Saved selectors pinned container id and child text on one element | TEA: fixture branch of `startNativeSession` verifies the bearer via GET user/profile and sets the owner (production path unchanged); Maestro asserts container and text separately |
+| P1.2 | medium  | `page.test.tsx` no-image test rejects the new role img placeholder                                                                           | TEA: asserts the named placeholder and no real img                                                                                                                                 |
+| P2.1 | medium  | Done and Undo can overwrite a newer edit                                                                                                     | Optional PATCH `expected` tags compared inside the serializable transaction, 409 `GARMENT_TAGS_CHANGED`; new Done retires the older Undo                                           |
+| P2.2 | medium  | PATCH fails after commit when signing fails                                                                                                  | Response built with `toListedGarment` (imageAccess null)                                                                                                                           |
+| P2.3 | medium  | Done skips CC-7.1 pending/still-saving announcements; ids restart per mount                                                                  | Shared lifecycle in `useGarmentTagEditor`, module-level ids                                                                                                                        |
+| P2.4 | medium  | Generated SDK requires `colorFamily` on legacy responses                                                                                     | One wire schema per response with optional `colorFamily`; runtime strict schemas unchanged                                                                                         |
+| P2.5 | medium  | Signed photo can expire before or while the detail is open                                                                                   | Refresh within 60 s of expiry (open, native foreground); one refetch on load error, then placeholder                                                                               |
+| P2.6 | medium  | Pre-save hub read can win over post-save reload                                                                                              | Change notice advances the inventory revision before reload                                                                                                                        |
+| P2.7 | medium  | Saved looks keep a stale status after a tag change                                                                                           | Saved looks reload after every committed Done or Undo                                                                                                                              |
+| P3   | low     | Browser Forward loses the pushed-entry flag                                                                                                  | Flag stored on the history entry                                                                                                                                                   |
 
 ## Verification
 

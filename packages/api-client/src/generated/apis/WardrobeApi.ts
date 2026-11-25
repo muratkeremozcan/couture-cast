@@ -13,8 +13,6 @@
 
 import * as runtime from '../runtime'
 import type {
-  ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response,
-  ApiV1WardrobeGarmentsGet200Response,
   CommitSilhouettePhotoInput,
   CreateGarmentItemInput,
   CreateGarmentItemResponse,
@@ -25,6 +23,7 @@ import type {
   CreateSilhouetteUploadUrlInput,
   CreateSilhouetteUploadUrlResponse,
   FavoriteOutfitCapsuleInput,
+  GarmentListResponse,
   OutfitCapsuleListResponse,
   OutfitCapsuleResponse,
   SavedLookListResponse,
@@ -32,6 +31,7 @@ import type {
   SilhouetteProfileResponse,
   SuggestGarmentTagsResponse,
   UpdateGarmentTagsInput,
+  UpdateGarmentTagsResponse,
   UpdateOutfitCapsuleInput,
   UpdateSilhouetteSlidersInput,
   UpdateWardrobeOnboardingStateInput,
@@ -289,7 +289,7 @@ export class WardrobeApi extends runtime.BaseAPI {
   async apiV1WardrobeGarmentsGarmentIdTagsPatchRaw(
     requestParameters: ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response>> {
+  ): Promise<runtime.ApiResponse<UpdateGarmentTagsResponse>> {
     const requestOptions =
       await this.apiV1WardrobeGarmentsGarmentIdTagsPatchRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
@@ -303,7 +303,7 @@ export class WardrobeApi extends runtime.BaseAPI {
   async apiV1WardrobeGarmentsGarmentIdTagsPatch(
     requestParameters: ApiV1WardrobeGarmentsGarmentIdTagsPatchRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response> {
+  ): Promise<UpdateGarmentTagsResponse> {
     const response = await this.apiV1WardrobeGarmentsGarmentIdTagsPatchRaw(
       requestParameters,
       initOverrides
@@ -352,7 +352,7 @@ export class WardrobeApi extends runtime.BaseAPI {
   async apiV1WardrobeGarmentsGetRaw(
     requestParameters: ApiV1WardrobeGarmentsGetRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<ApiV1WardrobeGarmentsGet200Response>> {
+  ): Promise<runtime.ApiResponse<GarmentListResponse>> {
     const requestOptions =
       await this.apiV1WardrobeGarmentsGetRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
@@ -366,7 +366,7 @@ export class WardrobeApi extends runtime.BaseAPI {
   async apiV1WardrobeGarmentsGet(
     requestParameters: ApiV1WardrobeGarmentsGetRequest = {},
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<ApiV1WardrobeGarmentsGet200Response> {
+  ): Promise<GarmentListResponse> {
     const response = await this.apiV1WardrobeGarmentsGetRaw(
       requestParameters,
       initOverrides

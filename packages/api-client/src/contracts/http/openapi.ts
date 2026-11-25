@@ -173,7 +173,8 @@ export function generateHttpOpenApiDocument() {
       // operations under /api/v1/wardrobe/saved-looks. No existing operation narrows.
       // Story CC-7.5 bumps the minor: an optional x-couture-garment-color header on the
       // garment list and tag update adds colorFamily for clients that send it. Responses
-      // without the header keep their strict legacy shape.
+      // without the header keep their strict legacy shape. The tag update also takes an
+      // optional `expected` and documents one more 409 message, GARMENT_TAGS_CHANGED.
       version: '1.10.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },

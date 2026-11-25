@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common'
 import { Prisma, PrismaClient, type GarmentItem } from '@prisma/client'
 import {
+  GARMENT_TAGS_CHANGED_MESSAGE,
   garmentTagSuggestionSnapshotSchema,
   type GarmentCategory,
   type GarmentMaterial,
@@ -431,6 +432,19 @@ function garmentData(
   }
 }
 
+/** Each tag the editor sent in `expected` equals the stored tag; an omitted one is not compared. */
+function storedTagsMatch(
+  garment: Pick<GarmentItem, 'category' | 'material' | 'comfort_range'>,
+  expected: NonNullable<UpdateGarmentTagsInput['expected']>
+): boolean {
+  return (
+    (expected.category === undefined || expected.category === garment.category) &&
+    (expected.material === undefined || expected.material === garment.material) &&
+    (expected.comfortRange === undefined ||
+      expected.comfortRange === garment.comfort_range)
+  )
+}
+
 /**
  * Story CC-7.5 D1: a request opts in to `colorFamily` with `x-couture-garment-color: 1`.
  * Without it the garment keeps the strict legacy shape, key for key.
@@ -762,8 +776,10 @@ export class WardrobeService {
       }
     }
 
-    const response = await this.toResponse(result.updated)
-    return { data: withGarmentColor(result.updated, response.data, options) }
+    // The tags are committed: a photo that cannot be signed right now leaves the answer without
+    // one, as the list does, instead of reporting a failed save for a committed edit.
+    const data = await this.toListedGarment(result.updated)
+    return { data: withGarmentColor(result.updated, data, options) }
   }
 
   private async confirmTagsTransaction(
@@ -809,6 +825,12 @@ export class WardrobeService {
         telemetryProperties: null,
         cacheInvalidationRequired: false,
       }
+    }
+    // Story CC-7.5: an editor that says which tags it saw is refused when another edit landed
+    // first, so Done or Undo never overwrites a newer edit. Checked on the row this
+    // serializable transaction read, before the guarded write.
+    if (input.expected && !storedTagsMatch(garment, input.expected)) {
+      throw new ConflictException(GARMENT_TAGS_CHANGED_MESSAGE)
     }
 
     const { suggestion, hasMalformedSuggestion } = parseTagSuggestion(garment)

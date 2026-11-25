@@ -53,6 +53,14 @@ import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-de
 /** D2: the open garment detail lives in the URL, so a reload reopens it. */
 const GARMENT_DETAIL_PARAM = 'garment'
 
+/** The history entry key that marks an entry this page pushed for an open detail. */
+const GARMENT_DETAIL_HISTORY_KEY = 'garmentDetail'
+
+function readHistoryState(): Record<string, unknown> {
+  const state: unknown = window.history.state
+  return state && typeof state === 'object' ? (state as Record<string, unknown>) : {}
+}
+
 function readGarmentDetailParam(): string | null {
   if (typeof window === 'undefined') return null
   return new URLSearchParams(window.location.search).get(GARMENT_DETAIL_PARAM) || null
@@ -219,7 +227,6 @@ function useGarmentDetailRoute(
   garmentOpenRefs: React.RefObject<Map<string, HTMLButtonElement>>
 ) {
   const [detailGarmentId, setDetailGarmentId] = useState<string | null>(null)
-  const detailPushedRef = useRef(false)
   const gridScrollRef = useRef(0)
   const lastDetailIdRef = useRef<string | null>(null)
 
@@ -227,7 +234,6 @@ function useGarmentDetailRoute(
     setDetailGarmentId(readGarmentDetailParam())
     const onPopState = () => {
       const next = readGarmentDetailParam()
-      if (!next) detailPushedRef.current = false
       setDetailGarmentId(next)
     }
     window.addEventListener('popstate', onPopState)
@@ -251,13 +257,18 @@ function useGarmentDetailRoute(
     gridScrollRef.current = window.scrollY
     const url = new URL(window.location.href)
     url.searchParams.set(GARMENT_DETAIL_PARAM, garmentId)
-    window.history.pushState(window.history.state, '', url)
-    detailPushedRef.current = true
+    // The entry records that this page pushed it, so the detail's back control can step back
+    // to the grid entry even after browser Back and Forward.
+    window.history.pushState(
+      { ...readHistoryState(), [GARMENT_DETAIL_HISTORY_KEY]: garmentId },
+      '',
+      url
+    )
     setDetailGarmentId(garmentId)
   }
 
   const closeGarmentDetail = () => {
-    if (detailPushedRef.current) {
+    if (readHistoryState()[GARMENT_DETAIL_HISTORY_KEY]) {
       // The popstate handler above closes the detail, so browser Back and this control agree.
       window.history.back()
       return
@@ -345,6 +356,8 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     setGarments((current) =>
       current.map((item) => (item.id === updated.id ? updated : item))
     )
+    // A saved look's Ready or Needs review status follows its anchor's live tags.
+    setSavedLooksAttempt((attempt) => attempt + 1)
   }
 
   const detailGarment = findReadyGarment(garments, detailGarmentId)

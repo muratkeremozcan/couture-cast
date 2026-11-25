@@ -199,7 +199,12 @@ function MemberWardrobeHub({
     () =>
       onWardrobeChanged(() => {
         if (notifyingWardrobeRef.current || epoch !== mobileIdentityEpoch()) return
+        // Every read started before the save carries an older revision and is discarded, so a
+        // pre-save snapshot that settles late cannot win over the reload below.
+        inventoryRevision.current++
         setLoadAttempt((attempt) => attempt + 1)
+        // A saved look's Ready or Needs review status follows its anchor's live tags.
+        setSavedLooksAttempt((attempt) => attempt + 1)
       }),
     [epoch]
   )

@@ -27,7 +27,7 @@ import {
   fetchMobileFederatedSignupStatus,
   submitMobileFederatedSignup,
 } from './signup'
-import { setMobileApplicationUserId } from './mobile-auth'
+import { resolveMobileAccessToken, setMobileApplicationUserId } from './mobile-auth'
 import { secureSessionStorage } from './secure-session-storage'
 import { forgetAllUploadAttempts } from './upload-attempts'
 import { codeRejected, NativeSignInError } from './native-signin-error'
@@ -262,14 +262,38 @@ async function installSessionLifecycle(lifecycle: SessionLifecycle) {
     throw error
   }
 }
+/**
+ * Story 7.5: the dev-only fixture lane (Maestro injects a bearer at bundle time) still names
+ * its member the way a real session does, from the API's own profile answer for that bearer,
+ * so owner-checked actions (tag edits, Style this piece, saved looks) behave as they do for a
+ * signed-in member. A failed check leaves the lane without an owner, as before.
+ */
+async function verifyFixtureIdentity(): Promise<void> {
+  for (let attempt = 1; attempt <= ACCOUNT_CHECK_ATTEMPTS; attempt += 1) {
+    try {
+      const token = await resolveMobileAccessToken()
+      if (!token) return
+      const result = await withRequestDeadline(5000, [], (signal) =>
+        createMobileApiClient({ accessToken: token }).apiV1UserProfileGet({ signal })
+      )
+      setMobileApplicationUserId(userProfileResponseSchema.parse(result).user.id)
+      return
+    } catch (error) {
+      if (sessionDenied(error) || attempt === ACCOUNT_CHECK_ATTEMPTS) return
+      await new Promise((resolve) => setTimeout(resolve, ACCOUNT_CHECK_RETRY_MS))
+    }
+  }
+}
 export async function startNativeSession(): Promise<() => void> {
   if (
     __DEV__ &&
     process.env.EXPO_PUBLIC_E2E_AUTH_MODE !== 'real' &&
     (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN ||
       process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE)
-  )
+  ) {
+    await verifyFixtureIdentity()
     return () => undefined
+  }
   let lifecycle = sessionLifecycle
   if (!lifecycle) {
     lifecycle = { owners: new Set(), ready: Promise.resolve(), dispose: () => undefined }

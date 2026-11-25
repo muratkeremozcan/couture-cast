@@ -15,7 +15,10 @@ import {
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { createSavedLooksMswHandlers } from '../../test-utils/saved-looks-msw'
+import {
+  createSavedLooksMswHandlers,
+  type SavedLooksMswStore,
+} from '../../test-utils/saved-looks-msw'
 import WardrobePage from './page'
 
 const session = vi.hoisted(() => ({ owner: null as string | null }))
@@ -66,6 +69,7 @@ const awaiting = readyGarment('awaiting-piece', {
 })
 
 let closet: GarmentWithColor[]
+let savedLooksStore: SavedLooksMswStore
 let listHeaders: (string | null)[]
 
 function signIn() {
@@ -88,6 +92,13 @@ beforeEach(() => {
   closet = [blueTop, blackShoes, uncoloredDress, awaiting]
   listHeaders = []
   const savedLooks = createSavedLooksMswHandlers([], `${api}/wardrobe/saved-looks`)
+  savedLooksStore = savedLooks.store
+  for (const garment of closet)
+    if (garment.category && garment.comfortRange)
+      savedLooksStore.garmentTagsById.set(garment.id, {
+        category: garment.category,
+        comfortRange: garment.comfortRange,
+      })
   useMswHandlers(
     http.get(`${api}/wardrobe/garments`, ({ request }) => {
       listHeaders.push(request.headers.get('x-couture-garment-color'))
@@ -95,8 +106,15 @@ beforeEach(() => {
     }),
     http.patch(`${api}/wardrobe/garments/:id/tags`, async ({ params, request }) => {
       const body = (await request.json()) as Record<string, unknown>
+      delete body.expected
       const current = closet.find((item) => item.id === params.id)!
-      const updated = { ...current, ...body }
+      const updated = { ...current, ...body } as GarmentWithColor
+      // Saved looks derive Ready or Needs review from the live garment tags, as the API does.
+      if (updated.category && updated.comfortRange)
+        savedLooksStore.garmentTagsById.set(updated.id, {
+          category: updated.category,
+          comfortRange: updated.comfortRange,
+        })
       closet = closet.map((item) => (item.id === updated.id ? updated : item))
       return HttpResponse.json({ data: updated })
     }),
@@ -258,5 +276,97 @@ describe('Closet garment detail', () => {
 
     const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
     expect(await within(panel).findByRole('heading', { name: 'Look 1' })).toBeVisible()
+  })
+
+  it('[P1] [7.5-CMP-016] a saved look anchored on the piece follows its tags through edit and Undo (Codex P2.7)', async () => {
+    const user = userEvent.setup()
+    const { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } = await import(
+      '@couture/utils'
+    )
+    const look = stylePieceLooks(stylePieceAnchor(blueTop)!, 'mild-dry', SAMPLE_CATALOG)
+      .looks[0]!
+    savedLooksStore.items.push({
+      id: 'look-on-blue-top',
+      ownerUserId: owner,
+      source: 'style_piece',
+      lookId: look.recipe.lookId,
+      weather: 'mild-dry',
+      title: 'Blue top look',
+      anchorGarmentId: blueTop.id,
+      anchorSnapshot: { garmentId: blueTop.id, category: 'top', comfortRange: 'mild' },
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top',
+          kind: 'garment',
+          itemId: blueTop.id,
+          label: null,
+          missing: false,
+          imageAccess: blueTop.imageAccess,
+        },
+        ...look.companions.map((companion, index) => ({
+          slotIndex: index + 1,
+          category: companion.category,
+          kind: 'catalog' as const,
+          itemId: companion.id,
+          label: null,
+          missing: false,
+          imageAccess: null,
+        })),
+      ],
+      swaps: {},
+      collection: null,
+      comfort: null,
+      availabilityStatus: 'ready',
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt: '2026-11-22T01:00:00.000Z',
+      updatedAt: '2026-11-22T01:00:00.000Z',
+    })
+    render(<WardrobePage />)
+    signIn()
+    expect(await screen.findByText('Blue top look')).toBeInTheDocument()
+    expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
+
+    await user.click(screen.getByTestId('garment-open-blue-top'))
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    await user.click(screen.getByTestId('garment-tag-option-category-outerwear'))
+    await user.click(screen.getByTestId('garment-tag-done'))
+    // The committed edit refreshes saved looks: the look now needs review.
+    expect(await screen.findByTestId('saved-look-needs-review')).toBeInTheDocument()
+
+    await user.click(await screen.findByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
+    )
+    await user.click(screen.getByTestId('garment-detail-back'))
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+    expect(screen.getByText('Blue top look')).toBeVisible()
+    expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
+  })
+
+  it('[P2] [7.5-CMP-017] browser Back then Forward keeps the detail Back control on history (Codex P3)', async () => {
+    const user = userEvent.setup()
+    render(<WardrobePage />)
+    signIn()
+
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    await screen.findByTestId('garment-detail')
+    act(() => window.history.back())
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+    act(() => window.history.forward())
+    await screen.findByTestId('garment-detail')
+    expect(window.location.search).toBe('?garment=blue-top')
+
+    const back = vi.spyOn(window.history, 'back')
+    const replace = vi.spyOn(window.history, 'replaceState')
+    await user.click(screen.getByTestId('garment-detail-back'))
+
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+    // Back steps through history instead of writing a second grid entry over the detail.
+    expect(back).toHaveBeenCalledTimes(1)
+    expect(replace).not.toHaveBeenCalled()
+    expect(window.location.search).toBe('')
   })
 })

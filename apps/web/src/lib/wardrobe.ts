@@ -17,6 +17,7 @@ import {
   type GarmentComfortRange,
   type GarmentItemContract,
   type GarmentWithColor,
+  type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
   type OutfitCapsuleContract,
   type CreateOutfitCapsuleInput,
@@ -342,6 +343,7 @@ async function readError(response: Response): Promise<Error> {
       'GARMENT_ANALYSIS_PENDING',
       'TAGGING_INFERENCE_UNAVAILABLE',
       'CONCURRENT_TAG_UPDATE',
+      'GARMENT_TAGS_CHANGED',
       'GUARDIAN_CONSENT_REQUIRED',
     ].includes(message)
       ? message
@@ -553,6 +555,8 @@ export async function updateGarmentTagsFromWeb(
     category: GarmentCategory
     material?: GarmentMaterial | null
     comfortRange: GarmentComfortRange
+    /** The tags the editor saw; a newer edit then answers 409 GARMENT_TAGS_CHANGED. */
+    expected?: UpdateGarmentTagsInput['expected']
   },
   signal?: AbortSignal
 ): Promise<GarmentWithColor> {

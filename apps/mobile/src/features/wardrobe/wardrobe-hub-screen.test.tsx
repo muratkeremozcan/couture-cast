@@ -204,6 +204,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
+import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
@@ -1608,6 +1609,73 @@ describe('WardrobeHubScreen', () => {
         pathname: '/wardrobe-garment',
         params: { id: 'hub-blue-top' },
       })
+    })
+
+    it('[P0] [7.5-NAT-010] a pre-save read that lands late cannot undo the post-save reload (Codex P2.6)', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      const processing = garmentFixture({ id: 'hub-processing', status: 'processing' })
+      const wool = { ...blueTop, material: 'wool' }
+      const pollStarted = deferred()
+      const poll = deferred()
+      let reads = 0
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', async () => {
+          const read = ++reads
+          if (read === 2) {
+            // An independent status poll reads before the save and answers after it.
+            pollStarted.resolve()
+            await poll.promise
+            return HttpResponse.json({ data: [blueTop, processing] })
+          }
+          return HttpResponse.json({ data: read === 1 ? [blueTop, processing] : [wool] })
+        })
+      )
+      renderScreen()
+      const label = () =>
+        within(screen.getByTestId('garment-card-hub-blue-top')).getByTestId(
+          'garment-card-label'
+        ).textContent
+      await screen.findByTestId('garment-card-hub-blue-top')
+
+      try {
+        await browserUser.click(
+          await screen.findByRole('button', { name: 'Check garment status' })
+        )
+        await pollStarted.promise
+        act(() => notifyWardrobeChanged())
+        await waitFor(() => expect(label()).toBe('Top · Wool'))
+
+        poll.resolve()
+        await waitFor(() => expect(reads).toBeGreaterThanOrEqual(3))
+        // Let the late pre-save snapshot reach the hub; it must be discarded.
+        for (let turn = 0; turn < 5; turn += 1) await act(drainMacrotask)
+        expect(label()).toBe('Top · Wool')
+      } finally {
+        poll.resolve()
+      }
+    })
+
+    it('[P1] [7.5-NAT-011] a detail save refreshes saved looks so their status follows the tags (Codex P2.7)', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      const { handlers: savedLooksHandlers, store } = createSavedLooksMswHandlers()
+      let savedLookReads = 0
+      store.onGet = () => {
+        savedLookReads += 1
+      }
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () =>
+          HttpResponse.json({ data: [blueTop] })
+        ),
+        ...savedLooksHandlers
+      )
+      renderScreen()
+      await screen.findByTestId('garment-card-hub-blue-top')
+      await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
+      const before = savedLookReads
+
+      act(() => notifyWardrobeChanged())
+
+      await waitFor(() => expect(savedLookReads).toBe(before + 1))
     })
 
     it('[P0] [7.5-NAT-006] reloads in place when the detail saves tags', async () => {

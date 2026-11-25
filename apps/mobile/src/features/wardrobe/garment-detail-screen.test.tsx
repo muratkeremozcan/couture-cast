@@ -133,9 +133,14 @@ let changes: number
 let stopWatching: () => void
 let restoreToken: () => void
 
+const loaded = { category: 'top', material: 'cotton', comfortRange: 'mild' }
+
+/** Answers like the API: the request's tags win; `expected` is a request-only field. */
 function acceptTags(body: Record<string, unknown>) {
+  const tags = { ...body }
+  delete tags.expected
   const current = closet.find((item) => item.id === garmentId)!
-  const updated = { ...current, ...body }
+  const updated = { ...current, ...tags }
   closet = closet.map((item) => (item.id === garmentId ? updated : item))
   return HttpResponse.json({ data: updated })
 }
@@ -251,7 +256,16 @@ describe('GarmentDetailScreen', () => {
     expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
     expect(tag('status-bar-action-undo')).toHaveTextContent('Undo')
     expect(patches).toEqual([
-      { body: { category: 'top', material: 'wool', comfortRange: 'cold' }, header: '1' },
+      {
+        // Codex P2.1: Done names the tags it loaded.
+        body: {
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+          expected: loaded,
+        },
+        header: '1',
+      },
     ])
     expect(tag('garment-detail-material').textContent).toBe('Wool')
     expect(tag('garment-detail-comfort').textContent).toBe('Cold')
@@ -272,9 +286,10 @@ describe('GarmentDetailScreen', () => {
     await waitFor(() =>
       expect(tag('status-feedback-bar')).toHaveTextContent('Change undone.')
     )
+    const savedTags = { category: 'outerwear', material: 'cotton', comfortRange: 'mild' }
     expect(patches.map(({ body }) => body)).toEqual([
-      { category: 'outerwear', material: 'cotton', comfortRange: 'mild' },
-      { category: 'top', material: 'cotton', comfortRange: 'mild' },
+      { ...savedTags, expected: loaded },
+      { ...loaded, expected: savedTags },
     ])
     expect(tag('garment-detail-category').textContent).toBe('Top')
     expect(tag('stack-header-title')).toHaveTextContent('Blue top')
@@ -362,6 +377,7 @@ describe('GarmentDetailScreen', () => {
       category: 'top',
       material: null,
       comfortRange: 'mild',
+      expected: loaded,
     })
     expect(tag('garment-detail-material').textContent).toBe('No material')
   })
@@ -382,5 +398,97 @@ describe('GarmentDetailScreen', () => {
     await browserUser.click(tag('garment-tag-done'))
 
     expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+  })
+
+  it('[P0] [7.5-NAT-007] a newer Done retires the older Undo (Codex P2.1)', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await screen.findByTestId('status-bar-action-undo')
+    await openEditorAndPick('garment-tag-option-comfort-cold')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(patches).toHaveLength(2))
+
+    await browserUser.click(await screen.findByTestId('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent('Change undone.')
+    )
+    const firstSave = { category: 'top', material: 'wool', comfortRange: 'mild' }
+    const secondSave = { ...firstSave, comfortRange: 'cold' }
+    expect(patches.map(({ body }) => body)).toEqual([
+      { ...firstSave, expected: loaded },
+      { ...secondSave, expected: firstSave },
+      { ...firstSave, expected: secondSave },
+    ])
+    expect(tag('garment-detail-comfort').textContent).toBe('Mild')
+  })
+
+  it('[P1] [7.5-NAT-007] an Undo refused because the piece changed elsewhere says so without Retry', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+
+    await browserUser.click(await screen.findByTestId('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent(
+        'This piece changed on another device. Check the tags and try again.'
+      )
+    )
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    expect(tag('garment-detail-material').textContent).toBe('Wool')
+  })
+
+  it('[P1] [7.5-NAT-008] a slow save reads Saving, then Still saving, then Saved (Codex P2.3)', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    reply = async (body) => {
+      await held
+      return acceptTags(body)
+    }
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+
+    await browserUser.click(tag('garment-tag-done'))
+
+    await waitFor(() => expect(tag('garment-tag-done')).toHaveTextContent('Saving'))
+    await waitFor(
+      () => expect(tag('garment-tag-done')).toHaveTextContent('Still saving'),
+      {
+        timeout: 3000,
+      }
+    )
+    release()
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+  })
+
+  it('[P1] [7.5-NAT-009] renews a photo whose signed link is about to expire (Codex P2.5)', async () => {
+    let reads = 0
+    const expiring = {
+      ...blueTop,
+      imageAccess: {
+        url: blueTop.imageAccess!.url,
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      },
+    }
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        reads += 1
+        return HttpResponse.json({ data: reads === 1 ? [expiring] : [blueTop] })
+      })
+    )
+    renderDetail()
+
+    await screen.findByTestId('garment-detail')
+    await waitFor(() => expect(reads).toBe(2))
+    expect(tag('garment-detail-photo')).toHaveAccessibleName('Blue top')
   })
 })

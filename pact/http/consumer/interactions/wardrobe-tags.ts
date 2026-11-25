@@ -473,10 +473,20 @@ export async function verifyUpdateGarmentTagsWithColorInteraction(
   pact: PactV4,
   createClient: CreateClient
 ) {
-  const input = {
+  const tags = {
     category: 'outerwear' as const,
     material: 'wool' as const,
     comfortRange: 'cold' as const,
+  }
+  // Web and native name the tags the editor loaded (Codex P2.1); the provider applies the edit
+  // when they still match.
+  const input = {
+    ...tags,
+    expected: {
+      category: 'top' as const,
+      material: 'cotton' as const,
+      comfortRange: 'mild' as const,
+    },
   }
 
   await pact
@@ -498,7 +508,7 @@ export async function verifyUpdateGarmentTagsWithColorInteraction(
     )
     .willRespondWith(
       200,
-      setJsonContent({ body: { data: readyGarmentWithColorBody(input) } })
+      setJsonContent({ body: { data: readyGarmentWithColorBody(tags) } })
     )
     .executeTest(async (mockServer: V3MockServer) => {
       const response = await createClient(

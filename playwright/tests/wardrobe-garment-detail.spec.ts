@@ -123,7 +123,13 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         await page.goto('/wardrobe')
         await waitForAccessibilityReady(page)
         const detail = await openDetail(page, garment.id, topAlt)
-        await expect(detail.getByRole('img', { name: topAlt })).toBeVisible()
+        const photo = detail.getByRole('img', { name: topAlt })
+        await expect(photo).toBeVisible()
+        // A decoded photo, not a broken image or the placeholder (Codex P2.5).
+        await expect(photo).toHaveJSProperty('tagName', 'IMG')
+        await expect
+          .poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth))
+          .toBeGreaterThan(0)
         await expect(detail.getByTestId('garment-detail-back')).toBeVisible()
         await expect(detail.getByTestId('style-piece-open')).toBeVisible()
         await expectTags(page, { category: 'Top', material: 'Cotton', comfort: 'Mild' })
@@ -216,14 +222,20 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
   async function mockCloset(
     page: Page,
     baseURL: string,
-    interceptNetworkCall: Parameters<typeof mockStyleWardrobe>[2]
+    interceptNetworkCall: Parameters<typeof mockStyleWardrobe>[2],
+    // Extra cards give the phone grid real scroll height for the back-navigation checks.
+    extraCards = 0
   ) {
     const blueTop: GarmentWithColor = {
       ...photographedGarment(baseURL, 'detail-blue-top'),
       colorFamily: 'blue',
     }
+    const others: GarmentWithColor[] = Array.from({ length: extraCards }, (_, index) => ({
+      ...photographedGarment(baseURL, `detail-extra-${index + 1}`),
+      colorFamily: 'gray',
+    }))
     const writes = await mockStyleWardrobe(page, baseURL, interceptNetworkCall, {
-      [memberA]: [blueTop],
+      [memberA]: [...others, blueTop],
     })
     return { blueTop, writes }
   }
@@ -242,7 +254,10 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
         .getByRole('img', { name: 'Blue top' })
     ).toBeVisible()
     const detail = await openDetail(page, blueTop.id, 'Blue top')
-    await expect(detail.getByRole('img', { name: 'Blue top' })).toBeVisible()
+    await expect(detail.getByRole('img', { name: 'Blue top' })).toHaveJSProperty(
+      'naturalWidth',
+      256
+    )
     await expect(detail.getByRole('heading', { name: 'Blue top' })).toBeVisible()
 
     await page.getByTestId('garment-edit-tags').click()
@@ -333,6 +348,96 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     const panel = page.getByTestId('style-piece-panel')
     await expect(panel).toBeVisible()
     await expect(panel.getByTestId('style-piece-look')).toHaveCount(3)
+  })
+
+  test('[P1] [7.5-E2E-001] back returns to the grid at the same scroll with focus on the card', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    // The opened card is the last of 12, well below the fold at 390x844.
+    const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall, 11)
+    await page.goto('/wardrobe')
+    const open = page.getByTestId(`garment-open-${blueTop.id}`)
+    await open.scrollIntoViewIfNeeded()
+    const gridScroll = await page.evaluate(() => window.scrollY)
+    expect(gridScroll).toBeGreaterThan(400)
+
+    await openDetail(page, blueTop.id, 'Blue top')
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+
+    await page.getByTestId('garment-detail-back').click()
+    await expect(page.getByTestId('garment-detail')).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(gridScroll)
+    await expect(open).toBeFocused()
+
+    // Browser Back from the detail lands in the same place.
+    await openDetail(page, blueTop.id, 'Blue top')
+    await page.goBack()
+    await expect(page.getByTestId('garment-detail')).toHaveCount(0)
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(gridScroll)
+  })
+
+  test('[P2] [7.5-E2E-001] browser Back and Forward keep the detail Back control on history', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
+    await page.goto('/wardrobe')
+    const entries = await page.evaluate(() => history.length)
+
+    await openDetail(page, blueTop.id, 'Blue top')
+    await page.goBack()
+    await expect(page.getByTestId('garment-detail')).toHaveCount(0)
+    await page.goForward()
+    await expect(page.getByTestId('garment-detail')).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`[?&]garment=${blueTop.id}(?:&|$)`))
+
+    // The detail Back control steps back through history: it adds no grid entry, so Forward
+    // still reaches the detail.
+    await page.getByTestId('garment-detail-back').click()
+    await expect(page.getByTestId('garment-detail')).toHaveCount(0)
+    await expect(page).not.toHaveURL(/[?&]garment=/)
+    expect(await page.evaluate(() => history.length)).toBe(entries + 1)
+    await page.goForward()
+    await expect(page.getByTestId('garment-detail')).toBeVisible()
+  })
+
+  test('[P1] [7.5-E2E-002] renews a photo link that is about to expire when the detail opens', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const expiring: GarmentWithColor = {
+      ...photographedGarment(baseURL!, 'detail-expiring-top'),
+      imageAccess: {
+        url: new URL('/style-piece-fixture-photo/detail-expiring-top', baseURL).href,
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      },
+      colorFamily: 'blue',
+    }
+    await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, {
+      [memberA]: [expiring],
+    })
+    let listReads = 0
+    page.on('request', (request) => {
+      if (
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname === '/api/v1/wardrobe/garments'
+      )
+        listReads += 1
+    })
+    await page.goto('/wardrobe')
+    await expect(page.getByTestId(`garment-open-${expiring.id}`)).toBeVisible()
+    const readsBeforeOpen = listReads
+
+    await openDetail(page, expiring.id, 'Blue top')
+
+    await expect.poll(() => listReads).toBe(readsBeforeOpen + 1)
+    await expect(page.getByTestId('garment-detail-photo')).toHaveAccessibleName(
+      'Blue top'
+    )
   })
 
   test('[P1] [7.5-E2E-003] the detail and the open editor pass axe', async ({

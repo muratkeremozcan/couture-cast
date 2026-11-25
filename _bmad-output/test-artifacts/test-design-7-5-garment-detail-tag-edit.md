@@ -116,6 +116,27 @@ lane).
 | 7.5-E2E-003 | P1  | axe on the detail and edit states (`checkA11y`), back control and tag choices reachable by keyboard                                                                                                 |
 | 7.5-MAE-001 | P0  | Android: open seeded garment, change material, Done, "Saved", relaunch, reopen detail, material persisted, restore original material, assert restored                                               |
 
+### Codex review follow-up (2026-11-25, review of bc7d7bb)
+
+| ID               | P     | Behavior                                                                                          |
+| ---------------- | ----- | ------------------------------------------------------------------------------------------------- |
+| 7.5-UNIT-017     | P0    | PATCH accepts optional `expected` tags; unknown keys refused; `GARMENT_TAGS_CHANGED` constant     |
+| 7.5-UNIT-018     | P1    | One published wire shape with optional colorFamily; generated SDK types keep it optional          |
+| 7.5-INT-004      | P0    | pg17: a Done whose expected tags changed is refused 409 `GARMENT_TAGS_CHANGED`, row untouched     |
+| 7.5-INT-005      | P0    | pg17: a stale Undo is refused; a current Undo applies                                             |
+| 7.5-INT-006      | P1    | pg17: unchanged request answers 200 despite stale expected; no expected applies as before         |
+| 7.5-INT-007      | P0    | pg17: signing fails after the write: 200 with committed tags and `imageAccess: null`              |
+| 7.5-CMP-013      | P0    | Web: Done and Undo send expected; a newer Done retires the older Undo; Undo conflict has no Retry |
+| 7.5-CMP-014      | P1    | Web: Saving, Still saving, Saved; a reopened detail announces again under one provider            |
+| 7.5-CMP-015      | P1    | Web: photo near expiry refetches; load error shows a named placeholder and refetches once         |
+| 7.5-CMP-016      | P1    | Web: a saved look follows its anchor through edit (Needs review) and Undo (Ready)                 |
+| 7.5-CMP-017      | P2    | Web: browser Back, Forward, then detail Back steps through history                                |
+| 7.5-NAT-007..009 | P0/P1 | Native: expected tags, retired Undo, Undo conflict, Still saving, photo renewal                   |
+| 7.5-NAT-010      | P0    | Native hub: a late pre-save read cannot undo the post-save reload                                 |
+| 7.5-NAT-011      | P1    | Native hub: a detail save refreshes saved looks                                                   |
+| 7.5-E2E-002      | P1    | Phone: decoded photo (naturalWidth), near-expiry renewal on open, scroll restore, Back/Forward    |
+| 7.5-MAE-001      | P0    | Android fixture lane verifies its member via GET user/profile (native-session fixture branch)     |
+
 ## Ownership
 
 Builder owns source, the two locale parity specs (`wardrobe-detail-locales.spec.ts` in web and

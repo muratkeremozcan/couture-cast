@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { router, Stack } from 'expo-router'
 import {
   ActivityIndicator,
+  AppState,
   Image,
   Pressable,
   ScrollView,
@@ -31,6 +32,8 @@ import {
   classifyGarmentTagSaveError,
   COMFORT_RANGES,
   createAnnouncementToken,
+  getSaveFeedbackUrgency,
+  SAVE_FEEDBACK_TIMINGS,
   formatGarmentAlt,
   formatGarmentCategory,
   formatGarmentTagLabels,
@@ -244,24 +247,7 @@ function MemberGarmentDetail({
       <View style={[styles.screen, themed.screen]}>
         {header}
         <ScrollView contentContainerStyle={styles.content} testID="garment-detail">
-          {garment.imageAccess ? (
-            <Image
-              testID="garment-detail-photo"
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel={title}
-              source={{ uri: garment.imageAccess.url }}
-              style={styles.photo}
-            />
-          ) : (
-            <View
-              testID="garment-detail-photo"
-              accessible
-              accessibilityRole="image"
-              accessibilityLabel={title}
-              style={[styles.photo, themed.placeholder]}
-            />
-          )}
+          <GarmentDetailPhoto garment={garment} label={title} onRefresh={closet.reload} />
           <Text accessibilityRole="header" style={[styles.title, themed.text]}>
             {title}
           </Text>
@@ -315,39 +301,60 @@ function MemberGarmentDetail({
   )
 }
 
-function GarmentTagPanel({
+/**
+ * Notice and announcement ids come from one counter for the app session, so they stay unique
+ * across detail mounts: the root provider announces each id once and would drop a repeat,
+ * such as the first "Saved" after the detail is reopened.
+ */
+let garmentTagRunSeq = 0
+const nextGarmentTagSeq = () => ++garmentTagRunSeq
+
+type GarmentTagSaveState = 'idle' | 'saving' | 'still-saving'
+
+/**
+ * The tag editor's save lifecycle, on the CC-7.1 timings: "Saving" at once, "Still saving"
+ * after `SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs`, each announced once; then "Saved" with
+ * Undo, "No changes", or a distinct failure. Done sends the tags it loaded as `expected` and
+ * Undo the tags it saved, so neither overwrites a newer edit (409 GARMENT_TAGS_CHANGED). A new
+ * Done retires the previous Undo, so a stale Undo cannot run.
+ */
+function useGarmentTagEditor({
   garment,
   owner,
   epoch,
   onTagsSaved,
-  styleEntry,
 }: {
   garment: ClosetGarment
   owner: string | null
   epoch: number
   onTagsSaved: (garment: GarmentWithColor) => void
-  styleEntry: ReactNode
 }) {
-  const { t, i18n } = useTranslation()
-  const locale = i18n.language
-  const themed = useThemedStyles()
-  const values = getGuestPreviewStrings(locale).values
+  const { t } = useTranslation()
   const statusBar = useStatusBar()
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
   const mountedRef = useRef(true)
-  const noticeSeqRef = useRef(0)
   const handleDoneRef = useRef<() => Promise<void>>(() => Promise.resolve())
+  const saveRunRef = useRef(0)
+  const slowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const undoRef = useRef<{ noticeId: string; epoch: number } | null>(null)
+  const undoEpochRef = useRef(0)
+  const undoInFlightRef = useRef(false)
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
-  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
-  const labels = formatGarmentTagLabels(locale, garment)
   const saved = garmentTagDraft(garment)
+
+  const clearSlowTimer = () => {
+    if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current)
+    slowTimerRef.current = null
+  }
 
   useEffect(() => {
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current)
     }
   }, [])
 
@@ -369,46 +376,75 @@ function GarmentTagPanel({
     actionOwner: string | null,
     kind: string,
     notice: Omit<Parameters<typeof statusBar.showNotice>[0], 'id' | 'announcementId'>
-  ) => {
-    if (!isActiveOwner(actionOwner)) return
-    const seq = ++noticeSeqRef.current
+  ): string | null => {
+    if (!isActiveOwner(actionOwner)) return null
+    const seq = nextGarmentTagSeq()
+    const id = `garment-tags-${kind}-${seq}`
     statusBarRef.current.showNotice({
       ...notice,
-      id: `garment-tags-${kind}-${seq}`,
+      id,
       announcementId: createAnnouncementToken(`garment-tags-${kind}`, seq),
     })
+    return id
   }
 
-  const saveTags = async (actionOwner: string | null, target: GarmentTagDraft) => {
+  const announce = (state: 'saving' | 'still-saving', runId: number) =>
+    statusBarRef.current.announce(
+      state === 'saving' ? t('feedback.saving') : t('feedback.stillSaving'),
+      {
+        announcementId: createAnnouncementToken(`garment-tags-${state}`, runId),
+        urgency: getSaveFeedbackUrgency(state),
+      }
+    )
+
+  const retireUndo = () => {
+    undoEpochRef.current++
+    const previous = undoRef.current
+    undoRef.current = null
+    if (previous) statusBarRef.current.dismissNotice(previous.noticeId)
+  }
+
+  const saveTags = async (
+    actionOwner: string | null,
+    target: GarmentTagDraft,
+    expected: GarmentTagDraft
+  ) => {
     const token = await resolveMobileAccessToken()
     if (!token) throw new Error('AUTHENTICATION_REQUIRED')
     const updated = await updateGarmentTagsFromMobile(token, garment.id, {
-      category: target.category,
-      material: target.material,
-      comfortRange: target.comfortRange,
+      ...target,
+      expected,
     })
     if (isActiveOwner(actionOwner)) onTagsSaved(updated)
     return updated
   }
 
-  const runUndo = async (actionOwner: string | null, previous: GarmentTagDraft) => {
+  const runUndo = async (
+    actionOwner: string | null,
+    previous: GarmentTagDraft,
+    savedTags: GarmentTagDraft,
+    undoEpoch: number
+  ) => {
+    if (undoEpoch !== undoEpochRef.current || undoInFlightRef.current) return
     if (!isActiveOwner(actionOwner)) return
     const retry = {
       id: 'retry' as const,
       kind: 'retry' as const,
       label: t('feedback.retry'),
-      onPress: () => void runUndo(actionOwner, previous),
+      onPress: () => void runUndo(actionOwner, previous, savedTags, undoEpoch),
     }
-    if (!(await ensureOnline())) {
-      showNotice(actionOwner, 'undo-offline', {
-        message: t('feedback.offlineAction'),
-        tone: 'offline',
-        actions: [retry],
-      })
-      return
-    }
+    undoInFlightRef.current = true
     try {
-      await saveTags(actionOwner, previous)
+      if (!(await ensureOnline())) {
+        showNotice(actionOwner, 'undo-offline', {
+          message: t('feedback.offlineAction'),
+          tone: 'offline',
+          actions: [retry],
+        })
+        return
+      }
+      await saveTags(actionOwner, previous, savedTags)
+      if (undoEpoch === undoEpochRef.current) retireUndo()
       showNotice(actionOwner, 'undone', {
         message: t('feedback.undone'),
         tone: 'neutral',
@@ -419,10 +455,14 @@ function GarmentTagPanel({
         message:
           kind === 'offline'
             ? t('feedback.offlineAction')
-            : t('wardrobe.detail.undoFailed'),
+            : kind === 'conflict'
+              ? t('wardrobe.detail.conflict')
+              : t('wardrobe.detail.undoFailed'),
         tone: kind === 'offline' ? 'offline' : 'error',
-        actions: [retry],
+        actions: kind === 'conflict' ? [] : [retry],
       })
+    } finally {
+      undoInFlightRef.current = false
     }
   }
 
@@ -431,10 +471,37 @@ function GarmentTagPanel({
     setFailure(null)
   }
 
+  const openEditor = () => {
+    if (!saved) return
+    setFailure(null)
+    setDraft(saved)
+  }
+
+  const failSave = (actionOwner: string | null, kind: GarmentTagSaveFailure) => {
+    setSaveState('idle')
+    setFailure(kind)
+    showNotice(actionOwner, kind, {
+      message: failureMessage(kind),
+      tone: kind === 'offline' ? 'offline' : 'error',
+      actions:
+        kind === 'offline' || kind === 'failed'
+          ? [
+              {
+                id: 'retry',
+                kind: 'retry',
+                label: t('feedback.retry'),
+                onPress: () => void handleDoneRef.current(),
+              },
+            ]
+          : [],
+    })
+  }
+
   const handleDone = async () => {
-    if (!draft || !saved || saving) return
+    if (!draft || !saved || saveState !== 'idle') return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
+    retireUndo()
     if (garmentTagsEqual(draft, saved)) {
       closeEditor()
       showNotice(actionOwner, 'unchanged', {
@@ -445,44 +512,44 @@ function GarmentTagPanel({
     }
     const previous = saved
     const target = draft
-    setSaving(true)
+    const runId = nextGarmentTagSeq()
+    saveRunRef.current = runId
+    const isCurrentRun = () => mountedRef.current && saveRunRef.current === runId
+    setSaveState('saving')
     setFailure(null)
-    const fail = (kind: GarmentTagSaveFailure) => {
-      setSaving(false)
-      setFailure(kind)
-      showNotice(actionOwner, kind, {
-        message: failureMessage(kind),
-        tone: kind === 'offline' ? 'offline' : 'error',
-        actions:
-          kind === 'offline' || kind === 'failed'
-            ? [
-                {
-                  id: 'retry',
-                  kind: 'retry',
-                  label: t('feedback.retry'),
-                  onPress: () => void handleDoneRef.current(),
-                },
-              ]
-            : [],
-      })
-    }
-    if (!(await ensureOnline())) {
-      if (mountedRef.current && isActiveOwner(actionOwner)) fail('offline')
-      return
-    }
+    announce('saving', runId)
+    clearSlowTimer()
+    slowTimerRef.current = setTimeout(() => {
+      slowTimerRef.current = null
+      if (!isCurrentRun()) return
+      setSaveState('still-saving')
+      announce('still-saving', runId)
+    }, SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs)
+    let updated: GarmentWithColor
     try {
-      await saveTags(actionOwner, target)
+      if (!(await ensureOnline())) {
+        if (!isCurrentRun()) return
+        clearSlowTimer()
+        if (isActiveOwner(actionOwner)) failSave(actionOwner, 'offline')
+        return
+      }
+      updated = await saveTags(actionOwner, target, previous)
     } catch (error) {
-      if (mountedRef.current && isActiveOwner(actionOwner)) {
-        fail(classifyGarmentTagSaveError(error, getNetworkOnline()))
+      if (!isCurrentRun()) return
+      clearSlowTimer()
+      if (isActiveOwner(actionOwner)) {
+        failSave(actionOwner, classifyGarmentTagSaveError(error, getNetworkOnline()))
       }
       return
     }
-    if (mountedRef.current) {
-      setSaving(false)
+    if (isCurrentRun()) {
+      clearSlowTimer()
+      setSaveState('idle')
       closeEditor()
     }
-    showNotice(actionOwner, 'saved', {
+    const savedTags = garmentTagDraft(updated) ?? target
+    const undoEpoch = ++undoEpochRef.current
+    const noticeId = showNotice(actionOwner, 'saved', {
       message: t('feedback.saved'),
       tone: 'success',
       actions: [
@@ -490,12 +557,130 @@ function GarmentTagPanel({
           id: 'undo',
           kind: 'undo',
           label: t('feedback.undo'),
-          onPress: () => void runUndo(actionOwner, previous),
+          onPress: () => void runUndo(actionOwner, previous, savedTags, undoEpoch),
         },
       ],
     })
+    undoRef.current = noticeId ? { noticeId, epoch: undoEpoch } : null
   }
   handleDoneRef.current = handleDone
+
+  return {
+    draft,
+    setDraft,
+    saveState,
+    failure,
+    failureMessage,
+    canEdit: Boolean(saved),
+    openEditor,
+    closeEditor,
+    handleDone,
+  }
+}
+
+/** A signed photo URL this close to expiry is renewed before it is shown. */
+const PHOTO_REFRESH_LEAD_MS = 60_000
+
+/**
+ * The detail photo. A signed URL within a minute of expiry, on open or when the app returns to
+ * the foreground, asks for a fresh list read; a photo that fails to load shows the placeholder
+ * and asks for a fresh URL once per opened garment, so a lasting fault never loops.
+ */
+function GarmentDetailPhoto({
+  garment,
+  label,
+  onRefresh,
+}: {
+  garment: ClosetGarment
+  label: string
+  onRefresh: () => void
+}) {
+  const themed = useThemedStyles()
+  const url = garment.imageAccess?.url ?? null
+  const expiresAt = garment.imageAccess?.expiresAt ?? null
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const expiryRefreshedUrlsRef = useRef(new Set<string>())
+  const errorRefreshUsedRef = useRef(false)
+  const onRefreshRef = useRef(onRefresh)
+  onRefreshRef.current = onRefresh
+  const leaseRef = useRef({ url, expiresAt })
+  leaseRef.current = { url, expiresAt }
+
+  useEffect(() => {
+    errorRefreshUsedRef.current = false
+    setFailedUrl(null)
+  }, [garment.id])
+
+  const refreshIfStale = useCallback(() => {
+    const lease = leaseRef.current
+    if (!lease.url || !lease.expiresAt) return
+    if (Date.parse(lease.expiresAt) - Date.now() > PHOTO_REFRESH_LEAD_MS) return
+    if (expiryRefreshedUrlsRef.current.has(lease.url)) return
+    expiryRefreshedUrlsRef.current.add(lease.url)
+    onRefreshRef.current()
+  }, [])
+
+  useEffect(() => {
+    refreshIfStale()
+  }, [url, expiresAt, refreshIfStale])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshIfStale()
+    })
+    return () => subscription.remove()
+  }, [refreshIfStale])
+
+  if (!url || failedUrl === url) {
+    return (
+      <View
+        testID="garment-detail-photo"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={label}
+        style={[styles.photo, themed.placeholder]}
+      />
+    )
+  }
+  return (
+    <Image
+      testID="garment-detail-photo"
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={label}
+      source={{ uri: url }}
+      onError={() => {
+        setFailedUrl(url)
+        if (errorRefreshUsedRef.current) return
+        errorRefreshUsedRef.current = true
+        onRefreshRef.current()
+      }}
+      style={styles.photo}
+    />
+  )
+}
+
+function GarmentTagPanel({
+  garment,
+  owner,
+  epoch,
+  onTagsSaved,
+  styleEntry,
+}: {
+  garment: ClosetGarment
+  owner: string | null
+  epoch: number
+  onTagsSaved: (garment: GarmentWithColor) => void
+  styleEntry: ReactNode
+}) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
+  const themed = useThemedStyles()
+  const values = getGuestPreviewStrings(locale).values
+  const labels = formatGarmentTagLabels(locale, garment)
+  const editor = useGarmentTagEditor({ garment, owner, epoch, onTagsSaved })
+  const { draft, setDraft, failure, saveState } = editor
+  const saving = saveState !== 'idle'
 
   const tagRow = (testID: string, label: string, value: string) => (
     <View style={[styles.tagRow, themed.divider]}>
@@ -596,7 +781,7 @@ function GarmentTagPanel({
           {failure ? (
             <View style={[styles.errorBox, themed.errorBox]}>
               <Text testID="garment-tag-error" style={themed.errorText}>
-                {failureMessage(failure)}
+                {editor.failureMessage(failure)}
               </Text>
             </View>
           ) : null}
@@ -606,18 +791,22 @@ function GarmentTagPanel({
               accessibilityState={{ busy: saving, disabled: saving }}
               disabled={saving}
               testID="garment-tag-done"
-              onPress={() => void handleDone()}
+              onPress={() => void editor.handleDone()}
               style={[styles.primaryButton, themed.primaryButton]}
             >
               <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
-                {saving ? t('feedback.saving') : t('wardrobe.detail.done')}
+                {saveState === 'still-saving'
+                  ? t('feedback.stillSaving')
+                  : saveState === 'saving'
+                    ? t('feedback.saving')
+                    : t('wardrobe.detail.done')}
               </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               disabled={saving}
               testID="garment-tag-cancel"
-              onPress={closeEditor}
+              onPress={editor.closeEditor}
               style={[styles.secondaryButton, themed.secondaryButton]}
             >
               <Text style={[styles.secondaryButtonText, themed.text]}>
@@ -630,14 +819,10 @@ function GarmentTagPanel({
         <View style={styles.actions}>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: !saved }}
-            disabled={!saved}
+            accessibilityState={{ disabled: !editor.canEdit }}
+            disabled={!editor.canEdit}
             testID="garment-edit-tags"
-            onPress={() => {
-              if (!saved) return
-              setFailure(null)
-              setDraft(saved)
-            }}
+            onPress={editor.openEditor}
             style={[styles.secondaryButton, themed.secondaryButton]}
           >
             <Text style={[styles.secondaryButtonText, themed.text]}>

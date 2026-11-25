@@ -288,6 +288,23 @@ export const suggestGarmentTagsResponseSchema = z
 
 // Optic 1.0.9 reports removal of the legacy null enum entry as a breaking
 // change. Keep the published arrays for these request fields.
+/**
+ * Story CC-7.5: the tags an editor last saw. When a tag update sends them, the API compares
+ * them with the stored tags inside the update transaction and answers 409
+ * `GARMENT_TAGS_CHANGED` when another edit landed first, instead of overwriting it.
+ */
+export const GARMENT_TAGS_CHANGED_MESSAGE = 'GARMENT_TAGS_CHANGED' as const
+
+// Each field is optional so the published request stays additive (Optic refuses a new required
+// request property). A field that is left out is not compared; web and native send all three.
+export const garmentExpectedTagsSchema = z
+  .object({
+    category: garmentCategoryEnum.nullable().optional(),
+    material: garmentMaterialEnum.nullable().optional(),
+    comfortRange: garmentComfortRangeEnum.nullable().optional(),
+  })
+  .strict()
+
 export const updateGarmentTagsInputSchema = z
   .object({
     category: garmentCategoryEnum.openapi({
@@ -296,6 +313,10 @@ export const updateGarmentTagsInputSchema = z
     material: garmentMaterialEnum.nullable().optional(),
     comfortRange: garmentComfortRangeEnum.openapi({
       enum: [...garmentComfortRangeEnum.options, null],
+    }),
+    expected: garmentExpectedTagsSchema.optional().openapi({
+      description:
+        'The tags the editor last saw. When present and the stored tags differ, the update is refused with 409 GARMENT_TAGS_CHANGED. Omitted, the update applies as before.',
     }),
   })
   .strict()
@@ -326,6 +347,29 @@ export const garmentItemWithColorSchema = garmentItemSchema
         'Color family of the stored dominant garment color. Null when no color was computed. Present only when the request sends x-couture-garment-color: 1.',
     }),
   })
+  .strict()
+
+/**
+ * The one published (OpenAPI) shape of a garment read or tag update: `colorFamily` optional,
+ * because it is present only for a request that sends the header. Generated SDK types follow
+ * this shape. Runtime parsing stays strict: the API and the clients use the legacy and
+ * WithColor schemas above and below.
+ */
+export const garmentItemWireSchema = garmentItemSchema
+  .extend({
+    colorFamily: garmentColorFamilyEnum.nullable().optional().openapi({
+      description:
+        'Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1.',
+    }),
+  })
+  .strict()
+
+export const garmentListWireResponseSchema = z
+  .object({ data: z.array(garmentItemWireSchema) })
+  .strict()
+
+export const updateGarmentTagsWireResponseSchema = z
+  .object({ data: garmentItemWireSchema })
   .strict()
 
 export const garmentListWithColorResponseSchema = z
@@ -432,11 +476,21 @@ const garmentSuggestionConflictErrorSchema = z
 const garmentUpdateConflictErrorSchema = z
   .object({
     statusCode: z.literal(409),
-    message: z.enum([
-      'GARMENT_ANALYSIS_PENDING',
-      'GARMENT_NOT_TAGGABLE',
-      'CONCURRENT_TAG_UPDATE',
-    ]),
+    message: z
+      .enum([
+        'GARMENT_ANALYSIS_PENDING',
+        'GARMENT_NOT_TAGGABLE',
+        'CONCURRENT_TAG_UPDATE',
+        GARMENT_TAGS_CHANGED_MESSAGE,
+      ])
+      // Exempt from `request and response property enums` only, like the garment `status`
+      // above: the conflict reasons of a tag update grow as editing gains checks (CC-7.5 added
+      // GARMENT_TAGS_CHANGED). Treat an unrecognized message as a generic conflict.
+      .openapi({
+        'x-optic-exemptions': 'request and response property enums',
+        description:
+          'Open set. Conflict reasons may gain values; treat an unrecognized message as a generic conflict.',
+      }),
     error: z.literal('Conflict'),
   })
   .strict()
@@ -1244,11 +1298,7 @@ export function registerWardrobeContracts(
   )
   const registeredGarmentListResponse = registry.register(
     'GarmentListResponse',
-    garmentListResponseSchema
-  )
-  const registeredGarmentListWithColorResponse = registry.register(
-    'GarmentListWithColorResponse',
-    garmentListWithColorResponseSchema
+    garmentListWireResponseSchema
   )
   const registeredSuggestGarmentTagsResponse = registry.register(
     'SuggestGarmentTagsResponse',
@@ -1260,11 +1310,7 @@ export function registerWardrobeContracts(
   )
   const registeredUpdateGarmentTagsResponse = registry.register(
     'UpdateGarmentTagsResponse',
-    updateGarmentTagsResponseSchema
-  )
-  const registeredUpdateGarmentTagsWithColorResponse = registry.register(
-    'UpdateGarmentTagsWithColorResponse',
-    updateGarmentTagsWithColorResponseSchema
+    updateGarmentTagsWireResponseSchema
   )
   const registeredGarmentIdBadRequestError = registry.register(
     'GarmentIdBadRequestError',
@@ -1314,10 +1360,7 @@ export function registerWardrobeContracts(
           'Persisted wardrobe garments. Each garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
         content: {
           'application/json': {
-            schema: z.union([
-              registeredGarmentListResponse,
-              registeredGarmentListWithColorResponse,
-            ]),
+            schema: registeredGarmentListResponse,
           },
         },
       },
@@ -1432,10 +1475,7 @@ export function registerWardrobeContracts(
           'Garment tags updated successfully. The garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
         content: {
           'application/json': {
-            schema: z.union([
-              registeredUpdateGarmentTagsResponse,
-              registeredUpdateGarmentTagsWithColorResponse,
-            ]),
+            schema: registeredUpdateGarmentTagsResponse,
           },
         },
       },
@@ -1472,7 +1512,8 @@ export function registerWardrobeContracts(
         },
       },
       409: {
-        description: 'Garment analysis pending or not taggable.',
+        description:
+          'Garment analysis pending, not taggable, a concurrent update, or tags changed since the editor read them (GARMENT_TAGS_CHANGED).',
         content: {
           'application/json': { schema: registeredGarmentUpdateConflictError },
         },

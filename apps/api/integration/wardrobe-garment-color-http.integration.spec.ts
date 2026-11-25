@@ -1,5 +1,7 @@
 // Story 7.5 test plan 7.5-INT-001..003: header-gated garment colorFamily over HTTP against real
 // PostgreSQL. Risk R1 (legacy strict clients) and R2 (tags persist) at the integration level.
+// 7.5-INT-004..007 (Codex P2.1, P2.2): an editor's `expected` tags refuse a stale Done or Undo
+// inside the transaction, and a committed edit answers 200 even when its photo cannot be signed.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 import 'reflect-metadata'
@@ -10,6 +12,7 @@ import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
+  GARMENT_TAGS_CHANGED_MESSAGE,
   garmentItemSchema,
   garmentItemWithColorSchema,
   WARDROBE_GARMENT_COLOR_HEADER,
@@ -47,6 +50,12 @@ const record = z.record(z.string(), z.unknown())
 const listOf = (body: unknown) => z.object({ data: z.array(record) }).parse(body).data
 /** The garment of a single-garment response. */
 const itemOf = (body: unknown) => z.object({ data: record }).parse(body).data
+
+const storage = {
+  signReadUrl: vi.fn((path: string) =>
+    Promise.resolve(`https://storage.test/${path}?token=signed`)
+  ),
+}
 
 let api: ReturnType<typeof request>
 let closeApp: () => Promise<void>
@@ -94,11 +103,6 @@ beforeAll(async () => {
   const guardian = new GuardianService({ capture: vi.fn() }, prisma, consent, {
     invalidateUserSessions: vi.fn().mockResolvedValue(undefined),
   } as never)
-  const storage = {
-    signReadUrl: vi.fn((path: string) =>
-      Promise.resolve(`https://storage.test/${path}?token=signed`)
-    ),
-  }
   const service = new WardrobeService(
     prisma,
     { captureEvent: vi.fn().mockResolvedValue(undefined) } as never,
@@ -244,6 +248,139 @@ describe('7.5 garment colorFamily over HTTP (pg17)', () => {
       category: 'top',
       material: 'cotton',
       comfort_range: 'mild',
+    })
+  })
+})
+
+describe('7.5 stale edits and signing outages over HTTP (pg17)', () => {
+  const tagsPath = (id: string) => `/api/v1/wardrobe/garments/${id}/tags`
+  const seen = { category: 'top', material: 'cotton', comfortRange: 'mild' } as const
+
+  async function storedTags(garmentId: string) {
+    const row = await prisma.garmentItem.findUniqueOrThrow({ where: { id: garmentId } })
+    return {
+      category: row.category,
+      material: row.material,
+      comfortRange: row.comfort_range,
+    }
+  }
+
+  it('[P0] [7.5-INT-004] refuses a Done whose expected tags another edit already changed', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, BLUE_HEX)
+
+    // Another device saves first, from the same starting tags.
+    const first = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ category: 'top', material: 'wool', comfortRange: 'mild', expected: seen })
+    expect(first.status).toBe(200)
+
+    const stale = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .set(WARDROBE_GARMENT_COLOR_HEADER, '1')
+      .send({ category: 'top', material: 'cotton', comfortRange: 'cold', expected: seen })
+    expect(stale.status).toBe(409)
+    expect(stale.body).toMatchObject({
+      statusCode: 409,
+      message: GARMENT_TAGS_CHANGED_MESSAGE,
+    })
+    expect(await storedTags(garmentId)).toEqual({
+      category: 'top',
+      material: 'wool',
+      comfortRange: 'mild',
+    })
+  })
+
+  it('[P0] [7.5-INT-005] refuses a stale Undo and applies a current one', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, BLUE_HEX)
+    const saved = { category: 'top', material: 'wool', comfortRange: 'cold' } as const
+    expect(
+      (
+        await api
+          .patch(tagsPath(garmentId))
+          .set('Authorization', owner.auth)
+          .send({ ...saved, expected: seen })
+      ).status
+    ).toBe(200)
+    // A later edit lands before the Undo of the first one.
+    expect(
+      (
+        await api
+          .patch(tagsPath(garmentId))
+          .set('Authorization', owner.auth)
+          .send({ ...saved, comfortRange: 'hot', expected: saved })
+      ).status
+    ).toBe(200)
+
+    const staleUndo = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ ...seen, expected: saved })
+    expect(staleUndo.status).toBe(409)
+    expect(staleUndo.body).toMatchObject({ message: GARMENT_TAGS_CHANGED_MESSAGE })
+    expect(await storedTags(garmentId)).toEqual({ ...saved, comfortRange: 'hot' })
+
+    const currentUndo = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ ...saved, expected: { ...saved, comfortRange: 'hot' } })
+    expect(currentUndo.status).toBe(200)
+    expect(await storedTags(garmentId)).toEqual(saved)
+  })
+
+  it('[P1] [7.5-INT-006] an unchanged request still answers 200, and a request without expected applies as before', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, BLUE_HEX)
+
+    // Stored already equals the request: the no-op wins over a stale expected.
+    const unchanged = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ ...seen, expected: { ...seen, material: 'linen' } })
+    expect(unchanged.status).toBe(200)
+
+    const legacy = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ category: 'dress', material: null, comfortRange: 'warm' })
+    expect(legacy.status).toBe(200)
+    expect(await storedTags(garmentId)).toEqual({
+      category: 'dress',
+      material: null,
+      comfortRange: 'warm',
+    })
+  })
+
+  it('[P0] [7.5-INT-007] answers the committed tags without a photo when signing fails after the write', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const owner = await member()
+    const garmentId = await readyGarment(owner.userId, BLUE_HEX)
+    storage.signReadUrl.mockRejectedValueOnce(new Error('storage unavailable'))
+
+    const saved = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .set(WARDROBE_GARMENT_COLOR_HEADER, '1')
+      .send({ category: 'top', material: 'wool', comfortRange: 'cold', expected: seen })
+
+    expect(saved.status).toBe(200)
+    expect(garmentItemWithColorSchema.parse(itemOf(saved.body))).toMatchObject({
+      id: garmentId,
+      material: 'wool',
+      comfortRange: 'cold',
+      colorFamily: 'blue',
+      imageAccess: null,
+    })
+    expect(await storedTags(garmentId)).toEqual({
+      category: 'top',
+      material: 'wool',
+      comfortRange: 'cold',
     })
   })
 })

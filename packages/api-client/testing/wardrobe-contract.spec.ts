@@ -32,7 +32,18 @@ import {
   WARDROBE_UPLOAD_CACHE_CONTROL,
   uploadCommitConflictErrorSchema,
   uploadCommitUnprocessableErrorSchema,
+  GARMENT_TAGS_CHANGED_MESSAGE,
+  garmentExpectedTagsSchema,
+  garmentListWireResponseSchema,
+  updateGarmentTagsInputSchema,
+  updateGarmentTagsWireResponseSchema,
 } from '../src/contracts/http'
+import type {
+  GarmentListResponse,
+  GarmentListResponseDataInner,
+  UpdateGarmentTagsInput as GeneratedUpdateGarmentTagsInput,
+  UpdateGarmentTagsResponse as GeneratedUpdateGarmentTagsResponse,
+} from '../src/generated/models'
 
 const VALID_SHA256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
 
@@ -843,5 +854,78 @@ describe('7.5 opt-in garment colorFamily', () => {
 
   it('[P2] [7.5-UNIT-013] names the opt-in header x-couture-garment-color', () => {
     expect(WARDROBE_GARMENT_COLOR_HEADER).toBe('x-couture-garment-color')
+  })
+})
+
+describe('7.5 Codex P2.1 and P2.4: expected tags and the published wire shape', () => {
+  const ready = buildGarmentItem({
+    status: 'ready',
+    category: 'top',
+    material: 'cotton',
+    comfortRange: 'mild',
+    tagsConfirmedAt: '2026-08-04T09:30:00.000Z',
+  })
+
+  it('[P0] [7.5-UNIT-017] accepts optional expected tags and refuses unknown keys in them', () => {
+    const tags = { category: 'top', material: null, comfortRange: 'mild' }
+    expect(updateGarmentTagsInputSchema.safeParse(tags).success).toBe(true)
+    expect(
+      updateGarmentTagsInputSchema.safeParse({
+        ...tags,
+        expected: { category: 'top', material: null, comfortRange: 'mild' },
+      }).success
+    ).toBe(true)
+    expect(garmentExpectedTagsSchema.safeParse({}).success).toBe(true)
+    expect(garmentExpectedTagsSchema.safeParse({ colorFamily: 'blue' }).success).toBe(
+      false
+    )
+    expect(
+      updateGarmentTagsInputSchema.safeParse({ ...tags, expected: { category: 'cape' } })
+        .success
+    ).toBe(false)
+    expect(GARMENT_TAGS_CHANGED_MESSAGE).toBe('GARMENT_TAGS_CHANGED')
+  })
+
+  it('[P1] [7.5-UNIT-018] publishes one wire shape whose colorFamily is optional', () => {
+    for (const garment of [
+      ready,
+      { ...ready, colorFamily: 'blue' },
+      { ...ready, colorFamily: null },
+    ]) {
+      expect(garmentListWireResponseSchema.safeParse({ data: [garment] }).success).toBe(
+        true
+      )
+      expect(
+        updateGarmentTagsWireResponseSchema.safeParse({ data: garment }).success
+      ).toBe(true)
+    }
+    expect(garmentListWireResponseSchema.safeParse({ data: [] }).success).toBe(true)
+    expect(
+      updateGarmentTagsWireResponseSchema.safeParse({
+        data: { ...ready, colorFamily: 'navy' },
+      }).success
+    ).toBe(false)
+
+    const spec = generateHttpOpenApiDocument()
+    const schemas = spec.components?.schemas as Record<string, unknown>
+    expect(schemas).not.toHaveProperty('GarmentListWithColorResponse')
+    expect(schemas).not.toHaveProperty('UpdateGarmentTagsWithColorResponse')
+  })
+
+  it('[P1] [7.5-UNIT-018] generated SDK types read a legacy and an opted-in garment', () => {
+    // Compile-time proof: these only type-check while the generated colorFamily stays optional
+    // on both the list item and the tag update answer, and the update input takes expected.
+    type ColorIsOptional<T> =
+      object extends Pick<T, Extract<keyof T, 'colorFamily'>> ? true : false
+    const listItem: ColorIsOptional<GarmentListResponseDataInner> = true
+    const updated: ColorIsOptional<GeneratedUpdateGarmentTagsResponse['data']> = true
+    const list: ColorIsOptional<GarmentListResponse['data'][number]> = true
+    const input: GeneratedUpdateGarmentTagsInput = {
+      category: 'top',
+      comfortRange: 'mild',
+      expected: { category: 'top', material: null, comfortRange: 'mild' },
+    }
+    expect([listItem, updated, list]).toEqual([true, true, true])
+    expect(input.expected?.material).toBeNull()
   })
 })

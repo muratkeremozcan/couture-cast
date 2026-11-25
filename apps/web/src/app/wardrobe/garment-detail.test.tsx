@@ -3,7 +3,15 @@
 // shows the tags the PATCH answered with.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import React, { useState } from 'react'
@@ -44,19 +52,26 @@ type Patch = { body: unknown; header: string | null }
 let patches: Patch[]
 let reply: (body: Record<string, unknown>) => Response | Promise<Response>
 
+const loaded = { category: 'top', material: 'cotton', comfortRange: 'mild' }
+
+/** Answers like the API: the request's tags win; `expected` is a request-only field. */
 function acceptTags(body: Record<string, unknown>) {
-  return HttpResponse.json({ data: { ...blueTop, ...body } })
+  const tags = { ...body }
+  delete tags.expected
+  return HttpResponse.json({ data: { ...blueTop, ...tags } })
 }
 
 function Harness({
   initial = blueTop,
   onBack = vi.fn(),
   onStylePiece = vi.fn(),
+  onRefresh = vi.fn(),
   withProvider = true,
 }: {
   initial?: ClosetGarment | null
   onBack?: () => void
   onStylePiece?: (selection: unknown, button: HTMLButtonElement) => void
+  onRefresh?: () => void
   withProvider?: boolean
 }) {
   const [garment, setGarment] = useState<ClosetGarment | null>(initial)
@@ -69,7 +84,7 @@ function Harness({
       loading={false}
       onBack={onBack}
       onTagsSaved={setGarment}
-      onRefresh={vi.fn()}
+      onRefresh={onRefresh}
       onStylePiece={onStylePiece}
     />
   )
@@ -156,7 +171,16 @@ describe('GarmentDetail', () => {
     expect(await statusBar()).toHaveTextContent('Saved')
     expect(screen.getByTestId('status-bar-action-undo')).toHaveTextContent('Undo')
     expect(patches).toEqual([
-      { body: { category: 'top', material: 'wool', comfortRange: 'cold' }, header: '1' },
+      {
+        // Codex P2.1: Done names the tags it loaded, so a newer edit elsewhere is not overwritten.
+        body: {
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+          expected: loaded,
+        },
+        header: '1',
+      },
     ])
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
     expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Cold$/)
@@ -189,9 +213,13 @@ describe('GarmentDetail', () => {
         'Change undone.'
       )
     )
+    // Undo restores the loaded tags and names the tags it saved.
     expect(patches.map(({ body }) => body)).toEqual([
-      { category: 'top', material: 'wool', comfortRange: 'cold' },
-      { category: 'top', material: 'cotton', comfortRange: 'mild' },
+      { category: 'top', material: 'wool', comfortRange: 'cold', expected: loaded },
+      {
+        ...loaded,
+        expected: { category: 'top', material: 'wool', comfortRange: 'cold' },
+      },
     ])
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Cotton$/)
     expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Mild$/)
@@ -219,10 +247,11 @@ describe('GarmentDetail', () => {
         'Change undone.'
       )
     )
+    const savedTags = { category: 'top', material: 'wool', comfortRange: 'mild' }
     expect(patches.map(({ body }) => body)).toEqual([
-      { category: 'top', material: 'wool', comfortRange: 'mild' },
-      { category: 'top', material: 'cotton', comfortRange: 'mild' },
-      { category: 'top', material: 'cotton', comfortRange: 'mild' },
+      { ...savedTags, expected: loaded },
+      { ...loaded, expected: savedTags },
+      { ...loaded, expected: savedTags },
     ])
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Cotton$/)
   })
@@ -244,6 +273,13 @@ describe('GarmentDetail', () => {
   })
 
   it.each([
+    [
+      'tags another device changed',
+      409,
+      'GARMENT_TAGS_CHANGED',
+      'conflict',
+      'This piece changed on another device. Check the tags and try again.',
+    ],
     [
       'a concurrent update',
       409,
@@ -363,6 +399,7 @@ describe('GarmentDetail', () => {
       category: 'top',
       material: null,
       comfortRange: 'mild',
+      expected: loaded,
     })
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(
       /^No material$/
@@ -418,5 +455,197 @@ describe('GarmentDetail', () => {
     const bar = await statusBar()
     expect(bar).toHaveAttribute('data-placement', 'inline')
     expect(bar).toHaveTextContent('Saved')
+  })
+
+  it('[P0] [7.5-CMP-013] a newer Done retires the older Undo (Codex P2.1)', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await screen.findByTestId('status-bar-action-undo')
+
+    await editTo(user, { comfort: 'cold' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() => expect(patches).toHaveLength(2))
+    expect(screen.getAllByTestId('status-bar-action-undo')).toHaveLength(1)
+
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Change undone.'
+      )
+    )
+    // Only the newest save is undone: back to the first save's tags, not the loaded ones.
+    expect(patches.map(({ body }) => body)).toEqual([
+      { category: 'top', material: 'wool', comfortRange: 'mild', expected: loaded },
+      {
+        category: 'top',
+        material: 'wool',
+        comfortRange: 'cold',
+        expected: { category: 'top', material: 'wool', comfortRange: 'mild' },
+      },
+      {
+        category: 'top',
+        material: 'wool',
+        comfortRange: 'mild',
+        expected: { category: 'top', material: 'wool', comfortRange: 'cold' },
+      },
+    ])
+    expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Mild$/)
+  })
+
+  it('[P1] [7.5-CMP-013] an Undo refused because the piece changed elsewhere says so without Retry', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+
+    await user.click(await screen.findByTestId('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'This piece changed on another device. Check the tags and try again.'
+      )
+    )
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
+  })
+
+  it('[P1] [7.5-CMP-014] a slow save shows Saving, then Still saving, then Saved (Codex P2.3)', async () => {
+    const user = userEvent.setup()
+    const pending = Promise.withResolvers<void>()
+    reply = async (body) => {
+      await pending.promise
+      return acceptTags(body)
+    }
+    render(<Harness />)
+    await editTo(user, { material: 'wool' })
+
+    await user.click(screen.getByTestId('garment-tag-done'))
+    const done = screen.getByTestId('garment-tag-done')
+    expect(done).toHaveAttribute('data-save-state', 'saving')
+    expect(done).toHaveTextContent('Saving')
+    await waitFor(() => expect(done).toHaveAttribute('data-save-state', 'still-saving'), {
+      timeout: 3000,
+    })
+    expect(done).toHaveTextContent('Still saving')
+    expect(screen.getByTestId('save-feedback-announcer')).toHaveTextContent(
+      'Still saving'
+    )
+
+    pending.resolve()
+    expect(await statusBar()).toHaveTextContent('Saved')
+  })
+
+  it('[P1] [7.5-CMP-014] a reopened detail announces its Saved again under the same provider', async () => {
+    const user = userEvent.setup()
+    function Reopenable({ round }: { round: number }) {
+      const [garment, setGarment] = useState<ClosetGarment>(blueTop)
+      return (
+        <GarmentDetail
+          key={round}
+          garment={garment}
+          owner={owner}
+          hasLoaded
+          loadFailed={false}
+          loading={false}
+          onBack={vi.fn()}
+          onTagsSaved={setGarment}
+          onRefresh={vi.fn()}
+          onStylePiece={vi.fn()}
+        />
+      )
+    }
+    const { rerender } = render(
+      <SaveFeedbackProvider>
+        <Reopenable round={1} />
+      </SaveFeedbackProvider>
+    )
+    const announcer = () => screen.getByTestId('save-feedback-announcer')
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() => expect(announcer()).toHaveTextContent('Saved'))
+    await editTo(user, {})
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() => expect(announcer()).toHaveTextContent('No changes'))
+
+    // The same piece opened again: its first notice must not reuse an announced id.
+    rerender(
+      <SaveFeedbackProvider>
+        <Reopenable round={2} />
+      </SaveFeedbackProvider>
+    )
+    await editTo(user, { material: 'linen' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+
+    await waitFor(() => expect(announcer()).toHaveTextContent('Saved'))
+  })
+
+  it('[P1] [7.5-CMP-015] renews a photo whose signed link is about to expire (Codex P2.5)', () => {
+    const onRefresh = vi.fn()
+    const soon = new Date(Date.now() + 30_000).toISOString()
+    const later = new Date(Date.now() + 10 * 60_000).toISOString()
+    const garmentWith = (expiresAt: string) => ({
+      ...blueTop,
+      imageAccess: { url: `https://photos.example.test/${expiresAt}.png`, expiresAt },
+    })
+
+    const { unmount } = render(
+      <Harness initial={garmentWith(later)} onRefresh={onRefresh} />
+    )
+    expect(onRefresh).not.toHaveBeenCalled()
+    unmount()
+
+    render(<Harness initial={garmentWith(soon)} onRefresh={onRefresh} />)
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('[P1] [7.5-CMP-015] a photo that fails to load falls back to a named placeholder and refetches once', () => {
+    const onRefresh = vi.fn()
+    const props = {
+      owner,
+      hasLoaded: true,
+      loadFailed: false,
+      loading: false,
+      onBack: vi.fn(),
+      onTagsSaved: vi.fn(),
+      onRefresh,
+      onStylePiece: vi.fn(),
+    }
+    const renewed = {
+      ...blueTop,
+      imageAccess: {
+        url: 'https://photos.example.test/blue-top-renewed.png',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    }
+    const { rerender } = render(
+      <SaveFeedbackProvider>
+        <GarmentDetail {...props} garment={blueTop} />
+      </SaveFeedbackProvider>
+    )
+
+    fireEvent.error(screen.getByRole('img', { name: 'Blue top' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    const placeholder = screen.getByTestId('garment-detail-photo')
+    expect(placeholder.tagName).not.toBe('IMG')
+    expect(placeholder).toHaveAccessibleName('Blue top')
+
+    // The refetched link loads again; a second failure stays a placeholder without a loop.
+    rerender(
+      <SaveFeedbackProvider>
+        <GarmentDetail {...props} garment={renewed} />
+      </SaveFeedbackProvider>
+    )
+    const retried = screen.getByRole('img', { name: 'Blue top' })
+    expect(retried).toHaveAttribute('src', renewed.imageAccess.url)
+    fireEvent.error(retried)
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('garment-detail-photo').tagName).not.toBe('IMG')
   })
 })

@@ -4871,171 +4871,6 @@
                     "expiresAt"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "id",
-                "status",
-                "category",
-                "material",
-                "comfortRange",
-                "tagsConfirmedAt",
-                "fileSizeBytes",
-                "mimeType",
-                "retentionStatus",
-                "createdAt",
-                "committedAt",
-                "imageAccess"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "data"
-        ],
-        "additionalProperties": false
-      },
-      "GarmentListWithColorResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "pending_upload",
-                    "bytes_uploaded",
-                    "processing",
-                    "awaiting_tags",
-                    "ready",
-                    "failed"
-                  ],
-                  "x-optic-exemptions": "request and response property enums",
-                  "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
-                },
-                "category": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "top",
-                    "bottom",
-                    "outerwear",
-                    "dress",
-                    "shoes",
-                    "accessory",
-                    null
-                  ]
-                },
-                "material": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "cotton",
-                    "wool",
-                    "linen",
-                    "leather",
-                    "denim",
-                    "fleece",
-                    "synthetic",
-                    "down",
-                    "silk",
-                    null
-                  ]
-                },
-                "comfortRange": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "cold",
-                    "cool",
-                    "mild",
-                    "warm",
-                    "hot",
-                    null
-                  ]
-                },
-                "tagsConfirmedAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "date-time"
-                },
-                "fileSizeBytes": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
-                  "minimum": 1,
-                  "maximum": 10485760
-                },
-                "mimeType": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "enum": [
-                    "image/jpeg",
-                    "image/png",
-                    "image/webp",
-                    null
-                  ],
-                  "x-optic-exemptions": "request and response property enums",
-                  "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
-                },
-                "retentionStatus": {
-                  "type": "string",
-                  "enum": [
-                    "active",
-                    "deletion_pending",
-                    "legal_hold"
-                  ]
-                },
-                "createdAt": {
-                  "type": "string",
-                  "format": "date-time"
-                },
-                "committedAt": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "format": "date-time"
-                },
-                "imageAccess": {
-                  "type": [
-                    "object",
-                    "null"
-                  ],
-                  "properties": {
-                    "url": {
-                      "type": "string",
-                      "format": "uri"
-                    },
-                    "expiresAt": {
-                      "type": "string",
-                      "format": "date-time"
-                    }
-                  },
-                  "required": [
-                    "url",
-                    "expiresAt"
-                  ],
-                  "additionalProperties": false
                 },
                 "colorFamily": {
                   "type": [
@@ -5056,7 +4891,7 @@
                     "brown",
                     null
                   ],
-                  "description": "Color family of the stored dominant garment color. Null when no color was computed. Present only when the request sends x-couture-garment-color: 1."
+                  "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
                 }
               },
               "required": [
@@ -5071,8 +4906,7 @@
                 "retentionStatus",
                 "createdAt",
                 "committedAt",
-                "imageAccess",
-                "colorFamily"
+                "imageAccess"
               ],
               "additionalProperties": false
             }
@@ -5291,37 +5125,10 @@
               "hot",
               null
             ]
-          }
-        },
-        "required": [
-          "category",
-          "comfortRange"
-        ],
-        "additionalProperties": false
-      },
-      "UpdateGarmentTagsResponse": {
-        "type": "object",
-        "properties": {
-          "data": {
+          },
+          "expected": {
             "type": "object",
             "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "status": {
-                "type": "string",
-                "enum": [
-                  "pending_upload",
-                  "bytes_uploaded",
-                  "processing",
-                  "awaiting_tags",
-                  "ready",
-                  "failed"
-                ],
-                "x-optic-exemptions": "request and response property enums",
-                "description": "Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch."
-              },
               "category": {
                 "type": [
                   "string",
@@ -5368,100 +5175,19 @@
                   "hot",
                   null
                 ]
-              },
-              "tagsConfirmedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "fileSizeBytes": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
-                "minimum": 1,
-                "maximum": 10485760
-              },
-              "mimeType": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "enum": [
-                  "image/jpeg",
-                  "image/png",
-                  "image/webp",
-                  null
-                ],
-                "x-optic-exemptions": "request and response property enums",
-                "description": "Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error."
-              },
-              "retentionStatus": {
-                "type": "string",
-                "enum": [
-                  "active",
-                  "deletion_pending",
-                  "legal_hold"
-                ]
-              },
-              "createdAt": {
-                "type": "string",
-                "format": "date-time"
-              },
-              "committedAt": {
-                "type": [
-                  "string",
-                  "null"
-                ],
-                "format": "date-time"
-              },
-              "imageAccess": {
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "expiresAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  }
-                },
-                "required": [
-                  "url",
-                  "expiresAt"
-                ],
-                "additionalProperties": false
               }
             },
-            "required": [
-              "id",
-              "status",
-              "category",
-              "material",
-              "comfortRange",
-              "tagsConfirmedAt",
-              "fileSizeBytes",
-              "mimeType",
-              "retentionStatus",
-              "createdAt",
-              "committedAt",
-              "imageAccess"
-            ],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "The tags the editor last saw. When present and the stored tags differ, the update is refused with 409 GARMENT_TAGS_CHANGED. Omitted, the update applies as before."
           }
         },
         "required": [
-          "data"
+          "category",
+          "comfortRange"
         ],
         "additionalProperties": false
       },
-      "UpdateGarmentTagsWithColorResponse": {
+      "UpdateGarmentTagsResponse": {
         "type": "object",
         "properties": {
           "data": {
@@ -5619,7 +5345,7 @@
                   "brown",
                   null
                 ],
-                "description": "Color family of the stored dominant garment color. Null when no color was computed. Present only when the request sends x-couture-garment-color: 1."
+                "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
               }
             },
             "required": [
@@ -5634,8 +5360,7 @@
               "retentionStatus",
               "createdAt",
               "committedAt",
-              "imageAccess",
-              "colorFamily"
+              "imageAccess"
             ],
             "additionalProperties": false
           }
@@ -5837,8 +5562,11 @@
             "enum": [
               "GARMENT_ANALYSIS_PENDING",
               "GARMENT_NOT_TAGGABLE",
-              "CONCURRENT_TAG_UPDATE"
-            ]
+              "CONCURRENT_TAG_UPDATE",
+              "GARMENT_TAGS_CHANGED"
+            ],
+            "x-optic-exemptions": "request and response property enums",
+            "description": "Open set. Conflict reasons may gain values; treat an unrecognized message as a generic conflict."
           },
           "error": {
             "type": "string",
@@ -24415,14 +24143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/GarmentListResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/GarmentListWithColorResponse"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/GarmentListResponse"
                 }
               }
             }
@@ -24727,14 +24448,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/components/schemas/UpdateGarmentTagsResponse"
-                    },
-                    {
-                      "$ref": "#/components/schemas/UpdateGarmentTagsWithColorResponse"
-                    }
-                  ]
+                  "$ref": "#/components/schemas/UpdateGarmentTagsResponse"
                 }
               }
             }
@@ -24780,7 +24494,7 @@
             }
           },
           "409": {
-            "description": "Garment analysis pending or not taggable.",
+            "description": "Garment analysis pending, not taggable, a concurrent update, or tags changed since the editor read them (GARMENT_TAGS_CHANGED).",
             "content": {
               "application/json": {
                 "schema": {

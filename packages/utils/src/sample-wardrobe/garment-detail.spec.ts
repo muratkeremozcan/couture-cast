@@ -75,6 +75,9 @@ describe('classifyGarmentTagSaveError', () => {
   it.each([
     [{ status: 409, code: 'CONCURRENT_TAG_UPDATE' }, 'conflict'],
     [{ status: 409, message: 'CONCURRENT_TAG_UPDATE' }, 'conflict'],
+    // Codex P2.1: another edit landed after the editor loaded the tags.
+    [{ status: 409, message: 'GARMENT_TAGS_CHANGED' }, 'conflict'],
+    [{ status: 409, code: 'GARMENT_TAGS_CHANGED' }, 'conflict'],
     [{ status: 409, code: 'GARMENT_NOT_TAGGABLE' }, 'failed'],
     [{ status: 403, code: 'GUARDIAN_CONSENT_REQUIRED' }, 'not-allowed'],
     [{ status: 500 }, 'failed'],

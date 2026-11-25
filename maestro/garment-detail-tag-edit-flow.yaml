@@ -51,6 +51,8 @@ tags:
 - assertVisible:
     id: 'garment-detail-material'
     text: 'Cotton'
+# Needs a verified member: run-maestro's fixture bearer is checked against GET user/profile at
+# startup (native-session.ts verifyFixtureIdentity), as a real session is.
 - assertVisible:
     id: 'style-piece-open'
 
@@ -69,11 +71,14 @@ tags:
 - tapOn:
     id: 'garment-tag-done'
 
+# The bar's container carries the test id and its child Text carries the copy, so the two are
+# asserted separately: one native element never holds both.
 - extendedWaitUntil:
     visible:
       id: 'status-feedback-bar'
-      text: '.*Saved.*'
     timeout: 15000
+- assertVisible:
+    text: 'Saved'
 - assertVisible:
     id: 'status-bar-action-undo'
 - scrollUntilVisible:
@@ -126,11 +131,14 @@ tags:
     direction: DOWN
 - tapOn:
     id: 'garment-tag-done'
+# The bar's container carries the test id and its child Text carries the copy, so the two are
+# asserted separately: one native element never holds both.
 - extendedWaitUntil:
     visible:
       id: 'status-feedback-bar'
-      text: '.*Saved.*'
     timeout: 15000
+- assertVisible:
+    text: 'Saved'
 - scrollUntilVisible:
     element:
       id: 'garment-detail-material'

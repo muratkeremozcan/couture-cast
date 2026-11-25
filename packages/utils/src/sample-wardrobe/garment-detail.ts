@@ -69,6 +69,15 @@ export function formatGarmentTagLabels(
   }
 }
 
+/**
+ * The 409 messages that mean another edit got there first: a concurrent write, or
+ * `GARMENT_TAGS_CHANGED` when the stored tags no longer match the ones the editor saw.
+ */
+const CONFLICT_CODES: ReadonlySet<string> = new Set([
+  'CONCURRENT_TAG_UPDATE',
+  'GARMENT_TAGS_CHANGED',
+])
+
 /** Each tag save failure the member is told about in its own words. */
 export type GarmentTagSaveFailure = 'conflict' | 'not-allowed' | 'offline' | 'failed'
 
@@ -88,8 +97,8 @@ export function classifyGarmentTagSaveError(
   const status = typeof candidate.status === 'number' ? candidate.status : undefined
   if (
     status === 409 &&
-    (candidate.code === 'CONCURRENT_TAG_UPDATE' ||
-      candidate.message === 'CONCURRENT_TAG_UPDATE')
+    (CONFLICT_CODES.has(String(candidate.code)) ||
+      CONFLICT_CODES.has(String(candidate.message)))
   ) {
     return 'conflict'
   }

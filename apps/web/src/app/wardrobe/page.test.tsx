@@ -1,3 +1,5 @@
+// Learning path Step 63: Garment detail and tag edit (placeholder photo name).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
@@ -733,17 +735,21 @@ describe('WardrobePage garment grid', () => {
   })
 
   it('renders a placeholder tile when a garment has no signed image URL', async () => {
-    listGarmentsFromWeb
-      .mockReset()
-      .mockResolvedValue([
-        garmentFixture('garment-no-image', 'ready', { imageAccess: null }),
-      ])
+    listGarmentsFromWeb.mockReset().mockResolvedValue([
+      garmentFixture('garment-no-image', 'ready', {
+        category: 'top',
+        material: 'cotton',
+        comfortRange: 'mild',
+        imageAccess: null,
+      }),
+    ])
     render(<WardrobePage />)
 
     const card = await screen.findByTestId('garment-card-garment-no-image')
-    // Rendering <img src={undefined}> would show a broken-image glyph instead.
-    expect(within(card).queryByRole('img')).not.toBeInTheDocument()
-    expect(card).toHaveTextContent('👗')
+    // Story 7.5: the placeholder is named like a photo would be (D6), and it is not an <img>:
+    // rendering <img src={undefined}> would show a broken-image glyph instead.
+    expect(within(card).getByRole('img', { name: 'Top' })).toHaveTextContent('👗')
+    expect(card.querySelector('img')).toBeNull()
   })
 
   it('opens capture for a failed garment and restores the replacement action on close', async () => {
