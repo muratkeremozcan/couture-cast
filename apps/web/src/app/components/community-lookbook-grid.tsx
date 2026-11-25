@@ -2178,7 +2178,10 @@ function CommunityFeedStates({
 
 interface LoadMoreControlProps {
   nextCursor: string | null
+  /** A first load, which hides the control; a return's in-place refresh does not. */
   isLoading: boolean
+  /** A page-one read is out: the control stays, disabled. */
+  isRefreshing: boolean
   isLoadingMore: boolean
   onLoadMore: () => void
   t: Translate
@@ -2187,6 +2190,7 @@ interface LoadMoreControlProps {
 function LoadMoreControl({
   nextCursor,
   isLoading,
+  isRefreshing,
   isLoadingMore,
   onLoadMore,
   t,
@@ -2196,10 +2200,12 @@ function LoadMoreControl({
   }
   return (
     <div className="flex justify-center pt-2">
+      {/* CC-7.7 D5: a return's in-place refresh keeps the control in its slot, disabled until
+          page one answered. */}
       <button
         type="button"
         data-testid="load-more-button"
-        disabled={isLoadingMore}
+        disabled={isLoadingMore || isRefreshing}
         onClick={onLoadMore}
         className="min-h-[44px] rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:opacity-50"
       >
@@ -4087,7 +4093,8 @@ export function CommunityLookbookGrid({
   }
 
   const handleLoadMore = () => {
-    if (nextCursor && !isLoadingMore) {
+    // A page-one read still out (a return's in-place refresh) would be cancelled by this one.
+    if (nextCursor && !isLoadingMore && !isLoading) {
       void loadFeed(currentMode, nextCursor)
     }
   }
@@ -4741,7 +4748,8 @@ export function CommunityLookbookGrid({
 
         <LoadMoreControl
           nextCursor={presentation.nextCursor}
-          isLoading={isLoading}
+          isLoading={firstLoadShowing(isLoading, restoring)}
+          isRefreshing={isLoading}
           isLoadingMore={isLoadingMore}
           onLoadMore={handleLoadMore}
           t={t}

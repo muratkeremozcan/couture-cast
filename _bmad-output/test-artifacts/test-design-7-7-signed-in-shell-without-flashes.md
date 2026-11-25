@@ -1,6 +1,9 @@
 # Test design: Story CC-7.7 signed-in shell without flashes
 
 Updated: 2026-11-25. Initial plan from spec-7-7 (ready-for-dev, baseline 11c26918).
+Updated: 2026-11-25. CI on 3d4b5c96: the Community sync read is never delayed by the fixtures (past
+its 2 s deadline the feed hides as an outage); feed and Spotlight fixtures carry reaction summaries
+as the API does (their absence stripped the bars and shifted E2E-013); 7.7-CMP-045.
 Updated: 2026-11-25. Builder web fixes after CI and CodeRabbit r1: 7.7-CMP-030..044; the Profile
 gate no longer waits on the account read; the Home hero and legal links sit outside the gate.
 Updated: 2026-11-25. CI on 61d7156e and CodeRabbit round 1: reduced motion for modals moved into

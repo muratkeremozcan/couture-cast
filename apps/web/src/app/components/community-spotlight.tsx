@@ -265,8 +265,9 @@ export function useCommunitySpotlight<Token = number>({
   )
 
   const loadMore = useCallback(async () => {
-    const { nextCursor, loadingMore } = stateRef.current
-    if (!nextCursor || loadingMore) return
+    const { nextCursor, loadingMore, status } = stateRef.current
+    // A page-one read still out (a return's in-place refresh) would be cancelled by this one.
+    if (!nextCursor || loadingMore || status === 'loading') return
     const request = begin()
     const startClock = textClockRef.current
     setState((previous) => ({ ...previous, loadingMore: true, moreFailed: false }))
@@ -570,10 +571,12 @@ function SpotlightViewMore({
   if (state.nextCursor === null) return null
   return (
     <div className="flex shrink-0 snap-start items-center px-2">
+      {/* CC-7.7 D5: a return's in-place refresh keeps the control in its slot, disabled until
+          page one answered, so the row never changes shape while it refreshes. */}
       <button
         type="button"
         data-testid="community-spotlight-view-more"
-        disabled={state.loadingMore}
+        disabled={state.loadingMore || state.status === 'loading'}
         onClick={onLoadMore}
         className="min-h-[44px] whitespace-nowrap rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
       >

@@ -9,6 +9,7 @@
 import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { screenSnapshot } from '../../lib/screen-snapshot'
 import type {
   GarmentItemContract,
   SilhouetteProfileContract,
@@ -128,6 +129,9 @@ function signedOutAtMount() {
 }
 
 beforeEach(() => {
+  // Story CC-7.7: the Closet keeps a per-member snapshot in module memory, so one test's closet
+  // would open the next test's hub for the same member (CI, 61d7156e).
+  screenSnapshot.clear()
   session.member = null
   for (const mock of Object.values(wardrobe)) mock.mockReset()
   wardrobe.getSilhouetteProfileFromWeb.mockResolvedValue(silhouetteProfile())

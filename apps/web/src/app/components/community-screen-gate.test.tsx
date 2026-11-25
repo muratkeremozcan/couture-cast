@@ -9,7 +9,8 @@
 // (P1-1), 7.7-CMP-013 the deep-link focus that waits for the gate (P2-8), 7.7-CMP-014 the return
 // with its filter, paged rows and scroll (P2-5), 7.7-CMP-015 losing access (P3-1).
 // CodeRabbit round 1 on PR 292: 7.7-CMP-030 a return's Spotlight refresh keeps every page it showed
-// (#1), 7.7-CMP-031 a failed filter switch never relabels the kept rows (#28).
+// (#1), 7.7-CMP-031 a failed filter switch never relabels the kept rows (#28). CI pw-e2e on 3d4b5c96
+// (7.7-E2E-013): 7.7-CMP-045 a return whose refresh answers the same data moves nothing.
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -20,6 +21,7 @@ import {
   FEED_PATH,
   POST_PATH,
   cursorFor,
+  feed,
   feedBody,
   item,
   postBody,
@@ -498,5 +500,120 @@ describe('7.7 Community screen gate', () => {
     expect(screen.getByTestId('lookbook-card-post-1')).toBeInTheDocument()
 
     expect(kept()).toMatchObject({ mode: readFor, items: [{ id: 'post-1' }] })
+  })
+
+  it('7.7-CMP-045 a return whose page-one refresh answers the same data keeps every row, Spotlight card and control in place (7.7-E2E-013)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    // The client opts in to reactions, so every read carries each look's summary.
+    const reactions = {
+      counts: { applause: 2, love: 1, inspiration: 0 },
+      total: 3,
+      viewerReaction: null,
+      revision: 1,
+      generation: 1,
+    }
+    const withReactions = <T extends object>(post: T) => ({ ...post, reactions })
+    let returning = false
+    const refresh = Promise.withResolvers<void>()
+    const refreshReads: string[] = []
+    useMswHandlers(
+      http.get(FEED_PATH, async () => {
+        if (returning) {
+          refreshReads.push('feed')
+          await refresh.promise
+        }
+        return HttpResponse.json({
+          data: feed({
+            items: [withReactions(item()), withReactions(item({ id: 'post-2' }))],
+            nextCursor: cursorFor({ mode: 'auto' }),
+          }),
+        })
+      }),
+      http.get(SPOTLIGHT_PATH, async () => {
+        if (returning) {
+          refreshReads.push('spotlight')
+          await refresh.promise
+        }
+        return spotlightBody({
+          items: [ranked(1, { reactions }), ranked(2, { reactions })],
+          nextCursor: 'cursor-2',
+        })
+      })
+    )
+
+    const firstVisit = renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall<{ items: unknown[]; spotlight: { items: unknown[] } }>(
+          currentWebSessionScope(),
+          'community',
+          COMMUNITY_GRID_SNAPSHOT_PART
+        )
+      ).toMatchObject({ items: { length: 2 }, spotlight: { items: { length: 2 } } })
+    )
+    firstVisit.unmount()
+
+    // The return: its first frame is the snapshot, and both page-one reads are held.
+    returning = true
+    renderCommunity()
+    const layout = () => ({
+      cards: ['lookbook-card-post-1', 'lookbook-card-post-2'].map((id) =>
+        screen.getByTestId(id)
+      ),
+      reactions: ['community-reactions-post-1', 'community-reactions-post-2'].map((id) =>
+        screen.getByTestId(id)
+      ),
+      spotlight: ['spot-1', 'spot-2'].map((id) =>
+        screen.getByTestId(`community-spotlight-item-${id}`)
+      ),
+      spotlightReactions: ['spot-1', 'spot-2'].map(
+        (id) =>
+          screen
+            .getByTestId(`community-spotlight-item-${id}`)
+            .querySelector(`[data-testid$="community-reactions-${id}"]`)!
+      ),
+      loadMore: screen.getByTestId('load-more-button'),
+      viewMore: screen.getByTestId('community-spotlight-view-more'),
+    })
+    const restored = layout()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    for (const node of restored.spotlightReactions) expect(node).toBeInTheDocument()
+    await waitFor(() => expect(refreshReads.sort()).toEqual(['feed', 'spotlight']))
+
+    // While the refresh is out: no loading marker, and both paging controls keep their slot,
+    // disabled until page one answers.
+    expect(screen.queryByTestId('community-spotlight-loading')).toBeNull()
+    expect(screen.queryByTestId('community-feed-loading')).toBeNull()
+    expect(screen.queryByTestId('lookbook-card-skeleton')).toBeNull()
+    expect(layout()).toEqual(restored)
+    expect(restored.loadMore).toBeDisabled()
+    expect(restored.viewMore).toBeDisabled()
+
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+    await waitFor(() => expect(restored.loadMore).toBeEnabled())
+    await waitFor(() => expect(restored.viewMore).toBeEnabled())
+
+    // The same data moved nothing: every node is the one the snapshot rendered, reactions kept.
+    const refreshed = layout()
+    refreshed.cards.forEach((node, index) => expect(node).toBe(restored.cards[index]))
+    refreshed.reactions.forEach((node, index) =>
+      expect(node).toBe(restored.reactions[index])
+    )
+    refreshed.spotlight.forEach((node, index) =>
+      expect(node).toBe(restored.spotlight[index])
+    )
+    refreshed.spotlightReactions.forEach((node, index) =>
+      expect(node).toBe(restored.spotlightReactions[index])
+    )
+    expect(refreshed.loadMore).toBe(restored.loadMore)
+    expect(refreshed.viewMore).toBe(restored.viewMore)
+    expect(screen.queryByTestId('community-spotlight-loading')).toBeNull()
   })
 })

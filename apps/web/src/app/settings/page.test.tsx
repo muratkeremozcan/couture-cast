@@ -969,10 +969,13 @@ describe('7.7 Profile without flashes', () => {
       expect(firstHtml.body.textContent ?? '', hint).not.toContain(hint)
     for (const id of SIGNED_OUT_TEST_IDS)
       expect(firstHtml.querySelector(`[data-testid="${id}"]`), id).toBeNull()
-    expect(firstHtml.querySelector('[data-testid="locations-section"]')).toHaveAttribute(
-      'data-state',
-      'checking'
-    )
+    // A plain attribute read: jest-dom's matchers refuse a node from a DOMParser document, which
+    // is not this window's HTMLElement (CI, 3d4b5c96).
+    expect(
+      firstHtml
+        .querySelector('[data-testid="locations-section"]')
+        ?.getAttribute('data-state')
+    ).toBe('checking')
     // A signed-out page still paints every hint where it will stay, out of the accessibility tree.
     const standIns = [...firstHtml.querySelectorAll('[data-guest-text]')]
     const standInWords = standIns.map(
@@ -981,8 +984,8 @@ describe('7.7 Profile without flashes', () => {
     expect(standInWords).toHaveLength(SIGN_IN_HINTS.length)
     SIGN_IN_HINTS.forEach((hint, index) => expect(standInWords[index]).toContain(hint))
     for (const node of standIns) {
-      expect(node).toHaveAttribute('aria-hidden', 'true')
-      expect(node).toHaveAttribute('data-landing', 'guest')
+      expect(node.getAttribute('aria-hidden')).toBe('true')
+      expect(node.getAttribute('data-landing')).toBe('guest')
       expect(node.textContent).toBe('')
     }
   })

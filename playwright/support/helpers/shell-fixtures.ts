@@ -1,8 +1,8 @@
 import type { Page, Request, Route } from '@playwright/test'
 import {
   communityEventsResponseSchema,
-  communityFeedResponseSchema,
-  communitySpotlightResponseSchema,
+  communityReactionFeedResponseSchema,
+  communityReactionSpotlightResponseSchema,
   listSavedLocationsResponseSchema,
   resolveCommunityTargetsResponseSchema,
   ritualResponseSchema,
@@ -21,9 +21,11 @@ import {
  * Modes:
  *   empty      every read answers its empty state (ritual: the no-city 400 Home turns into setup)
  *   populated  every read answers one or more items
- *   delayed    populated, every stubbed read answers after DELAY_MS
- *   late       populated, the active screen's gate reads answer at once, every other read after
- *              DELAY_MS (AC3: the late sections land after the first tap)
+ *   delayed    populated, every stubbed content read answers after DELAY_MS
+ *   late       populated, the active screen's gate reads answer at once, every other content
+ *              read after DELAY_MS (AC3: the late sections land after the first tap)
+ *   The Community sync channel (`community/events`) is never delayed: past its own deadline the
+ *   feed hides as an outage, which is not what these modes measure.
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
  */
 export type ShellMode = 'empty' | 'populated' | 'delayed' | 'late' | 'ritual-503'
@@ -108,6 +110,16 @@ function feedItem(id: string, title: string) {
     publishedAt: iso,
     createdAt: iso,
     imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
+    // The web always asks for reaction summaries (x-couture-reactions: 1), and the API sends one
+    // on every item. Without it the client reads reactions as off and drops the bars, so a
+    // refresh without them shrank the cards it replaced (CI E2E-013, 3d4b5c96).
+    reactions: {
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      viewerReaction: null,
+      revision: 0,
+      generation: 0,
+    },
   }
 }
 
@@ -298,8 +310,10 @@ function bodies(memberId: string, populated: boolean) {
       offset: 0,
     },
     'events-poll': { events: [], nextSince: null },
-    'community-feed': checked(communityFeedResponseSchema, { data: feedPage }),
-    'community-spotlight': checked(communitySpotlightResponseSchema, { data: spotlight }),
+    'community-feed': checked(communityReactionFeedResponseSchema, { data: feedPage }),
+    'community-spotlight': checked(communityReactionSpotlightResponseSchema, {
+      data: spotlight,
+    }),
     'home-teaser': { data: spotlight },
     'community-events': checked(communityEventsResponseSchema, {
       data: { events: [], nextCursor: 'fixture', hasMore: false, resyncRequired: false },
@@ -338,16 +352,7 @@ function bodies(memberId: string, populated: boolean) {
             key,
             status: 'available',
             communityRevision: '0',
-            post: {
-              ...feedItem(post.id, post.title),
-              reactions: {
-                counts: { applause: 0, love: 0, inspiration: 0 },
-                total: 0,
-                viewerReaction: null,
-                revision: 0,
-                generation: 0,
-              },
-            },
+            post: feedItem(post.id, post.title),
             comment: null,
             parent: null,
             pageCursor: null,
@@ -422,6 +427,10 @@ export function createShellRouter(options: {
 
   const delayFor = (key: string) => {
     const held = options.hold?.[key] ?? 0
+    // The Community sync channel gives up on an events read after about 2 s and then hides the
+    // feed as an outage (CI trace, 3d4b5c96: events aborted at 1996 ms). Delaying it past that
+    // measures an outage, not slow content, so it answers at once in every mode.
+    if (key === 'community-events') return held
     if (mode === 'delayed') return DELAY_MS + held
     if (mode === 'late' && !GATE_READS[options.screen()].includes(key))
       return DELAY_MS + held
