@@ -1,6 +1,8 @@
 import { ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   type GarmentItemContract,
+  type GarmentWithColor,
+  type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
   type GarmentCategory,
   type GarmentMaterial,
@@ -17,9 +19,9 @@ import {
   type CreateSilhouetteUploadUrlResponse,
   type CommitSilhouettePhotoInput,
   userProfileResponseSchema,
-  garmentListResponseSchema,
+  parseGarmentListWithColorResponse,
+  parseUpdateGarmentTagsWithColorResponse,
   suggestGarmentTagsResponseSchema,
-  updateGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
   wardrobeOnboardingStateResponseSchema,
@@ -29,6 +31,9 @@ import {
 import { createMobileApiClient } from './api-client'
 import { waitForPoll } from './native-utils'
 import { throwUploadStepError } from './upload-attempts'
+
+/** A wardrobe API refusal: its code when the API named one, and its HTTP status. */
+export type WardrobeMobileError = Error & { code?: string; status?: number }
 
 async function actionableWardrobeError(error: unknown, fallback: string): Promise<Error> {
   if (error instanceof ResponseError) {
@@ -42,16 +47,27 @@ async function actionableWardrobeError(error: unknown, fallback: string): Promis
         (typeof payload.error === 'object' ? payload.error.message : undefined) ??
         payload.message ??
         `Wardrobe request failed with status ${error.response.status}`
-      const normalized = new Error(message) as Error & { code?: string }
+      const normalized = new Error(message) as WardrobeMobileError
       normalized.code =
         (typeof payload.error === 'object' ? payload.error.code : undefined) ??
         payload.code ??
-        (['GARMENT_ANALYSIS_PENDING', 'TAGGING_INFERENCE_UNAVAILABLE'].includes(message)
+        ([
+          'GARMENT_ANALYSIS_PENDING',
+          'TAGGING_INFERENCE_UNAVAILABLE',
+          'CONCURRENT_TAG_UPDATE',
+          'GARMENT_TAGS_CHANGED',
+          'GUARDIAN_CONSENT_REQUIRED',
+        ].includes(message)
           ? message
           : undefined)
+      normalized.status = error.response.status
       return normalized
     } catch {
-      return new Error(`Wardrobe request failed with status ${error.response.status}`)
+      const normalized = new Error(
+        `Wardrobe request failed with status ${error.response.status}`
+      ) as WardrobeMobileError
+      normalized.status = error.response.status
+      return normalized
     }
   }
   return error instanceof Error ? error : new Error(fallback)
@@ -90,17 +106,24 @@ async function withRequestTimeout<T>(
   }
 }
 
+/**
+ * Story CC-7.5 D1: garment reads and tag updates opt in to `colorFamily` with
+ * `x-couture-garment-color: 1`, so photos carry color plus category labels ("Blue top").
+ */
 export async function listGarmentsFromMobile(
   accessToken: string,
   signal?: AbortSignal
-): Promise<GarmentItemContract[]> {
+): Promise<GarmentWithColor[]> {
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createMobileApiClient({
         accessToken,
-      }).apiV1WardrobeGarmentsGet({ signal: requestSignal })
+      }).apiV1WardrobeGarmentsGet(
+        { xCoutureGarmentColor: '1' },
+        { signal: requestSignal }
+      )
     )
-    return garmentListResponseSchema.parse(response).data
+    return parseGarmentListWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
@@ -178,19 +201,21 @@ export async function updateGarmentTagsFromMobile(
     category: GarmentCategory
     material?: GarmentMaterial | null
     comfortRange: GarmentComfortRange
+    /** The tags the editor saw; a newer edit then answers 409 GARMENT_TAGS_CHANGED. */
+    expected?: UpdateGarmentTagsInput['expected']
   },
   signal?: AbortSignal
-): Promise<GarmentItemContract> {
+): Promise<GarmentWithColor> {
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createMobileApiClient({
         accessToken,
       }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
-        { garmentId, updateGarmentTagsInput: tags },
+        { garmentId, updateGarmentTagsInput: tags, xCoutureGarmentColor: '1' },
         { signal: requestSignal }
       )
     )
-    return updateGarmentTagsResponseSchema.parse(response).data
+    return parseUpdateGarmentTagsWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
   }

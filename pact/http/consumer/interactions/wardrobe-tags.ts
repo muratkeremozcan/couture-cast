@@ -2,8 +2,11 @@ import type { PactV4, V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
+  garmentListWithColorResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
+  updateGarmentTagsWithColorResponseSchema,
+  WARDROBE_GARMENT_COLOR_HEADER,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 import {
@@ -386,5 +389,141 @@ export async function verifyUpdateGarmentTagsInteraction(
       })
 
       expect(updateGarmentTagsResponseSchema.parse(response)).toBeDefined()
+    })
+}
+
+// Story 7.5: clients that send `x-couture-garment-color: 1` receive `colorFamily` on each
+// garment (test plan 7.5-PACT-001..002). Requests without the header keep the interactions
+// above, so installed builds stay verified against the strict legacy shape.
+// Learning path Step 63: Garment detail and tag edit.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+const colorGarmentId = '00000000-0000-4000-8000-000000000002'
+
+function readyGarmentWithColorBody(tags: {
+  category: string
+  material: string
+  comfortRange: string
+}) {
+  return {
+    id: string(colorGarmentId),
+    status: 'ready',
+    category: tags.category,
+    material: tags.material,
+    comfortRange: tags.comfortRange,
+    tagsConfirmedAt: isoTimestamp('2026-08-05T12:00:00.000Z'),
+    fileSizeBytes: like(1024),
+    mimeType: 'image/png',
+    retentionStatus: 'active',
+    createdAt: isoTimestamp('2026-08-05T10:00:00.000Z'),
+    committedAt: isoTimestamp('2026-08-05T10:01:00.000Z'),
+    imageAccess: {
+      url: string('https://example.com/read.png'),
+      expiresAt: isoTimestamp('2026-08-05T12:15:00.000Z'),
+    },
+    colorFamily: 'blue',
+  }
+}
+
+export async function verifyListGarmentsWithColorInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A ready blue garment exists for user',
+        params: { garmentId: colorGarmentId, userId: 'guardian-1' },
+      })
+    )
+    .uponReceiving('a request to list garments with their color family')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/garments',
+      setJsonContent({
+        headers: { ...pactEventHeaders, [WARDROBE_GARMENT_COLOR_HEADER]: '1' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: [
+            readyGarmentWithColorBody({
+              category: 'top',
+              material: 'cotton',
+              comfortRange: 'mild',
+            }),
+          ],
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeGarmentsGet({
+        xCoutureGarmentColor: '1',
+      })
+      const parsed = garmentListWithColorResponseSchema.parse(response)
+      expect(parsed.data).toEqual([
+        expect.objectContaining({ id: colorGarmentId, colorFamily: 'blue' }),
+      ])
+    })
+}
+
+export async function verifyUpdateGarmentTagsWithColorInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  const tags = {
+    category: 'outerwear' as const,
+    material: 'wool' as const,
+    comfortRange: 'cold' as const,
+  }
+  // Web and native name the tags the editor loaded (Codex P2.1); the provider applies the edit
+  // when they still match.
+  const input = {
+    ...tags,
+    expected: {
+      category: 'top' as const,
+      material: 'cotton' as const,
+      comfortRange: 'mild' as const,
+    },
+  }
+
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A ready blue garment exists for user',
+        params: { garmentId: colorGarmentId, userId: 'guardian-1' },
+      })
+    )
+    .uponReceiving('a request to edit garment tags and read back the color family')
+    .withRequest(
+      'PATCH',
+      `/api/v1/wardrobe/garments/${colorGarmentId}/tags`,
+      setJsonContent({
+        headers: { ...pactEventHeaders, [WARDROBE_GARMENT_COLOR_HEADER]: '1' },
+        body: input,
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({ body: { data: readyGarmentWithColorBody(tags) } })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1WardrobeGarmentsGarmentIdTagsPatch({
+        garmentId: colorGarmentId,
+        updateGarmentTagsInput: input,
+        xCoutureGarmentColor: '1',
+      })
+      expect(updateGarmentTagsWithColorResponseSchema.parse(response).data).toMatchObject(
+        {
+          // The answer carries the saved tags; `expected` is a request-only field.
+          ...tags,
+          colorFamily: 'blue',
+        }
+      )
     })
 }

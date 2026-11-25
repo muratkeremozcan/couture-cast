@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-22.
-Added Steps 40 to 61:
+Updated: 2026-11-25.
+Added Steps 40 to 63:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -26,7 +26,8 @@ Added Steps 40 to 61:
 - Step 59: Story 7.1, shared save, undo and status feedback, `0154d786` (PR #286), merged on 2026-11-21.
 - Step 60: Story 7.2, saved looks follow the account, `72b685c2` (PR #287), merged on 2026-11-22.
 - Step 61: Story 7.3, import device-saved looks for the same member, `f65ed8e5` (PR #288), merged on 2026-11-22.
-- Step 62: Story 7.4, community post edits persist, in review on `feat/epic7-story-7-4-community-post-edits-persist`.
+- Step 62: Story 7.4, community post edits persist, `ea93273b` (PR #289), merged on 2026-11-22.
+- Step 63: Story 7.5, garment detail and tag edit, in review on `feat/epic7-story-7-5-garment-detail-tag-edit`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -34,6 +35,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 63 for Story CC-7.5 (garment detail and tag edit) while its PR is in review, and moved Step 62 to merged (`ea93273b`, PR #289).
 Added Step 62 for Story CC-7.4 (community post edits persist) while its PR is in review, and moved Step 61 to merged (`f65ed8e5`, PR #288).
 Added Step 61 for Story CC-7.3 (import device-saved looks for the same member) while its PR is in review, and moved Step 60 to merged (`72b685c2`, PR #287).
 Added Step 60 for Story CC-7.2 (saved looks follow the account) while its PR is in review, and moved Step 59 to merged (`0154d786`, PR #286).
@@ -21499,3 +21501,103 @@ Evidence boundaries:
   isolated Postgres 17 (`127.0.0.1:54361`), workspace `tsc --noEmit`, ESLint `--max-warnings=0`,
   and isolated-DB Playwright E2E ran locally.
 - Full workspace suites, CI coverage gates, and native iOS/Android builds run in CI on the PR.
+
+## Step 63: Garment detail and tag edit
+
+User/business impact:
+
+- Members tap a ready garment on web or native and get its detail: back control, photo,
+  category, material, comfort range, Edit tags and Style this piece. Before this story the grid
+  cards were inert and tags could not change after first tagging.
+- Done saves the tag edit with the CC-7.1 status bar: "Saved" with Undo, "No changes" for an
+  unchanged draft (no request), and its own message for a concurrent update, a guardian block
+  and a lost connection. The draft stays on screen after any failure.
+- Garment photos are named by color plus category ("Blue top") in all 10 locales, instead of the
+  fixed "Uploaded garment" on web and the capture title on native. Native cards no longer print
+  the raw garment id.
+
+Technical architecture:
+
+- `packages/utils/src/garment-color.ts` holds the one color classifier
+  (`GARMENT_COLOR_FAMILIES`, `classifyRgbColorFamily`, `colorFamilyFromHex`). The community photo
+  caption imports it, so a garment and a community photo name a color the same way.
+- `packages/utils/src/sample-wardrobe/garment-alt.ts` builds the alt text per locale
+  (`formatGarmentAlt`, `formatGarmentCategory`): word order and adjective agreement per locale,
+  the category alone when there is no color, "Untagged garment" when there is no category.
+  `garment-detail.ts` shares the tag labels, draft comparison and failure classifier
+  (`classifyGarmentTagSaveError`) between web and native.
+- `colorFamily` is opt-in with `x-couture-garment-color: 1` on `GET /api/v1/wardrobe/garments`
+  and `PATCH /api/v1/wardrobe/garments/{garmentId}/tags` (`WARDROBE_GARMENT_COLOR_HEADER`,
+  `garmentItemWithColorSchema`, OpenAPI 1.10.0). Without the exact value `1` the response keeps
+  today's strict keys, because installed web and native builds parse garments strictly.
+- Clients read the opted-in response with `parseGarmentListWithColorResponse` and
+  `parseUpdateGarmentTagsWithColorResponse`, which accept a legacy response as
+  `colorFamily: null`, so a client deployed before the API keeps working.
+- Web renders the detail in place for `/wardrobe?garment=<id>`; the grid stays mounted and
+  hidden, so Back restores its scroll and focus, and a reload reopens the detail. Native pushes
+  `app/wardrobe-garment.tsx?id=<id>`, reads the garment from the list endpoint, and calls
+  `notifyWardrobeChanged` after a save so the hub reloads in place.
+
+Hard-won lessons from the implementation of this story:
+
+- An added response key breaks installed clients whose schemas are strict, so a new field ships
+  behind a request header (as the reactions, post text and sponsorship fields did) and the
+  client tolerates a server that ignores the header.
+- One alt text builder per locale table beats string templates in each app: Romance languages
+  need the color adjective to agree with the noun, and German reads best with the color as a noun.
+
+Story/Task mapping:
+
+- Story CC-7.5: Garment detail and tag edit (Epic 7 Lane A reliability).
+- Follows CC-4.2 and CC-7.1 (`#step-59-shared-save-undo-and-status-feedback`).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.5: Garment detail and tag edit**`)
+- `_bmad-output/implementation-artifacts/spec-7-5-garment-detail-tag-edit.md`
+- `_bmad-output/test-artifacts/test-design-7-5-garment-detail-tag-edit.md`
+
+Cross-links:
+
+- Step 59 (`#step-59-shared-save-undo-and-status-feedback`): the status bar, Undo and offline
+  notices the tag editor uses.
+- Step 60 (`#step-60-saved-looks-follow-the-account`): Style this piece, opened from the detail.
+
+Sequence to follow:
+
+1. Move the color classifier to `packages/utils/src/garment-color.ts` and add the alt and detail
+   helpers under `packages/utils/src/sample-wardrobe/`.
+2. Add the opt-in contract in `packages/api-client/src/contracts/http/wardrobe.ts`, bump
+   `openapi.ts`, regenerate the SDK (`npm run generate:api-client`) and rebuild the dist.
+3. Read the header in `wardrobe.controller.ts` and add `colorFamily` in `wardrobe.service.ts`.
+4. Send the header from `apps/web/src/lib/wardrobe.ts` and `apps/mobile/src/lib/wardrobe.ts`.
+5. Build the web detail (`apps/web/src/app/wardrobe/garment-detail.tsx`, `page.tsx`) and the
+   native detail (`apps/mobile/app/wardrobe-garment.tsx`,
+   `apps/mobile/src/features/wardrobe/garment-detail-screen.tsx`, `wardrobe-hub-screen.tsx`).
+6. Add `wardrobe.detail.*` to the 10 web and 10 mobile locales with parity specs.
+
+Task owner map:
+
+- Step 63 step 1 owner: `packages/utils/src/garment-color.ts`,
+  `packages/utils/src/sample-wardrobe/garment-alt.ts` and `garment-detail.ts`.
+- Step 63 step 2 owner: opt-in contract in `packages/api-client/src/contracts/http/wardrobe.ts`.
+- Step 63 step 3 owner: header-gated `colorFamily` in
+  `apps/api/src/modules/wardrobe/wardrobe.controller.ts` and `wardrobe.service.ts`.
+- Step 63 step 4 owner: web detail and editor in `apps/web/src/app/wardrobe/garment-detail.tsx`.
+- Step 63 step 5 owner: native detail and editor in
+  `apps/mobile/src/features/wardrobe/garment-detail-screen.tsx`.
+
+Tests that cover this step:
+
+- [`apps/web/src/i18n/wardrobe-detail-locales.spec.ts`](../../apps/web/src/i18n/wardrobe-detail-locales.spec.ts)
+  and [`apps/mobile/src/i18n/wardrobe-detail-locales.spec.ts`](../../apps/mobile/src/i18n/wardrobe-detail-locales.spec.ts):
+  `wardrobe.detail` parity across the 10 web and 10 mobile locales.
+- The unit, contract, API integration, Pact, web, native, Playwright and Maestro suites are
+  listed in `_bmad-output/test-artifacts/test-design-7-5-garment-detail-tag-edit.md`.
+
+Evidence boundaries:
+
+- Locally: `tsc --noEmit` in utils, api-client, apps/api, apps/web and apps/mobile, ESLint
+  `--max-warnings=0` on touched files, and an Optic diff of the OpenAPI document against the
+  baseline (36 of 36 checks passed).
+- Unit, integration, Playwright, native and Maestro suites run in CI on the PR.

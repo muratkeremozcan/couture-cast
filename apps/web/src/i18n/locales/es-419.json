@@ -466,6 +466,23 @@
       "loading": "Cargando tu prenda...",
       "pending_desc": "Describe esta prenda con una categoría y un rango de confort.",
       "manual_desc": "Elige la categoría y el rango de confort que mejor le queden a esta prenda. El material es opcional."
+    },
+    "detail": {
+      "back": "Volver al clóset",
+      "category": "Categoría",
+      "material": "Tela",
+      "comfort": "Rango de comodidad",
+      "noMaterial": "Sin tela",
+      "editTags": "Editar etiquetas",
+      "done": "Listo",
+      "cancel": "Cancelar",
+      "noChanges": "Sin cambios",
+      "conflict": "Esta prenda cambió en otro dispositivo. Revisa las etiquetas e inténtalo de nuevo.",
+      "notAllowed": "Un tutor debe aprobar primero los cambios en tu clóset.",
+      "undoFailed": "No se pudo deshacer. Inténtalo de nuevo.",
+      "missing": "Esta prenda ya no está en tu clóset.",
+      "loading": "Cargando la prenda...",
+      "loadFailed": "No se pudo cargar la prenda. Inténtalo de nuevo."
     }
   },
   "community": {

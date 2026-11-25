@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 63: Garment detail and tag edit (7.5-NAT-001, opt-in colorFamily).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,6 +24,7 @@ import {
   silhouetteETag,
   suggestGarmentTagsFromMobile,
   updateSilhouetteSlidersFromMobile,
+  updateGarmentTagsFromMobile,
   updateWardrobeOnboardingStateFromMobile,
 } from './wardrobe'
 
@@ -426,4 +429,101 @@ describe('wardrobe request error handling', () => {
 
     await assertion
   })
+})
+
+describe('7.5 garment colorFamily opt-in', () => {
+  const ready = {
+    ...garmentFixture({ id: 'garment-1', status: 'ready' }),
+    category: 'top',
+    material: 'cotton',
+    comfortRange: 'mild',
+    tagsConfirmedAt: '2026-08-09T00:00:02.000Z',
+  }
+
+  it('[P0] [7.5-NAT-001] sends the header on the list and reads colorFamily', async () => {
+    const headers: (string | null)[] = []
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', ({ request }) => {
+        headers.push(request.headers.get('x-couture-garment-color'))
+        return HttpResponse.json({ data: [{ ...ready, colorFamily: 'blue' }] })
+      })
+    )
+
+    const garments = await listGarmentsFromMobile('token')
+
+    // Every list read opts in to colorFamily.
+    expect(headers.length).toBeGreaterThan(0)
+    expect(headers.every((header) => header === '1')).toBe(true)
+    expect(garments).toEqual([{ ...ready, colorFamily: 'blue' }])
+  })
+
+  it('[P0] [7.5-NAT-001] reads a legacy list answer as colorFamily null', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [ready] }))
+    )
+
+    await expect(listGarmentsFromMobile('token')).resolves.toEqual([
+      { ...ready, colorFamily: null },
+    ])
+  })
+
+  it('[P0] [7.5-NAT-001] sends the header and the exact tags on the update', async () => {
+    const seen: { header: string | null; body: unknown }[] = []
+    server.use(
+      http.patch('*/api/v1/wardrobe/garments/garment-1/tags', async ({ request }) => {
+        seen.push({
+          header: request.headers.get('x-couture-garment-color'),
+          body: await request.json(),
+        })
+        return HttpResponse.json({
+          data: {
+            ...ready,
+            category: 'outerwear',
+            material: null,
+            comfortRange: 'cold',
+            colorFamily: 'blue',
+          },
+        })
+      })
+    )
+
+    const saved = await updateGarmentTagsFromMobile('token', 'garment-1', {
+      category: 'outerwear',
+      material: null,
+      comfortRange: 'cold',
+    })
+
+    expect(seen).toEqual([
+      {
+        header: '1',
+        body: { category: 'outerwear', material: null, comfortRange: 'cold' },
+      },
+    ])
+    expect(saved).toMatchObject({
+      category: 'outerwear',
+      material: null,
+      colorFamily: 'blue',
+    })
+  })
+
+  it.each([
+    [409, 'CONCURRENT_TAG_UPDATE'],
+    [403, 'GUARDIAN_CONSENT_REQUIRED'],
+  ])(
+    '[P1] [7.5-NAT-001] keeps status %i and code %s on a refused update',
+    async (status, message) => {
+      server.use(
+        http.patch('*/api/v1/wardrobe/garments/garment-1/tags', () =>
+          HttpResponse.json({ statusCode: status, message }, { status })
+        )
+      )
+
+      await expect(
+        updateGarmentTagsFromMobile('token', 'garment-1', {
+          category: 'top',
+          comfortRange: 'mild',
+        })
+      ).rejects.toMatchObject({ code: message, status })
+    }
+  )
 })

@@ -466,6 +466,23 @@
       "loading": "Parçan yükleniyor...",
       "pending_desc": "Bu parçayı bir kategori ve konfor aralığı ile tanımla.",
       "manual_desc": "Bu parçaya uyan kategoriyi ve konfor aralığını seç. Malzeme isteğe bağlıdır."
+    },
+    "detail": {
+      "back": "Dolaba dön",
+      "category": "Kategori",
+      "material": "Kumaş",
+      "comfort": "Konfor aralığı",
+      "noMaterial": "Kumaş yok",
+      "editTags": "Etiketleri düzenle",
+      "done": "Bitti",
+      "cancel": "İptal",
+      "noChanges": "Değişiklik yok",
+      "conflict": "Bu parça başka bir cihazda değişti. Etiketleri kontrol edip tekrar dene.",
+      "notAllowed": "Önce bir velinin dolap değişikliklerini onaylaması gerekiyor.",
+      "undoFailed": "Geri alınamadı. Tekrar dene.",
+      "missing": "Bu parça artık dolabında değil.",
+      "loading": "Parça yükleniyor...",
+      "loadFailed": "Bu parça yüklenemedi. Tekrar dene."
     }
   },
   "community": {

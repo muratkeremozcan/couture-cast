@@ -11,6 +11,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
+import { useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import type * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
@@ -59,7 +60,36 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => session.owner,
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/wardrobe' }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/wardrobe',
+  // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
+  // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
+  useSearchParams: () => useMockSearchParams(),
+}))
+
+/** A useSearchParams stand-in that re-renders on pushState, replaceState and popstate. */
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange)
+      window.addEventListener('test:history', onChange)
+      return () => {
+        window.removeEventListener('popstate', onChange)
+        window.removeEventListener('test:history', onChange)
+      }
+    },
+    () => window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    original(...args)
+    window.dispatchEvent(new Event('test:history'))
+  }
+}
 
 const api = 'http://wardrobe-style.test/api/v1'
 const owner = 'style-member'
@@ -329,11 +359,22 @@ describe('Wardrobe styling', () => {
       const refresh = await screen.findByRole('button', { name: 'Refresh photo' })
       expect(screen.queryByRole('button', dialogName)).toBeNull()
       await user.click(refresh)
-      expect(refresh).toBeDisabled()
+      // While the photo refreshes the button stays focused and only reads as unavailable: a
+      // disabled button would drop keyboard focus to the page body.
+      expect(refresh).toHaveAttribute('aria-disabled', 'true')
+      expect(refresh).toHaveFocus()
+      const reads = inventory.mock.calls.length
+      await user.click(refresh)
+      expect(inventory.mock.calls.length).toBe(reads)
 
       await completeRead(reply, list(renewed))
-      expect(await openButton()).toBeEnabled()
-      expect(screen.getByRole('img', { name: 'Uploaded garment' })).toHaveAttribute(
+      const open = await openButton()
+      expect(open).toBeEnabled()
+      expect(open).toHaveAttribute('aria-disabled', 'false')
+      expect(open).toHaveFocus()
+      // Story CC-7.5 D6: color plus category alt text; this legacy fixture has no color, so
+      // the category alone names the photo.
+      expect(screen.getByRole('img', { name: 'Top' })).toHaveAttribute(
         'src',
         renewed.imageAccess.url
       )

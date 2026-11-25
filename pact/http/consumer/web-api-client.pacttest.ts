@@ -102,6 +102,8 @@ import {
   verifySmartTagErrorInteraction,
   suggestGarmentTagsErrorInteractions,
   verifyUpdateGarmentTagsInteraction,
+  verifyListGarmentsWithColorInteraction,
+  verifyUpdateGarmentTagsWithColorInteraction,
   updateGarmentTagsErrorInteractions,
   verifyUpdateGarmentTagsNullMaterialInteraction,
   verifyCreateCapsuleInteraction,
@@ -332,6 +334,15 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('updates garment smart tags', async () => {
     await verifyUpdateGarmentTagsInteraction(pact, createWebClientForMockServer)
+  })
+
+  // Story 7.5 test plan 7.5-PACT-001..002: opt-in colorFamily for garment detail and alt text.
+  it('lists garments with their color family when opted in', async () => {
+    await verifyListGarmentsWithColorInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('edits garment tags and reads back the color family when opted in', async () => {
+    await verifyUpdateGarmentTagsWithColorInteraction(pact, createWebClientForMockServer)
   })
 
   it.each(suggestGarmentTagsErrorInteractions)(

@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+// Learning path Step 63: Garment detail and tag edit (7.5-NAT-002, 7.5-NAT-006).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -201,6 +203,7 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
@@ -226,6 +229,19 @@ function fixtureWardrobePhoto(color: string) {
     url: canvas.toDataURL('image/png'),
     expiresAt: '2099-12-31T00:00:00.000Z',
   }
+}
+
+/**
+ * Story 7.5: the hub no longer prints raw garment ids, so a card is found by its testID and
+ * an owner's wardrobe is told apart by the photo it shows (both owners share a garment id).
+ */
+async function expectCardPhoto(id: string, url: string) {
+  await waitFor(() =>
+    expect(screen.getByTestId(`garment-card-${id}`).querySelector('img')).toHaveAttribute(
+      'src',
+      url
+    )
+  )
 }
 
 function deferred() {
@@ -400,7 +416,7 @@ describe('WardrobeHubScreen', () => {
     )
     renderScreen()
 
-    await screen.findByText(garmentA.id, { exact: true })
+    await expectCardPhoto(garmentA.id, garmentA.imageAccess!.url)
     expect(screen.getByTestId('wardrobe-screen')).not.toHaveAttribute('aria-hidden')
     await browserUser.click(
       await screen.findByRole('button', { name: 'Style this piece' })
@@ -422,7 +438,7 @@ describe('WardrobeHubScreen', () => {
       active = ownerB
       setMobileApplicationUserId(active)
     })
-    await screen.findByText(garmentB.id, { exact: true })
+    await expectCardPhoto(garmentB.id, garmentB.imageAccess.url)
     expect(screen.queryByTestId('style-piece-panel')).toBeNull()
     const currentWardrobe = screen.getByTestId('wardrobe-screen')
     expect(currentWardrobe).not.toHaveAttribute('aria-hidden')
@@ -449,7 +465,7 @@ describe('WardrobeHubScreen', () => {
       active = ownerA
       setMobileApplicationUserId(active)
     })
-    await screen.findByText(garmentA.id, { exact: true })
+    await expectCardPhoto(garmentA.id, garmentA.imageAccess!.url)
     expect(screen.queryByTestId('style-piece-panel')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
     const restored = await screen.findByTestId('style-piece-panel')
@@ -954,11 +970,11 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(within(panel).queryByRole('progressbar')).toBeNull())
       expect(screen.queryByTestId('garment-status-processing')).toBeNull()
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-      expect(screen.getByText(anchor.id, { exact: true })).toBeVisible()
+      expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
 
       await browserUser.click(within(panel).getByTestId('style-piece-refresh'))
       await waitFor(() =>
-        expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+        expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
       )
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
     } finally {
@@ -1004,13 +1020,13 @@ describe('WardrobeHubScreen', () => {
       await browserUser.click(await screen.findByTestId('style-piece-open'))
       const panel = await screen.findByTestId('style-piece-panel')
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
-      expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+      expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
 
       poll.resolve()
       await waitFor(() =>
         expect(screen.queryByTestId('garment-status-processing')).toBeNull()
       )
-      expect(screen.queryByText(anchor.id, { exact: true })).toBeNull()
+      expect(screen.queryByTestId(`garment-card-${anchor.id}`)).toBeNull()
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
     } finally {
       poll.resolve()
@@ -1309,7 +1325,7 @@ describe('WardrobeHubScreen', () => {
     // The second wardrobe read is what surfaces `garment-refreshed`; asserting
     // on it proves the re-read happened without counting mock calls.
     await waitFor(() => {
-      expect(screen.getByText('garment-refreshed')).toBeInTheDocument()
+      expect(screen.getByTestId('garment-card-garment-refreshed')).toBeInTheDocument()
     })
     expect(screen.getAllByTestId('garment-status-ready')).toHaveLength(2)
     expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
@@ -1535,5 +1551,167 @@ describe('WardrobeHubScreen', () => {
       expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
     })
     expect(nativeStyleRuntime.files.has(otherMemberUri)).toBe(true)
+  })
+
+  describe('7.5 garment cards open the detail', () => {
+    const blueTop = {
+      ...createReadyGarmentFixture({
+        id: 'hub-blue-top',
+        imageAccess: fixtureWardrobePhoto('#1e3cc8'),
+      }),
+      colorFamily: 'blue' as const,
+    }
+    const plainShoes = {
+      ...createReadyGarmentFixture({
+        id: 'hub-plain-shoes',
+        category: 'shoes',
+        material: 'leather',
+        imageAccess: fixtureWardrobePhoto('#222222'),
+      }),
+      colorFamily: null,
+    }
+    const tagging = { ...garmentFixture({ id: 'hub-tagging' }), colorFamily: null }
+
+    it('[P0] [7.5-NAT-002] labels photos by color plus category and opens only ready cards', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      const colorHeaders: (string | null)[] = []
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', ({ request }) => {
+          colorHeaders.push(request.headers.get('x-couture-garment-color'))
+          return HttpResponse.json({ data: [blueTop, plainShoes, tagging] })
+        })
+      )
+      renderScreen()
+
+      const open = await screen.findByTestId('garment-open-hub-blue-top')
+      expect(colorHeaders.length).toBeGreaterThan(0)
+      expect(colorHeaders.every((header) => header === '1')).toBe(true)
+      expect(open).toHaveAccessibleName('Blue top')
+      expect(
+        within(screen.getByTestId('garment-card-hub-blue-top')).getByTestId(
+          'garment-card-label'
+        ).textContent
+      ).toBe('Top · Cotton')
+      expect(screen.getByTestId('garment-open-hub-plain-shoes')).toHaveAccessibleName(
+        'Shoes'
+      )
+      // A garment still being tagged keeps its tagging button and opens no detail.
+      expect(screen.queryByTestId('garment-open-hub-tagging')).toBeNull()
+      expect(screen.getByLabelText('Needs tags')).toBeVisible()
+      // The raw garment id never shows (2026-11-19 tester report).
+      for (const id of [blueTop.id, plainShoes.id, tagging.id]) {
+        expect(screen.queryByText(id, { exact: false })).toBeNull()
+      }
+
+      press(open)
+      expect(routerMock.push).toHaveBeenCalledWith({
+        pathname: '/wardrobe-garment',
+        params: { id: 'hub-blue-top' },
+      })
+    })
+
+    it('[P0] [7.5-NAT-010] a pre-save read that lands late cannot undo the post-save reload (Codex P2.6)', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      // Every garment in one answer has the same shape: an opted-in list carries colorFamily.
+      const processing = {
+        ...garmentFixture({ id: 'hub-processing', status: 'processing' }),
+        colorFamily: null,
+      }
+      const wool = { ...blueTop, material: 'wool' }
+      const pollStarted = deferred()
+      const poll = deferred()
+      // Reads after the held one stay open, so the screen can only show what reads 1 to 3 said.
+      const later = deferred()
+      let reads = 0
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', async () => {
+          const read = ++reads
+          if (read === 2) {
+            // An independent status poll reads before the save and answers after it.
+            pollStarted.resolve()
+            await poll.promise
+            return HttpResponse.json({ data: [blueTop, processing] })
+          }
+          if (read >= 4) await later.promise
+          return HttpResponse.json({ data: read === 1 ? [blueTop, processing] : [wool] })
+        })
+      )
+      renderScreen()
+      const label = () =>
+        within(screen.getByTestId('garment-card-hub-blue-top')).getByTestId(
+          'garment-card-label'
+        ).textContent
+      await screen.findByTestId('garment-card-hub-blue-top')
+
+      try {
+        await browserUser.click(
+          await screen.findByRole('button', { name: 'Check garment status' })
+        )
+        await pollStarted.promise
+        act(() => notifyWardrobeChanged())
+        await waitFor(() => expect(label()).toBe('Top · Wool'))
+
+        poll.resolve()
+        // The status poll reads again only after it has consumed the held pre-save answer,
+        // so read 4 starting proves that answer settled; it must not have replaced Wool.
+        await waitFor(() => expect(reads).toBeGreaterThanOrEqual(4))
+        expect(label()).toBe('Top · Wool')
+      } finally {
+        poll.resolve()
+        later.resolve()
+      }
+    })
+
+    it('[P1] [7.5-NAT-011] a detail save refreshes saved looks so their status follows the tags (Codex P2.7)', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      const { handlers: savedLooksHandlers, store } = createSavedLooksMswHandlers()
+      let savedLookReads = 0
+      store.onGet = () => {
+        savedLookReads += 1
+      }
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () =>
+          HttpResponse.json({ data: [blueTop] })
+        ),
+        ...savedLooksHandlers
+      )
+      renderScreen()
+      await screen.findByTestId('garment-card-hub-blue-top')
+      await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
+      const before = savedLookReads
+
+      act(() => notifyWardrobeChanged())
+
+      await waitFor(() => expect(savedLookReads).toBe(before + 1))
+    })
+
+    it('[P0] [7.5-NAT-006] reloads in place when the detail saves tags', async () => {
+      setMobileApplicationUserId('hub-detail-owner')
+      let reads = 0
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () => {
+          reads += 1
+          return HttpResponse.json({
+            data: [reads === 1 ? blueTop : { ...blueTop, material: 'wool' }],
+          })
+        })
+      )
+      renderScreen()
+      const card = await screen.findByTestId('garment-card-hub-blue-top')
+      expect(within(card).getByTestId('garment-card-label').textContent).toBe(
+        'Top · Cotton'
+      )
+
+      act(() => notifyWardrobeChanged())
+
+      await waitFor(() =>
+        expect(
+          within(screen.getByTestId('garment-card-hub-blue-top')).getByTestId(
+            'garment-card-label'
+          ).textContent
+        ).toBe('Top · Wool')
+      )
+      expect(reads).toBe(2)
+    })
   })
 })

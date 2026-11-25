@@ -324,6 +324,23 @@
         "confirm_required": "Confirmez la consigne sur les vêtements de base avant de charger la photo.",
         "session_changed": "Vous vous êtes déconnecté ou avez changé de compte pendant ce chargement. Choisissez à nouveau la photo."
       }
+    },
+    "detail": {
+      "back": "Retour à la penderie",
+      "category": "Catégorie",
+      "material": "Matière",
+      "comfort": "Plage de confort",
+      "noMaterial": "Aucune matière",
+      "editTags": "Modifier les étiquettes",
+      "done": "Terminé",
+      "cancel": "Annuler",
+      "noChanges": "Aucun changement",
+      "conflict": "Cette pièce a changé sur un autre appareil. Vérifie les étiquettes et réessaie.",
+      "notAllowed": "Un parent ou tuteur doit d'abord approuver les changements de ta penderie.",
+      "undoFailed": "Impossible d'annuler. Réessaie.",
+      "missing": "Cette pièce n'est plus dans ta penderie.",
+      "loading": "Chargement de la pièce...",
+      "loadFailed": "Impossible de charger cette pièce. Réessaie."
     }
   },
   "commerce": {

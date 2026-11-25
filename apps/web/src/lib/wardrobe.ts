@@ -3,9 +3,9 @@
 import {
   uploadGarmentBytes,
   WARDROBE_UPLOAD_CACHE_CONTROL,
-  garmentListResponseSchema,
+  parseGarmentListWithColorResponse,
+  parseUpdateGarmentTagsWithColorResponse,
   suggestGarmentTagsResponseSchema,
-  updateGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
   userProfileResponseSchema,
@@ -16,6 +16,8 @@ import {
   type GarmentMaterial,
   type GarmentComfortRange,
   type GarmentItemContract,
+  type GarmentWithColor,
+  type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
   type OutfitCapsuleContract,
   type CreateOutfitCapsuleInput,
@@ -76,7 +78,9 @@ export type PreparedImage = {
 export class WardrobeRequestError extends Error {
   constructor(
     message: string,
-    readonly code?: string
+    readonly code?: string,
+    /** The HTTP status of an API refusal; absent for local and network failures. */
+    readonly status?: number
   ) {
     super(message)
     this.name = 'WardrobeRequestError'
@@ -338,6 +342,9 @@ async function readError(response: Response): Promise<Error> {
     const knownCode = [
       'GARMENT_ANALYSIS_PENDING',
       'TAGGING_INFERENCE_UNAVAILABLE',
+      'CONCURRENT_TAG_UPDATE',
+      'GARMENT_TAGS_CHANGED',
+      'GUARDIAN_CONSENT_REQUIRED',
     ].includes(message)
       ? message
       : undefined
@@ -345,10 +352,15 @@ async function readError(response: Response): Promise<Error> {
       message,
       (typeof payload.error === 'object' ? payload.error.code : undefined) ??
         payload.code ??
-        knownCode
+        knownCode,
+      response.status
     )
   } catch {
-    return new Error(`Wardrobe request failed with status ${response.status}`)
+    return new WardrobeRequestError(
+      `Wardrobe request failed with status ${response.status}`,
+      undefined,
+      response.status
+    )
   }
 }
 
@@ -499,15 +511,19 @@ export async function uploadGarmentImageFromWeb({
   return garment
 }
 
+/**
+ * Story CC-7.5 D1: every garment read and tag update opts in to `colorFamily` with
+ * `x-couture-garment-color: 1`, so photos carry color plus category alt text ("Blue top").
+ */
 export async function listGarmentsFromWeb(
   signal?: AbortSignal
-): Promise<GarmentItemContract[]> {
+): Promise<GarmentWithColor[]> {
   const accessToken = readAccessToken()
   try {
     const response = await createWebApiClient({
       accessToken,
-    }).apiV1WardrobeGarmentsGet({ signal })
-    return garmentListResponseSchema.parse(response).data
+    }).apiV1WardrobeGarmentsGet({ xCoutureGarmentColor: '1' }, { signal })
+    return parseGarmentListWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')
   }
@@ -539,18 +555,20 @@ export async function updateGarmentTagsFromWeb(
     category: GarmentCategory
     material?: GarmentMaterial | null
     comfortRange: GarmentComfortRange
+    /** The tags the editor saw; a newer edit then answers 409 GARMENT_TAGS_CHANGED. */
+    expected?: UpdateGarmentTagsInput['expected']
   },
   signal?: AbortSignal
-): Promise<GarmentItemContract> {
+): Promise<GarmentWithColor> {
   const accessToken = readAccessToken()
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdTagsPatch(
-        { garmentId, updateGarmentTagsInput: tags },
+        { garmentId, updateGarmentTagsInput: tags, xCoutureGarmentColor: '1' },
         { signal: requestSignal }
       )
     )
-    return updateGarmentTagsResponseSchema.parse(response).data
+    return parseUpdateGarmentTagsWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
   }

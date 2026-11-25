@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.9.0",
+    "version": "1.10.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -4871,6 +4871,27 @@
                     "expiresAt"
                   ],
                   "additionalProperties": false
+                },
+                "colorFamily": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "black",
+                    "gray",
+                    "white",
+                    "red",
+                    "orange",
+                    "yellow",
+                    "green",
+                    "blue",
+                    "purple",
+                    "pink",
+                    "brown",
+                    null
+                  ],
+                  "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
                 }
               },
               "required": [
@@ -5104,6 +5125,60 @@
               "hot",
               null
             ]
+          },
+          "expected": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "top",
+                  "bottom",
+                  "outerwear",
+                  "dress",
+                  "shoes",
+                  "accessory",
+                  null
+                ]
+              },
+              "material": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cotton",
+                  "wool",
+                  "linen",
+                  "leather",
+                  "denim",
+                  "fleece",
+                  "synthetic",
+                  "down",
+                  "silk",
+                  null
+                ]
+              },
+              "comfortRange": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "cold",
+                  "cool",
+                  "mild",
+                  "warm",
+                  "hot",
+                  null
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "description": "The tags the editor last saw. When present and the stored tags differ, the update is refused with 409 GARMENT_TAGS_CHANGED. Omitted, the update applies as before."
           }
         },
         "required": [
@@ -5250,6 +5325,27 @@
                   "expiresAt"
                 ],
                 "additionalProperties": false
+              },
+              "colorFamily": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "black",
+                  "gray",
+                  "white",
+                  "red",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "brown",
+                  null
+                ],
+                "description": "Color family of the stored dominant garment color, null when none was computed. Present only when the request sends x-couture-garment-color: 1."
               }
             },
             "required": [
@@ -5466,8 +5562,11 @@
             "enum": [
               "GARMENT_ANALYSIS_PENDING",
               "GARMENT_NOT_TAGGABLE",
-              "CONCURRENT_TAG_UPDATE"
-            ]
+              "CONCURRENT_TAG_UPDATE",
+              "GARMENT_TAGS_CHANGED"
+            ],
+            "x-optic-exemptions": "request and response property enums",
+            "description": "Open set. Conflict reasons may gain values; treat an unrecognized message as a generic conflict."
           },
           "error": {
             "type": "string",
@@ -24023,9 +24122,24 @@
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response."
+            },
+            "required": false,
+            "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.",
+            "name": "x-couture-garment-color",
+            "in": "header"
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Persisted wardrobe garments.",
+            "description": "Persisted wardrobe garments. Each garment carries colorFamily only when the request sends x-couture-garment-color: 1.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24303,6 +24417,19 @@
             "description": "Unique garment item ID.",
             "name": "garmentId",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ],
+              "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response."
+            },
+            "required": false,
+            "description": "Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.",
+            "name": "x-couture-garment-color",
+            "in": "header"
           }
         ],
         "requestBody": {
@@ -24317,7 +24444,7 @@
         },
         "responses": {
           "200": {
-            "description": "Garment tags updated successfully.",
+            "description": "Garment tags updated successfully. The garment carries colorFamily only when the request sends x-couture-garment-color: 1.",
             "content": {
               "application/json": {
                 "schema": {
@@ -24367,7 +24494,7 @@
             }
           },
           "409": {
-            "description": "Garment analysis pending or not taggable.",
+            "description": "Garment analysis pending, not taggable, a concurrent update, or tags changed since the editor read them (GARMENT_TAGS_CHANGED).",
             "content": {
               "application/json": {
                 "schema": {

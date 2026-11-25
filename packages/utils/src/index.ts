@@ -124,6 +124,13 @@ export {
 } from './comfort-rules'
 export type { ComfortRange, ComfortRun, ComfortTolerance } from './comfort-rules'
 
+export {
+  classifyRgbColorFamily,
+  colorFamilyFromHex,
+  GARMENT_COLOR_FAMILIES,
+} from './garment-color'
+export type { GarmentColorFamily } from './garment-color'
+
 export * from './sample-wardrobe'
 export * from './federated-signin'
 export * from './save-feedback'

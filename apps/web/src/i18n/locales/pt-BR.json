@@ -466,6 +466,23 @@
       "loading": "Carregando sua peça...",
       "pending_desc": "Descreva esta peça com uma categoria e uma faixa de conforto.",
       "manual_desc": "Escolha a categoria e a faixa de conforto que combinam com esta peça. O material é opcional."
+    },
+    "detail": {
+      "back": "Voltar ao guarda-roupa",
+      "category": "Categoria",
+      "material": "Tecido",
+      "comfort": "Faixa de conforto",
+      "noMaterial": "Sem tecido",
+      "editTags": "Editar etiquetas",
+      "done": "Concluir",
+      "cancel": "Cancelar",
+      "noChanges": "Nenhuma alteração",
+      "conflict": "Esta peça mudou em outro dispositivo. Confira as etiquetas e tente de novo.",
+      "notAllowed": "Um responsável precisa aprovar as mudanças no guarda-roupa primeiro.",
+      "undoFailed": "Não foi possível desfazer. Tente de novo.",
+      "missing": "Esta peça não está mais no seu guarda-roupa.",
+      "loading": "Carregando a peça...",
+      "loadFailed": "Não foi possível carregar esta peça. Tente de novo."
     }
   },
   "community": {

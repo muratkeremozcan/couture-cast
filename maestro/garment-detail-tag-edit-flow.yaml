@@ -1,0 +1,158 @@
+# Learning path Step 63: Garment detail and tag edit.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+# Story 7.5 test plan 7.5-MAE-001: open a seeded ready garment on Android, change its material,
+# Done shows Saved, the change survives a relaunch, then the original material is restored.
+#
+# The fixture wardrobe that scripts/run-maestro.mjs seeds has one shoes garment (cotton, mild),
+# and no other flow creates shoes, so the card is found by its label without knowing its id or
+# position. Its color comes from the photo, so the label is matched by category only. The flow
+# changes material alone and puts it back before it ends: the capsule flows share this wardrobe
+# and select by category, so they never see a difference.
+appId: ${MAESTRO_APP_ID}
+name: 'Garment detail and tag edit'
+tags:
+  - e2e
+  - wardrobe
+  - garment-detail
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow: subflows/open-wardrobe-tab.yaml
+
+- scrollUntilVisible:
+    element:
+      id: 'garment-open-.*'
+      text: '.*[Ss]hoes.*'
+    direction: DOWN
+    timeout: 20000
+
+- tapOn:
+    id: 'garment-open-.*'
+    text: '.*[Ss]hoes.*'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail'
+    timeout: 15000
+
+- assertVisible:
+    id: 'garment-detail-back'
+- assertVisible:
+    id: 'garment-detail-photo'
+- assertVisible:
+    id: 'garment-detail-category'
+    text: 'Shoes'
+- assertVisible:
+    id: 'garment-detail-material'
+    text: 'Cotton'
+# Needs a verified member: run-maestro's fixture bearer is checked against GET user/profile at
+# startup (native-session.ts verifyFixtureIdentity), as a real session is.
+- assertVisible:
+    id: 'style-piece-open'
+
+- tapOn:
+    id: 'garment-edit-tags'
+- scrollUntilVisible:
+    element:
+      id: 'garment-tag-option-material-wool'
+    direction: DOWN
+- tapOn:
+    id: 'garment-tag-option-material-wool'
+- scrollUntilVisible:
+    element:
+      id: 'garment-tag-done'
+    direction: DOWN
+- tapOn:
+    id: 'garment-tag-done'
+
+# The bar's container carries the test id and its child Text carries the copy, so the two are
+# asserted separately: one native element never holds both.
+- extendedWaitUntil:
+    visible:
+      id: 'status-feedback-bar'
+    timeout: 15000
+- assertVisible:
+    text: 'Saved'
+- assertVisible:
+    id: 'status-bar-action-undo'
+- scrollUntilVisible:
+    element:
+      id: 'garment-detail-material'
+    direction: UP
+- assertVisible:
+    id: 'garment-detail-material'
+    text: 'Wool'
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-detail-tag-edit-saved
+
+# Relaunch and read the edit back from the server through the hub and the detail.
+- runFlow:
+    file: subflows/relaunch-app.yaml
+    label: 'Relaunch to prove the tag edit persisted'
+
+- runFlow: subflows/open-wardrobe-tab.yaml
+
+- scrollUntilVisible:
+    element:
+      id: 'garment-open-.*'
+      text: '.*[Ss]hoes.*'
+    direction: DOWN
+    timeout: 20000
+
+- tapOn:
+    id: 'garment-open-.*'
+    text: '.*[Ss]hoes.*'
+
+- extendedWaitUntil:
+    visible:
+      id: 'garment-detail-material'
+      text: 'Wool'
+    timeout: 15000
+
+# Restore the seeded material so the shared fixture wardrobe ends as it started.
+- tapOn:
+    id: 'garment-edit-tags'
+- scrollUntilVisible:
+    element:
+      id: 'garment-tag-option-material-cotton'
+    direction: DOWN
+- tapOn:
+    id: 'garment-tag-option-material-cotton'
+- scrollUntilVisible:
+    element:
+      id: 'garment-tag-done'
+    direction: DOWN
+- tapOn:
+    id: 'garment-tag-done'
+# The bar's container carries the test id and its child Text carries the copy, so the two are
+# asserted separately: one native element never holds both.
+- extendedWaitUntil:
+    visible:
+      id: 'status-feedback-bar'
+    timeout: 15000
+- assertVisible:
+    text: 'Saved'
+- scrollUntilVisible:
+    element:
+      id: 'garment-detail-material'
+    direction: UP
+- assertVisible:
+    id: 'garment-detail-material'
+    text: 'Cotton'
+
+- tapOn:
+    id: 'garment-detail-back'
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-screen'
+    timeout: 15000
+
+- takeScreenshot:
+    path: maestro/artifacts/garment-detail-tag-edit-flow

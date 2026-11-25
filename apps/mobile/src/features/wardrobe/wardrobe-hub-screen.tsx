@@ -35,7 +35,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import { safeFindNodeHandle } from '@/src/lib/expo-native-helpers'
-import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
+import { notifyWardrobeChanged, onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 
 import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture-modal'
 import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
@@ -50,6 +50,11 @@ import {
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import {
+  garmentCardLabel,
+  garmentPhotoLabel,
+  type ClosetGarment,
+} from './garment-detail-screen'
 import {
   focusStylePieceControl,
   StylePieceEntry,
@@ -81,7 +86,7 @@ function MemberWardrobeHub({
     backgroundColor: colors.noticeSurface,
     borderColor: colors.noticeBorder,
   }
-  const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const [garments, setGarments] = useState<ClosetGarment[]>([])
   const inventoryRevision = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
@@ -176,11 +181,33 @@ function MemberWardrobeHub({
     })
   }
 
+  // The hub's own change notices are for other screens; it already reloads itself.
+  const notifyingWardrobeRef = useRef(false)
   const markGarmentConfirmed = () => {
     if (epoch !== mobileIdentityEpoch()) return
     setConfirmedGarment(true)
-    notifyWardrobeChanged()
+    notifyingWardrobeRef.current = true
+    try {
+      notifyWardrobeChanged()
+    } finally {
+      notifyingWardrobeRef.current = false
+    }
   }
+
+  // Story CC-7.5 D3: a tag save on the garment detail reloads the grid in place.
+  useEffect(
+    () =>
+      onWardrobeChanged(() => {
+        if (notifyingWardrobeRef.current || epoch !== mobileIdentityEpoch()) return
+        // Every read started before the save carries an older revision and is discarded, so a
+        // pre-save snapshot that settles late cannot win over the reload below.
+        inventoryRevision.current++
+        setLoadAttempt((attempt) => attempt + 1)
+        // A saved look's Ready or Needs review status follows its anchor's live tags.
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }),
+    [epoch]
+  )
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureOpen
@@ -592,17 +619,28 @@ function MemberWardrobeHub({
           ) : (
             <View style={styles.grid} testID="wardrobe-garment-list">
               {garments.map((garment) => (
-                <View key={garment.id} style={styles.garmentCard}>
-                  {garment.imageAccess ? (
-                    <Image
-                      source={{ uri: garment.imageAccess.url }}
-                      accessibilityLabel={t('wardrobe.capture.title')}
-                      style={styles.garmentImage}
-                    />
-                  ) : null}
-                  <Text numberOfLines={1} style={styles.garmentId}>
-                    {garment.id}
-                  </Text>
+                <View
+                  key={garment.id}
+                  style={styles.garmentCard}
+                  testID={`garment-card-${garment.id}`}
+                >
+                  {garment.status === 'ready' ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
+                      testID={`garment-open-${garment.id}`}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/wardrobe-garment',
+                          params: { id: garment.id },
+                        })
+                      }
+                    >
+                      <GarmentCardFace garment={garment} locale={i18n.language} />
+                    </Pressable>
+                  ) : (
+                    <GarmentCardFace garment={garment} locale={i18n.language} />
+                  )}
                   <Text testID={`garment-status-${garment.status}`}>
                     {garment.status}
                   </Text>
@@ -713,6 +751,33 @@ function MemberWardrobeHub({
   )
 }
 
+/** A card's photo and label. The raw garment id never shows (2026-11-19 tester report). */
+function GarmentCardFace({
+  garment,
+  locale,
+}: {
+  garment: ClosetGarment
+  locale: string
+}) {
+  const label = garmentPhotoLabel(locale, garment)
+  return (
+    <>
+      {garment.imageAccess ? (
+        <Image
+          source={{ uri: garment.imageAccess.url }}
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel={label}
+          style={styles.garmentImage}
+        />
+      ) : null}
+      <Text numberOfLines={1} style={styles.garmentLabel} testID="garment-card-label">
+        {garmentCardLabel(locale, garment)}
+      </Text>
+    </>
+  )
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   needsTagsBtn: {
@@ -768,6 +833,6 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 10 },
   garmentImage: { width: '100%', aspectRatio: 0.75, borderRadius: 8 },
-  garmentId: { marginTop: 8, fontSize: 12 },
+  garmentLabel: { marginTop: 8, fontSize: 13, fontWeight: '600' },
   errorBox: { borderRadius: 12, padding: 12, gap: 8 },
 })

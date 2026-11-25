@@ -1,3 +1,5 @@
+// Learning path Step 63: Garment detail and tag edit (placeholder photo name).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 30: Smart tagging and comfort metadata.
@@ -7,7 +9,7 @@
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
-import React from 'react'
+import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,7 +63,34 @@ const {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wardrobe',
+  // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
+  // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
+  useSearchParams: () => useMockSearchParams(),
 }))
+
+/** A useSearchParams stand-in that re-renders on pushState, replaceState and popstate. */
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange)
+      window.addEventListener('test:history', onChange)
+      return () => {
+        window.removeEventListener('popstate', onChange)
+        window.removeEventListener('test:history', onChange)
+      }
+    },
+    () => window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    original(...args)
+    window.dispatchEvent(new Event('test:history'))
+  }
+}
 
 const verifiedSession = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../lib/web-session', async (importOriginal) => ({
@@ -322,8 +351,9 @@ describe('WardrobePage garment card label', () => {
     render(<WardrobePage />)
 
     const card = await screen.findByTestId(`garment-card-${tagged.id}`)
+    // Story CC-7.5: the label is localized, with the singular category noun.
     expect(within(card).getByTestId('garment-card-label')).toHaveTextContent(
-      'top · cotton'
+      'Top · Cotton'
     )
     expect(card).not.toHaveTextContent(tagged.id)
   })
@@ -732,17 +762,21 @@ describe('WardrobePage garment grid', () => {
   })
 
   it('renders a placeholder tile when a garment has no signed image URL', async () => {
-    listGarmentsFromWeb
-      .mockReset()
-      .mockResolvedValue([
-        garmentFixture('garment-no-image', 'ready', { imageAccess: null }),
-      ])
+    listGarmentsFromWeb.mockReset().mockResolvedValue([
+      garmentFixture('garment-no-image', 'ready', {
+        category: 'top',
+        material: 'cotton',
+        comfortRange: 'mild',
+        imageAccess: null,
+      }),
+    ])
     render(<WardrobePage />)
 
     const card = await screen.findByTestId('garment-card-garment-no-image')
-    // Rendering <img src={undefined}> would show a broken-image glyph instead.
-    expect(within(card).queryByRole('img')).not.toBeInTheDocument()
-    expect(card).toHaveTextContent('👗')
+    // Story 7.5: the placeholder is named like a photo would be (D6), and it is not an <img>:
+    // rendering <img src={undefined}> would show a broken-image glyph instead.
+    expect(within(card).getByRole('img', { name: 'Top' })).toHaveTextContent('👗')
+    expect(card.querySelector('img')).toBeNull()
   })
 
   it('opens capture for a failed garment and restores the replacement action on close', async () => {

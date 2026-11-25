@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 58: Hosted wardrobe workers and manual tagging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+// Learning path Step 63: Garment detail and tag edit (7.5-UNIT-014, header-gated colorFamily).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 /* eslint-disable @typescript-eslint/unbound-method -- assertions read the vi.fn() `status` member off the mocked Express response, which is the established pattern for these suites. */
 import { BadRequestException, RequestMethod } from '@nestjs/common'
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
@@ -421,6 +423,92 @@ describe('WardrobeController', () => {
       await expect(
         controller.updateGarmentTags(mockAuth, 'garment_99', validTags)
       ).rejects.toThrow(/retentionStatus/)
+    })
+  })
+
+  describe('7.5 opt-in colorFamily header', () => {
+    const tags = {
+      category: 'top' as const,
+      material: 'cotton' as const,
+      comfortRange: 'mild' as const,
+    }
+
+    it.each([undefined, '', '0', 'true', 'yes', '1, 1', ['1', '1']])(
+      '[P0] [7.5-UNIT-014] keeps the legacy list and tag shape when the header is %j',
+      async (header) => {
+        mockListGarments.mockResolvedValueOnce({ data: [garmentItemResponse().data] })
+        mockUpdateGarmentTags.mockResolvedValueOnce(garmentItemResponse())
+
+        const list = await controller.listGarments(mockAuth, header)
+        const updated = await controller.updateGarmentTags(
+          mockAuth,
+          'garment_99',
+          tags,
+          header
+        )
+
+        expect(mockListGarments).toHaveBeenCalledWith('user_123')
+        expect(mockUpdateGarmentTags).toHaveBeenCalledWith(
+          'user_123',
+          'teen',
+          'garment_99',
+          tags
+        )
+        expect(list.data[0]).not.toHaveProperty('colorFamily')
+        expect(updated.data).not.toHaveProperty('colorFamily')
+      }
+    )
+
+    it('[P0] [7.5-UNIT-014] asks the service for colorFamily on exactly 1 and returns it', async () => {
+      mockListGarments.mockResolvedValueOnce({
+        data: [
+          garmentItemResponse({ colorFamily: 'blue' }).data,
+          garmentItemResponse({ id: 'garment_100', colorFamily: null }).data,
+        ],
+      })
+      mockUpdateGarmentTags.mockResolvedValueOnce(
+        garmentItemResponse({ colorFamily: 'blue' })
+      )
+
+      const list = await controller.listGarments(mockAuth, '1')
+      const updated = await controller.updateGarmentTags(
+        mockAuth,
+        'garment_99',
+        tags,
+        '1'
+      )
+
+      expect(mockListGarments).toHaveBeenCalledWith('user_123', { includeColor: true })
+      expect(mockUpdateGarmentTags).toHaveBeenCalledWith(
+        'user_123',
+        'teen',
+        'garment_99',
+        tags,
+        { includeColor: true }
+      )
+      expect(list.data.map((garment) => garment.colorFamily)).toEqual(['blue', null])
+      expect(updated.data).toMatchObject({ category: 'top', colorFamily: 'blue' })
+    })
+
+    it('[P0] [7.5-UNIT-014] refuses an opted-in service answer without a valid colorFamily', async () => {
+      mockListGarments.mockResolvedValueOnce({ data: [garmentItemResponse().data] })
+      await expect(controller.listGarments(mockAuth, '1')).rejects.toThrow(/colorFamily/)
+
+      mockUpdateGarmentTags.mockResolvedValueOnce(
+        garmentItemResponse({ colorFamily: 'navy' })
+      )
+      await expect(
+        controller.updateGarmentTags(mockAuth, 'garment_99', tags, '1')
+      ).rejects.toThrow(/colorFamily/)
+    })
+
+    it('[P1] [7.5-UNIT-014] refuses a legacy tag answer that leaks colorFamily', async () => {
+      mockUpdateGarmentTags.mockResolvedValueOnce(
+        garmentItemResponse({ colorFamily: 'blue' })
+      )
+      await expect(
+        controller.updateGarmentTags(mockAuth, 'garment_99', tags)
+      ).rejects.toThrow(/colorFamily/)
     })
   })
 })

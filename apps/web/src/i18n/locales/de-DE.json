@@ -466,6 +466,23 @@
       "loading": "Dein Kleidungsstück wird geladen …",
       "pending_desc": "Beschreibe dieses Kleidungsstück mit einer Kategorie und einem Komfortbereich.",
       "manual_desc": "Wähle die Kategorie und den Komfortbereich, die zu diesem Kleidungsstück passen. Das Material ist optional."
+    },
+    "detail": {
+      "back": "Zurück zum Schrank",
+      "category": "Kategorie",
+      "material": "Stoff",
+      "comfort": "Komfortbereich",
+      "noMaterial": "Kein Stoff",
+      "editTags": "Tags bearbeiten",
+      "done": "Fertig",
+      "cancel": "Abbrechen",
+      "noChanges": "Keine Änderungen",
+      "conflict": "Dieses Teil wurde auf einem anderen Gerät geändert. Prüfe die Tags und versuche es erneut.",
+      "notAllowed": "Eine erziehungsberechtigte Person muss Änderungen am Schrank zuerst erlauben.",
+      "undoFailed": "Rückgängig machen hat nicht geklappt. Versuche es erneut.",
+      "missing": "Dieses Teil ist nicht mehr in deinem Schrank.",
+      "loading": "Teil wird geladen...",
+      "loadFailed": "Dieses Teil konnte nicht geladen werden. Versuche es erneut."
     }
   },
   "community": {

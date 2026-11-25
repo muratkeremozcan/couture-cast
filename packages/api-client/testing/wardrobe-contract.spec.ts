@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 63: Garment detail and tag edit (7.5-UNIT-010..013, opt-in colorFamily).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
@@ -11,17 +13,37 @@ import {
   createGarmentItemResponseSchema,
   createGarmentUploadUrlInputSchema,
   createGarmentUploadUrlResponseSchema,
+  garmentColorFamilyEnum,
   garmentItemSchema,
+  garmentItemWithColorSchema,
+  garmentListResponseSchema,
+  garmentListWithColorResponseSchema,
   GARMENT_TAGGING_ANALYSIS_VERSION,
   generateHttpOpenApiDocument,
+  parseGarmentListWithColorResponse,
+  parseUpdateGarmentTagsWithColorResponse,
   suggestGarmentTagsResponseSchema,
   suggestGarmentTagsWireResponseSchema,
+  updateGarmentTagsResponseSchema,
+  updateGarmentTagsWithColorResponseSchema,
   uploadGarmentBytes,
+  WARDROBE_GARMENT_COLOR_HEADER,
   resolveApiUploadUrl,
   WARDROBE_UPLOAD_CACHE_CONTROL,
   uploadCommitConflictErrorSchema,
   uploadCommitUnprocessableErrorSchema,
+  GARMENT_TAGS_CHANGED_MESSAGE,
+  garmentExpectedTagsSchema,
+  garmentListWireResponseSchema,
+  updateGarmentTagsInputSchema,
+  updateGarmentTagsWireResponseSchema,
 } from '../src/contracts/http'
+import type {
+  GarmentListResponse,
+  GarmentListResponseDataInner,
+  UpdateGarmentTagsInput as GeneratedUpdateGarmentTagsInput,
+  UpdateGarmentTagsResponse as GeneratedUpdateGarmentTagsResponse,
+} from '../src/generated/models'
 
 const VALID_SHA256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
 
@@ -712,5 +734,198 @@ describe('suggest-tags wire compatibility (mixed deployments)', () => {
         data: { ...suggestedWire.data, analysisVersion: 'fashion-clip:untrusted' },
       }).success
     ).toBe(false)
+  })
+})
+
+describe('7.5 opt-in garment colorFamily', () => {
+  const ready = buildGarmentItem({
+    status: 'ready',
+    category: 'top',
+    material: 'cotton',
+    comfortRange: 'mild',
+    tagsConfirmedAt: '2026-08-04T09:30:00.000Z',
+  })
+
+  it('[P0] [7.5-UNIT-010] keeps the legacy list and tag responses strict: colorFamily is refused', () => {
+    const withColor = { ...ready, colorFamily: 'blue' }
+    expect(garmentItemSchema.safeParse(withColor).success).toBe(false)
+    expect(garmentListResponseSchema.safeParse({ data: [withColor] }).success).toBe(false)
+    expect(updateGarmentTagsResponseSchema.safeParse({ data: withColor }).success).toBe(
+      false
+    )
+    expect(garmentListResponseSchema.safeParse({ data: [ready] }).success).toBe(true)
+  })
+
+  it('[P0] [7.5-UNIT-011] accepts every family and null, and refuses a missing or unknown colorFamily', () => {
+    expect(garmentColorFamilyEnum.options).toEqual([
+      'black',
+      'gray',
+      'white',
+      'red',
+      'orange',
+      'yellow',
+      'green',
+      'blue',
+      'purple',
+      'pink',
+      'brown',
+    ])
+    for (const colorFamily of [...garmentColorFamilyEnum.options, null]) {
+      expect(
+        garmentItemWithColorSchema.safeParse({ ...ready, colorFamily }).success
+      ).toBe(true)
+    }
+    expectIssuePath(garmentItemWithColorSchema, ready, 'colorFamily')
+    expectIssuePath(
+      garmentItemWithColorSchema,
+      { ...ready, colorFamily: 'navy' },
+      'colorFamily'
+    )
+    expectIssuePath(
+      garmentItemWithColorSchema,
+      { ...ready, colorFamily: 'blue', colorHex: '#1e3cc8' },
+      ''
+    )
+    expect(
+      garmentListWithColorResponseSchema.safeParse({
+        data: [{ ...ready, colorFamily: 'blue' }],
+      }).success
+    ).toBe(true)
+    expect(
+      updateGarmentTagsWithColorResponseSchema.safeParse({
+        data: { ...ready, colorFamily: null },
+      }).success
+    ).toBe(true)
+  })
+
+  it('[P0] [7.5-UNIT-011] reads a legacy answer to an opted-in request as colorFamily null', () => {
+    // A server from before the header (rollback, or a client deployed first) must not fail
+    // the member's whole closet.
+    expect(parseGarmentListWithColorResponse({ data: [ready] })).toEqual({
+      data: [{ ...ready, colorFamily: null }],
+    })
+    expect(parseUpdateGarmentTagsWithColorResponse({ data: ready })).toEqual({
+      data: { ...ready, colorFamily: null },
+    })
+    expect(
+      parseGarmentListWithColorResponse({ data: [{ ...ready, colorFamily: 'blue' }] })
+    ).toEqual({ data: [{ ...ready, colorFamily: 'blue' }] })
+  })
+
+  it('[P0] [7.5-UNIT-011] still refuses unknown keys and unknown families in either shape', () => {
+    expect(() =>
+      parseGarmentListWithColorResponse({ data: [{ ...ready, colorFamily: 'navy' }] })
+    ).toThrow(/colorFamily/)
+    expect(() =>
+      parseUpdateGarmentTagsWithColorResponse({ data: { ...ready, colorHex: '#1e3cc8' } })
+    ).toThrow()
+    expect(() =>
+      parseGarmentListWithColorResponse({
+        data: [{ ...ready, retentionStatus: 'archived' }],
+      })
+    ).toThrow(/retentionStatus/)
+  })
+
+  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.10.0', () => {
+    const spec = generateHttpOpenApiDocument()
+    expect(spec.info.version).toBe('1.10.0')
+    type Operation = {
+      parameters?: {
+        in?: string
+        name?: string
+        required?: boolean
+        schema?: { enum?: string[] }
+      }[]
+    }
+    const operations = [
+      spec.paths?.['/api/v1/wardrobe/garments']?.get,
+      spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/tags']?.patch,
+    ] as (Operation | undefined)[]
+    for (const operation of operations) {
+      const header = operation?.parameters?.find(
+        (parameter) =>
+          parameter.in === 'header' && parameter.name === WARDROBE_GARMENT_COLOR_HEADER
+      )
+      expect(header).toBeDefined()
+      expect(header?.required ?? false).toBe(false)
+      expect(header?.schema?.enum).toEqual(['1'])
+    }
+  })
+
+  it('[P2] [7.5-UNIT-013] names the opt-in header x-couture-garment-color', () => {
+    expect(WARDROBE_GARMENT_COLOR_HEADER).toBe('x-couture-garment-color')
+  })
+})
+
+describe('7.5 Codex P2.1 and P2.4: expected tags and the published wire shape', () => {
+  const ready = buildGarmentItem({
+    status: 'ready',
+    category: 'top',
+    material: 'cotton',
+    comfortRange: 'mild',
+    tagsConfirmedAt: '2026-08-04T09:30:00.000Z',
+  })
+
+  it('[P0] [7.5-UNIT-017] accepts optional expected tags and refuses unknown keys in them', () => {
+    const tags = { category: 'top', material: null, comfortRange: 'mild' }
+    expect(updateGarmentTagsInputSchema.safeParse(tags).success).toBe(true)
+    expect(
+      updateGarmentTagsInputSchema.safeParse({
+        ...tags,
+        expected: { category: 'top', material: null, comfortRange: 'mild' },
+      }).success
+    ).toBe(true)
+    expect(garmentExpectedTagsSchema.safeParse({}).success).toBe(true)
+    expect(garmentExpectedTagsSchema.safeParse({ colorFamily: 'blue' }).success).toBe(
+      false
+    )
+    expect(
+      updateGarmentTagsInputSchema.safeParse({ ...tags, expected: { category: 'cape' } })
+        .success
+    ).toBe(false)
+    expect(GARMENT_TAGS_CHANGED_MESSAGE).toBe('GARMENT_TAGS_CHANGED')
+  })
+
+  it('[P1] [7.5-UNIT-018] publishes one wire shape whose colorFamily is optional', () => {
+    for (const garment of [
+      ready,
+      { ...ready, colorFamily: 'blue' },
+      { ...ready, colorFamily: null },
+    ]) {
+      expect(garmentListWireResponseSchema.safeParse({ data: [garment] }).success).toBe(
+        true
+      )
+      expect(
+        updateGarmentTagsWireResponseSchema.safeParse({ data: garment }).success
+      ).toBe(true)
+    }
+    expect(garmentListWireResponseSchema.safeParse({ data: [] }).success).toBe(true)
+    expect(
+      updateGarmentTagsWireResponseSchema.safeParse({
+        data: { ...ready, colorFamily: 'navy' },
+      }).success
+    ).toBe(false)
+
+    const spec = generateHttpOpenApiDocument()
+    const schemas = spec.components?.schemas as Record<string, unknown>
+    expect(schemas).not.toHaveProperty('GarmentListWithColorResponse')
+    expect(schemas).not.toHaveProperty('UpdateGarmentTagsWithColorResponse')
+  })
+
+  it('[P1] [7.5-UNIT-018] generated SDK types read a legacy and an opted-in garment', () => {
+    // Compile-time proof: these only type-check while the generated colorFamily stays optional
+    // on both the list item and the tag update answer, and the update input takes expected.
+    type ColorIsOptional<T> =
+      object extends Pick<T, Extract<keyof T, 'colorFamily'>> ? true : false
+    const listItem: ColorIsOptional<GarmentListResponseDataInner> = true
+    const updated: ColorIsOptional<GeneratedUpdateGarmentTagsResponse['data']> = true
+    const list: ColorIsOptional<GarmentListResponse['data'][number]> = true
+    const input: GeneratedUpdateGarmentTagsInput = {
+      category: 'top',
+      comfortRange: 'mild',
+      expected: { category: 'top', material: null, comfortRange: 'mild' },
+    }
+    expect([listItem, updated, list]).toEqual([true, true, true])
+    expect(input.expected?.material).toBeNull()
   })
 })

@@ -324,6 +324,23 @@
         "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın.",
         "session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin."
       }
+    },
+    "detail": {
+      "back": "Dolaba dön",
+      "category": "Kategori",
+      "material": "Kumaş",
+      "comfort": "Konfor aralığı",
+      "noMaterial": "Kumaş yok",
+      "editTags": "Etiketleri düzenle",
+      "done": "Bitti",
+      "cancel": "İptal",
+      "noChanges": "Değişiklik yok",
+      "conflict": "Bu parça başka bir cihazda değişti. Etiketleri kontrol edip tekrar dene.",
+      "notAllowed": "Önce bir velinin dolap değişikliklerini onaylaması gerekiyor.",
+      "undoFailed": "Geri alınamadı. Tekrar dene.",
+      "missing": "Bu parça artık dolabında değil.",
+      "loading": "Parça yükleniyor...",
+      "loadFailed": "Bu parça yüklenemedi. Tekrar dene."
     }
   },
   "commerce": {

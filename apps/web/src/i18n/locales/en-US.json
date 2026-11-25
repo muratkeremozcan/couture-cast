@@ -466,6 +466,23 @@
       "loading": "Loading your garment...",
       "pending_desc": "Describe this garment with a category and a comfort range.",
       "manual_desc": "Choose the category and comfort range that fit this garment. Material is optional."
+    },
+    "detail": {
+      "back": "Back to closet",
+      "category": "Category",
+      "material": "Material",
+      "comfort": "Comfort range",
+      "noMaterial": "No material",
+      "editTags": "Edit tags",
+      "done": "Done",
+      "cancel": "Cancel",
+      "noChanges": "No changes",
+      "conflict": "This piece changed on another device. Check the tags and try again.",
+      "notAllowed": "A guardian has to approve closet changes first.",
+      "undoFailed": "Could not undo. Try again.",
+      "missing": "This piece is no longer in your closet.",
+      "loading": "Loading this piece...",
+      "loadFailed": "Could not load this piece. Try again."
     }
   },
   "community": {

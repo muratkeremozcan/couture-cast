@@ -102,6 +102,7 @@ export type ContractApiClient = Pick<
   | 'apiV1UserPreferencesPut'
   | 'apiV1WardrobeGarmentsGarmentIdSuggestTagsPost'
   | 'apiV1WardrobeGarmentsGarmentIdTagsPatch'
+  | 'apiV1WardrobeGarmentsGet'
   | 'apiV1WardrobeOwnerUserIdCapsulesGet'
   | 'apiV1WardrobeOwnerUserIdCapsulesPost'
   | 'apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet'
