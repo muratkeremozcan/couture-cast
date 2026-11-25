@@ -74,16 +74,25 @@ export default function Home() {
             city line), the Spotlight teaser in the hero, the City Spotlight above the feed and
             any deep link above the grid have answered; the feed is the last section and fills
             in below them. */}
-        <ScreenGate screen="home" reads={HOME_GATE_READS}>
+        <ScreenGate
+          screen="home"
+          reads={HOME_GATE_READS}
+          placeholderClassName={HOME_PLACEHOLDER_CLASS}
+        >
           <GuestPreviewEntry />
           {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd
               widths and blends the dark page into column 0. */}
           <div className="relative mx-[calc(50%-min(50vw,720px))] w-[min(100vw,1440px)]">
             <LookbookPrismLayout />
           </div>
-          <HomeHero />
-          <LegalLinks className="text-neutral-300" />
         </ScreenGate>
+        {/* The hero reads nothing, and its landing actions follow <html data-session> from first
+            paint, so it stays outside the gate: a pending session shows the hero with neither
+            set of actions while it is verified (real-session L-10), instead of a hidden body that
+            a verification timeout later reveals as the signed-out landing. The placeholder
+            fills the viewport, so the body appearing above it moves nothing on screen. */}
+        <HomeHero />
+        <LegalLinks className="text-neutral-300" />
         <StickyBottomNav />
       </main>
       <PostHogClickTracker />
@@ -92,6 +101,8 @@ export default function Home() {
 }
 
 const HOME_GATE_READS = ['ritual', 'teaser', 'spotlight', 'deeplink'] as const
+const HOME_PLACEHOLDER_CLASS =
+  'min-h-screen w-full rounded-[16px] bg-[var(--screen-placeholder-surface)]'
 
 function HomeHero() {
   return (

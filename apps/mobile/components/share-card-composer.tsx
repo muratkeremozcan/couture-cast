@@ -64,7 +64,6 @@ import {
 } from '@/src/lib/share-card-share'
 import type { ShareCardShareAnchor } from '../modules/share-card-native-share/types'
 import { trackMobileShareCardShared } from '@/src/analytics/track-events'
-import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 type PreparedPreview = {
   card: PreparedShareCard
@@ -483,7 +482,6 @@ export function ShareCardComposer({
   watermark?: boolean
   onWatermarkChange?: React.Dispatch<React.SetStateAction<boolean>>
 }) {
-  const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
   const locale = resolveSupportedLocale(i18n.language) ?? 'en-US'
   const member = useSyncExternalStore(
@@ -867,7 +865,7 @@ export function ShareCardComposer({
   return (
     <EdgeToEdgeModal
       visible={open && source !== null && systemBarsReady}
-      animationType={modalAnimation}
+      animationType="slide"
       onRequestClose={close}
       onDismiss={restoreFocus}
       scrim="#0009"

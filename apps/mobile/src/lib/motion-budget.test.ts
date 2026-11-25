@@ -7,9 +7,10 @@
 // from the shared reduced-motion hook instead of a literal slide or fade, and the root stack
 // transitions in 200 ms or less. The behavior under the OS setting is 7.7-NAT-005 (builder).
 import { describe, expect, it } from 'vitest'
-import { motionSources as sources } from './motion-budget-sources.mjs'
+import { motionSources } from './motion-budget-sources.mjs'
 
 const BUDGET_MS = 200
+const sources = motionSources as Record<string, string>
 
 /** The text of the first `{ ... }` argument after `start`, braces balanced. */
 function configAfter(source: string, start: number): string | null {
@@ -30,7 +31,10 @@ export function motionProblems(source: string): string[] {
   const problems: string[] = []
   for (const call of source.matchAll(/\b(Animated\.timing|withTiming)\s*\(/g)) {
     const config = configAfter(source, (call.index ?? 0) + call[0].length)
-    const duration = config?.match(/\bduration\s*:\s*([^,}\n]+)/)?.[1]?.trim()
+    // Comments are not configuration: a commented-out duration must not stand in for the real
+    // one (CodeRabbit r1 #17).
+    const code = config?.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+    const duration = code?.match(/\bduration\s*:\s*([^,}\n]+)/)?.[1]?.trim()
     if (duration === undefined) problems.push(`${call[1]} without a duration`)
     else if (!/^\d+$/.test(duration))
       problems.push(`${call[1]} duration ${duration} is not a literal`)
@@ -43,6 +47,10 @@ export function motionProblems(source: string): string[] {
   for (const match of source.matchAll(
     /\banimationType\s*=\s*(?:"(\w+)"|'(\w+)'|\{([^}]*)\})/g
   )) {
+    // EdgeToEdgeModal applies the reduced-motion rule itself (the wrapper check below), so a
+    // literal slide or fade on it is the motion-on presentation; on a bare Modal it is not.
+    const tag = source.slice(0, match.index).match(/<([A-Za-z.]+)[^<]*$/)?.[1]
+    if (tag === 'EdgeToEdgeModal') continue
     const literal = match[1] ?? match[2]
     if (literal !== undefined && literal !== 'none') {
       problems.push(`Modal animationType="${literal}" ignores reduced motion`)
@@ -59,6 +67,16 @@ describe('7.7-UNIT-021 native motion budget', () => {
     expect(
       motionProblems(
         'Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: false })'
+      )
+    ).toEqual([])
+    expect(
+      motionProblems(
+        'Animated.timing(x, {\n  // duration: 150,\n  toValue: 1,\n  duration: 300,\n})'
+      )
+    ).toEqual(['Animated.timing duration 300 ms'])
+    expect(
+      motionProblems(
+        'Animated.timing(x, { /* duration: 900 */ toValue: 1, duration: 150 })'
       )
     ).toEqual([])
     expect(motionProblems('Animated.timing(x, { toValue: 1, duration: 300 })')).toEqual([
@@ -79,6 +97,12 @@ describe('7.7-UNIT-021 native motion budget', () => {
       "Modal animationType={reduceMotion ? 'none' : 'slide'} bypasses the shared hook",
     ])
     expect(motionProblems('<Modal animationType={modalAnimation} />')).toEqual([])
+    expect(
+      motionProblems('<EdgeToEdgeModal\n  visible={open}\n  animationType="slide"\n/>')
+    ).toEqual([])
+    expect(motionProblems('<Modal\n  visible\n  animationType="fade"\n/>')).toEqual([
+      'Modal animationType="fade" ignores reduced motion',
+    ])
     expect(motionProblems('screenOptions={{ animationDuration: 350 }}')).toEqual([
       'animationDuration 350 ms',
     ])
@@ -93,6 +117,14 @@ describe('7.7-UNIT-021 native motion budget', () => {
     )
 
     expect(problems).toEqual([])
+  })
+
+  it('EdgeToEdgeModal, the wrapper every app modal opens through, applies the reduced-motion rule', () => {
+    const wrapper = sources['../../components/edge-to-edge-modal.tsx'] ?? ''
+
+    expect(wrapper).toMatch(/useReducedMotion\(\)/)
+    expect(wrapper).toMatch(/reducedMotion \? 'none' : props\.animationType/)
+    expect(wrapper).toMatch(/animationType=\{animationType\}/)
   })
 
   it('gives the root stack a 200 ms transition (D6)', () => {

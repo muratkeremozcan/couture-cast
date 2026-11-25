@@ -13,6 +13,7 @@ import React, {
 } from 'react'
 import Image from 'next/image'
 import {
+  SPOTLIGHT_TEASER_EXPIRY_MS,
   SpotlightTeaserState,
   withRequestDeadline,
   type SpotlightTeaserValue,
@@ -102,6 +103,10 @@ export interface HomeSpotlightTeaserLifecycle {
 /** The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5). */
 type TeaserSnapshot = { memberId: string; value: SpotlightTeaserValue | null }
 
+function snapshotValueExpired(value: SpotlightTeaserValue | null, now: number): boolean {
+  return value !== null && value.completedAt + SPOTLIGHT_TEASER_EXPIRY_MS <= now
+}
+
 /**
  * Lives in the layout, so the value and its read time survive the teaser's
  * unmount when the layout leaves the stacked arrangement. Side-by-side layouts
@@ -161,6 +166,19 @@ export function useHomeSpotlightTeaser({
       : undefined
   )
   const [snapshotDropped, setSnapshotDropped] = useState(false)
+  /** The remembered value has passed the expiry `SpotlightTeaserState` enforces on a live one. */
+  const [snapshotExpired, setSnapshotExpired] = useState(() =>
+    snapshotValueExpired(snapshot?.value ?? null, Date.now())
+  )
+  useEffect(() => {
+    const remembered = snapshot?.value
+    if (!remembered || snapshotExpired) return
+    const timer = setTimeout(
+      () => setSnapshotExpired(true),
+      Math.max(0, remembered.completedAt + SPOTLIGHT_TEASER_EXPIRY_MS - Date.now())
+    )
+    return () => clearTimeout(timer)
+  }, [snapshot, snapshotExpired])
   const memberSettled = member !== undefined && settledFor === member
   const snapshotLive =
     !snapshotDropped &&
@@ -168,7 +186,8 @@ export function useHomeSpotlightTeaser({
     member !== undefined &&
     member !== null &&
     snapshot?.memberId === member
-  const value = liveValue ?? (snapshotLive ? (snapshot?.value ?? null) : null)
+  const value =
+    liveValue ?? (snapshotLive && !snapshotExpired ? (snapshot?.value ?? null) : null)
   const settled = member === null || visible === false || memberSettled || snapshotLive
   const removeValue = useCallback(() => {
     setSnapshotDropped(true)

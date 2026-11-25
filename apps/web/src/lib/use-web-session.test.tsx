@@ -303,6 +303,14 @@ describe('recovery after a failed recheck', () => {
 // bridge already names the member starts from that member, so a return never flashes the
 // checking state (or the placeholder that follows it).
 describe('useWebSession remount seed', () => {
+  // The previous describe leaves its checks in `session.pending` (CI, 61d7156e): start empty.
+  beforeEach(() => {
+    session.identity = null
+    session.stored = false
+    session.pending = []
+    window.sessionStorage.clear()
+  })
+
   afterEach(() => {
     session.identity = null
     session.stored = false

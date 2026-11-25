@@ -10,7 +10,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 // Story CC-7.7 (Codex review of 8327b4fb): 7.7-CMP-010 pins the prerendered Locations chrome
-// (P2-3) and 7.7-CMP-011 the Profile return from its snapshot (P1-2).
+// (P2-3) and 7.7-CMP-011 the Profile return from its snapshot (P1-2). CodeRabbit round 1 on PR
+// 292: 7.7-CMP-033 a theme save outranks a return's refresh (#12), 7.7-CMP-034 a preference save
+// outranks it (#13), 7.7-CMP-035 the snapshot keeps the confirmed preference (#27). CI real-session
+// on 61d7156e: 7.7-CMP-036 the gate never waits on the account read (PS-2), 7.7-CMP-037 no Sign
+// in hint is ever in a member's document (PS-1, PL-1 to PL-3).
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
 // shape, the bearer header, and the contract parsing are all exercised by the
@@ -19,13 +23,14 @@ import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { activateBrowserLocale, getI18n } from '../../i18n'
 import deDE from '../../i18n/locales/de-DE.json'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import { currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import SettingsPage from './page'
 
 const navigation = vi.hoisted(() => ({ prerendering: false }))
@@ -654,9 +659,10 @@ describe('7.7 Profile without flashes', () => {
 
     // Only the guided-entry query waits for the client: the section's chrome and its signed-out
     // hint are in the first HTML, so nothing is inserted above Shopping when the page hydrates.
+    // The hint is the guest stand-in, its words drawn by CSS (7.7-CMP-037).
     const locations = html.indexOf('data-testid="locations-section"')
     expect(locations).toBeGreaterThan(-1)
-    expect(html).toContain('data-testid="locations-signed-out"')
+    expect(html).toContain('data-guest-text="Sign in to manage your locations."')
     expect(locations).toBeLessThan(
       html.indexOf('data-testid="commerce-preferences-section"')
     )
@@ -758,5 +764,255 @@ describe('7.7 Profile without flashes', () => {
     expect(toggle()).not.toBeChecked()
     expect(screen.getByTestId('premium-status-line')).toBeVisible()
     expect(screen.getByTestId('premium-theme-locked')).toBeVisible()
+  })
+
+  /** Every Profile read for one member, answered at once unless a test overrides it first. */
+  function memberProfileReads(theme: { theme: string | null; isEntitled: boolean }) {
+    return [
+      profileHandler(),
+      locationsHandler(),
+      subscriptionHandler(),
+      http.get('/api/v1/commerce/premium/access', () => HttpResponse.error()),
+      http.get(THEME_PATH, () =>
+        HttpResponse.json({ data: { ...theme, themesEnabled: true } })
+      ),
+      http.get(PREFERENCES_PATH, () =>
+        HttpResponse.json({ data: { affiliateCtasEnabled: true } })
+      ),
+    ]
+  }
+
+  async function firstVisitSettles() {
+    const firstVisit = render(<SettingsPage />)
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await waitFor(() => expect(toggle()).toBeEnabled())
+    return firstVisit
+  }
+
+  const kept = <T,>(part: string) =>
+    screenSnapshot.recall<T>(currentWebSessionScope(), 'profile', part)
+
+  it('7.7-CMP-033 a palette saved while a return refreshes the theme keeps the saved palette when the older read answers (CodeRabbit r1 #12)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    onTestFinished(() => document.documentElement.removeAttribute('data-theme'))
+    const refresh = deferred<void>()
+    let returning = false
+    useMswHandlers(
+      http.get(THEME_PATH, async () => {
+        if (returning) await refresh.promise
+        return HttpResponse.json({
+          data: { theme: null, isEntitled: true, themesEnabled: true },
+        })
+      }),
+      http.put(THEME_PATH, () =>
+        HttpResponse.json({
+          data: { theme: 'jewel_radiance', isEntitled: true, themesEnabled: true },
+        })
+      ),
+      ...memberProfileReads({ theme: null, isEntitled: true })
+    )
+    ;(await firstVisitSettles()).unmount()
+    expect(kept<{ theme: string | null }>('theme')?.theme).toBeNull()
+
+    // The return shows the remembered gallery; its refresh is still out when the member saves.
+    returning = true
+    render(<SettingsPage />)
+    fireEvent.click(screen.getByTestId('premium-theme-option-jewel_radiance'))
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
+    )
+
+    // The refresh sent before the save answers with the palette the save replaced.
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+    await settle()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
+    expect(screen.getByTestId('premium-theme-option-jewel_radiance')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(kept<{ theme: string | null }>('theme')?.theme).toBe('jewel_radiance')
+  })
+
+  it('7.7-CMP-034 a preference saved while a return refreshes it keeps the saved value when the older read answers (CodeRabbit r1 #13)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    const refresh = deferred<void>()
+    let returning = false
+    useMswHandlers(
+      http.get(PREFERENCES_PATH, async () => {
+        if (returning) await refresh.promise
+        return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
+      }),
+      http.put(PREFERENCES_PATH, async ({ request }) => {
+        const body = (await request.json()) as { affiliateCtasEnabled: boolean }
+        return HttpResponse.json({
+          data: { affiliateCtasEnabled: body.affiliateCtasEnabled },
+        })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+    ;(await firstVisitSettles()).unmount()
+
+    // The return shows the remembered opt-in at once, with no loading state, while it refreshes.
+    returning = true
+    render(<SettingsPage />)
+    expect(toggle()).toBeEnabled()
+    expect(toggle()).toBeChecked()
+    fireEvent.click(toggle())
+    expect(await screen.findByText('Shopping preferences updated')).toBeInTheDocument()
+    expect(toggle()).not.toBeChecked()
+
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+    await settle()
+    expect(toggle()).not.toBeChecked()
+    expect(kept<{ enabled: boolean }>('commerce')).toEqual({ enabled: false })
+  })
+
+  it('7.7-CMP-035 a save in flight never reaches the snapshot: a return starts from the value the server confirmed (CodeRabbit r1 #27)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    const putGate = deferred<void>()
+    useMswHandlers(
+      ...preferenceHandlers({ initial: true, putGate: putGate.promise }),
+      http.get('/api/v1/commerce/premium/access', () => HttpResponse.error())
+    )
+    await firstVisitSettles()
+    await waitFor(() => expect(kept('commerce')).toEqual({ enabled: true }))
+
+    fireEvent.click(toggle())
+    // The checkbox shows the requested value at once; the snapshot keeps the confirmed one.
+    expect(toggle()).not.toBeChecked()
+    await settle()
+    expect(kept('commerce')).toEqual({ enabled: true })
+
+    await act(async () => {
+      putGate.resolve()
+      await putGate.promise
+    })
+    expect(await screen.findByText('Shopping preferences updated')).toBeInTheDocument()
+    await waitFor(() => expect(kept('commerce')).toEqual({ enabled: false }))
+  })
+
+  it('7.7-CMP-036 the Profile gate opens while the account read is out, and the account header keeps its space (real-session PS-2)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    const account = deferred<void>()
+    useMswHandlers(
+      http.get(PROFILE_PATH, async () => {
+        // The same request the session's verification makes, held as a slow check holds it.
+        await account.promise
+        return HttpResponse.json({
+          user: {
+            id: 'member-1',
+            birthdate: null,
+            role: 'guardian',
+            displayName: 'Jade Rivers',
+            email: 'jade@example.test',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+    render(<SettingsPage />)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    expect(screen.getByTestId('commerce-preferences-section')).toBeVisible()
+    await waitFor(() => expect(toggle()).toBeEnabled())
+    // The header's two lines are held above the sections, so it lands without pushing them.
+    const reserved = screen.getByTestId('profile-account-reserved')
+    expect(reserved).toHaveAttribute('aria-hidden', 'true')
+    expect(reserved.textContent?.trim()).toBe('')
+    expect(screen.queryByTestId('profile-account')).toBeNull()
+
+    await act(async () => {
+      account.resolve()
+      await account.promise
+    })
+    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent(
+      'Jade Rivers'
+    )
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+  })
+
+  const SIGN_IN_HINTS = [
+    'Sign in to manage your locations.',
+    'Sign in to change this',
+    'Sign in to subscribe or manage Premium',
+    'Sign in and subscribe to Premium',
+  ]
+  const SIGNED_OUT_TEST_IDS = [
+    'locations-signed-out',
+    'commerce-signed-out-hint',
+    'premium-signed-out-hint',
+  ]
+
+  it('7.7-CMP-037 the first HTML paints the signed-out hints from CSS only: no Sign in words or hint ids in the document (real-session PS-1, PL-1)', () => {
+    const html = renderToString(<SettingsPage />)
+    const firstHtml = new DOMParser().parseFromString(html, 'text/html')
+
+    // A member's page hides this first paint, but its text and ids were still in the document,
+    // so a member's page held a Sign in hint and Locations passed through its hint id.
+    for (const hint of SIGN_IN_HINTS)
+      expect(firstHtml.body.textContent ?? '', hint).not.toContain(hint)
+    for (const id of SIGNED_OUT_TEST_IDS)
+      expect(firstHtml.querySelector(`[data-testid="${id}"]`), id).toBeNull()
+    expect(firstHtml.querySelector('[data-testid="locations-section"]')).toHaveAttribute(
+      'data-state',
+      'checking'
+    )
+    // A signed-out page still paints every hint where it will stay, out of the accessibility tree.
+    const standIns = [...firstHtml.querySelectorAll('[data-guest-text]')]
+    const standInWords = standIns.map(
+      (node) => node.getAttribute('data-guest-text') ?? ''
+    )
+    expect(standInWords).toHaveLength(SIGN_IN_HINTS.length)
+    SIGN_IN_HINTS.forEach((hint, index) => expect(standInWords[index]).toContain(hint))
+    for (const node of standIns) {
+      expect(node).toHaveAttribute('aria-hidden', 'true')
+      expect(node).toHaveAttribute('data-landing', 'guest')
+      expect(node.textContent).toBe('')
+    }
+  })
+
+  it('7.7-CMP-037 after hydration a member page holds no guest stand-in while the session is checked, and the signed-out hints come only for a signed-out reader', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'pending')
+    const never = new Promise<never>(() => undefined)
+    useMswHandlers(
+      http.get(PROFILE_PATH, () => never),
+      http.get('/api/v1/locations', () => never),
+      http.get(PREFERENCES_PATH, () => never),
+      http.get(SUBSCRIPTION_PATH, () => never),
+      http.get('/api/v1/commerce/premium/access', () => never),
+      http.get(THEME_PATH, () => never)
+    )
+    const { container, unmount } = render(<SettingsPage />)
+
+    expect(container.querySelector('[data-landing="guest"]')).toBeNull()
+    expect(container.querySelector('[data-guest-text]')).toBeNull()
+    for (const hint of SIGN_IN_HINTS) expect(container.textContent).not.toContain(hint)
+    unmount()
+
+    // A signed-out reader gets the real hints, with their ids, once the check ends signed out.
+    vi.unstubAllEnvs()
+    window.sessionStorage.clear()
+    document.documentElement.setAttribute('data-session', 'none')
+    render(<SettingsPage />)
+    for (const id of SIGNED_OUT_TEST_IDS)
+      expect(await screen.findByTestId(id)).toBeVisible()
+    expect(document.querySelector('[data-guest-text]')).toBeNull()
   })
 })

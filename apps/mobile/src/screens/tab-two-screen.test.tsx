@@ -49,6 +49,7 @@ const {
   premiumPassthroughMocks,
   resolveMobileAccessTokenMock,
   getUserProfileMock,
+  identityEpochMock,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
@@ -69,6 +70,7 @@ const {
   },
   resolveMobileAccessTokenMock: vi.fn(),
   getUserProfileMock: vi.fn(),
+  identityEpochMock: vi.fn<() => number>(),
 }))
 
 // The member's session is a boundary too: shopping preferences and the subscription
@@ -77,6 +79,8 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   resolveMobileAccessToken: resolveMobileAccessTokenMock,
   subscribeMobileApplicationUser: () => () => undefined,
   mobileApplicationUserId: () => null,
+  // Advances on a sign-out or account switch; a case moves it to change hands mid-read.
+  mobileIdentityEpoch: identityEpochMock,
   setMobileApplicationUserId: vi.fn(),
   setMobileAccessTokenResolver: vi.fn(),
 }))
@@ -172,6 +176,8 @@ describe('SettingsScreen', () => {
     resolveMobileAccessTokenMock.mockResolvedValue('member-token')
     getUserProfileMock.mockReset()
     getUserProfileMock.mockResolvedValue(memberProfile(null))
+    identityEpochMock.mockReset()
+    identityEpochMock.mockReturnValue(0)
     getCommercePreferenceMock.mockReset()
     getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: true })
     updateCommercePreferenceMock.mockReset()
@@ -222,8 +228,10 @@ describe('SettingsScreen', () => {
 
     act(() => profile.release(memberProfile('Jade')))
 
-    // The header arrives with the body, so it never pushes the sections below it down.
-    expect(await screen.findByTestId('profile-account-name')).toBeVisible()
+    // The header arrives with the body, so it never pushes the sections below it down. The
+    // name mounts with the read's answer; the gate opens on the settle that follows it.
+    const name = await screen.findByTestId('profile-account-name')
+    await waitFor(() => expect(name).toBeVisible())
     expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
     expect(placeholder()).toBeNull()
   })
@@ -244,7 +252,8 @@ describe('SettingsScreen', () => {
     act(() => store.release('ready'))
 
     // The subscribe controls appear with the section, never under the member's finger.
-    expect(await screen.findByTestId('premium-restore')).toBeVisible()
+    const restore = await screen.findByTestId('premium-restore')
+    await waitFor(() => expect(restore).toBeVisible())
     expect(placeholder()).toBeNull()
   })
 
@@ -275,6 +284,89 @@ describe('SettingsScreen', () => {
     act(() => profile.release(memberProfile('Jade')))
     expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')
     expect(placeholder()).toBeNull()
+  })
+
+  /** Leaves Profile and comes back: the return re-reads every section in place. */
+  function leaveAndReturn() {
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+  }
+
+  // CodeRabbit r1: a return read that began before a toggle answers with the value the toggle
+  // replaced. The saved choice stays.
+  it('7.7-NAT-013 a return read that started before a toggle never lands over the saved choice', async () => {
+    await render(<SettingsScreen />)
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(toggle).toBeVisible()
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
+    })
+    const stale = held<{ affiliateCtasEnabled: boolean }>()
+    getCommercePreferenceMock.mockReturnValue(stale.promise)
+    leaveAndReturn()
+    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
+
+    // react-native-web hands the enabled state to its press responder in a passive effect.
+    await act(() => Promise.resolve())
+    fireEvent.click(screen.getByTestId('commerce-opt-out-toggle'))
+    await screen.findByText('Shopping preferences updated')
+    expect(updateCommercePreferenceMock).toHaveBeenCalledWith(false)
+
+    // The read from before the toggle answers with the old value.
+    await act(async () => {
+      stale.release({ affiliateCtasEnabled: true })
+      // A task boundary: every promise step of the read's chain runs before it.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+  })
+
+  // CodeRabbit r1: a return read belongs to the member it started for. One that answers after
+  // the device changed hands restores nothing of theirs.
+  it('7.7-NAT-015 return reads that answer after the member changed leave the screen as it is', async () => {
+    await render(<SettingsScreen />)
+    const email = await screen.findByTestId('profile-account-email')
+    const toggle = screen.getByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(email).toBeVisible()
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+    })
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    const preference = held<{ affiliateCtasEnabled: boolean }>()
+    getCommercePreferenceMock.mockReturnValue(preference.promise)
+    leaveAndReturn()
+    await waitFor(() => {
+      expect(getUserProfileMock).toHaveBeenCalledTimes(2)
+      expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2)
+    })
+
+    // Another identity takes the device while both reads are in flight.
+    identityEpochMock.mockReturnValue(1)
+    const previous = memberProfile('Previous member')
+    await act(async () => {
+      profile.release({
+        ...previous,
+        user: { ...previous.user, email: 'previous@example.test' },
+      })
+      preference.release({ affiliateCtasEnabled: false })
+      // A task boundary: every promise step of both reads' chains runs before it.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      'jade@example.test'
+    )
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
   })
 
   it('6.5-MOB-POLISH-07 keeps API health and wiring notes out of the user build', async () => {

@@ -247,6 +247,14 @@ html[data-session='pending'] [data-landing='guest-inline'],
 html[data-session='pending'] [data-landing='refused-inline'] {
   visibility: hidden;
 }
+/*
+ * Story CC-7.7 D3: a signed-out hint in a section's guest first paint (GuestText in
+ * components/screen-gate.tsx). The words are drawn here, so they are not in the document's text
+ * and a member's page never holds a Sign in hint, even a hidden one.
+ */
+[data-guest-text]::before {
+  content: attr(data-guest-text);
+}
 
 /*
  * Story CC-7.7 D1 and D3: the screen gate (components/screen-gate.tsx). The gate and its body

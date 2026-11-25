@@ -2629,6 +2629,12 @@ export function CommunityLookbookGrid({
 
   const [currentMode, setCurrentMode] = useState<FilterCategory>(startMode)
   /**
+   * The filter the rows on screen were read for. It follows `currentMode` only once that
+   * filter's page is accepted, so a failed switch keeps the earlier filter with its rows, and a
+   * return never restores those rows under a filter they were not read for.
+   */
+  const [rowsMode, setRowsMode] = useState<FilterCategory>(startMode)
+  /**
    * The mode the server said it served, or `null` while the request that would
    * answer that is still in flight. Distinct from `currentMode`, which is what
    * the reader asked for and what the next request sends: a `auto` request is
@@ -3287,6 +3293,7 @@ export function CommunityLookbookGrid({
               )
           )
         })
+        setRowsMode(mode)
         announceFeed(
           {
             key:
@@ -3548,6 +3555,7 @@ export function CommunityLookbookGrid({
         )
         itemsRef.current = rebuilt
         setItems(rebuilt)
+        setRowsMode(currentMode)
       } else if (incoming.length) {
         const existingBufferById = new Map(
           newLooksRef.current.map((item) => [item.id, item])
@@ -4472,7 +4480,7 @@ export function CommunityLookbookGrid({
     if (!feedSettled || isLoading || banned || spotlightState.status === 'loading') return
     if (!communityAvailable || realtimeDeniedRef.current) return
     screenSnapshot.remember(snapshotScope, gateScreen, COMMUNITY_GRID_SNAPSHOT_PART, {
-      mode: currentMode,
+      mode: rowsMode,
       scope: sessionScope,
       items,
       authorStates,
@@ -4496,7 +4504,6 @@ export function CommunityLookbookGrid({
     bandResolved,
     bandUnresolvedReason,
     banned,
-    currentMode,
     experimentVariant,
     feedSettled,
     gateScreen,
@@ -4505,6 +4512,7 @@ export function CommunityLookbookGrid({
     communityAvailable,
     snapshotScope,
     nextCursor,
+    rowsMode,
     servedMode,
     sessionScope,
     spotlightState,

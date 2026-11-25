@@ -848,16 +848,19 @@ function MemberRitual({ owner }: { owner: string }) {
   // nothing renders here, never the sample outfit: a member sees the sample only once their
   // own read settled without a usable outfit.
   const settled = ritual !== null || failure !== null
-  useScreenGateRead('ritual', failure !== null || (ritual !== null && cityRead))
+  // The gate and the snapshot share one condition, so a return never starts from an outfit
+  // whose city line had not answered yet.
+  const readSettled = failure !== null || (ritual !== null && cityRead)
+  useScreenGateRead('ritual', readSettled)
   useEffect(() => {
-    if (!screen || !settled) return
+    if (!screen || !readSettled) return
     // Stored under the scope its read started in: the store drops it once that scope left.
     screenSnapshot.remember(shownScopeRef.current, screen, RITUAL_SNAPSHOT_PART, {
       ritual,
       city,
       failure,
     } satisfies RitualSnapshot)
-  }, [city, failure, ritual, screen, settled])
+  }, [city, failure, readSettled, ritual, screen])
 
   useEffect(() => {
     const token = currentWebSessionBearer()

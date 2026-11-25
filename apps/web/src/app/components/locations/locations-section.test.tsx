@@ -18,7 +18,9 @@ import type {
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/wardrobe'
 import { screenSnapshot } from '../../../lib/screen-snapshot'
+import { currentWebSessionScope } from '../../../lib/use-web-session'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
+import { settle } from '../../../test-utils/request-barrier'
 import { ScreenGate, useScreenGateRead } from '../screen-gate'
 import { LocationsSection } from './locations-section'
 
@@ -579,6 +581,75 @@ describe('LocationsSection', () => {
     expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
     await waitFor(() => expect(input).toHaveFocus())
     expect(screen.getByTestId('locations-guided-cancel')).toBeVisible()
+  })
+
+  // CodeRabbit round 1 on PR 292 (#11): a return's list refresh is in flight when the member
+  // deletes a city; the refresh answers last, with the list from before the delete.
+  it('7.7-CMP-032 a return refresh that answers after a delete never puts the deleted city back, on screen or in the snapshot', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    onTestFinished(() => {
+      document.documentElement.removeAttribute('data-session')
+      screenSnapshot.clear()
+    })
+    saved = [location(), office]
+    let holdNextList = false
+    const refresh = deferred()
+    useMswHandlers(
+      http.get('/api/v1/locations', async () => {
+        if (!holdNextList) return HttpResponse.json({ data: saved })
+        holdNextList = false
+        const sentWith = saved
+        await refresh.promise
+        return HttpResponse.json({ data: sentWith })
+      }),
+      http.delete('/api/v1/locations/loc-1', () => {
+        saved = [{ ...office, isPrimary: true }]
+        return HttpResponse.json({ data: { deleted: true } })
+      })
+    )
+    const renderProfile = () =>
+      render(
+        <I18nextProvider i18n={getI18n()}>
+          <main>
+            <ScreenGate screen="profile" reads={['locations']}>
+              <LocationsSection />
+            </ScreenGate>
+          </main>
+        </I18nextProvider>
+      )
+    const keptIds = () =>
+      screenSnapshot
+        .recall<{
+          locations: SavedLocation[]
+        }>(currentWebSessionScope(), 'profile', 'locations')
+        ?.locations.map((item) => item.id)
+
+    const firstVisit = renderProfile()
+    await waitFor(() => expect(keptIds()).toEqual(['loc-1', 'loc-2']))
+    firstVisit.unmount()
+
+    // The return shows the remembered list while its refresh is held.
+    holdNextList = true
+    renderProfile()
+    expect(screen.getAllByTestId('location-item')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: 'Delete, Home' }))
+    await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
+    await waitFor(() => expect(status().textContent).toBe('Home deleted.'))
+    expect(screen.getAllByTestId('location-item')).toHaveLength(1)
+
+    // The refresh sent before the delete answers with both cities.
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+    await settle()
+    const items = screen.getAllByTestId('location-item')
+    expect(items).toHaveLength(1)
+    expect(within(items[0]!).getByTestId('location-item-label')).toHaveTextContent(
+      'Office'
+    )
+    expect(keptIds()).toEqual(['loc-2'])
   })
 
   it('finds a city that was saved before the response failed and returns to Planner on retry', async () => {

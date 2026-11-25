@@ -79,8 +79,8 @@ export const GATE_READS: Record<ShellScreen, string[]> = {
   home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
   closet: ['profile', 'onboarding', 'garments', 'saved-looks'],
   community: ['community-feed', 'community-spotlight'],
+  // The account header's profile read shares the session check, so it is not a gate read.
   profile: [
-    'profile',
     'locations',
     'commerce-preferences',
     'subscription',
@@ -330,8 +330,9 @@ function bodies(memberId: string, populated: boolean) {
     )
     const body = {
       data: {
-        targets: targets.map(({ key }) => {
-          const post = posts.get(key)
+        // Looked up by postId; the caller's correlation key only travels back (CodeRabbit r1 #21).
+        targets: targets.map(({ key, postId }) => {
+          const post = posts.get(postId)
           if (!post) return { key, status: 'unavailable' }
           return {
             key,
@@ -416,6 +417,8 @@ export function createShellRouter(options: {
   const calls = new Map<string, number>()
   const unknown = new Set<string>()
   const unauthenticated = new Set<string>()
+  /** Reads held by the test until it releases them (`hold(key)`). */
+  const gates = new Map<string, Promise<void>>()
 
   const delayFor = (key: string) => {
     const held = options.hold?.[key] ?? 0
@@ -447,6 +450,8 @@ export function createShellRouter(options: {
     calls.set(key, (calls.get(key) ?? 0) + 1)
     open += 1
     try {
+      const gate = gates.get(key)
+      if (gate) await gate
       const delay = delayFor(key)
       if (delay > 0) await new Promise((resolveDelay) => setTimeout(resolveDelay, delay))
       const { json, resolve } = bodiesFor(request)
@@ -478,6 +483,23 @@ export function createShellRouter(options: {
     handler,
     inflight: () => open,
     calls: (key: string) => calls.get(key) ?? 0,
+    /**
+     * Holds every `key` read from now on, sent or not yet sent, until the returned release runs:
+     * a test decides when a read answers instead of guessing with a delay.
+     */
+    hold: (key: string) => {
+      let release = () => undefined as void
+      gates.set(
+        key,
+        new Promise<void>((resolve) => {
+          release = () => {
+            gates.delete(key)
+            resolve()
+          }
+        })
+      )
+      return () => release()
+    },
     unknown: () => [...unknown].sort(),
     /** Member reads that arrived without a fixture bearer and were refused. */
     unauthenticated: () => [...unauthenticated].sort(),

@@ -8,11 +8,15 @@
 // Codex review of 8327b4fb: 7.7-CMP-016 pins the city line inside the gate and the refresh
 // notice that never lands above the outfit (P2-4), 7.7-CMP-017 the teaser in a return's first
 // frame (P2-4), 7.7-CMP-018 a fixture bearer switch while the ritual read is out (P2-1).
+// CodeRabbit round 1 on PR 292: 7.7-CMP-042 the ritual snapshot waits for the city line (#9),
+// 7.7-CMP-043 an expired remembered teaser is never shown (#10). CI real-session on 61d7156e:
+// 7.7-CMP-044 the hero stays outside the gate (L-10).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { useLayoutEffect } from 'react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import { currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -24,7 +28,9 @@ import {
   setupHomeTeaserSuite,
   useServedSpotlight,
 } from '../../test-utils/home-spotlight-teaser'
-import { screenSnapshot } from '../../lib/screen-snapshot'
+import { HOME_TEASER_SNAPSHOT_PART, screenSnapshot } from '../../lib/screen-snapshot'
+import { SPOTLIGHT_TEASER_EXPIRY_MS } from '@couture/api-client'
+import Home from '../page'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 import { ScreenGate } from './screen-gate'
 
@@ -320,5 +326,145 @@ describe('7.7 Home screen gate', () => {
         )?.ritual.outfits[0]?.comfortNotes
       ).toBe('morning fixture B')
     )
+  })
+
+  it('7.7-CMP-021 a severe-alert deep link takes focus once the gate opens, not while it hides the alert (CodeRabbit r1 #8)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    window.history.replaceState(
+      null,
+      '',
+      '/?source=notification&type=severe_weather&alertId=alert-777'
+    )
+    onTestFinished(() => window.history.replaceState(null, '', '/'))
+    const ritual = Promise.withResolvers<void>()
+    useMswHandlers(
+      http.get('/api/v1/ritual', async () => {
+        await ritual.promise
+        return HttpResponse.json(memberRitual())
+      }),
+      http.get('/api/v1/locations', () => HttpResponse.json({ data: [] })),
+      http.get('/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [createWeatherAlertPolledEvent('alert-777', 'user-1')],
+          nextSince: '2026-11-25T12:00:00.000Z',
+        })
+      )
+    )
+    const { answer } = useServedSpotlight()
+
+    renderHomeGate()
+    const gate = screen.getByTestId('screen-gate')
+    // The alert resolved behind the closed gate: it is in place but hidden, and not focused.
+    const alert = await screen.findByTestId('severe-weather-alert-focused')
+    expect(alert).not.toBeVisible()
+    expect(gate).not.toHaveAttribute('data-ready')
+    expect(alert).not.toHaveFocus()
+
+    ritual.resolve()
+    await answer(0, cityPage())
+    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+    // Readiness alone moves the focus: the alert id never changed.
+    await waitFor(() => expect(alert).toHaveFocus())
+    expect(alert).toBeVisible()
+  })
+
+  it('7.7-CMP-042 the ritual snapshot waits for the city line, so a return never starts from an outfit without it (CodeRabbit r1 #9)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    const locations = Promise.withResolvers<void>()
+    useMswHandlers(
+      http.get('/api/v1/ritual', () => HttpResponse.json(memberRitual())),
+      http.get('/api/v1/locations', async () => {
+        await locations.promise
+        return HttpResponse.json({ data: [chicagoHome] })
+      })
+    )
+    const { answer } = useServedSpotlight()
+    renderHomeGate()
+    await answer(0, cityPage())
+    const keptRitual = () =>
+      screenSnapshot.recall<{ city: string | undefined }>(
+        currentWebSessionScope(),
+        'home',
+        'ritual'
+      )
+
+    // The outfit is in and its city line is not: nothing is kept for a return yet.
+    expect(await screen.findByTestId('home-live-outfit')).not.toBeVisible()
+    expect(keptRitual()).toBeUndefined()
+
+    await act(async () => {
+      locations.resolve()
+      await locations.promise
+    })
+    await waitFor(() => expect(keptRitual()?.city).toBe('Chicago home'))
+  })
+
+  it('7.7-CMP-043 a return never shows a remembered teaser past its expiry, and the fresh read brings it back (CodeRabbit r1 #10)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    useAnsweredRitual()
+    const { answer } = useServedSpotlight()
+    const firstVisit = renderHomeGate()
+    await answer(0, cityPage())
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    expect(screen.getByTestId('home-spotlight-teaser-link')).toBeVisible()
+    firstVisit.unmount()
+
+    // The remembered teaser was read longer ago than a teaser lives.
+    const scope = currentWebSessionScope()
+    const kept = screenSnapshot.recall<{
+      memberId: string
+      value: { completedAt: number }
+    }>(scope, 'home', HOME_TEASER_SNAPSHOT_PART)!
+    screenSnapshot.remember(scope, 'home', HOME_TEASER_SNAPSHOT_PART, {
+      ...kept,
+      value: { ...kept.value, completedAt: Date.now() - SPOTLIGHT_TEASER_EXPIRY_MS - 1 },
+    })
+    const firstCommit: string[] = []
+    renderHomeGate(firstCommit)
+
+    expect(firstCommit).toEqual(['home-live-outfit'])
+    expect(screen.queryByTestId('home-spotlight-teaser-link')).toBeNull()
+
+    await answer(1, cityPage())
+    expect(await screen.findByTestId('home-spotlight-teaser-link')).toBeVisible()
+  })
+
+  it('7.7-CMP-044 the hero stays outside the Home gate, so a session being verified shows it while the body waits (real-session L-10)', () => {
+    document.documentElement.setAttribute('data-session', 'pending')
+    signInFixtureMember()
+    const ritual = Promise.withResolvers<void>()
+    onTestFinished(() => ritual.resolve())
+    useMswHandlers(
+      http.get('/api/v1/ritual', async () => {
+        await ritual.promise
+        return HttpResponse.json(memberRitual())
+      }),
+      http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
+    )
+    useServedSpotlight()
+    render(<Home />)
+
+    const gate = screen.getByTestId('screen-gate')
+    expect(gate).not.toHaveAttribute('data-ready')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.getByTestId('lookbook-prism-container')).not.toBeVisible()
+    // The hero reads nothing: it is there at once, so the page never waits on a verification
+    // that could time out into the signed-out landing.
+    const hero = screen.getByTestId('hero-section')
+    expect(gate.contains(hero)).toBe(false)
+    expect(screen.getByTestId('hero-headline')).toBeVisible()
+    expect(screen.getByTestId('cta-primary')).toBeVisible()
+    // The hero follows the placeholder, which holds the viewport, so the body appearing above it
+    // moves nothing on screen.
+    expect(
+      screen.getByTestId('screen-placeholder').compareDocumentPosition(hero) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getByTestId('screen-placeholder')).toHaveClass('min-h-screen')
   })
 })

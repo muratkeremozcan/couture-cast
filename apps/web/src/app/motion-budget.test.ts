@@ -25,6 +25,24 @@ function files(dir: string): string[] {
 const toMs = (amount: string | undefined, unit: string | undefined) =>
   Number(amount) * (unit === 's' ? 1000 : 1)
 
+/** Splits a CSS value at commas that are not inside parentheses. */
+function splitTopLevel(value: string): string[] {
+  const items: string[] = []
+  let depth = 0
+  let start = 0
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index]
+    if (char === '(') depth += 1
+    if (char === ')') depth -= 1
+    if (char === ',' && depth === 0) {
+      items.push(value.slice(start, index))
+      start = index + 1
+    }
+  }
+  items.push(value.slice(start))
+  return items
+}
+
 /** Every time a source gives a transition or a finite animation, in ms, with the text it came from. */
 export function motionTimes(source: string): { ms: number; text: string }[] {
   const found: { ms: number; text: string }[] = []
@@ -38,12 +56,28 @@ export function motionTimes(source: string): { ms: number; text: string }[] {
   // CSS declarations and inline style objects: transition, animation and their -duration and
   // -delay longhands (transitionDuration, animationDelay in style objects).
   const declarations =
-    /\b(transition|animation)(?:-?(?:duration|delay|Duration|Delay))?['"]?\s*:\s*([^;{}\n]*)/g
+    /\b((?:transition|animation)(?:-?(?:duration|delay|Duration|Delay))?)['"]?\s*:\s*([^;{}\n]*)/g
   for (const match of source.matchAll(declarations)) {
-    const value = match[2] ?? ''
-    if (match[1] === 'animation' && /\binfinite\b/.test(value)) continue
-    for (const time of value.matchAll(/(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g)) {
-      found.push({ ms: toMs(time[1], time[2]), text: match[0].trim() })
+    const property = match[1] ?? ''
+    const shorthand = property === 'transition' || property === 'animation'
+    // Each comma-separated item is its own transition or animation (CodeRabbit r1 #19); commas
+    // inside cubic-bezier(...) and steps(...) belong to the timing function.
+    for (const item of splitTopLevel(match[2] ?? '')) {
+      const times = [...item.matchAll(/(?<![\w.-])(\d*\.?\d+)(ms|s)\b/g)].map((time) =>
+        toMs(time[1], time[2])
+      )
+      if (times.length === 0) continue
+      if (property === 'animation' && /\binfinite\b/.test(item)) continue
+      if (shorthand) {
+        // The first time is the duration, the second the delay: together they are how long the
+        // item takes to finish (CodeRabbit r1 #18).
+        found.push({
+          ms: (times[0] ?? 0) + (times[1] ?? 0),
+          text: `${property}: ${item.trim()}`,
+        })
+      } else {
+        for (const ms of times) found.push({ ms, text: `${property}: ${item.trim()}` })
+      }
     }
   }
   return found
@@ -60,6 +94,23 @@ describe('7.7-UNIT-020 web motion budget', () => {
     expect(motionTimes("style={{ transitionDuration: '0.4s' }}")[0]?.ms).toBe(400)
     expect(motionTimes('delay-[350ms]')).toEqual([{ ms: 350, text: 'delay-[350ms]' }])
     expect(motionTimes('.s { animation: spin 1s linear infinite; }')).toEqual([])
+    // Duration and delay of one transition add up (CodeRabbit r1 #18).
+    expect(motionTimes('.t { transition: opacity 150ms ease 150ms; }')).toEqual([
+      { ms: 300, text: 'transition: opacity 150ms ease 150ms' },
+    ])
+    // Parallel transitions stay apart; a comma inside cubic-bezier() does not split one.
+    expect(
+      motionTimes(
+        '.t { transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1), color 100ms; }'
+      )
+    ).toEqual([
+      { ms: 150, text: 'transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1)' },
+      { ms: 100, text: 'transition: color 100ms' },
+    ])
+    // A spinner beside a finite animation skips the spinner only (CodeRabbit r1 #19).
+    expect(
+      motionTimes('.a { animation: spin 1s linear infinite, rise 300ms ease-out; }')
+    ).toEqual([{ ms: 300, text: 'animation: rise 300ms ease-out' }])
     expect(motionTimes('max-w-300 w-[300px] h-1.5s')).toEqual([])
   })
 

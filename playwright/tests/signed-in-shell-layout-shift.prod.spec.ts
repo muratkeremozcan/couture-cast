@@ -5,9 +5,10 @@
 // The PR gate measures the shell against fixed responses (signed-in-shell-layout-shift.spec.ts);
 // this measures production with real data at 390 x 844, as a signed-out visitor and as the
 // production synthetic member. Read-only: every non-GET request is aborted before it leaves the
-// browser, so a measurement never writes to the member's account (owner rule 2026-11-20).
+// browser, except Community's read-only target resolve, so a measurement never writes to the
+// member's account (owner rule 2026-11-20).
 // Baseline before this story, main 11c26918: signed-out Home 0, Closet 0.1157, Community 0.0018,
-// Profile 0.51; member Home 0.574 at 500 px on 2026-11-21.
+// Profile 0.51; member Home 0.82 at 390 x 844 (0.574 at 500 px on 2026-11-21).
 import type { Browser, BrowserContext } from '@playwright/test'
 import { isProdEnvironment, projectMetadata } from '../support/helpers/api-test'
 import {
@@ -53,9 +54,15 @@ async function readOnlyContext(
   })
   // Deviation from interceptNetworkCall: that fixture binds to the default page, and each case
   // here needs its own context for its storage. This stubs nothing; it refuses writes.
-  await context.route('**/*', (route) =>
-    route.request().method() === 'GET' ? route.fallback() : route.abort()
-  )
+  await context.route('**/*', (route) => {
+    const request = route.request()
+    // Community resolves the posts it shows through a POST that only reads (CodeRabbit r1 #22);
+    // aborting it would make the feed hide itself and measure an outage instead of the shell.
+    const readOnlyPost =
+      request.method() === 'POST' &&
+      new URL(request.url()).pathname.endsWith('/api/v1/community/targets/resolve')
+    return request.method() === 'GET' || readOnlyPost ? route.fallback() : route.abort()
+  })
   return context
 }
 

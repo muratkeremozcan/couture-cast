@@ -61,6 +61,7 @@ import {
 } from '@/src/lib/premium-theme'
 import {
   mobileApplicationUserId,
+  mobileIdentityEpoch,
   resolveMobileAccessToken,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
@@ -176,6 +177,14 @@ function useReturnFocusCount(): number {
   return returns
 }
 
+/**
+ * Story CC-7.7 D5: whether a return read that started under `identity` still belongs to the
+ * member on screen. A sign-out or account switch in between drops its answer.
+ */
+function isSameMember(identity: number, signedIn: boolean | null): boolean {
+  return signedIn === true && mobileIdentityEpoch() === identity
+}
+
 export default function SettingsScreen() {
   const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
@@ -200,6 +209,8 @@ export default function SettingsScreen() {
     'commerce.settings.loadError' | 'commerce.settings.error' | null
   >(null)
   const commerceChangeInFlight = useRef(false)
+  // Advances when a toggle starts, so a return read that began before it never lands over it.
+  const commerceMutationRef = useRef(0)
   const signedIn = useMemberSignedIn()
   const signedInRef = useRef(signedIn)
   signedInRef.current = signedIn
@@ -266,9 +277,16 @@ export default function SettingsScreen() {
     if (returns === 0 || signedInRef.current !== true || commerceChangeInFlight.current)
       return
     const controller = new AbortController()
+    const mutation = commerceMutationRef.current
+    const identity = mobileIdentityEpoch()
     void getCommercePreferenceFromMobile(controller.signal)
       .then((preference) => {
-        if (controller.signal.aborted || commerceChangeInFlight.current) return
+        if (
+          controller.signal.aborted ||
+          commerceMutationRef.current !== mutation ||
+          !isSameMember(identity, signedInRef.current)
+        )
+          return
         setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
         setCommerceError((current) =>
           current === 'commerce.settings.loadError' ? null : current
@@ -286,6 +304,7 @@ export default function SettingsScreen() {
     const previous = affiliateCtasEnabled
     const next = !previous
     commerceChangeInFlight.current = true
+    commerceMutationRef.current += 1
     // Optimistic, then reverted on failure. The alternative leaves the switch
     // visually stuck under the user's finger for a whole round trip.
     setAffiliateCtasEnabled(next)
@@ -845,6 +864,8 @@ function PremiumSettingsSection({
   // the unavailable fallback after would flash a control that cannot work.
   const [purchasesAvailability, setPurchasesAvailability] =
     useState<PurchasesAvailability | null>(null)
+  const purchasesAvailabilityRef = useRef(purchasesAvailability)
+  purchasesAvailabilityRef.current = purchasesAvailability
   const [purchasesSettled, setPurchasesSettled] = useState(false)
   const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
   const premiumFlowInFlight = useRef(false)
@@ -924,16 +945,32 @@ function PremiumSettingsSection({
     if (returns === 0 || signedInRef.current !== true || premiumFlowInFlight.current)
       return
     const controller = new AbortController()
+    const identity = mobileIdentityEpoch()
+    const stillCurrent = () =>
+      !controller.signal.aborted && isSameMember(identity, signedInRef.current)
     void getSubscriptionFromMobile(controller.signal)
-      .then((current) => {
-        if (controller.signal.aborted || premiumFlowInFlight.current) return
-        setSubscription(current)
+      .then((refreshed) => {
+        if (!stillCurrent() || premiumFlowInFlight.current) return
+        setSubscription(refreshed)
         setSubscriptionLoadFailed(false)
       })
       .catch(() => undefined)
     void getPremiumAccessFromMobile(controller.signal)
-      .then((access) => {
-        if (!controller.signal.aborted && access) setPremiumAccess(access)
+      .then(async (access) => {
+        if (!stillCurrent() || !access) return
+        setPremiumAccess(access)
+        // Access that stopped being complimentary needs the store's answer the first read
+        // skipped, or the subscribe controls never appear. Complimentary access still never
+        // configures the store.
+        if (isComplimentaryAccess(access) || purchasesAvailabilityRef.current !== null)
+          return
+        setPurchasesSettled(false)
+        try {
+          const availability = await ensurePurchasesConfigured()
+          if (stillCurrent()) setPurchasesAvailability(availability)
+        } finally {
+          if (stillCurrent()) setPurchasesSettled(true)
+        }
       })
       .catch(() => undefined)
     return () => controller.abort()
@@ -1761,10 +1798,11 @@ function ProfileAccountHeader({
   useEffect(() => {
     if (returns === 0 || signedInRef.current !== true) return
     let active = true
+    const identity = mobileIdentityEpoch()
     void Promise.resolve()
       .then(() => getUserProfileFromMobile())
       .then((profile) => {
-        if (!active || !profile) return
+        if (!active || !profile || !isSameMember(identity, signedInRef.current)) return
         const displayName = profile.user.displayName?.trim() || null
         setAccount({ displayName, email: profile.user.email })
       })

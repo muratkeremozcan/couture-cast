@@ -154,6 +154,12 @@ export function useCommunitySpotlight<Token = number>({
   const itemControllersRef = useRef(new Set<AbortController>())
   const textClockRef = useRef(0)
   const textFenceRef = useRef(new Map<string, number>())
+  /**
+   * CC-7.7 D5: a return started from a remembered row, which may hold several pages. Its first
+   * page-one read refreshes that row in place and keeps its cursor; a reset, a failed read or a
+   * cursor restart ends it.
+   */
+  const restoringRef = useRef((initial?.items.length ?? 0) > 0)
 
   const preserveNewerText = useCallback(
     (
@@ -195,6 +201,8 @@ export function useCommunitySpotlight<Token = number>({
     async (restarted = false) => {
       const request = begin()
       const startClock = textClockRef.current
+      const inPlace =
+        !restarted && restoringRef.current && stateRef.current.items.length > 0
       setState((previous) => ({
         ...previous,
         status: 'loading',
@@ -207,8 +215,28 @@ export function useCommunitySpotlight<Token = number>({
         const page = await getCommunitySpotlightFromWeb({ signal: request.signal })
         if (!request.current()) return
         const items = reconcileRef.current(page.items, ticket)
+        restoringRef.current = false
         setState((previous) => {
           const previousById = new Map(previous.items.map((item) => [item.id, item]))
+          if (inPlace) {
+            // The remembered row keeps every page it showed and its cursor: the looks on this
+            // page take its answer where they are, and any new one joins at the end of the row.
+            const pageById = new Map(items.map((item) => [item.id, item]))
+            const kept = previous.items.map((item) => {
+              const fresh = pageById.get(item.id)
+              return fresh ? preserveNewerText(fresh, item, startClock) : item
+            })
+            return {
+              ...previous,
+              status: 'ready',
+              level: page.level,
+              label: page.label,
+              items: [...kept, ...newEntries(previous.items, items)],
+              loadingMore: false,
+              moreFailed: false,
+              focusTargetId: null,
+            }
+          }
           const merged = items.map((item) =>
             preserveNewerText(item, previousById.get(item.id), startClock)
           )
@@ -227,6 +255,7 @@ export function useCommunitySpotlight<Token = number>({
           announceRef.current({ key: 'community.spotlight.announceRefreshed' })
       } catch (error: unknown) {
         if (!request.current()) return
+        restoringRef.current = false
         const sanction = bannedSanctionOf(error)
         if (sanction) onBannedRef.current?.(sanction)
         setState({ ...IDLE, status: isDisabledRefusal(error) ? 'disabled' : 'error' })
@@ -304,6 +333,7 @@ export function useCommunitySpotlight<Token = number>({
     controllerRef.current?.abort()
     abortItemRefreshes()
     generationRef.current++
+    restoringRef.current = false
     textClockRef.current++
     textFenceRef.current.clear()
     setState(IDLE)

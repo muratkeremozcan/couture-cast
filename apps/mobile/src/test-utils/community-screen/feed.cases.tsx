@@ -10,6 +10,7 @@ import {
   feedUrls,
   serveFeed,
   setMockParams,
+  communityGateOpen,
 } from './harness'
 import { refreshEvents, routing } from './mock-state'
 import { userEvent as browserUser } from 'vitest/browser'
@@ -59,6 +60,7 @@ export function registerCommunityFeedCases() {
           })
     )
     await render(<CommunityScreen />)
+    await communityGateOpen()
     expect(await screen.findByTestId('community-example-inspiration')).toBeVisible()
     press(screen.getByTestId('community-feed-load-more'))
     expect(await screen.findByTestId('community-post-card-post-peer')).toBeVisible()
@@ -88,6 +90,7 @@ export function registerCommunityFeedCases() {
         )
       )
       await render(<CommunityScreen />)
+      await communityGateOpen()
       const detail = await screen.findByTestId('highlighted-community-card-own-private')
       expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
       // The published row proves the detail renders the opener in the same pass, so the
@@ -157,6 +160,7 @@ export function registerCommunityFeedCases() {
       await screen.findByTestId('community-post-card-post-a')
       release()
       const target = await screen.findByTestId('highlighted-community-card-post-a')
+      await communityGateOpen()
       expect(within(target).getByTestId('community-post-card-post-a')).toBeVisible()
       expect(within(target).queryByTestId('community-reactions-post-a')).toBeNull()
     } finally {
@@ -206,6 +210,7 @@ export function registerCommunityFeedCases() {
         await waitFor(() =>
           expect(screen.queryByTestId('community-post-card-post-b')).toBeNull()
         )
+        await communityGateOpen()
         expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
         if (openedPost === 'post-a') {
           expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
@@ -554,6 +559,7 @@ export function registerCommunityFeedCases() {
     try {
       await render(<CommunityScreen />)
       const notice = await screen.findByTestId('community-band-unresolved')
+      await communityGateOpen()
       expect(within(notice).getByTestId('community-add-location')).toBeVisible()
 
       // What signOutNativeSession does to the session boundary: the token goes

@@ -48,7 +48,12 @@ import {
   type MemberSession,
 } from '../../../lib/use-web-session'
 import { LocationSearchForm, type LocationClaim } from './location-search-form'
-import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from '../screen-gate'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from '../screen-gate'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -151,6 +156,8 @@ function MemberLocationsSection({
    * section, or after sign out.
    */
   const ownerGenerationRef = useRef(0)
+  /** Only the newest list read lands; a mutation also retires the reads started before it. */
+  const reloadGenerationRef = useRef(0)
   /**
    * One ownership token for work started now for `startedFor`: it may still
    * touch this section while the section is mounted for the same member and
@@ -212,8 +219,11 @@ function MemberLocationsSection({
       const { current } = claimed
       const credentials = claimed.credentials()
       if (!credentials) return false
+      const generation = ++reloadGenerationRef.current
       const next = await listLocationsFromWeb(signal, credentials)
       if (signal?.aborted || !current()) return false
+      // A newer list read, or a change the member started since, outranks this answer.
+      if (generation !== reloadGenerationRef.current) return false
       setLocations(next)
       setSectionState('ready')
       return true
@@ -313,6 +323,8 @@ function MemberLocationsSection({
     const claimed = claim()
     if (!claimed) return
     const { current } = claimed
+    // A list read still out (a return's in-place refresh) predates this change: drop it.
+    reloadGenerationRef.current++
     setBusyId(locationId)
     setError(null)
     try {
@@ -428,14 +440,16 @@ function MemberLocationsSection({
         </button>
       )}
 
-      {(sectionState === 'signed_out' || guestHint) && (
-        <p
-          data-landing={guestHint ? 'guest' : undefined}
-          className="mt-4 text-sm text-neutral-300"
-          data-testid="locations-signed-out"
-        >
+      {sectionState === 'signed_out' && (
+        <p className="mt-4 text-sm text-neutral-300" data-testid="locations-signed-out">
           {t('locations.signedOutHint')}
         </p>
+      )}
+      {guestHint && (
+        <GuestText
+          text={t('locations.signedOutHint')}
+          className="mt-4 text-sm text-neutral-300"
+        />
       )}
 
       {sectionState === 'load_failed' && (

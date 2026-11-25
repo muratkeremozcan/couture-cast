@@ -594,19 +594,28 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         signedIn: true,
         memberId: memberA,
         watchMembers: [memberA, memberB],
-        // Codex P2-1: the third path swaps while member A's ritual read is still in flight.
-        hold: path === 'swap-while-reading' ? { ritual: 2500 } : undefined,
       })
-      const go = async (screen: ShellScreen) => {
+      const tap = async (screen: ShellScreen) => {
         setScreen(screen)
         const tappedAt = await meterNow(page)
         await page.getByTestId(TABS[screen].nav).click()
-        return settleTransition(page, {
+        return tappedAt
+      }
+      const go = async (screen: ShellScreen) =>
+        settleTransition(page, {
           screen,
-          fromMs: tappedAt,
+          fromMs: await tap(screen),
           inflight: router.inflight,
         })
-      }
+      const switchToB = () =>
+        page.evaluate(
+          ({ token }) => {
+            window.sessionStorage.setItem('couturecast.access-token', token)
+            window.dispatchEvent(new Event('couture:session'))
+          },
+          { token: localE2EAccessToken(memberB) }
+        )
+
       await page.goto('/')
       await settleTransition(page, {
         screen: 'home',
@@ -619,32 +628,71 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       )
       await go('closet')
 
-      if (path === 'sign-out-then-sign-in') {
-        await go('home')
-        await page.getByTestId('landing-sign-out').click()
-      }
-      // Member B signs in inside the same document: the app's own session event, no reload.
-      // From here on member A's content may not appear in any frame.
-      const switchedAt = await meterNow(page)
-      await page.evaluate(
-        ({ token }) => {
-          window.sessionStorage.setItem('couturecast.access-token', token)
-          window.dispatchEvent(new Event('couture:session'))
-        },
-        { token: localE2EAccessToken(memberB) }
-      )
+      let switchedAt: number
       if (path === 'swap-while-reading') {
-        // A's late answer lands on the mounted Home after the switch; then a tab round trip
-        // must not bring A back from the snapshot either.
+        // Codex P2-1, CodeRabbit r1 #30: back on Home (from A's snapshot) with A's refresh read
+        // sent and held, B signs in while that read is still out; then it answers.
+        const releaseA = router.hold('ritual')
+        const ritualReads = router.calls('ritual')
+        await tap('home')
+        await recurse(
+          () => Promise.resolve(router.calls('ritual')),
+          (calls) => calls > ritualReads,
+          { timeout: 10_000, interval: 50, log: false }
+        )
+        await switchToB()
+        // A's Home was on screen up to the switch; the frame the switch lands in is A's own.
+        // From the next frame on, nothing of A's may show.
+        await page.evaluate(
+          () =>
+            new Promise((done) =>
+              requestAnimationFrame(() => requestAnimationFrame(done))
+            )
+        )
+        switchedAt = await meterNow(page)
+        releaseA()
         await settleTransition(page, {
           screen: 'home',
           fromMs: switchedAt,
           inflight: router.inflight,
         })
         await go('closet')
-      } else if (path === 'sign-out-then-sign-in') await go('closet')
-      const homeAt = await meterNow(page)
-      const snapshot = await go('home')
+      } else {
+        if (path === 'sign-out-then-sign-in') {
+          await go('home')
+          await page.getByTestId('landing-sign-out').click()
+        }
+        // Home is not mounted here, so the window starts before the switch itself.
+        switchedAt = await meterNow(page)
+        await switchToB()
+        if (path === 'sign-out-then-sign-in') await go('closet')
+      }
+
+      // CodeRabbit r1 #20: B's ritual is held until the first Home frame is recorded, so that
+      // frame cannot be ready from B's own reads; a ready first frame can only be a snapshot.
+      const releaseB = router.hold('ritual')
+      const homeAt = await tap('home')
+      const firstFrames = await recurse(
+        () => readMeter(page, homeAt),
+        (current) => current.frames.some((frame) => frame.present.includes('home')),
+        { timeout: 10_000, interval: 50, log: false }
+      )
+      const firstHome = firstFrames.frames.find((frame) => frame.present.includes('home'))
+      if (path === 'bearer-swap') {
+        // A's remembered Home was dropped: B's Home opens through the gate, not at once. The
+        // other paths leave Home mounted while B signs in, so B legitimately has a Home of their
+        // own to return to by now (CI, 61d7156e); for them the oracle is the text check below.
+        expect(
+          firstHome?.ready ?? [],
+          'Home opened from a remembered snapshot'
+        ).not.toContain('home')
+      }
+      releaseB()
+      const snapshot = await settleTransition(page, {
+        screen: 'home',
+        fromMs: homeAt,
+        inflight: router.inflight,
+      })
 
       // D5 privacy: no frame from the switch on shows member A's outfit, on the mounted Home
       // or after the round trip (the whole window, not only the last transition).
@@ -653,16 +701,6 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         textSightings(sinceSwitch.frames, [ownerMarker(memberA)], switchedAt),
         'member A content shown after the owner changed'
       ).toEqual({})
-      if (path !== 'swap-while-reading') {
-        // A's remembered Home was dropped: B's Home opens through the gate, not at once.
-        const firstHome = snapshot.frames.find(
-          (frame) => frame.t >= homeAt && frame.present.includes('home')
-        )
-        expect(
-          firstHome?.ready ?? [],
-          'Home opened from a remembered snapshot'
-        ).not.toContain('home')
-      }
       await expect(page.getByTestId('home-live-outfit')).toContainText(
         ownerMarker(memberB)
       )

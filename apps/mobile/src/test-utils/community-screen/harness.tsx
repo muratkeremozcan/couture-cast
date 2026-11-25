@@ -6,9 +6,10 @@ import {
   imageEvents,
 } from './mock-state'
 import { createElement } from 'react'
+import { screen, waitFor } from '@testing-library/react'
 import { Buffer } from 'buffer'
 import { http, HttpResponse } from 'msw'
-import { beforeEach, vi } from 'vitest'
+import { beforeEach, expect, vi } from 'vitest'
 import {
   encodeCommunityFeedCursor,
   type ClimateBand,
@@ -206,6 +207,18 @@ function serveFeed(respond: (url: URL, index: number) => Response | Promise<Resp
   )
 }
 
+/**
+ * Story CC-7.7 D3: the feed sits inside the screen gate, which opens once the first feed page
+ * and the City Spotlight both settle. The Spotlight read starts only after the member resolves,
+ * so feed content can mount behind the closed gate one read before the member sees it. A case
+ * that asserts what is on screen waits for the gate first.
+ */
+async function communityGateOpen() {
+  await waitFor(() =>
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+  )
+}
+
 function setMockParams(params: Record<string, string>) {
   routing.params = params
 }
@@ -223,6 +236,7 @@ export {
   errorEnvelope,
   feedUrls,
   serveFeed,
+  communityGateOpen,
   setMockParams,
   authorState,
   UPLOAD_URL,

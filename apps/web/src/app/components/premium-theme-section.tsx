@@ -51,7 +51,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
 
@@ -323,14 +328,21 @@ function LockedPanel({
       <p className="text-sm font-medium text-white">
         {t('commerce.premium.theme.locked.title')}
       </p>
-      <p className="text-sm text-neutral-300">
-        {t(
-          isSignedOut
-            ? 'commerce.premium.theme.locked.signedOutBody'
-            : 'commerce.premium.theme.locked.body',
-          { palettes }
-        )}
-      </p>
+      {landing ? (
+        <GuestText
+          text={t('commerce.premium.theme.locked.signedOutBody', { palettes })}
+          className="text-sm text-neutral-300"
+        />
+      ) : (
+        <p className="text-sm text-neutral-300">
+          {t(
+            isSignedOut
+              ? 'commerce.premium.theme.locked.signedOutBody'
+              : 'commerce.premium.theme.locked.body',
+            { palettes }
+          )}
+        </p>
+      )}
     </div>
   )
 }
@@ -375,6 +387,11 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
    * of whatever page the reader had moved to, from a component that no longer existed.
    */
   const saveControllerRef = useRef<AbortController | null>(null)
+  /**
+   * Advances when a save starts. A read started before it (a return's in-place refresh) answers
+   * for an older palette, so it never replaces the one the save commits.
+   */
+  const saveGenerationRef = useRef(0)
 
   useEffect(() => () => saveControllerRef.current?.abort(), [])
 
@@ -412,6 +429,8 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    const saveGeneration = saveGenerationRef.current
+    const superseded = () => saveGeneration !== saveGenerationRef.current
     beginRead()
     setError(null)
     if (!inPlace) setSectionState('loading')
@@ -424,14 +443,14 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
           () => getThemeFromWeb(controller.signal),
           (error) => premiumThemeFailureReason(error) === 'signed_out'
         )
-        if (!current()) {
+        if (!current() || superseded()) {
           return
         }
         setTheme(next)
         applyMemberTheme(next.theme, owner)
         setSectionState('ready')
       } catch (loadError: unknown) {
-        if (!current()) {
+        if (!current() || superseded()) {
           return
         }
         // A restored palette stays on screen when its refresh fails, unless the member is out.
@@ -503,6 +522,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     saveControllerRef.current = controller
+    saveGenerationRef.current++
     setSavingTheme(option.dataTheme)
     setError(null)
 

@@ -130,6 +130,112 @@ describe('ScreenGate (native)', () => {
     expect(placeholder()).toBeVisible()
   })
 
+  // CodeRabbit r1: the open latch belongs to one member visit. Member A's latch never reopens
+  // the gate when A comes back over reads that have not settled yet.
+  it('7.7-NAT-007 a latch from member A never reopens the gate for A’s return over unsettled reads', () => {
+    const view = render(<Gate session="member" ready />)
+    expect(placeholder()).toBeNull()
+
+    act(() => setMobileApplicationUserId('member-b'))
+    view.rerender(<Gate session="member" ready={false} />)
+    expect(placeholder()).toBeVisible()
+
+    act(() => setMobileApplicationUserId('member-a'))
+
+    expect(placeholder()).toBeVisible()
+    expect(screen.getByTestId('gated-body')).not.toBeVisible()
+    expect(gate()).not.toHaveAttribute('data-ready')
+
+    view.rerender(<Gate session="member" ready />)
+
+    expect(placeholder()).toBeNull()
+    expect(screen.getByTestId('gated-body')).toBeVisible()
+  })
+
+  // CodeRabbit r1: a screen resets its reads in an effect, so on the first render for a new
+  // member `ready` can still describe the previous member. That readiness opens nothing.
+  it('7.7-NAT-008 readiness still true from the previous member keeps the gate closed until the new member’s reads settle', () => {
+    const view = render(<Gate session="member" ready />)
+    expect(placeholder()).toBeNull()
+
+    act(() => setMobileApplicationUserId('member-b'))
+
+    // Same props, so `ready` is member A's: the gate closes at once for member B.
+    expect(placeholder()).toBeVisible()
+    expect(screen.getByTestId('gated-body')).not.toBeVisible()
+    expect(gate()).not.toHaveAttribute('data-ready')
+
+    // The screen reports member B's reads as unsettled, then settled.
+    view.rerender(<Gate session="member" ready={false} />)
+    expect(placeholder()).toBeVisible()
+    view.rerender(<Gate session="member" ready />)
+
+    expect(placeholder()).toBeNull()
+    expect(gate()).toHaveAttribute('data-ready', 'true')
+    // Member B's own settled reads latch the gate: a refresh keeps it open.
+    view.rerender(<Gate session="member" ready={false} />)
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-008 readiness carried through a sign-out still opens nothing for the next member', () => {
+    const view = render(<Gate session="member" ready />)
+
+    act(() => setMobileApplicationUserId(null))
+    view.rerender(<Gate session="signed-out" ready />)
+    // Signed out opens the gate at once, as before.
+    expect(placeholder()).toBeNull()
+
+    act(() => setMobileApplicationUserId('member-b'))
+    view.rerender(<Gate session="member" ready />)
+
+    expect(placeholder()).toBeVisible()
+    expect(screen.getByTestId('gated-body')).not.toBeVisible()
+  })
+
+  // CodeRabbit r1: the session state can lag a sign-in by a render. A signed-out state seen
+  // with the new member's id opens the gate, but never latches it for that member.
+  it('7.7-NAT-009 a signed-out session lagging a sign-in never latches the gate for the new member', () => {
+    setMobileApplicationUserId(null)
+    const view = render(<Gate session="signed-out" ready={false} />)
+    expect(placeholder()).toBeNull()
+
+    act(() => setMobileApplicationUserId('member-b'))
+    // Still signed out for one render, with member B's id.
+    expect(placeholder()).toBeNull()
+
+    view.rerender(<Gate session="member" ready={false} />)
+
+    expect(placeholder()).toBeVisible()
+    expect(screen.getByTestId('gated-body')).not.toBeVisible()
+  })
+
+  it('7.7-NAT-012 reports each open and close, the deadline opening included', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const onOpenChange = vi.fn<(open: boolean) => void>()
+    try {
+      render(
+        <ScreenGate
+          screen="community"
+          session="member"
+          ready={false}
+          onOpenChange={onOpenChange}
+        >
+          <Body label="feed" />
+        </ScreenGate>
+      )
+      expect(onOpenChange.mock.calls).toEqual([[false]])
+
+      act(() => {
+        vi.advanceTimersByTime(SCREEN_GATE_DEADLINE_MS)
+      })
+
+      expect(placeholder()).toBeNull()
+      expect(onOpenChange.mock.calls).toEqual([[false], [true]])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   // Review triage P2-2: one stalled read never hides the sections that answered, or their Retry.
   it('7.7-NAT-001 opens at the deadline when a member read never settles', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

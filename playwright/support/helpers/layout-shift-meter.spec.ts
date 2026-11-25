@@ -228,6 +228,7 @@ describe('readKey', () => {
       `${api}/user/profile`,
       `${api}/wardrobe/onboarding`,
       `${api}/wardrobe/garments`,
+      `${api}/wardrobe/saved-looks?limit=50&offset=0`,
       `${api}/locations`,
       `${api}/commerce/preferences`,
       `${api}/commerce/subscription`,

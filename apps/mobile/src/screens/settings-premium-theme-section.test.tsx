@@ -92,6 +92,8 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   resolveMobileAccessToken: () => Promise.resolve('member-token'),
   subscribeMobileApplicationUser: () => () => undefined,
   mobileApplicationUserId: () => null,
+  // Settings drops a return read whose member changed; no member change happens here.
+  mobileIdentityEpoch: () => 0,
   setMobileApplicationUserId: () => undefined,
   setMobileAccessTokenResolver: () => undefined,
 }))

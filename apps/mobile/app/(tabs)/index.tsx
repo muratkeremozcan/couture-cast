@@ -134,6 +134,14 @@ async function classifyRitualError(error: unknown): Promise<HeroLoadError> {
 }
 const modalFocusRestorationDelayMs = 400
 
+/**
+ * Story CC-7.7 D5: whether a ritual read brought back the answer already on screen. Both sides
+ * are parsed JSON from the same endpoint, so their serialized forms compare field by field.
+ */
+function sameRitualAnswer(shown: unknown, fetched: unknown): boolean {
+  return JSON.stringify(shown) === JSON.stringify(fetched)
+}
+
 function focusAccessibilityTarget(
   target: ComponentRef<typeof Pressable> | null,
   testId: string
@@ -381,6 +389,9 @@ export default function TabOneScreen() {
     setShareCardSource(null)
     setShareCardOpen(false)
     setOwnedRitual(null)
+    // Cleared when the member leaves, so the same member returning (A, signed out, A) is
+    // unsettled until their new ritual read settles: no sample outfit before it.
+    setSettledOwner(undefined)
     setAlertPreferences(undefined)
     setError(null)
     setIsCacheServed(false)
@@ -493,8 +504,16 @@ export default function TabOneScreen() {
       const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
       if (!isCurrent()) return
 
-      setOwnedRitual({ owner: applicationUserId, data })
-      setAlertPreferences(fetchedPreferences)
+      // A tab return re-reads in place; an unchanged answer keeps the state it already has, so
+      // the outfit card and the rest of Home do not render again for the same outfit.
+      setOwnedRitual((shown) =>
+        shown?.owner === applicationUserId && sameRitualAnswer(shown.data, data)
+          ? shown
+          : { owner: applicationUserId, data }
+      )
+      setAlertPreferences((shown) =>
+        sameRitualAnswer(shown, fetchedPreferences) ? shown : fetchedPreferences
+      )
       setIsCacheServed(false)
       setError(null)
       setIsStale(false)

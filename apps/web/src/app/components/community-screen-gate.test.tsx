@@ -8,6 +8,8 @@
 // Codex review of 8327b4fb: 7.7-CMP-012 pins realtime cancelling or refusing the first feed read
 // (P1-1), 7.7-CMP-013 the deep-link focus that waits for the gate (P2-8), 7.7-CMP-014 the return
 // with its filter, paged rows and scroll (P2-5), 7.7-CMP-015 losing access (P3-1).
+// CodeRabbit round 1 on PR 292: 7.7-CMP-030 a return's Spotlight refresh keeps every page it showed
+// (#1), 7.7-CMP-031 a failed filter switch never relabels the kept rows (#28).
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -393,5 +395,108 @@ describe('7.7 Community screen gate', () => {
     expect(screen.getByTestId('screen-gate')).not.toHaveAttribute('data-ready')
     expect(screen.getByTestId('screen-placeholder')).toBeVisible()
     expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+  })
+
+  it('7.7-CMP-030 a return refreshes a paged Spotlight in place: the pages it showed and their cursor stay (CodeRabbit r1 #1)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    let returning = false
+    const refresh = Promise.withResolvers<void>()
+    const cursors: (string | null)[] = []
+    useMswHandlers(
+      http.get(FEED_PATH, () => feedBody({ items: [item()] })),
+      http.get(SPOTLIGHT_PATH, async ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        cursors.push(cursor)
+        if (cursor === 'cursor-2')
+          return spotlightBody({ items: [ranked(3), ranked(4)], nextCursor: 'cursor-3' })
+        if (cursor === 'cursor-3')
+          return spotlightBody({ items: [ranked(5)], nextCursor: null })
+        if (!returning)
+          return spotlightBody({ items: [ranked(1), ranked(2)], nextCursor: 'cursor-2' })
+        await refresh.promise
+        // Page one now holds a look that is new since the member left.
+        return spotlightBody({
+          items: [ranked(1), ranked(2), ranked(6)],
+          nextCursor: 'cursor-2',
+        })
+      })
+    )
+    const user = userEvent.setup()
+    const ranks = () =>
+      within(screen.getByTestId('community-spotlight-list'))
+        .getAllByRole('listitem')
+        .map((entry) => entry.getAttribute('data-rank'))
+
+    // First visit: the member pages the Spotlight to its second page.
+    const firstVisit = renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await user.click(await screen.findByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('spotlight-lookbook-card-spot-4')
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall<{ spotlight: { items: unknown[]; nextCursor: string } }>(
+          currentWebSessionScope(),
+          'community',
+          COMMUNITY_GRID_SNAPSHOT_PART
+        )?.spotlight
+      ).toMatchObject({ items: { length: 4 }, nextCursor: 'cursor-3' })
+    )
+    firstVisit.unmount()
+
+    // The return starts from both pages, and its page-one refresh updates them in place.
+    returning = true
+    renderCommunity()
+    expect(ranks()).toEqual(['1', '2', '3', '4'])
+    await waitFor(() => expect(cursors.at(-1)).toBeNull())
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+    await waitFor(() => expect(ranks()).toEqual(['1', '2', '3', '4', '6']))
+    expect(screen.queryByTestId('community-spotlight-loading')).toBeNull()
+
+    // The cursor of the second page survived the refresh: View more asks for the third.
+    await user.click(screen.getByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('spotlight-lookbook-card-spot-5')
+    expect(cursors.at(-1)).toBe('cursor-3')
+    expect(ranks()).toEqual(['1', '2', '3', '4', '6', '5'])
+  })
+
+  it('7.7-CMP-031 a filter switch whose read fails keeps the snapshot on the filter its rows were read for (CodeRabbit r1 #28)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    useMswHandlers(
+      http.get(FEED_PATH, ({ request }) =>
+        new URL(request.url).searchParams.get('mode') === 'all'
+          ? HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+          : feedBody({ items: [item()] })
+      ),
+      http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] }))
+    )
+    const user = userEvent.setup()
+    renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    const kept = () =>
+      screenSnapshot.recall<{ mode: string; items: { id: string }[] }>(
+        currentWebSessionScope(),
+        'community',
+        COMMUNITY_GRID_SNAPSHOT_PART
+      )
+    await waitFor(() => expect(kept()?.items.map((post) => post.id)).toEqual(['post-1']))
+    const readFor = kept()!.mode
+    expect(readFor).not.toBe('all')
+
+    // The member picks All; its first page fails, so the rows on screen are still the first
+    // filter's rows.
+    await user.click(screen.getByTestId('community-filter-all'))
+    expect(await screen.findByTestId('community-feed-error')).toBeVisible()
+    expect(screen.getByTestId('lookbook-card-post-1')).toBeInTheDocument()
+
+    expect(kept()).toMatchObject({ mode: readFor, items: [{ id: 'post-1' }] })
   })
 })

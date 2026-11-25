@@ -66,6 +66,11 @@ export interface CommunitySpotlightModuleProps {
   items: CommunityReactionSpotlightItem[]
   hasMore: boolean
   isLoadingMore: boolean
+  /**
+   * Story CC-7.7 D5: page one is being replaced in place. View more keeps its place but is
+   * disabled until the fresh page (and its cursor) lands.
+   */
+  isReplacing?: boolean
   loadMoreFailed: boolean
   focusRequest: SpotlightFocusRequest | null
   /** Retires a handled request in its owner, so a remount never replays it. */
@@ -86,6 +91,7 @@ export function CommunitySpotlightModule({
   items,
   hasMore,
   isLoadingMore,
+  isReplacing = false,
   loadMoreFailed,
   focusRequest,
   onFocusRequestHandled,
@@ -348,8 +354,10 @@ export function CommunitySpotlightModule({
           testID="community-spotlight-view-more"
           style={[styles.outlineButton, { borderColor: palette.mutedText }]}
           onPress={onViewMore}
+          disabled={isReplacing}
           accessibilityRole="button"
           accessibilityLabel={t('community.spotlight.viewMore')}
+          accessibilityState={{ disabled: isReplacing }}
         >
           <Text style={[styles.outlineButtonText, { color: palette.text }]}>
             {t('community.spotlight.viewMore')}

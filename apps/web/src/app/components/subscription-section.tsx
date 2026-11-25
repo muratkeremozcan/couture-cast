@@ -52,7 +52,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 
@@ -757,16 +762,22 @@ function MemberSubscriptionSection({
         />
       )}
 
-      {isSignedOut && (
-        <p
-          id={SIGNED_OUT_HINT_ID}
-          data-landing={landing}
-          className="mt-2 text-sm text-neutral-300"
-          data-testid="premium-signed-out-hint"
-        >
-          {t('commerce.premium.signedOutHint')}
-        </p>
-      )}
+      {isSignedOut &&
+        (landing ? (
+          <GuestText
+            id={SIGNED_OUT_HINT_ID}
+            text={t('commerce.premium.signedOutHint')}
+            className="mt-2 text-sm text-neutral-300"
+          />
+        ) : (
+          <p
+            id={SIGNED_OUT_HINT_ID}
+            className="mt-2 text-sm text-neutral-300"
+            data-testid="premium-signed-out-hint"
+          >
+            {t('commerce.premium.signedOutHint')}
+          </p>
+        ))}
 
       {showPortalLagHint && (
         <p

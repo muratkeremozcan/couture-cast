@@ -24,6 +24,7 @@ import {
   liveFontMountMarkersEnabled,
 } from './live-font-mount-marker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 
 /**
  * Whether the software keyboard is open. iOS reports the change as the keyboard starts
@@ -214,14 +215,31 @@ export function EdgeToEdgeModal({
   ...props
 }: EdgeToEdgeModalProps) {
   const [keyboardOpen] = useKeyboardOpen()
+  // Story CC-7.7 D6: every app modal opens through this wrapper, so the reduced-motion rule lives
+  // here once: instant under the OS setting (and until it resolves), the caller's slide or fade
+  // otherwise. Callers may still pass useModalAnimation's answer; both agree.
+  const reducedMotion = useReducedMotion()
   const { visible = true } = props
+  const requested = reducedMotion ? 'none' : props.animationType
+  // One presentation keeps the animation it opened with (CodeRabbit r1 #16): the setting can
+  // resolve while the modal is up, and react-native-web replays the fade from opacity 0 when the
+  // type changes on an open modal. The next opening uses the resolved setting.
+  const [presented, setPresented] = useState(requested)
+  if (!visible && presented !== requested) setPresented(requested)
+  const animationType = visible ? presented : requested
   useEffect(() => {
     if (!visible) return
     setOpenModals(1)
     return () => setOpenModals(-1)
   }, [visible])
   return (
-    <Modal transparent {...props} statusBarTranslucent navigationBarTranslucent>
+    <Modal
+      transparent
+      {...props}
+      animationType={animationType}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <View testID={scrimTestID} style={[styles.fill, { backgroundColor: scrim }]}>
         <KeyboardAvoidingView
           testID="edge-to-edge-modal-keyboard-view"

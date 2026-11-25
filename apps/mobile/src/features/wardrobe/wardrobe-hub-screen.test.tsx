@@ -521,6 +521,8 @@ describe('WardrobeHubScreen', () => {
   })
 
   it('7.7-NAT-004 keeps the 24-point gap between the setup card, Saved Looks and the closet inside the gate', async () => {
+    // Saved Looks belong to a member: without one the row renders nothing to measure.
+    setMobileApplicationUserId('closet-gate-gap-owner')
     renderScreen()
     const setupCard = await screen.findByTestId('wardrobe-onboarding-card')
     await waitFor(() => expect(setupCard).toBeVisible())

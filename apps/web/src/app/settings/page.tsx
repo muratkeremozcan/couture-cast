@@ -52,8 +52,9 @@ export default function SettingsPage() {
         className="min-h-screen bg-neutral-950 px-6 py-16 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-white outline-none"
       >
         <SettingsTitle />
-        {/* Story CC-7.7 D3 (amended): the body appears once the account, locations, shopping,
-            subscription and theme reads have answered; each used to land and push the next. */}
+        {/* Story CC-7.7 D3 (amended): the body appears once the locations, shopping,
+            subscription and theme reads have answered; each used to land and push the next. The
+            account header above them keeps its own space while it reads (profile-account.tsx). */}
         <ScreenGate screen="profile" reads={PROFILE_GATE_READS}>
           <ProfileAccount />
           {/* Rendered in the first HTML: only its guided-entry query reader waits for the
@@ -69,10 +70,4 @@ export default function SettingsPage() {
   )
 }
 
-const PROFILE_GATE_READS = [
-  'account',
-  'locations',
-  'commerce',
-  'subscription',
-  'theme',
-] as const
+const PROFILE_GATE_READS = ['locations', 'commerce', 'subscription', 'theme'] as const

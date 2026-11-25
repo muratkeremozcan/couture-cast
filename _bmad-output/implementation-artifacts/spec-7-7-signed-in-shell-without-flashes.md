@@ -226,6 +226,17 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
 
 ## Review Triage Log
 
+- 2026-11-25, CodeRabbit round 1 on 61d7156e (30 findings: 29 fixed, #16 handled in
+  EdgeToEdgeModal) plus CI reds. Decisions: the Home marketing hero and legal links sit outside
+  the Home gate and the Home placeholder is `min-h-screen`, so a pending session that ends
+  signed out still shows the landing and its Sign in at once (L-10), and the body appearing
+  above the hero moves nothing on screen; this narrows D1 for Home only. Signed-out first-paint
+  hints render as `GuestText` (aria-hidden, CSS-drawn from `data-guest-text`) only while the
+  session is checking, then the real hint replaces it once signed out, so a member page never
+  carries hint text or test ids. Profile no longer gates on the account read (it shares the
+  session verification request); the account block reserves its two lines instead.
+  `share-card-composer.tsx` returns to its main bytes (Story 6.9 iPad proof hash); the modal
+  reduced-motion rule moves into `EdgeToEdgeModal`, which keeps a presentation's animation.
 - 2026-11-25, Codex review of 8327b4fb (2 P1, 11 P2, 2 P3; 7.7-codex-review.md). Decisions:
   every gate also opens after a 10 s deadline so one stalled read never hides finished sections
   or their Retry (P2-2); a verified member's snapshot is keyed by owner and survives a token

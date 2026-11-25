@@ -37,9 +37,14 @@ function shouldUseBrowserWorker() {
   return typeof navigator !== 'undefined' && 'serviceWorker' in navigator
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   cleanup()
   mockServer?.use(...delayHandler())
+  // Story CC-7.7: gated pages keep a per-member tab snapshot in module memory, so one test's
+  // Closet or Home would open the next test's page for the same member (CI, 61d7156e).
+  // Imported here, after the test file registered its mocks, so the snapshot module sees them.
+  const { screenSnapshot } = await import('./src/lib/screen-snapshot')
+  screenSnapshot.clear()
 })
 
 afterEach(() => {

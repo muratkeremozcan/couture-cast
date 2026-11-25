@@ -160,6 +160,35 @@ export function useGuestFirstPaint(): boolean {
   return document.documentElement.getAttribute(LANDING_SESSION_ATTRIBUTE) === 'none'
 }
 
+/**
+ * A signed-out hint in a section's guest first paint (`useGuestFirstPaint`). Its words are drawn
+ * by globals.css from `data-guest-text`, so they are neither in the document's text nor in the
+ * accessibility tree: a page painted for a stored session never holds a Sign in hint, not even a
+ * hidden one (CI real-session PL-1 to PL-3 and PS-1 on 61d7156e). A signed-out page shows the
+ * same words in the same box from its first paint, and the section's real hint takes the box
+ * once its session check ends signed out.
+ */
+export function GuestText({
+  text,
+  className,
+  id,
+}: {
+  text: string
+  className?: string
+  /** For a control that names the hint in `aria-describedby`. */
+  id?: string
+}) {
+  return (
+    <p
+      id={id}
+      aria-hidden="true"
+      data-landing="guest"
+      data-guest-text={text}
+      className={className}
+    />
+  )
+}
+
 /** The page painted for a stored session (`member` or `pending`), where the placeholder shows. */
 function htmlHoldsSession(): boolean {
   const session = document.documentElement.getAttribute(LANDING_SESSION_ATTRIBUTE)

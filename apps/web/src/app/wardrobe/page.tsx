@@ -39,7 +39,6 @@ import {
   currentWebSessionBearer,
   currentWebSessionOwner,
   currentWebSessionScope,
-  isLiveScope,
   UNVERIFIED_BEARER_OWNER,
   useHydrating,
   useWebSessionOwner,
@@ -520,14 +519,18 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const loadInventory = useCallback(
     async (signal: AbortSignal) => {
       // Give a superseded request one fresh read, including any missing garments.
+      let scopeChanged = false
       for (let attempt = 0; attempt < 2; attempt++) {
         const version = inventoryVersion.current
         const scope = currentWebSessionScope()
         const items = await listGarmentsFromWeb(signal)
         if (signal.aborted || currentWebSessionOwner() !== owner) return null
         // Codex review P2-1: e2e fixture bearers share one owner, so a closet read with the
-        // last fixture bearer is dropped and read again with the bearer the tab holds now.
-        if (!isLiveScope(scope)) continue
+        // last fixture bearer is dropped and read again with the bearer the tab holds now. An
+        // unchanged scope counts, a null one included: a closet read with no member (the
+        // signed-out hub) has no other member's rows to land.
+        scopeChanged = scope !== currentWebSessionScope()
+        if (scopeChanged) continue
         // A completed refresh or local update may be newer than this snapshot.
         if (version !== inventoryVersion.current) continue
         shownScopeRef.current = scope
@@ -537,6 +540,14 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         setHasLoaded(true)
         return items
       }
+      // The session moved again under the fresh read: the load error and its Retry show, never
+      // a blank closet behind a gate that waits for nothing.
+      if (scopeChanged)
+        throw new Error(
+          loadAfterTags.current
+            ? 'Unable to refresh your wardrobe.'
+            : 'Unable to load your wardrobe.'
+        )
       return null
     },
     [owner]
@@ -619,6 +630,8 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
    * again when the verified identity is published, instead of leaving "Your session expired".
    */
   const { attempt: sessionAttempt, missed: missedSession } = useRetryOnVerifiedSession()
+  /** Reads the account and setup progress again after an answer for a scope that left. */
+  const [accountReadAttempt, setAccountReadAttempt] = useState(0)
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureModalOpen
@@ -636,11 +649,19 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   useEffect(() => {
     const controller = new AbortController()
     const capturedBearer = readLiveWebBearer()
+    // Codex review P2-1, like the closet read: an answer read for a session scope the tab no
+    // longer holds (a fixture bearer switch) is dropped and read again for the one it holds now.
+    const scope = currentWebSessionScope()
+    const sameScope = () => {
+      if (scope === currentWebSessionScope()) return true
+      setAccountReadAttempt((attempt) => attempt + 1)
+      return false
+    }
     setUserIdError(false)
     setProfileOwnerBinding(null)
     void resolveCurrentUserId()
       .then((id) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && sameScope()) {
           setUserId(id)
           const liveBearer = readLiveWebBearer()
           if (id && capturedBearer && liveBearer === capturedBearer) {
@@ -649,30 +670,37 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         }
       })
       .catch(() => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || !sameScope()) return
         setUserIdError(true)
         missedSession()
       })
     void getOnboardingStateFromWeb(controller.signal)
       .then((state) => {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && sameScope()) {
           setOnboardingStatus(state.status)
           setOnboardingStatusError(false)
         }
       })
       .catch(() => {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || !sameScope()) return
         setOnboardingStatusError(true)
         missedSession()
       })
     return () => controller.abort()
-  }, [sessionAttempt, missedSession])
+  }, [sessionAttempt, missedSession, accountReadAttempt])
 
   const retryOnboardingStatus = () => {
+    const scope = currentWebSessionScope()
     setOnboardingStatusError(false)
     void getOnboardingStateFromWeb()
-      .then((state) => setOnboardingStatus(state.status))
-      .catch(() => setOnboardingStatusError(true))
+      .then((state) => {
+        if (scope === currentWebSessionScope()) setOnboardingStatus(state.status)
+        else setAccountReadAttempt((attempt) => attempt + 1)
+      })
+      .catch(() => {
+        if (scope === currentWebSessionScope()) setOnboardingStatusError(true)
+        else setAccountReadAttempt((attempt) => attempt + 1)
+      })
   }
 
   useEffect(() => {
@@ -723,6 +751,16 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       return
     }
     const controller = new AbortController()
+    // Codex review P2-1: a page read for a session scope the tab no longer holds is dropped and
+    // read again, and the row does not count as settled on it.
+    const scope = currentWebSessionScope()
+    let superseded = false
+    const sameScope = () => {
+      if (scope === currentWebSessionScope()) return true
+      superseded = true
+      setSavedLooksAttempt((attempt) => attempt + 1)
+      return false
+    }
     setSavedLooksLoading(true)
     void listSavedLooksPageFromWeb({
       owner: effectiveSavedLooksOwner,
@@ -734,7 +772,8 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         if (
           controller.signal.aborted ||
           savedLooksLoadEpochRef.current !== loadEpoch ||
-          currentWebSessionOwner() !== owner
+          currentWebSessionOwner() !== owner ||
+          !sameScope()
         ) {
           return
         }
@@ -743,7 +782,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         setSavedLooksError(null)
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted || savedLooksLoadEpochRef.current !== loadEpoch) {
+        if (
+          controller.signal.aborted ||
+          savedLooksLoadEpochRef.current !== loadEpoch ||
+          !sameScope()
+        ) {
           return
         }
         setSavedLooksError(
@@ -752,7 +795,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         missedSession()
       })
       .finally(() => {
-        if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
+        if (
+          !controller.signal.aborted &&
+          !superseded &&
+          savedLooksLoadEpochRef.current === loadEpoch
+        ) {
           setSavedLooksLoading(false)
           setSavedLooksSettled(true)
         }

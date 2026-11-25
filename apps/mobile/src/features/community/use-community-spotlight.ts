@@ -43,6 +43,11 @@ export interface CommunitySpotlightView {
   items: CommunityReactionSpotlightItem[]
   hasMore: boolean
   isLoadingMore: boolean
+  /**
+   * Story CC-7.7 D5: a page-one read is replacing the shown row in place. View more stays in
+   * place but disabled until it lands, so it never pages from the cursor being replaced.
+   */
+  isReplacing: boolean
   loadMoreFailed: boolean
   focusRequest: SpotlightFocusRequest | null
   reload: () => void
@@ -151,6 +156,14 @@ export function useCommunitySpotlight({
   const generationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
   const loadingMoreRef = useRef(false)
+  // Story CC-7.7 D5: true while a page-one read replaces the shown row in place. View more
+  // would page from the cursor that read is about to replace, so it waits until the row lands.
+  const replacingRef = useRef(false)
+  const [isReplacing, setIsReplacingState] = useState(false)
+  const setReplacing = useCallback((value: boolean) => {
+    replacingRef.current = value
+    setIsReplacingState(value)
+  }, [])
   const focusSerialRef = useRef(0)
   // The refresh-failure Retry runs after later renders; it reads with the latest reload.
   const reloadRef = useRef<() => void>(() => undefined)
@@ -190,6 +203,7 @@ export function useCommunitySpotlight({
       const textStamp = textLedger.begin()
       const { controller, isCurrent } = begin()
       loadingMoreRef.current = false
+      setReplacing(inPlace)
       setIsLoadingMore(false)
       setLoadMoreFailed(false)
       // Story CC-7.7 D5: a pull to refresh or a location change over a shown row refreshes in
@@ -241,9 +255,19 @@ export function useCommunitySpotlight({
         setFocusRequest(null)
         if (sanction) onBannedRef.current?.(sanction)
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
+      } finally {
+        if (isCurrent()) setReplacing(false)
       }
     },
-    [begin, reactionState, readItems, setNextCursor, sponsorships, textLedger]
+    [
+      begin,
+      reactionState,
+      readItems,
+      setNextCursor,
+      setReplacing,
+      sponsorships,
+      textLedger,
+    ]
   )
 
   // Pull to refresh and Retry read page one only for a signed-in member.
@@ -256,7 +280,7 @@ export function useCommunitySpotlight({
 
   const loadMore = useCallback(() => {
     const cursor = nextCursorRef.current
-    if (!cursor || loadingMoreRef.current) return
+    if (!cursor || loadingMoreRef.current || replacingRef.current) return
     loadingMoreRef.current = true
     const ticket = reactionState.beginRead()
     const textStamp = textLedger.begin()
@@ -346,6 +370,7 @@ export function useCommunitySpotlight({
     controllerRef.current?.abort()
     generationRef.current += 1
     loadingMoreRef.current = false
+    setReplacing(false)
     setIsLoadingMore(false)
     setLoadMoreFailed(false)
     setStatus('idle')
@@ -356,6 +381,7 @@ export function useCommunitySpotlight({
     postTextLedger,
     sessionScope,
     setNextCursor,
+    setReplacing,
   ])
   useEffect(
     () => () => {
@@ -494,6 +520,7 @@ export function useCommunitySpotlight({
     items,
     hasMore: nextCursor !== null,
     isLoadingMore,
+    isReplacing,
     loadMoreFailed,
     focusRequest,
     reload,

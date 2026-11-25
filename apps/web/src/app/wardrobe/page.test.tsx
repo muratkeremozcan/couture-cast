@@ -1654,4 +1654,104 @@ describe('WardrobePage screen gate', () => {
       ).toEqual([fixtureB.id])
     )
   })
+
+  /** The e2e fixture member, with its first bearer in the tab. */
+  function signInFixtureA() {
+    screenSnapshot.clear()
+    onTestFinished(() => {
+      screenSnapshot.clear()
+      vi.unstubAllEnvs()
+    })
+    verifiedSession.owner = null
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-a')
+    window.dispatchEvent(new Event('couture:session'))
+  }
+
+  /** The tab switches fixture members (one owner, a new bearer), as the e2e fixtures do. */
+  const switchBearer = (token: string) =>
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
+
+  // CodeRabbit round 1 on PR 292 (#14): the closet read is retried once for the bearer the tab
+  // holds; when that one is overtaken too, the read used to return with nothing on screen.
+  it('7.7-CMP-040 a closet read overtaken by a second bearer switch shows the load error and Retry, never a blank closet', async () => {
+    signInFixtureA()
+    const fixtureA = garmentFixture('garment-fixture-a', 'ready')
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    const listForB = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockReturnValueOnce(listForB.promise)
+      .mockResolvedValue([])
+    render(<WardrobePage />)
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+
+    switchBearer('test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([fixtureA])
+      await listForA.promise
+    })
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
+    switchBearer('test-token-fixture-c')
+    await act(async () => {
+      listForB.resolve([fixtureB])
+      await listForB.promise
+    })
+
+    expect(await screen.findByTestId('wardrobe-list-retry')).toBeVisible()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    expect(screen.queryByTestId(`garment-card-${fixtureA.id}`)).toBeNull()
+    expect(screen.queryByTestId(`garment-card-${fixtureB.id}`)).toBeNull()
+    expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
+  })
+
+  // CodeRabbit round 1 on PR 292 (#15): the account read had no scope guard, so an answer read
+  // with the last fixture bearer landed for the next, on screen and in its Closet snapshot.
+  it('7.7-CMP-041 an account read sent with one fixture bearer never lands for the next, on screen or in the snapshot', async () => {
+    signInFixtureA()
+    const remember = vi.spyOn(screenSnapshot, 'remember')
+    onTestFinished(() => remember.mockRestore())
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const accountForA = Promise.withResolvers<string>()
+    resolveCurrentUserId
+      .mockReset()
+      .mockReturnValueOnce(accountForA.promise)
+      .mockResolvedValue('user-fixture-b')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockResolvedValue([fixtureB])
+    render(<WardrobePage />)
+    await waitFor(() => expect(resolveCurrentUserId).toHaveBeenCalledTimes(1))
+
+    // The bearer switches while A's account read is out; the closet reloads for B.
+    switchBearer('test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([])
+      await listForA.promise
+    })
+    expect(await screen.findByTestId(`garment-card-${fixtureB.id}`)).toBeInTheDocument()
+
+    // A's account read answers last: it is dropped and the account is read again for B.
+    await act(async () => {
+      accountForA.resolve('user-fixture-a')
+      await accountForA.promise
+    })
+    await waitFor(() => expect(resolveCurrentUserId).toHaveBeenCalledTimes(2))
+    const keptUserId = () =>
+      screenSnapshot.recall<{ userId: string | null }>(
+        currentWebSessionScope(),
+        'closet',
+        'closet'
+      )?.userId
+    await waitFor(() => expect(keptUserId()).toBe('user-fixture-b'))
+    expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+    const storedUserIds = remember.mock.calls
+      .filter(([, screenName, part]) => screenName === 'closet' && part === 'closet')
+      .map(([, , , value]) => (value as { userId: string | null }).userId)
+    expect(storedUserIds).not.toContain('user-fixture-a')
+  })
 })

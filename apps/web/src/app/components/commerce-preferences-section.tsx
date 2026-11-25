@@ -27,7 +27,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
-import { useGuestFirstPaint, useScreenGateRead, useSectionSnapshot } from './screen-gate'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
 const HELP_ID = 'commerce-affiliate-ctas-help'
@@ -72,6 +77,16 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
   const sectionStateRef = useRef(sectionState)
   sectionStateRef.current = sectionState
   const [enabled, setEnabled] = useState(() => snapshot.restored?.enabled ?? true)
+  /**
+   * The value the server last confirmed (a read or a save), kept apart from the optimistic
+   * `enabled`: a return, or a refresh that fails, starts from what the server holds.
+   */
+  const [confirmed, setConfirmed] = useState(() => snapshot.restored?.enabled ?? true)
+  /**
+   * Advances when a save starts. A read started before it (a return's in-place refresh) answers
+   * for an older value, so it never replaces the one the save commits.
+   */
+  const saveGenerationRef = useRef(0)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -122,6 +137,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    const saveGeneration = saveGenerationRef.current
     beginRead()
     setError(null)
     if (!inPlace) setSectionState('loading')
@@ -138,7 +154,13 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         if (!current()) {
           return
         }
+        if (saveGeneration !== saveGenerationRef.current) {
+          // A save started while this read was out: its answer is the newer value.
+          setSectionState('ready')
+          return
+        }
         setEnabled(preference.affiliateCtasEnabled)
+        setConfirmed(preference.affiliateCtasEnabled)
         setSectionState('ready')
       } catch (loadError: unknown) {
         if (!current()) {
@@ -158,8 +180,9 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
           setSectionState('signed_out')
           return
         }
-        // A restored setting stays on screen when its refresh fails.
-        if (inPlace) return
+        // A restored setting stays on screen when its refresh fails, and a save started since
+        // owns the control.
+        if (inPlace || saveGeneration !== saveGenerationRef.current) return
         /*
          * The catalog string, unconditionally — the server's own message is
          * deliberately NOT shown.
@@ -190,12 +213,13 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     beginRead,
   ])
 
-  // What a return to Profile shows first: the setting once read, nothing after a failure.
+  // What a return to Profile shows first: the setting the server last confirmed, never a save
+  // still in flight, and nothing after a failure.
   useEffect(() => {
-    if (sectionState === 'ready') remember({ enabled })
+    if (sectionState === 'ready') remember({ enabled: confirmed })
     else if (sectionState === 'load_failed' || sectionState === 'signed_out')
       remember(undefined)
-  }, [enabled, remember, sectionState])
+  }, [confirmed, remember, sectionState])
 
   /**
    * Optimistic, and reverted on failure.
@@ -218,6 +242,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     }
 
     const previous = enabled
+    saveGenerationRef.current++
     setEnabled(nextEnabled)
     setIsSaving(true)
     setError(null)
@@ -229,6 +254,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       })
       if (!isLiveOwner(owner)) return
       setEnabled(saved.affiliateCtasEnabled)
+      setConfirmed(saved.affiliateCtasEnabled)
       setConfirmation(t('commerce.settings.saved'))
     } catch {
       if (!isLiveOwner(owner)) return
@@ -316,15 +342,20 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         {t('commerce.settings.optOutHelp')}
       </p>
 
-      {(isSignedOut || showGuestHint) && (
+      {isSignedOut && (
         <p
           id={SIGNED_OUT_HINT_ID}
-          data-landing={isSignedOut ? undefined : 'guest'}
           className="mt-2 text-sm text-neutral-300"
           data-testid="commerce-signed-out-hint"
         >
           {t('commerce.settings.signedOutHint')}
         </p>
+      )}
+      {showGuestHint && (
+        <GuestText
+          text={t('commerce.settings.signedOutHint')}
+          className="mt-2 text-sm text-neutral-300"
+        />
       )}
 
       {/*

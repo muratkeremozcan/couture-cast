@@ -2,7 +2,7 @@
 // member sees the fixed shell (native header, tab bar) and a neutral placeholder until the
 // body's first reads settle, and then the body appears as one unit instead of jumping in
 // piece by piece. Web has the same gate in apps/web/src/app/components/screen-gate.tsx.
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { underModalAccessibility } from '@/components/edge-to-edge-modal'
@@ -36,6 +36,11 @@ export interface ScreenGateProps {
   session?: MemberSessionState
   /** Layout for the body wrapper, e.g. `{ flex: 1 }` around a list. */
   style?: StyleProp<ViewStyle>
+  /**
+   * Told each time the body becomes shown or hidden, the deadline opening included, so a
+   * screen can hold a one-time focus until its target is on screen.
+   */
+  onOpenChange?: (open: boolean) => void
   children: ReactNode
 }
 
@@ -70,11 +75,53 @@ function SessionFollowingGate(props: ScreenGateProps) {
   return <GateFrame {...props} session={session} />
 }
 
+/** What the gate remembers about the member on screen. */
+interface GateIdentity {
+  /** The application user the gate last rendered for. */
+  owner: string | null
+  /** The member the gate last opened for; undefined until it first opens. */
+  openedFor: string | null | undefined
+  /**
+   * True from a member's departure while `ready` was true until `ready` is seen false: until
+   * then `ready` may still describe the previous member's reads, so it settles nothing.
+   */
+  staleReady: boolean
+}
+
+/**
+ * The gate's memory for this render. A new owner drops the open latch (a latch from member A
+ * never reopens the gate for A's return over unsettled reads), and a `ready` still true from a
+ * previous member's reads counts only once the screen has reported unsettled reads.
+ */
+function gateIdentityFor(
+  last: GateIdentity,
+  owner: string | null,
+  ready: boolean
+): GateIdentity {
+  let next = last
+  if (next.owner !== owner) {
+    next = {
+      owner,
+      openedFor: undefined,
+      staleReady: next.staleReady || (next.owner !== null && ready),
+    }
+  }
+  if (next.staleReady && !ready) next = { ...next, staleReady: false }
+  return next
+}
+
+function latchFor(last: GateIdentity, owner: string | null): GateIdentity {
+  return last.owner !== owner || last.openedFor === owner
+    ? last
+    : { ...last, openedFor: owner }
+}
+
 function GateFrame({
   screen,
   ready,
   session: current,
   style,
+  onOpenChange,
   children,
 }: ScreenGateProps & { session: MemberSessionState }) {
   const { t } = useTranslation()
@@ -84,22 +131,45 @@ function GateFrame({
     mobileApplicationUserId,
     mobileApplicationUserId
   )
-  // The member the gate last opened for; undefined until it first opens.
-  const [openedFor, setOpenedFor] = useState<string | null | undefined>(undefined)
-  const settled = screenGateSettled(current, ready)
-  const open = current !== 'restoring' && (settled || openedFor === owner)
+  const [identity, setIdentity] = useState<GateIdentity>(() => ({
+    owner,
+    openedFor: undefined,
+    staleReady: false,
+  }))
+  // Settled at the identity boundary, during render, so the first frame for a new owner already
+  // ignores the previous owner's latch and readiness (review r1).
+  const gate = gateIdentityFor(identity, owner, ready)
+  if (gate !== identity) setIdentity(gate)
+  const latched = gate.openedFor === owner
+  const settled = screenGateSettled(current, ready && !gate.staleReady)
+  const open = current !== 'restoring' && (settled || latched)
 
   useEffect(() => {
-    if (settled) setOpenedFor(owner)
-    else if (current === 'restoring') setOpenedFor(undefined)
+    // Only a member's own settled reads latch the gate open. A signed-out or unavailable
+    // session opens it without a latch: that state can lag a sign-in for a render, and a latch
+    // taken then would keep the gate open over the new member's unsettled reads.
+    if (settled && current === 'member') setIdentity((last) => latchFor(last, owner))
+    else if (current === 'restoring')
+      setIdentity((last) =>
+        last.openedFor === undefined ? last : { ...last, openedFor: undefined }
+      )
   }, [current, owner, settled])
 
   // The deadline counts from the moment the gate waits on this member's reads.
   useEffect(() => {
     if (open || current === 'restoring') return
-    const timer = setTimeout(() => setOpenedFor(owner), SCREEN_GATE_DEADLINE_MS)
+    const timer = setTimeout(
+      () => setIdentity((last) => latchFor(last, owner)),
+      SCREEN_GATE_DEADLINE_MS
+    )
     return () => clearTimeout(timer)
   }, [current, open, owner])
+
+  const onOpenChangeRef = useRef(onOpenChange)
+  onOpenChangeRef.current = onOpenChange
+  useEffect(() => {
+    onOpenChangeRef.current?.(open)
+  }, [open])
 
   return (
     <View

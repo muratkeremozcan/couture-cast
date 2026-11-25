@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSession } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
-import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
+import { useGuestFirstPaint, useSectionSnapshot } from './screen-gate'
 
 interface Account {
   displayName: string | null
@@ -27,11 +27,18 @@ export function ProfileAccount() {
   const [account, setAccount] = useState<Account | null>(() => snapshot.restored ?? null)
   // The member whose profile read answered, with an account or without one.
   const [answeredFor, setAnsweredFor] = useState<string | null>(restoredFor)
-  // Story CC-7.7: the account sits at the top of Profile, so the screen gate waits for it.
-  useScreenGateRead(
-    'account',
-    session.status !== 'checking' && (owner === null || answeredFor === owner)
-  )
+  /*
+   * Story CC-7.7: the account sits at the top of Profile, above every section. Its read is the
+   * same request the session's own verification makes, so Profile's gate does not wait for it
+   * (CI real-session PS-2 on 61d7156e: a reload held the whole page behind a verification still
+   * out). Instead the header keeps its two lines while a member's read is out, or while a page
+   * painted for a stored session is still checked, so the account never pushes the sections
+   * below it when it lands.
+   */
+  const guestFirstPaint = useGuestFirstPaint()
+  const reserved =
+    (owner !== null && answeredFor !== owner) ||
+    (session.status === 'checking' && !guestFirstPaint)
 
   const { beginRead, remember } = snapshot
   // One profile request per member, like the Locations list. The restored member's account
@@ -56,7 +63,17 @@ export function ProfileAccount() {
     return () => controller.abort()
   }, [owner, restoredFor, beginRead, remember])
 
-  if (!account) return null
+  if (!account)
+    return reserved ? (
+      <div
+        aria-hidden="true"
+        data-testid="profile-account-reserved"
+        className="mt-4 max-w-2xl"
+      >
+        <p className="text-lg font-semibold">&nbsp;</p>
+        <p className="text-sm">&nbsp;</p>
+      </div>
+    ) : null
 
   return (
     <section

@@ -2,7 +2,9 @@
 // Story CC-7.7 (TEA): the native sources the motion budget guard scans (motion-budget.test.ts).
 // The mobile suite runs in a browser, so Vite inlines them at build time. An ES module file,
 // because the app's .ts files compile as CommonJS, where import.meta is not allowed.
-export const motionSources: Record<string, string> = import.meta.glob(
+// Plain JavaScript syntax on purpose: the mobile browser run serves this file without a
+// TypeScript transform, so a type annotation here failed the import (CI, 61d7156e).
+export const motionSources = import.meta.glob(
   [
     '../../app/**/*.{ts,tsx}',
     '../../src/**/*.{ts,tsx}',

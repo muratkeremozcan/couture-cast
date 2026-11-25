@@ -5,9 +5,9 @@
 // Same boundary as settings-premium-section.test.tsx: the premium network and SDK seams are
 // mocked, the render-state resolver and entitlement predicate stay real, and copy comes from
 // the real locale catalog. Scenario ids are the plan's (`cc614-complimentary-access-test-design.md`).
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PremiumAccess } from '@couture/api-client/contracts/http'
 import type * as PremiumModule from '../lib/premium'
 
@@ -87,6 +87,8 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   resolveMobileAccessToken: () => Promise.resolve('member-token'),
   subscribeMobileApplicationUser: () => () => undefined,
   mobileApplicationUserId: () => null,
+  // Settings drops a return read whose member changed; no member change happens here.
+  mobileIdentityEpoch: () => 0,
   setMobileApplicationUserId: () => undefined,
   setMobileAccessTokenResolver: () => undefined,
 }))
@@ -111,6 +113,7 @@ import i18n, { initI18n } from '../lib/i18n'
 import enUS from '../../assets/locales/en-US.json'
 import { mockSubscriptionActive, mockSubscriptionNone } from '../test-utils/msw/handlers'
 import SettingsScreen from '../../app/(tabs)/settings'
+import { screenFocus } from '../test-utils/focus-effect'
 
 const premiumCopy = (
   enUS as unknown as {
@@ -171,6 +174,54 @@ describe('SettingsScreen premium section, complimentary access', () => {
     restorePremiumPurchasesMock.mockReset()
     showManageSubscriptionsMock.mockReset()
     showManageSubscriptionsMock.mockResolvedValue(true)
+  })
+
+  afterEach(() => {
+    screenFocus.reset()
+  })
+
+  // CodeRabbit r1: the first read skipped the store for a complimentary member. When a return
+  // finds the grant gone, the store answers then, so the subscribe controls appear.
+  it('7.7-NAT-014 access that stops being complimentary on a return asks the store and shows the subscribe controls', async () => {
+    await render(<SettingsScreen />)
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-status-line').textContent).toBe(
+        COMPLIMENTARY_STATUS
+      )
+    )
+    expect(ensurePurchasesConfiguredMock).not.toHaveBeenCalled()
+
+    getPremiumAccessMock.mockResolvedValue({
+      premium: false,
+      source: 'none',
+    } satisfies PremiumAccess)
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+
+    await waitFor(() => expect(ensurePurchasesConfiguredMock).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId('premium-subscribe-monthly')).toBeVisible()
+    expect(screen.getByTestId('premium-subscribe-annual')).toBeVisible()
+    expect(screen.getByTestId('premium-restore')).toBeVisible()
+    expect(screen.queryByTestId('premium-complimentary-note')).toBeNull()
+  })
+
+  it('7.7-NAT-014 access still complimentary on a return never configures the store', async () => {
+    await render(<SettingsScreen />)
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-status-line').textContent).toBe(
+        COMPLIMENTARY_STATUS
+      )
+    )
+
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+
+    await waitFor(() => expect(getPremiumAccessMock).toHaveBeenCalledTimes(2))
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(ensurePurchasesConfiguredMock).not.toHaveBeenCalled()
+    for (const id of PURCHASE_CONTROLS) expect(screen.queryByTestId(id)).toBeNull()
   })
 
   it('M-COMPLIMENTARY: an unpaid complimentary member sees the complimentary status and no purchase or manage control', async () => {

@@ -5,12 +5,20 @@
 // Home shows the gate's placeholder until the ritual read (which carries the weather) settles:
 // the member sample never shows first (D2), the stale and alert banners arrive with the body
 // (D4), and a refresh with the outfit on screen never returns to the loading state (D5).
-import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import React from 'react'
 import { act, configure, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import { http, HttpResponse } from 'msw'
 
 const ritualCache = vi.hoisted(() => ({
@@ -20,9 +28,9 @@ const ritualCache = vi.hoisted(() => ({
 vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
-  useFocusEffect: (
-    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
-  ).useFocusEffect,
+  // A plain import: `vi.importActual` loads a second copy of the double, whose `screenFocus`
+  // the test's own import never drives.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -52,12 +60,19 @@ import {
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { SaveFeedbackProvider } from '@/components/save-feedback'
+import { formatTemperature } from '@/components/hero/weather-header'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { userEvent } from 'vitest/browser'
 
-/** Ritual answers the test releases by hand, in request order. */
+/**
+ * Ritual answers the test releases by hand, in request order. Every answer still held when the
+ * test ends, a failed one included, is released then, so no request outlives its test.
+ */
 function heldRitualAnswers() {
   const releases: ((response: Response) => void)[] = []
+  onTestFinished(() => {
+    for (const release of releases) release(new HttpResponse(null, { status: 503 }))
+  })
   server.use(
     http.get(
       '*/api/v1/ritual',
@@ -204,6 +219,35 @@ describe('Home screen gate (native)', () => {
     expect(placeholder()).toBeNull()
   })
 
+  // CodeRabbit r1: the settled ritual belongs to one member visit. The same member back after a
+  // sign-out waits for their new ritual read like a first load.
+  it('7.7-NAT-010 the same member back after a sign-out sees the placeholder, never the sample, until the new ritual settles', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+
+    // Sign out: the device has no token and no member.
+    const signOut = setMobileAccessTokenResolver(() => undefined)
+    act(() => setMobileApplicationUserId(null))
+    expect(await screen.findByTestId('home-signed-out-welcome')).toBeVisible()
+
+    // The same member signs back in; their new ritual read is held.
+    signOut()
+    act(() => setMobileApplicationUserId('gate-member'))
+    await waitFor(() => expect(ritual.requests()).toBe(2))
+
+    expect(placeholder()).toBeVisible()
+    expect(homeGate()).not.toHaveAttribute('data-ready')
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+
+    await ritual.release(1, HttpResponse.json(mockRitualResponse))
+
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+    expect(placeholder()).toBeNull()
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+  })
+
   it('7.7-NAT-004 the weather alert banner arrives with the body, never above a shown outfit', async () => {
     const ritual = heldRitualAnswers()
     await renderHome()
@@ -244,7 +288,7 @@ describe('Home screen gate (native)', () => {
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
     await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
-    const temperature = screen.getByTestId('current-temperature').textContent
+    const header = screen.getByTestId('weather-header')
 
     // A locale change reads the ritual again while the outfit stays on screen.
     await act(async () => {
@@ -255,8 +299,13 @@ describe('Home screen gate (native)', () => {
     expect(placeholder()).toBeNull()
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
     expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
-    expect(screen.getByTestId('weather-header')).toBeVisible()
-    expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
+    // The same mounted header keeps the first answer's reading, in the new locale's unit
+    // (fr-FR reads Celsius, so the en-US text it showed before cannot match).
+    expect(screen.getByTestId('weather-header')).toBe(header)
+    expect(header).toBeVisible()
+    expect(screen.getByTestId('current-temperature').textContent).toBe(
+      formatTemperature(mockRitualResponse.data.weather.current.temperature)
+    )
 
     // A refresh that fails keeps the outfit and inserts no banner above it.
     await ritual.release(1, new HttpResponse(null, { status: 503 }))

@@ -24,6 +24,12 @@ import {
  * react-native-web never reports a software keyboard, so the R57 cases drive the
  * platform's keyboard events through these listeners.
  */
+// Story CC-7.7 D6: the wrapper follows the OS reduced-motion setting; each test names it.
+const motion = vi.hoisted(() => ({ reduced: false }))
+vi.mock('@/src/hooks/use-reduced-motion', () => ({
+  useReducedMotion: () => motion.reduced,
+}))
+
 const keyboard = vi.hoisted(() => {
   const listeners = new Map<string, Set<() => void>>()
   return {
@@ -98,6 +104,45 @@ describe('R52 EdgeToEdgeModal', () => {
       visible: true,
       animationType: 'slide',
     })
+  })
+
+  it('7.7-NAT-005 opens instantly under reduced motion, whatever presentation the caller asked for', () => {
+    motion.reduced = true
+    try {
+      render(
+        <EdgeToEdgeModal visible animationType="slide">
+          <Text>Sheet</Text>
+        </EdgeToEdgeModal>
+      )
+      expect(lastModalProps()).toMatchObject({ animationType: 'none', visible: true })
+    } finally {
+      motion.reduced = false
+    }
+  })
+
+  it('7.7-NAT-005 keeps the animation a presentation opened with when the setting resolves meanwhile (CodeRabbit r1 #16)', () => {
+    motion.reduced = true
+    try {
+      const sheet = (visible: boolean) => (
+        <EdgeToEdgeModal visible={visible} animationType="fade">
+          <Text>Sheet</Text>
+        </EdgeToEdgeModal>
+      )
+      const view = render(sheet(true))
+      expect(lastModalProps()).toMatchObject({ animationType: 'none' })
+
+      // The setting resolves to motion allowed while the sheet is up: it stays instant.
+      motion.reduced = false
+      view.rerender(sheet(true))
+      expect(lastModalProps()).toMatchObject({ animationType: 'none', visible: true })
+
+      // Closed, then opened again: this presentation uses the resolved setting.
+      view.rerender(sheet(false))
+      view.rerender(sheet(true))
+      expect(lastModalProps()).toMatchObject({ animationType: 'fade', visible: true })
+    } finally {
+      motion.reduced = false
+    }
   })
 
   it('keeps both translucent flags for an opaque full-screen page', () => {

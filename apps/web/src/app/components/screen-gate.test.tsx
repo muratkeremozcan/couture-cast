@@ -3,7 +3,7 @@
 // Story CC-7.7 D1, D3 and D5 test owner: the web screen gate.
 // Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md
 // (7.7-CMP-001, 7.7-CMP-002). The layout-shift budget itself is 7.7-E2E-001 to 7.7-E2E-008.
-// Codex review of 8327b4fb: 7.7-CMP-008 pins the gate deadline (P2-2).
+// Codex review of 8327b4fb: 7.7-CMP-020 pins the gate deadline (P2-2).
 import { useEffect, useState } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
@@ -192,7 +192,7 @@ describe('ScreenGate', () => {
     expect(scrollTo).toHaveBeenCalledExactlyOnceWith(0, 0)
   })
 
-  it('7.7-CMP-008 a read that never answers opens the gate at the deadline, with a finished section and its Retry shown (Codex review P2-2)', () => {
+  it('7.7-CMP-020 a read that never answers opens the gate at the deadline, with a finished section and its Retry shown (Codex review P2-2)', () => {
     vi.useFakeTimers()
     signIn('member-1')
     const openSeen: boolean[] = []
@@ -242,15 +242,31 @@ describe('ScreenGate', () => {
     expect(screenSnapshot.isSettled('member-1', 'profile')).toBe(false)
   })
 
-  it('7.7-CMP-008 a gate whose reads settle before the deadline never waits for it', () => {
+  it('7.7-CMP-020 a gate whose reads settle before the deadline never waits for it', () => {
     vi.useFakeTimers()
+    // The gate's own deadline timers, told apart from any other timer by their delay: counting
+    // every pending timer failed on unrelated ones (CI, 61d7156e).
+    const deadlines = new Set<unknown>()
+    const cleared = new Set<unknown>()
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout')
+    const realClearTimeout = window.clearTimeout.bind(window)
+    vi.spyOn(window, 'clearTimeout').mockImplementation(((id?: number) => {
+      cleared.add(id)
+      realClearTimeout(id)
+    }) as typeof window.clearTimeout)
     signIn('member-1')
     renderGate()
+    for (const [index, call] of setTimeoutSpy.mock.calls.entries()) {
+      if (call[1] === SCREEN_GATE_DEADLINE_MS)
+        deadlines.add(setTimeoutSpy.mock.results[index]?.value)
+    }
     settle('error')
 
     expect(gate()).toHaveAttribute('data-ready', 'true')
     expect(screenSnapshot.isSettled('member-1', 'home')).toBe(true)
-    // No timer is left to fire for a gate that opened from its reads.
-    expect(vi.getTimerCount()).toBe(0)
+    // The deadline started while the read was out, and the gate cleared it once the read
+    // settled: nothing is left to fire for a gate that opened from its reads.
+    expect(deadlines.size).toBeGreaterThan(0)
+    for (const id of deadlines) expect(cleared).toContain(id)
   })
 })

@@ -21,7 +21,7 @@ import {
   HomeSpotlightTeaserSlot,
   useHomeSpotlightTeaserLink,
 } from './home-spotlight-teaser'
-import { useScreenGateRead } from './screen-gate'
+import { useScreenGateOpen, useScreenGateRead } from './screen-gate'
 import { useHydrating } from '../../lib/use-web-session'
 
 /**
@@ -333,18 +333,21 @@ export function LookbookPrismLayout() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Story CC-7.7 (CI, 61d7156e): Home's gate hides the body until its reads settle, and focus
+  // on a hidden element is dropped, so a deep-link target takes focus once the gate is open.
+  const gateOpen = useScreenGateOpen()
   useEffect(() => {
-    if (!focusedWeatherAlert) {
+    if (!focusedWeatherAlert || !gateOpen) {
       return
     }
     requestAnimationFrame(() => {
       alertRef.current?.scrollIntoView?.({ block: 'center' })
       alertRef.current?.focus()
     })
-  }, [focusedWeatherAlert])
+  }, [focusedWeatherAlert, gateOpen])
 
   useEffect(() => {
-    if (!highlightedCardId) {
+    if (!highlightedCardId || !gateOpen) {
       return
     }
     requestAnimationFrame(() => {
@@ -352,7 +355,7 @@ export function LookbookPrismLayout() {
       card?.scrollIntoView?.({ block: 'center' })
       card?.focus()
     })
-  }, [activeTab, highlightedCardId])
+  }, [activeTab, highlightedCardId, gateOpen])
 
   useEffect(() => {
     try {

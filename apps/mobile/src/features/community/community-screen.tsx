@@ -1761,10 +1761,14 @@ export function CommunityScreen() {
   ])
 
   const focusedNoticeSerialRef = useRef<number | null>(null)
+  // Story CC-7.7 D3: the notice sits in the list header, inside the screen gate. It is focused
+  // only once the gate actually shows it, the gate's deadline opening included, so an intent
+  // that timed out behind the placeholder still focuses its notice when the body appears.
+  const [communityGateOpen, setCommunityGateOpen] = useState(false)
   // Focusing the notice is its single announcement: the list returns to its
   // top, then focus moves to the message. No live region repeats it.
   useEffect(() => {
-    if (!spotlightNotice || !screenFocused) return
+    if (!spotlightNotice || !screenFocused || !communityGateOpen) return
     // Focused once: a later visit leaves focus where the member puts it.
     if (focusedNoticeSerialRef.current === spotlightNotice.serial) return
     focusedNoticeSerialRef.current = spotlightNotice.serial
@@ -1778,7 +1782,7 @@ export function CommunityScreen() {
       const handle = safeFindNodeHandle(noticeRef.current)
       if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
     })
-  }, [feedListRef, screenFocused, spotlightNotice])
+  }, [communityGateOpen, feedListRef, screenFocused, spotlightNotice])
 
   // A read still in flight was authorized before the ban, so its answer can never land.
   useEffect(() => {
@@ -2167,6 +2171,7 @@ export function CommunityScreen() {
           items={spotlight.items}
           hasMore={spotlight.hasMore}
           isLoadingMore={spotlight.isLoadingMore}
+          isReplacing={spotlight.isReplacing}
           loadMoreFailed={spotlight.loadMoreFailed}
           focusRequest={spotlight.focusRequest}
           onFocusRequestHandled={spotlight.acknowledgeFocusRequest}
@@ -2272,7 +2277,12 @@ export function CommunityScreen() {
           />
         </UnlessBanned>
 
-        <ScreenGate screen="community" ready={communityGateReady} style={styles.feedArea}>
+        <ScreenGate
+          screen="community"
+          ready={communityGateReady}
+          style={styles.feedArea}
+          onOpenChange={setCommunityGateOpen}
+        >
           <FlatList
             ref={feedScroll.listRef}
             testID="community-feed-list"
