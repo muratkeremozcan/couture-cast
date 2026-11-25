@@ -359,10 +359,19 @@ describe('Wardrobe styling', () => {
       const refresh = await screen.findByRole('button', { name: 'Refresh photo' })
       expect(screen.queryByRole('button', dialogName)).toBeNull()
       await user.click(refresh)
-      expect(refresh).toBeDisabled()
+      // While the photo refreshes the button stays focused and only reads as unavailable: a
+      // disabled button would drop keyboard focus to the page body.
+      expect(refresh).toHaveAttribute('aria-disabled', 'true')
+      expect(refresh).toHaveFocus()
+      const reads = inventory.mock.calls.length
+      await user.click(refresh)
+      expect(inventory.mock.calls.length).toBe(reads)
 
       await completeRead(reply, list(renewed))
-      expect(await openButton()).toBeEnabled()
+      const open = await openButton()
+      expect(open).toBeEnabled()
+      expect(open).toHaveAttribute('aria-disabled', 'false')
+      expect(open).toHaveFocus()
       // Story CC-7.5 D6: color plus category alt text; this legacy fixture has no color, so
       // the category alone names the photo.
       expect(screen.getByRole('img', { name: 'Top' })).toHaveAttribute(

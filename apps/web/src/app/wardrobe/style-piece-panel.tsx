@@ -93,9 +93,12 @@ export function StylePieceEntry({
     <button
       type="button"
       data-testid={needsRefresh ? 'style-piece-refresh' : 'style-piece-open'}
-      className="min-h-11 rounded-lg border border-zinc-300 px-2 py-1 text-xs font-semibold disabled:opacity-60 dark:border-zinc-700"
-      disabled={needsRefresh && loading}
+      className="min-h-11 rounded-lg border border-zinc-300 px-2 py-1 text-xs font-semibold aria-disabled:opacity-60 dark:border-zinc-700"
+      // aria-disabled keeps focus on the button while the photo refreshes; a disabled button
+      // drops keyboard focus to the page body and Chromium does not restore it.
+      aria-disabled={needsRefresh && loading}
       onClick={(event) => {
+        if (needsRefresh && loading) return
         if (currentWebSessionOwner() !== owner) return
         if (unavailable || !stylePieceAnchor(garment)) onRefresh()
         else {
