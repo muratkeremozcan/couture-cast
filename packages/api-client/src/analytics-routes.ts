@@ -57,6 +57,8 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/two',
   '/wardrobe',
   '/wardrobe-capsules',
+  // Story CC-7.5 D3: the garment detail, /wardrobe-garment?id=<garment id>.
+  '/wardrobe-garment',
   '/wardrobe-onboarding',
   '/wardrobe-silhouette',
 ] as const)

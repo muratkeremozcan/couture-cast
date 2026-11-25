@@ -277,8 +277,8 @@ describe('GarmentDetailScreen', () => {
     renderDetail()
     await openEditorAndPick('garment-tag-option-category-outerwear')
     await browserUser.click(tag('garment-tag-done'))
-    expect(await screen.findByTestId('stack-header-title')).toHaveTextContent(
-      'Blue outer layer'
+    await waitFor(() =>
+      expect(tag('stack-header-title')).toHaveTextContent('Blue outer layer')
     )
 
     await browserUser.click(await screen.findByTestId('status-bar-action-undo'))

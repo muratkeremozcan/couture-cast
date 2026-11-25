@@ -1613,7 +1613,11 @@ describe('WardrobeHubScreen', () => {
 
     it('[P0] [7.5-NAT-010] a pre-save read that lands late cannot undo the post-save reload (Codex P2.6)', async () => {
       setMobileApplicationUserId('hub-detail-owner')
-      const processing = garmentFixture({ id: 'hub-processing', status: 'processing' })
+      // Every garment in one answer has the same shape: an opted-in list carries colorFamily.
+      const processing = {
+        ...garmentFixture({ id: 'hub-processing', status: 'processing' }),
+        colorFamily: null,
+      }
       const wool = { ...blueTop, material: 'wool' }
       const pollStarted = deferred()
       const poll = deferred()

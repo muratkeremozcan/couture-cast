@@ -6,6 +6,8 @@
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { server } from '../test-utils/msw/server'
+import { mobileApplicationUserId, setMobileApplicationUserId } from './mobile-auth'
+import { startNativeSession } from './native-session'
 
 const supabase = vi.hoisted(() => ({ createClient: vi.fn() }))
 vi.mock('react-native', () => ({
@@ -42,14 +44,9 @@ function profile(id: string) {
   }
 }
 
-/** Fresh module state per test: the session and the owner are process singletons. */
-async function load(): Promise<{
-  mobileApplicationUserId: () => string | null
-  startNativeSession: () => Promise<() => void>
-}> {
-  vi.resetModules()
-  const { mobileApplicationUserId } = await import('./mobile-auth.js')
-  const { startNativeSession } = await import('./native-session.js')
+/** The owner is process state: every test starts without one. */
+function load() {
+  setMobileApplicationUserId(null)
   return { mobileApplicationUserId, startNativeSession }
 }
 
@@ -77,7 +74,7 @@ describe('startNativeSession in the fixture lane', () => {
         return HttpResponse.json(profile(MEMBER))
       })
     )
-    const { mobileApplicationUserId, startNativeSession } = await load()
+    const { mobileApplicationUserId, startNativeSession } = load()
     expect(mobileApplicationUserId()).toBeNull()
 
     const cleanup = await startNativeSession()
@@ -99,7 +96,7 @@ describe('startNativeSession in the fixture lane', () => {
           : HttpResponse.json(profile(MEMBER))
       })
     )
-    const { mobileApplicationUserId, startNativeSession } = await load()
+    const { mobileApplicationUserId, startNativeSession } = load()
 
     await startNativeSession()
 
@@ -115,7 +112,7 @@ describe('startNativeSession in the fixture lane', () => {
         return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
       })
     )
-    const { mobileApplicationUserId, startNativeSession } = await load()
+    const { mobileApplicationUserId, startNativeSession } = load()
 
     await startNativeSession()
 
@@ -131,7 +128,7 @@ describe('startNativeSession in the fixture lane', () => {
         return HttpResponse.json({ message: 'unavailable' }, { status: 503 })
       })
     )
-    const { mobileApplicationUserId, startNativeSession } = await load()
+    const { mobileApplicationUserId, startNativeSession } = load()
 
     await startNativeSession()
 

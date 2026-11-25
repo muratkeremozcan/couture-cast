@@ -451,7 +451,9 @@ describe('7.5 garment colorFamily opt-in', () => {
 
     const garments = await listGarmentsFromMobile('token')
 
-    expect(headers).toEqual(['1'])
+    // Every list read opts in to colorFamily.
+    expect(headers.length).toBeGreaterThan(0)
+    expect(headers.every((header) => header === '1')).toBe(true)
     expect(garments).toEqual([{ ...ready, colorFamily: 'blue' }])
   })
 

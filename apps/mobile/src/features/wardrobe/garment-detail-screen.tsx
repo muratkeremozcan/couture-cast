@@ -708,6 +708,9 @@ function GarmentTagPanel({
               key={option.value}
               accessibilityRole="radio"
               accessibilityState={{ checked: pressed, disabled: saving }}
+              // Without this the web target renders a radio with no checked state
+              // (community-post-sheet.tsx precedent).
+              aria-checked={pressed}
               disabled={saving}
               testID={`garment-tag-option-${name}-${option.value}`}
               onPress={() => onSelect(option.value)}

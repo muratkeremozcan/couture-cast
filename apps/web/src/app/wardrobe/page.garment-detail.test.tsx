@@ -272,7 +272,9 @@ describe('Closet garment detail', () => {
     signIn()
 
     await user.click(await screen.findByTestId('garment-open-blue-top'))
-    await user.click(await screen.findByTestId('style-piece-open'))
+    // The hidden grid keeps its own opener mounted; use the detail's.
+    const detail = await screen.findByTestId('garment-detail')
+    await user.click(await within(detail).findByTestId('style-piece-open'))
 
     const panel = await screen.findByRole('dialog', { name: 'Style this piece' })
     expect(await within(panel).findByRole('heading', { name: 'Look 1' })).toBeVisible()
@@ -326,6 +328,7 @@ describe('Closet garment detail', () => {
     })
     render(<WardrobePage />)
     signIn()
+    await user.click(await screen.findByRole('button', { name: 'Show saved looks' }))
     expect(await screen.findByText('Blue top look')).toBeInTheDocument()
     expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
 
