@@ -340,7 +340,16 @@
       "undoFailed": "Impossibile annullare. Riprova.",
       "missing": "Questo capo non è più nel tuo armadio.",
       "loading": "Caricamento del capo...",
-      "loadFailed": "Impossibile caricare questo capo. Riprova."
+      "loadFailed": "Impossibile caricare questo capo. Riprova.",
+      "delete": "Elimina",
+      "deleteConfirmTitle_one": "Eliminare questo capo? È in {{count}} look.",
+      "deleteConfirmTitle_other": "Eliminare questo capo? È in {{count}} look.",
+      "deleteConfirmAccept": "Elimina capo",
+      "deleteCancel": "Tienilo",
+      "deleteSucceeded": "Eliminato",
+      "deleteUndone": "Eliminazione annullata",
+      "deleteFailed": "Impossibile eliminare questo capo.",
+      "deleteUsageFailed": "Impossibile verificare dove è usato questo capo. Riprova."
     }
   },
   "commerce": {

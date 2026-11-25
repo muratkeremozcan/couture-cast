@@ -449,6 +449,24 @@ export const stateHandlers: StateHandlers = {
     configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })
     return Promise.resolve({ description: 'Configured ready blue garment' })
   },
+  // Story 7.6: the usage read and the DELETE (7.6-PACT-001..002). The doubles answer one saved
+  // look and one capsule for the configured garment, and 204 for its delete.
+  'A ready garment held by one saved look and one capsule exists for user': (
+    parameters?: unknown
+  ) => {
+    const { garmentId, userId } = parameters as GarmentStateParams
+    configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })
+    return Promise.resolve({
+      description: 'Configured garment in one look and one capsule',
+    })
+  },
+  'A ready garment held by no saved look or capsule exists for user': (
+    parameters?: unknown
+  ) => {
+    const { garmentId, userId } = parameters as GarmentStateParams
+    configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })
+    return Promise.resolve({ description: 'Configured unused ready garment' })
+  },
   'A garment in awaiting_tags status exists for user': (parameters?: unknown) => {
     const { garmentId, userId } = parameters as GarmentStateParams
     configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })

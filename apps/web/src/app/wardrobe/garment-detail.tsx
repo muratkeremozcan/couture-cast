@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import type {
   GarmentComfortRange,
   GarmentMaterial,
+  GarmentUsageResponse,
   GarmentWithColor,
 } from '@couture/api-client/contracts/http'
 import {
@@ -31,10 +32,11 @@ import {
   type StylePieceSelection,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
-import { updateGarmentTagsFromWeb } from '../../lib/wardrobe'
+import { getGarmentUsageFromWeb, updateGarmentTagsFromWeb } from '../../lib/wardrobe'
 import { currentWebSessionOwner } from '../../lib/use-web-session'
 import { SaveFeedbackProvider, useStatusBar } from '../components/save-feedback'
 import { StylePieceEntry } from './style-piece-panel'
+import type { GarmentDeleteMode } from './garment-deletion'
 
 /** A Closet garment: list reads carry `colorFamily`; a just-committed upload may not yet. */
 export type ClosetGarment = Omit<GarmentWithColor, 'colorFamily'> &
@@ -64,6 +66,12 @@ export type GarmentDetailProps = {
   onTagsSaved: (garment: GarmentWithColor, startToken?: number) => void
   onRefresh: () => void
   onStylePiece: (selection: StylePieceSelection, button: HTMLButtonElement) => void
+  /**
+   * Story CC-7.6: the member deletes this piece. `deferred`: in no saved look or capsule, so it
+   * gets an Undo window. `immediate`: confirmed after the prompt named its looks. `gone`: the
+   * usage read answered 404, so it already left the closet. Absent, no Delete is offered.
+   */
+  onDelete?: (garmentId: string, mode: GarmentDeleteMode) => void
 }
 
 export function GarmentDetail(props: GarmentDetailProps) {
@@ -501,6 +509,224 @@ function useGarmentTagEditor({
 }
 
 /**
+ * `failed`: the usage read failed (D3). The error and its Retry stay inside this detail, bound
+ * to this piece, so they never cover another piece's Undo on the status bar and leave with
+ * the detail.
+ */
+type GarmentDeletePhase =
+  | { kind: 'idle' }
+  | { kind: 'checking' }
+  | { kind: 'confirm'; count: number }
+  | { kind: 'failed' }
+
+/**
+ * Story CC-7.6 D2/D3: Delete reads where the piece is used first. Used nowhere: the closet hides
+ * it with Undo. Used: one prompt names how many looks (saved looks plus capsules); accepting
+ * deletes at once. A failed read deletes nothing and offers Retry; a 404 means it is gone.
+ */
+function useGarmentDelete({
+  garment,
+  owner,
+  onDelete,
+}: {
+  garment: ClosetGarment
+  owner: string | null
+  onDelete?: (garmentId: string, mode: GarmentDeleteMode) => void
+}) {
+  const [phase, setPhase] = useState<GarmentDeletePhase>({ kind: 'idle' })
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+  const deleteButtonRef = useRef<HTMLButtonElement | null>(null)
+  const cancelButtonRef = useRef<HTMLButtonElement | null>(null)
+  const runRef = useRef(0)
+  const garmentId = garment.id
+  const ownerRef = useRef(owner)
+  ownerRef.current = owner
+
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  // Another garment abandons a read in flight; so does an unmount (`mountedRef`).
+  useEffect(() => {
+    runRef.current++
+    setPhase({ kind: 'idle' })
+  }, [garmentId])
+
+  // The prompt opens on Cancel, the safe choice.
+  useEffect(() => {
+    if (phase.kind === 'confirm') cancelButtonRef.current?.focus()
+  }, [phase.kind])
+
+  const isActiveOwner = (actionOwner: string | null) => {
+    if (!actionOwner || ownerRef.current !== actionOwner) return false
+    const verified = currentWebSessionOwner()
+    return verified === null || verified === actionOwner
+  }
+
+  /** A 404 is gone; no looks gets the Undo window; any looks asks first. */
+  const settleUsage = (usage: GarmentUsageResponse | null) => {
+    if (!onDelete) return
+    const count = usage ? usage.savedLookCount + usage.capsuleCount : 0
+    if (usage && count > 0) {
+      setPhase({ kind: 'confirm', count })
+      return
+    }
+    setPhase({ kind: 'idle' })
+    onDelete(garmentId, usage ? 'deferred' : 'gone')
+  }
+
+  const startDelete = async () => {
+    const from = phaseRef.current.kind
+    if (!onDelete || (from !== 'idle' && from !== 'failed')) return
+    const actionOwner = ownerRef.current
+    if (!isActiveOwner(actionOwner)) return
+    const run = ++runRef.current
+    const current = () => run === runRef.current && mountedRef.current
+    setPhase({ kind: 'checking' })
+    let usage: GarmentUsageResponse | null
+    try {
+      usage = await getGarmentUsageFromWeb(garmentId)
+    } catch {
+      if (!current()) return
+      setPhase(isActiveOwner(actionOwner) ? { kind: 'failed' } : { kind: 'idle' })
+      return
+    }
+    if (current() && isActiveOwner(actionOwner)) settleUsage(usage)
+  }
+
+  const cancel = () => {
+    setPhase({ kind: 'idle' })
+    deleteButtonRef.current?.focus()
+  }
+
+  const accept = () => {
+    if (phaseRef.current.kind !== 'confirm' || !onDelete) return
+    if (!isActiveOwner(ownerRef.current)) return
+    setPhase({ kind: 'idle' })
+    onDelete(garmentId, 'immediate')
+  }
+
+  return {
+    phase,
+    available: Boolean(onDelete) && garment.status === 'ready',
+    deleteButtonRef,
+    cancelButtonRef,
+    startDelete: () => void startDelete(),
+    cancel,
+    accept,
+  }
+}
+
+type GarmentDeleteState = ReturnType<typeof useGarmentDelete>
+
+function GarmentDeleteButton({ deletion }: { deletion: GarmentDeleteState }) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
+  if (!deletion.available) return null
+  return (
+    <button
+      ref={deletion.deleteButtonRef}
+      type="button"
+      data-testid="garment-delete"
+      aria-busy={deletion.phase.kind === 'checking'}
+      // aria-disabled keeps focus on Delete while the usage read runs.
+      aria-disabled={
+        deletion.phase.kind === 'checking' || deletion.phase.kind === 'confirm'
+      }
+      aria-expanded={deletion.phase.kind === 'confirm'}
+      aria-controls={
+        deletion.phase.kind === 'confirm' ? 'garment-delete-confirm' : undefined
+      }
+      onClick={deletion.startDelete}
+      className="min-h-11 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 aria-disabled:opacity-60 dark:border-red-800 dark:text-red-300"
+    >
+      {t('wardrobe.detail.delete')}
+    </button>
+  )
+}
+
+/** D3: the usage read failed; nothing was deleted, and Retry reads the usage again. */
+function GarmentDeleteUsageFailed({ deletion }: { deletion: GarmentDeleteState }) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
+  if (deletion.phase.kind !== 'failed') return null
+  return (
+    <div
+      role="alert"
+      data-testid="garment-delete-usage-failed"
+      className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/60"
+    >
+      <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+        {t('wardrobe.detail.deleteUsageFailed')}
+      </p>
+      <button
+        type="button"
+        data-testid="garment-delete-usage-retry"
+        onClick={deletion.startDelete}
+        className="min-h-11 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-800 dark:border-red-800 dark:bg-zinc-900 dark:text-red-200"
+      >
+        {t('feedback.retry')}
+      </button>
+    </div>
+  )
+}
+
+/** The one prompt for a piece in use: it names how many looks lose it (D2). */
+function GarmentDeleteConfirm({ deletion }: { deletion: GarmentDeleteState }) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
+  const { phase } = deletion
+  if (phase.kind !== 'confirm') return null
+  return (
+    <div
+      id="garment-delete-confirm"
+      data-testid="garment-delete-confirm"
+      role="alertdialog"
+      aria-labelledby="garment-delete-confirm-title"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.stopPropagation()
+          deletion.cancel()
+        }
+      }}
+      className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/60"
+    >
+      <p
+        id="garment-delete-confirm-title"
+        data-testid="garment-delete-confirm-count"
+        data-count={phase.count}
+        className="text-sm font-semibold text-red-900 dark:text-red-100"
+      >
+        {t('wardrobe.detail.deleteConfirmTitle', {
+          count: phase.count,
+        })}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="garment-delete-confirm-accept"
+          onClick={deletion.accept}
+          className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 dark:bg-red-300 dark:text-red-950"
+        >
+          {t('wardrobe.detail.deleteConfirmAccept')}
+        </button>
+        <button
+          ref={deletion.cancelButtonRef}
+          type="button"
+          data-testid="garment-delete-cancel"
+          onClick={deletion.cancel}
+          className="min-h-11 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+        >
+          {t('wardrobe.detail.deleteCancel')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
  * The detail photo. A signed URL within a minute of expiry asks the page for a fresh one; a
  * photo that fails to load shows the placeholder and asks for a fresh URL once per opened
  * garment, so a lasting fault never loops.
@@ -577,6 +803,7 @@ function GarmentDetailInner({
   onTagsSaved,
   onRefresh,
   onStylePiece,
+  onDelete,
 }: GarmentDetailProps & { garment: ClosetGarment }) {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const locale = i18n.language
@@ -591,6 +818,7 @@ function GarmentDetailInner({
     onRefresh,
   })
   const { draft, setDraft, failure, saveState, awaitingRead } = editor
+  const deletion = useGarmentDelete({ garment, owner, onDelete })
   const busy = saveState !== 'idle'
   const rereadFailed = awaitingRead && loadFailed && !loading
   const garmentId = garment.id
@@ -794,7 +1022,13 @@ function GarmentDetailInner({
                   ref={editor.editButtonRef}
                   type="button"
                   data-testid="garment-edit-tags"
-                  disabled={!editor.canEdit}
+                  // A delete check or its prompt owns the detail until it settles, so a tag
+                  // draft is never discarded by the delete closing the detail.
+                  disabled={
+                    !editor.canEdit ||
+                    deletion.phase.kind === 'checking' ||
+                    deletion.phase.kind === 'confirm'
+                  }
                   onClick={editor.openEditor}
                   className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-800 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100"
                 >
@@ -809,7 +1043,10 @@ function GarmentDetailInner({
                   onRefresh={onRefresh}
                   onOpen={onStylePiece}
                 />
+                <GarmentDeleteButton deletion={deletion} />
               </div>
+              <GarmentDeleteConfirm deletion={deletion} />
+              <GarmentDeleteUsageFailed deletion={deletion} />
             </>
           )}
         </div>

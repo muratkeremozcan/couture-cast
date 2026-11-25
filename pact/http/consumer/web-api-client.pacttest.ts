@@ -104,6 +104,8 @@ import {
   verifyUpdateGarmentTagsInteraction,
   verifyListGarmentsWithColorInteraction,
   verifyUpdateGarmentTagsWithColorInteraction,
+  verifyGarmentUsageInteraction,
+  verifyDeleteGarmentInteraction,
   updateGarmentTagsErrorInteractions,
   verifyUpdateGarmentTagsNullMaterialInteraction,
   verifyCreateCapsuleInteraction,
@@ -343,6 +345,15 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('edits garment tags and reads back the color family when opted in', async () => {
     await verifyUpdateGarmentTagsWithColorInteraction(pact, createWebClientForMockServer)
+  })
+
+  // Story 7.6 test plan 7.6-PACT-001..002: garment delete and the usage read before it.
+  it('reads what deleting a garment affects', async () => {
+    await verifyGarmentUsageInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('deletes a garment', async () => {
+    await verifyDeleteGarmentInteraction(pact, createWebClientForMockServer)
   })
 
   it.each(suggestGarmentTagsErrorInteractions)(

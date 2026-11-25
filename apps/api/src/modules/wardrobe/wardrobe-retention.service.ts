@@ -100,6 +100,16 @@ export class WardrobeRetentionService {
     this.deletions = new WardrobeObjectDeletionOutbox(prisma, storage)
   }
 
+  /**
+   * A member's deletion request. A request on a garment of another member, or on one that does
+   * not exist, changes nothing. Under a legal hold the request is recorded on the row
+   * (`deletion_requested_at`, `retention_trigger`) and the hold stays; the database trigger
+   * `garment_hold_release_honours_deletion` turns the release of such a row into
+   * `deletion_pending`, and the hourly sweep purges it (Story CC-7.6 D4). Otherwise the row
+   * flips to `deletion_pending` and its bytes are purged at once; a purge that throws after the
+   * flip committed is logged and left to the hourly sweep (D5), so the member's request still
+   * succeeds. A repeated request is idempotent.
+   */
   async requestDeletion(
     userId: string,
     garmentId: string,
@@ -108,7 +118,7 @@ export class WardrobeRetentionService {
     const garment = await this.prisma.garmentItem.findFirst({
       where: { id: garmentId, user_id: userId },
     })
-    if (!garment || garment.retention_status === 'legal_hold') {
+    if (!garment || garment.retention_purged_at) {
       return
     }
 
@@ -116,9 +126,10 @@ export class WardrobeRetentionService {
      * The availability flip runs under the shared lock order rather than as a
      * bare update. Capsule creation validates garment eligibility while holding
      * these same locks, so an unlocked flip here would let a capsule be built
-     * from a garment that is being deleted in the same instant.
+     * from a garment that is being deleted in the same instant. The legal-hold
+     * record takes the same locks, so a release racing it sees one or the other.
      */
-    const claimed = await interactiveTransaction(this.prisma, async (tx) => {
+    const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await lockOwnerProfile(tx, userId)
 
       const affectedCapsules = await tx.outfitCapsule.findMany({
@@ -133,27 +144,75 @@ export class WardrobeRetentionService {
       )
       await lockGarments(tx, userId, [garment.id])
 
-      return tx.garmentItem.updateMany({
+      const requestedAt = new Date()
+      const flipped = await tx.garmentItem.updateMany({
         where: {
           id: garment.id,
           user_id: userId,
-          retention_status: { not: 'legal_hold' },
+          retention_status: 'active',
+          retention_purged_at: null,
         },
         data: {
           retention_status: 'deletion_pending',
           retention_trigger: trigger,
-          deletion_requested_at: new Date(),
+          deletion_requested_at: requestedAt,
         },
       })
+      if (flipped.count === 1) return { claimed: true as const, trigger }
+
+      // A pending row whose purge has not finished (a released hold, a failed purge, a
+      // guardian revocation) keeps its first recorded request and reason; the repeat only
+      // retries the purge. A purged row stays as it is.
+      const pending = await tx.garmentItem.findFirst({
+        where: {
+          id: garment.id,
+          user_id: userId,
+          retention_status: 'deletion_pending',
+          retention_purged_at: null,
+        },
+        select: { retention_trigger: true },
+      })
+      if (pending) {
+        return { claimed: true as const, trigger: pending.retention_trigger ?? trigger }
+      }
+
+      // Under a hold: record the request once and leave the hold as it is. An already purged
+      // row matches neither update.
+      await tx.garmentItem.updateMany({
+        where: {
+          id: garment.id,
+          user_id: userId,
+          retention_status: 'legal_hold',
+          deletion_requested_at: null,
+        },
+        data: {
+          retention_trigger: trigger,
+          deletion_requested_at: requestedAt,
+        },
+      })
+      return { claimed: false as const }
     })
 
-    if (claimed.count === 1) {
-      await this.invalidateRitualCache(userId, garment.id)
+    if (!outcome.claimed) {
+      return
+    }
+    await this.invalidateRitualCache(userId, garment.id)
+    try {
       await this.purgeGarment({
         ...garment,
         retention_status: 'deletion_pending',
-        retention_trigger: trigger,
+        retention_trigger: outcome.trigger,
       })
+    } catch (error) {
+      // The flip committed, so the list and every reader already treat the garment as gone;
+      // the hourly sweep picks up the `deletion_pending` row and finishes the purge.
+      this.logger.error(
+        {
+          garmentId: garment.id,
+          errorClass: error instanceof Error ? error.constructor.name : typeof error,
+        },
+        'wardrobe_retention_purge_deferred'
+      )
     }
   }
 
@@ -811,7 +870,8 @@ export class WardrobeRetentionService {
           event_type: 'garment_retention_purged',
           event_data: {
             garmentId: garment.id,
-            trigger: garment.retention_trigger ?? 'unknown',
+            // The locked row holds the recorded reason; the caller's copy may predate it.
+            trigger: locked.retention_trigger ?? garment.retention_trigger ?? 'unknown',
             completedAt: completedAt.toISOString(),
             outcome: 'purged',
           },

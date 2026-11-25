@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Learning path Step 63: Garment detail and tag edit (7.5-NAT-001, opt-in colorFamily).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 64: Garment delete (7.6-NAT-001, usage read and DELETE wrappers).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -14,7 +16,9 @@ import {
   capsuleETag,
   commitSilhouettePhotoFromMobile,
   createSilhouetteUploadUrlFromMobile,
+  deleteGarmentFromMobile,
   deleteSilhouettePhotoFromMobile,
+  getGarmentUsageFromMobile,
   getSilhouetteProfileFromMobile,
   getWardrobeOnboardingStateFromMobile,
   listGarmentsFromMobile,
@@ -526,4 +530,92 @@ describe('7.5 garment colorFamily opt-in', () => {
       ).rejects.toMatchObject({ code: message, status })
     }
   )
+})
+
+describe('7.6 garment delete wrappers', () => {
+  const usage = { garmentId: 'garment-1', savedLookCount: 2, capsuleCount: 1 }
+
+  it('[P0] [7.6-NAT-001] reads the usage with the bearer and parses it strictly', async () => {
+    const authorizations: (string | null)[] = []
+    server.use(
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', ({ request, params }) => {
+        authorizations.push(request.headers.get('authorization'))
+        return HttpResponse.json({ ...usage, garmentId: params.garmentId })
+      })
+    )
+
+    await expect(getGarmentUsageFromMobile('token', 'garment-1')).resolves.toEqual(usage)
+    expect(authorizations).toEqual(['Bearer token'])
+  })
+
+  it('[P0] [7.6-NAT-001] treats a 404 usage read as already gone', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () =>
+        HttpResponse.json(
+          { statusCode: 404, message: 'GARMENT_NOT_FOUND', error: 'Not Found' },
+          { status: 404 }
+        )
+      )
+    )
+
+    await expect(getGarmentUsageFromMobile('token', 'garment-1')).resolves.toBeNull()
+  })
+
+  it('[P1] [7.6-NAT-001] never reads a failed usage answer as an unused piece', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () => {
+        reads++
+        return HttpResponse.json({ message: 'down' }, { status: 503 })
+      })
+    )
+
+    const failure = await getGarmentUsageFromMobile('token', 'garment-1').catch(
+      (error: unknown) => error
+    )
+
+    expect(reads).toBe(1)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error & { status?: number }).status).toBe(503)
+  })
+
+  it('[P1] [7.6-NAT-001] rejects a 200 usage answer with an unexpected key instead of reading it as an unused piece', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () => {
+        reads++
+        return HttpResponse.json({ ...usage, total: 3 })
+      })
+    )
+
+    const failure = await getGarmentUsageFromMobile('token', 'garment-1').catch(
+      (error: unknown) => error
+    )
+
+    // The 200 handler answered, so the rejection comes from the strict parse, not from HTTP.
+    expect(reads).toBe(1)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error & { status?: number }).status).toBeUndefined()
+  })
+
+  it('[P0] [7.6-NAT-001] deletes with the bearer and rejects a failure with its status', async () => {
+    const seen: string[] = []
+    server.use(
+      http.delete('*/api/v1/wardrobe/garments/:garmentId', ({ request, params }) => {
+        seen.push(`${request.headers.get('authorization')} ${String(params.garmentId)}`)
+        return seen.length === 1
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json({ message: 'Internal server error' }, { status: 500 })
+      })
+    )
+
+    await expect(deleteGarmentFromMobile('token', 'garment-1')).resolves.toBeUndefined()
+    const failure = await deleteGarmentFromMobile('token', 'garment-1').catch(
+      (error: unknown) => error
+    )
+
+    expect(seen).toEqual(['Bearer token garment-1', 'Bearer token garment-1'])
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error & { status?: number }).status).toBe(500)
+  })
 })

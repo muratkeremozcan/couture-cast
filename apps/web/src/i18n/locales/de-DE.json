@@ -482,7 +482,16 @@
       "undoFailed": "Rückgängig machen hat nicht geklappt. Versuche es erneut.",
       "missing": "Dieses Teil ist nicht mehr in deinem Schrank.",
       "loading": "Teil wird geladen...",
-      "loadFailed": "Dieses Teil konnte nicht geladen werden. Versuche es erneut."
+      "loadFailed": "Dieses Teil konnte nicht geladen werden. Versuche es erneut.",
+      "delete": "Löschen",
+      "deleteConfirmTitle_one": "Dieses Teil löschen? Es ist in {{count}} Look.",
+      "deleteConfirmTitle_other": "Dieses Teil löschen? Es ist in {{count}} Looks.",
+      "deleteConfirmAccept": "Teil löschen",
+      "deleteCancel": "Behalten",
+      "deleteSucceeded": "Gelöscht",
+      "deleteUndone": "Löschen rückgängig gemacht",
+      "deleteFailed": "Dieses Teil konnte nicht gelöscht werden.",
+      "deleteUsageFailed": "Wir konnten nicht prüfen, wo dieses Teil verwendet wird. Versuche es erneut."
     }
   },
   "community": {

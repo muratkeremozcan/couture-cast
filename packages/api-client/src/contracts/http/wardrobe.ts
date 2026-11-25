@@ -503,6 +503,21 @@ const garmentTaggingUnavailableErrorSchema = z
   })
   .strict()
 
+/**
+ * Story CC-7.6 D2: what deleting a garment affects. `savedLookCount` counts the member's saved
+ * looks (not deleted) that hold the garment as the anchor or in a composition slot;
+ * `capsuleCount` counts the capsules that contain it. Clients name the sum before a delete.
+ */
+export const garmentUsageResponseSchema = z
+  .object({
+    garmentId: nonEmptyStringSchema.max(128, {
+      error: 'String must contain at most 128 character(s)',
+    }),
+    savedLookCount: z.number().int().min(0),
+    capsuleCount: z.number().int().min(0),
+  })
+  .strict()
+
 export const ownerUserIdPathParamsSchema = z
   .object({
     ownerUserId: nonEmptyStringSchema.max(128).describe('Unique owner user ID.'),
@@ -805,6 +820,7 @@ export type SuggestGarmentTagsResponse = z.infer<
 >
 export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
 export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>
+export type GarmentUsageResponse = z.infer<typeof garmentUsageResponseSchema>
 export type GarmentColorFamilyContract = z.infer<typeof garmentColorFamilyEnum>
 export type GarmentWithColor = z.infer<typeof garmentItemWithColorSchema>
 export type GarmentListWithColorResponse = z.infer<
@@ -1344,6 +1360,10 @@ export function registerWardrobeContracts(
     'GarmentTaggingUnavailableError',
     garmentTaggingUnavailableErrorSchema
   )
+  const registeredGarmentUsageResponse = registry.register(
+    'GarmentUsageResponse',
+    garmentUsageResponseSchema
+  )
 
   registry.registerPath({
     method: 'get',
@@ -1377,6 +1397,103 @@ export function registerWardrobeContracts(
         content: {
           'application/json': {
             schema: commonSchemas.forbiddenHttpErrorSchema,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/wardrobe/garments/{garmentId}/usage',
+    tags: ['wardrobe'],
+    summary: 'Count the saved looks and capsules a garment deletion would affect',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: garmentIdPathParamsSchema,
+    },
+    responses: {
+      200: {
+        description:
+          'Saved looks (not deleted) holding the garment and capsules containing it. Never cached.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentUsageResponse,
+          },
+        },
+      },
+      400: {
+        description: 'Invalid garment ID.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentIdBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentTaggingUnauthorizedError,
+          },
+        },
+      },
+      403: {
+        description: 'Account blocked from member access.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentTaggingForbiddenError,
+          },
+        },
+      },
+      404: {
+        description:
+          'Garment not found, owned by another user, not ready, or already being deleted.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentTaggingNotFoundError,
+          },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/v1/wardrobe/garments/{garmentId}',
+    tags: ['wardrobe'],
+    summary: 'Request deletion of a garment and purge its image',
+    description:
+      'Idempotent. A garment that does not exist or belongs to another user answers 204 and changes nothing. Under a legal hold the request is recorded and the garment is purged after the hold is released. A purge that cannot finish at once completes in the hourly retention sweep.',
+    security: [{ bearerAuth: [] }],
+    request: {
+      params: garmentIdPathParamsSchema,
+    },
+    responses: {
+      204: {
+        description: 'Deletion requested; the garment no longer appears in the closet.',
+      },
+      400: {
+        description: 'Invalid garment ID.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentIdBadRequestError,
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentTaggingUnauthorizedError,
+          },
+        },
+      },
+      403: {
+        description: 'Account blocked from member access.',
+        content: {
+          'application/json': {
+            schema: registeredGarmentTaggingForbiddenError,
           },
         },
       },

@@ -12,6 +12,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
 // Learning path Step 63: Garment detail and tag edit (7.5-CMP-001, opt-in colorFamily).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 64: Garment delete (7.6-CMP-001, usage read and DELETE wrappers).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
 import {
@@ -24,7 +26,9 @@ import {
   WardrobeRequestError,
   createCapsuleFromWeb,
   deleteCapsuleFromWeb,
+  deleteGarmentFromWeb,
   favoriteCapsuleFromWeb,
+  getGarmentUsageFromWeb,
   generateIdempotencyKey,
   getCapsuleFromWeb,
   isStaleRevisionError,
@@ -2307,5 +2311,103 @@ describe('wardrobe uploads to storage', () => {
 
     expect(garment.id).toBe(garmentFixture.id)
     expect(putHeaders['Cache-Control']).toBe('private, max-age=0')
+  })
+})
+
+describe('7.6-CMP-001 garment delete wrappers', () => {
+  const usage = { garmentId: 'garment-1', savedLookCount: 2, capsuleCount: 1 }
+
+  it('[P0] reads the usage with the bearer and parses it strictly', async () => {
+    authenticate()
+    const fetchMock = stubFetchOnce(jsonResponse(usage))
+
+    await expect(getGarmentUsageFromWeb('garment-1')).resolves.toEqual(usage)
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toMatch(/\/api\/v1\/wardrobe\/garments\/garment-1\/usage$/)
+    expect(init.method).toBe('GET')
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      'Bearer test-access-token'
+    )
+  })
+
+  it('[P0] treats a 404 usage read as already gone', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ message: 'GARMENT_NOT_FOUND', statusCode: 404 }, 404))
+
+    await expect(getGarmentUsageFromWeb('garment-1')).resolves.toBeNull()
+  })
+
+  it('[P0] reads a route-level 404 without the API code as a failure, never as gone', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ message: 'Cannot GET', statusCode: 404 }, 404))
+
+    await expect(getGarmentUsageFromWeb('garment-1')).rejects.toBeInstanceOf(
+      WardrobeRequestError
+    )
+  })
+
+  it('[P1] refuses a usage answer with an unknown key instead of trusting it', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ ...usage, total: 3 }))
+
+    await expect(getGarmentUsageFromWeb('garment-1')).rejects.toThrow()
+  })
+
+  it('[P1] surfaces a failed usage read as an error, never as an unused piece', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ message: 'Internal server error' }, 500))
+
+    await expect(getGarmentUsageFromWeb('garment-1')).rejects.toBeInstanceOf(
+      WardrobeRequestError
+    )
+  })
+
+  it('[P0] deletes with the bearer and sets keepalive only when asked', async () => {
+    authenticate()
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(deleteGarmentFromWeb('garment-1')).resolves.toBeUndefined()
+    await expect(
+      deleteGarmentFromWeb('garment-1', { keepalive: true })
+    ).resolves.toBeUndefined()
+
+    const calls = fetchMock.mock.calls as [string, RequestInit][]
+    const [url, plain] = calls[0]!
+    const kept = calls[1]![1]
+    expect(url).toMatch(/\/api\/v1\/wardrobe\/garments\/garment-1$/)
+    expect(plain.method).toBe('DELETE')
+    expect((plain.headers as Record<string, string>).Authorization).toBe(
+      'Bearer test-access-token'
+    )
+    expect(plain.keepalive).not.toBe(true)
+    expect(kept.method).toBe('DELETE')
+    expect(kept.keepalive).toBe(true)
+  })
+
+  it('[P1] speaks for the account that tapped Delete when a token is passed', async () => {
+    authenticate()
+    const fetchMock = stubFetchOnce(new Response(null, { status: 204 }))
+
+    await deleteGarmentFromWeb('garment-1', { accessToken: 'token-of-the-deleter' })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect((init.headers as Record<string, string>).Authorization).toBe(
+      'Bearer token-of-the-deleter'
+    )
+  })
+
+  it('[P0] rejects a failed delete with the HTTP status, so the closet can return the piece', async () => {
+    authenticate()
+    stubFetchOnce(jsonResponse({ message: 'Internal server error' }, 500))
+
+    const failure = await deleteGarmentFromWeb('garment-1').catch(
+      (error: unknown) => error
+    )
+    expect(failure).toBeInstanceOf(WardrobeRequestError)
+    expect((failure as WardrobeRequestError).status).toBe(500)
   })
 })

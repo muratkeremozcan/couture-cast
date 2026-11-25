@@ -1,4 +1,5 @@
 // Story 6.3 device-reset owner: reset a member's reaction state between flow attempts in `scripts/lib/mobile-e2e-flow-state.mjs` and `scripts/lib/mobile-e2e-flow-retry.mjs`
+import { createHash } from 'node:crypto'
 import { fold, reversePlaces } from './weather-provider-double-data.mjs'
 
 // The native harness owns an isolated UUID database, genuine identities and source fixtures.
@@ -239,21 +240,164 @@ export const seedCommunityCommentsLongRoot = async (
 }
 
 /**
+ * Story 7.6 (7.6-MAE-001): `maestro/garment-delete-flow.yaml` deletes one garment for real. The
+ * shared seeded garments (top, bottom, outerwear, shoes) belong to the capsule and tag-edit
+ * flows, so this flow gets its own ready dress before each attempt, a category no other flow
+ * seeds or selects, under an ID reserved for this fixture (`garmentDeleteFixtureId`), so the hooks
+ * never touch another dress; the after hook removes whatever is left of it. The row has no stored
+ * photo: the closet lists it with `imageAccess: null` (signing failure is logged, not raised) and
+ * the purge's storage removal of an absent key is a no-op.
+ * Learning path Step 64: Garment delete.
+ * See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+ */
+export const GARMENT_DELETE_FLOW = 'maestro/garment-delete-flow.yaml'
+export const GARMENT_DELETE_TARGET_CATEGORY = 'dress'
+
+const requireGarmentDeleteMember = (userId) => {
+  if (typeof userId !== 'string' || userId.trim().length === 0) {
+    throw new Error('The garment delete flow state requires a member ID')
+  }
+}
+
+/**
+ * The fixture's reserved ID: a UUID derived from the member, so the hooks name exactly this row
+ * and never another dress the member may own. Seed, settle check and cleanup all use it.
+ */
+export const garmentDeleteFixtureId = (userId) => {
+  requireGarmentDeleteMember(userId)
+  const hex = createHash('sha256')
+    .update(`garment-delete-fixture:${userId}`)
+    .digest('hex')
+  const variant = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+/** The fixture's object key: the only key a purge of this photo-less ready row enqueues. */
+const garmentDeleteFixturePath = (userId, garmentId) =>
+  `wardrobe/${userId}/${garmentId}.png`
+
+export const removeGarmentDeleteTarget = async (prisma, userId) => {
+  const garmentId = garmentDeleteFixtureId(userId)
+  await prisma.$transaction([
+    // A purge records the fixture's object key in the deletion outbox; the drain must not chase
+    // it. Only that exact key, so no other member's job is touched.
+    prisma.wardrobeObjectDeletion.deleteMany({
+      where: { object_path: garmentDeleteFixturePath(userId, garmentId) },
+    }),
+    prisma.garmentItem.deleteMany({ where: { id: garmentId, user_id: userId } }),
+  ])
+}
+
+/**
+ * Story 7.6 (7.6-MAE-001): the proof that the flow's last Delete reached the server. The flow
+ * ends once its Undo window closes, while the DELETE may still be in flight, so it cannot relaunch
+ * the app to read the closet back: the force stop could cancel that request. This waits, after the
+ * flow and before the fixture is removed, until the fixture is no longer active: the API purged
+ * it, or flipped it to `deletion_pending` for the sweep. A fixture still active at the deadline
+ * fails the flow with that cause; whether the request never arrived or the API refused it is left
+ * to the API and device logs.
+ */
+export const waitForGarmentDeleteTargetGone = async (
+  prisma,
+  userId,
+  {
+    timeoutMs = 15_000,
+    intervalMs = 250,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  } = {}
+) => {
+  const garmentId = garmentDeleteFixtureId(userId)
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const fixture = await prisma.garmentItem.findFirst({
+      where: { id: garmentId, user_id: userId },
+      select: { retention_status: true },
+    })
+    if (!fixture) {
+      throw new Error(
+        `garment_delete_fixture_missing: the seeded dress ${garmentId} is gone; something other than the flow removed it`
+      )
+    }
+    if (fixture.retention_status !== 'active') return
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `garment_delete_not_committed: the seeded dress ${garmentId} was still active at the ${timeoutMs} ms deadline`
+      )
+    }
+    await sleep(intervalMs)
+  }
+}
+
+/**
+ * The end of a flow's state: `verify` (when the hook has one) only after a passing flow, then
+ * `after` whatever happened. `verify` proves an outcome the flow cannot see itself; a failed flow
+ * already has its cause. When both fail, both causes are reported.
+ *
+ * @param {{ verify?: (prisma: unknown, userId: string) => Promise<void>, after: (prisma: unknown, userId: string) => Promise<void> }} hook
+ */
+export const settleMobileE2EFlowState = async (hook, prisma, userId, { passed }) => {
+  let verifyError
+  if (passed && hook.verify) {
+    try {
+      await hook.verify(prisma, userId)
+    } catch (error) {
+      verifyError = error
+    }
+  }
+  try {
+    await hook.after(prisma, userId)
+  } catch (cleanupError) {
+    if (!verifyError) throw cleanupError
+    throw new AggregateError(
+      [verifyError, cleanupError],
+      `${verifyError.message}; the cleanup also failed: ${cleanupError.message}`
+    )
+  }
+  if (verifyError) throw verifyError
+}
+
+export const seedGarmentDeleteTarget = async (prisma, userId) => {
+  await removeGarmentDeleteTarget(prisma, userId)
+  const garmentId = garmentDeleteFixtureId(userId)
+  const now = new Date()
+  await prisma.garmentItem.create({
+    data: {
+      id: garmentId,
+      user_id: userId,
+      object_path: garmentDeleteFixturePath(userId, garmentId),
+      mime_type: 'image/png',
+      file_size_bytes: 2048,
+      category: GARMENT_DELETE_TARGET_CATEGORY,
+      material: 'cotton',
+      comfort_range: 'mild',
+      upload_status: 'ready',
+      retention_status: 'active',
+      tags_confirmed_at: now,
+      committed_at: now,
+    },
+  })
+  return garmentId
+}
+
+/**
  * State a flow needs beyond the shared per-flow reset, keyed by flow path.
- * `before` runs ahead of every attempt; `after` runs once the flow finishes,
- * pass or fail, so the flows after it start from the baseline the identity
+ * `before` runs ahead of every attempt; `verify`, when present, runs once a
+ * flow passed (see `settleMobileE2EFlowState`); `after` runs once the flow
+ * finishes, pass or fail, so the flows after it start from the baseline the identity
  * setup created. A flow with no entry gets the shared reset alone.
  *
  * @param {{
  *   locationSentinelKeySuffix: string,
  *   cleanupComments: (tx: unknown, commentIds: string[]) => Promise<void>,
  *   longRootTarget?: { postId: string, authorId: string },
+ *   garmentDeleteSettle?: { timeoutMs?: number, intervalMs?: number, sleep?: (ms: number) => Promise<void> },
  * }} options
  */
 export const mobileE2EFlowStateHooks = ({
   locationSentinelKeySuffix,
   cleanupComments,
   longRootTarget = COMMUNITY_COMMENTS_LONG_ROOT_TARGET,
+  garmentDeleteSettle,
 }) => ({
   [LOCATION_CAPTURE_FLOW]: {
     before: (prisma, userId) =>
@@ -271,6 +415,13 @@ export const mobileE2EFlowStateHooks = ({
       seedCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
     after: (prisma) =>
       removeCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
+  },
+  [GARMENT_DELETE_FLOW]: {
+    before: (prisma, userId) => seedGarmentDeleteTarget(prisma, userId),
+    // Runs only after a passing flow: the DELETE landed (see waitForGarmentDeleteTargetGone).
+    verify: (prisma, userId) =>
+      waitForGarmentDeleteTargetGone(prisma, userId, garmentDeleteSettle),
+    after: (prisma, userId) => removeGarmentDeleteTarget(prisma, userId),
   },
 })
 

@@ -5,6 +5,7 @@ import {
   WARDROBE_UPLOAD_CACHE_CONTROL,
   parseGarmentListWithColorResponse,
   parseUpdateGarmentTagsWithColorResponse,
+  garmentUsageResponseSchema,
   suggestGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
@@ -17,6 +18,7 @@ import {
   type GarmentComfortRange,
   type GarmentItemContract,
   type GarmentWithColor,
+  type GarmentUsageResponse,
   type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
   type OutfitCapsuleContract,
@@ -345,6 +347,7 @@ async function readError(response: Response): Promise<Error> {
       'CONCURRENT_TAG_UPDATE',
       'GARMENT_TAGS_CHANGED',
       'GUARDIAN_CONSENT_REQUIRED',
+      'GARMENT_NOT_FOUND',
     ].includes(message)
       ? message
       : undefined
@@ -571,6 +574,67 @@ export async function updateGarmentTagsFromWeb(
     return parseUpdateGarmentTagsWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
+  }
+}
+
+/**
+ * Story CC-7.6 D2/D3: the saved looks and capsules deleting the garment affects. A 404
+ * (`GARMENT_NOT_FOUND`: unknown, another member's, no longer ready, or already being deleted)
+ * resolves `null`, which the closet treats as already gone.
+ */
+export async function getGarmentUsageFromWeb(
+  garmentId: string,
+  signal?: AbortSignal
+): Promise<GarmentUsageResponse | null> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdUsageGet(
+        { garmentId },
+        { signal: requestSignal }
+      )
+    )
+    return garmentUsageResponseSchema.parse(response)
+  } catch (error) {
+    const failure = await actionableWardrobeError(
+      error,
+      'Unable to check where this piece is used.'
+    )
+    // Only the API's own answer means gone; a route-level 404 (a deploy without the route)
+    // is a failure like any other.
+    if (
+      failure instanceof WardrobeRequestError &&
+      failure.status === 404 &&
+      failure.code === 'GARMENT_NOT_FOUND'
+    ) {
+      return null
+    }
+    throw failure
+  }
+}
+
+/**
+ * Story CC-7.6: requests the garment's deletion (204, idempotent). `keepalive` lets the request
+ * outlive the page; the closet sets it on every send (D1). `accessToken` is
+ * the bearer of the account that tapped Delete, so a commit that runs after an account change
+ * still speaks for that account.
+ */
+export async function deleteGarmentFromWeb(
+  garmentId: string,
+  options: { keepalive?: boolean; signal?: AbortSignal; accessToken?: string | null } = {}
+): Promise<void> {
+  const accessToken = options.accessToken?.trim() || readAccessToken()
+  try {
+    await withRequestTimeout(options.signal, (requestSignal) =>
+      createWebApiClient({ accessToken }).apiV1WardrobeGarmentsGarmentIdDelete(
+        { garmentId },
+        options.keepalive
+          ? { keepalive: true, signal: requestSignal }
+          : { signal: requestSignal }
+      )
+    )
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to delete this piece.')
   }
 }
 

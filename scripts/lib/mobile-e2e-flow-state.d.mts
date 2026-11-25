@@ -54,6 +54,34 @@ export declare const COMMUNITY_COMMENTS_FLOW: 'maestro/community-comments.yaml'
 
 export declare const USE_MY_LOCATION_FLOW: 'maestro/location-use-my-location.yaml'
 
+/** Story 7.6: the flow that deletes its own seeded dress (7.6-MAE-001). */
+export declare const GARMENT_DELETE_FLOW: 'maestro/garment-delete-flow.yaml'
+
+export declare const GARMENT_DELETE_TARGET_CATEGORY: 'dress'
+
+/** The fixture's reserved garment ID for this member. */
+export declare function garmentDeleteFixtureId(userId: string): string
+
+export declare function seedGarmentDeleteTarget(
+  prisma: PrismaClient,
+  userId: string
+): Promise<string>
+
+export declare function removeGarmentDeleteTarget(
+  prisma: PrismaClient,
+  userId: string
+): Promise<void>
+
+export declare function waitForGarmentDeleteTargetGone(
+  prisma: PrismaClient,
+  userId: string,
+  options?: {
+    timeoutMs?: number
+    intervalMs?: number
+    sleep?: (ms: number) => Promise<void>
+  }
+): Promise<void>
+
 export declare const USE_MY_LOCATION_DEVICE: Readonly<{
   latitude: number
   longitude: number
@@ -98,11 +126,25 @@ export declare function removeCommunityCommentsLongRoot(
 
 export type MobileE2EFlowStateHook = {
   before: (prisma: PrismaClient, userId: string) => Promise<void>
+  /** Runs only after a passing flow, before `after`. */
+  verify?: (prisma: PrismaClient, userId: string) => Promise<void>
   after: (prisma: PrismaClient, userId: string) => Promise<void>
 }
+
+export declare function settleMobileE2EFlowState(
+  hook: MobileE2EFlowStateHook,
+  prisma: PrismaClient,
+  userId: string,
+  options: { passed: boolean }
+): Promise<void>
 
 export declare function mobileE2EFlowStateHooks(options: {
   locationSentinelKeySuffix: string
   cleanupComments: CommunityCommentFixtureCleanup
   longRootTarget?: CommunityCommentsLongRootTarget
+  garmentDeleteSettle?: {
+    timeoutMs?: number
+    intervalMs?: number
+    sleep?: (ms: number) => Promise<void>
+  }
 }): Record<string, MobileE2EFlowStateHook>

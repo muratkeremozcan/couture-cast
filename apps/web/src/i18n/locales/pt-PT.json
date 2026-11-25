@@ -482,7 +482,16 @@
       "undoFailed": "Não foi possível anular. Tenta novamente.",
       "missing": "Esta peça já não está no teu roupeiro.",
       "loading": "A carregar a peça...",
-      "loadFailed": "Não foi possível carregar esta peça. Tenta novamente."
+      "loadFailed": "Não foi possível carregar esta peça. Tenta novamente.",
+      "delete": "Eliminar",
+      "deleteConfirmTitle_one": "Eliminar esta peça? Está em {{count}} look.",
+      "deleteConfirmTitle_other": "Eliminar esta peça? Está em {{count}} looks.",
+      "deleteConfirmAccept": "Eliminar peça",
+      "deleteCancel": "Manter",
+      "deleteSucceeded": "Eliminada",
+      "deleteUndone": "Eliminação anulada",
+      "deleteFailed": "Não foi possível eliminar esta peça.",
+      "deleteUsageFailed": "Não foi possível verificar onde esta peça é usada. Tenta novamente."
     }
   },
   "community": {

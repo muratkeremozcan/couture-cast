@@ -680,6 +680,36 @@ export class WardrobeService {
     }
   }
 
+  /**
+   * Story CC-7.6 D2/D3: how many capsules hold one of the member's own ready, active garments
+   * with no recorded deletion request. Anything else, another member's garment included,
+   * answers 404 `GARMENT_NOT_FOUND`, so the read reveals nothing about garments the caller
+   * cannot delete from the closet.
+   */
+  async countGarmentCapsules(
+    userId: string,
+    garmentId: string
+  ): Promise<{ garmentId: string; capsuleCount: number }> {
+    const garment = await this.prisma.garmentItem.findFirst({
+      where: {
+        id: garmentId,
+        user_id: userId,
+        object_path: { not: null },
+        retention_status: 'active',
+        upload_status: 'ready',
+        deletion_requested_at: null,
+      },
+      select: { id: true },
+    })
+    if (!garment) {
+      throw new NotFoundException('GARMENT_NOT_FOUND')
+    }
+    const capsuleCount = await this.prisma.outfitCapsule.count({
+      where: { user_id: userId, garment_joins: { some: { garment_id: garment.id } } },
+    })
+    return { garmentId: garment.id, capsuleCount }
+  }
+
   async suggestGarmentTags(
     userId: string,
     role: ApiRole,

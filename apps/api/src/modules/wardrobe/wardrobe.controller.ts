@@ -4,7 +4,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Delete,
   Header,
   Headers,
   HttpCode,
@@ -34,7 +33,6 @@ import { RequestAuthGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeUploadGuard } from './wardrobe.guard'
 import { WardrobeService } from './wardrobe.service'
-import { WardrobeRetentionService } from './wardrobe-retention.service'
 
 function validationMessage(prefix: string, error: z.ZodError): string {
   const details = error.issues
@@ -55,9 +53,7 @@ function wantsGarmentColor(header: string | string[] | undefined): boolean {
 @UseGuards(RequestAuthGuard, WardrobeUploadGuard)
 export class WardrobeController {
   constructor(
-    @Inject(WardrobeService) private readonly wardrobeService: WardrobeService,
-    @Inject(WardrobeRetentionService)
-    private readonly wardrobeRetentionService: WardrobeRetentionService
+    @Inject(WardrobeService) private readonly wardrobeService: WardrobeService
   ) {}
 
   @Get('garments')
@@ -134,15 +130,9 @@ export class WardrobeController {
     return result.response
   }
 
-  @Delete('garments/:garmentId')
-  @HttpCode(204)
-  @Header('Cache-Control', 'private, no-store')
-  async deleteGarment(
-    @AuthContext() auth: RequestAuthContext,
-    @Param('garmentId') garmentId: string
-  ): Promise<void> {
-    await this.wardrobeRetentionService.requestDeletion(auth.userId, garmentId)
-  }
+  // Story CC-7.6 D8: the garment DELETE and its usage read live in
+  // `WardrobeGarmentRemovalController`, which skips the guardian upload-consent guard so a
+  // member can always delete their own data.
 
   @Post('garments/:garmentId/suggest-tags')
   @HttpCode(200)

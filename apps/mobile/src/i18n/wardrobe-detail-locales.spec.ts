@@ -1,5 +1,7 @@
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 64: Garment delete (wardrobe.detail.delete* keys).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { describe, expect, it } from 'vitest'
 import mobileDeDe from '../../assets/locales/de-DE.json'
 import webDeDe from '../../../web/src/i18n/locales/de-DE.json'
@@ -38,6 +40,15 @@ const REQUIRED_KEYS = [
   'missing',
   'loading',
   'loadFailed',
+  'delete',
+  'deleteConfirmTitle_one',
+  'deleteConfirmTitle_other',
+  'deleteConfirmAccept',
+  'deleteCancel',
+  'deleteSucceeded',
+  'deleteUndone',
+  'deleteFailed',
+  'deleteUsageFailed',
 ] as const
 
 const catalogs = [

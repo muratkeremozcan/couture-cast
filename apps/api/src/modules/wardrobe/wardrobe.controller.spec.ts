@@ -16,7 +16,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ZodError } from 'zod'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeController } from './wardrobe.controller'
+import { WardrobeGarmentRemovalController } from './wardrobe-garment-removal.controller'
 import type { WardrobeRetentionService } from './wardrobe-retention.service'
+import type { WardrobeSavedLookService } from './wardrobe-saved-look.service.js'
 import type { WardrobeService } from './wardrobe.service'
 
 const mockAuth: RequestAuthContext = {
@@ -86,7 +88,13 @@ const mockRetentionService = {
 } as unknown as WardrobeRetentionService
 
 describe('WardrobeController', () => {
-  const controller = new WardrobeController(mockWardrobeService, mockRetentionService)
+  const controller = new WardrobeController(mockWardrobeService)
+  // Story CC-7.6 D8: the garment DELETE moved to its own controller without the upload guard.
+  const removalController = new WardrobeGarmentRemovalController(
+    mockWardrobeService,
+    mockRetentionService,
+    {} as WardrobeSavedLookService
+  )
 
   beforeEach(() => {
     vi.resetAllMocks()
@@ -155,7 +163,7 @@ describe('WardrobeController', () => {
   })
 
   it('delegates deletion to retention service', async () => {
-    await controller.deleteGarment(mockAuth, 'garment_99')
+    await removalController.deleteGarment(mockAuth, 'garment_99')
     expect(mockRequestDeletion).toHaveBeenCalledWith('user_123', 'garment_99')
   })
 

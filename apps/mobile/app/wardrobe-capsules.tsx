@@ -32,6 +32,7 @@ import {
   type MobileCapsuleSaveOptions,
 } from '@/components/wardrobe/capsule-builder-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { createSchemeStyles, useSchemeColors } from '@/components/themed'
 import {
   mobileIdentityEpoch,
@@ -199,6 +200,11 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
   useEffect(() => {
     void loadCapsules()
   }, [loadCapsules])
+
+  // Story CC-7.6: a garment change this member's Closet confirmed while Capsules is open (a
+  // delete that landed, a tag save) reads the capsules again, so a capsule that lost a piece
+  // stops showing Ready. `loadCapsules` reads nothing for another account.
+  useEffect(() => onWardrobeChanged(() => void loadCapsules()), [loadCapsules])
 
   const handleSave = async (
     input: CreateOutfitCapsuleInput,

@@ -3,6 +3,10 @@
 // changes, distinct failures), tells the hub to reload, and opens Style this piece.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Story 7.6 test plan 7.6-NAT-002..003: Delete on the detail reads where the piece is used,
+// asks only for a piece in a look, and returns to the hub.
+// Learning path Step 64: Garment delete.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -117,6 +121,7 @@ import {
 } from '@/components/save-feedback'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
+  mobileIdentityEpoch,
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
@@ -124,6 +129,17 @@ import type * as MobileWardrobe from '@/src/lib/wardrobe'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
 import { server } from '@/src/test-utils/msw/server'
+import {
+  createDeferredGarmentDeletion,
+  SAVE_FEEDBACK_TIMINGS,
+  type DeferredGarmentDeletionEvent,
+  type DeferredGarmentDeletionTimer,
+} from '@couture/utils'
+import {
+  createMobileGarmentDeletion,
+  resetGarmentDeletionForTests,
+  type MobileGarmentDeletion,
+} from './garment-deletion'
 import { GarmentDetailScreen } from './garment-detail-screen'
 
 const owner = 'garment-detail-owner'
@@ -213,6 +229,43 @@ async function openEditorAndPick(...testIds: string[]) {
     expect(option).toHaveAttribute('data-testid', testId)
     await browserUser.click(option)
   }
+}
+
+/**
+ * A manual timer for the deletion controller. `advance` runs the live timers due by then one at a
+ * time, earliest first (ties in the order they were set): it moves the clock to each timer's due
+ * time before running it, so a timer a callback clears never runs and one it sets is due from
+ * that moment. The same implementation lives in the hub and detail suites.
+ */
+function createManualTimer() {
+  let now = 0
+  let nextHandle = 1
+  const scheduled = new Map<number, { at: number; callback: () => void }>()
+  const timer: DeferredGarmentDeletionTimer = {
+    setTimeout: (callback, ms) => {
+      const handle = nextHandle++
+      scheduled.set(handle, { at: now + ms, callback })
+      return handle
+    },
+    clearTimeout: (handle) => {
+      scheduled.delete(handle as number)
+    },
+  }
+  const nextDue = (until: number) =>
+    [...scheduled.entries()]
+      .filter(([, entry]) => entry.at <= until)
+      .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0]
+  const advance = (ms: number) => {
+    const until = now + ms
+    for (let due = nextDue(until); due; due = nextDue(until)) {
+      const [handle, entry] = due
+      scheduled.delete(handle)
+      now = entry.at
+      entry.callback()
+    }
+    now = until
+  }
+  return { timer, advance, active: () => scheduled.size, now: () => now }
 }
 
 describe('GarmentDetailScreen', () => {
@@ -1076,6 +1129,362 @@ describe('GarmentDetailScreen', () => {
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
       value: 'visible',
+    })
+  })
+  // Story 7.6 test plan 7.6-NAT-002..003: Delete reads where the piece is used first. Unused:
+  // no prompt, a deferred delete with an Undo window, back to the hub. Used: one in-screen
+  // prompt with the count; accepting deletes at once. A 404 usage read means already gone; a
+  // failed read deletes nothing and offers Retry.
+  // Learning path Step 64: Garment delete.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+  describe('7.6 garment delete', () => {
+    const windowMs = SAVE_FEEDBACK_TIMINGS.statusBarDurationMs
+    const bearer = `Bearer ${fakeAccessToken(owner)}`
+    const scheduled = { type: 'scheduled', id: garmentId } as const
+    const committing = { type: 'committing', id: garmentId } as const
+    const committed = { type: 'committed', id: garmentId } as const
+    let usageReply: () => Response | Promise<Response>
+    let usageReads: { id: string; authorization: string | null }[]
+    let deletes: { id: string; authorization: string | null }[]
+    let clock: ReturnType<typeof createManualTimer>
+    let deletion: MobileGarmentDeletion
+    let events: DeferredGarmentDeletionEvent[]
+
+    const usedIn = (savedLookCount: number, capsuleCount: number) => () =>
+      HttpResponse.json({ garmentId, savedLookCount, capsuleCount })
+
+    function deletableDetail(id = garmentId) {
+      return (
+        <SaveFeedbackProvider>
+          <GarmentDetailScreen garmentId={id} deletion={deletion} />
+        </SaveFeedbackProvider>
+      )
+    }
+
+    function renderDeletableDetail() {
+      return render(deletableDetail())
+    }
+
+    const deleteButton = () => screen.findByRole('button', { name: 'Delete' })
+    const USAGE_FAILED = 'Could not check where this piece is used. Try again.'
+    /** The inline usage failure, with its Retry, inside the detail (D3). */
+    const usageFailed = () => screen.findByTestId('garment-delete-usage-failed')
+    const usageRetry = () => tag('garment-delete-usage-retry')
+
+    beforeEach(() => {
+      usageReads = []
+      deletes = []
+      usageReply = usedIn(0, 0)
+      server.use(
+        http.get('*/api/v1/wardrobe/garments/:garmentId/usage', ({ request, params }) => {
+          usageReads.push({
+            id: String(params.garmentId),
+            authorization: request.headers.get('authorization'),
+          })
+          return usageReply()
+        }),
+        http.delete('*/api/v1/wardrobe/garments/:garmentId', ({ request, params }) => {
+          deletes.push({
+            id: String(params.garmentId),
+            authorization: request.headers.get('authorization'),
+          })
+          return new HttpResponse(null, { status: 204 })
+        })
+      )
+      clock = createManualTimer()
+      deletion = createMobileGarmentDeletion(
+        createDeferredGarmentDeletion({ timer: clock.timer })
+      )
+      events = []
+      deletion.controller.subscribe((event) => {
+        events.push(event)
+      })
+    })
+
+    afterEach(() => {
+      deletion.reset()
+      deletion.dispose()
+      resetGarmentDeletionForTests()
+    })
+
+    it('[P0] [7.6-NAT-002] Delete on an unused piece asks nothing, returns to the hub and sends one DELETE only when the window ends', async () => {
+      renderDeletableDetail()
+      const remove = await deleteButton()
+      expect(remove).toHaveAttribute('data-testid', 'garment-delete')
+
+      await browserUser.click(remove)
+
+      await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+      expect(routerMock.dismissTo).not.toHaveBeenCalled()
+      expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+      expect(usageReads).toEqual([{ id: garmentId, authorization: bearer }])
+      expect(deletion.pendingIds()).toEqual([garmentId])
+      expect(events).toEqual([scheduled])
+
+      act(() => clock.advance(windowMs - 1))
+      expect(events).toEqual([scheduled])
+
+      act(() => clock.advance(1))
+      await waitFor(() => expect(events).toEqual([scheduled, committing, committed]))
+      expect(deletes).toEqual([{ id: garmentId, authorization: bearer }])
+      expect(deletion.pendingIds()).toEqual([])
+    })
+
+    it.each([
+      ['one saved look', 1, 0, 'Delete this piece? It is in 1 look.'],
+      ['two saved looks and a capsule', 2, 1, 'Delete this piece? It is in 3 looks.'],
+    ])(
+      '[P0] [7.6-NAT-003] a piece in %s asks first and names how many looks',
+      async (_case, savedLookCount, capsuleCount, copy) => {
+        usageReply = usedIn(savedLookCount, capsuleCount)
+        renderDeletableDetail()
+
+        await browserUser.click(await deleteButton())
+
+        const confirm = await screen.findByTestId('garment-delete-confirm')
+        expect(
+          within(confirm).getByTestId('garment-delete-confirm-count').textContent
+        ).toBe(copy)
+        expect(
+          within(confirm).getByRole('button', { name: 'Delete piece' })
+        ).toHaveAttribute('data-testid', 'garment-delete-confirm-accept')
+        expect(within(confirm).getByRole('button', { name: 'Keep it' })).toHaveAttribute(
+          'data-testid',
+          'garment-delete-cancel'
+        )
+        expect(routerMock.back).not.toHaveBeenCalled()
+        expect(deletion.pendingIds()).toEqual([])
+        expect(events).toEqual([])
+      }
+    )
+
+    it('[P0] [7.6-NAT-003] Keep it sends nothing and leaves the detail open', async () => {
+      usageReply = usedIn(1, 1)
+      renderDeletableDetail()
+      await browserUser.click(await deleteButton())
+
+      await browserUser.click(await screen.findByRole('button', { name: 'Keep it' }))
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+      )
+      act(() => clock.advance(windowMs * 2))
+      expect(tag('garment-detail')).toBeVisible()
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(routerMock.back).not.toHaveBeenCalled()
+      expect(usageReads).toHaveLength(1)
+      expect(clock.active()).toBe(0)
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
+    })
+
+    it('[P0] [7.6-NAT-003] Delete piece deletes at once with no Undo window and returns to the hub', async () => {
+      usageReply = usedIn(2, 0)
+      renderDeletableDetail()
+      await browserUser.click(await deleteButton())
+
+      await browserUser.click(await screen.findByRole('button', { name: 'Delete piece' }))
+
+      expect(routerMock.back).toHaveBeenCalledTimes(1)
+      // No window was started: the send began on the tap.
+      expect(clock.active()).toBe(0)
+      await waitFor(() => expect(events).toEqual([committing, committed]))
+      expect(deletes).toEqual([{ id: garmentId, authorization: bearer }])
+      expect(usageReads).toHaveLength(1)
+    })
+
+    it('[P1] [7.6-NAT-003] a piece already gone (usage 404 GARMENT_NOT_FOUND) sends one idempotent DELETE at once and returns to the hub', async () => {
+      usageReply = () =>
+        HttpResponse.json(
+          { statusCode: 404, message: 'GARMENT_NOT_FOUND', error: 'Not Found' },
+          { status: 404 }
+        )
+      // The hub's side of the deletion: the hidden set, its grid update and the notices it
+      // shows on the root status bar.
+      let hiddenSetChanges = 0
+      deletion.subscribe(() => {
+        hiddenSetChanges++
+      })
+      const committedIds: string[] = []
+      const shown: string[] = []
+      const spoken: string[] = []
+      deletion.attach({
+        epoch: mobileIdentityEpoch(),
+        presenter: {
+          showNotice: (input) => {
+            shown.push(input.message)
+            return { id: input.id, durationMs: windowMs }
+          },
+          dismissNotice: () => undefined,
+          announce: (message) => {
+            spoken.push(message)
+          },
+          isOnline: () => true,
+          t: (key) => i18n.t(key),
+        },
+        onCommitted: (id) => {
+          committedIds.push(id)
+        },
+      })
+      renderDeletableDetail()
+
+      await browserUser.click(await deleteButton())
+
+      await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+      // No Undo window: the send began without any timer.
+      expect(clock.active()).toBe(0)
+      await waitFor(() => expect(events).toEqual([committing, committed]))
+      expect(deletes).toEqual([{ id: garmentId, authorization: bearer }])
+      // Hidden while it sends, then gone; the hub removes it and says Deleted with no Undo.
+      expect(hiddenSetChanges).toBe(2)
+      expect(committedIds).toEqual([garmentId])
+      expect(shown).toEqual(['Deleted'])
+      // No Retry was on the bar, so Deleted shows rather than being only announced.
+      expect(spoken).toEqual([])
+      expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+    })
+
+    it('[P1] [7.6-NAT-003] a bare 404 usage answer (no GARMENT_NOT_FOUND) is a failed read: nothing is deleted and Retry is offered', async () => {
+      // A deploy without the usage route answers the framework's own 404.
+      usageReply = () =>
+        HttpResponse.json(
+          {
+            statusCode: 404,
+            message: `Cannot GET /api/v1/wardrobe/garments/${garmentId}/usage`,
+            error: 'Not Found',
+          },
+          { status: 404 }
+        )
+      renderDeletableDetail()
+
+      await browserUser.click(await deleteButton())
+
+      // The failure stays inside this detail, bound to this piece; the status bar is free.
+      const failure = await usageFailed()
+      expect(failure).toHaveAttribute('role', 'alert')
+      expect(failure.textContent).toBe(`${USAGE_FAILED}Retry`)
+      expect(within(failure).getByRole('button', { name: 'Retry' })).toBe(usageRetry())
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+      expect(tag('garment-detail')).toBeVisible()
+      expect(routerMock.back).not.toHaveBeenCalled()
+      act(() => clock.advance(windowMs))
+      expect(deletion.pendingIds()).toEqual([])
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
+      // Delete itself stays usable from the failure, and so does Edit tags.
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(tag('garment-edit-tags')).not.toHaveAttribute('aria-disabled', 'true')
+      usageReply = usedIn(0, 0)
+
+      await browserUser.click(await deleteButton())
+
+      await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+      expect(usageReads).toHaveLength(2)
+      expect(events).toEqual([scheduled])
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+    })
+
+    it('[P1] [7.6-NAT-003] a failed usage read deletes nothing, offers Retry, and Retry reads again', async () => {
+      usageReply = () =>
+        HttpResponse.json(
+          { statusCode: 500, message: 'Internal server error' },
+          { status: 500 }
+        )
+      renderDeletableDetail()
+
+      await browserUser.click(await deleteButton())
+
+      expect((await usageFailed()).textContent).toBe(`${USAGE_FAILED}Retry`)
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+      expect(tag('garment-detail')).toBeVisible()
+      expect(routerMock.back).not.toHaveBeenCalled()
+      expect(deletion.pendingIds()).toEqual([])
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
+
+      usageReply = usedIn(0, 0)
+      await browserUser.click(usageRetry())
+
+      await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+      expect(usageReads).toHaveLength(2)
+      expect(events).toEqual([scheduled])
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+    })
+
+    it('[P1] [7.6-NAT-003] the usage failure leaves when the detail shows another piece', async () => {
+      const otherId = 'native-plain-shoes'
+      closet = [
+        blueTop,
+        {
+          ...createReadyGarmentFixture({
+            id: otherId,
+            category: 'shoes',
+            material: 'leather',
+            comfortRange: 'mild',
+            imageAccess: photo('#222222'),
+          }),
+          colorFamily: null,
+        },
+      ]
+      usageReply = () =>
+        HttpResponse.json(
+          { statusCode: 500, message: 'Internal server error' },
+          { status: 500 }
+        )
+      const view = renderDeletableDetail()
+      await browserUser.click(await deleteButton())
+      await usageFailed()
+
+      view.rerender(deletableDetail(otherId))
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+      )
+      expect(tag('garment-detail')).toBeVisible()
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(usageReads).toEqual([{ id: garmentId, authorization: bearer }])
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
+    })
+
+    it('[P1] [7.6-NAT-003] Edit tags is disabled while the delete check and its prompt run, and comes back after Keep it', async () => {
+      const usageAnswer = (() => {
+        let open!: () => void
+        const opened = new Promise<void>((resolve) => {
+          open = resolve
+        })
+        return { opened, open }
+      })()
+      usageReply = async () => {
+        await usageAnswer.opened
+        return usedIn(1, 0)()
+      }
+      renderDeletableDetail()
+      expect(await editTagsButton()).not.toHaveAttribute('aria-disabled', 'true')
+
+      await browserUser.click(await deleteButton())
+
+      // The check is out.
+      await waitFor(() => expect(usageReads).toHaveLength(1))
+      expect(tag('garment-edit-tags')).toHaveAttribute('aria-disabled', 'true')
+      expect(tag('garment-delete')).toHaveAttribute('aria-disabled', 'true')
+
+      usageAnswer.open()
+
+      // The prompt is up.
+      await screen.findByTestId('garment-delete-confirm')
+      expect(tag('garment-edit-tags')).toHaveAttribute('aria-disabled', 'true')
+
+      await browserUser.click(screen.getByRole('button', { name: 'Keep it' }))
+
+      await waitFor(() =>
+        expect(tag('garment-edit-tags')).not.toHaveAttribute('aria-disabled', 'true')
+      )
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
     })
   })
 })

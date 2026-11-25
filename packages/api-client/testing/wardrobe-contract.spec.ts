@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 63: Garment detail and tag edit (7.5-UNIT-010..013, opt-in colorFamily).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 64: Garment delete (7.6-UNIT-010..011, usage read and DELETE contract).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
@@ -37,6 +39,7 @@ import {
   garmentListWireResponseSchema,
   updateGarmentTagsInputSchema,
   updateGarmentTagsWireResponseSchema,
+  garmentUsageResponseSchema,
 } from '../src/contracts/http'
 import type {
   GarmentListResponse,
@@ -826,9 +829,9 @@ describe('7.5 opt-in garment colorFamily', () => {
     ).toThrow(/retentionStatus/)
   })
 
-  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.10.0', () => {
+  it('[P1] [7.5-UNIT-012] documents the header on the list and the tag update, at version 1.11.0', () => {
     const spec = generateHttpOpenApiDocument()
-    expect(spec.info.version).toBe('1.10.0')
+    expect(spec.info.version).toBe('1.11.0')
     type Operation = {
       parameters?: {
         in?: string
@@ -927,5 +930,69 @@ describe('7.5 Codex P2.1 and P2.4: expected tags and the published wire shape', 
     }
     expect([listItem, updated, list]).toEqual([true, true, true])
     expect(input.expected?.material).toBeNull()
+  })
+})
+
+describe('7.6 garment usage read and delete contract', () => {
+  const usage = { garmentId: 'garment-1', savedLookCount: 2, capsuleCount: 1 }
+
+  it('[P0] [7.6-UNIT-010] accepts the usage shape and refuses extra, missing, negative and fractional counts', () => {
+    expect(garmentUsageResponseSchema.parse(usage)).toEqual(usage)
+    expect(
+      garmentUsageResponseSchema.safeParse({
+        ...usage,
+        savedLookCount: 0,
+        capsuleCount: 0,
+      }).success
+    ).toBe(true)
+    // Strict: a server that adds a key breaks installed clients loudly in tests first.
+    expect(garmentUsageResponseSchema.safeParse({ ...usage, total: 3 }).success).toBe(
+      false
+    )
+    for (const key of ['garmentId', 'savedLookCount', 'capsuleCount'] as const) {
+      const missing: Record<string, unknown> = { ...usage }
+      delete missing[key]
+      expect(garmentUsageResponseSchema.safeParse(missing).success).toBe(false)
+    }
+    expect(
+      garmentUsageResponseSchema.safeParse({ ...usage, capsuleCount: -1 }).success
+    ).toBe(false)
+    expect(
+      garmentUsageResponseSchema.safeParse({ ...usage, savedLookCount: 1.5 }).success
+    ).toBe(false)
+    expect(
+      garmentUsageResponseSchema.safeParse({ ...usage, garmentId: '' }).success
+    ).toBe(false)
+  })
+
+  it('[P1] [7.6-UNIT-011] documents DELETE garment as 204 without a body and the usage read as 200 or 404', () => {
+    const spec = generateHttpOpenApiDocument()
+    type Operation = {
+      security?: unknown[]
+      parameters?: { in?: string; name?: string; required?: boolean }[]
+      responses?: Record<string, { content?: Record<string, unknown> }>
+    }
+    const remove = spec.paths?.['/api/v1/wardrobe/garments/{garmentId}']?.delete as
+      | Operation
+      | undefined
+    const read = spec.paths?.['/api/v1/wardrobe/garments/{garmentId}/usage']?.get as
+      | Operation
+      | undefined
+
+    for (const operation of [remove, read]) {
+      expect(operation).toBeDefined()
+      expect(operation?.security).toEqual([{ bearerAuth: [] }])
+      expect(
+        operation?.parameters?.find(
+          (parameter) => parameter.in === 'path' && parameter.name === 'garmentId'
+        )?.required
+      ).toBe(true)
+    }
+    expect(remove?.responses?.['204']).toBeDefined()
+    expect(remove?.responses?.['204']?.content).toBeUndefined()
+    expect(read?.responses?.['200']?.content?.['application/json']).toEqual({
+      schema: { $ref: '#/components/schemas/GarmentUsageResponse' },
+    })
+    expect(read?.responses?.['404']).toBeDefined()
   })
 })

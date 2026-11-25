@@ -482,7 +482,16 @@
       "undoFailed": "Could not undo. Try again.",
       "missing": "This piece is no longer in your closet.",
       "loading": "Loading this piece...",
-      "loadFailed": "Could not load this piece. Try again."
+      "loadFailed": "Could not load this piece. Try again.",
+      "delete": "Delete",
+      "deleteConfirmTitle_one": "Delete this piece? It is in {{count}} look.",
+      "deleteConfirmTitle_other": "Delete this piece? It is in {{count}} looks.",
+      "deleteConfirmAccept": "Delete piece",
+      "deleteCancel": "Keep it",
+      "deleteSucceeded": "Deleted",
+      "deleteUndone": "Undone",
+      "deleteFailed": "Could not delete this piece.",
+      "deleteUsageFailed": "Could not check where this piece is used. Try again."
     }
   },
   "community": {

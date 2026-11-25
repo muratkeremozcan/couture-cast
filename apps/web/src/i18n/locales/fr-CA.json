@@ -482,7 +482,16 @@
       "undoFailed": "Impossible d'annuler. Réessaie.",
       "missing": "Cette pièce n'est plus dans ta garde-robe.",
       "loading": "Chargement de la pièce...",
-      "loadFailed": "Impossible de charger cette pièce. Réessaie."
+      "loadFailed": "Impossible de charger cette pièce. Réessaie.",
+      "delete": "Supprimer",
+      "deleteConfirmTitle_one": "Supprimer cette pièce? Elle est dans {{count}} look.",
+      "deleteConfirmTitle_other": "Supprimer cette pièce? Elle est dans {{count}} looks.",
+      "deleteConfirmAccept": "Supprimer la pièce",
+      "deleteCancel": "La garder",
+      "deleteSucceeded": "Supprimée",
+      "deleteUndone": "Suppression annulée",
+      "deleteFailed": "Impossible de supprimer cette pièce.",
+      "deleteUsageFailed": "Impossible de vérifier où cette pièce est utilisée. Réessaie."
     }
   },
   "community": {

@@ -8716,6 +8716,31 @@ export type GarmentUpdateConflictErrorErrorEnum =
 /**
  *
  * @export
+ * @interface GarmentUsageResponse
+ */
+export interface GarmentUsageResponse {
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentUsageResponse
+   */
+  garmentId: string
+  /**
+   *
+   * @type {number}
+   * @memberof GarmentUsageResponse
+   */
+  savedLookCount: number
+  /**
+   *
+   * @type {number}
+   * @memberof GarmentUsageResponse
+   */
+  capsuleCount: number
+}
+/**
+ *
+ * @export
  * @interface GetAlertPreferencesResponse
  */
 export interface GetAlertPreferencesResponse {

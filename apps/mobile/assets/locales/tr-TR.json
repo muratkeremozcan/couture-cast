@@ -340,7 +340,16 @@
       "undoFailed": "Geri alınamadı. Tekrar dene.",
       "missing": "Bu parça artık dolabında değil.",
       "loading": "Parça yükleniyor...",
-      "loadFailed": "Bu parça yüklenemedi. Tekrar dene."
+      "loadFailed": "Bu parça yüklenemedi. Tekrar dene.",
+      "delete": "Sil",
+      "deleteConfirmTitle_one": "Bu parça silinsin mi? {{count}} kombinde kullanılıyor.",
+      "deleteConfirmTitle_other": "Bu parça silinsin mi? {{count}} kombinde kullanılıyor.",
+      "deleteConfirmAccept": "Parçayı sil",
+      "deleteCancel": "Kalsın",
+      "deleteSucceeded": "Silindi",
+      "deleteUndone": "Silme geri alındı",
+      "deleteFailed": "Bu parça silinemedi.",
+      "deleteUsageFailed": "Bu parçanın nerede kullanıldığı kontrol edilemedi. Tekrar dene."
     }
   },
   "commerce": {

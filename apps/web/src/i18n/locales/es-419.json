@@ -482,7 +482,16 @@
       "undoFailed": "No se pudo deshacer. Inténtalo de nuevo.",
       "missing": "Esta prenda ya no está en tu clóset.",
       "loading": "Cargando la prenda...",
-      "loadFailed": "No se pudo cargar la prenda. Inténtalo de nuevo."
+      "loadFailed": "No se pudo cargar la prenda. Inténtalo de nuevo.",
+      "delete": "Eliminar",
+      "deleteConfirmTitle_one": "¿Eliminar esta prenda? Está en {{count}} look.",
+      "deleteConfirmTitle_other": "¿Eliminar esta prenda? Está en {{count}} looks.",
+      "deleteConfirmAccept": "Eliminar prenda",
+      "deleteCancel": "Conservarla",
+      "deleteSucceeded": "Eliminada",
+      "deleteUndone": "Se deshizo",
+      "deleteFailed": "No se pudo eliminar esta prenda.",
+      "deleteUsageFailed": "No se pudo revisar dónde se usa esta prenda. Inténtalo de nuevo."
     }
   },
   "community": {

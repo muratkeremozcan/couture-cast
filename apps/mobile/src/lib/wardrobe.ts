@@ -2,6 +2,7 @@ import { ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   type GarmentItemContract,
   type GarmentWithColor,
+  type GarmentUsageResponse,
   type UpdateGarmentTagsInput,
   type SuggestGarmentTagsData,
   type GarmentCategory,
@@ -21,6 +22,7 @@ import {
   userProfileResponseSchema,
   parseGarmentListWithColorResponse,
   parseUpdateGarmentTagsWithColorResponse,
+  garmentUsageResponseSchema,
   suggestGarmentTagsResponseSchema,
   outfitCapsuleResponseSchema,
   outfitCapsuleListResponseSchema,
@@ -57,6 +59,7 @@ async function actionableWardrobeError(error: unknown, fallback: string): Promis
           'CONCURRENT_TAG_UPDATE',
           'GARMENT_TAGS_CHANGED',
           'GUARDIAN_CONSENT_REQUIRED',
+          'GARMENT_NOT_FOUND',
         ].includes(message)
           ? message
           : undefined)
@@ -218,6 +221,52 @@ export async function updateGarmentTagsFromMobile(
     return parseUpdateGarmentTagsWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to save garment tags.')
+  }
+}
+
+/**
+ * Story CC-7.6 D2/D3: the saved looks and capsules deleting the garment affects. A 404
+ * (`GARMENT_NOT_FOUND`: unknown, another member's, no longer ready, or already being deleted)
+ * resolves `null`, which the closet treats as already gone.
+ */
+export async function getGarmentUsageFromMobile(
+  accessToken: string,
+  garmentId: string,
+  signal?: AbortSignal
+): Promise<GarmentUsageResponse | null> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({
+        accessToken,
+      }).apiV1WardrobeGarmentsGarmentIdUsageGet({ garmentId }, { signal: requestSignal })
+    )
+    return garmentUsageResponseSchema.parse(response)
+  } catch (error) {
+    const failure = (await actionableWardrobeError(
+      error,
+      'Unable to check where this piece is used.'
+    )) as WardrobeMobileError
+    // Only the API's own answer means gone; a route-level 404 (a deploy without the route)
+    // is a failure like any other.
+    if (failure.status === 404 && failure.code === 'GARMENT_NOT_FOUND') return null
+    throw failure
+  }
+}
+
+/** Story CC-7.6: requests the garment's deletion (204, idempotent). */
+export async function deleteGarmentFromMobile(
+  accessToken: string,
+  garmentId: string,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({
+        accessToken,
+      }).apiV1WardrobeGarmentsGarmentIdDelete({ garmentId }, { signal: requestSignal })
+    )
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to delete this piece.')
   }
 }
 

@@ -12,8 +12,15 @@ import {
   type ElementRef,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { router } from 'expo-router'
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
+import { router, useFocusEffect } from 'expo-router'
+import {
+  ActivityIndicator,
+  AppState,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+} from 'react-native'
 import type {
   GarmentItemContract,
   SavedLookContract,
@@ -27,6 +34,7 @@ import {
 } from '@couture/utils'
 
 import { underModalAccessibility } from '@/components/edge-to-edge-modal'
+import { useStatusBar } from '@/components/save-feedback'
 import { Text, View, useSchemeColors } from '@/components/themed'
 import {
   mobileApplicationUserId,
@@ -50,6 +58,7 @@ import {
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import { garmentDeletion, type MobileGarmentDeletion } from './garment-deletion'
 import {
   garmentCardLabel,
   garmentPhotoLabel,
@@ -65,6 +74,87 @@ export interface WardrobeHubScreenProps {
   addEntry?: boolean
   /** Test-only override for the still-processing garment poll cadence. */
   pollOffsetsMs?: readonly number[]
+  /** Story CC-7.6 D10: test seam; defaults to the app's one garment deletion. */
+  deletion?: MobileGarmentDeletion
+}
+
+/**
+ * Story CC-7.6: the hub's side of a garment delete the detail requested. Pending pieces are
+ * hidden, and the hub hands the deletion its root status bar and grid, so "Deleted" with Undo,
+ * "Deleted" once a confirmed delete or a Retry lands, and "Could not delete" with Retry show
+ * there, even after the member left the hub. Backgrounding the app or leaving the hub (a tab
+ * switch, Capsules, Silhouette: anything but a garment detail) sends every pending delete at
+ * once (D1).
+ */
+function useHubGarmentDeletion({
+  deletion,
+  epoch,
+  onCommitted,
+  openingDetailRef,
+}: {
+  deletion: MobileGarmentDeletion
+  epoch: number
+  onCommitted: (garmentId: string) => void
+  /** True from a garment card press until the hub is focused again. */
+  openingDetailRef: React.MutableRefObject<boolean>
+}) {
+  const { t } = useTranslation()
+  const statusBar = useStatusBar()
+  const statusBarRef = useRef(statusBar)
+  statusBarRef.current = statusBar
+  // Every bar change renders the hub; the deletion learns which notice is on screen.
+  deletion.observeBar(statusBar.notice?.id ?? null)
+  const tRef = useRef(t)
+  tRef.current = t
+  const onCommittedRef = useRef(onCommitted)
+  onCommittedRef.current = onCommitted
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(
+    () => new Set(deletion.pendingIds())
+  )
+
+  useEffect(() => {
+    const detach = deletion.attach({
+      epoch,
+      presenter: {
+        showNotice: (input) => statusBarRef.current.showNotice(input),
+        dismissNotice: (noticeId) => statusBarRef.current.dismissNotice(noticeId),
+        announce: (message, announcementId) =>
+          statusBarRef.current.announce(message, { announcementId }),
+        isOnline: () => statusBarRef.current.isOnline,
+        t: (key) => tRef.current(key),
+      },
+      onCommitted: (garmentId) => onCommittedRef.current(garmentId),
+    })
+    setPendingIds(new Set(deletion.pendingIds()))
+    const unsubscribe = deletion.subscribe(() => {
+      setPendingIds(new Set(deletion.pendingIds()))
+    })
+    // Backgrounding the app sends every pending delete at once (D1).
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'background') void deletion.controller.flush()
+    })
+    return () => {
+      subscription.remove()
+      unsubscribe()
+      detach()
+      // Leaving the hub sends whatever is still inside its Undo window; the deletion keeps
+      // the root status bar, so a failure still shows "Could not delete" with Retry (D6).
+      void deletion.controller.flush()
+    }
+  }, [deletion, epoch])
+
+  // Tabs and pushed routes keep the hub mounted, so leaving it is a blur. A garment detail
+  // pushed over the hub is still the Closet: its delete is what the window is for.
+  useFocusEffect(
+    useCallback(() => {
+      openingDetailRef.current = false
+      return () => {
+        if (!openingDetailRef.current) void deletion.controller.flush()
+      }
+    }, [deletion, openingDetailRef])
+  )
+
+  return pendingIds
 }
 
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
@@ -76,6 +166,7 @@ function MemberWardrobeHub({
   pollOffsetsMs,
   addEntry,
   epoch,
+  deletion = garmentDeletion,
 }: WardrobeHubScreenProps & { epoch: number }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
@@ -212,6 +303,38 @@ function MemberWardrobeHub({
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureOpen
   }, [isCaptureOpen])
+
+  const openingDetailRef = useRef(false)
+  const hasLoadedRef = useRef(hasLoaded)
+  hasLoadedRef.current = hasLoaded
+  const pendingDeleteIds = useHubGarmentDeletion({
+    deletion,
+    epoch,
+    openingDetailRef,
+    onCommitted: (garmentId) => {
+      if (epoch !== mobileIdentityEpoch()) return
+      inventoryRevision.current++
+      setGarments((current) => current.filter((item) => item.id !== garmentId))
+      // The revision bump discards any read still in flight. Before the first read landed
+      // (a hub that remounted while the DELETE was out) that read is the grid itself, so
+      // read again: the server already answers without the deleted piece.
+      if (!hasLoadedRef.current) setLoadAttempt((attempt) => attempt + 1)
+      // A saved look holding the piece now shows it as missing (CC-7.2).
+      setSavedLooksAttempt((attempt) => attempt + 1)
+      // Other screens (capsules, Today) read the closet again.
+      notifyingWardrobeRef.current = true
+      try {
+        notifyWardrobeChanged()
+      } finally {
+        notifyingWardrobeRef.current = false
+      }
+    },
+  })
+  // A piece inside its Undo window, or being sent, is hidden from the grid.
+  const visibleGarments =
+    pendingDeleteIds.size === 0
+      ? garments
+      : garments.filter((garment) => !pendingDeleteIds.has(garment.id))
 
   const refreshGarmentList = useCallback(
     async (token: string, signal?: AbortSignal) => {
@@ -608,9 +731,9 @@ function MemberWardrobeHub({
             </Pressable>
           ) : null}
 
-          {isLoading && garments.length === 0 ? (
+          {isLoading && visibleGarments.length === 0 ? (
             <ActivityIndicator accessibilityLabel="Loading wardrobe" />
-          ) : garments.length === 0 ? (
+          ) : visibleGarments.length === 0 ? (
             hasLoaded && !loadFailed ? (
               <View style={styles.emptyState}>
                 <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
@@ -618,7 +741,7 @@ function MemberWardrobeHub({
             ) : null
           ) : (
             <View style={styles.grid} testID="wardrobe-garment-list">
-              {garments.map((garment) => (
+              {visibleGarments.map((garment) => (
                 <View
                   key={garment.id}
                   style={styles.garmentCard}
@@ -629,12 +752,13 @@ function MemberWardrobeHub({
                       accessibilityRole="button"
                       accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
                       testID={`garment-open-${garment.id}`}
-                      onPress={() =>
+                      onPress={() => {
+                        openingDetailRef.current = true
                         router.push({
                           pathname: '/wardrobe-garment',
                           params: { id: garment.id },
                         })
-                      }
+                      }}
                     >
                       <GarmentCardFace garment={garment} locale={i18n.language} />
                     </Pressable>
