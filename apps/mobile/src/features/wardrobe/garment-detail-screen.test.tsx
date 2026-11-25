@@ -632,4 +632,138 @@ describe('GarmentDetailScreen', () => {
     // The root provider holds no notice: the bar shown belongs to the detail screen.
     expect(screen.getByTestId('root-notice').textContent).toBe('')
   })
+
+  it('[P1] [7.5-NAT-014] a failed closet read offers Try again, which loads the piece', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        reads += 1
+        return reads === 1
+          ? HttpResponse.json({ message: 'unavailable' }, { status: 503 })
+          : HttpResponse.json({ data: closet })
+      })
+    )
+    renderDetail()
+
+    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    expect(screen.queryByTestId('garment-detail-missing')).toBeNull()
+    await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    expect(reads).toBe(2)
+  })
+
+  it('[P1] [7.5-NAT-014] without a session the closet is not read and Try again is offered', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        reads += 1
+        return HttpResponse.json({ data: closet })
+      })
+    )
+    const restoreSignedOut = setMobileAccessTokenResolver(() => undefined)
+    renderDetail()
+
+    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    expect(reads).toBe(0)
+
+    restoreSignedOut()
+    await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    expect(reads).toBe(1)
+  })
+
+  it('[P1] [7.5-NAT-014] a piece without a signed photo shows a named placeholder', async () => {
+    closet = [{ ...blueTop, imageAccess: null }]
+    renderDetail()
+
+    const photo = await screen.findByTestId('garment-detail-photo')
+    expect(photo).toHaveAccessibleName('Blue top')
+    expect(photo.querySelector('img')).toBeNull()
+  })
+
+  it('[P1] [7.5-NAT-014] Undo while offline says so, and its Retry undoes once back online', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    act(() => reportNetworkOffline())
+
+    await browserUser.click(tag('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    expect(patches).toHaveLength(1)
+    act(() => reportNetworkOnline())
+    await browserUser.click(tag('status-bar-action-retry'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent('Change undone.')
+    )
+    expect(patches).toHaveLength(2)
+    expect(tag('garment-detail-material').textContent).toBe('Cotton')
+  })
+
+  it('[P1] [7.5-NAT-014] a failed Undo keeps the saved tags and offers Retry', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    reply = () => HttpResponse.json({ statusCode: 500, message: 'boom' }, { status: 500 })
+
+    await browserUser.click(tag('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent('Could not undo. Try again.')
+    )
+    expect(tag('status-bar-action-retry')).toBeVisible()
+    expect(tag('garment-detail-material').textContent).toBe('Wool')
+  })
+
+  it('[P2] [7.5-NAT-014] renews an expiring photo lease once, even when the app returns to the foreground', async () => {
+    const expiring = {
+      ...blueTop,
+      imageAccess: {
+        url: blueTop.imageAccess!.url,
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      },
+    }
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        reads += 1
+        return HttpResponse.json({ data: [expiring] })
+      })
+    )
+    renderDetail()
+    await screen.findByTestId('garment-detail')
+    // The open renews the lease; the API hands back the same lease.
+    await waitFor(() => expect(reads).toBe(2))
+
+    // Back in the foreground the same lease is not renewed again.
+    for (const visibility of ['hidden', 'visible'] as const) {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        value: visibility,
+      })
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        value: visibility === 'hidden',
+      })
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+    }
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+    expect(reads).toBe(2)
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+  })
 })
