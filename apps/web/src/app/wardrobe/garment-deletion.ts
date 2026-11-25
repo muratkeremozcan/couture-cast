@@ -92,6 +92,7 @@ let injectedControllerFactory:
   | ((owner: string | null) => DeferredGarmentDeletionController)
   | null = null
 let deleteNoticeSeq = 0
+const noop = () => undefined
 let readNow: () => number = () => Date.now()
 
 /**
@@ -224,7 +225,10 @@ function addFailures(
   presentFailures(owning)
 }
 
-/** Shows the Retry notice unless an Undo window is open; then it waits for the close. */
+/**
+ * Shows the Retry notice. Both callers run only with no Undo window open: the controller
+ * reports failures then, and `handleEvent` re-shows a covered Retry then.
+ */
 function presentFailures(owning: DeletionSession) {
   const failures = owning.failures
   const t = owning.t
@@ -234,10 +238,6 @@ function presentFailures(owning: DeletionSession) {
   }
   if (failures.ids.size === 0) {
     owning.failures = null
-    return
-  }
-  if (owning.controller.hasOpenWindow()) {
-    failures.covered = true
     return
   }
   const ids = [...failures.ids]
@@ -338,8 +338,9 @@ function acquireSession(owner: string | null): DeletionSession {
     t: null,
     onCommitted: null,
     readBearer: () => null,
-    unsubscribe: () => undefined,
-    stopWatchingOwner: () => undefined,
+    // Both are replaced below before anything can call them.
+    unsubscribe: noop,
+    stopWatchingOwner: noop,
   }
   created.unsubscribe = created.controller.subscribe((event) =>
     handleEvent(created, event)

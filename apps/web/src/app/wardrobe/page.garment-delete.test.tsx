@@ -123,6 +123,15 @@ const blackShoes = readyGarment('black-shoes', {
   colorFamily: 'black',
 })
 const plainDress = readyGarment('plain-dress', { category: 'dress', colorFamily: null })
+/** Still being tagged: its card has no detail opener, only the upload check. */
+const processingPiece = readyGarment('processing-piece', {
+  status: 'processing',
+  category: null,
+  material: null,
+  comfortRange: null,
+  tagsConfirmedAt: null,
+  colorFamily: null,
+})
 
 type Usage = { savedLookCount: number; capsuleCount: number }
 
@@ -136,6 +145,10 @@ let savedLookReads: number
 let deleteGate: Promise<void> | null
 /** While set, every usage read waits for it before answering (a delete check in flight). */
 let usageGate: Promise<void> | null
+/** While set, every saved looks list read waits for it before answering. */
+let savedLooksGate: Promise<void> | null
+/** Each tag save the detail sent (CC-7.5 Done and its Undo). */
+let tagRequests: { id: string; category: unknown; authorization: string | null }[]
 let manual: ReturnType<typeof createManualTimer>
 
 function signIn(member = owner) {
@@ -143,6 +156,14 @@ function signIn(member = owner) {
     session.owner = member
     sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, member)
     window.dispatchEvent(new Event('couture:session'))
+  })
+}
+
+/** The browser drops or regains its connection, as the status bar and the detail read it. */
+function setOnline(online: boolean) {
+  Object.defineProperty(window.navigator, 'onLine', { configurable: true, value: online })
+  act(() => {
+    window.dispatchEvent(new Event(online ? 'online' : 'offline'))
   })
 }
 
@@ -193,14 +214,17 @@ beforeEach(() => {
   savedLookReads = 0
   deleteGate = null
   usageGate = null
+  savedLooksGate = null
+  tagRequests = []
   manual = createManualTimer()
   // Every new member session gets its own controller on the manual timer, as production does.
   injectWardrobeGarmentDeletionForTests(() =>
     createDeferredGarmentDeletion({ timer: manual.timer })
   )
   const savedLooks = createSavedLooksMswHandlers([], `${api}/wardrobe/saved-looks`)
-  savedLooks.store.onGet = () => {
+  savedLooks.store.onGet = async () => {
     savedLookReads += 1
+    if (savedLooksGate) await savedLooksGate
   }
   useMswHandlers(
     http.get(`${api}/wardrobe/garments`, () => HttpResponse.json({ data: closet })),
@@ -234,6 +258,19 @@ beforeEach(() => {
       closet = closet.filter((garment) => garment.id !== id)
       return new HttpResponse(null, { status: 204 })
     }),
+    http.patch(`${api}/wardrobe/garments/:id/tags`, async ({ params, request }) => {
+      const body = (await request.json()) as Record<string, unknown>
+      tagRequests.push({
+        id: String(params.id),
+        category: body.category,
+        authorization: request.headers.get('authorization'),
+      })
+      delete body.expected
+      const current = closet.find((item) => item.id === params.id)!
+      const updated = { ...current, ...body } as GarmentWithColor
+      closet = closet.map((item) => (item.id === updated.id ? updated : item))
+      return HttpResponse.json({ data: updated })
+    }),
     ...savedLooks.handlers,
     http.get(`${api}/wardrobe/onboarding`, () =>
       HttpResponse.json({ data: createCompletedOnboardingStateFixture() })
@@ -259,6 +296,8 @@ afterEach(() => {
   injectWardrobeGarmentDeletionForTests(null)
   injectWardrobeGarmentDeletionClockForTests(null)
   rootBar.current = null
+  // A test that went offline put its own onLine on navigator; the jsdom getter comes back.
+  Reflect.deleteProperty(window.navigator, 'onLine')
   window.history.replaceState(null, '', '/wardrobe')
   session.owner = null
   sessionStorage.clear()
@@ -1367,14 +1406,6 @@ describe('Closet garment delete', () => {
 
   it('[P1] [7.6-CMP-010] focus skips a next card still processing and lands on the following ready card opener', async () => {
     const user = userEvent.setup()
-    const processingPiece = readyGarment('processing-piece', {
-      status: 'processing',
-      category: null,
-      material: null,
-      comfortRange: null,
-      tagsConfirmedAt: null,
-      colorFamily: null,
-    })
     closet = [blueTop, blackShoes, processingPiece, plainDress]
     render(<WardrobePage />)
     signIn()
@@ -1387,6 +1418,25 @@ describe('Closet garment delete', () => {
 
     expect(screen.getByTestId('garment-open-plain-dress')).toHaveFocus()
     expect(screen.getByTestId('garment-card-processing-piece')).toBeInTheDocument()
+  })
+
+  it('[P1] [7.6-CMP-010] deleting the only ready piece moves focus to the closet heading at the saved scroll', async () => {
+    const user = userEvent.setup()
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    closet = [blackShoes, processingPiece]
+    render(<WardrobePage />)
+    signIn()
+    await screen.findByTestId('garment-open-black-shoes')
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 640 })
+
+    await openAndDelete(user, 'black-shoes')
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+
+    // No card left has a detail opener, so focus goes to the grid heading.
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 640)
+    expect(screen.getByTestId('wardrobe-closet-heading')).toHaveFocus()
+    expect(screen.getByTestId('garment-card-processing-piece')).toBeInTheDocument()
+    expect(screen.queryByTestId('garment-card-black-shoes')).toBeNull()
   })
 
   it('[P1] [7.6-CMP-011] a committed delete reloads saved looks so they show the missing piece', async () => {
@@ -1402,6 +1452,36 @@ describe('Closet garment delete', () => {
     await manual.advance(WINDOW_MS)
 
     await waitFor(() => expect(savedLookReads).toBeGreaterThan(readsBefore))
+  })
+
+  it('[P2] [7.6-CMP-011] a saved looks read cut short by the reload after a delete shows no load error', async () => {
+    const user = userEvent.setup()
+    let releaseFirstRead: () => void = () => undefined
+    savedLooksGate = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve
+    })
+    usageById.set('blue-top', 'missing')
+    render(<WardrobePage />)
+    signIn()
+    await screen.findByTestId('garment-open-blue-top')
+    await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
+    const readsBefore = savedLookReads
+    // The first read stays out; the reload the delete starts answers at once.
+    savedLooksGate = null
+
+    await openAndDelete(user, 'blue-top')
+    await waitFor(() =>
+      expect(deleteRequests.map((request) => request.id)).toEqual(['blue-top'])
+    )
+    await waitFor(() => expect(savedLookReads).toBeGreaterThan(readsBefore))
+
+    // The reload abandoned the first read: its late end reports nothing.
+    await act(async () => {
+      releaseFirstRead()
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+    expect(deleteRequests).toHaveLength(1)
   })
 
   it('[P2] [7.6-CMP-012] a piece that is not ready offers no Delete', async () => {
@@ -1426,5 +1506,49 @@ describe('Closet garment delete', () => {
         'garment-delete'
       )
     ).toBeNull()
+  })
+
+  /**
+   * CC-7.5 tag edit Undo, kept here with the Closet harness: an Undo pressed offline sends
+   * nothing and offers Retry, which runs that Undo once the connection is back.
+   */
+  it('[P1] [7.5-CMP-007] a tag edit Undo pressed offline sends nothing and offers Retry; online, Retry undoes once', async () => {
+    const user = userEvent.setup()
+    render(<WardrobePage />)
+    signIn()
+
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    await user.click(screen.getByTestId('garment-tag-option-category-outerwear'))
+    await user.click(screen.getByTestId('garment-tag-done'))
+    const undo = await screen.findByTestId('status-bar-action-undo')
+    expect(tagRequests).toEqual([
+      { id: 'blue-top', category: 'outerwear', authorization: `Bearer ${owner}` },
+    ])
+
+    setOnline(false)
+    await user.click(undo)
+
+    const bar = await statusBar()
+    await waitFor(() =>
+      expect(bar).toHaveTextContent('You are offline. Save when you reconnect.')
+    )
+    expect(bar).toHaveAttribute('data-tone', 'offline')
+    expect(screen.queryByTestId('status-bar-action-undo')).toBeNull()
+    expect(tagRequests).toHaveLength(1)
+
+    setOnline(true)
+    await user.click(screen.getByTestId('status-bar-action-retry'))
+
+    await waitFor(() => expect(tagRequests).toHaveLength(2))
+    expect(tagRequests[1]).toEqual({
+      id: 'blue-top',
+      category: 'top',
+      authorization: `Bearer ${owner}`,
+    })
+    await waitFor(async () =>
+      expect(await statusBar()).toHaveTextContent('Change undone.')
+    )
+    expect(tagRequests).toHaveLength(2)
   })
 })

@@ -137,6 +137,15 @@ async function savedLook(
   slotIds: readonly string[],
   deletedAt: Date | null = null
 ) {
+  // Snapshots carry each piece's real category: a mismatch reads as needs_review, not ready.
+  const categories = new Map(
+    (
+      await prisma.garmentItem.findMany({
+        where: { id: { in: [anchorId, ...slotIds] } },
+        select: { id: true, category: true },
+      })
+    ).map((garment) => [garment.id, garment.category])
+  )
   const look = await prisma.savedLook.create({
     data: {
       user_id: userId,
@@ -144,10 +153,14 @@ async function savedLook(
       look_id: `look-${randomUUID().slice(0, 8)}`,
       weather: 'mild',
       anchor_garment_id: anchorId,
-      anchor_snapshot: { garmentId: anchorId, category: 'top', comfortRange: 'mild' },
+      anchor_snapshot: {
+        garmentId: anchorId,
+        category: categories.get(anchorId),
+        comfortRange: 'mild',
+      },
       composition: slotIds.map((itemId, slotIndex) => ({
         slotIndex,
-        category: slotIndex === 0 ? 'top' : 'bottom',
+        category: categories.get(itemId),
         kind: 'garment',
         itemId,
       })),
