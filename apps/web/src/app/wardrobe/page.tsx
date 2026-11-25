@@ -452,11 +452,11 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
       index < 0 ? [] : [...order.slice(index + 1), ...order.slice(0, index).reverse()]
     requestDelete(garmentId, mode)
     closeGarmentDetail(() => {
+      // The next or previous card's detail opener; a card still processing has none (its
+      // only button checks the upload), so it is skipped.
       for (const id of neighbours) {
-        const button = document
-          .querySelector(`[data-testid="garment-card-${CSS.escape(id)}"]`)
-          ?.querySelector<HTMLButtonElement>('button')
-        if (button) return button
+        const opener = garmentOpenRefs.current.get(id)
+        if (opener?.isConnected) return opener
       }
       return closetHeadingRef.current
     })

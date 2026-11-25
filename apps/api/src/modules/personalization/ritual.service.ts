@@ -542,9 +542,11 @@ export class RitualService implements OnModuleDestroy {
         })
 
       let persistedThisRequest = false
+      // `updated_at` moves on every regeneration, so a refreshed recommendation is fresh again
+      // until the next wardrobe or comfort change.
       const isStale =
         recommendation &&
-        (recommendation.created_at.getTime() < stalenessThreshold.getTime() ||
+        (recommendation.updated_at.getTime() < stalenessThreshold.getTime() ||
           recommendation.capsule_revision !== currentCapsuleRevision)
 
       if (!recommendation || isStale) {

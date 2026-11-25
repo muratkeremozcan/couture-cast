@@ -18,7 +18,6 @@ export const {
   eachLike,
   equal,
   fromProviderState,
-  integer,
   like,
   nullValue,
   regex,

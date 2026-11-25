@@ -57,8 +57,12 @@ type DeletionSession = {
   deletedToAnnounce: boolean
   /** The id of the last notice this session showed, dismissed when the session ends. */
   lastNoticeId: string | null
-  /** The ids under the "Could not delete" notice still on screen, and when it expires. */
-  failureNotice: { ids: string[]; until: number } | null
+  /**
+   * Failed pieces still offered a Retry. Their notice shows only while no Undo window is open;
+   * another notice that covers it (an Undo, "Undone") brings it back once no window is open,
+   * and it ends when it expires on screen, its pieces are sent again, or they are deleted.
+   */
+  failures: FailureNotice | null
   /** The status bar and strings of the last mounted Closet (the root bar outlives it). */
   statusBar: StatusBarApi | null
   t: TFunction | null
@@ -66,6 +70,21 @@ type DeletionSession = {
   onCommitted: ((garmentId: string) => void) | null
   readBearer: () => string | null
   unsubscribe: () => void
+  /** Stops following the tab's member. */
+  stopWatchingOwner: () => void
+}
+
+type FailureNotice = {
+  ids: Set<string>
+  offline: boolean
+  /** When the notice on screen expires; 0 while it waits to show. */
+  until: number
+  /** The id of the Retry notice on screen, null while it waits to show. */
+  noticeId: string | null
+  /** True once a render of the bar showed that notice, so its absence means it was replaced. */
+  seenOnBar: boolean
+  /** True when another notice replaced it, or it waits for an Undo window to close. */
+  covered: boolean
 }
 
 let session: DeletionSession | null = null
@@ -73,6 +92,17 @@ let injectedControllerFactory:
   | ((owner: string | null) => DeferredGarmentDeletionController)
   | null = null
 let deleteNoticeSeq = 0
+let readNow: () => number = () => Date.now()
+
+/**
+ * D10 clock seam: the time the failure notice's expiry is measured against, so a test can run
+ * it on the same clock as the status bar. Null restores `Date.now`.
+ */
+export function injectWardrobeGarmentDeletionClockForTests(
+  now: (() => number) | null
+): void {
+  readNow = now ?? (() => Date.now())
+}
 
 /**
  * D10 test seam. A Next page takes no props, so a test injects here the factory each new
@@ -93,8 +123,10 @@ function speaks(owning: DeletionSession): boolean {
 }
 
 function endSession(ending: DeletionSession, { send }: { send: boolean }) {
+  if (!ending.live) return
   ending.live = false
   if (session === ending) session = null
+  ending.stopWatchingOwner()
   // A new member's Closet ends the last session while it renders, so the rest waits for a
   // microtask: no status bar or grid of another component updates during that render.
   queueMicrotask(() => {
@@ -113,6 +145,8 @@ function endSession(ending: DeletionSession, { send }: { send: boolean }) {
 function show(owning: DeletionSession, kind: string, notice: NoticeInput) {
   const statusBar = owning.statusBar
   if (!statusBar || !speaks(owning)) return null
+  // Any other notice takes a showing failure off the bar; it comes back later (D9).
+  if (kind !== 'failed' && failuresLive(owning)) owning.failures!.covered = true
   const seq = ++deleteNoticeSeq
   const shown = statusBar.showNotice({
     ...notice,
@@ -135,42 +169,81 @@ function commitFor(owning: DeletionSession, garmentId: string) {
   return commit
 }
 
+function failuresLive(owning: DeletionSession): boolean {
+  const failures = owning.failures
+  if (!failures) return false
+  // A notice that ran its course on screen has ended; one that was covered has not.
+  if (!failures.covered && failures.until > 0) {
+    // A Retry that expired, that the member dismissed, or that another feature's notice
+    // replaced has ended; the bar is read while a Closet is mounted to see the last two.
+    const onBar = owning.statusBar?.hasProvider ? owning.statusBar.notice?.id : undefined
+    if (onBar === failures.noticeId) failures.seenOnBar = true
+    const replaced = failures.seenOnBar && onBar !== failures.noticeId
+    if (failures.until <= readNow() || replaced) {
+      owning.failures = null
+      return false
+    }
+  }
+  return true
+}
+
 function retry(owning: DeletionSession, garmentIds: readonly string[]) {
   if (!speaks(owning)) return
-  // Its pieces are being sent again; a later failure notice must not offer them a second time.
-  owning.failureNotice = null
   for (const garmentId of garmentIds) {
+    // Its piece is being sent again, so no later notice offers it a second time.
+    owning.failures?.ids.delete(garmentId)
     if (owning.controller.isPending(garmentId)) continue
     // A Retry reads the bearer again, so a token that expired since is not reused.
     owning.commits.delete(garmentId)
     owning.announceOnCommit.add(garmentId)
     void owning.controller.retry(garmentId, commitFor(owning, garmentId))
   }
+  if (owning.failures?.ids.size === 0) owning.failures = null
 }
 
-function showFailures(
+function addFailures(
   owning: DeletionSession,
   failures: readonly { id: string; error: unknown }[]
 ) {
-  const t = owning.t
-  if (!t || !owning.statusBar) return
+  if (!owning.statusBar) return
   const online =
     owning.statusBar.isOnline &&
     (typeof navigator === 'undefined' || navigator.onLine !== false)
   const offline = !online || failures.some((failure) => isOfflineError(failure.error))
   // One notice holds every failure still waiting for its Retry, so a later failure never
   // takes the Retry of an earlier one off the bar.
-  const earlier =
-    owning.failureNotice && owning.failureNotice.until > Date.now()
-      ? owning.failureNotice.ids
-      : []
-  const ids = [...new Set([...earlier, ...failures.map((failure) => failure.id)])].filter(
-    (id) => !owning.controller.isPending(id)
-  )
-  if (ids.length === 0) return
+  const current = failuresLive(owning) ? owning.failures! : null
+  owning.failures = {
+    ids: new Set([...(current?.ids ?? []), ...failures.map((failure) => failure.id)]),
+    offline: (current?.offline ?? false) || offline,
+    until: 0,
+    noticeId: null,
+    seenOnBar: false,
+    covered: true,
+  }
+  presentFailures(owning)
+}
+
+/** Shows the Retry notice unless an Undo window is open; then it waits for the close. */
+function presentFailures(owning: DeletionSession) {
+  const failures = owning.failures
+  const t = owning.t
+  if (!failures || !t) return
+  for (const id of failures.ids) {
+    if (owning.controller.isPending(id)) failures.ids.delete(id)
+  }
+  if (failures.ids.size === 0) {
+    owning.failures = null
+    return
+  }
+  if (owning.controller.hasOpenWindow()) {
+    failures.covered = true
+    return
+  }
+  const ids = [...failures.ids]
   const shown = show(owning, 'failed', {
     message: t('wardrobe.detail.deleteFailed'),
-    tone: offline ? 'offline' : 'error',
+    tone: failures.offline ? 'offline' : 'error',
     actions: [
       {
         id: 'retry',
@@ -180,30 +253,50 @@ function showFailures(
       },
     ],
   })
-  owning.failureNotice = shown ? { ids, until: Date.now() + shown.durationMs } : null
+  if (!shown) return
+  failures.covered = false
+  failures.noticeId = shown.id
+  failures.seenOnBar = false
+  failures.until = readNow() + shown.durationMs
 }
 
 function showDeleted(owning: DeletionSession) {
-  if (!owning.t) return
-  show(owning, 'deleted', {
-    message: owning.t('wardrobe.detail.deleteSucceeded'),
-    tone: 'success',
-  })
+  if (!owning.t || !owning.statusBar) return
+  const message = owning.t('wardrobe.detail.deleteSucceeded')
+  // A Retry on the bar stays there: another piece's "Deleted" is only announced.
+  if (failuresLive(owning) && !owning.failures!.covered) {
+    if (!speaks(owning)) return
+    const seq = ++deleteNoticeSeq
+    owning.statusBar.announce(message, {
+      announcementId: createAnnouncementToken(`${NOTICE_PREFIX}deleted`, seq),
+    })
+    return
+  }
+  show(owning, 'deleted', { message, tone: 'success' })
 }
 
 function handleEvent(owning: DeletionSession, event: DeferredGarmentDeletionEvent) {
   if (!speaks(owning)) return
-  // The last open window closed: a held "Deleted" shows now, before any failure report that
-  // the same close releases, so the failure's Retry is what stays on the bar.
-  if (owning.deletedToAnnounce && !owning.controller.hasOpenWindow()) {
+  handleOneEvent(owning, event)
+  if (owning.controller.hasOpenWindow()) return
+  // No Undo window is open any more: a held "Deleted" shows, then the Retry of any failure
+  // that another notice covered or that waited for the window, so the Retry stays on top.
+  if (owning.deletedToAnnounce) {
     owning.deletedToAnnounce = false
     showDeleted(owning)
   }
+  if (failuresLive(owning) && owning.failures!.covered) presentFailures(owning)
+}
+
+function handleOneEvent(owning: DeletionSession, event: DeferredGarmentDeletionEvent) {
+  if (event.type === 'scheduled') {
+    // The member deleted this piece again; its old Retry no longer applies.
+    owning.failures?.ids.delete(event.id)
+    return
+  }
   if (event.type === 'committed') {
     owning.commits.delete(event.id)
-    if (owning.failureNotice) {
-      owning.failureNotice.ids = owning.failureNotice.ids.filter((id) => id !== event.id)
-    }
+    owning.failures?.ids.delete(event.id)
     owning.onCommitted?.(event.id)
     if (owning.announceOnCommit.delete(event.id)) {
       if (owning.controller.hasOpenWindow()) owning.deletedToAnnounce = true
@@ -216,8 +309,7 @@ function handleEvent(owning: DeletionSession, event: DeferredGarmentDeletionEven
     owning.commits.delete(event.id)
     return
   }
-  // Only the member's Undo cancels a window. "Undone" shows before any failure this Undo
-  // releases, so the failure's Retry is what stays on the bar.
+  // Only the member's Undo cancels a window.
   if (event.type === 'undone' && owning.t) {
     owning.commits.delete(event.id)
     show(owning, 'undone', {
@@ -226,7 +318,7 @@ function handleEvent(owning: DeletionSession, event: DeferredGarmentDeletionEven
     })
     return
   }
-  if (event.type === 'failuresToReport') showFailures(owning, event.failures)
+  if (event.type === 'failuresToReport') addFailures(owning, event.failures)
 }
 
 /** The session of `owner`, started when the tab holds a new member (ending the last one). */
@@ -241,16 +333,30 @@ function acquireSession(owner: string | null): DeletionSession {
     announceOnCommit: new Set(),
     deletedToAnnounce: false,
     lastNoticeId: null,
-    failureNotice: null,
+    failures: null,
     statusBar: null,
     t: null,
     onCommitted: null,
     readBearer: () => null,
     unsubscribe: () => undefined,
+    stopWatchingOwner: () => undefined,
   }
   created.unsubscribe = created.controller.subscribe((event) =>
     handleEvent(created, event)
   )
+  // The tab can change member with no Closet mounted (sign-out or a switch from another
+  // page): the session ends then, so its notice leaves the bar at once (D11).
+  if (typeof window !== 'undefined') {
+    const onSessionChange = () => {
+      if (currentWebSessionOwner() !== created.owner) endSession(created, { send: true })
+    }
+    window.addEventListener('couture:session', onSessionChange)
+    window.addEventListener('storage', onSessionChange)
+    created.stopWatchingOwner = () => {
+      window.removeEventListener('couture:session', onSessionChange)
+      window.removeEventListener('storage', onSessionChange)
+    }
+  }
   session = created
   return created
 }
@@ -278,6 +384,11 @@ export function useGarmentDeletion({
   )
   const statusBar = useStatusBar()
   owning.statusBar = statusBar
+  // Every bar change renders the Closet: note when the Retry notice is on screen, so its later
+  // absence reads as dismissed or replaced.
+  const failures = owning.failures
+  if (failures?.noticeId && statusBar.notice?.id === failures.noticeId)
+    failures.seenOnBar = true
   owning.t = t
   owning.readBearer = readBearer
   const onCommittedRef = useRef(onCommitted)

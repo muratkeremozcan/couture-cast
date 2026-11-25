@@ -39,7 +39,6 @@ import {
   formatGarmentTagLabels,
   garmentTagDraft,
   garmentTagsEqual,
-  isOfflineError,
   getGuestPreviewStrings,
   getStylePieceStrings,
   SAMPLE_GARMENT_CATEGORIES,
@@ -748,12 +747,16 @@ function GarmentDetailPhoto({
   )
 }
 
+/**
+ * `failed`: the usage read failed (D3). The error and its Retry stay inside this detail, bound
+ * to this piece, so they never cover another piece's Undo on the status bar and leave with
+ * the detail.
+ */
 type GarmentDeletePhase =
   | { kind: 'idle' }
   | { kind: 'checking' }
   | { kind: 'confirm'; count: number; accessToken: string }
-
-let garmentDeleteSeq = 0
+  | { kind: 'failed' }
 
 /** Back to the hub, which stayed mounted and kept its scroll position (D7). */
 function returnToHub() {
@@ -778,10 +781,6 @@ function useGarmentDelete({
   epoch: number
   deletion: MobileGarmentDeletion
 }) {
-  const { t } = useTranslation()
-  const statusBar = useStatusBar()
-  const statusBarRef = useRef(statusBar)
-  statusBarRef.current = statusBar
   const [phase, setPhase] = useState<GarmentDeletePhase>({ kind: 'idle' })
   const phaseRef = useRef(phase)
   phaseRef.current = phase
@@ -801,26 +800,9 @@ function useGarmentDelete({
     epoch === mobileIdentityEpoch() &&
     mobileApplicationUserId() === actionOwner
 
-  const showUsageFailed = (error: unknown) => {
-    const seq = ++garmentDeleteSeq
-    statusBarRef.current.showNotice({
-      id: `garment-delete-usage-failed-${seq}`,
-      announcementId: createAnnouncementToken('garment-delete-usage-failed', seq),
-      message: t('wardrobe.detail.deleteUsageFailed'),
-      tone: !statusBarRef.current.isOnline || isOfflineError(error) ? 'offline' : 'error',
-      actions: [
-        {
-          id: 'retry',
-          kind: 'retry',
-          label: t('feedback.retry'),
-          onPress: () => void startDeleteRef.current(),
-        },
-      ],
-    })
-  }
-
   const startDelete = async () => {
-    if (phaseRef.current.kind !== 'idle') return
+    const from = phaseRef.current.kind
+    if (from !== 'idle' && from !== 'failed') return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
     const run = ++runRef.current
@@ -832,10 +814,9 @@ function useGarmentDelete({
       if (!token) throw new Error('AUTHENTICATION_REQUIRED')
       accessToken = token
       usage = await getGarmentUsageFromMobile(accessToken, garmentId)
-    } catch (error) {
+    } catch {
       if (run !== runRef.current) return
-      setPhase({ kind: 'idle' })
-      if (isActiveOwner(actionOwner)) showUsageFailed(error)
+      setPhase(isActiveOwner(actionOwner) ? { kind: 'failed' } : { kind: 'idle' })
       return
     }
     if (run !== runRef.current || !isActiveOwner(actionOwner)) return
@@ -849,9 +830,6 @@ function useGarmentDelete({
     }
     setPhase({ kind: 'confirm', count, accessToken })
   }
-  const startDeleteRef = useRef(startDelete)
-  startDeleteRef.current = startDelete
-
   const accept = () => {
     const current = phaseRef.current
     if (current.kind !== 'confirm' || !isActiveOwner(owner)) return
@@ -862,10 +840,93 @@ function useGarmentDelete({
 
   return {
     phase,
+    /** A delete check or its prompt owns the detail until it settles. */
+    busy: phase.kind === 'checking' || phase.kind === 'confirm',
     startDelete: () => void startDelete(),
     cancel: () => setPhase({ kind: 'idle' }),
     accept,
   }
+}
+
+/** The one prompt for a piece in use: it names how many looks lose it (D2). */
+function GarmentDeleteConfirm({
+  count,
+  onAccept,
+  onCancel,
+}: {
+  count: number
+  onAccept: () => void
+  onCancel: () => void
+}) {
+  const { t } = useTranslation()
+  const themed = useThemedStyles()
+  return (
+    <View
+      testID="garment-delete-confirm"
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={[styles.errorBox, themed.errorBox]}
+    >
+      <Text
+        testID="garment-delete-confirm-count"
+        style={[styles.confirmTitle, themed.errorText]}
+      >
+        {t('wardrobe.detail.deleteConfirmTitle', { count })}
+      </Text>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          testID="garment-delete-confirm-accept"
+          onPress={onAccept}
+          style={[styles.primaryButton, themed.dangerPrimaryButton]}
+        >
+          <Text style={[styles.primaryButtonText, themed.dangerPrimaryButtonText]}>
+            {t('wardrobe.detail.deleteConfirmAccept')}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          testID="garment-delete-cancel"
+          onPress={onCancel}
+          style={[styles.secondaryButton, themed.secondaryButton]}
+        >
+          <Text style={[styles.secondaryButtonText, themed.text]}>
+            {t('wardrobe.detail.deleteCancel')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+/** D3: the usage read failed; nothing was deleted, and Retry reads the usage again. */
+function GarmentDeleteUsageFailed({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation()
+  const themed = useThemedStyles()
+  return (
+    <View
+      testID="garment-delete-usage-failed"
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
+      style={[styles.errorBox, themed.errorBox]}
+    >
+      <Text style={[styles.confirmTitle, themed.errorText]}>
+        {t('wardrobe.detail.deleteUsageFailed')}
+      </Text>
+      <View style={styles.actions}>
+        <Pressable
+          accessibilityRole="button"
+          testID="garment-delete-usage-retry"
+          onPress={onRetry}
+          style={[styles.secondaryButton, themed.secondaryButton]}
+        >
+          <Text style={[styles.secondaryButtonText, themed.text]}>
+            {t('feedback.retry')}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  )
 }
 
 function GarmentTagPanel({
@@ -898,7 +959,10 @@ function GarmentTagPanel({
   const saving = saveState !== 'idle'
   const doneBlocked = saving || awaitingRead
   const remover = useGarmentDelete({ garment, owner, epoch, deletion })
-  const deleteBusy = remover.phase.kind !== 'idle'
+  const deleteBusy = remover.busy
+  // Tags stay closed while a delete check or its prompt runs, so the delete never closes the
+  // detail over a tag draft.
+  const editDisabled = !editor.canEdit || deleteBusy
 
   const tagRow = (testID: string, label: string, value: string) => (
     <View style={[styles.tagRow, themed.divider]}>
@@ -1053,8 +1117,8 @@ function GarmentTagPanel({
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: !editor.canEdit }}
-              disabled={!editor.canEdit}
+              accessibilityState={{ disabled: editDisabled }}
+              disabled={editDisabled}
               testID="garment-edit-tags"
               onPress={editor.openEditor}
               style={[styles.secondaryButton, themed.secondaryButton]}
@@ -1082,43 +1146,14 @@ function GarmentTagPanel({
             </Pressable>
           </View>
           {remover.phase.kind === 'confirm' ? (
-            <View
-              testID="garment-delete-confirm"
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
-              style={[styles.errorBox, themed.errorBox]}
-            >
-              <Text
-                testID="garment-delete-confirm-count"
-                style={[styles.confirmTitle, themed.errorText]}
-              >
-                {t('wardrobe.detail.deleteConfirmTitle', { count: remover.phase.count })}
-              </Text>
-              <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  testID="garment-delete-confirm-accept"
-                  onPress={remover.accept}
-                  style={[styles.primaryButton, themed.dangerPrimaryButton]}
-                >
-                  <Text
-                    style={[styles.primaryButtonText, themed.dangerPrimaryButtonText]}
-                  >
-                    {t('wardrobe.detail.deleteConfirmAccept')}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  testID="garment-delete-cancel"
-                  onPress={remover.cancel}
-                  style={[styles.secondaryButton, themed.secondaryButton]}
-                >
-                  <Text style={[styles.secondaryButtonText, themed.text]}>
-                    {t('wardrobe.detail.deleteCancel')}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+            <GarmentDeleteConfirm
+              count={remover.phase.count}
+              onAccept={remover.accept}
+              onCancel={remover.cancel}
+            />
+          ) : null}
+          {remover.phase.kind === 'failed' ? (
+            <GarmentDeleteUsageFailed onRetry={remover.startDelete} />
           ) : null}
         </>
       )}

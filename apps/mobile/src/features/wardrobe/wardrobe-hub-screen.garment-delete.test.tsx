@@ -130,7 +130,11 @@ import {
   type DeferredGarmentDeletionTimer,
   type StatusBarNoticeInput,
 } from '@couture/utils'
-import { reportNetworkOnline, SaveFeedbackProvider } from '@/components/save-feedback'
+import {
+  reportNetworkOnline,
+  SaveFeedbackProvider,
+  useStatusBar,
+} from '@/components/save-feedback'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
   resolveMobileAccessToken,
@@ -145,6 +149,7 @@ import {
   createMobileGarmentDeletion,
   resetGarmentDeletionForTests,
   type GarmentDeleteMode,
+  type GarmentDeletionPresenter,
   type MobileGarmentDeletion,
   type MobileGarmentDeletionDependencies,
 } from './garment-deletion'
@@ -154,6 +159,8 @@ const owner = 'hub-delete-owner'
 /** The account the app holds after a sign-out and a sign-in as someone else. */
 const secondMember = 'hub-delete-second-member'
 const windowMs = SAVE_FEEDBACK_TIMINGS.statusBarDurationMs
+/** The longest delay `setTimeout` takes: a notice timer that never fires during a case. */
+const NEVER_ON_REAL_TIME_MS = 2_147_483_647
 
 function fakeAccessToken(userId: string): string {
   const payload = btoa(JSON.stringify({ sub: userId })).replace(/=+$/, '')
@@ -191,6 +198,14 @@ const plainShoes = {
   colorFamily: null,
 }
 
+const greenScarf = {
+  ...createReadyGarmentFixture({
+    id: 'delete-green-scarf',
+    imageAccess: photo('#2e8b57'),
+  }),
+  colorFamily: null,
+}
+
 const onboardingNotCompleted = {
   status: 'in_progress' as const,
   currentStep: 'capture' as const,
@@ -201,7 +216,12 @@ const onboardingNotCompleted = {
   revision: 1,
 }
 
-/** A manual timer for the deletion controller: `advance` runs every callback due by then. */
+/**
+ * A manual timer for the deletion controller. `advance` runs the live timers due by then one at a
+ * time, earliest first (ties in the order they were set): it moves the clock to each timer's due
+ * time before running it, so a timer a callback clears never runs and one it sets is due from
+ * that moment. The same implementation lives in the hub and detail suites.
+ */
 function createManualTimer() {
   let now = 0
   let nextHandle = 1
@@ -216,17 +236,21 @@ function createManualTimer() {
       scheduled.delete(handle as number)
     },
   }
+  const nextDue = (until: number) =>
+    [...scheduled.entries()]
+      .filter(([, entry]) => entry.at <= until)
+      .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0]
   const advance = (ms: number) => {
-    now += ms
-    for (const [handle, entry] of [...scheduled.entries()].sort(
-      (a, b) => a[1].at - b[1].at
-    )) {
-      if (entry.at > now) continue
+    const until = now + ms
+    for (let due = nextDue(until); due; due = nextDue(until)) {
+      const [handle, entry] = due
       scheduled.delete(handle)
+      now = entry.at
       entry.callback()
     }
+    now = until
   }
-  return { timer, advance, active: () => scheduled.size }
+  return { timer, advance, active: () => scheduled.size, now: () => now }
 }
 
 /** The hub's ScrollView: the nearest ancestor of the grid that scrolls vertically. */
@@ -305,6 +329,13 @@ const reportEvent = (...ids: string[]) => ({
   failures: ids.map((id) => ({ id, error: expect.any(Error) })),
 })
 
+/** The root status bar as another feature on the screen holds it. */
+const otherFeature: { bar: ReturnType<typeof useStatusBar> | null } = { bar: null }
+function OtherFeatureOnTheBar() {
+  otherFeature.bar = useStatusBar()
+  return null
+}
+
 const FAILED = 'Could not delete this piece.'
 const FAILED_WITH_RETRY = `${FAILED}Retry`
 
@@ -312,11 +343,15 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
   let closet: Record<string, unknown>[]
   let deletes: { id: string; authorization: string | null }[]
   let listReads: (string | null)[]
+  /** A closet read answers once this settles, with the closet as it was when it arrived. */
+  let listHeld: Promise<void>
   let deleteReply: (garmentId: string) => Response | Promise<Response>
   let changes: number
   let stopWatching: () => void
   let restoreToken: () => void
   let clock: ReturnType<typeof createManualTimer>
+  /** The status bar's notice timer, apart from the controller clock. */
+  let noticeClock: ReturnType<typeof createManualTimer>
   let deletion: MobileGarmentDeletion
   let events: DeferredGarmentDeletionEvent[]
   /** Every deletion a case built, reset and disposed after it. */
@@ -333,6 +368,7 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
   function hubTree(hub: MobileGarmentDeletion | null, capsules = false) {
     return (
       <SaveFeedbackProvider onAnnounce={(entry) => announced.push(entry.message)}>
+        <OtherFeatureOnTheBar />
         <View style={{ height: 600 }}>
           {hub ? <WardrobeHubScreen pollOffsetsMs={[1, 1, 1, 1]} deletion={hub} /> : null}
         </View>
@@ -346,28 +382,67 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
   }
 
   /**
-   * A deletion on the manual timer whose controller events land in `events`. It hears the real
-   * identity store until the case ends and disposes it.
+   * The root status bar's own timer clears a notice on real time, so a slow worker could take
+   * Undo off the bar while the controller window is still open. Each notice is shown with a
+   * duration that never ends on real time, and leaves the bar when `noticeClock` reaches its own
+   * duration; only a case that advances `noticeClock` expires a notice. The notice keeps its id,
+   * so the hub reports the real id to `observeBar`, and the deletion hears the notice's own
+   * duration, which it measures on `noticeClock` too (`now`).
+   */
+  function withNoticeExpiryOnTestClock(
+    presenter: GarmentDeletionPresenter
+  ): GarmentDeletionPresenter {
+    return {
+      ...presenter,
+      showNotice: (input) => {
+        const shown = presenter.showNotice({
+          ...input,
+          durationMs: NEVER_ON_REAL_TIME_MS,
+        })
+        const durationMs = input.durationMs ?? SAVE_FEEDBACK_TIMINGS.statusBarDurationMs
+        noticeClock.timer.setTimeout(() => presenter.dismissNotice(shown.id), durationMs)
+        return { id: shown.id, durationMs }
+      },
+    }
+  }
+
+  /**
+   * A deletion on the manual timer whose controller events land in `events`, and whose notices
+   * expire on `noticeClock`. It hears the real identity store until the case ends and disposes
+   * it.
    */
   function createDeletion(dependencies: Partial<MobileGarmentDeletionDependencies> = {}) {
     const created = createMobileGarmentDeletion(
       createDeferredGarmentDeletion({ timer: clock.timer }),
-      dependencies
+      { now: () => noticeClock.now(), ...dependencies }
     )
     created.controller.subscribe((event) => {
       events.push(event)
     })
     built.push(created)
-    return created
+    return {
+      ...created,
+      attach: (hub) =>
+        created.attach({ ...hub, presenter: withNoticeExpiryOnTestClock(hub.presenter) }),
+    } satisfies MobileGarmentDeletion
   }
 
   /** What the detail does after Delete: it requests the delete, then pops to the hub. */
-  function requestDelete(id: string, mode: GarmentDeleteMode = 'deferred') {
-    act(() => deletion.request(id, mode, ACCESS_TOKEN))
+  function requestDelete(
+    id: string,
+    mode: GarmentDeleteMode = 'deferred',
+    accessToken = ACCESS_TOKEN
+  ) {
+    act(() => deletion.request(id, mode, accessToken))
   }
 
   function advance(ms: number) {
     act(() => clock.advance(ms))
+  }
+
+  /** Real time passing for the status bar's notices only. */
+  function advanceNotices(ms: number) {
+    act(() => noticeClock.advance(ms))
   }
 
   function changeAppState(state: ReactNativeModule.AppStateStatus) {
@@ -414,6 +489,7 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     closet = [blueTop, plainShoes]
     deletes = []
     listReads = []
+    listHeld = Promise.resolve()
     deleteReply = ok
     changes = 0
     stopWatching = onWardrobeChanged(() => {
@@ -421,14 +497,17 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     })
     appState.state = 'active'
     clock = createManualTimer()
+    noticeClock = createManualTimer()
     events = []
     built = []
     announced = []
     deletion = createDeletion()
     server.use(
-      http.get('*/api/v1/wardrobe/garments', ({ request }) => {
+      http.get('*/api/v1/wardrobe/garments', async ({ request }) => {
         listReads.push(request.headers.get('authorization'))
-        return HttpResponse.json({ data: closet })
+        const snapshot = closet
+        await listHeld
+        return HttpResponse.json({ data: snapshot })
       }),
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({ data: onboardingNotCompleted })
@@ -480,6 +559,32 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     expect(clock.active()).toBe(0)
     expect(deletes).toEqual([])
     expect(changes).toBe(changesBefore)
+  })
+
+  it('[P1] [7.6-NAT-004] the Undo notice leaves the bar only when its own duration passes; the window still ends on the controller clock', async () => {
+    await renderLoadedHub()
+    requestDelete(blueTop.id)
+
+    advanceNotices(windowMs - 1)
+    expect(bar().textContent).toBe('DeletedUndo')
+
+    advanceNotices(1)
+
+    expect(noBar()).toBeNull()
+    expect(clock.active()).toBe(1)
+    expect(events).toEqual([scheduledEvent(blueTop.id)])
+    expect(deletes).toEqual([])
+
+    advance(windowMs)
+
+    await waitFor(() =>
+      expect(events).toEqual([
+        scheduledEvent(blueTop.id),
+        committingEvent(blueTop.id),
+        committedEvent(blueTop.id),
+      ])
+    )
+    expect(deletes).toEqual([sentDelete(blueTop.id)])
   })
 
   it('[P0] [7.6-NAT-004] the window end sends exactly one DELETE, and not a millisecond sooner', async () => {
@@ -887,7 +992,11 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     )
     const changesBefore = changes
 
+    // The next account signs in with its own token.
+    restoreToken()
+    restoreToken = setMobileAccessTokenResolver(() => SECOND_TOKEN)
     await switchAccount()
+    expect(listReads.at(-1)).toBe(SECOND_BEARER)
     answer.open()
 
     // One answer succeeds and one fails, in either order; the failure is released for its
@@ -910,13 +1019,13 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
 
     // A delete requested under the account the app holds now does reach the hub.
     deleteReply = ok
-    requestDelete(blueTop.id, 'immediate')
+    requestDelete(blueTop.id, 'immediate', SECOND_TOKEN)
 
     await waitFor(() => expect(bar().textContent).toBe('Deleted'))
     expect(announced).toEqual(['Deleted'])
     expect(card(blueTop.id)).toBeNull()
     expect(deletes).toHaveLength(3)
-    expect(deletes.at(-1)).toEqual(sentDelete(blueTop.id))
+    expect(deletes.at(-1)).toEqual(sentDelete(blueTop.id, SECOND_BEARER))
     expect(changes).toBe(changesBefore + 1)
   })
 
@@ -1261,6 +1370,211 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     expect(announced.slice(announcedBefore)).toEqual([])
   })
 
+  it('[P0] [7.6-NAT-005] a Retry covered by a new Undo comes back once that window ends, and still retries only the failed piece', async () => {
+    const replies: Record<string, () => Response> = {
+      [blueTop.id]: serverError,
+      [plainShoes.id]: ok,
+    }
+    deleteReply = (id) => replies[id]!()
+    await renderLoadedHub()
+    requestDelete(blueTop.id, 'immediate')
+    await waitFor(() => expect(bar().textContent).toBe(FAILED_WITH_RETRY))
+
+    // A new deferred delete covers the Retry with its Undo.
+    requestDelete(plainShoes.id)
+    expect(bar().textContent).toBe('DeletedUndo')
+
+    advance(windowMs - 1)
+    expect(bar().textContent).toBe('DeletedUndo')
+
+    advance(1)
+
+    // The window closed as the shoes' send started: the Retry is back on top.
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    await waitFor(() => expect(events.at(-1)).toEqual(committedEvent(plainShoes.id)))
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    expect(announced).toEqual([FAILED, 'Deleted', FAILED])
+    replies[blueTop.id] = ok
+
+    await browserUser.click(retryButton())
+
+    await waitFor(() => expect(bar().textContent).toBe('Deleted'))
+    expect(deletes).toEqual([
+      sentDelete(blueTop.id),
+      sentDelete(plainShoes.id),
+      sentDelete(blueTop.id),
+    ])
+    expect(card(blueTop.id)).toBeNull()
+    expect(card(plainShoes.id)).toBeNull()
+  })
+
+  it('[P0] [7.6-NAT-005] a Deleted that lands while a Retry shows is only announced; the Retry stays on the bar for its piece', async () => {
+    const replies: Record<string, () => Response> = {
+      [blueTop.id]: serverError,
+      [plainShoes.id]: ok,
+    }
+    deleteReply = (id) => replies[id]!()
+    await renderLoadedHub()
+    const changesBefore = changes
+    requestDelete(blueTop.id, 'immediate')
+    await waitFor(() => expect(bar().textContent).toBe(FAILED_WITH_RETRY))
+
+    // A confirmed delete of the shoes lands while the Retry shows.
+    requestDelete(plainShoes.id, 'immediate')
+
+    await waitFor(() => expect(announced).toEqual([FAILED, 'Deleted']))
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    expect(card(plainShoes.id)).toBeNull()
+    expect(card(blueTop.id)).toBeVisible()
+    expect(changes).toBe(changesBefore + 1)
+    replies[blueTop.id] = ok
+
+    await browserUser.click(retryButton())
+
+    await waitFor(() => expect(bar().textContent).toBe('Deleted'))
+    expect(deletes).toEqual([
+      sentDelete(blueTop.id),
+      sentDelete(plainShoes.id),
+      sentDelete(blueTop.id),
+    ])
+    expect(announced).toEqual([FAILED, 'Deleted', 'Deleted'])
+    expect(changes).toBe(changesBefore + 2)
+  })
+
+  it('[P0] [7.6-NAT-005] a Retry with no bearer while an Undo window is open waits for that window before it shows again', async () => {
+    const bearerRead = heldBearerRead()
+    const resolveAccessToken = vi.fn(() => bearerRead.read)
+    deletion = createDeletion({ resolveAccessToken })
+    const replies: Record<string, () => Response> = {
+      [blueTop.id]: serverError,
+      [plainShoes.id]: ok,
+    }
+    deleteReply = (id) => replies[id]!()
+    await renderLoadedHub()
+    requestDelete(blueTop.id, 'immediate')
+    await waitFor(() => expect(bar().textContent).toBe(FAILED_WITH_RETRY))
+    await browserUser.click(retryButton())
+    expect(resolveAccessToken).toHaveBeenCalledTimes(1)
+    requestDelete(plainShoes.id)
+    expect(bar().textContent).toBe('DeletedUndo')
+
+    // The session ended: the bearer read answers nothing while the shoes' window is open.
+    await act(async () => {
+      bearerRead.answer('')
+      await bearerRead.read
+    })
+
+    expect(bar().textContent).toBe('DeletedUndo')
+    expect(announced).toEqual([FAILED, 'Deleted'])
+    expect(deletes).toEqual([sentDelete(blueTop.id)])
+
+    advance(windowMs)
+
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    expect(announced).toEqual([FAILED, 'Deleted', FAILED])
+    await waitFor(() => expect(events.at(-1)).toEqual(committedEvent(plainShoes.id)))
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    expect(deletes).toEqual([sentDelete(blueTop.id), sentDelete(plainShoes.id)])
+    expect(card(blueTop.id)).toBeVisible()
+  })
+
+  /** The top's confirmed delete fails and its Retry shows; the closet also holds a scarf. */
+  async function showTopRetry() {
+    closet = [blueTop, plainShoes, greenScarf]
+    const replies: Record<string, () => Response> = {
+      [blueTop.id]: serverError,
+      [plainShoes.id]: ok,
+      [greenScarf.id]: ok,
+    }
+    deleteReply = (id) => replies[id]!()
+    await renderLoadedHub()
+    requestDelete(blueTop.id, 'immediate')
+    await waitFor(() => expect(bar().textContent).toBe(FAILED_WITH_RETRY))
+    return replies
+  }
+
+  /** After the Retry left the bar: a later window ends with no Retry coming back. */
+  async function expectNoRetryAfterWindow() {
+    const announcedBefore = announced.length
+    requestDelete(greenScarf.id)
+    expect(bar().textContent).toBe('DeletedUndo')
+
+    advance(windowMs)
+
+    await waitFor(() => expect(events.at(-1)).toEqual(committedEvent(greenScarf.id)))
+    expect(bar().textContent).toBe('DeletedUndo')
+    expect(announced.slice(announcedBefore)).toEqual(['Deleted'])
+    expect(card(blueTop.id)).toBeVisible()
+  }
+
+  it('[P0] [7.6-NAT-005] a Retry the member dismissed is gone: the next Deleted shows on the bar and no Retry returns after a later window', async () => {
+    await showTopRetry()
+
+    act(() => otherFeature.bar!.dismissNotice())
+
+    expect(noBar()).toBeNull()
+    requestDelete(plainShoes.id, 'immediate')
+
+    await waitFor(() => expect(bar().textContent).toBe('Deleted'))
+    expect(announced).toEqual([FAILED, 'Deleted'])
+    await expectNoRetryAfterWindow()
+    expect(deletes).toEqual([
+      sentDelete(blueTop.id),
+      sentDelete(plainShoes.id),
+      sentDelete(greenScarf.id),
+    ])
+  })
+
+  it('[P0] [7.6-NAT-005] a Retry another feature replaced is gone: the next Deleted shows on the bar and no Retry returns after a later window', async () => {
+    await showTopRetry()
+
+    act(() => {
+      otherFeature.bar!.showNotice({
+        id: 'other-feature-saved',
+        message: 'Saved',
+        durationMs: NEVER_ON_REAL_TIME_MS,
+      })
+    })
+
+    expect(bar().textContent).toBe('Saved')
+    requestDelete(plainShoes.id, 'immediate')
+
+    await waitFor(() => expect(bar().textContent).toBe('Deleted'))
+    expect(announced).toEqual([FAILED, 'Saved', 'Deleted'])
+    await expectNoRetryAfterWindow()
+    expect(deletes).toEqual([
+      sentDelete(blueTop.id),
+      sentDelete(plainShoes.id),
+      sentDelete(greenScarf.id),
+    ])
+  })
+
+  it('[P0] [7.6-NAT-005] a Retry that expired uncovered is not merged into a later failure: the new Retry sends only the new piece', async () => {
+    let now = 0
+    deletion = createDeletion({ now: () => now })
+    const replies = await showTopRetry()
+    replies[plainShoes.id] = serverError
+
+    // The top's Retry has run its course on the deletion's clock while the bar still shows it.
+    now += windowMs
+    requestDelete(plainShoes.id, 'immediate')
+
+    await waitFor(() => expect(announced).toEqual([FAILED, FAILED]))
+    expect(bar().textContent).toBe(FAILED_WITH_RETRY)
+    replies[plainShoes.id] = ok
+
+    await browserUser.click(retryButton())
+
+    await waitFor(() => expect(bar().textContent).toBe('Deleted'))
+    expect(deletes).toEqual([
+      sentDelete(blueTop.id),
+      sentDelete(plainShoes.id),
+      sentDelete(plainShoes.id),
+    ])
+    expect(card(plainShoes.id)).toBeNull()
+    expect(card(blueTop.id)).toBeVisible()
+  })
+
   it('[P1] [7.6-NAT-006] a send that fails after the hub left still shows Could not delete with a working Retry', async () => {
     const answer = gate()
     const replies = [serverError, ok]
@@ -1442,6 +1756,40 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     expect(card(blueTop.id)).toBeVisible()
   })
 
+  it('[P0] [7.6-NAT-006] a DELETE that lands before the remounted hub read its closet reads the closet once more, without the piece', async () => {
+    const answer = gate()
+    deleteReply = async () => {
+      await answer.opened
+      return ok()
+    }
+    const view = await renderLoadedHub()
+    requestDelete(blueTop.id)
+    view.rerender(hubTree(null))
+    await waitFor(() => expect(deletes).toEqual([sentDelete(blueTop.id)]))
+    // Hub B mounts and its first closet read is out, answering with the piece still there.
+    const firstRead = gate()
+    listHeld = firstRead.opened
+    const readsBefore = listReads.length
+    view.rerender(hubTree(deletion))
+    await waitFor(() => expect(listReads).toHaveLength(readsBefore + 1))
+    expect(screen.queryByTestId('wardrobe-garment-list')).toBeNull()
+    const changesBefore = changes
+    // The server answers later reads without the deleted piece.
+    listHeld = Promise.resolve()
+    closet = [plainShoes]
+
+    answer.open()
+
+    await waitFor(() => expect(events.at(-1)).toEqual(committedEvent(blueTop.id)))
+    expect(changes).toBe(changesBefore + 1)
+    await screen.findByTestId(`garment-card-${plainShoes.id}`)
+    expect(card(blueTop.id)).toBeNull()
+    expect(listReads).toHaveLength(readsBefore + 2)
+    expect(listReads.slice(readsBefore)).toEqual([BEARER, BEARER])
+    // The read that started before the commit was dropped for the fresh one; let its handler end.
+    firstRead.open()
+  })
+
   it('[P0] [7.6-NAT-005] an account change during the bearer read at Retry sends nothing', async () => {
     const bearerRead = heldBearerRead()
     const resolveAccessToken = vi.fn(() => bearerRead.read)
@@ -1580,6 +1928,9 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     expect(deletes).toEqual([sentDelete('delete-piece-12')])
     expect(screen.getByTestId('wardrobe-garment-list')).toBe(grid)
     expect(screen.getAllByTestId(/^garment-card-delete-piece-/)).toHaveLength(11)
+    // The commit removed nothing above the offset, and nothing reset the scroll.
+    expect(scrollContainerOf(grid)).toBe(scroller)
+    expect(scroller.scrollTop).toBe(400)
   })
 
   // Capsules is pushed over the hub, so the hub's delete feedback keeps running under it; a

@@ -143,9 +143,20 @@ export function createDeferredGarmentDeletion(
     if (entry.sent) return entry.sent
     timer.clearTimeout(entry.handle)
     entry.state = 'committing'
+    // The send is registered before anyone hears `committing`, so a subscriber that calls
+    // `commitNow` or `flush` for this id joins this send instead of starting a second one.
+    let settle!: (succeeded: boolean) => void
+    entry.sent = new Promise<boolean>((resolve) => {
+      settle = resolve
+    })
     emit({ type: 'committing', id: entry.id })
     reportFailuresIfNoWindow()
-    entry.sent = (async () => {
+    // A subscriber may have reset the controller while hearing `committing`: nothing is sent.
+    if (entries.get(entry.id) !== entry) {
+      settle(false)
+      return entry.sent
+    }
+    void (async () => {
       try {
         await entry.commit(commitOptions)
       } catch (error) {
@@ -163,7 +174,7 @@ export function createDeferredGarmentDeletion(
       entries.delete(entry.id)
       emit({ type: 'committed', id: entry.id })
       return true
-    })()
+    })().then(settle)
     return entry.sent
   }
 
@@ -186,12 +197,17 @@ export function createDeferredGarmentDeletion(
     schedule(id, commit) {
       if (entries.has(id)) return false
       unreported = unreported.filter((failure) => failure.id !== id)
-      void commitWaiting({ keepalive: false })
+      const superseded = [...entries.values()].filter(
+        (entry) => entry.state === 'waiting'
+      )
+      // The new window opens before the superseded deletes are sent, so a notice held for "no
+      // open window" stays held through their `committing` events.
       const entry: Entry = { id, commit, state: 'waiting', handle: null, sent: null }
+      entries.set(id, entry)
       entry.handle = timer.setTimeout(() => {
         void send(entry, { keepalive: false })
       }, windowMs)
-      entries.set(id, entry)
+      for (const other of superseded) void send(other, { keepalive: false })
       emit({ type: 'scheduled', id })
       return true
     },

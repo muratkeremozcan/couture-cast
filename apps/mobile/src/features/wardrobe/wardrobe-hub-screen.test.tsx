@@ -24,7 +24,11 @@ const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
   setParams: vi.fn(),
 }))
-vi.mock('expo-router', () => ({ router: routerMock }))
+vi.mock('expo-router', async () => ({
+  router: routerMock,
+  // Story 7.6: the hub flushes pending deletes when its screen blurs; these cases stay focused.
+  useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 const imagePicker = vi.hoisted(() => ({
   requestCameraPermissionsAsync: vi.fn(),

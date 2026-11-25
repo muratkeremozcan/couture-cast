@@ -51,6 +51,7 @@ import {
   mobileE2EBaselineLocationRequestBody,
   mobileE2EFlowStateHooks,
   resetMobileE2EFlowState,
+  settleMobileE2EFlowState,
   USE_MY_LOCATION_DEVICE,
   USE_MY_LOCATION_FLOW,
   useMyLocationWeatherDoubleCause,
@@ -1740,24 +1741,26 @@ const resetMobileE2EPerFlowState = async (identity, flowPath) =>
     await FLOW_STATE_HOOKS[flowPath]?.before(prisma, identity.userId)
   })
 
-const restoreMobileE2EStateAfterFlow = async (identity, flowPath) => {
-  const hook = FLOW_STATE_HOOKS[flowPath]?.after
+const restoreMobileE2EStateAfterFlow = async (identity, flowPath, passed) => {
+  const hook = FLOW_STATE_HOOKS[flowPath]
   if (!identity || !hook) return
-  await withMobileE2EPrisma((prisma) => hook(prisma, identity.userId))
+  await withMobileE2EPrisma((prisma) =>
+    settleMobileE2EFlowState(hook, prisma, identity.userId, { passed })
+  )
 }
 
 /**
- * Runs the after hook and turns its error into the cause the flow is failed
- * with. A throw here used to replace the flow's own outcome and escape the
+ * Runs the flow's verify hook (passing flows only) and after hook, and turns
+ * an error into the cause the flow is failed with. A throw here used to replace the flow's own outcome and escape the
  * suite loop, so every later flow went unrun and the summary never printed.
  * The later flows still run: each one gets its own per-flow reset, and the
  * summary names this failure next to whatever they report.
  *
  * @returns {Promise<string | undefined>}
  */
-const restoreMobileE2EStateOrCause = async (identity, flowPath) => {
+const restoreMobileE2EStateOrCause = async (identity, flowPath, { passed }) => {
   try {
-    await restoreMobileE2EStateAfterFlow(identity, flowPath)
+    await restoreMobileE2EStateAfterFlow(identity, flowPath, passed)
     return undefined
   } catch (error) {
     return `state restore failed: ${error instanceof Error ? error.message : String(error)}`
@@ -4474,7 +4477,9 @@ const runUserScopedFlows = async (
       log(`FAIL ${flowPath} (${error.message})`)
     }
     maestroDriverReuse.recordInvocation(target.platform, SHARD_DEVICE_IDS[0])
-    const restoreCause = await restoreMobileE2EStateOrCause(identity, flowPath)
+    const restoreCause = await restoreMobileE2EStateOrCause(identity, flowPath, {
+      passed: flowPasses.has(flowPath),
+    })
     const doubleCause = await doubleWatch?.verify?.()
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
@@ -4845,7 +4850,9 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
         target.platform,
         androidSerial || DEFAULT_ADB_DEVICE
       )
-    const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
+    const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath, {
+      passed: !maestroExitError,
+    })
     const doubleCause = await doubleWatch?.verify?.()
 
     recordSingleFlowOutcome(

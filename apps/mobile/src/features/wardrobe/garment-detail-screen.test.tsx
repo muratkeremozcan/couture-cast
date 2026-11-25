@@ -231,7 +231,12 @@ async function openEditorAndPick(...testIds: string[]) {
   }
 }
 
-/** A manual timer for the deletion controller: `advance` runs every callback due by then. */
+/**
+ * A manual timer for the deletion controller. `advance` runs the live timers due by then one at a
+ * time, earliest first (ties in the order they were set): it moves the clock to each timer's due
+ * time before running it, so a timer a callback clears never runs and one it sets is due from
+ * that moment. The same implementation lives in the hub and detail suites.
+ */
 function createManualTimer() {
   let now = 0
   let nextHandle = 1
@@ -246,17 +251,21 @@ function createManualTimer() {
       scheduled.delete(handle as number)
     },
   }
+  const nextDue = (until: number) =>
+    [...scheduled.entries()]
+      .filter(([, entry]) => entry.at <= until)
+      .sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0]
   const advance = (ms: number) => {
-    now += ms
-    for (const [handle, entry] of [...scheduled.entries()].sort(
-      (a, b) => a[1].at - b[1].at
-    )) {
-      if (entry.at > now) continue
+    const until = now + ms
+    for (let due = nextDue(until); due; due = nextDue(until)) {
+      const [handle, entry] = due
       scheduled.delete(handle)
+      now = entry.at
       entry.callback()
     }
+    now = until
   }
-  return { timer, advance, active: () => scheduled.size }
+  return { timer, advance, active: () => scheduled.size, now: () => now }
 }
 
 describe('GarmentDetailScreen', () => {
@@ -1134,7 +1143,7 @@ describe('GarmentDetailScreen', () => {
     const scheduled = { type: 'scheduled', id: garmentId } as const
     const committing = { type: 'committing', id: garmentId } as const
     const committed = { type: 'committed', id: garmentId } as const
-    let usageReply: () => Response
+    let usageReply: () => Response | Promise<Response>
     let usageReads: { id: string; authorization: string | null }[]
     let deletes: { id: string; authorization: string | null }[]
     let clock: ReturnType<typeof createManualTimer>
@@ -1144,15 +1153,23 @@ describe('GarmentDetailScreen', () => {
     const usedIn = (savedLookCount: number, capsuleCount: number) => () =>
       HttpResponse.json({ garmentId, savedLookCount, capsuleCount })
 
-    function renderDeletableDetail() {
-      render(
+    function deletableDetail(id = garmentId) {
+      return (
         <SaveFeedbackProvider>
-          <GarmentDetailScreen garmentId={garmentId} deletion={deletion} />
+          <GarmentDetailScreen garmentId={id} deletion={deletion} />
         </SaveFeedbackProvider>
       )
     }
 
+    function renderDeletableDetail() {
+      return render(deletableDetail())
+    }
+
     const deleteButton = () => screen.findByRole('button', { name: 'Delete' })
+    const USAGE_FAILED = 'Could not check where this piece is used. Try again.'
+    /** The inline usage failure, with its Retry, inside the detail (D3). */
+    const usageFailed = () => screen.findByTestId('garment-delete-usage-failed')
+    const usageRetry = () => tag('garment-delete-usage-retry')
 
     beforeEach(() => {
       usageReads = []
@@ -1290,6 +1307,7 @@ describe('GarmentDetailScreen', () => {
       })
       const committedIds: string[] = []
       const shown: string[] = []
+      const spoken: string[] = []
       deletion.attach({
         epoch: mobileIdentityEpoch(),
         presenter: {
@@ -1298,6 +1316,9 @@ describe('GarmentDetailScreen', () => {
             return { id: input.id, durationMs: windowMs }
           },
           dismissNotice: () => undefined,
+          announce: (message) => {
+            spoken.push(message)
+          },
           isOnline: () => true,
           t: (key) => i18n.t(key),
         },
@@ -1318,6 +1339,8 @@ describe('GarmentDetailScreen', () => {
       expect(hiddenSetChanges).toBe(2)
       expect(committedIds).toEqual([garmentId])
       expect(shown).toEqual(['Deleted'])
+      // No Retry was on the bar, so Deleted shows rather than being only announced.
+      expect(spoken).toEqual([])
       expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
     })
 
@@ -1336,20 +1359,29 @@ describe('GarmentDetailScreen', () => {
 
       await browserUser.click(await deleteButton())
 
-      await waitFor(() =>
-        expect(tag('status-feedback-bar').textContent).toBe(
-          'Could not check where this piece is used. Try again.Retry'
-        )
-      )
-      expect(
-        within(tag('status-feedback-bar')).getByRole('button', { name: 'Retry' })
-      ).toBeVisible()
+      // The failure stays inside this detail, bound to this piece; the status bar is free.
+      const failure = await usageFailed()
+      expect(failure).toHaveAttribute('role', 'alert')
+      expect(failure.textContent).toBe(`${USAGE_FAILED}Retry`)
+      expect(within(failure).getByRole('button', { name: 'Retry' })).toBe(usageRetry())
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
       expect(tag('garment-detail')).toBeVisible()
       expect(routerMock.back).not.toHaveBeenCalled()
       act(() => clock.advance(windowMs))
       expect(deletion.pendingIds()).toEqual([])
       expect(events).toEqual([])
       expect(deletes).toEqual([])
+      // Delete itself stays usable from the failure, and so does Edit tags.
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(tag('garment-edit-tags')).not.toHaveAttribute('aria-disabled', 'true')
+      usageReply = usedIn(0, 0)
+
+      await browserUser.click(await deleteButton())
+
+      await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+      expect(usageReads).toHaveLength(2)
+      expect(events).toEqual([scheduled])
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
     })
 
     it('[P1] [7.6-NAT-003] a failed usage read deletes nothing, offers Retry, and Retry reads again', async () => {
@@ -1362,11 +1394,8 @@ describe('GarmentDetailScreen', () => {
 
       await browserUser.click(await deleteButton())
 
-      await waitFor(() =>
-        expect(tag('status-feedback-bar').textContent).toBe(
-          'Could not check where this piece is used. Try again.Retry'
-        )
-      )
+      expect((await usageFailed()).textContent).toBe(`${USAGE_FAILED}Retry`)
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
       expect(tag('garment-detail')).toBeVisible()
       expect(routerMock.back).not.toHaveBeenCalled()
       expect(deletion.pendingIds()).toEqual([])
@@ -1374,13 +1403,88 @@ describe('GarmentDetailScreen', () => {
       expect(deletes).toEqual([])
 
       usageReply = usedIn(0, 0)
-      await browserUser.click(
-        within(tag('status-feedback-bar')).getByRole('button', { name: 'Retry' })
-      )
+      await browserUser.click(usageRetry())
 
       await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
       expect(usageReads).toHaveLength(2)
       expect(events).toEqual([scheduled])
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+    })
+
+    it('[P1] [7.6-NAT-003] the usage failure leaves when the detail shows another piece', async () => {
+      const otherId = 'native-plain-shoes'
+      closet = [
+        blueTop,
+        {
+          ...createReadyGarmentFixture({
+            id: otherId,
+            category: 'shoes',
+            material: 'leather',
+            comfortRange: 'mild',
+            imageAccess: photo('#222222'),
+          }),
+          colorFamily: null,
+        },
+      ]
+      usageReply = () =>
+        HttpResponse.json(
+          { statusCode: 500, message: 'Internal server error' },
+          { status: 500 }
+        )
+      const view = renderDeletableDetail()
+      await browserUser.click(await deleteButton())
+      await usageFailed()
+
+      view.rerender(deletableDetail(otherId))
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+      )
+      expect(tag('garment-detail')).toBeVisible()
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(usageReads).toEqual([{ id: garmentId, authorization: bearer }])
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
+    })
+
+    it('[P1] [7.6-NAT-003] Edit tags is disabled while the delete check and its prompt run, and comes back after Keep it', async () => {
+      const usageAnswer = (() => {
+        let open!: () => void
+        const opened = new Promise<void>((resolve) => {
+          open = resolve
+        })
+        return { opened, open }
+      })()
+      usageReply = async () => {
+        await usageAnswer.opened
+        return usedIn(1, 0)()
+      }
+      renderDeletableDetail()
+      expect(await editTagsButton()).not.toHaveAttribute('aria-disabled', 'true')
+
+      await browserUser.click(await deleteButton())
+
+      // The check is out.
+      await waitFor(() => expect(usageReads).toHaveLength(1))
+      expect(tag('garment-edit-tags')).toHaveAttribute('aria-disabled', 'true')
+      expect(tag('garment-delete')).toHaveAttribute('aria-disabled', 'true')
+
+      usageAnswer.open()
+
+      // The prompt is up.
+      await screen.findByTestId('garment-delete-confirm')
+      expect(tag('garment-edit-tags')).toHaveAttribute('aria-disabled', 'true')
+
+      await browserUser.click(screen.getByRole('button', { name: 'Keep it' }))
+
+      await waitFor(() =>
+        expect(tag('garment-edit-tags')).not.toHaveAttribute('aria-disabled', 'true')
+      )
+      expect(tag('garment-delete')).not.toHaveAttribute('aria-disabled', 'true')
+      expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+      expect(events).toEqual([])
+      expect(deletes).toEqual([])
     })
   })
 })

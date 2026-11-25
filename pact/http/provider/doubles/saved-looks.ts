@@ -10,6 +10,7 @@ import {
   parseSavedLookIfMatchHeader,
   type WardrobeSavedLookService,
 } from '../../../../apps/api/src/modules/wardrobe/wardrobe-saved-look.service.js'
+import { getProviderWardrobeState } from '../state'
 
 export type SavedLookProviderScenario = 'ready' | 'replay' | 'missing'
 
@@ -95,8 +96,17 @@ function buildContract(): SavedLookContract {
 
 export function createSavedLookDoubles() {
   const mockWardrobeSavedLookService = {
-    // Story 7.6: the garment usage read; the wardrobe double already refused any other garment.
-    countSavedLooksUsingGarment: () => Promise.resolve(1),
+    // Story 7.6: the garment usage read counts one look for the configured member and garment;
+    // any other pair means the controller delegated the wrong arguments.
+    countSavedLooksUsingGarment: (userId: string, garmentId: string) => {
+      const state = getProviderWardrobeState()
+      if (state.userId !== userId || state.garmentId !== garmentId) {
+        throw new Error(
+          `countSavedLooksUsingGarment got ${userId}/${garmentId}, expected ${state.userId}/${state.garmentId}`
+        )
+      }
+      return Promise.resolve(1)
+    },
     createSavedLook: () =>
       Promise.resolve({
         data: buildContract(),

@@ -1,4 +1,4 @@
-// Learning path Step 64: Garment delete (7.6-UNIT-001..008, 013..018, deferred deletion controller).
+// Learning path Step 64: Garment delete (7.6-UNIT-001..008, 013..019, deferred deletion controller).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SAVE_FEEDBACK_TIMINGS } from '../save-feedback'
@@ -216,6 +216,8 @@ describe('createDeferredGarmentDeletion', () => {
       { type: 'scheduled', id: 'g1' },
       { type: 'committing', id: 'g1' },
       { type: 'failed', id: 'g1', error },
+      // No other window is open, so the failure is released for its notice at once (D9).
+      { type: 'failuresToReport', failures: [{ id: 'g1', error }] },
     ])
     expect(controller.pendingIds()).toEqual([])
   })
@@ -227,7 +229,10 @@ describe('createDeferredGarmentDeletion', () => {
       throw error
     })
     expect(result).toBe(false)
-    expect(events.at(-1)).toEqual({ type: 'failed', id: 'g1', error })
+    expect(events.slice(-2)).toEqual([
+      { type: 'failed', id: 'g1', error },
+      { type: 'failuresToReport', failures: [{ id: 'g1', error }] },
+    ])
   })
 
   it('[P0] [7.6-UNIT-013] commitNow sends at once with no window, and retry after a failure sends again', async () => {
@@ -438,6 +443,62 @@ describe('createDeferredGarmentDeletion', () => {
     expect(events.some((event) => event.type === 'failuresToReport')).toBe(false)
   })
 
+  it('[P1] [7.6-UNIT-019] a subscriber that resets on committing stops the send before it starts', async () => {
+    const { controller } = setup()
+    const commit = vi.fn().mockResolvedValue(undefined)
+    controller.subscribe((event) => {
+      if (event.type === 'committing') controller.reset()
+    })
+
+    await expect(controller.commitNow('g1', commit)).resolves.toBe(false)
+    expect(commit).not.toHaveBeenCalled()
+    expect(controller.pendingIds()).toEqual([])
+  })
+
+  it('[P1] [7.6-UNIT-019] commitNow or flush from a committing subscriber joins the send in flight', async () => {
+    const { controller } = setup()
+    let finish!: () => void
+    const commit = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve
+        })
+    )
+    const joined: Promise<unknown>[] = []
+    controller.subscribe((event) => {
+      if (event.type !== 'committing') return
+      joined.push(controller.commitNow('g1', commit), controller.flush())
+    })
+
+    const sending = controller.commitNow('g1', commit)
+    let flushed = false
+    void joined[1]!.then(() => {
+      flushed = true
+    })
+    await flushMicrotasks()
+    expect(commit).toHaveBeenCalledTimes(1)
+    expect(flushed).toBe(false)
+
+    finish()
+    await expect(sending).resolves.toBe(true)
+    await expect(joined[0]).resolves.toBe(true)
+    await flushMicrotasks()
+    expect(flushed).toBe(true)
+  })
+
+  it('[P1] [7.6-UNIT-019] a superseding delete has its window open when the superseded one is sent', () => {
+    const { controller } = setup()
+    const openWhenCommitting: boolean[] = []
+    controller.subscribe((event) => {
+      if (event.type === 'committing') openWhenCommitting.push(controller.hasOpenWindow())
+    })
+    controller.schedule('g1', vi.fn().mockResolvedValue(undefined))
+    controller.schedule('g2', vi.fn().mockResolvedValue(undefined))
+
+    expect(openWhenCommitting).toEqual([true])
+    expect(controller.isPending('g2')).toBe(true)
+  })
+
   it('[P1] [7.6-UNIT-015] a throwing listener neither fails the send nor silences later listeners', async () => {
     const { controller, advance } = setup()
     const later: DeferredGarmentDeletionEvent[] = []
@@ -473,26 +534,43 @@ describe('createDeferredGarmentDeletion', () => {
     expect(commit).not.toHaveBeenCalled()
   })
 
-  it('[P2] [7.6-UNIT-014] a send that settles after reset leaves a newer delete of the same id alone', async () => {
-    const { controller, advance } = setup()
-    const settle: { resolve: () => void; reject: (error: Error) => void }[] = []
-    const slow = () =>
-      new Promise<void>((resolve, reject) => {
-        settle.push({ resolve, reject })
-      })
+  it.each([
+    ['succeeds', (late: { resolve: () => void }) => late.resolve()],
+    [
+      'fails',
+      (late: { reject: (error: Error) => void }) => late.reject(new Error('late')),
+    ],
+  ] as const)(
+    '[P2] [7.6-UNIT-014] a send from before reset that %s leaves the newer delete of that id pending, with no terminal event',
+    async (_outcome, settleLate) => {
+      const { controller, events } = setup()
+      let late!: { resolve: () => void; reject: (error: Error) => void }
+      void controller.commitNow(
+        'g1',
+        () =>
+          new Promise<void>((resolve, reject) => {
+            late = { resolve, reject }
+          })
+      )
+      controller.reset()
+      // The replacement's own send stays out, so only the stale answer could settle it.
+      void controller.commitNow('g1', () => new Promise<void>(() => undefined))
+      const before = events.length
 
-    void controller.commitNow('g1', slow)
-    void controller.commitNow('g2', slow)
-    controller.reset()
-    controller.schedule('g1', vi.fn().mockResolvedValue(undefined))
-    controller.schedule('g2', vi.fn().mockResolvedValue(undefined))
-    advance(0)
+      settleLate(late)
+      await flushMicrotasks()
 
-    settle[0]!.resolve()
-    settle[1]!.reject(new Error('late'))
-    await flushMicrotasks()
-    expect(controller.pendingIds()).toEqual(['g2'])
-  })
+      expect(controller.pendingIds()).toEqual(['g1'])
+      expect(controller.isPending('g1')).toBe(true)
+      expect(
+        events
+          .slice(before)
+          .filter((event) =>
+            ['committed', 'failed', 'failuresToReport'].includes(event.type)
+          )
+      ).toEqual([])
+    }
+  )
 
   it('[P2] [7.6-UNIT-008] the window is the CC-7.1 status bar duration on the default timer', async () => {
     vi.useFakeTimers()

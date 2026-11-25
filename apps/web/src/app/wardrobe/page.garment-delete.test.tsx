@@ -6,7 +6,7 @@
 // Learning path Step 64: Garment delete.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -24,8 +24,11 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { createSavedLooksMswHandlers } from '../../test-utils/saved-looks-msw'
-import { SaveFeedbackProvider } from '../components/save-feedback'
-import { injectWardrobeGarmentDeletionForTests } from './garment-deletion'
+import { SaveFeedbackProvider, useStatusBar } from '../components/save-feedback'
+import {
+  injectWardrobeGarmentDeletionClockForTests,
+  injectWardrobeGarmentDeletionForTests,
+} from './garment-deletion'
 import WardrobePage from './page'
 
 const session = vi.hoisted(() => ({ owner: null as string | null }))
@@ -131,6 +134,8 @@ let deleteStatuses: number[]
 let savedLookReads: number
 /** While set, every DELETE waits for it before answering (an in-flight send). */
 let deleteGate: Promise<void> | null
+/** While set, every usage read waits for it before answering (a delete check in flight). */
+let usageGate: Promise<void> | null
 let manual: ReturnType<typeof createManualTimer>
 
 function signIn(member = owner) {
@@ -148,12 +153,29 @@ function signIn(member = owner) {
 function RootWithCloset({ closetOpen }: { closetOpen: boolean }) {
   return (
     <SaveFeedbackProvider inline renderOfflineLine={false}>
+      <RootBarProbe />
       {closetOpen ? <WardrobePage /> : <p>Another page</p>}
     </SaveFeedbackProvider>
   )
 }
 
+/** The root status bar as any other feature on the page holds it (saved looks, styling). */
+const rootBar: { current: ReturnType<typeof useStatusBar> | null } = { current: null }
+function RootBarProbe() {
+  const bar = useStatusBar()
+  useEffect(() => {
+    rootBar.current = bar
+  })
+  return null
+}
+
 const statusBar = () => screen.findByTestId('status-feedback-bar')
+/** What the status bar shows now, empty when no bar is up. Live-region copies are not read. */
+const barText = () =>
+  screen
+    .queryAllByTestId('status-feedback-bar')
+    .map((bar) => bar.textContent)
+    .join('')
 
 async function openAndDelete(user: ReturnType<typeof userEvent.setup>, id: string) {
   await user.click(await screen.findByTestId(`garment-open-${id}`))
@@ -170,6 +192,7 @@ beforeEach(() => {
   deleteStatuses = []
   savedLookReads = 0
   deleteGate = null
+  usageGate = null
   manual = createManualTimer()
   // Every new member session gets its own controller on the manual timer, as production does.
   injectWardrobeGarmentDeletionForTests(() =>
@@ -181,7 +204,8 @@ beforeEach(() => {
   }
   useMswHandlers(
     http.get(`${api}/wardrobe/garments`, () => HttpResponse.json({ data: closet })),
-    http.get(`${api}/wardrobe/garments/:id/usage`, ({ params }) => {
+    http.get(`${api}/wardrobe/garments/:id/usage`, async ({ params }) => {
+      if (usageGate) await usageGate
       const id = String(params.id)
       const usage = usageById.get(id) ?? { savedLookCount: 0, capsuleCount: 0 }
       if (usage === 'missing')
@@ -233,6 +257,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   injectWardrobeGarmentDeletionForTests(null)
+  injectWardrobeGarmentDeletionClockForTests(null)
+  rootBar.current = null
   window.history.replaceState(null, '', '/wardrobe')
   session.owner = null
   sessionStorage.clear()
@@ -389,30 +415,154 @@ describe('Closet garment delete', () => {
     expect(deleteRequests).toHaveLength(1)
   })
 
-  it('[P1] [7.6-CMP-005] a failed usage read deletes nothing and offers Retry, which schedules one delete', async () => {
+  /**
+   * D3: the usage error and its Retry stay inside the detail, bound to that piece, so they never
+   * cover another piece's Undo on the status bar. Delete stays usable beside them.
+   */
+  it.each([['garment-delete-usage-retry'], ['garment-delete']] as const)(
+    '[P1] [7.6-CMP-005] a failed usage read deletes nothing and shows its error in the detail; %s schedules one delete',
+    async (control) => {
+      const user = userEvent.setup()
+      usageById.set('blue-top', 'error')
+      render(<WardrobePage />)
+      signIn()
+
+      await openAndDelete(user, 'blue-top')
+
+      const failed = await screen.findByTestId('garment-delete-usage-failed')
+      expect(failed).toHaveAttribute('role', 'alert')
+      expect(failed).toHaveTextContent(
+        'Could not check where this piece is used. Try again.'
+      )
+      expect(within(failed).getByTestId('garment-delete-usage-retry')).toHaveTextContent(
+        'Retry'
+      )
+      // Nothing about the failed read reaches the status bar.
+      expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+      expect(screen.getByTestId('garment-detail')).toBeVisible()
+      expect(screen.getByTestId('garment-card-blue-top')).toBeInTheDocument()
+      // No check or prompt runs now: Delete and Edit tags are both usable.
+      expect(screen.getByTestId('garment-delete')).toHaveAttribute(
+        'aria-disabled',
+        'false'
+      )
+      expect(screen.getByTestId('garment-edit-tags')).toBeEnabled()
+
+      usageById.delete('blue-top')
+      await user.click(screen.getByTestId(control))
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-card-blue-top')).toBeNull()
+      )
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+      expect(await statusBar()).toHaveTextContent('Deleted')
+      expect(screen.getByTestId('status-bar-action-undo')).toBeVisible()
+      // The failed read sent nothing; the second read schedules the delete in its own window.
+      expect(deleteRequests).toEqual([])
+      await manual.advance(WINDOW_MS)
+      await waitFor(() => expect(deleteRequests).toHaveLength(1))
+      expect(deleteRequests[0]).toEqual({
+        id: 'blue-top',
+        keepalive: true,
+        authorization: `Bearer ${owner}`,
+      })
+    }
+  )
+
+  it('[P1] [7.6-CMP-005] the usage error leaves with the detail and does not come back when the piece reopens', async () => {
     const user = userEvent.setup()
     usageById.set('blue-top', 'error')
     render(<WardrobePage />)
     signIn()
 
     await openAndDelete(user, 'blue-top')
+    await screen.findByTestId('garment-delete-usage-failed')
 
-    expect(await statusBar()).toHaveTextContent(
-      'Could not check where this piece is used. Try again.'
+    await user.click(screen.getByTestId('garment-detail-back'))
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+    expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+
+    await user.click(screen.getByTestId('garment-open-blue-top'))
+    await screen.findByTestId('garment-detail')
+    expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
+    expect(screen.getByTestId('garment-delete')).toHaveAttribute('aria-disabled', 'false')
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toEqual([])
+  })
+
+  it('[P1] [7.6-CMP-005] the usage error leaves when another piece opens in the detail; that piece deletes on its own', async () => {
+    const user = userEvent.setup()
+    usageById.set('blue-top', 'error')
+    render(<WardrobePage />)
+    signIn()
+
+    await openAndDelete(user, 'blue-top')
+    await screen.findByTestId('garment-delete-usage-failed')
+
+    // Another piece takes the open detail, as a link or history step to it does.
+    act(() => {
+      window.history.replaceState(
+        { garmentDetail: 'plain-dress' },
+        '',
+        '/wardrobe?garment=plain-dress'
+      )
+    })
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
     )
     expect(screen.getByTestId('garment-detail')).toBeVisible()
-    expect(screen.getByTestId('garment-card-blue-top')).toBeInTheDocument()
+    expect(screen.getByTestId('garment-delete')).toHaveAttribute('aria-disabled', 'false')
 
-    usageById.delete('blue-top')
-    await user.click(screen.getByTestId('status-bar-action-retry'))
-    await waitFor(() => expect(screen.queryByTestId('garment-card-blue-top')).toBeNull())
-    expect(await statusBar()).toHaveTextContent('Deleted')
-    // The failed read sent nothing; the retried read schedules the delete in its own window.
-    expect(deleteRequests).toEqual([])
-    await manual.advance(WINDOW_MS)
+    // Delete now reads the dress, which is unused: it alone hides in its Undo window.
+    await user.click(screen.getByTestId('garment-delete'))
     await waitFor(() =>
-      expect(deleteRequests.map((request) => request.id)).toEqual(['blue-top'])
+      expect(screen.queryByTestId('garment-card-plain-dress')).toBeNull()
     )
+    expect(screen.getByTestId('garment-card-blue-top')).toBeInTheDocument()
+    await manual.advance(WINDOW_MS)
+    await waitFor(() => expect(deleteRequests).toHaveLength(1))
+    expect(deleteRequests[0]).toEqual({
+      id: 'plain-dress',
+      keepalive: true,
+      authorization: `Bearer ${owner}`,
+    })
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toHaveLength(1)
+  })
+
+  it('[P1] [7.6-CMP-005] Edit tags is disabled while the delete check runs and while its prompt is open', async () => {
+    const user = userEvent.setup()
+    let answerUsage: () => void = () => undefined
+    usageGate = new Promise<void>((resolve) => {
+      answerUsage = resolve
+    })
+    usageById.set('blue-top', { savedLookCount: 1, capsuleCount: 0 })
+    render(<WardrobePage />)
+    signIn()
+
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    await screen.findByTestId('garment-detail')
+    expect(screen.getByTestId('garment-edit-tags')).toBeEnabled()
+
+    await user.click(screen.getByTestId('garment-delete'))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-delete')).toHaveAttribute('aria-busy', 'true')
+    )
+    expect(screen.getByTestId('garment-edit-tags')).toBeDisabled()
+
+    await act(async () => {
+      answerUsage()
+      await Promise.resolve()
+    })
+    await screen.findByTestId('garment-delete-confirm')
+    expect(screen.getByTestId('garment-edit-tags')).toBeDisabled()
+
+    await user.click(screen.getByTestId('garment-delete-cancel'))
+    expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
+    expect(screen.getByTestId('garment-edit-tags')).toBeEnabled()
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toEqual([])
   })
 
   it('[P1] [7.6-CMP-005] a GARMENT_NOT_FOUND usage answer treats the piece as gone and sends one idempotent DELETE at once', async () => {
@@ -442,10 +592,12 @@ describe('Closet garment delete', () => {
 
     await openAndDelete(user, 'blue-top')
 
-    expect(await statusBar()).toHaveTextContent(
+    const failed = await screen.findByTestId('garment-delete-usage-failed')
+    expect(failed).toHaveTextContent(
       'Could not check where this piece is used. Try again.'
     )
-    expect(screen.getByTestId('status-bar-action-retry')).toBeVisible()
+    expect(within(failed).getByTestId('garment-delete-usage-retry')).toBeVisible()
+    expect(screen.queryByTestId('status-feedback-bar')).toBeNull()
     expect(screen.getByTestId('garment-card-blue-top')).toBeInTheDocument()
     await manual.advance(WINDOW_MS * 2)
     expect(deleteRequests).toEqual([])
@@ -725,6 +877,82 @@ describe('Closet garment delete', () => {
   })
 
   /**
+   * D9: a Retry on the bar that a new Undo covers is still owed. It comes back once no Undo
+   * window is open, and its Retry still sends the failed piece alone.
+   */
+  it('[P0] [7.6-CMP-013] a Retry covered by a new Undo comes back once that window ends', async () => {
+    const user = userEvent.setup()
+    deleteStatuses = [500]
+    render(<WardrobePage />)
+    signIn()
+
+    await openAndDelete(user, 'black-shoes')
+    await manual.advance(WINDOW_MS)
+    await screen.findByTestId('status-bar-action-retry')
+    expect(await screen.findByTestId('garment-card-black-shoes')).toBeInTheDocument()
+
+    await openAndDelete(user, 'plain-dress')
+    await waitFor(() =>
+      expect(screen.queryByTestId('garment-card-plain-dress')).toBeNull()
+    )
+    // The dress's Undo covers the Retry while its window is open.
+    expect(screen.getByTestId('status-bar-action-undo')).toBeVisible()
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    expect(barText()).not.toContain('Could not delete this piece.')
+    expect(deleteRequests.map((request) => request.id)).toEqual(['black-shoes'])
+
+    await manual.advance(WINDOW_MS)
+    await waitFor(() =>
+      expect(deleteRequests.map((request) => request.id)).toEqual([
+        'black-shoes',
+        'plain-dress',
+      ])
+    )
+    const retry = await screen.findByTestId('status-bar-action-retry')
+    expect(await statusBar()).toHaveTextContent('Could not delete this piece.')
+    expect(screen.queryByTestId('status-bar-action-undo')).toBeNull()
+
+    await user.click(retry)
+    await waitFor(() => expect(deleteRequests).toHaveLength(3))
+    expect(deleteRequests[2]).toEqual({
+      id: 'black-shoes',
+      keepalive: true,
+      authorization: `Bearer ${owner}`,
+    })
+    await waitFor(() =>
+      expect(screen.queryByTestId('garment-card-black-shoes')).toBeNull()
+    )
+    expect(await statusBar()).toHaveTextContent('Deleted')
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toHaveLength(3)
+  })
+
+  it('[P1] [7.6-CMP-013] deleting a failed piece again ends its Retry, so an Undo of that delete brings no Retry back', async () => {
+    const user = userEvent.setup()
+    deleteStatuses = [500]
+    render(<WardrobePage />)
+    signIn()
+
+    await openAndDelete(user, 'black-shoes')
+    await manual.advance(WINDOW_MS)
+    await screen.findByTestId('status-bar-action-retry')
+
+    await openAndDelete(user, 'black-shoes')
+    await waitFor(() =>
+      expect(screen.queryByTestId('garment-card-black-shoes')).toBeNull()
+    )
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+
+    expect(await screen.findByTestId('garment-card-black-shoes')).toBeInTheDocument()
+    await waitFor(async () => expect(await statusBar()).toHaveTextContent('Undone'))
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    expect(barText()).not.toContain('Could not delete this piece.')
+    await manual.advance(WINDOW_MS * 2)
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    expect(deleteRequests.map((request) => request.id)).toEqual(['black-shoes'])
+  })
+
+  /**
    * Codex P2-1: the member's deletes outlive the Closet. A send that fails after the member left
    * shows Retry on the root bar; that Retry is heard while away and after coming back.
    */
@@ -890,6 +1118,149 @@ describe('Closet garment delete', () => {
     expect(deleteRequests).toHaveLength(4)
   })
 
+  it('[P1] [7.6-CMP-016] a Deleted for another piece while a Retry shows is only announced; the Retry stays on the bar', async () => {
+    const user = userEvent.setup()
+    deleteStatuses = [500]
+    usageById.set('blue-top', { savedLookCount: 1, capsuleCount: 0 })
+    render(<WardrobePage />)
+    signIn()
+
+    await openAndDelete(user, 'black-shoes')
+    await manual.advance(WINDOW_MS)
+    await screen.findByTestId('status-bar-action-retry')
+    const announcer = screen.getByTestId('save-feedback-announcer')
+    expect(announcer).toHaveTextContent(/^Could not delete this piece\.$/)
+
+    await openAndDelete(user, 'blue-top')
+    await user.click(await screen.findByTestId('garment-delete-confirm-accept'))
+    await waitFor(() =>
+      expect(deleteRequests.map((request) => request.id)).toEqual([
+        'black-shoes',
+        'blue-top',
+      ])
+    )
+
+    // The top's confirmed delete landed: screen readers hear it, and the bar keeps the Retry.
+    await waitFor(() => expect(announcer).toHaveTextContent(/^Deleted$/))
+    expect(await statusBar()).toHaveTextContent('Could not delete this piece.')
+    expect(barText()).not.toContain('Deleted')
+    expect(screen.getByTestId('status-bar-action-retry')).toBeVisible()
+
+    await user.click(screen.getByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(deleteRequests).toHaveLength(3))
+    expect(deleteRequests[2]).toEqual({
+      id: 'black-shoes',
+      keepalive: true,
+      authorization: `Bearer ${owner}`,
+    })
+    await waitFor(async () => expect(await statusBar()).toHaveTextContent('Deleted'))
+    expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+  })
+
+  /**
+   * D9: a Retry that left the bar without a delete notice covering it has ended. A later
+   * "Deleted" for another piece shows on the bar, and no Undo window brings the Retry back.
+   */
+  it.each<[string, (bar: ReturnType<typeof useStatusBar>) => void]>([
+    ['the member dismisses it', (bar) => bar.dismissNotice()],
+    [
+      'another feature replaces it',
+      (bar) => {
+        bar.showNotice({
+          id: 'saved-looks-saved',
+          message: 'Saved to your looks.',
+          tone: 'success',
+        })
+      },
+    ],
+  ])(
+    '[P1] [7.6-CMP-016] a Retry that %s has ended: a later Deleted shows on the bar and no window brings it back',
+    async (_label, takeRetryOff) => {
+      const user = userEvent.setup()
+      deleteStatuses = [500]
+      usageById.set('blue-top', { savedLookCount: 1, capsuleCount: 0 })
+      render(<RootWithCloset closetOpen />)
+      signIn()
+
+      await openAndDelete(user, 'black-shoes')
+      await manual.advance(WINDOW_MS)
+      await screen.findByTestId('status-bar-action-retry')
+
+      act(() => takeRetryOff(rootBar.current!))
+      expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+
+      await openAndDelete(user, 'blue-top')
+      await user.click(await screen.findByTestId('garment-delete-confirm-accept'))
+      await waitFor(() =>
+        expect(deleteRequests.map((request) => request.id)).toEqual([
+          'black-shoes',
+          'blue-top',
+        ])
+      )
+      await waitFor(async () => expect(await statusBar()).toHaveTextContent('Deleted'))
+      expect(barText()).not.toContain('Could not delete this piece.')
+      expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+
+      // A later Undo window opens and closes: the ended Retry stays gone.
+      await openAndDelete(user, 'plain-dress')
+      await screen.findByTestId('status-bar-action-undo')
+      await manual.advance(WINDOW_MS)
+      await waitFor(() => expect(deleteRequests).toHaveLength(3))
+      expect(deleteRequests[2]).toEqual({
+        id: 'plain-dress',
+        keepalive: true,
+        authorization: `Bearer ${owner}`,
+      })
+      await manual.advance(WINDOW_MS * 2)
+      expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+      expect(barText()).not.toContain('Could not delete this piece.')
+      expect(deleteRequests).toHaveLength(3)
+    }
+  )
+
+  it('[P1] [7.6-CMP-016] a Retry that expired uncovered is not merged into a later failure notice', async () => {
+    const user = userEvent.setup()
+    let now = 1_000
+    injectWardrobeGarmentDeletionClockForTests(() => now)
+    deleteStatuses = [500, 500]
+    render(<WardrobePage />)
+    signIn()
+
+    await openAndDelete(user, 'black-shoes')
+    await manual.advance(WINDOW_MS)
+    await screen.findByTestId('status-bar-action-retry')
+    expect(await screen.findByTestId('garment-card-black-shoes')).toBeInTheDocument()
+
+    // The Retry notice runs its whole course on screen.
+    now += WINDOW_MS
+
+    await openAndDelete(user, 'plain-dress')
+    await screen.findByTestId('status-bar-action-undo')
+    await manual.advance(WINDOW_MS)
+    await waitFor(() =>
+      expect(deleteRequests.map((request) => request.id)).toEqual([
+        'black-shoes',
+        'plain-dress',
+      ])
+    )
+    expect(await screen.findByTestId('garment-card-plain-dress')).toBeInTheDocument()
+
+    // The new failure's Retry names the dress alone; the shoes' expired Retry is not owed.
+    await user.click(await screen.findByTestId('status-bar-action-retry'))
+    await waitFor(() => expect(deleteRequests).toHaveLength(3))
+    expect(deleteRequests[2]).toEqual({
+      id: 'plain-dress',
+      keepalive: true,
+      authorization: `Bearer ${owner}`,
+    })
+    await waitFor(() =>
+      expect(screen.queryByTestId('garment-card-plain-dress')).toBeNull()
+    )
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toHaveLength(3)
+    expect(screen.getByTestId('garment-card-black-shoes')).toBeInTheDocument()
+  })
+
   /**
    * Codex P3-1 (D11): once the tab holds another member, the first member's deletes say nothing.
    * What was still in its window is sent with the first member's own bearer; its notices leave
@@ -923,7 +1294,7 @@ describe('Closet garment delete', () => {
       await Promise.resolve()
     })
     await manual.advance(WINDOW_MS * 2)
-    expect(screen.queryByText('Could not delete this piece.')).toBeNull()
+    expect(barText()).not.toContain('Could not delete this piece.')
     expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
     expect(deleteRequests).toHaveLength(1)
   })
@@ -943,7 +1314,32 @@ describe('Closet garment delete', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
     )
-    expect(screen.queryByText('Could not delete this piece.')).toBeNull()
+    // The live region keeps what it last read out; the bar itself no longer shows the failure.
+    expect(barText()).not.toContain('Could not delete this piece.')
+    await manual.advance(WINDOW_MS * 2)
+    expect(deleteRequests).toHaveLength(1)
+  })
+
+  it('[P1] [7.6-CMP-015] a member switch after leaving the Closet takes the old member Retry off the root bar and sends nothing', async () => {
+    const user = userEvent.setup()
+    deleteStatuses = [500]
+    const { rerender } = render(<RootWithCloset closetOpen />)
+    signIn()
+
+    await openAndDelete(user, 'black-shoes')
+    await manual.advance(WINDOW_MS)
+    await screen.findByTestId('status-bar-action-retry')
+    rerender(<RootWithCloset closetOpen={false} />)
+    expect(screen.queryByTestId('wardrobe-closet-view')).toBeNull()
+    expect(screen.getByTestId('status-bar-action-retry')).toBeVisible()
+
+    // No Closet is mounted to notice the switch: the session follows the tab's member itself.
+    signIn('next-member')
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
+    )
+    expect(barText()).not.toContain('Could not delete this piece.')
     await manual.advance(WINDOW_MS * 2)
     expect(deleteRequests).toHaveLength(1)
   })
@@ -960,16 +1356,37 @@ describe('Closet garment delete', () => {
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(scrollTo).toHaveBeenLastCalledWith(0, 640)
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
-    expect(screen.getByTestId('garment-card-plain-dress')).toContainElement(
-      document.activeElement as HTMLElement
-    )
+    // Focus lands on the next card's detail opener, the control that card's own Back returns to.
+    expect(screen.getByTestId('garment-open-plain-dress')).toHaveFocus()
 
     // The last card's next neighbour is gone, so focus goes back to the one before it.
     await openAndDelete(user, 'plain-dress')
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
-    expect(screen.getByTestId('garment-card-blue-top')).toContainElement(
-      document.activeElement as HTMLElement
-    )
+    expect(screen.getByTestId('garment-open-blue-top')).toHaveFocus()
+  })
+
+  it('[P1] [7.6-CMP-010] focus skips a next card still processing and lands on the following ready card opener', async () => {
+    const user = userEvent.setup()
+    const processingPiece = readyGarment('processing-piece', {
+      status: 'processing',
+      category: null,
+      material: null,
+      comfortRange: null,
+      tagsConfirmedAt: null,
+      colorFamily: null,
+    })
+    closet = [blueTop, blackShoes, processingPiece, plainDress]
+    render(<WardrobePage />)
+    signIn()
+    // A processing card has no detail opener, only its upload check.
+    await screen.findByTestId('garment-card-processing-piece')
+    expect(screen.queryByTestId('garment-open-processing-piece')).toBeNull()
+
+    await openAndDelete(user, 'black-shoes')
+    await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
+
+    expect(screen.getByTestId('garment-open-plain-dress')).toHaveFocus()
+    expect(screen.getByTestId('garment-card-processing-piece')).toBeInTheDocument()
   })
 
   it('[P1] [7.6-CMP-011] a committed delete reloads saved looks so they show the missing piece', async () => {

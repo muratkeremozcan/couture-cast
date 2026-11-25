@@ -34,6 +34,8 @@ export type GarmentDeleteMode = 'deferred' | 'immediate' | 'gone'
 export interface GarmentDeletionPresenter {
   showNotice: (input: StatusBarNoticeInput) => { id: string; durationMs: number }
   dismissNotice: (noticeId?: string) => void
+  /** Speaks a message to the screen reader without changing the bar. */
+  announce: (message: string, announcementId: string) => void
   isOnline: () => boolean
   t: (key: string) => string
 }
@@ -51,6 +53,8 @@ export interface MobileGarmentDeletionDependencies {
   /** The verified bearer of the account the app holds now; Retry reads it when pressed. */
   resolveAccessToken: () => Promise<string | null | undefined>
   subscribeIdentity: (listener: () => void) => () => void
+  /** The clock a failure notice's expiry is measured against (D10 seam). */
+  now: () => number
 }
 
 export interface MobileGarmentDeletion {
@@ -69,6 +73,11 @@ export interface MobileGarmentDeletion {
   attach: (hub: GarmentDeletionHub) => () => void
   /** Runs when the hidden set changes. */
   subscribe: (listener: () => void) => () => void
+  /**
+   * The hub reports the notice on the root bar at each render, so a Retry the member
+   * dismissed or another feature's notice replaced reads as ended.
+   */
+  observeBar: (noticeId: string | null) => void
   /** Test seam (D10): drops every pending delete, notice and hub without sending anything. */
   reset: () => void
   /** Stops following the controller and the account; for an instance a test built. */
@@ -81,13 +90,14 @@ const defaultDependencies: MobileGarmentDeletionDependencies = {
   readEpoch: mobileIdentityEpoch,
   resolveAccessToken: resolveMobileAccessToken,
   subscribeIdentity: subscribeMobileApplicationUser,
+  now: () => Date.now(),
 }
 
 export function createMobileGarmentDeletion(
   controller: DeferredGarmentDeletionController = createDeferredGarmentDeletion(),
   dependencies: Partial<MobileGarmentDeletionDependencies> = {}
 ): MobileGarmentDeletion {
-  const { readEpoch, resolveAccessToken, subscribeIdentity } = {
+  const { readEpoch, resolveAccessToken, subscribeIdentity, now } = {
     ...defaultDependencies,
     ...dependencies,
   }
@@ -99,7 +109,23 @@ export function createMobileGarmentDeletion(
   let presenter: GarmentDeletionPresenter | null = null
   let hub: GarmentDeletionHub | null = null
   let lastNoticeId: string | null = null
-  let failureNotice: { ids: string[]; epoch: number; until: number } | null = null
+  /**
+   * Failed pieces still offered a Retry. Their notice shows only while no Undo window is
+   * open; another notice that covers it (an Undo, "Undone") brings it back once no window is
+   * open, and it ends when it expires on screen, its pieces are sent again, or they are
+   * deleted (D9).
+   */
+  let failures: {
+    ids: Set<string>
+    epoch: number
+    offline: boolean
+    /** When the notice on screen expires; 0 while it waits to show. */
+    until: number
+    /** The Retry notice on screen, and whether the bar was seen showing it. */
+    noticeId: string | null
+    seenOnBar: boolean
+    covered: boolean
+  } | null = null
   let noticeSeq = 0
   // A confirmed delete or Retry that landed while another delete was inside its Undo window:
   // its "Deleted" waits for that window to close, so it never takes the Undo off the bar.
@@ -112,6 +138,8 @@ export function createMobileGarmentDeletion(
     notice: Omit<StatusBarNoticeInput, 'id' | 'announcementId'>
   ) => {
     if (!presenter || epoch !== readEpoch()) return null
+    // Any other notice takes a showing failure off the bar; it comes back later.
+    if (kind !== 'failed' && failuresLive() && failures) failures.covered = true
     const seq = ++noticeSeq
     const shown = presenter.showNotice({
       ...notice,
@@ -122,29 +150,50 @@ export function createMobileGarmentDeletion(
     return shown
   }
 
-  const showDeleted = (epoch: number) => {
-    if (!presenter) return
-    show(epoch, 'deleted', {
-      message: presenter.t('wardrobe.detail.deleteSucceeded'),
-      tone: 'success',
-    })
+  let barNoticeId: string | null = null
+
+  function failuresLive(): boolean {
+    if (!failures) return false
+    const showing = !failures.covered && failures.until > 0
+    // A showing Retry ends when it expires, or when the member dismissed it or another
+    // feature's notice replaced it after the bar was seen showing it.
+    const replaced = failures.seenOnBar && barNoticeId !== failures.noticeId
+    const ended =
+      failures.epoch !== readEpoch() || (showing && (failures.until <= now() || replaced))
+    if (ended) failures = null
+    return !ended
   }
 
-  const showFailed = (epoch: number, garmentIds: readonly string[], offline: boolean) => {
+  const showDeleted = (epoch: number) => {
     if (!presenter) return
-    // One notice holds every failure still waiting for its Retry, so a later failure never
-    // takes the Retry of an earlier one off the bar.
-    const earlier =
-      failureNotice && failureNotice.epoch === epoch && failureNotice.until > Date.now()
-        ? failureNotice.ids
-        : []
-    const ids = [...new Set([...earlier, ...garmentIds])].filter(
-      (id) => !controller.isPending(id)
-    )
-    if (ids.length === 0) return
+    const message = presenter.t('wardrobe.detail.deleteSucceeded')
+    // A Retry on the bar stays there: another piece's "Deleted" is only announced.
+    if (failuresLive() && failures && !failures.covered) {
+      if (epoch !== readEpoch()) return
+      const seq = ++noticeSeq
+      presenter.announce(message, createAnnouncementToken(`${NOTICE_PREFIX}deleted`, seq))
+      return
+    }
+    show(epoch, 'deleted', { message, tone: 'success' })
+  }
+
+  /** Shows the Retry notice unless an Undo window is open; then it waits for the close. */
+  const presentFailures = () => {
+    if (!presenter || !failures) return
+    for (const id of failures.ids) if (controller.isPending(id)) failures.ids.delete(id)
+    if (failures.ids.size === 0) {
+      failures = null
+      return
+    }
+    if (controller.hasOpenWindow()) {
+      failures.covered = true
+      return
+    }
+    const { epoch } = failures
+    const ids = [...failures.ids]
     const shown = show(epoch, 'failed', {
       message: presenter.t('wardrobe.detail.deleteFailed'),
-      tone: offline ? 'offline' : 'error',
+      tone: failures.offline ? 'offline' : 'error',
       actions: [
         {
           id: 'retry',
@@ -154,17 +203,40 @@ export function createMobileGarmentDeletion(
         },
       ],
     })
-    failureNotice = shown ? { ids, epoch, until: Date.now() + shown.durationMs } : null
+    if (!shown || !failures) return
+    failures.covered = false
+    failures.noticeId = shown.id
+    failures.seenOnBar = false
+    failures.until = now() + shown.durationMs
   }
 
-  const reportFailures = (failures: readonly { id: string; error: unknown }[]) => {
+  /** One notice holds every failure still waiting for its Retry. */
+  const addFailures = (
+    epoch: number,
+    garmentIds: readonly string[],
+    offline: boolean
+  ) => {
+    const current = failuresLive() && failures?.epoch === epoch ? failures : null
+    failures = {
+      ids: new Set([...(current?.ids ?? []), ...garmentIds]),
+      epoch,
+      offline: (current?.offline ?? false) || offline,
+      until: 0,
+      noticeId: null,
+      seenOnBar: false,
+      covered: true,
+    }
+    presentFailures()
+  }
+
+  const reportFailures = (reported: readonly { id: string; error: unknown }[]) => {
     const current = readEpoch()
-    const mine = failures.filter((failure) => epochs.get(failure.id) === current)
-    for (const failure of failures) epochs.delete(failure.id)
+    const mine = reported.filter((failure) => epochs.get(failure.id) === current)
+    for (const failure of reported) epochs.delete(failure.id)
     if (mine.length === 0 || !presenter) return
     const offline =
       !presenter.isOnline() || mine.some((failure) => isOfflineError(failure.error))
-    showFailed(
+    addFailures(
       current,
       mine.map((failure) => failure.id),
       offline
@@ -196,9 +268,7 @@ export function createMobileGarmentDeletion(
 
   const handleCommitted = (garmentId: string, epoch: number) => {
     epochs.delete(garmentId)
-    if (failureNotice) {
-      failureNotice.ids = failureNotice.ids.filter((id) => id !== garmentId)
-    }
+    failures?.ids.delete(garmentId)
     const announce = announceOnCommit.delete(garmentId)
     if (epoch !== readEpoch()) return
     // The hub updates its grid and tells the other screens; with no hub mounted (a Retry
@@ -213,13 +283,19 @@ export function createMobileGarmentDeletion(
 
   const handle = (event: DeferredGarmentDeletionEvent) => {
     for (const listener of [...listeners]) listener()
-    // The last open window closed: a held "Deleted" shows now, before any failure report
-    // that the same close releases, so the failure's Retry is what stays on the bar.
-    if (deletedToAnnounce !== null && !controller.hasOpenWindow()) {
+    handleOne(event)
+    if (controller.hasOpenWindow()) return
+    // No Undo window is open any more: a held "Deleted" shows, then the Retry of any failure
+    // that another notice covered or that waited for the window, so the Retry stays on top.
+    if (deletedToAnnounce !== null) {
       const epoch = deletedToAnnounce
       deletedToAnnounce = null
       showDeleted(epoch)
     }
+    if (failuresLive() && failures?.covered) presentFailures()
+  }
+
+  const handleOne = (event: DeferredGarmentDeletionEvent) => {
     if (event.type === 'failuresToReport') {
       reportFailures(event.failures)
       return
@@ -228,6 +304,8 @@ export function createMobileGarmentDeletion(
     // A delete with no recorded account (dropped by reset) belongs to no one.
     if (epoch === undefined) return
     if (event.type === 'scheduled') {
+      // The member deleted this piece again; its old Retry no longer applies.
+      failures?.ids.delete(event.id)
       showScheduled(event.id, epoch)
       return
     }
@@ -256,7 +334,7 @@ export function createMobileGarmentDeletion(
     heldEpoch = epoch
     if (lastNoticeId) presenter?.dismissNotice(lastNoticeId)
     lastNoticeId = null
-    failureNotice = null
+    failures = null
     deletedToAnnounce = null
     void controller.flush()
   })
@@ -281,7 +359,10 @@ export function createMobileGarmentDeletion(
     async retry(garmentIds, epoch) {
       if (epoch !== readEpoch()) return
       // Its pieces are being sent again; a later failure notice must not offer them twice.
-      if (failureNotice?.epoch === epoch) failureNotice = null
+      if (failures?.epoch === epoch) {
+        for (const garmentId of garmentIds) failures.ids.delete(garmentId)
+        if (failures.ids.size === 0) failures = null
+      }
       let accessToken: string | null | undefined = null
       try {
         accessToken = await resolveAccessToken()
@@ -291,8 +372,9 @@ export function createMobileGarmentDeletion(
       // The app may hold another account by the time the bearer read answers.
       if (epoch !== readEpoch()) return
       if (!accessToken) {
-        // No bearer to send under: the pieces stay back and Retry stays offered.
-        showFailed(epoch, garmentIds, !presenter?.isOnline())
+        // No bearer to send under: the pieces stay back and Retry stays offered, after any
+        // Undo window that opened meanwhile.
+        addFailures(epoch, garmentIds, !presenter?.isOnline())
         return
       }
       for (const garmentId of garmentIds) {
@@ -318,6 +400,10 @@ export function createMobileGarmentDeletion(
         if (hub === next) hub = null
       }
     },
+    observeBar(noticeId) {
+      barNoticeId = noticeId
+      if (failures?.noticeId && noticeId === failures.noticeId) failures.seenOnBar = true
+    },
     subscribe(listener) {
       listeners.add(listener)
       return () => {
@@ -331,7 +417,7 @@ export function createMobileGarmentDeletion(
       hub = null
       presenter = null
       lastNoticeId = null
-      failureNotice = null
+      failures = null
       deletedToAnnounce = null
       heldEpoch = readEpoch()
     },

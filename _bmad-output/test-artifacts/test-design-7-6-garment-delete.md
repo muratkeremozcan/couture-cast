@@ -9,6 +9,12 @@ Updated: 2026-11-25. Usage counts, 404 states, IDOR and D8 moved from mocked con
 Updated: 2026-11-25. Codex review fixes: UNIT-029 split (purged at read writes nothing; 029b
 purged under the lock), INT-008 under consent policy required_13_15 with birthdateForAge(15),
 MAE-001 proves the commit in its after hook and runs serially, E2E-001 pauses the page clock.
+Updated: 2026-11-25. CodeRabbit round 1 and CI on 3f5122ac: usage failure inline in the detail
+(CMP-005, NAT-003 cases), Retry notice set lifecycle (covered Retry returns, Deleted over a Retry
+is only announced; CMP-013/016, NAT-005), web member switch with no Closet (CMP-015), D7 focus on
+the next ready opener (CMP-010), native reload after an early commit (NAT-006), controller
+re-entrancy (UNIT-019, builder), Pact literal counts, INT capsule refusal reason and anchor-only
+look, MAE-001 verify hook on a reserved fixture ID (68 s recorded), E2E-003 paused clock.
 Updated: 2026-11-25. Codex P1-1, P2-1..5, P3-1..3 source fixes: UNIT-017/018 (builder), UNIT-029c,
 INT-009, CMP-013..015, native NAT updates; INT-005 asserts a repeat DELETE keeps the first request.
 Native, in the NAT-004..007 describes of wardrobe-hub-screen.garment-delete.test.tsx: a failure
@@ -81,6 +87,7 @@ All with the injectable timer; no real sleeps.
 | 7.6-UNIT-015 | P1  | A throwing listener never stops the commit or the events other listeners get (builder)                                                                                                                                         |
 | 7.6-UNIT-017 | P0  | `retry` sends only its own id at once; a delete inside its window keeps its timer and Undo (Codex P1-1, builder)                                                                                                               |
 | 7.6-UNIT-018 | P0  | D9: `failuresToReport` waits until no window is open and batches every failure once; Undo of the last window releases it; with no window it comes at once; retried, rescheduled or reset failures are never reported (builder) |
+| 7.6-UNIT-019 | P1  | Re-entrancy: a reset in a committing subscriber stops the send; commitNow or flush from it joins the send in flight; a superseding delete has its window open before the superseded one is sent (builder)                      |
 
 ### Contract (`packages/api-client`)
 

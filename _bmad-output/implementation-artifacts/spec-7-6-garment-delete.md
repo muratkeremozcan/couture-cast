@@ -298,7 +298,33 @@ while writing the tests for these fixes.
 | T10 | medium  | A merged failure notice kept ids that were retried or had committed                      | Retry clears the notice's ids; a commit drops its id from the notice             |
 | T11 | false   | Undo of the last window while a "Deleted" is held announces both                         | Kept: each names a different piece, and dropping it leaves a Retry unconfirmed   |
 
+Pass 3: CodeRabbit round 1 on `3f5122ac` (5 threads, 27 minor and 2 nitpicks in the review body).
+Source fixes below; every test-side item went to TEA.
+
+| #   | Verdict | Finding                                                                              | Resolution                                                                     |
+| --- | ------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| R1  | medium  | Native Retry with no bearer covered an open Undo                                     | Failure notice held until no window is open                                    |
+| R2  | medium  | Usage Retry on the bar could act on another piece or outlive its detail              | Usage failure and Retry live inside the detail (web and native)                |
+| R3  | medium  | Usage failure for B replaced A's Undo on the bar                                     | Same fix as R2                                                                 |
+| R4  | medium  | Hub remounted mid-DELETE never finished its first read                               | A commit before the first read landed reads again                              |
+| R5  | low     | Controller re-entrancy: send not registered, reset during committing still sent      | Send registered before `committing`; ownership checked before the request      |
+| R6  | low     | Held notices shown while a superseding window was not yet open                       | `schedule` opens the new window before sending the superseded delete           |
+| R7  | low     | Regenerated recommendation stayed stale (`created_at`)                               | Staleness reads `updated_at`                                                   |
+| R8  | low     | Edit tags during a delete check could lose a draft                                   | Edit tags disabled while the check or prompt runs                              |
+| R9  | low     | "Deleted" replaced a live Retry; Retry not restored after another notice             | Covered Retry returns once no window is open; "Deleted" only announced over it |
+| R10 | low     | Web notice stayed after an account change with no Closet mounted                     | Session ends on the session event and dismisses its notice                     |
+| R11 | low     | D7 focus could land on a processing card's status button                             | Focus uses the next or previous detail opener                                  |
+| R12 | false   | A `failuresToReport` listener that schedules could see the report with a window open | No listener schedules from a report; the report is decided with no window open |
+| R13 | false   | Prompt says "looks" for a capsule-only piece                                         | D2 counts saved looks and capsules together as looks                           |
+| T12 | medium  | A Retry the member dismissed or another feature replaced still counted as showing    | The bar's notice is read at each render; a replaced Retry ends                 |
+| T13 | low     | Failure notice expiry ran on real time only                                          | Clock seam: web `injectWardrobeGarmentDeletionClockForTests`, native `now`     |
+| T14 | false   | Inline usage failure lost the offline tone                                           | One style: the text is the same either way and the offline line already shows  |
+
 ## Design Notes
+
+On web the bar is read from the last Closet render, so a Retry dismissed or replaced while no
+Closet is mounted is not seen; no "Deleted" can arise then, since nothing deletes outside the
+Closet and a dismissed Retry cannot be pressed.
 
 The controller is shared because both apps need the same window, flush and supersede rules; only
 the commit function and the lifecycle hooks (pagehide vs AppState) differ. Web sends every

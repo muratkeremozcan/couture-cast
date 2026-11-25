@@ -6,7 +6,7 @@ import type { PactV4, V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import { garmentUsageResponseSchema } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
-import { integer, pactEventHeaders, string, type CreateClient } from './shared'
+import { pactEventHeaders, string, type CreateClient } from './shared'
 
 const usedGarmentId = '00000000-0000-4000-8000-000000000076'
 const unusedGarmentId = '00000000-0000-4000-8000-000000000077'
@@ -34,8 +34,10 @@ export async function verifyGarmentUsageInteraction(
       setJsonContent({
         body: {
           garmentId: string(usedGarmentId),
-          savedLookCount: integer(1),
-          capsuleCount: integer(1),
+          // Literal counts: the provider state declares one look and one capsule, and a zero
+          // (which makes clients skip the confirmation) must fail verification.
+          savedLookCount: 1,
+          capsuleCount: 1,
         },
       })
     )

@@ -561,20 +561,41 @@ describe('7.6 garment delete wrappers', () => {
     await expect(getGarmentUsageFromMobile('token', 'garment-1')).resolves.toBeNull()
   })
 
-  it('[P1] [7.6-NAT-001] never reads a failed or malformed usage answer as an unused piece', async () => {
+  it('[P1] [7.6-NAT-001] never reads a failed usage answer as an unused piece', async () => {
+    let reads = 0
     server.use(
-      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () =>
-        HttpResponse.json({ message: 'down' }, { status: 503 })
-      )
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () => {
+        reads++
+        return HttpResponse.json({ message: 'down' }, { status: 503 })
+      })
     )
-    await expect(getGarmentUsageFromMobile('token', 'garment-1')).rejects.toThrow()
 
-    server.use(
-      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () =>
-        HttpResponse.json({ ...usage, total: 3 })
-      )
+    const failure = await getGarmentUsageFromMobile('token', 'garment-1').catch(
+      (error: unknown) => error
     )
-    await expect(getGarmentUsageFromMobile('token', 'garment-1')).rejects.toThrow()
+
+    expect(reads).toBe(1)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error & { status?: number }).status).toBe(503)
+  })
+
+  it('[P1] [7.6-NAT-001] rejects a 200 usage answer with an unexpected key instead of reading it as an unused piece', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments/:garmentId/usage', () => {
+        reads++
+        return HttpResponse.json({ ...usage, total: 3 })
+      })
+    )
+
+    const failure = await getGarmentUsageFromMobile('token', 'garment-1').catch(
+      (error: unknown) => error
+    )
+
+    // The 200 handler answered, so the rejection comes from the strict parse, not from HTTP.
+    expect(reads).toBe(1)
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error & { status?: number }).status).toBeUndefined()
   })
 
   it('[P0] [7.6-NAT-001] deletes with the bearer and rejects a failure with its status', async () => {

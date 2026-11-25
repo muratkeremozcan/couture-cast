@@ -381,6 +381,10 @@ realTest.describe('Garment delete against the local API', () => {
 
   realTest(
     '[P1] [7.6-E2E-003] a failed delete returns the piece, and Retry deletes it at once',
+    {
+      // The first DELETE answers 500 on purpose; the test asserts every DELETE and its status.
+      annotation: [{ type: 'skipNetworkMonitoring', description: 'injected DELETE 500' }],
+    },
     async ({ apiRequest, interceptNetworkCall, member, page }) => {
       const [garmentId] = await seedReadyRows(member.userId, ['shoes'])
       const id = garmentId!
@@ -408,6 +412,9 @@ realTest.describe('Garment delete against the local API', () => {
         await page.goto('/wardrobe')
         await waitForAccessibilityReady(page)
         await openDetail(page, id)
+        // Paused, the window cannot end (and the failure restore the card) before the hidden
+        // check; the clock stays paused so the Retry notice cannot expire either.
+        await pauseClock(page)
         await page.getByTestId('garment-delete').click()
         await expect(card).toHaveCount(0)
         await page.clock.fastForward(UNDO_WINDOW_MS + 100)
@@ -437,6 +444,7 @@ realTest.describe('Garment delete against the local API', () => {
       )
 
       await realTest.step('Reload: still gone', async () => {
+        await page.clock.resume()
         await page.reload()
         await waitForAccessibilityReady(page)
         await expect(page.getByTestId(`garment-card-${id}`)).toHaveCount(0)

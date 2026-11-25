@@ -159,19 +159,22 @@ async function savedLook(
 }
 
 async function capsule(userId: string, garmentIds: readonly string[]) {
+  // The joins share `user_id` with both compound relations, so they are written unchecked on
+  // their own rather than nested in the capsule create.
   const created = await prisma.outfitCapsule.create({
     data: {
       user_id: userId,
       name: `Capsule ${randomUUID().slice(0, 6)}`,
       occasions: ['work'],
-      garment_joins: {
-        create: garmentIds.map((garment_id, garment_order) => ({
-          user_id: userId,
-          garment_id,
-          garment_order,
-        })),
-      },
     },
+  })
+  await prisma.outfitCapsuleGarment.createMany({
+    data: garmentIds.map((garment_id, garment_order) => ({
+      user_id: userId,
+      capsule_id: created.id,
+      garment_id,
+      garment_order,
+    })),
   })
   return created.id
 }
@@ -238,13 +241,17 @@ function ritualFor(userId: string) {
   return { cache, garmentIds }
 }
 
-/** Capsule creation validates garment eligibility in the repository, under the shared locks. */
-const canBuildCapsuleFrom = async (userId: string, garmentIds: string[]) =>
+/**
+ * Capsule creation validates garment eligibility in the repository, under the shared locks. The
+ * probe answers 'created' or the refusal's own message, so an unrelated error never passes for
+ * an ineligible garment.
+ */
+const capsuleProbe = async (userId: string, garmentIds: string[]) =>
   capsules
     .createCapsule(userId, { name: 'Eligibility probe', occasions: ['work'], garmentIds })
     .then(
-      () => true,
-      () => false
+      () => 'created',
+      (error: unknown) => (error instanceof Error ? error.message : String(error))
     )
 
 beforeAll(async () => {
@@ -350,7 +357,7 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
     expect(after.body).toMatchObject({ message: 'GARMENT_NOT_FOUND' })
   })
 
-  it('[P0] [7.6-INT-002] counts saved looks by anchor or slot once each, skips deleted looks, and counts capsules', async () => {
+  it('[P0] [7.6-INT-002] counts saved looks by anchor, slot or both once each, skips deleted looks, and counts capsules', async () => {
     vi.stubEnv('TEST_ENV', 'local')
     const owner = await member()
     const top = await readyGarment(owner.userId, 'top')
@@ -359,6 +366,8 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
     await savedLook(owner.userId, top.id, [top.id, bottom.id])
     // A slot only, anchored on another piece.
     await savedLook(owner.userId, bottom.id, [top.id, bottom.id])
+    // The anchor only: no slot holds the piece, so only anchor matching counts it.
+    await savedLook(owner.userId, top.id, [bottom.id])
     // A look the member deleted never counts.
     await savedLook(owner.userId, top.id, [top.id], new Date())
     // A look that holds only the other piece never counts.
@@ -371,7 +380,7 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
     expect(usage.status).toBe(200)
     expect(garmentUsageResponseSchema.parse(usage.body)).toEqual({
       garmentId: top.id,
-      savedLookCount: 2,
+      savedLookCount: 3,
       capsuleCount: 1,
     })
   })
@@ -421,7 +430,12 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
         [bottom.id, 'active'],
       ])
     )
-    expect(await canBuildCapsuleFrom(owner.userId, [top.id, bottom.id])).toBe(false)
+    expect(await capsuleProbe(owner.userId, [top.id, bottom.id])).toBe(
+      'GARMENT_NOT_CAPSULE_ELIGIBLE'
+    )
+    // The same remaining piece with an active one still builds a capsule.
+    const freshTop = await readyGarment(owner.userId, 'top')
+    expect(await capsuleProbe(owner.userId, [freshTop.id, bottom.id])).toBe('created')
   })
 
   it('[P0] [7.6-INT-004] under a legal hold answers 204, records the request and keeps the hold and the bytes', async () => {
@@ -501,7 +515,10 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
     expect(listed).not.toContain(held.id)
     expect(listed).toContain(keptHeld.id)
     expect(await savedLookStatuses(owner.auth)).toEqual({ [look]: 'missing_garment' })
-    expect(await canBuildCapsuleFrom(owner.userId, [held.id, bottom.id])).toBe(false)
+    expect(await capsuleProbe(owner.userId, [held.id, bottom.id])).toBe(
+      'GARMENT_NOT_CAPSULE_ELIGIBLE'
+    )
+    expect(await capsuleProbe(owner.userId, [keptHeld.id, bottom.id])).toBe('created')
     const usage = await api
       .get(`/api/v1/wardrobe/garments/${held.id}/usage`)
       .set('Authorization', owner.auth)

@@ -102,6 +102,8 @@ function useHubGarmentDeletion({
   const statusBar = useStatusBar()
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
+  // Every bar change renders the hub; the deletion learns which notice is on screen.
+  deletion.observeBar(statusBar.notice?.id ?? null)
   const tRef = useRef(t)
   tRef.current = t
   const onCommittedRef = useRef(onCommitted)
@@ -116,6 +118,8 @@ function useHubGarmentDeletion({
       presenter: {
         showNotice: (input) => statusBarRef.current.showNotice(input),
         dismissNotice: (noticeId) => statusBarRef.current.dismissNotice(noticeId),
+        announce: (message, announcementId) =>
+          statusBarRef.current.announce(message, { announcementId }),
         isOnline: () => statusBarRef.current.isOnline,
         t: (key) => tRef.current(key),
       },
@@ -301,6 +305,8 @@ function MemberWardrobeHub({
   }, [isCaptureOpen])
 
   const openingDetailRef = useRef(false)
+  const hasLoadedRef = useRef(hasLoaded)
+  hasLoadedRef.current = hasLoaded
   const pendingDeleteIds = useHubGarmentDeletion({
     deletion,
     epoch,
@@ -309,6 +315,10 @@ function MemberWardrobeHub({
       if (epoch !== mobileIdentityEpoch()) return
       inventoryRevision.current++
       setGarments((current) => current.filter((item) => item.id !== garmentId))
+      // The revision bump discards any read still in flight. Before the first read landed
+      // (a hub that remounted while the DELETE was out) that read is the grid itself, so
+      // read again: the server already answers without the deleted piece.
+      if (!hasLoadedRef.current) setLoadAttempt((attempt) => attempt + 1)
       // A saved look holding the piece now shows it as missing (CC-7.2).
       setSavedLooksAttempt((attempt) => attempt + 1)
       // Other screens (capsules, Today) read the closet again.
