@@ -794,6 +794,33 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-material').textContent).toBe('Wool')
   })
 
+  it('[P1] [7.5-NAT-014] an Undo whose connection drops mid-request reads as offline and offers Retry', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    // The device still reports online; the request itself fails at the network.
+    reply = () => HttpResponse.error()
+
+    await browserUser.click(tag('status-bar-action-undo'))
+
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent(
+        'You are offline. Save when you reconnect.'
+      )
+    )
+    expect(patches).toHaveLength(2)
+    expect(tag('status-bar-action-retry')).toBeVisible()
+    expect(tag('garment-detail-material').textContent).toBe('Wool')
+
+    reply = acceptTags
+    await browserUser.click(tag('status-bar-action-retry'))
+    await waitFor(() =>
+      expect(tag('status-feedback-bar')).toHaveTextContent('Change undone.')
+    )
+    expect(tag('garment-detail-material').textContent).toBe('Cotton')
+  })
+
   it('[P2] [7.5-NAT-014] renews an expiring photo lease once, even when the app returns to the foreground', async () => {
     const expiring = {
       ...blueTop,

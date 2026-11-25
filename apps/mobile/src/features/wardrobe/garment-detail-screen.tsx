@@ -862,13 +862,6 @@ function GarmentTagPanel({
         </View>
       ) : (
         <>
-          {failure ? (
-            <View style={[styles.errorBox, themed.errorBox]}>
-              <Text testID="garment-tag-error" style={themed.errorText}>
-                {editor.failureMessage(failure)}
-              </Text>
-            </View>
-          ) : null}
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"

@@ -747,15 +747,6 @@ function GarmentDetailInner({
             </div>
           ) : (
             <>
-              {failure && (
-                <p
-                  data-testid="garment-tag-error"
-                  data-failure={failure}
-                  className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/60 dark:text-red-200"
-                >
-                  {editor.failureMessage(failure)}
-                </p>
-              )}
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <button
                   ref={editor.editButtonRef}
