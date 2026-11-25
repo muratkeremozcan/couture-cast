@@ -352,16 +352,24 @@ export class RitualService implements OnModuleDestroy {
     let targetLocalDateStr = resolveRitualAnchorDate(now, timezone)
     const originalTargetLocalDateStr = targetLocalDateStr
 
-    // Get latest garment update timestamp for staleness check
+    // Get latest garment update timestamp for staleness check. A garment that left `active`
+    // (a deletion, a hold placed, a held deletion released into `deletion_pending` by the
+    // Story CC-7.6 trigger, which stamps `updated_at`) counts too, so a cached or persisted
+    // recommendation never names a piece that is no longer available.
     let latestGarment: GarmentItem | null = null
     if (this.prisma.garmentItem.findFirst) {
       latestGarment = await this.prisma.garmentItem.findFirst({
         where: {
           user_id: userId,
-          retention_status: 'active',
-          upload_status: 'ready',
-          category: { not: null },
-          comfort_range: { not: null },
+          OR: [
+            {
+              retention_status: 'active',
+              upload_status: 'ready',
+              category: { not: null },
+              comfort_range: { not: null },
+            },
+            { retention_status: { not: 'active' } },
+          ],
         },
         orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
       })

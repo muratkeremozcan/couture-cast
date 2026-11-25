@@ -70,6 +70,16 @@ export declare function removeGarmentDeleteTarget(
   userId: string
 ): Promise<void>
 
+export declare function waitForGarmentDeleteTargetGone(
+  prisma: PrismaClient,
+  userId: string,
+  options?: {
+    timeoutMs?: number
+    intervalMs?: number
+    sleep?: (ms: number) => Promise<void>
+  }
+): Promise<void>
+
 export declare const USE_MY_LOCATION_DEVICE: Readonly<{
   latitude: number
   longitude: number
@@ -121,4 +131,9 @@ export declare function mobileE2EFlowStateHooks(options: {
   locationSentinelKeySuffix: string
   cleanupComments: CommunityCommentFixtureCleanup
   longRootTarget?: CommunityCommentsLongRootTarget
+  garmentDeleteSettle?: {
+    timeoutMs?: number
+    intervalMs?: number
+    sleep?: (ms: number) => Promise<void>
+  }
 }): Record<string, MobileE2EFlowStateHook>

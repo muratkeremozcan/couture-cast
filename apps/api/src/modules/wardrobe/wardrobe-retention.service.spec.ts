@@ -347,7 +347,10 @@ describe('WardrobeRetentionService', () => {
    * See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
    */
   it('[P0] [7.6-UNIT-020] records the request under legal hold and preserves source and metadata', async () => {
-    findFirst.mockResolvedValue(garment({ retention_status: 'legal_hold' }))
+    // The request's read finds the held row; the pending check under the lock finds none.
+    findFirst
+      .mockResolvedValueOnce(garment({ retention_status: 'legal_hold' }))
+      .mockResolvedValueOnce(null)
     // The flip matches nothing under a hold; the record matches the held row once.
     updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
 
@@ -358,7 +361,7 @@ describe('WardrobeRetentionService', () => {
       where: {
         id: 'garment-1',
         user_id: 'user-1',
-        retention_status: { not: 'legal_hold' },
+        retention_status: 'active',
         retention_purged_at: null,
       },
     })
@@ -436,24 +439,94 @@ describe('WardrobeRetentionService', () => {
 
   /**
    * Story 7.6 test plan 7.6-UNIT-029: a repeat request on a purged garment changes nothing. The
-   * flip only matches unpurged rows, so a purged one is never re-stamped, re-invalidated or
-   * re-purged; a pending unpurged row still re-flips so Retry re-attempts its purge.
+   * service reads the purged row and returns before it takes a lock or writes, so the row is never
+   * re-stamped, re-invalidated or re-purged.
    */
-  it('[P1] [7.6-UNIT-029] a repeat request on a purged garment re-stamps and removes nothing', async () => {
+  it('[P1] [7.6-UNIT-029] a repeat request on a purged garment writes and removes nothing', async () => {
     findFirst.mockResolvedValue(
       purged(garment({ retention_trigger: 'user_deleted_garment' }))
     )
+
+    await expect(service.requestDeletion('user-1', 'garment-1')).resolves.toBeUndefined()
+
+    expect(updateMany).not.toHaveBeenCalled()
+    expect(invalidateUserCache).not.toHaveBeenCalled()
+    expect(garmentUpdate).not.toHaveBeenCalled()
+    expect(auditCreate).not.toHaveBeenCalled()
+    expect(storageRemove).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Story 7.6 test plan 7.6-UNIT-029b: a row that is live when read but purged by the sweep while
+   * the request waits for the locks matches no update. The flip only takes unpurged rows, so the
+   * request claims nothing and neither invalidates nor purges again.
+   */
+  it('[P1] [7.6-UNIT-029b] a row purged while the request waits for the lock is left as it is', async () => {
+    findFirst
+      .mockResolvedValueOnce(garment({ retention_trigger: 'user_deleted_garment' }))
+      .mockResolvedValueOnce(null)
     updateMany.mockResolvedValue({ count: 0 })
 
     await expect(service.requestDeletion('user-1', 'garment-1')).resolves.toBeUndefined()
 
     expect(updateMany.mock.calls[0]?.[0]).toMatchObject({
-      where: { retention_purged_at: null },
+      where: { id: 'garment-1', user_id: 'user-1', retention_purged_at: null },
+    })
+    // The pending check only takes an unpurged row, so a purged one is never purged again.
+    expect(findFirst.mock.calls[1]?.[0]).toMatchObject({
+      where: {
+        id: 'garment-1',
+        user_id: 'user-1',
+        retention_status: 'deletion_pending',
+        retention_purged_at: null,
+      },
     })
     expect(invalidateUserCache).not.toHaveBeenCalled()
     expect(garmentUpdate).not.toHaveBeenCalled()
     expect(auditCreate).not.toHaveBeenCalled()
     expect(storageRemove).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Story 7.6 test plan 7.6-UNIT-029c (Codex P3-3): a repeat request on a row already pending its
+   * purge (a released hold, a failed purge, a guardian revocation) keeps the first recorded time
+   * and reason, and only retries the purge. The purge audit names the recorded reason.
+   */
+  it('[P1] [7.6-UNIT-029c] a repeat request on a pending row keeps its first request and reason and retries the purge', async () => {
+    const pending = garment({
+      retention_status: 'deletion_pending',
+      retention_trigger: 'guardian_consent_revoked',
+      deletion_requested_at: new Date('2026-11-20T08:00:00.000Z'),
+    })
+    // The request's read, the pending check, the purge's locked re-read, then the purged row.
+    findFirst
+      .mockResolvedValueOnce(pending)
+      .mockResolvedValueOnce({ retention_trigger: 'guardian_consent_revoked' })
+      .mockResolvedValueOnce(pending)
+      .mockResolvedValue(purged(pending))
+    updateMany.mockResolvedValueOnce({ count: 0 })
+
+    await expect(service.requestDeletion('user-1', 'garment-1')).resolves.toBeUndefined()
+
+    // The flip missed and nothing else re-stamped the row: no hold record either.
+    expect(updateMany).toHaveBeenCalledOnce()
+    expect(garmentUpdate).toHaveBeenCalled()
+    for (const [call] of garmentUpdate.mock.calls as [
+      { data: Record<string, unknown> },
+    ][]) {
+      expect(call.data).not.toHaveProperty('deletion_requested_at')
+      expect(call.data).not.toHaveProperty('retention_trigger')
+    }
+    expect(storageRemove).toHaveBeenCalledExactlyOnceWith([
+      'wardrobe/user-1/garment-1.png',
+    ])
+    expect(invalidateUserCache).toHaveBeenCalledWith('user-1')
+    const auditCall = auditCreate.mock.calls[0]?.[0] as
+      | { data: { event_data: Record<string, unknown> } }
+      | undefined
+    expect(auditCall?.data.event_data).toMatchObject({
+      trigger: 'guardian_consent_revoked',
+    })
   })
 
   it('claims expired pending uploads for idempotent scheduled cleanup', async () => {

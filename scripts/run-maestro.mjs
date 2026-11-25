@@ -45,6 +45,7 @@ import {
 import {
   COMMUNITY_COMMENTS_FLOW,
   COMMUNITY_COMMENTS_LONG_ROOT,
+  GARMENT_DELETE_FLOW,
   LOCATION_CAPTURE_FLOW,
   locationCaptureWeatherDoubleCause,
   mobileE2EBaselineLocationRequestBody,
@@ -4894,6 +4895,9 @@ const USER_SCOPED_FLOWS = [
   // Story 6.4: replies to a long root seeded and removed by its per-flow
   // hooks, which only a serial run calls.
   COMMUNITY_COMMENTS_FLOW,
+  // Story 7.6: deletes the dress its per-flow hook seeds, and the after hook
+  // proves the DELETE landed; only a serial run calls those hooks.
+  GARMENT_DELETE_FLOW,
 ]
 
 /**

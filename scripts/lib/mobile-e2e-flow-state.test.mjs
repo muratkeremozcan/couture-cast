@@ -178,13 +178,18 @@ describe('Use my location flow state hooks', () => {
 // Learning path Step 64: Garment delete.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 describe('Garment delete flow state hooks', () => {
-  const recordingPrisma = (existingIds) => {
+  // `activeReads` answers the after hook's "is a dress still active" reads in order; every other
+  // read lists `existingIds`.
+  const recordingPrisma = (existingIds, activeReads = []) => {
     const calls = []
     const prisma = {
       garmentItem: {
         findMany: async (args) => (
           calls.push(['garmentItem.findMany', args]),
-          existingIds.map((id) => ({ id }))
+          (args.where.retention_status === 'active'
+            ? (activeReads.shift() ?? [])
+            : existingIds
+          ).map((id) => ({ id }))
         ),
         deleteMany: (args) => (calls.push(['garmentItem.deleteMany', args]), args),
         create: async (args) => (
@@ -202,10 +207,29 @@ describe('Garment delete flow state hooks', () => {
     }
     return { prisma, calls }
   }
+  const sleeps = []
   const hooks = mobileE2EFlowStateHooks({
     locationSentinelKeySuffix: '-sentinel',
     cleanupComments: () => Promise.resolve(),
+    garmentDeleteSettle: {
+      timeoutMs: 1_000,
+      intervalMs: 250,
+      sleep: async (ms) => {
+        sleeps.push(ms)
+      },
+    },
   })
+  const activeDressRead = [
+    'garmentItem.findMany',
+    {
+      where: { user_id: 'member-1', category: 'dress', retention_status: 'active' },
+      select: { id: true },
+    },
+  ]
+  const dressRead = [
+    'garmentItem.findMany',
+    { where: { user_id: 'member-1', category: 'dress' }, select: { id: true } },
+  ]
 
   test('before seeds one ready dress for the member after clearing a leftover one', async () => {
     const { prisma, calls } = recordingPrisma(['old-dress'])
@@ -241,11 +265,44 @@ describe('Garment delete flow state hooks', () => {
 
     await hooks[GARMENT_DELETE_FLOW].after(prisma, 'member-1')
 
-    assert.deepEqual(calls, [
-      [
-        'garmentItem.findMany',
-        { where: { user_id: 'member-1', category: 'dress' }, select: { id: true } },
-      ],
+    assert.deepEqual(calls, [activeDressRead, dressRead])
+  })
+
+  test('after waits for the in-flight DELETE to land before it removes the dress', async () => {
+    sleeps.length = 0
+    const { prisma, calls } = recordingPrisma(['dress-1'], [['dress-1'], ['dress-1'], []])
+
+    await hooks[GARMENT_DELETE_FLOW].after(prisma, 'member-1')
+
+    assert.deepEqual(sleeps, [250, 250])
+    assert.deepEqual(calls.slice(0, 4), [
+      activeDressRead,
+      activeDressRead,
+      activeDressRead,
+      dressRead,
+    ])
+    assert.deepEqual(calls[5], [
+      'garmentItem.deleteMany',
+      { where: { user_id: 'member-1', id: { in: ['dress-1'] } } },
+    ])
+  })
+
+  test('after fails the flow when the dress is still active, and still removes it', async () => {
+    const { prisma, calls } = recordingPrisma(['dress-1'], Array(100).fill(['dress-1']))
+    const settle = mobileE2EFlowStateHooks({
+      locationSentinelKeySuffix: '-sentinel',
+      cleanupComments: () => Promise.resolve(),
+      garmentDeleteSettle: { timeoutMs: 0, sleep: () => Promise.resolve() },
+    })
+
+    await assert.rejects(
+      settle[GARMENT_DELETE_FLOW].after(prisma, 'member-1'),
+      /garment_delete_not_committed/
+    )
+
+    assert.deepEqual(calls.at(-1), [
+      'garmentItem.deleteMany',
+      { where: { user_id: 'member-1', id: { in: ['dress-1'] } } },
     ])
   })
 

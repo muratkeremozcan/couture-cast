@@ -149,9 +149,7 @@ export class WardrobeRetentionService {
         where: {
           id: garment.id,
           user_id: userId,
-          retention_status: { not: 'legal_hold' },
-          // A purged row stays as it is: a repeat request neither re-stamps it nor purges it
-          // again. A pending row whose purge failed flips again, so the repeat retries it.
+          retention_status: 'active',
           retention_purged_at: null,
         },
         data: {
@@ -160,7 +158,23 @@ export class WardrobeRetentionService {
           deletion_requested_at: requestedAt,
         },
       })
-      if (flipped.count === 1) return 'claimed' as const
+      if (flipped.count === 1) return { claimed: true as const, trigger }
+
+      // A pending row whose purge has not finished (a released hold, a failed purge, a
+      // guardian revocation) keeps its first recorded request and reason; the repeat only
+      // retries the purge. A purged row stays as it is.
+      const pending = await tx.garmentItem.findFirst({
+        where: {
+          id: garment.id,
+          user_id: userId,
+          retention_status: 'deletion_pending',
+          retention_purged_at: null,
+        },
+        select: { retention_trigger: true },
+      })
+      if (pending) {
+        return { claimed: true as const, trigger: pending.retention_trigger ?? trigger }
+      }
 
       // Under a hold: record the request once and leave the hold as it is. An already purged
       // row matches neither update.
@@ -176,10 +190,10 @@ export class WardrobeRetentionService {
           deletion_requested_at: requestedAt,
         },
       })
-      return 'unchanged' as const
+      return { claimed: false as const }
     })
 
-    if (outcome !== 'claimed') {
+    if (!outcome.claimed) {
       return
     }
     await this.invalidateRitualCache(userId, garment.id)
@@ -187,7 +201,7 @@ export class WardrobeRetentionService {
       await this.purgeGarment({
         ...garment,
         retention_status: 'deletion_pending',
-        retention_trigger: trigger,
+        retention_trigger: outcome.trigger,
       })
     } catch (error) {
       // The flip committed, so the list and every reader already treat the garment as gone;
@@ -856,7 +870,8 @@ export class WardrobeRetentionService {
           event_type: 'garment_retention_purged',
           event_data: {
             garmentId: garment.id,
-            trigger: garment.retention_trigger ?? 'unknown',
+            // The locked row holds the recorded reason; the caller's copy may predate it.
+            trigger: locked.retention_trigger ?? garment.retention_trigger ?? 'unknown',
             completedAt: completedAt.toISOString(),
             outcome: 'purged',
           },

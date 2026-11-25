@@ -271,6 +271,46 @@ export const removeGarmentDeleteTarget = async (prisma, userId) => {
   ])
 }
 
+/**
+ * Story 7.6 (7.6-MAE-001): the proof that the flow's last Delete reached the server. The flow
+ * ends once its Undo window closes, while the DELETE may still be in flight, so it cannot relaunch
+ * the app to read the closet back: the force stop could cancel that request. This waits, after the
+ * flow and before the dress is removed, until the member has no active dress left: the API purged
+ * it, or flipped it to `deletion_pending` for the sweep. A dress still active when the time runs
+ * out fails the flow with that cause.
+ */
+export const waitForGarmentDeleteTargetGone = async (
+  prisma,
+  userId,
+  {
+    timeoutMs = 15_000,
+    intervalMs = 250,
+    sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+  } = {}
+) => {
+  if (typeof userId !== 'string' || userId.trim().length === 0) {
+    throw new Error('The garment delete flow state requires a member ID')
+  }
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const active = await prisma.garmentItem.findMany({
+      where: {
+        user_id: userId,
+        category: GARMENT_DELETE_TARGET_CATEGORY,
+        retention_status: 'active',
+      },
+      select: { id: true },
+    })
+    if (active.length === 0) return
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `garment_delete_not_committed: the seeded dress was still active ${timeoutMs} ms after the flow, so its DELETE never reached the API`
+      )
+    }
+    await sleep(intervalMs)
+  }
+}
+
 export const seedGarmentDeleteTarget = async (
   prisma,
   userId,
@@ -307,12 +347,14 @@ export const seedGarmentDeleteTarget = async (
  *   locationSentinelKeySuffix: string,
  *   cleanupComments: (tx: unknown, commentIds: string[]) => Promise<void>,
  *   longRootTarget?: { postId: string, authorId: string },
+ *   garmentDeleteSettle?: { timeoutMs?: number, intervalMs?: number, sleep?: (ms: number) => Promise<void> },
  * }} options
  */
 export const mobileE2EFlowStateHooks = ({
   locationSentinelKeySuffix,
   cleanupComments,
   longRootTarget = COMMUNITY_COMMENTS_LONG_ROOT_TARGET,
+  garmentDeleteSettle,
 }) => ({
   [LOCATION_CAPTURE_FLOW]: {
     before: (prisma, userId) =>
@@ -331,9 +373,16 @@ export const mobileE2EFlowStateHooks = ({
     after: (prisma) =>
       removeCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
   },
+  // The after hook first proves the delete landed, then removes the row whatever that found.
   [GARMENT_DELETE_FLOW]: {
     before: (prisma, userId) => seedGarmentDeleteTarget(prisma, userId),
-    after: (prisma, userId) => removeGarmentDeleteTarget(prisma, userId),
+    after: async (prisma, userId) => {
+      try {
+        await waitForGarmentDeleteTargetGone(prisma, userId, garmentDeleteSettle)
+      } finally {
+        await removeGarmentDeleteTarget(prisma, userId)
+      }
+    },
   },
 })
 

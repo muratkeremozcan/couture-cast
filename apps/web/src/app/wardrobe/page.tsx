@@ -429,6 +429,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
 
   const closetHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const { pendingIds: pendingDeleteIds, requestDelete } = useGarmentDeletion({
+    owner,
     readBearer: readLiveWebBearer,
     onCommitted: (garmentId) => {
       inventoryVersion.current++

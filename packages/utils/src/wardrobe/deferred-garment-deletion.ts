@@ -24,7 +24,10 @@ export type DeferredGarmentDeletionCommit = (
  * One state change. `scheduled`: hidden, inside its Undo window. `undone`: the window was
  * cancelled and the piece returns. `committing`: the DELETE is being sent (Undo no longer
  * applies). `committed`: the DELETE succeeded. `failed`: the DELETE failed and the piece
- * returns (D6).
+ * returns (D6). `failuresToReport`: the failed ids whose "Could not delete" notice may show
+ * now. A failure that lands while another delete is inside its Undo window waits until no
+ * window is open, so its notice never covers a live Undo (D9); every failure since the last
+ * report comes in one event, with the last error of each.
  */
 export type DeferredGarmentDeletionEvent =
   | { type: 'scheduled'; id: string }
@@ -32,6 +35,10 @@ export type DeferredGarmentDeletionEvent =
   | { type: 'committing'; id: string }
   | { type: 'committed'; id: string }
   | { type: 'failed'; id: string; error: unknown }
+  | {
+      type: 'failuresToReport'
+      failures: readonly { id: string; error: unknown }[]
+    }
 
 export type DeferredGarmentDeletionListener = (
   event: DeferredGarmentDeletionEvent
@@ -57,21 +64,30 @@ export interface DeferredGarmentDeletionController {
    */
   schedule: (id: string, commit: DeferredGarmentDeletionCommit) => boolean
   /**
-   * Sends the DELETE at once with no Undo window: the confirmed delete of a piece in use (D2)
-   * and Retry after a failure (D9). A piece still inside its window commits now, and so does
-   * every other delete still inside its window (starting another delete flushes, D1).
-   * Resolves true when the DELETE succeeded.
+   * Sends the DELETE at once with no Undo window: the confirmed delete of a piece in use (D2).
+   * A piece still inside its window commits now, and so does every other delete still inside
+   * its window (starting another delete flushes, D1). Resolves true when the DELETE succeeded.
    */
   commitNow: (id: string, commit: DeferredGarmentDeletionCommit) => Promise<boolean>
+  /**
+   * Retry after a failure (D9): sends the DELETE for `id` alone, at once. Every other delete
+   * keeps its own Undo window. Resolves true when the DELETE succeeded.
+   */
+  retry: (id: string, commit: DeferredGarmentDeletionCommit) => Promise<boolean>
   /** Cancels `id` inside its window. False once its commit started, or for an unknown id. */
   undo: (id: string) => boolean
   /** Commits every delete still inside its window at once, and waits for every send. */
   flush: (options?: Partial<DeferredGarmentDeletionCommitOptions>) => Promise<void>
   /** Every hidden id: inside its window or being sent. */
   pendingIds: () => string[]
+  /** True while any delete is inside its Undo window. */
+  hasOpenWindow: () => boolean
   isPending: (id: string) => boolean
   subscribe: (listener: DeferredGarmentDeletionListener) => () => void
-  /** Test seam (D10): drops every pending delete and timer without committing any. */
+  /**
+   * Drops every pending delete, timer and unreported failure without committing any: the
+   * D10 test seam, and how a session that ended stops speaking for its member (D11).
+   */
   reset: () => void
 }
 
@@ -96,6 +112,7 @@ export function createDeferredGarmentDeletion(
   const timer = options.timer ?? defaultTimer
   const entries = new Map<string, Entry>()
   const listeners = new Set<DeferredGarmentDeletionListener>()
+  let unreported: { id: string; error: unknown }[] = []
 
   // A listener that throws never rejects a send, surfaces as an unhandled rejection on the
   // timer path, or keeps the listeners after it from hearing the event.
@@ -109,6 +126,16 @@ export function createDeferredGarmentDeletion(
     }
   }
 
+  const hasOpenWindow = () =>
+    [...entries.values()].some((entry) => entry.state === 'waiting')
+
+  const reportFailuresIfNoWindow = () => {
+    if (unreported.length === 0 || hasOpenWindow()) return
+    const failures = unreported
+    unreported = []
+    emit({ type: 'failuresToReport', failures })
+  }
+
   const send = (
     entry: Entry,
     commitOptions: DeferredGarmentDeletionCommitOptions
@@ -117,15 +144,23 @@ export function createDeferredGarmentDeletion(
     timer.clearTimeout(entry.handle)
     entry.state = 'committing'
     emit({ type: 'committing', id: entry.id })
+    reportFailuresIfNoWindow()
     entry.sent = (async () => {
       try {
         await entry.commit(commitOptions)
       } catch (error) {
-        if (entries.get(entry.id) === entry) entries.delete(entry.id)
+        if (entries.get(entry.id) !== entry) return false
+        entries.delete(entry.id)
         emit({ type: 'failed', id: entry.id, error })
+        unreported = [
+          ...unreported.filter((failure) => failure.id !== entry.id),
+          { id: entry.id, error },
+        ]
+        reportFailuresIfNoWindow()
         return false
       }
-      if (entries.get(entry.id) === entry) entries.delete(entry.id)
+      if (entries.get(entry.id) !== entry) return false
+      entries.delete(entry.id)
       emit({ type: 'committed', id: entry.id })
       return true
     })()
@@ -137,9 +172,20 @@ export function createDeferredGarmentDeletion(
       .filter((entry) => entry.state === 'waiting')
       .map((entry) => send(entry, commitOptions))
 
+  const sendAlone = (id: string, commit: DeferredGarmentDeletionCommit) => {
+    // A retried id leaves the unreported failures: its new send speaks for it.
+    unreported = unreported.filter((failure) => failure.id !== id)
+    const existing = entries.get(id)
+    if (existing) return send(existing, { keepalive: false })
+    const entry: Entry = { id, commit, state: 'waiting', handle: null, sent: null }
+    entries.set(id, entry)
+    return send(entry, { keepalive: false })
+  }
+
   return {
     schedule(id, commit) {
       if (entries.has(id)) return false
+      unreported = unreported.filter((failure) => failure.id !== id)
       void commitWaiting({ keepalive: false })
       const entry: Entry = { id, commit, state: 'waiting', handle: null, sent: null }
       entry.handle = timer.setTimeout(() => {
@@ -155,11 +201,10 @@ export function createDeferredGarmentDeletion(
           void send(other, { keepalive: false })
         }
       }
-      const existing = entries.get(id)
-      if (existing) return send(existing, { keepalive: false })
-      const entry: Entry = { id, commit, state: 'waiting', handle: null, sent: null }
-      entries.set(id, entry)
-      return send(entry, { keepalive: false })
+      return sendAlone(id, commit)
+    },
+    retry(id, commit) {
+      return sendAlone(id, commit)
     },
     undo(id) {
       const entry = entries.get(id)
@@ -167,6 +212,7 @@ export function createDeferredGarmentDeletion(
       timer.clearTimeout(entry.handle)
       entries.delete(id)
       emit({ type: 'undone', id })
+      reportFailuresIfNoWindow()
       return true
     },
     async flush(flushOptions = {}) {
@@ -178,6 +224,7 @@ export function createDeferredGarmentDeletion(
       await Promise.all([...waiting, ...inFlight])
     },
     pendingIds: () => [...entries.keys()],
+    hasOpenWindow,
     isPending: (id) => entries.has(id),
     subscribe(listener) {
       listeners.add(listener)
@@ -188,6 +235,7 @@ export function createDeferredGarmentDeletion(
     reset() {
       for (const entry of entries.values()) timer.clearTimeout(entry.handle)
       entries.clear()
+      unreported = []
     },
   }
 }

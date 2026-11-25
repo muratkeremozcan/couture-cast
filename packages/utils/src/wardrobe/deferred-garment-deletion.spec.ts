@@ -1,4 +1,4 @@
-// Learning path Step 64: Garment delete (7.6-UNIT-001..008, 013..016, deferred deletion controller).
+// Learning path Step 64: Garment delete (7.6-UNIT-001..008, 013..018, deferred deletion controller).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SAVE_FEEDBACK_TIMINGS } from '../save-feedback'
@@ -230,7 +230,7 @@ describe('createDeferredGarmentDeletion', () => {
     expect(events.at(-1)).toEqual({ type: 'failed', id: 'g1', error })
   })
 
-  it('[P0] [7.6-UNIT-013] commitNow sends at once with no window, and Retry after a failure sends again', async () => {
+  it('[P0] [7.6-UNIT-013] commitNow sends at once with no window, and retry after a failure sends again', async () => {
     const { controller, events, active } = setup()
     const commit = vi
       .fn()
@@ -243,11 +243,12 @@ describe('createDeferredGarmentDeletion', () => {
     expect(active()).toBe(0)
     await expect(sending).resolves.toBe(false)
 
-    await expect(controller.commitNow('g1', commit)).resolves.toBe(true)
+    await expect(controller.retry('g1', commit)).resolves.toBe(true)
     expect(commit).toHaveBeenCalledTimes(2)
     expect(events.map((event) => event.type)).toEqual([
       'committing',
       'failed',
+      'failuresToReport',
       'committing',
       'committed',
     ])
@@ -303,6 +304,138 @@ describe('createDeferredGarmentDeletion', () => {
     advance(10_000)
     await flushMicrotasks()
     expect(first).toHaveBeenCalledTimes(1)
+  })
+
+  it('[P0] [7.6-UNIT-017] retry sends only its own id; a delete inside its window keeps its timer and Undo', async () => {
+    const { controller, advance } = setup()
+    const failing = vi.fn().mockRejectedValueOnce(new Error('500'))
+    controller.schedule('g1', failing)
+    const later = vi.fn().mockResolvedValue(undefined)
+    controller.schedule('g2', later)
+    await flushMicrotasks()
+    advance(1_000)
+
+    const again = vi.fn().mockResolvedValue(undefined)
+    await expect(controller.retry('g1', again)).resolves.toBe(true)
+
+    expect(again).toHaveBeenCalledTimes(1)
+    expect(later).not.toHaveBeenCalled()
+    expect(controller.hasOpenWindow()).toBe(true)
+    expect(controller.undo('g2')).toBe(true)
+    advance(10_000)
+    await flushMicrotasks()
+    expect(later).not.toHaveBeenCalled()
+  })
+
+  it('[P0] [7.6-UNIT-017] after a retry, a delete inside its window is sent once, at its own deadline', async () => {
+    const { controller, advance } = setup()
+    controller.schedule('g1', vi.fn().mockRejectedValueOnce(new Error('500')))
+    const later = vi.fn().mockResolvedValue(undefined)
+    controller.schedule('g2', later)
+    await flushMicrotasks()
+    advance(1_000)
+
+    await expect(
+      controller.retry('g1', vi.fn().mockResolvedValue(undefined))
+    ).resolves.toBe(true)
+    advance(3_999)
+    await flushMicrotasks()
+    expect(later).not.toHaveBeenCalled()
+    expect(controller.isPending('g2')).toBe(true)
+
+    advance(1)
+    await flushMicrotasks()
+    expect(later).toHaveBeenCalledTimes(1)
+    advance(10_000)
+    await flushMicrotasks()
+    expect(later).toHaveBeenCalledTimes(1)
+  })
+
+  it('[P0] [7.6-UNIT-018] D9: a failure report waits for the open window, then names every failure once', async () => {
+    const { controller, advance, events } = setup()
+    const reports = () => events.filter((event) => event.type === 'failuresToReport')
+    const first = new Error('first')
+    const second = new Error('second')
+    controller.schedule('g1', vi.fn().mockRejectedValue(first))
+    controller.schedule('g2', vi.fn().mockRejectedValue(second))
+    const last = vi.fn().mockResolvedValue(undefined)
+    controller.schedule('g3', last)
+    await flushMicrotasks()
+
+    expect(events).toContainEqual({ type: 'failed', id: 'g1', error: first })
+    expect(events).toContainEqual({ type: 'failed', id: 'g2', error: second })
+    expect(controller.pendingIds()).toEqual(['g3'])
+    expect(reports()).toEqual([])
+
+    advance(4_999)
+    expect(reports()).toEqual([])
+    advance(1)
+    await flushMicrotasks()
+
+    expect(last).toHaveBeenCalledTimes(1)
+    expect(reports()).toEqual([
+      {
+        type: 'failuresToReport',
+        failures: [
+          { id: 'g1', error: first },
+          { id: 'g2', error: second },
+        ],
+      },
+    ])
+  })
+
+  it('[P1] [7.6-UNIT-018] Undo of the last open window releases the report; with no window it comes at once', async () => {
+    const { controller, events } = setup()
+    const error = new Error('500')
+    controller.schedule('g1', vi.fn().mockRejectedValue(error))
+    controller.schedule('g2', vi.fn().mockResolvedValue(undefined))
+    await flushMicrotasks()
+    expect(events.some((event) => event.type === 'failuresToReport')).toBe(false)
+
+    expect(controller.undo('g2')).toBe(true)
+    expect(events.slice(-2)).toEqual([
+      { type: 'undone', id: 'g2' },
+      { type: 'failuresToReport', failures: [{ id: 'g1', error }] },
+    ])
+
+    void controller.commitNow('g3', vi.fn().mockRejectedValue(error))
+    await flushMicrotasks()
+    expect(events.at(-1)).toEqual({
+      type: 'failuresToReport',
+      failures: [{ id: 'g3', error }],
+    })
+  })
+
+  it('[P1] [7.6-UNIT-018] a retried or rescheduled failure is never reported', async () => {
+    const { controller, events, advance } = setup()
+    const error = new Error('500')
+    controller.schedule('g1', vi.fn().mockRejectedValue(error))
+    controller.schedule('g2', vi.fn().mockRejectedValue(error))
+    controller.schedule('g3', vi.fn().mockResolvedValue(undefined))
+    await flushMicrotasks()
+
+    await controller.retry('g1', vi.fn().mockResolvedValue(undefined))
+    const again = vi.fn().mockResolvedValue(undefined)
+    expect(controller.schedule('g2', again)).toBe(true)
+    advance(5_000)
+    await flushMicrotasks()
+
+    expect(again).toHaveBeenCalledTimes(1)
+    expect(controller.pendingIds()).toEqual([])
+    expect(events.some((event) => event.type === 'failuresToReport')).toBe(false)
+  })
+
+  it('[P1] [7.6-UNIT-018] reset drops unreported failures', async () => {
+    const { controller, events, advance } = setup()
+    controller.schedule('g1', vi.fn().mockRejectedValue(new Error('500')))
+    controller.schedule('g2', vi.fn().mockResolvedValue(undefined))
+    await flushMicrotasks()
+
+    controller.reset()
+    advance(10_000)
+    await flushMicrotasks()
+
+    expect(events.some((event) => event.type === 'failuresToReport')).toBe(false)
   })
 
   it('[P1] [7.6-UNIT-015] a throwing listener neither fails the send nor silences later listeners', async () => {

@@ -21,6 +21,7 @@ import { buildGarmentObjectPath } from '@couture/utils'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
+import { RitualService } from '../src/modules/personalization/ritual.service.js'
 import { WardrobeCapsuleRepository } from '../src/modules/wardrobe/wardrobe-capsule.repository.js'
 import { WardrobeController } from '../src/modules/wardrobe/wardrobe.controller.js'
 import { WardrobeGarmentRemovalController } from '../src/modules/wardrobe/wardrobe-garment-removal.controller.js'
@@ -28,6 +29,7 @@ import { WardrobeRetentionService } from '../src/modules/wardrobe/wardrobe-reten
 import { WardrobeSavedLookController } from '../src/modules/wardrobe/wardrobe-saved-look.controller.js'
 import { WardrobeSavedLookService } from '../src/modules/wardrobe/wardrobe-saved-look.service.js'
 import { WardrobeService } from '../src/modules/wardrobe/wardrobe.service.js'
+import { birthdateForAge } from '../src/testing/birthdate.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 
@@ -90,9 +92,8 @@ async function member(
       email: `${namespace}-${randomUUID()}@synthetic.test`,
       profile: {
         create: {
-          birthdate: new Date(
-            role === 'teen' ? '2011-06-15T00:00:00Z' : '1990-01-01T00:00:00Z'
-          ),
+          birthdate:
+            role === 'teen' ? birthdateForAge(15) : new Date('1990-01-01T00:00:00Z'),
           preferences: { compliance: { accountStatus } },
         },
       },
@@ -194,6 +195,48 @@ async function savedLookStatuses(auth: string) {
 }
 
 const row = (id: string) => prisma.garmentItem.findUniqueOrThrow({ where: { id } })
+
+/**
+ * The real Ritual over this database: one saved location with no stored weather (TEST_ENV local
+ * lets the service write its synthetic snapshot), and Redis as a map the test can clear.
+ */
+function ritualFor(userId: string) {
+  const cache = new Map<string, string>()
+  const ritual = new RitualService(
+    prisma,
+    {
+      getLatestWeather: () => Promise.resolve({ status: 'unavailable', data: null }),
+    } as never,
+    {
+      listLocations: () =>
+        Promise.resolve([
+          {
+            id: `location-${userId}`,
+            label: 'Home',
+            city: 'Chicago',
+            locationKey: `ritual-home-${userId}`,
+            latitude: 41.88,
+            longitude: -87.63,
+            timezone: 'America/Chicago',
+            isPrimary: true,
+          },
+        ]),
+    } as never,
+    {
+      get: (key: string) => Promise.resolve(cache.get(key) ?? null),
+      set: (key: string, value: string) => {
+        cache.set(key, value)
+        return Promise.resolve('OK')
+      },
+    } as never,
+    { capture: vi.fn() } as never
+  )
+  const garmentIds = async () =>
+    (await ritual.getOrCreateRitual(userId)).outfits.flatMap(
+      (outfit) => outfit.garmentIds
+    )
+  return { cache, garmentIds }
+}
 
 /** Capsule creation validates garment eligibility in the repository, under the shared locks. */
 const canBuildCapsuleFrom = async (userId: string, garmentIds: string[]) =>
@@ -438,6 +481,8 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
       .delete(`/api/v1/wardrobe/garments/${held.id}`)
       .set('Authorization', owner.auth)
     expect(removed.status).toBe(204)
+    const firstRequestedAt = (await row(held.id)).deletion_requested_at
+    expect(firstRequestedAt).toBeInstanceOf(Date)
 
     // The operator's release, as a plain update of the column (the runbook's path).
     await prisma.garmentItem.update({
@@ -462,13 +507,81 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
       .set('Authorization', owner.auth)
     expect(usage.status).toBe(404)
 
+    // A repeat request before the sweep keeps the first recorded request (Codex P3-3).
+    const repeated = await api
+      .delete(`/api/v1/wardrobe/garments/${held.id}`)
+      .set('Authorization', owner.auth)
+    expect(repeated.status).toBe(204)
+    expect(await row(held.id)).toMatchObject({
+      deletion_requested_at: firstRequestedAt,
+      retention_trigger: 'user_deleted_garment',
+    })
+
     await retention.purgeExpiredAndDeletedGarments()
     const purged = await row(held.id)
-    expect(purged).toMatchObject({ object_path: null, failure_code: 'DELETED' })
+    expect(purged).toMatchObject({
+      object_path: null,
+      failure_code: 'DELETED',
+      deletion_requested_at: firstRequestedAt,
+    })
     expect(purged.retention_purged_at).toBeInstanceOf(Date)
     expect(bucket.objects.has(held.objectPath)).toBe(false)
     expect(bucket.objects.has(keptHeld.objectPath)).toBe(true)
   })
+
+  /**
+   * Codex P2-4 (D4): a recommendation made before the hold must not outlive a held deletion. Once
+   * the release turns the row into `deletion_pending`, neither the cached Ritual nor the persisted
+   * recommendation names the piece, before or after the sweep purges it.
+   */
+  it.each([
+    // The Redis entry stays, so the next read meets the cache.
+    ['the cached Ritual', (_cache: Map<string, string>) => undefined],
+    // Redis misses, so the next read meets the persisted recommendation.
+    ['the persisted recommendation', (cache: Map<string, string>) => cache.clear()],
+  ] as const)(
+    '[P0] [7.6-INT-009] after a held deletion is released, %s no longer names the piece',
+    async (_path, choosePath) => {
+      vi.stubEnv('TEST_ENV', 'local')
+      const owner = await member()
+      // A standalone wardrobe: no capsule, so no capsule revision moves.
+      const garments = [
+        await readyGarment(owner.userId, 'top'),
+        await readyGarment(owner.userId, 'bottom'),
+        await readyGarment(owner.userId, 'shoes'),
+      ]
+      const ritual = ritualFor(owner.userId)
+      const before = await ritual.garmentIds()
+      const target = garments.find((garment) => before.includes(garment.id))
+      expect(target).toBeDefined()
+      const targetId = target!.id
+      choosePath(ritual.cache)
+      expect(
+        await prisma.outfitRecommendation.count({ where: { user_id: owner.userId } })
+      ).toBeGreaterThan(0)
+
+      await prisma.garmentItem.update({
+        where: { id: targetId },
+        data: { retention_status: 'legal_hold' },
+      })
+      const removed = await api
+        .delete(`/api/v1/wardrobe/garments/${targetId}`)
+        .set('Authorization', owner.auth)
+      expect(removed.status).toBe(204)
+      await prisma.garmentItem.update({
+        where: { id: targetId },
+        data: { retention_status: 'active' },
+      })
+      expect((await row(targetId)).retention_status).toBe('deletion_pending')
+
+      expect(await ritual.garmentIds()).not.toContain(targetId)
+
+      await retention.purgeExpiredAndDeletedGarments()
+      expect((await row(targetId)).retention_purged_at).toBeInstanceOf(Date)
+      ritual.cache.clear()
+      expect(await ritual.garmentIds()).not.toContain(targetId)
+    }
+  )
 
   it('[P0] [7.6-INT-006] a purge that fails after the flip still answers 204, and the next sweep finishes it', async () => {
     vi.stubEnv('TEST_ENV', 'local')
@@ -557,6 +670,9 @@ describe('7.6 garment delete over HTTP (pg17)', () => {
 
   it('[P0] [7.6-INT-008] a guardian-pending teen can delete and read usage; uploads stay blocked; a suspended account cannot', async () => {
     vi.stubEnv('TEST_ENV', 'local')
+    // The shipped policy is off, which lets a pending teen through every guard. Consent is
+    // required here so the upload route refuses the teen and the removal routes prove D8.
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     const teen = await member('teen', 'pending_guardian_consent')
     const garment = await readyGarment(teen.userId)
 

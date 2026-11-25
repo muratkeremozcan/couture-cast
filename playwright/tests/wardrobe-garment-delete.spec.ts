@@ -63,6 +63,16 @@ function recordDeletes(page: Page, garmentId: string) {
   return sent
 }
 
+/**
+ * Stops the installed page clock just ahead of the page's own time, so the Undo window only moves
+ * when the test moves it. A running clock spends the window on assertions, and a slow runner can
+ * cross the deadline during a check meant to land before it.
+ */
+async function pauseClock(page: Page) {
+  const now = await page.evaluate(() => Date.now())
+  await page.clock.pauseAt(now + 1_000)
+}
+
 async function signIn(page: Page, member: SeededMember) {
   await page.addInitScript((token) => {
     window.sessionStorage.setItem('couturecast.access-token', token)
@@ -174,6 +184,7 @@ realTest.describe('Garment delete against the local API', () => {
             method: 'GET',
             url: USAGE_URL(garment.id),
           })
+          await pauseClock(page)
           await page.getByTestId('garment-delete').click()
           const { status, responseJson } = await usage
           expect(status).toBe(200)
@@ -200,6 +211,7 @@ realTest.describe('Garment delete against the local API', () => {
         await page.clock.fastForward(UNDO_WINDOW_MS + 1_000)
         expect(deletes).toHaveLength(0)
         expect(await listedIds()).toContain(garment.id)
+        await page.clock.resume()
       })
 
       await realTest.step('Delete again commits once the window closes', async () => {
@@ -208,6 +220,7 @@ realTest.describe('Garment delete against the local API', () => {
           method: 'DELETE',
           url: GARMENT_URL(garment.id),
         })
+        await pauseClock(page)
         await page.getByTestId('garment-delete').click()
         await expect(card).toHaveCount(0)
         await expect(statusBar).toContainText('Deleted')
@@ -217,6 +230,7 @@ realTest.describe('Garment delete against the local API', () => {
         await page.clock.fastForward(200)
         expect((await removal).status).toBe(204)
         expect(deletes).toHaveLength(1)
+        await page.clock.resume()
       })
 
       await realTest.step(

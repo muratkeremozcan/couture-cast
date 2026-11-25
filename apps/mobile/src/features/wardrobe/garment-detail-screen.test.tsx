@@ -138,7 +138,6 @@ import {
 import {
   createMobileGarmentDeletion,
   resetGarmentDeletionForTests,
-  type GarmentDeletionEvent,
   type MobileGarmentDeletion,
 } from './garment-deletion'
 import { GarmentDetailScreen } from './garment-detail-screen'
@@ -1187,6 +1186,7 @@ describe('GarmentDetailScreen', () => {
 
     afterEach(() => {
       deletion.reset()
+      deletion.dispose()
       resetGarmentDeletionForTests()
     })
 
@@ -1282,9 +1282,28 @@ describe('GarmentDetailScreen', () => {
           { statusCode: 404, message: 'GARMENT_NOT_FOUND', error: 'Not Found' },
           { status: 404 }
         )
-      const heard: GarmentDeletionEvent[] = []
-      deletion.subscribe((event) => {
-        heard.push(event)
+      // The hub's side of the deletion: the hidden set, its grid update and the notices it
+      // shows on the root status bar.
+      let hiddenSetChanges = 0
+      deletion.subscribe(() => {
+        hiddenSetChanges++
+      })
+      const committedIds: string[] = []
+      const shown: string[] = []
+      deletion.attach({
+        epoch: mobileIdentityEpoch(),
+        presenter: {
+          showNotice: (input) => {
+            shown.push(input.message)
+            return { id: input.id, durationMs: windowMs }
+          },
+          dismissNotice: () => undefined,
+          isOnline: () => true,
+          t: (key) => i18n.t(key),
+        },
+        onCommitted: (id) => {
+          committedIds.push(id)
+        },
       })
       renderDeletableDetail()
 
@@ -1295,16 +1314,10 @@ describe('GarmentDetailScreen', () => {
       expect(clock.active()).toBe(0)
       await waitFor(() => expect(events).toEqual([committing, committed]))
       expect(deletes).toEqual([{ id: garmentId, authorization: bearer }])
-      expect(heard).toEqual([
-        { type: 'changed' },
-        { type: 'changed' },
-        {
-          type: 'committed',
-          id: garmentId,
-          announce: true,
-          epoch: mobileIdentityEpoch(),
-        },
-      ])
+      // Hidden while it sends, then gone; the hub removes it and says Deleted with no Undo.
+      expect(hiddenSetChanges).toBe(2)
+      expect(committedIds).toEqual([garmentId])
+      expect(shown).toEqual(['Deleted'])
       expect(screen.queryByTestId('garment-delete-confirm')).toBeNull()
     })
 

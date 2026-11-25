@@ -3,7 +3,7 @@ title: 'Story CC-7.6: Garment delete'
 type: feature
 ticket: '7-6-garment-delete'
 created: '2026-11-25'
-status: in-review
+status: built
 baseline_revision: '246577af39e8917eee29e14f437deccaf65c2c88'
 route: full
 route_source: auto
@@ -42,7 +42,9 @@ asynchronously.
   with Undo for 5 s (`SAVE_FEEDBACK_TIMINGS.statusBarDurationMs`); the DELETE is sent when the
   window ends. Undo cancels and the piece returns. The window flushes early when the member starts
   another delete, leaves the closet, hides the page (web `pagehide`/`visibilitychange` with
-  `keepalive`) or backgrounds the app (native `AppState`). Rejected: a server soft delete with a
+  `keepalive`) or backgrounds the app (native `AppState`). On native, leaving the closet is a
+  navigation blur of the hub (tab switch, Capsules, Silhouette) other than opening a garment
+  detail. Rejected: a server soft delete with a
   restore route, because it delays byte removal to the hourly sweep and adds a restore race; the
   deferred commit keeps the existing immediate purge.
 - D2 "Looks it affects" = saved looks (not soft-deleted) whose anchor or composition slots hold
@@ -70,14 +72,22 @@ asynchronously.
 - D8 A member can always delete their own data: DELETE and the usage read skip the guardian
   upload-consent check (`WardrobeUploadGuard`); auth and ownership stay. Both routes move to a
   separate controller under `/api/v1/wardrobe` guarded by `RequestAuthGuard` only.
-- D9 A failed commit shows its failure notice (piece returns, Retry) even while a later delete is
-  in its window; the later piece stays hidden and commits on its own timer. Retry sends at once,
-  with no new Undo window.
-- D11 A send that fails after its account has signed out and another account's closet has
-  mounted shows nothing: the app never speaks for another account, and the piece stays in the
-  old account's closet, where the next load shows it. This is the one exception to D6.
-- D10 Test seam: web page and native hub take an optional injected controller; the module
-  instance exposes a reset for tests, so pending deletes never leak between tests.
+- D9 A failed commit returns its piece at once. Its failure notice ("Could not delete", Retry)
+  waits until no delete is inside its Undo window, so a later delete keeps its Undo on the bar
+  until its own deadline (at most 5 s). Failures reported together share one notice, which also
+  carries the ids of a failure notice still on screen; its Retry sends each of those pieces
+  alone, at once, with no new Undo window, under the bearer the app holds when Retry is pressed.
+  Every other delete keeps its window.
+- D11 Every notice, action and late answer belongs to the account that started the delete. Once
+  the tab or app holds another account (or none), that account's last notice leaves the bar, its
+  pending deletes are sent with its own bearer, and their answers show nothing; Undo and Retry
+  do nothing for another account. The piece stays in the old account's closet, where the next
+  load shows it. This is the one exception to D6. The deletes and their notices outlive a closet
+  mount, so a Retry pressed after leaving the closet is still heard, and a closet mounted later
+  for the same account gets its grid update.
+- D10 Test seam: web takes an injected controller factory (one controller per member session);
+  native takes an injected deletion with injectable epoch, bearer and identity sources; both
+  expose a reset for tests, so pending deletes never leak between tests.
 
 ## Boundaries & Constraints
 
@@ -166,9 +176,9 @@ garment_joins: { some: { garment_id } } } })`.
 - [x] Web lib, `garment-detail.tsx`, `page.tsx` -- delete, confirm, undo, retry, scroll and focus.
 - [x] Mobile lib, `garment-detail-screen.tsx`, `wardrobe-hub-screen.tsx` -- same on native.
 - [x] Locales (10 + 10) and parity spec keys.
-- [ ] Tests per TEA plan (`_bmad-output/test-artifacts/test-design-7-6-garment-delete.md`),
+- [x] Tests per TEA plan (`_bmad-output/test-artifacts/test-design-7-6-garment-delete.md`),
       cross-link comments.
-- [ ] `learning-path-step-by-step.md` -- Step 63 to merged (`246577af`, PR #290), add Step 64;
+- [x] `learning-path-step-by-step.md` -- Step 63 to merged (`246577af`, PR #290), add Step 64;
       sprint-status 7-6 done before final push.
 
 **Acceptance Criteria:**
@@ -218,10 +228,16 @@ IS NULL`) inside the same lock order. Hold release: trigger
 - Review fixes: a usage 404 reads as gone only when its body says `GARMENT_NOT_FOUND`; a gone
   piece still gets the idempotent DELETE at once (so a hold that landed after the list read
   records the request); `commitNow` first sends every other delete still in its window; Undo
-  after the send started shows "Deleted" again with no Undo; leaving the Closet or hub keeps the
-  listener until the flush settles, so a failure still shows Retry. Native events carry the
-  identity epoch the delete was requested under, the hub ignores another account's events, and
-  Retry sends under the hub's current bearer.
+  after the send started shows "Deleted" again with no Undo.
+- Codex fixes: `retry` sends one id alone, and `failuresToReport` holds a failure notice until no
+  Undo window is open (UNIT-017, UNIT-018). Web deletes live in a per-member module session that
+  outlives a Closet mount and speaks only while the tab holds that member. Native notices live in
+  the module deletion, which the hub hands its root status bar; identity changes dismiss the
+  last notice, Undo and Retry check the epoch at press, and Retry resolves the verified bearer
+  when pressed. The hub flushes on navigation blur unless a garment detail opened; Capsules
+  reloads on a wardrobe change. Ritual staleness counts garments that left `active`, and the
+  hold-release trigger stamps `updated_at`. A repeat DELETE of a pending row keeps its first
+  request time and reason.
 - Locale keys: `delete`, `deleteConfirmTitle_one/_other`, `deleteConfirmAccept`, `deleteCancel`,
   `deleteSucceeded`, `deleteUndone`, `deleteFailed`, `deleteUsageFailed`. The web parity spec now
   allows `{{count}}` in the plural keys only.
@@ -253,6 +269,34 @@ writing tests. Verdicts: 0 high, 6 medium, 5 low, 3 false. Every kept finding ro
 | Q11 | false   | Native component tests missing                                                                                  | TEA landed NAT-002..007 after the diff was staged                                  |
 | Q12 | false   | Maestro flow absent from the diff                                                                               | Untracked when staged; `maestro/garment-delete-flow.yaml` ships in the PR          |
 | Q13 | false   | Spec tasks and sprint status unfinished                                                                         | Flipped before the final push, as the spec says                                    |
+
+Pass 2: Codex review plus Codex Security on `246577af..fd00e337`
+(`epic7-coord/7.6-codex-review.md`). 3 P1, 8 P2, 3 P3; Codex Security reported none. Every
+finding routes to patch; test-only findings went to TEA. T6 to T11 are TEA source findings
+while writing the tests for these fixes.
+
+| #   | Verdict | Finding                                                                                  | Resolution                                                                       |
+| --- | ------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| C1  | high    | Retry for A used `commitNow`, sending B inside its Undo window; A's notice hid B's Undo  | `retry` sends its id alone; failure notice waits for no open window (D9)         |
+| C2  | high    | UNIT-029 asserted a write the purged path skips                                          | TEA: zero writes; UNIT-029b covers a row purged under the lock                   |
+| C3  | high    | INT-008 ran under policy `off` and a fixed birthdate                                     | TEA: `required_13_15` and `birthdateForAge(15)`                                  |
+| C4  | medium  | Retry after leaving the closet had no listener; web Retry tied to a retired controller   | Deletes and notices live in a member session that outlives a mount (D11)         |
+| C5  | medium  | Native Retry read the hub's last-load bearer                                             | Retry resolves the verified bearer at press and rechecks the epoch               |
+| C6  | medium  | Native tab switch or Capsules push did not flush                                         | Hub blur flushes unless a garment detail was opened (D1)                         |
+| C7  | medium  | Ritual reused cached or persisted outfits naming a released held piece                   | Staleness counts garments that left `active`; trigger stamps `updated_at`        |
+| C8  | medium  | Native Capsules stayed Ready after the delete landed                                     | Capsules reloads on `onWardrobeChanged` for its epoch                            |
+| C9  | medium  | Parallel Maestro runner skipped the dress fixture hook                                   | TEA: flow added to `USER_SCOPED_FLOWS`                                           |
+| C10 | medium  | CMP-005 asserted zero DELETEs after a valid schedule                                     | TEA: zero before Retry, one after the window                                     |
+| C11 | medium  | Playwright clock and Maestro timing could cross the deadline on a slow runner            | TEA: clock paused before Delete; Maestro timed leg trimmed, commit polled        |
+| C12 | low     | Web published a previous member's late failure and Retry                                 | Session speaks only while the tab holds its owner; ends and dismisses on change  |
+| C13 | low     | Native notice actions outlived their account                                             | Identity change dismisses the last notice; Undo and Retry check epoch at press   |
+| C14 | low     | Repeat DELETE overwrote the first request time and reason                                | Pending rows keep both; purge audit reads the locked row's trigger               |
+| T6  | medium  | A Retry or confirmed delete landing during another window replaced its Undo with Deleted | "Deleted" is held until no window is open, before any failure report             |
+| T7  | medium  | A native Retry landing with no hub mounted never told Capsules or Today                  | The module calls `notifyWardrobeChanged` when no hub of that account is attached |
+| T8  | low     | Capsules epoch guard and late-Undo epoch guard could never decide                        | Removed; `loadCapsules` and the identity flush already cover both                |
+| T9  | low     | Native deletion never unsubscribed from identity changes                                 | `dispose()` stops following the controller and the account                       |
+| T10 | medium  | A merged failure notice kept ids that were retried or had committed                      | Retry clears the notice's ids; a commit drops its id from the notice             |
+| T11 | false   | Undo of the last window while a "Deleted" is held announces both                         | Kept: each names a different piece, and dropping it leaves a Retry unconfirmed   |
 
 ## Design Notes
 

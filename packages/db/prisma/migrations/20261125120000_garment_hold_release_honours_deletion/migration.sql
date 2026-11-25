@@ -6,7 +6,9 @@
 -- retention sweep purges `deletion_pending` rows.
 --
 -- Only the release transition of a row with a recorded request changes; every other update passes
--- through untouched, and a hold placed on a pending row is never undone here.
+-- through untouched, and a hold placed on a pending row is never undone here. The conversion also
+-- stamps `updated_at`, which the ritual staleness check reads, so a cached or persisted outfit that
+-- names the piece is regenerated before the sweep purges it.
 
 CREATE OR REPLACE FUNCTION private.garment_hold_release_honours_deletion()
 RETURNS TRIGGER
@@ -20,6 +22,7 @@ BEGIN
     AND NEW.retention_purged_at IS NULL
   THEN
     NEW.retention_status := 'deletion_pending';
+    NEW.updated_at := now();
   END IF;
   RETURN NEW;
 END;

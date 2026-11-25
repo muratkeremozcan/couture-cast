@@ -21620,9 +21620,11 @@ User/business impact:
 Technical architecture:
 
 - `packages/utils/src/wardrobe/deferred-garment-deletion.ts` is the one platform-free controller
-  (`createDeferredGarmentDeletion`): `schedule`, `commitNow`, `undo`, `flush`, `pendingIds`,
-  `subscribe`, `reset`, with an injectable timer and the window from
-  `SAVE_FEEDBACK_TIMINGS.statusBarDurationMs`. Scheduling a second piece sends the first at once.
+  (`createDeferredGarmentDeletion`): `schedule`, `commitNow`, `retry`, `undo`, `flush`,
+  `pendingIds`, `subscribe`, `reset`, with an injectable timer and the window from
+  `SAVE_FEEDBACK_TIMINGS.statusBarDurationMs`. Scheduling a second piece sends the first at once;
+  Retry sends only its own piece, and a failure notice (`failuresToReport`) waits until no Undo
+  window is open, so a later delete keeps its Undo.
 - `GET /api/v1/wardrobe/garments/{garmentId}/usage` (OpenAPI 1.11.0) answers
   `{ garmentId, savedLookCount, capsuleCount }` for the caller's own ready garment and 404
   `GARMENT_NOT_FOUND` for anything else, another member's garment included. The saved look count
