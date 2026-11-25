@@ -184,6 +184,14 @@ function useGarmentTagEditor({
   const baselineRef = useRef<GarmentTagDraft | null>(null)
   // Set by a 409: the next closet read is the member's review point, so it becomes the baseline.
   const rebaseAfterConflictRef = useRef(false)
+  // True from a 409 until that re-read lands: Done waits, so it never compares the draft with
+  // the pre-conflict baseline.
+  const [awaitingRead, setAwaitingRead] = useState(false)
+  const awaitingReadRef = useRef(false)
+  const setAwaiting = (value: boolean) => {
+    awaitingReadRef.current = value
+    setAwaitingRead(value)
+  }
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
   const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
@@ -219,6 +227,8 @@ function useGarmentTagEditor({
     if (!rebaseAfterConflictRef.current || !baselineRef.current) return
     rebaseAfterConflictRef.current = false
     baselineRef.current = garmentTagDraft(garment)
+    awaitingReadRef.current = false
+    setAwaitingRead(false)
   }, [garment])
 
   // Opening the editor moves focus to its first control, the selected category; closing it
@@ -364,6 +374,7 @@ function useGarmentTagEditor({
     focusEditAfterCloseRef.current = true
     baselineRef.current = null
     rebaseAfterConflictRef.current = false
+    setAwaiting(false)
     setDraft(null)
     setFailure(null)
   }
@@ -372,6 +383,7 @@ function useGarmentTagEditor({
     if (!saved) return
     baselineRef.current = saved
     rebaseAfterConflictRef.current = false
+    setAwaiting(false)
     setFailure(null)
     setDraft(saved)
   }
@@ -383,6 +395,7 @@ function useGarmentTagEditor({
     // as the baseline once they land. The conflict message asks the member to check them.
     if (kind === 'conflict') {
       rebaseAfterConflictRef.current = true
+      setAwaiting(true)
       onRefresh()
     }
     showNotice(actionOwner, kind, {
@@ -404,7 +417,7 @@ function useGarmentTagEditor({
 
   const handleDone = async () => {
     const baseline = baselineRef.current
-    if (!draft || !baseline || saveState !== 'idle') return
+    if (!draft || !baseline || saveState !== 'idle' || awaitingReadRef.current) return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
     retireUndo()
@@ -475,6 +488,7 @@ function useGarmentTagEditor({
     draft,
     setDraft,
     saveState,
+    awaitingRead,
     failure,
     failureMessage,
     editButtonRef,
@@ -576,8 +590,9 @@ function GarmentDetailInner({
     onTagsSaved,
     onRefresh,
   })
-  const { draft, setDraft, failure, saveState } = editor
+  const { draft, setDraft, failure, saveState, awaitingRead } = editor
   const busy = saveState !== 'idle'
+  const rereadFailed = awaitingRead && loadFailed && !loading
   const garmentId = garment.id
 
   // A newly opened garment starts with its heading focused.
@@ -731,6 +746,16 @@ function GarmentDetailInner({
                   {editor.failureMessage(failure)}
                 </p>
               )}
+              {rereadFailed && (
+                <button
+                  type="button"
+                  data-testid="garment-tag-reread"
+                  onClick={onRefresh}
+                  className="mt-2 min-h-11 px-2 text-sm font-semibold underline"
+                >
+                  {t('feedback.retry')}
+                </button>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -739,9 +764,11 @@ function GarmentDetailInner({
                   data-primary-action="true"
                   aria-busy={busy}
                   data-save-state={saveState}
-                  disabled={busy}
+                  // aria-disabled keeps keyboard focus on Done while it saves or while the
+                  // re-read after a conflict is pending; handleDone ignores those presses.
+                  aria-disabled={busy || awaitingRead}
                   onClick={() => void editor.handleDone()}
-                  className="min-h-11 min-w-[5.5rem] rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-zinc-800 motion-reduce:transition-none disabled:opacity-70 dark:bg-zinc-100 dark:text-zinc-900"
+                  className="min-h-11 min-w-[5.5rem] rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-zinc-800 motion-reduce:transition-none aria-disabled:opacity-70 dark:bg-zinc-100 dark:text-zinc-900"
                 >
                   {saveState === 'still-saving'
                     ? t('feedback.stillSaving')

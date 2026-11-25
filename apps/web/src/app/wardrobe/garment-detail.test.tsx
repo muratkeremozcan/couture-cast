@@ -14,17 +14,33 @@ import {
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GarmentWithColor } from '@couture/api-client/contracts/http'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
+import type * as WebWardrobe from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { SaveFeedbackProvider } from '../components/save-feedback'
 import { GarmentDetail, type ClosetGarment } from './garment-detail'
 
 const session = vi.hoisted(() => ({ owner: null as string | null }))
+// Every tag save the detail starts, so a test can await the client answer it is checking.
+const tagSaves = vi.hoisted(() => ({ calls: [] as Promise<unknown>[] }))
+vi.mock('../../lib/wardrobe', async (importOriginal) => {
+  const actual = await importOriginal<typeof WebWardrobe>()
+  return {
+    ...actual,
+    updateGarmentTagsFromWeb: (
+      ...args: Parameters<typeof actual.updateGarmentTagsFromWeb>
+    ) => {
+      const call = actual.updateGarmentTagsFromWeb(...args)
+      tagSaves.calls.push(call)
+      return call
+    },
+  }
+})
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   webSessionIdentity: () => session.owner,
@@ -67,6 +83,8 @@ function Harness({
   onStylePiece = vi.fn(),
   onRefresh = vi.fn(),
   refreshTo,
+  refreshGate,
+  failedReads = 0,
   withProvider = true,
 }: {
   initial?: ClosetGarment | null
@@ -75,20 +93,38 @@ function Harness({
   onRefresh?: () => void
   /** What the closet re-read finds; it arrives after the refresh call, as a real read does. */
   refreshTo?: ClosetGarment
+  /** Holds every closet re-read until the test resolves it. */
+  refreshGate?: Promise<void>
+  /** How many closet re-reads fail before one succeeds. */
+  failedReads?: number
   withProvider?: boolean
 }) {
   const [garment, setGarment] = useState<ClosetGarment | null>(initial)
+  const [read, setRead] = useState({ loading: false, failed: false })
+  const reads = useRef(0)
   const refresh = () => {
     onRefresh()
-    if (refreshTo) setTimeout(() => setGarment(refreshTo), 0)
+    if (!refreshTo) return
+    const attempt = ++reads.current
+    setRead({ loading: true, failed: false })
+    void (refreshGate ?? Promise.resolve()).then(() =>
+      setTimeout(() => {
+        if (attempt <= failedReads) {
+          setRead({ loading: false, failed: true })
+          return
+        }
+        setRead({ loading: false, failed: false })
+        setGarment(refreshTo)
+      }, 0)
+    )
   }
   const detail = (
     <GarmentDetail
       garment={garment}
       owner={owner}
       hasLoaded
-      loadFailed={false}
-      loading={false}
+      loadFailed={read.failed}
+      loading={read.loading}
       onBack={onBack}
       onTagsSaved={setGarment}
       onRefresh={refresh}
@@ -131,6 +167,7 @@ beforeEach(() => {
   sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, owner)
   setOnline(true)
   patches = []
+  tagSaves.calls = []
   reply = acceptTags
   useMswHandlers(
     http.patch(tagsPath, async ({ request }) => {
@@ -341,6 +378,91 @@ describe('GarmentDetail', () => {
     }
   )
 
+  it('[P1] [7.5-CMP-009] after a conflict, Done waits for the re-read, even for a draft back on the old tags', async () => {
+    const user = userEvent.setup()
+    const readLands = Promise.withResolvers<void>()
+    const stored: GarmentWithColor = { ...blueTop, material: 'linen' }
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    render(<Harness refreshTo={stored} refreshGate={readLands.promise} />)
+
+    await editTo(user, { material: 'wool' })
+    const done = screen.getByTestId('garment-tag-done')
+    await user.click(done)
+    await screen.findByTestId('garment-tag-error')
+    // The member puts the draft back on the tags the editor opened with before the read lands.
+    await user.click(screen.getByTestId('garment-tag-option-material-cotton'))
+    await waitFor(() => expect(done).toHaveAttribute('aria-disabled', 'true'))
+
+    await user.click(done)
+    // Done waits: no request and no "No changes" against the tags from before the conflict.
+    expect(patches).toHaveLength(1)
+    expect(screen.getByTestId('status-feedback-bar')).not.toHaveTextContent('No changes')
+    expect(done).toHaveFocus()
+
+    await act(async () => {
+      readLands.resolve()
+      await readLands.promise
+    })
+    await waitFor(() =>
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Linen$/)
+    )
+    expect(done).toHaveAttribute('aria-disabled', 'false')
+
+    reply = acceptTags
+    await user.click(done)
+    expect(await statusBar()).toHaveTextContent('Saved')
+    expect(patches[1]!.body).toEqual({
+      ...loaded,
+      expected: { ...loaded, material: 'linen' },
+    })
+  })
+
+  it('[P1] [7.5-CMP-009] a failed re-read after a conflict offers Retry, which reads the closet again', async () => {
+    const user = userEvent.setup()
+    const onRefresh = vi.fn()
+    const stored: GarmentWithColor = { ...blueTop, material: 'linen' }
+    reply = () =>
+      HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    render(<Harness onRefresh={onRefresh} refreshTo={stored} failedReads={1} />)
+
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    const retry = await screen.findByTestId('garment-tag-reread')
+    expect(retry).toHaveTextContent('Retry')
+    expect(screen.getByTestId('garment-tag-done')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+
+    await user.click(retry)
+    expect(onRefresh).toHaveBeenCalledTimes(2)
+    await waitFor(() =>
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Linen$/)
+    )
+    expect(screen.queryByTestId('garment-tag-reread')).toBeNull()
+    expect(screen.getByTestId('garment-tag-option-material-wool')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+
+    reply = acceptTags
+    await user.click(screen.getByTestId('garment-tag-done'))
+    expect(await statusBar()).toHaveTextContent('Saved')
+    expect(patches[1]!.body).toEqual({
+      ...loaded,
+      material: 'wool',
+      expected: { ...loaded, material: 'linen' },
+    })
+  })
+
   it('[P1] [7.5-CMP-009] after a conflict, a draft that matches the re-read tags says No changes', async () => {
     const user = userEvent.setup()
     const stored: GarmentWithColor = { ...blueTop, material: 'wool' }
@@ -432,7 +554,10 @@ describe('GarmentDetail', () => {
       expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(
         /^Cotton$/
       )
-      expect(screen.getByTestId('garment-tag-done')).toBeEnabled()
+      expect(screen.getByTestId('garment-tag-done')).toHaveAttribute(
+        'aria-disabled',
+        'false'
+      )
     }
   )
 
@@ -602,7 +727,6 @@ describe('GarmentDetail', () => {
   it('[P0] [7.5-CMP-013] an Undo answer that lands after a newer Done committed leaves that Done in place', async () => {
     const user = userEvent.setup()
     const undoAnswer = Promise.withResolvers<void>()
-    let undoAnswered = false
     render(<Harness />)
     await editTo(user, { material: 'wool' })
     await user.click(screen.getByTestId('garment-tag-done'))
@@ -611,12 +735,12 @@ describe('GarmentDetail', () => {
     reply = async (body) => {
       if (body.material !== 'cotton') return acceptTags(body)
       await undoAnswer.promise
-      undoAnswered = true
       return acceptTags(body)
     }
 
     await user.click(screen.getByTestId('status-bar-action-undo'))
     await waitFor(() => expect(patches).toHaveLength(2))
+    const undoCall = tagSaves.calls[1]!
     await editTo(user, { comfort: 'cold' })
     await user.click(screen.getByTestId('garment-tag-done'))
     await waitFor(() => expect(patches).toHaveLength(3))
@@ -624,10 +748,11 @@ describe('GarmentDetail', () => {
       expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Cold$/)
     )
 
-    undoAnswer.resolve()
-    await waitFor(() => expect(undoAnswered).toBe(true))
-    // Let the held answer reach the screen before checking that it changed nothing.
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 50)))
+    // The detail handles the Undo answer before this await resumes, and act flushes what it set.
+    await act(async () => {
+      undoAnswer.resolve()
+      await undoCall
+    })
 
     // The stale Undo answer (cotton, mild) never replaces the newer Done's garment.
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)

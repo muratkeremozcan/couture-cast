@@ -5,7 +5,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
@@ -76,6 +76,32 @@ vi.mock('expo-file-system', () => ({
   Paths: { cache: 'file:///cache/', document: 'file:///documents' },
 }))
 
+// Every tag save and closet read the detail starts, so a test can await the client answer it
+// is checking.
+const client = vi.hoisted(() => ({
+  saves: [] as Promise<unknown>[],
+  reads: [] as Promise<unknown>[],
+}))
+vi.mock('@/src/lib/wardrobe', async (importOriginal) => {
+  const actual = await importOriginal<typeof MobileWardrobe>()
+  return {
+    ...actual,
+    updateGarmentTagsFromMobile: (
+      ...args: Parameters<typeof actual.updateGarmentTagsFromMobile>
+    ) => {
+      const call = actual.updateGarmentTagsFromMobile(...args)
+      client.saves.push(call)
+      return call
+    },
+    listGarmentsFromMobile: (
+      ...args: Parameters<typeof actual.listGarmentsFromMobile>
+    ) => {
+      const call = actual.listGarmentsFromMobile(...args)
+      client.reads.push(call)
+      return call
+    },
+  }
+})
 vi.mock('expo-crypto', () => ({
   digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
@@ -94,6 +120,7 @@ import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
+import type * as MobileWardrobe from '@/src/lib/wardrobe'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
 import { server } from '@/src/test-utils/msw/server'
@@ -164,6 +191,16 @@ const TAG_CHOICES: Record<string, readonly [group: string, choice: string]> = {
 
 const editTagsButton = () => screen.findByRole('button', { name: 'Edit tags' })
 
+/** Picks one option in the open editor the way a screen reader user names it. */
+async function openEditorChoice(testId: string) {
+  const [group, choice] = TAG_CHOICES[testId]!
+  await browserUser.click(
+    within(screen.getByRole('radiogroup', { name: group })).getByRole('radio', {
+      name: choice,
+    })
+  )
+}
+
 /** Opens the editor and picks options the way a screen reader user names them. */
 async function openEditorAndPick(...testIds: string[]) {
   await browserUser.click(await editTagsButton())
@@ -191,6 +228,8 @@ describe('GarmentDetailScreen', () => {
     reportNetworkOnline()
     closet = [blueTop]
     patches = []
+    client.saves = []
+    client.reads = []
     reply = acceptTags
     changes = 0
     stopWatching = onWardrobeChanged(() => {
@@ -394,6 +433,112 @@ describe('GarmentDetailScreen', () => {
     }
   )
 
+  it('[P1] [7.5-NAT-005] after a conflict, Done waits for the re-read, even for a draft back on the old tags', async () => {
+    let releaseRead!: () => void
+    const readHeld = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    let conflicted = false
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        if (conflicted) await readHeld
+        return HttpResponse.json({ data: closet })
+      })
+    )
+    reply = () => {
+      conflicted = true
+      return HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    }
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    closet = [{ ...blueTop, material: 'linen' }]
+
+    await browserUser.click(tag('garment-tag-done'))
+    await screen.findByTestId('garment-tag-error')
+    // The member puts the draft back on the tags the editor opened with before the read lands.
+    await openEditorChoice('garment-tag-option-material-cotton')
+    await waitFor(() =>
+      expect(tag('garment-tag-done')).toHaveAttribute('aria-disabled', 'true')
+    )
+
+    // A press while the read is pending does nothing: no request and no "No changes".
+    act(() => {
+      fireEvent.click(tag('garment-tag-done'))
+    })
+    expect(patches).toHaveLength(1)
+    expect(tag('status-feedback-bar')).not.toHaveTextContent('No changes')
+
+    const pendingRead = client.reads.at(-1)!
+    await act(async () => {
+      releaseRead()
+      await pendingRead
+    })
+    await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Linen'))
+    await waitFor(() =>
+      expect(tag('garment-tag-done')).not.toHaveAttribute('aria-disabled', 'true')
+    )
+
+    reply = acceptTags
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    expect(patches[1]!.body).toEqual({
+      ...loaded,
+      expected: { ...loaded, material: 'linen' },
+    })
+  })
+
+  it('[P1] [7.5-NAT-005] a failed re-read after a conflict offers Retry, which reads the closet again', async () => {
+    let conflicted = false
+    let failedOnce = false
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        if (conflicted && !failedOnce) {
+          failedOnce = true
+          return HttpResponse.json({ message: 'unavailable' }, { status: 503 })
+        }
+        return HttpResponse.json({ data: closet })
+      })
+    )
+    reply = () => {
+      conflicted = true
+      return HttpResponse.json(
+        { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
+        { status: 409 }
+      )
+    }
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    closet = [{ ...blueTop, material: 'linen' }]
+
+    await browserUser.click(tag('garment-tag-done'))
+    const retry = await screen.findByTestId('garment-tag-reread')
+    expect(retry).toHaveTextContent('Retry')
+    expect(tag('garment-tag-done')).toHaveAttribute('aria-disabled', 'true')
+    expect(tag('garment-detail-material').textContent).toBe('Cotton')
+    const readsBefore = client.reads.length
+
+    await browserUser.click(retry)
+    await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Linen'))
+    expect(client.reads).toHaveLength(readsBefore + 1)
+    expect(screen.queryByTestId('garment-tag-reread')).toBeNull()
+    expect(tag('garment-tag-option-material-wool')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+
+    reply = acceptTags
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    expect(patches[1]!.body).toEqual({
+      ...loaded,
+      material: 'wool',
+      expected: { ...loaded, material: 'linen' },
+    })
+  })
+
   it('[P1] [7.5-NAT-005] after a conflict, a draft that matches the re-read tags says No changes', async () => {
     reply = () =>
       HttpResponse.json(
@@ -549,7 +694,6 @@ describe('GarmentDetailScreen', () => {
     const undoHeld = new Promise<void>((resolve) => {
       releaseUndo = resolve
     })
-    let undoAnswered = false
     renderDetail()
     await openEditorAndPick('garment-tag-option-material-wool')
     await browserUser.click(tag('garment-tag-done'))
@@ -559,21 +703,22 @@ describe('GarmentDetailScreen', () => {
     reply = async (body) => {
       if (body.material !== 'cotton') return acceptTags(body)
       await undoHeld
-      undoAnswered = true
       return HttpResponse.json({ data: blueTop })
     }
 
     await browserUser.click(tag('status-bar-action-undo'))
     await waitFor(() => expect(patches).toHaveLength(2))
+    const undoCall = client.saves[1]!
     await openEditorAndPick('garment-tag-option-comfort-cold')
     await browserUser.click(tag('garment-tag-done'))
     await waitFor(() => expect(patches).toHaveLength(3))
     await waitFor(() => expect(tag('garment-detail-comfort').textContent).toBe('Cold'))
 
-    releaseUndo()
-    await waitFor(() => expect(undoAnswered).toBe(true))
-    // Let the held answer reach the screen before checking that it changed nothing.
-    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 50)))
+    // The detail handles the Undo answer before this await resumes, and act flushes what it set.
+    await act(async () => {
+      releaseUndo()
+      await undoCall
+    })
 
     // The stale Undo answer (cotton, mild) never replaces the newer Done's garment.
     expect(tag('garment-detail-material').textContent).toBe('Wool')
@@ -582,13 +727,6 @@ describe('GarmentDetailScreen', () => {
   })
 
   it('[P1] [7.5-NAT-007] an Undo refused because the piece changed elsewhere says so without Retry', async () => {
-    let reads = 0
-    server.use(
-      http.get('*/api/v1/wardrobe/garments', () => {
-        reads += 1
-        return HttpResponse.json({ data: closet })
-      })
-    )
     renderDetail()
     await openEditorAndPick('garment-tag-option-material-wool')
     await browserUser.click(tag('garment-tag-done'))
@@ -599,9 +737,11 @@ describe('GarmentDetailScreen', () => {
         { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
         { status: 409 }
       )
-    // Let any reload the Done started finish, so only the conflict's re-read is counted.
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    const readsBefore = reads
+    // Settle every read started so far, so only reads the conflict starts are counted.
+    await act(async () => {
+      await Promise.allSettled(client.reads)
+    })
+    const readsBefore = client.reads.length
 
     await browserUser.click(await screen.findByTestId('status-bar-action-undo'))
 
@@ -612,10 +752,13 @@ describe('GarmentDetailScreen', () => {
     )
     expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
     expect(tag('garment-detail-material').textContent).toBe('Wool')
-    // The closet reads the piece again once, so the rows show what is stored now.
-    await waitFor(() => expect(reads).toBe(readsBefore + 1))
-    await new Promise((resolve) => setTimeout(resolve, 50))
-    expect(reads).toBe(readsBefore + 1)
+    // The closet reads the piece again once, so the rows show what is stored now. Once that
+    // read has landed and its updates are flushed, no further read has started.
+    await waitFor(() => expect(client.reads).toHaveLength(readsBefore + 1))
+    await act(async () => {
+      await Promise.allSettled(client.reads)
+    })
+    expect(client.reads).toHaveLength(readsBefore + 1)
   })
 
   it('[P1] [7.5-NAT-013] an account change drops the detail notice and its Undo', async () => {

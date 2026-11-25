@@ -266,6 +266,7 @@ function MemberGarmentDetail({
             owner={owner}
             epoch={epoch}
             onRefresh={closet.reload}
+            readFailed={closet.loadFailed && !closet.loading}
             onTagsSaved={(updated) => {
               closet.replaceGarment(updated)
               notifyWardrobeChanged()
@@ -361,8 +362,17 @@ function useGarmentTagEditor({
   const baselineRef = useRef<GarmentTagDraft | null>(null)
   // Set by a 409: the next list read is the member's review point, so it becomes the baseline.
   const rebaseAfterConflictRef = useRef(false)
+  // True from a 409 until that re-read lands: Done waits, so it never compares the draft with
+  // the pre-conflict baseline.
+  const [awaitingRead, setAwaitingRead] = useState(false)
+  const awaitingReadRef = useRef(false)
+  const setAwaiting = (value: boolean) => {
+    awaitingReadRef.current = value
+    setAwaitingRead(value)
+  }
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
   const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
+  const doneBlockedNow = () => saveState !== 'idle' || awaitingReadRef.current
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
   const saved = garmentTagDraft(garment)
 
@@ -506,11 +516,14 @@ function useGarmentTagEditor({
     if (!rebaseAfterConflictRef.current || !baselineRef.current) return
     rebaseAfterConflictRef.current = false
     baselineRef.current = garmentTagDraft(garment)
+    awaitingReadRef.current = false
+    setAwaitingRead(false)
   }, [garment])
 
   const closeEditor = () => {
     baselineRef.current = null
     rebaseAfterConflictRef.current = false
+    setAwaiting(false)
     setDraft(null)
     setFailure(null)
   }
@@ -519,6 +532,7 @@ function useGarmentTagEditor({
     if (!saved) return
     baselineRef.current = saved
     rebaseAfterConflictRef.current = false
+    setAwaiting(false)
     setFailure(null)
     setDraft(saved)
   }
@@ -530,6 +544,7 @@ function useGarmentTagEditor({
     // as the baseline once they land. The conflict message asks the member to check them.
     if (kind === 'conflict') {
       rebaseAfterConflictRef.current = true
+      setAwaiting(true)
       onRefresh()
     }
     showNotice(actionOwner, kind, {
@@ -551,7 +566,7 @@ function useGarmentTagEditor({
 
   const handleDone = async () => {
     const baseline = baselineRef.current
-    if (!draft || !baseline || saveState !== 'idle') return
+    if (!draft || !baseline || doneBlockedNow()) return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
     retireUndo()
@@ -625,6 +640,7 @@ function useGarmentTagEditor({
     draft,
     setDraft,
     saveState,
+    awaitingRead,
     failure,
     failureMessage,
     canEdit: Boolean(saved),
@@ -721,6 +737,7 @@ function GarmentTagPanel({
   owner,
   epoch,
   onRefresh,
+  readFailed,
   onTagsSaved,
   styleEntry,
 }: {
@@ -728,6 +745,8 @@ function GarmentTagPanel({
   owner: string | null
   epoch: number
   onRefresh: () => void
+  /** The latest closet read failed and none is running. */
+  readFailed: boolean
   onTagsSaved: (garment: GarmentWithColor) => void
   styleEntry: ReactNode
 }) {
@@ -737,8 +756,9 @@ function GarmentTagPanel({
   const values = getGuestPreviewStrings(locale).values
   const labels = formatGarmentTagLabels(locale, garment)
   const editor = useGarmentTagEditor({ garment, owner, epoch, onTagsSaved, onRefresh })
-  const { draft, setDraft, failure, saveState } = editor
+  const { draft, setDraft, failure, saveState, awaitingRead } = editor
   const saving = saveState !== 'idle'
+  const doneBlocked = saving || awaitingRead
 
   const tagRow = (testID: string, label: string, value: string) => (
     <View style={[styles.tagRow, themed.divider]}>
@@ -846,11 +866,23 @@ function GarmentTagPanel({
               </Text>
             </View>
           ) : null}
+          {awaitingRead && readFailed ? (
+            <Pressable
+              accessibilityRole="button"
+              testID="garment-tag-reread"
+              onPress={onRefresh}
+              style={[styles.secondaryButton, themed.secondaryButton]}
+            >
+              <Text style={[styles.secondaryButtonText, themed.text]}>
+                {t('feedback.retry')}
+              </Text>
+            </Pressable>
+          ) : null}
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ busy: saving, disabled: saving }}
-              disabled={saving}
+              accessibilityState={{ busy: saving, disabled: doneBlocked }}
+              disabled={doneBlocked}
               testID="garment-tag-done"
               onPress={() => void editor.handleDone()}
               style={[styles.primaryButton, themed.primaryButton]}
