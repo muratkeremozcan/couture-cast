@@ -628,7 +628,12 @@ describe('GarmentDetailScreen', () => {
     act(() => setMobileApplicationUserId('another-member'))
 
     await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
-    expect(screen.queryByText('Saved')).toBeNull()
+    // No visible Saved remains. The outer provider's live region keeps the text it already
+    // spoke, since the detail forwards announcements to it; that is not a notice on screen.
+    const visibleSaved = screen
+      .queryAllByText('Saved')
+      .filter((node) => !node.closest('[data-testid="save-feedback-announcer"]'))
+    expect(visibleSaved).toEqual([])
     expect(patches).toHaveLength(1)
   })
 
