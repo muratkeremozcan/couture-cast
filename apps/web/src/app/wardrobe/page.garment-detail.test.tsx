@@ -366,7 +366,8 @@ describe('Closet garment detail', () => {
     })
     render(<WardrobePage />)
     signIn()
-    await user.click(await screen.findByRole('button', { name: 'Show saved looks' }))
+    // The toggle is named by its whole label ("Saved looks, 1 saved, Show saved looks").
+    await user.click(await screen.findByRole('button', { name: /Show saved looks/ }))
     expect(await screen.findByText('Blue top look')).toBeInTheDocument()
     expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
 
