@@ -24,14 +24,17 @@ import {
  *   delayed    populated, every stubbed content read answers after DELAY_MS
  *   late       populated, the active screen's gate reads answer at once, every other content
  *              read after DELAY_MS (AC3: the late sections land after the first tap)
- *   The Community sync channel (`community/events`) is never delayed: past its own deadline the
- *   feed hides as an outage, which is not what these modes measure.
+ *   The Community sync channel (`community/events`, `community/targets/resolve`) answers after
+ *   SYNC_DELAY_MS in both slow modes: past its own ~2 s deadline the feed hides as an outage,
+ *   which is not what these modes measure.
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
  */
 export type ShellMode = 'empty' | 'populated' | 'delayed' | 'late' | 'ritual-503'
 export type ShellScreen = 'home' | 'closet' | 'community' | 'profile'
 
 export const DELAY_MS = 3000
+/** The Community sync channel's slow answer: late, and half its ~2 s deadline. */
+export const SYNC_DELAY_MS = 1000
 
 /** Text the Home outfit renders for one member, so a test can tell two members apart. */
 export const ownerMarker = (memberId: string) => `comfort note for ${memberId}`
@@ -427,10 +430,13 @@ export function createShellRouter(options: {
 
   const delayFor = (key: string) => {
     const held = options.hold?.[key] ?? 0
-    // The Community sync channel gives up on an events read after about 2 s and then hides the
-    // feed as an outage (CI trace, 3d4b5c96: events aborted at 1996 ms). Delaying it past that
-    // measures an outage, not slow content, so it answers at once in every mode.
-    if (key === 'community-events') return held
+    // The Community sync channel (events and the target resolve) gives up on a read after about
+    // 2 s, then hides the feed as an outage and bootstraps again (CI traces: events aborted at
+    // 1996 ms on 3d4b5c96, resolve at 2000 ms on 330e6966, after which the rebuild loop kept a
+    // read in flight for good). Past that deadline these modes would measure an outage, not slow
+    // content, so the sync answers late but inside it.
+    if (key === 'community-events' || key === 'community-resolve')
+      return held + (mode === 'delayed' || mode === 'late' ? SYNC_DELAY_MS : 0)
     if (mode === 'delayed') return DELAY_MS + held
     if (mode === 'late' && !GATE_READS[options.screen()].includes(key))
       return DELAY_MS + held
