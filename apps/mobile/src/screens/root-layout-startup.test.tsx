@@ -23,6 +23,8 @@ const layout = vi.hoisted(() => {
   ;(globalThis as { require?: unknown }).require ??= () => 1
   return {
     screens: [] as { name: string; options?: Record<string, unknown> }[],
+    stackOptions: [] as Record<string, unknown>[],
+    reduceMotion: false,
     statusBars: [] as Record<string, unknown>[],
     // Plain counters: a `vi.fn` subscribes to every promise it returns (settledResults),
     // which would handle a rejection the layout forgot to catch and hide the bug.
@@ -79,7 +81,16 @@ vi.mock('expo-status-bar', () => ({
   },
 }))
 vi.mock('expo-router', () => {
-  const Stack = ({ children }: { children: ReactNode }) => children
+  const Stack = ({
+    children,
+    screenOptions,
+  }: {
+    children: ReactNode
+    screenOptions?: Record<string, unknown>
+  }) => {
+    if (screenOptions) layout.stackOptions.push(screenOptions)
+    return children
+  }
   Stack.Screen = (props: { name: string; options?: Record<string, unknown> }) => {
     layout.screens.push(props)
     return null
@@ -123,6 +134,10 @@ vi.mock('@/src/analytics/track-events', () => ({
 vi.mock('@/src/lib/i18n', () => ({ initI18n: () => Promise.resolve() }))
 vi.mock('@/src/lib/background-task', () => ({
   registerRitualBackgroundTaskAsync: () => Promise.resolve(),
+}))
+// Story CC-7.7 D6: the stack's transitions follow the OS reduced-motion setting.
+vi.mock('@/src/hooks/use-reduced-motion', () => ({
+  useReducedMotion: () => layout.reduceMotion,
 }))
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   AccessibilityAnnouncerProvider: ({ children }: { children: ReactNode }) => children,
@@ -168,6 +183,8 @@ async function mountLayout() {
 describe('RootLayout startup', () => {
   beforeEach(() => {
     layout.screens.length = 0
+    layout.stackOptions.length = 0
+    layout.reduceMotion = false
     layout.statusBars.length = 0
     layout.sweepCalls = 0
     layout.cleanupCalls = 0
@@ -221,6 +238,24 @@ describe('RootLayout startup', () => {
       })
     }
   )
+
+  it('7.7-NAT-005 gives the root stack 200 ms transitions while motion is on', async () => {
+    await mountLayout()
+
+    const options = layout.stackOptions.at(-1)
+    expect(options).toMatchObject({ animationDuration: 200 })
+    expect(options).not.toHaveProperty('animation')
+  })
+
+  it('7.7-NAT-005 turns root stack transitions off under reduced motion', async () => {
+    layout.reduceMotion = true
+    await mountLayout()
+
+    expect(layout.stackOptions.at(-1)).toMatchObject({
+      animationDuration: 200,
+      animation: 'none',
+    })
+  })
 
   it('mounts one root status bar that follows the OS scheme', async () => {
     await mountLayout()

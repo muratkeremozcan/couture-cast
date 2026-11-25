@@ -153,3 +153,34 @@ it('never inserts looks from an insertion started before the filter changed', as
   )
   expect(screen.queryByTestId('lookbook-card-post-cold-new')).toBeNull()
 })
+
+// Story CC-7.7 D4 (7.7-CMP-008): realtime looks that arrive after the first paint show as a pill
+// pinned over the top of the list. It takes no space in the flow, so nothing in the list moves.
+it('7.7-CMP-008 the new-looks pill is an overlay over the list, and the list does not move for it', async () => {
+  const feeds = useTwoFilterFeeds()
+  const user = userEvent.setup()
+  renderGrid()
+  await user.click(await screen.findByTestId('community-filter-cold_dry'))
+  await screen.findByTestId('lookbook-card-post-cold')
+  const grid = screen.getByTestId('community-card-grid')
+  const overlayHost = grid.previousElementSibling as HTMLElement
+  const flowBefore = [...grid.parentElement!.parentElement!.children]
+
+  await act(async () => {
+    await feeds.syncs.at(-1)!.catchUp()
+  })
+  feeds.state.published = true
+  await act(async () => {
+    await feeds.syncs.at(-1)!.catchUp()
+  })
+  const pill = await screen.findByRole('button', { name: 'Show 1 new looks' })
+
+  expect(pill).toHaveAttribute('data-testid', 'community-new-looks-pill')
+  // The pill lives in a zero-height, sticky host pinned above the grid, inside the list's own
+  // wrapper: no new element joins the section's flow and the grid keeps its place.
+  expect(overlayHost.contains(pill)).toBe(true)
+  expect(overlayHost).toHaveClass('sticky', 'h-0', 'pointer-events-none')
+  expect(grid.previousElementSibling).toBe(overlayHost)
+  expect([...grid.parentElement!.parentElement!.children]).toEqual(flowBefore)
+  expect(pill).toHaveClass('pointer-events-auto')
+})

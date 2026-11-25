@@ -85,6 +85,7 @@
     "diagnostic_info": "Das Tracking für alert_received ist mit den echten Push-Benachrichtigungsempfängern verknüpft."
   },
   "common": {
+    "loading": "Wird geladen",
     "cancel": "Abbrechen",
     "dismiss_banner": "Banner schließen",
     "invalid_link": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar.",

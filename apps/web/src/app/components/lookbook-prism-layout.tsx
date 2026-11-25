@@ -21,6 +21,8 @@ import {
   HomeSpotlightTeaserSlot,
   useHomeSpotlightTeaserLink,
 } from './home-spotlight-teaser'
+import { useScreenGateRead } from './screen-gate'
+import { useHydrating } from '../../lib/use-web-session'
 
 /**
  * Story 6.1: every chip category lands on the `auto` feed.
@@ -160,6 +162,18 @@ function PlannerOverlaySlot({
   )
 }
 
+/**
+ * Story CC-7.7 D4: the teaser's place is known once the viewport is measured; it shows only when
+ * the layout stacks, and then the gate waits for its read.
+ */
+function teaserGateSettled(
+  measured: boolean,
+  stacked: boolean,
+  settled: boolean
+): boolean {
+  return measured && (!stacked || settled)
+}
+
 export function LookbookPrismLayout() {
   const { i18n } = useTranslation(undefined, { i18n: getI18n() })
   const containerRef = useRef<HTMLDivElement>(null)
@@ -195,13 +209,27 @@ export function LookbookPrismLayout() {
   // effect below corrects it immediately on mount, one render after
   // hydration completes, which is the standard fix for viewport-dependent
   // state in an SSR'd component.
-  const [isNarrowViewport, setIsNarrowViewport] = useState(false)
+  //
+  // Story CC-7.7 D5: only hydration needs that literal. A client-side mount (a return to Home)
+  // measures at once, so its first frame already holds the stacked teaser it will keep.
+  const hydrating = useHydrating()
+  const [isNarrowViewport, setIsNarrowViewport] = useState(
+    () => !hydrating && window.innerWidth < 1440
+  )
   // Story 6.7: below 1280px the hero sits above the community section. Same
   // SSR-safe `false` default as above, measured after mount.
-  const [isBelowSplit, setIsBelowSplit] = useState(false)
+  const [isBelowSplit, setIsBelowSplit] = useState(
+    () => !hydrating && window.innerWidth < 1280
+  )
+  // True once the effect below measured the viewport: until then nobody knows whether the
+  // layout stacks, so whether the teaser shows is unknown too.
+  const [isMeasured, setIsMeasured] = useState(!hydrating)
   const isStacked = isMobilePreview || isBelowSplit
   const heroCanvasRef = useRef<HTMLElement>(null)
   const teaser = useHomeSpotlightTeaserLink({ stacked: isStacked })
+  // Story CC-7.7 D4: the teaser sits inside the hero, above the community section, so Home's
+  // screen gate waits for it wherever it shows (stacked layouts).
+  useScreenGateRead('teaser', teaserGateSettled(isMeasured, isStacked, teaser.settled))
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
@@ -287,6 +315,7 @@ export function LookbookPrismLayout() {
     function handleResize() {
       setIsNarrowViewport(window.innerWidth < 1440)
       setIsBelowSplit(window.innerWidth < 1280)
+      setIsMeasured(true)
     }
     // Correct the SSR-safe `false` default to the real viewport immediately
     // on mount -- this runs after hydration has already committed with the
@@ -340,7 +369,7 @@ export function LookbookPrismLayout() {
       ref={containerRef}
       data-focus-surface="light"
       data-testid="lookbook-prism-container"
-      className={`lookbook-body relative w-full bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
+      className={`lookbook-body relative w-full bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
         isMobilePreview
           ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[var(--lookbook-surface)] p-4 shadow-2xl'
           : 'mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-8'
@@ -522,7 +551,7 @@ export function LookbookPrismLayout() {
                   >
                     {!isComparisonMode ? (
                       // Single Primary Card
-                      <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
+                      <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-200 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
                         <div className="mb-4 flex items-center justify-between">
                           <span className="lookbook-metrics text-xs uppercase text-[color:var(--lookbook-gold-ink)]">
                             {heroRecommendation.eyebrow}

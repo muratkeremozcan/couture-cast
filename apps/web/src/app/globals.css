@@ -200,7 +200,7 @@ body {
 }
 
 .planner-rail-enter {
-  animation: planner-rail-in 280ms ease-out;
+  animation: planner-rail-in 200ms ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -246,4 +246,34 @@ html[data-session='member'] [data-landing='guest-inline'] {
 html[data-session='pending'] [data-landing='guest-inline'],
 html[data-session='pending'] [data-landing='refused-inline'] {
   visibility: hidden;
+}
+
+/*
+ * Story CC-7.7 D1 and D3: the screen gate (components/screen-gate.tsx). The gate and its body
+ * take no box of their own, so the tab's layout is the one it always had. A page painted for a
+ * stored session (`member`, or `pending` while it is verified) shows the neutral placeholder in
+ * place of the body until the gate's reads settle and it sets `data-ready`; a signed-out page
+ * never shows the placeholder. These rules apply before first paint, ahead of React.
+ */
+:root {
+  --screen-placeholder-surface: rgb(127 127 127 / 0.08);
+}
+[data-screen-gate],
+[data-screen-body]:not([hidden]) {
+  display: contents;
+}
+[data-screen-placeholder] {
+  display: none;
+}
+html[data-session='member']
+  [data-screen-gate]:not([data-ready])
+  > [data-screen-placeholder]:not([hidden]),
+html[data-session='pending']
+  [data-screen-gate]:not([data-ready])
+  > [data-screen-placeholder]:not([hidden]) {
+  display: block;
+}
+html[data-session='member'] [data-screen-gate]:not([data-ready]) > [data-screen-body],
+html[data-session='pending'] [data-screen-gate]:not([data-ready]) > [data-screen-body] {
+  display: none !important;
 }

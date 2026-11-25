@@ -468,7 +468,8 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
   async function renderLoadedHub(hub: MobileGarmentDeletion = deletion) {
     const view = renderHub(hub)
     await screen.findByTestId(`garment-card-${blueTop.id}`)
-    expect(card(plainShoes.id)).toBeVisible()
+    // Story CC-7.7: the grid shows once the Closet gate's reads (inventory, onboarding) settle.
+    await waitFor(() => expect(card(plainShoes.id)).toBeVisible())
     return view
   }
 

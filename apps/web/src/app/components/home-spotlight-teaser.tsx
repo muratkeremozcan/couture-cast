@@ -32,6 +32,9 @@ import {
   type SponsoredShownRegistry,
 } from './community-sponsored-cta'
 import type { SpotlightFocusIntent } from './community-lookbook-grid'
+import { useScreenGateScreen } from './screen-gate'
+import { screenSnapshot } from '../../lib/screen-snapshot'
+import { isLiveOwner, useWebSessionOwner } from '../../lib/use-web-session'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -62,8 +65,9 @@ function useCommunityMember(): string | null | undefined {
   return member
 }
 
-function usePageVisible(): boolean {
-  const [visible, setVisible] = useState(false)
+/** Null until mounted, then whether the page is visible. */
+function usePageVisible(): boolean | null {
+  const [visible, setVisible] = useState<boolean | null>(null)
   useEffect(() => {
     const sync = () => setVisible(document.visibilityState === 'visible')
     sync()
@@ -76,9 +80,19 @@ function usePageVisible(): boolean {
 export interface HomeSpotlightTeaserLifecycle {
   value: SpotlightTeaserValue | null
   removeValue: () => void
+  /**
+   * Story CC-7.7 D4: the teaser's read for the current member has answered, or no read will run
+   * (no member, or a hidden page). Home's screen gate waits for it while the layout is stacked,
+   * so the teaser is in place when the body appears instead of pushing the page down later.
+   */
+  settled: boolean
   /** Story 6.7b: shown blocks for this Home visit, kept across the teaser's unmount. */
   sponsoredShown: SponsoredShownRegistry
 }
+
+/** The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5). */
+type TeaserSnapshot = { memberId: string; value: SpotlightTeaserValue | null }
+const TEASER_SNAPSHOT_PART = 'teaser'
 
 /**
  * Lives in the layout, so the value and its read time survive the teaser's
@@ -91,31 +105,76 @@ export function useHomeSpotlightTeaser({
 }: {
   stacked: boolean
 }): HomeSpotlightTeaserLifecycle {
+  // The member each read started for, so a settled read counts only for that member.
+  const readingForRef = useRef<string | null | undefined>(undefined)
+  const [settledFor, setSettledFor] = useState<string | null | undefined>(undefined)
   const [state] = useState(
     () =>
       new SpotlightTeaserState({
-        read: (signal) =>
-          withRequestDeadline(SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS, [signal], (deadline) =>
-            getCommunitySpotlightFromWeb({
-              limit: 1,
-              surface: 'home_teaser',
-              signal: deadline,
-            })
-          ),
+        read: (signal) => {
+          const readFor = readingForRef.current
+          return withRequestDeadline(
+            SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS,
+            [signal],
+            (deadline) =>
+              getCommunitySpotlightFromWeb({
+                limit: 1,
+                surface: 'home_teaser',
+                signal: deadline,
+              })
+          ).finally(() => {
+            // After the state stored its answer (it does so as this promise settles), so the
+            // gate never opens on the settled flag before the value is there to render.
+            if (!signal.aborted) setTimeout(() => setSettledFor(readFor), 0)
+          })
+        },
         retryAfterSeconds: communityRetryAfterSeconds,
       })
   )
-  const value = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
+  const liveValue = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
   const sponsoredShown = useSponsoredShownRegistry()
   const member = useCommunityMember()
   const visible = usePageVisible()
 
+  // Story CC-7.7 D5: a return to Home shows the teaser it last showed this member (or none)
+  // until the teaser's own read answers, then the read's answer, in place.
+  const screen = useScreenGateScreen()
+  const owner = useWebSessionOwner()
+  const [snapshot] = useState(() =>
+    screen && owner
+      ? screenSnapshot.recall<TeaserSnapshot>(owner, screen, TEASER_SNAPSHOT_PART)
+      : undefined
+  )
+  const [snapshotDropped, setSnapshotDropped] = useState(false)
+  const memberSettled = member !== undefined && settledFor === member
+  const snapshotLive =
+    !snapshotDropped &&
+    !memberSettled &&
+    member !== undefined &&
+    member !== null &&
+    snapshot?.memberId === member
+  const value = liveValue ?? (snapshotLive ? (snapshot?.value ?? null) : null)
+  const settled = member === null || visible === false || memberSettled || snapshotLive
+  const removeValue = useCallback(() => {
+    setSnapshotDropped(true)
+    state.removeValue()
+  }, [state])
+
   useEffect(() => {
+    if (!screen || !owner || !member || !memberSettled || !isLiveOwner(owner)) return
+    screenSnapshot.remember(owner, screen, TEASER_SNAPSHOT_PART, {
+      memberId: member,
+      value: liveValue,
+    } satisfies TeaserSnapshot)
+  }, [liveValue, member, memberSettled, owner, screen])
+
+  useEffect(() => {
+    readingForRef.current = member
     state.setMember(member)
   }, [member, state])
 
   useEffect(() => {
-    state.setActive(stacked && visible)
+    state.setActive(stacked && visible === true)
   }, [stacked, visible, state])
 
   useEffect(
@@ -126,7 +185,7 @@ export function useHomeSpotlightTeaser({
     [state]
   )
 
-  return { value, removeValue: state.removeValue, sponsoredShown }
+  return { value, removeValue, sponsoredShown, settled }
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
@@ -227,7 +286,7 @@ export function HomeSpotlightTeaser({
           event.preventDefault()
           onOpen()
         }}
-        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
+        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-4 text-left motion-safe:transition-colors motion-safe:duration-200 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
       >
         <Image
           data-testid="home-spotlight-teaser-image"

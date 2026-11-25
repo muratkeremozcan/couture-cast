@@ -93,6 +93,11 @@ export interface UseCommunitySpotlightOptions<Token = number> {
     token: Token
   ) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
+  /**
+   * Story CC-7.7 D5: the state a return to the tab starts from (its last settled spotlight for
+   * this member). The first read then refreshes it in place.
+   */
+  initial?: CommunitySpotlightState
 }
 
 /**
@@ -127,8 +132,9 @@ export function useCommunitySpotlight<Token = number>({
   beginRead,
   reconcile,
   announce,
+  initial,
 }: UseCommunitySpotlightOptions<Token>) {
-  const [state, setState] = useState<CommunitySpotlightState>(IDLE)
+  const [state, setState] = useState<CommunitySpotlightState>(initial ?? IDLE)
   const stateRef = useRef(state)
   stateRef.current = state
   const beginReadRef = useRef(beginRead)
@@ -466,28 +472,15 @@ function focusSpotlightCard(postId: string) {
 
 function SpotlightStates({
   state,
-  isMobilePreview,
   t,
   onRetry,
-}: Pick<CommunitySpotlightSectionProps, 'state' | 'isMobilePreview' | 't' | 'onRetry'>) {
+}: Pick<CommunitySpotlightSectionProps, 'state' | 't' | 'onRetry'>) {
   if (state.status === 'loading') {
-    // Decorative. The section carries `aria-busy`, and the grid's single live
-    // region stays free for the feed's own loading announcement. The skeleton
-    // takes the row's shape, so the feed below does not jump when cards land.
-    return (
-      <div
-        data-testid="community-spotlight-loading"
-        aria-hidden="true"
-        className="flex gap-4 overflow-hidden p-1 [container-type:inline-size]"
-      >
-        {[1, 2].map((n) => (
-          <div
-            key={n}
-            className={`h-72 shrink-0 animate-pulse rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] ${cardWidth(isMobilePreview)}`}
-          />
-        ))}
-      </div>
-    )
+    // Story CC-7.7: no skeleton. A skeleton that collapsed into the real row moved the feed below
+    // it; the tab's screen gate now holds the whole body until this read settles, so the first
+    // load never shows here, and a retry keeps the section's heading while it reads. The empty
+    // marker stays for the tests and the section's `aria-busy`.
+    return <div data-testid="community-spotlight-loading" aria-hidden="true" />
   }
   if (state.status === 'disabled') {
     return (
@@ -645,7 +638,10 @@ export function CommunitySpotlightSection({
 
   if (state.status === 'idle' || !available) return null
 
-  const ready = state.status === 'ready'
+  // A refresh of a shown row (a return to the tab, or a session recheck) keeps the row in place
+  // while it reads, instead of collapsing it (CC-7.7 D5).
+  const refreshing = state.status === 'loading' && state.items.length > 0
+  const ready = state.status === 'ready' || refreshing
   const hasArea = ready && state.level !== 'none' && state.label
   // A page can arrive with every post filtered while ranks remain behind its
   // cursor. The empty state is for a spotlight with nothing left to show.
@@ -686,12 +682,7 @@ export function CommunitySpotlightSection({
           renderCard={renderCard}
         />
       ) : (
-        <SpotlightStates
-          state={state}
-          isMobilePreview={isMobilePreview}
-          t={t}
-          onRetry={onRetry}
-        />
+        <SpotlightStates state={state} t={t} onRetry={onRetry} />
       )}
     </section>
   )

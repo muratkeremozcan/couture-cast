@@ -1325,7 +1325,8 @@
     "navigatedTo": "Aba {{label}} aberta"
   },
   "session": {
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "loading": "Carregando"
   },
   "feedback": {
     "save": "Salvar",

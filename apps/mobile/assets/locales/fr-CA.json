@@ -85,6 +85,7 @@
     "diagnostic_info": "Le suivi alert_received est relié aux écouteurs de réception de notifications push réels."
   },
   "common": {
+    "loading": "Chargement",
     "cancel": "Annuler",
     "dismiss_banner": "Fermer la bannière",
     "invalid_link": "Ce lien est invalide, expiré ou n’est plus disponible.",

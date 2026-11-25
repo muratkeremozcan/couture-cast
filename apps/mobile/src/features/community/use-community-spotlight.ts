@@ -123,6 +123,8 @@ export function useCommunitySpotlight({
   const [fallbackTextLedger] = useState(() => new CommunityPostTextLedger())
   const textLedger = postTextLedger ?? fallbackTextLedger
   const [status, setStatus] = useState<SpotlightStatus>('loading')
+  const statusRef = useRef(status)
+  statusRef.current = status
   const [level, setLevel] = useState<CommunitySpotlightLevel>('none')
   const [label, setLabel] = useState<string | null>(null)
   const [items, setItems] = useState<CommunityReactionSpotlightItem[]>([])
@@ -173,14 +175,16 @@ export function useCommunitySpotlight({
   }, [])
 
   const load = useCallback(
-    async (restarted = false) => {
+    async (restarted = false, inPlace = false) => {
       const ticket = reactionState.beginRead()
       const textStamp = textLedger.begin()
       const { controller, isCurrent } = begin()
       loadingMoreRef.current = false
       setIsLoadingMore(false)
       setLoadMoreFailed(false)
-      setStatus('loading')
+      // Story CC-7.7 D5: a pull to refresh or a location change over a shown row refreshes in
+      // place. The row never collapses into the loading line, so the feed below stays put.
+      if (!inPlace) setStatus('loading')
       try {
         const stamp = sponsorships.begin()
         const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
@@ -216,10 +220,12 @@ export function useCommunitySpotlight({
         setStatus('ready')
       } catch (error: unknown) {
         if (!isCurrent()) return
+        const sanction = communitySanctionOf(error)
+        // A failed refresh keeps the row on screen; a ban or a disabled Spotlight still closes it.
+        if (inPlace && !sanction && !isDisabledRefusal(error)) return
         setItems([])
         setNextCursor(null)
         setFocusRequest(null)
-        const sanction = communitySanctionOf(error)
         if (sanction) onBannedRef.current?.(sanction)
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
       }
@@ -231,7 +237,7 @@ export function useCommunitySpotlight({
   const sessionScopeRef = useRef(sessionScope)
   sessionScopeRef.current = sessionScope
   const reload = useCallback(() => {
-    if (sessionScopeRef.current) void load()
+    if (sessionScopeRef.current) void load(false, statusRef.current === 'ready')
   }, [load])
 
   const loadMore = useCallback(() => {

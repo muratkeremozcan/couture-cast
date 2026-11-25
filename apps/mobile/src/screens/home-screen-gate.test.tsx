@@ -1,0 +1,237 @@
+// Learning path Step 65: Signed-in shell without flashes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
+// Story CC-7.7 builder tests: 7.7-NAT-002, 7.7-NAT-003 and the Home half of 7.7-NAT-004.
+// Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md.
+// Home shows the gate's placeholder until the ritual read (which carries the weather) settles:
+// the member sample never shows first (D2), the stale and alert banners arrive with the body
+// (D4), and a refresh with the outfit on screen never returns to the loading state (D5).
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
+import type * as RitualCacheModule from '@/src/lib/ritual-cache'
+import React from 'react'
+import { act, configure, screen, waitFor } from '@testing-library/react'
+import { render } from 'vitest-browser-react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { http, HttpResponse } from 'msw'
+
+const ritualCache = vi.hoisted(() => ({
+  cached: null as null | { data: unknown; timestamp: number },
+}))
+
+vi.mock('expo-router', async () => ({
+  useLocalSearchParams: () => ({}),
+  useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
+}))
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
+}))
+vi.mock('@/src/analytics/mobile-analytics', async () =>
+  (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
+)
+vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof RitualCacheModule>()
+  return {
+    withoutShopThisLook: actual.withoutShopThisLook,
+    ritualCacheOwner: actual.ritualCacheOwner,
+    readLatestRitualCache: () => Promise.resolve(ritualCache.cached),
+    saveRitualCache: () => Promise.resolve(undefined),
+    clearRitualMemoryCache: () => undefined,
+    forgetLatestRitual: () => Promise.resolve(undefined),
+  }
+})
+
+import TabOneScreen from '@/app/(tabs)/index'
+import { server } from '@/src/test-utils/msw/server'
+import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import i18n, { initI18n } from '@/src/lib/i18n'
+
+/** Ritual answers the test releases by hand, in request order. */
+function heldRitualAnswers() {
+  const releases: ((response: Response) => void)[] = []
+  server.use(
+    http.get(
+      '*/api/v1/ritual',
+      () =>
+        new Promise<Response>((resolve) => {
+          releases.push(resolve)
+        })
+    )
+  )
+  return {
+    requests: () => releases.length,
+    release: async (index: number, response: Response) => {
+      await waitFor(() => expect(releases.length).toBeGreaterThan(index))
+      await act(async () => {
+        releases[index]!(response)
+        await Promise.resolve()
+      })
+    },
+  }
+}
+
+const emptyOutfitRitual = {
+  ...mockRitualResponse,
+  data: {
+    ...mockRitualResponse.data,
+    outfits: mockRitualResponse.data.outfits.map((outfit) => ({
+      ...outfit,
+      garmentIds: [],
+    })),
+  },
+}
+
+const alertRitual = {
+  ...mockRitualResponse,
+  data: {
+    ...mockRitualResponse.data,
+    weather: {
+      ...mockRitualResponse.data.weather,
+      alerts: [
+        {
+          event: 'Severe Wind Advisory',
+          description: 'High winds expected up to 50mph.',
+          start: '2026-07-22T00:00:00.000Z',
+          end: '2026-07-22T06:00:00.000Z',
+          severity: 'high',
+        },
+      ],
+    },
+  },
+}
+
+function renderHome() {
+  return render(
+    <AccessibilityAnnouncerProvider>
+      <TabOneScreen />
+    </AccessibilityAnnouncerProvider>
+  )
+}
+
+const placeholder = () => screen.queryByTestId('screen-placeholder')
+const homeGate = () => screen.getByTestId('screen-gate')
+
+describe('Home screen gate (native)', () => {
+  let restore: (() => void) | undefined
+
+  beforeAll(async () => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+    configure({ asyncUtilTimeout: 5_000 })
+    await initI18n()
+  })
+
+  beforeEach(async () => {
+    ritualCache.cached = null
+    restore = setMobileAccessTokenResolver(() => 'member-token')
+    setMobileApplicationUserId('gate-member')
+    await i18n.changeLanguage('en-US')
+  })
+
+  afterEach(() => {
+    restore?.()
+    setMobileApplicationUserId(null)
+  })
+
+  it('7.7-NAT-002 shows the placeholder, never the member sample, until the ritual and weather read settles', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+
+    await waitFor(() => expect(ritual.requests()).toBe(1))
+    expect(placeholder()).toBeVisible()
+    expect(homeGate()).not.toHaveAttribute('data-ready')
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+    expect(screen.queryByTestId('home-signed-out-welcome')).toBeNull()
+
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+    expect(placeholder()).toBeNull()
+    expect(homeGate()).toHaveAttribute('data-ready', 'true')
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+  })
+
+  it('7.7-NAT-002 shows the member sample only once the ritual settled without a usable outfit', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+
+    await waitFor(() => expect(ritual.requests()).toBe(1))
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+
+    await ritual.release(0, HttpResponse.json(emptyOutfitRitual))
+
+    expect(await screen.findByTestId('member-sample-outfit')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-004 the weather alert banner arrives with the body, never above a shown outfit', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+
+    await waitFor(() => expect(ritual.requests()).toBe(1))
+    expect(screen.queryByTestId('weather-alert-banner')).toBeNull()
+
+    await ritual.release(0, HttpResponse.json(alertRitual))
+
+    await waitFor(() => expect(screen.getByTestId('weather-alert-banner')).toBeVisible())
+    // Same commit: the banner and the weather it sits above appear together.
+    expect(screen.getByTestId('weather-header')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-004 the stale banner arrives with the cached outfit, behind the placeholder until then', async () => {
+    ritualCache.cached = {
+      data: mockRitualResponse,
+      // Older than the 15-minute freshness window, so the network is asked first.
+      timestamp: Date.now() - 20 * 60 * 1000,
+    }
+    const ritual = heldRitualAnswers()
+    await renderHome()
+
+    await waitFor(() => expect(ritual.requests()).toBe(1))
+    expect(placeholder()).toBeVisible()
+    expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
+
+    await ritual.release(0, new HttpResponse(null, { status: 503 }))
+
+    await waitFor(() => expect(screen.getByTestId('stale-cache-banner')).toBeVisible())
+    expect(screen.getByTestId('weather-header')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-003 a refresh with the outfit on screen keeps it in place, with no loading state', async () => {
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() => expect(screen.getByTestId('weather-header')).toBeVisible())
+    const temperature = screen.getByTestId('current-temperature').textContent
+
+    // A locale change reads the ritual again while the outfit stays on screen.
+    await act(async () => {
+      await i18n.changeLanguage('fr-FR')
+    })
+    await waitFor(() => expect(ritual.requests()).toBe(2))
+
+    expect(placeholder()).toBeNull()
+    expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
+    expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
+    expect(screen.getByTestId('weather-header')).toBeVisible()
+    expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
+
+    // A refresh that fails keeps the outfit and inserts no banner above it.
+    await ritual.release(1, new HttpResponse(null, { status: 503 }))
+    // A kept outfit has no event to wait for: give the failed answer a few turns to land.
+    await act(async () => {
+      for (let turn = 0; turn < 5; turn += 1)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(screen.getByTestId('weather-header')).toBeVisible()
+    expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
+    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+  })
+})

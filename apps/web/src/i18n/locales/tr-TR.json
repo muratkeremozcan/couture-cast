@@ -1325,7 +1325,8 @@
     "navigatedTo": "{{label}} sekmesine geçildi"
   },
   "session": {
-    "retry": "Tekrar dene"
+    "retry": "Tekrar dene",
+    "loading": "Yükleniyor"
   },
   "feedback": {
     "save": "Kaydet",

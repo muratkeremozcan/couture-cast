@@ -1325,7 +1325,8 @@
     "navigatedTo": "Zum Tab {{label}} gewechselt"
   },
   "session": {
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "loading": "Wird geladen"
   },
   "feedback": {
     "save": "Speichern",

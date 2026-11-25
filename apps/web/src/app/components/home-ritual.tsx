@@ -59,6 +59,13 @@ import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialo
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
 import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 import { SaveFeedbackProvider, useStatusBar } from './save-feedback'
+import {
+  ScreenGateReport,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useScreenGateScreen,
+} from './screen-gate'
+import { screenSnapshot } from '../../lib/screen-snapshot'
 
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
@@ -797,15 +804,45 @@ function LiveOutfit({
   )
 }
 
+type RitualFailure = 'missing-city' | 'failed'
+
+/** Story CC-7.7 D5: what a return to Home shows in its first frame, per member. */
+type RitualSnapshot = {
+  ritual: LiveRitual | null
+  city: string | undefined
+  failure: RitualFailure | null
+}
+
+const RITUAL_SNAPSHOT_PART = 'ritual'
+
 function MemberRitual({ owner }: { owner: string }) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
-  const [ritual, setRitual] = useState<LiveRitual | null>(null)
-  const [city, setCity] = useState<string>()
-  const [failure, setFailure] = useState<'missing-city' | 'failed' | null>(null)
+  const screen = useScreenGateScreen()
+  const [snapshot] = useState(() =>
+    screen
+      ? screenSnapshot.recall<RitualSnapshot>(owner, screen, RITUAL_SNAPSHOT_PART)
+      : undefined
+  )
+  const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
+  const [city, setCity] = useState<string | undefined>(snapshot?.city)
+  const [failure, setFailure] = useState<RitualFailure | null>(snapshot?.failure ?? null)
   const [attempt, setAttempt] = useState(0)
   const [busy, setBusy] = useState(true)
+  // Story CC-7.7 D2: the ritual read has answered (an outfit, none, or a failure). Until then
+  // nothing renders here, never the sample outfit: a member sees the sample only once their
+  // own read settled without a usable outfit.
+  const settled = ritual !== null || failure !== null
+  useScreenGateRead('ritual', settled)
+  useEffect(() => {
+    if (!screen || !settled || !isLiveOwner(owner)) return
+    screenSnapshot.remember(owner, screen, RITUAL_SNAPSHOT_PART, {
+      ritual,
+      city,
+      failure,
+    } satisfies RitualSnapshot)
+  }, [city, failure, owner, ritual, screen, settled])
 
   useEffect(() => {
     const token = currentWebSessionBearer()
@@ -871,6 +908,8 @@ function MemberRitual({ owner }: { owner: string }) {
       </>
     )
 
+  if (!settled) return null
+
   return (
     <>
       <SampleOutfit
@@ -909,17 +948,20 @@ function HomeRitualSession({
 }) {
   const { i18n } = useTranslation(undefined, { i18n: getI18n() })
   const strings = getGuestPreviewStrings(i18n.language)
+  const guestFirstPaint = useGuestFirstPaint()
   useEffect(() => {
     if (session.status === 'signed_in' || session.status === 'signed_out')
       resetSampleForOwner(session.owner)
   }, [session.owner, session.status])
 
-  if (session.status === 'signed_out') return demo
+  if (session.status === 'signed_out') return <DemoOutfit demo={demo} />
   if (session.owner && isLiveOwner(session.owner))
     return <MemberRitual key={session.owner} owner={session.owner} />
   if (session.status === 'unavailable') {
     return (
       <div role="status">
+        {/* The session check failed: its retry is this section's settled state. */}
+        <ScreenGateReport read="ritual" settled />
         <p>{strings.chrome.sessionUnavailable}</p>
         <button type="button" className={linkClass} onClick={session.retry}>
           {strings.chrome.retry}
@@ -927,7 +969,30 @@ function HomeRitualSession({
       </div>
     )
   }
+  // Story CC-7.7 D1: while the session is checked, a signed-out page (`data-session="none"`)
+  // already shows the demo it will keep, so nothing swaps in after the check. A page painted for
+  // a stored session hides it (globals.css) and its screen gate shows the placeholder instead.
+  if (guestFirstPaint) return <DemoOutfit demo={demo} guestOnly />
   return <p role="status">{strings.chrome.checkingSession}</p>
+}
+
+/** The signed-out demonstration outfit, never shown to a member (D2). */
+function DemoOutfit({
+  demo,
+  guestOnly = false,
+}: {
+  demo: ReactNode
+  guestOnly?: boolean
+}) {
+  return (
+    <div
+      data-testid="home-demo-outfit"
+      data-landing={guestOnly ? 'guest' : undefined}
+      className="flex flex-col gap-6"
+    >
+      {demo}
+    </div>
+  )
 }
 
 export function HomeRitual({ demo }: { demo: ReactNode }) {

@@ -3,7 +3,8 @@
 // Production follow-up after the project close (2026-11-19): when the session check fails (a
 // timeout, a 5xx from the profile check), Shopping and partners, Premium, Interface palettes and
 // the Palette advisor show their load error with one shared Try again control, which verifies the
-// session again. Its one string ships in all ten web locales.
+// session again. Its one string ships in all ten web locales. Story CC-7.7 adds the screen gate
+// placeholder's one visually hidden label, `session.loading`.
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
@@ -51,20 +52,30 @@ function locationsRetry(catalog: Catalog): string {
 
 describe('Session outage locale parity (web)', () => {
   it('SESSION-I18N-WEB-01 matches the canonical en-US strings', () => {
-    expect(sessionStrings(CATALOGS['en-US'])).toEqual({ retry: 'Try again' })
+    expect(sessionStrings(CATALOGS['en-US'])).toEqual({
+      retry: 'Try again',
+      loading: 'Loading',
+    })
   })
 
   it('SESSION-I18N-WEB-02 ships the same keys, non-empty, in every locale', () => {
     for (const locale of SUPPORTED_LOCALES) {
       const strings = sessionStrings(CATALOGS[locale])
-      expect(Object.keys(strings), locale).toEqual(['retry'])
+      expect(Object.keys(strings), locale).toEqual(['retry', 'loading'])
       expect(strings.retry?.trim().length, locale).toBeGreaterThan(0)
+      expect(strings.loading?.trim().length, locale).toBeGreaterThan(0)
     }
   })
 
   it('SESSION-I18N-WEB-03 translates the retry outside English', () => {
     for (const locale of SUPPORTED_LOCALES.filter((tag) => !tag.startsWith('en-'))) {
       expect(sessionStrings(CATALOGS[locale]).retry, locale).not.toBe('Try again')
+    }
+  })
+
+  it('7.7 SESSION-I18N-WEB-05 translates the screen placeholder label outside English', () => {
+    for (const locale of SUPPORTED_LOCALES.filter((tag) => !tag.startsWith('en-'))) {
+      expect(sessionStrings(CATALOGS[locale]).loading, locale).not.toBe('Loading')
     }
   })
 

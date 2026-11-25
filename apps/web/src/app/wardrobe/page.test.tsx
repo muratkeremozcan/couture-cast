@@ -1462,3 +1462,149 @@ describe('WardrobePage commit deduplication', () => {
     }
   })
 })
+
+// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet and the setup progress
+// have answered, so the setup banner is already above the grid at reveal and nothing is inserted
+// there afterwards. The measured budget is 7.7-E2E-001.
+describe('WardrobePage screen gate', () => {
+  beforeEach(() => {
+    resetWardrobeMocks()
+    document.documentElement.setAttribute('data-session', 'member')
+    verifiedSession.owner = 'gate-member'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-gate-member')
+    window.dispatchEvent(new Event('couture:session'))
+  })
+
+  afterEach(() => {
+    cleanup()
+    verifiedSession.owner = null
+    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    document.documentElement.removeAttribute('data-session')
+  })
+
+  it('7.7-CMP-006 waits for the closet and the setup progress, and reveals with the setup banner in place', async () => {
+    const inventory = Promise.withResolvers<GarmentItemContract[]>()
+    const onboarding = Promise.withResolvers<WardrobeOnboardingStateContract>()
+    listGarmentsFromWeb.mockReset().mockReturnValue(inventory.promise)
+    getOnboardingStateFromWeb.mockReset().mockReturnValue(onboarding.promise)
+    render(<WardrobePage />)
+
+    const gate = screen.getByTestId('screen-gate')
+    expect(gate).toHaveAttribute('data-screen', 'closet')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.getByTestId('wardrobe-closet-view')).not.toBeVisible()
+
+    await act(async () => {
+      inventory.resolve([])
+      await inventory.promise
+    })
+    // The closet answered; the setup progress has not, so the body stays hidden.
+    expect(gate).not.toHaveAttribute('data-ready')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+
+    await act(async () => {
+      onboarding.resolve(onboardingState({ status: 'in_progress' }))
+      await onboarding.promise
+    })
+    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+  })
+
+  // A total only the answered page can carry, so "3 saved" proves the read landed (the row
+  // starts at "0 saved" and reads "…" while it loads).
+  const SAVED_LOOKS_PAGE = { data: [], total: 3, limit: 50, offset: 0 }
+  type GateRead = 'garments' | 'onboarding' | 'profile' | 'savedLooks'
+  const GATE_READS: GateRead[] = ['garments', 'onboarding', 'profile', 'savedLooks']
+
+  /**
+   * Holds one of the gate's four reads (or none, the control); the others answer at once with
+   * values that leave evidence on the page. Returns the release.
+   */
+  function holdOneRead(read: GateRead | 'none') {
+    const held = Promise.withResolvers<void>()
+    const answer = <T,>(name: GateRead, value: T) =>
+      read === name ? held.promise.then(() => value) : Promise.resolve(value)
+    listGarmentsFromWeb
+      .mockReset()
+      .mockImplementation(() => answer('garments', [persistedGarment]))
+    getOnboardingStateFromWeb
+      .mockReset()
+      .mockImplementation(() =>
+        answer('onboarding', onboardingState({ status: 'in_progress' }))
+      )
+    resolveCurrentUserId
+      .mockReset()
+      .mockImplementation(() => answer('profile', 'user-hub-1'))
+    savedLooksMocks.listSavedLooksPageFromWeb.mockImplementationOnce(() =>
+      answer('savedLooks', SAVED_LOOKS_PAGE)
+    )
+    return held
+  }
+
+  /** Positive evidence that an answered read landed, rendered under the closed gate. */
+  function expectLanded(read: GateRead) {
+    switch (read) {
+      case 'garments':
+        expect(listGarmentsFromWeb).toHaveBeenCalled()
+        expect(
+          screen.getByTestId(`garment-card-${persistedGarment.id}`)
+        ).toBeInTheDocument()
+        return
+      case 'onboarding':
+        expect(getOnboardingStateFromWeb).toHaveBeenCalled()
+        expect(
+          screen.getByRole('link', { name: 'Set up your closet', hidden: true })
+        ).toBeInTheDocument()
+        return
+      case 'profile':
+        // The header sits outside the gate: Silhouette enables once the account read answers.
+        expect(resolveCurrentUserId).toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+        return
+      case 'savedLooks':
+        expect(savedLooksMocks.listSavedLooksPageFromWeb).toHaveBeenCalled()
+        expect(screen.getByText('3 saved')).toBeInTheDocument()
+    }
+  }
+
+  it('7.7-CMP-006 control: with every read answered the gate opens once they land', async () => {
+    holdOneRead('none')
+    render(<WardrobePage />)
+    const gate = screen.getByTestId('screen-gate')
+
+    await waitFor(() => {
+      for (const read of GATE_READS) expectLanded(read)
+    })
+    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+    expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+  })
+
+  it.each(GATE_READS)(
+    '7.7-CMP-006 stays closed while the %s read is unanswered and the others have landed, then opens',
+    async (read) => {
+      const held = holdOneRead(read)
+      render(<WardrobePage />)
+      const gate = screen.getByTestId('screen-gate')
+
+      // Judge the gate only once every answered read has visibly landed under it.
+      await waitFor(() => {
+        for (const other of GATE_READS) if (other !== read) expectLanded(other)
+      })
+      expect(gate).not.toHaveAttribute('data-ready')
+      expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+      expect(screen.getByTestId('wardrobe-closet-view')).not.toBeVisible()
+
+      await act(async () => {
+        held.resolve()
+        await held.promise
+      })
+      await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+      expectLanded(read)
+      expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+      expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+    }
+  )
+})

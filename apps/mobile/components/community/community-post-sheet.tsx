@@ -41,6 +41,7 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useGlyphBox } from '@/components/glyph-box'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useComposeFieldReveal } from './compose-field-reveal'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 /**
  * `hero-theme.ts` carries neither the premium gold accent nor the community
@@ -279,6 +280,7 @@ export function CommunityPostSheet({
   onClose,
   onPublished,
 }: CommunityPostSheetProps) {
+  const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
   const insets = useModalInsets()
@@ -624,7 +626,7 @@ export function CommunityPostSheet({
     <EdgeToEdgeModal
       testID="community-post-sheet"
       visible={visible}
-      animationType="slide"
+      animationType={modalAnimation}
       onRequestClose={handleClose}
       scrim="rgba(0, 0, 0, 0.6)"
     >

@@ -41,6 +41,7 @@ import {
   type MemberSession,
 } from '../../../lib/use-web-session'
 import { LocationSearchForm, type LocationClaim } from './location-search-form'
+import { useGuestFirstPaint, useScreenGateRead } from '../screen-gate'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -312,6 +313,15 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
+  // Story CC-7.7: Profile's screen gate waits for the list, which sits above the sections it
+  // would otherwise push down when it lands. A signed-out page paints the signed-out hint from
+  // its first frame (hidden by globals.css on a page painted for a stored session).
+  useScreenGateRead(
+    'locations',
+    sectionState !== 'checking' && sectionState !== 'loading'
+  )
+  const guestFirstPaint = useGuestFirstPaint()
+  const guestHint = sectionState === 'checking' && guestFirstPaint
 
   return (
     <section
@@ -346,8 +356,12 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
         </button>
       )}
 
-      {sectionState === 'signed_out' && (
-        <p className="mt-4 text-sm text-neutral-300" data-testid="locations-signed-out">
+      {(sectionState === 'signed_out' || guestHint) && (
+        <p
+          data-landing={guestHint ? 'guest' : undefined}
+          className="mt-4 text-sm text-neutral-300"
+          data-testid="locations-signed-out"
+        >
           {t('locations.signedOutHint')}
         </p>
       )}

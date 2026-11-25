@@ -11,6 +11,7 @@ import { CommercePreferencesSection } from '../components/commerce-preferences-s
 import { LocationsSection } from '../components/locations/locations-section'
 import { PremiumThemeSection } from '../components/premium-theme-section'
 import { ProfileAccount } from '../components/profile-account'
+import { ScreenGate } from '../components/screen-gate'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 import { SubscriptionSection } from '../components/subscription-section'
 
@@ -33,12 +34,12 @@ import { SubscriptionSection } from '../components/subscription-section'
 function SettingsTitle() {
   const { t } = useTranslation()
   return (
-    <>
+    <header data-testid="app-header">
       <Link href="/" className="hidden min-h-11 items-center underline md:inline-flex">
         {t('nav.home')}
       </Link>
       <h1 className="text-4xl font-semibold">{t('settings.title')}</h1>
-    </>
+    </header>
   )
 }
 
@@ -52,16 +53,28 @@ export default function SettingsPage() {
         className="min-h-screen bg-neutral-950 px-6 py-16 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-white outline-none"
       >
         <SettingsTitle />
-        <ProfileAccount />
-        {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
-        <Suspense fallback={null}>
-          <LocationsSection />
-        </Suspense>
-        <CommercePreferencesSection />
-        <SubscriptionSection />
-        <PremiumThemeSection />
+        {/* Story CC-7.7 D3 (amended): the body appears once the account, locations, shopping,
+            subscription and theme reads have answered; each used to land and push the next. */}
+        <ScreenGate screen="profile" reads={PROFILE_GATE_READS}>
+          <ProfileAccount />
+          {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
+          <Suspense fallback={null}>
+            <LocationsSection />
+          </Suspense>
+          <CommercePreferencesSection />
+          <SubscriptionSection />
+          <PremiumThemeSection />
+        </ScreenGate>
         <StickyBottomNav />
       </main>
     </I18nextProvider>
   )
 }
+
+const PROFILE_GATE_READS = [
+  'account',
+  'locations',
+  'commerce',
+  'subscription',
+  'theme',
+] as const

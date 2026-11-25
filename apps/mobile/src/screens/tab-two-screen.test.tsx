@@ -357,8 +357,9 @@ describe('SettingsScreen', () => {
 
     await render(<SettingsScreen />)
 
+    // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
-      screen.getByRole('button', { name: 'Record weather alert analytics' })
+      await screen.findByRole('button', { name: 'Record weather alert analytics' })
     )
 
     expect(analyticsCaptureMock).toHaveBeenCalledWith(
@@ -378,8 +379,9 @@ describe('SettingsScreen', () => {
 
     await render(<SettingsScreen />)
 
+    // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
-      screen.getByRole('button', { name: 'Record weather alert analytics' })
+      await screen.findByRole('button', { name: 'Record weather alert analytics' })
     )
     expect(analyticsCaptureMock).toHaveBeenCalledWith(
       'alert_received',

@@ -27,6 +27,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import { useGuestFirstPaint, useScreenGateRead } from './screen-gate'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
 const HELP_ID = 'commerce-affiliate-ctas-help'
@@ -214,6 +215,11 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
   }
 
   const isSignedOut = sectionState === 'signed_out'
+  // Story CC-7.7: Profile's screen gate waits for this read; a signed-out page paints the hint
+  // from its first frame instead of inserting it when the session check ends.
+  useScreenGateRead('commerce', sectionState !== 'checking' && sectionState !== 'loading')
+  const guestFirstPaint = useGuestFirstPaint()
+  const showGuestHint = sectionState === 'checking' && guestFirstPaint
   /*
    * A read that failed leaves the control disabled on purpose. Falling back to
    * the default `true` would render an opted-out account as opted in, which
@@ -284,9 +290,10 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         {t('commerce.settings.optOutHelp')}
       </p>
 
-      {isSignedOut && (
+      {(isSignedOut || showGuestHint) && (
         <p
           id={SIGNED_OUT_HINT_ID}
+          data-landing={isSignedOut ? undefined : 'guest'}
           className="mt-2 text-sm text-neutral-300"
           data-testid="commerce-signed-out-hint"
         >

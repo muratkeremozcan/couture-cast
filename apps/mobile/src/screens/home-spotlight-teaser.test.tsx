@@ -286,10 +286,11 @@ describe('6.7 mobile Home spotlight teaser', () => {
     }
   )
 
-  it('6.7-MOB-005 follows the hero while it is loading, failed or without a location', async () => {
+  it('6.7-MOB-005 follows the hero once it settled failed or without a location, and waits behind the placeholder while it loads', async () => {
     const { answer } = deferSpotlightReads()
-    // Loading: the ritual never answers, the teaser still shows. The held
-    // request is released when the test ends, so it holds no connection after.
+    // Loading: the ritual never answers. Story CC-7.7 (7.7-NAT-002): the teaser waits inside
+    // the Home gate with the hero, and no member sample shows before the ritual settles. The
+    // held request is released when the test ends, so it holds no connection after.
     let releaseRitual!: () => void
     const ritualHeld = new Promise<void>((resolve) => {
       releaseRitual = resolve
@@ -305,7 +306,9 @@ describe('6.7 mobile Home spotlight teaser', () => {
     const loading = await renderHome()
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
-    expect(follows(screen.getByTestId('member-sample-outfit'), link)).toBe(true)
+    expect(link).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
     await loading.unmount()
 
     server.use(

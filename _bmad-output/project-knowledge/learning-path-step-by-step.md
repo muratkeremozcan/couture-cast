@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-25.
-Added Steps 40 to 64:
+Added Steps 40 to 65:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -28,7 +28,8 @@ Added Steps 40 to 64:
 - Step 61: Story 7.3, import device-saved looks for the same member, `f65ed8e5` (PR #288), merged on 2026-11-22.
 - Step 62: Story 7.4, community post edits persist, `ea93273b` (PR #289), merged on 2026-11-22.
 - Step 63: Story 7.5, garment detail and tag edit, `246577af` (PR #290), merged on 2026-11-25.
-- Step 64: Story 7.6, garment delete, in review on `feat/epic7-story-7-6-garment-delete`.
+- Step 64: Story 7.6, garment delete, `11c26918` (PR #291), merged on 2026-11-25.
+- Step 65: Story 7.7, signed-in shell without flashes, in review on `feat/epic7-story-7-7-signed-in-shell-without-flashes`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -36,6 +37,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 65 for Story CC-7.7 (signed-in shell without flashes) while its PR is in review, and moved Step 64 to merged (`11c26918`, PR #291).
 Added Step 64 for Story CC-7.6 (garment delete) while its PR is in review, and moved Step 63 to merged (`246577af`, PR #290).
 Added Step 63 for Story CC-7.5 (garment detail and tag edit) while its PR is in review, and moved Step 62 to merged (`ea93273b`, PR #289).
 Added Step 62 for Story CC-7.4 (community post edits persist) while its PR is in review, and moved Step 61 to merged (`f65ed8e5`, PR #288).
@@ -21703,3 +21705,107 @@ Evidence boundaries:
 - Locally: `tsc --noEmit` in utils, api-client, apps/api, apps/web, apps/mobile and pact, and
   ESLint `--max-warnings=0` on touched files.
 - Unit, integration, Playwright, native and Maestro suites run in CI on the PR.
+
+## Step 65: Signed-in shell without flashes
+
+User/business impact:
+
+- A signed-in member on a phone no longer sees signed-out or sample content first. Each tab
+  paints its header and bottom tab bar at once and one neutral placeholder where the body will
+  be; the body appears as one unit when its reads have answered. The owner's 2026-11-21 walk
+  measured a Home cold-load shift score of 0.574; the budget is now 0.1, checked in the PR gate.
+- The member sample outfit shows only after the member's own ritual read answered without a
+  usable outfit (or failed, with Retry). The Closet setup banner is in place when the Closet
+  appears, and the Community Spotlight no longer collapses a skeleton and pulls the feed up.
+- A return to a tab in the same session shows its last content and scroll position in the first
+  frame, then refreshes in place. Realtime new looks show as a pill over the list, so the list
+  never moves. App transitions last 200 ms or less and are instant under reduced motion.
+
+Technical architecture:
+
+- Web: `apps/web/src/app/components/screen-gate.tsx` (`ScreenGate`, `useScreenGateRead`). The
+  server cannot know the session, so the placeholder and the body are both in the HTML and
+  `globals.css` picks one from `<html data-session>` before first paint
+  (`lib/landing-session.ts`); the gate sets `data-ready` once its named reads settle, and a
+  signed-out session opens it at once. Gate reads: Home `ritual`, `teaser`, `spotlight`; Closet
+  inventory, onboarding, account and saved looks; Community `feed`, `spotlight`; Profile
+  `account`, `locations`, `commerce`, `subscription`, `theme`.
+- Signed-out pages keep their first paint: a section in its `checking` state paints the
+  signed-out layout it will keep, marked `data-landing="guest"`, which `globals.css` hides on a
+  page painted for a stored session (`useGuestFirstPaint`).
+- `apps/web/src/lib/screen-snapshot.ts` holds each tab's last settled data and scroll offset per
+  member, in memory only, and clears on any change of owner or bearer. `useWebSession` seeds a
+  client-side remount from the session it already knows (`useHydrating` tells hydration apart),
+  and the bottom-nav links use `scroll={false}` so the gate restores each tab's own offset.
+- Native: `apps/mobile/src/components/screen-gate.tsx` with the same placeholder, one gate per
+  tab body; refocus refreshes no longer reset the initial loading state. Every RN `Modal` takes
+  its animation from `useModalAnimation()`, and the root stack uses `animationDuration: 200` and
+  `animation: 'none'` under reduced motion.
+
+Hard-won lessons from the implementation of this story:
+
+- An element going from `display: none` to shown is an insertion, not a layout shift, so a gate
+  that mounts the body hidden lets every read start at once and still moves nothing.
+- A server render cannot branch on a session that lives in browser storage; a pre-paint
+  attribute plus CSS can, and a client render must match the server's HTML while it hydrates.
+- A per-member snapshot keyed by owner alone leaks between end-to-end fixture members who share
+  one owner, so it is keyed by the bearer too.
+
+Story/Task mapping:
+
+- Story CC-7.7: Signed-in shell without flashes (Epic 7 Lane A reliability).
+- Follows CC-3.6 (sticky bottom navigation).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.7: Signed-in shell without flashes**`)
+- `_bmad-output/implementation-artifacts/spec-7-7-signed-in-shell-without-flashes.md`
+- `_bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md`
+
+Cross-links:
+
+- Step 58 (`#step-58-production-status-and-nightly-health`): the pre-paint `data-session`
+  attribute and the session follower (`MemberScope`) the gate builds on.
+- Step 46 (`#step-46-home-spotlight-teaser`): the teaser that now joins the Home gate.
+- Step 44 (`#step-44-community-city-spotlight`): the Spotlight whose skeleton the gate replaces.
+
+Sequence to follow:
+
+1. Add `lib/screen-snapshot.ts` and the remount seed in `lib/use-web-session.ts`.
+2. Add `components/screen-gate.tsx` and its `globals.css` rules.
+3. Gate Home (`page.tsx`, `home-ritual.tsx`, `lookbook-prism-layout.tsx`,
+   `home-spotlight-teaser.tsx`), Closet (`wardrobe/page.tsx`), Community (`community/page.tsx`,
+   `community-lookbook-grid.tsx`, `community-spotlight.tsx`) and Profile (`settings/page.tsx` and
+   its sections).
+4. Give the bottom nav `scroll={false}` and bring web motion to 200 ms.
+5. Native: the gate, the Home, Closet, Community and Profile gates, the overlay pill,
+   `useModalAnimation` and the root stack options.
+6. Add `session.loading` (web) and `common.loading` (mobile) to the 10 + 10 locales.
+
+Task owner map:
+
+- Step 65 step 1 owner: `apps/web/src/lib/screen-snapshot.ts`.
+- Step 65 step 2 owner: `apps/web/src/app/components/screen-gate.tsx`.
+- Step 65 step 3 owner: `apps/web/src/app/wardrobe/page.tsx` and
+  `apps/web/src/app/components/community-lookbook-grid.tsx`.
+- Step 65 step 4 owner: `apps/web/src/app/components/sticky-bottom-nav.tsx`.
+- Step 65 step 5 owner: `apps/mobile/src/components/screen-gate.tsx` and
+  `apps/mobile/src/hooks/use-modal-animation.ts`.
+
+Tests that cover this step:
+
+- [`apps/web/src/lib/screen-snapshot.test.ts`](../../apps/web/src/lib/screen-snapshot.test.ts):
+  7.7-UNIT-010 to 7.7-UNIT-012.
+- [`apps/web/src/app/components/screen-gate.test.tsx`](../../apps/web/src/app/components/screen-gate.test.tsx):
+  7.7-CMP-001 and 7.7-CMP-002.
+- [`apps/mobile/src/components/screen-gate.test.tsx`](../../apps/mobile/src/components/screen-gate.test.tsx):
+  7.7-NAT-001 and 7.7-NAT-003.
+- The other component, native, layout-shift and motion suites are listed in
+  `_bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md`.
+
+Evidence boundaries:
+
+- Locally: `tsc --noEmit` in apps/web and apps/mobile, and ESLint `--max-warnings=0` on touched
+  files.
+- Unit, component, native and Playwright suites (the Chromium layout-shift check included) run in
+  CI on the PR.

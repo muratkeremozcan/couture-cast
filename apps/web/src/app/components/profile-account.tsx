@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSession } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
+import { useScreenGateRead } from './screen-gate'
 
 interface Account {
   displayName: string | null
@@ -20,6 +21,13 @@ export function ProfileAccount() {
   const session = useWebSession()
   const owner = session.status === 'signed_in' ? session.owner : null
   const [account, setAccount] = useState<Account | null>(null)
+  // The member whose profile read answered, with an account or without one.
+  const [answeredFor, setAnsweredFor] = useState<string | null>(null)
+  // Story CC-7.7: the account sits at the top of Profile, so the screen gate waits for it.
+  useScreenGateRead(
+    'account',
+    session.status !== 'checking' && (owner === null || answeredFor === owner)
+  )
 
   // One profile request per member, like the Locations list.
   useEffect(() => {
@@ -30,9 +38,11 @@ export function ProfileAccount() {
       .then(({ user }) => {
         if (controller.signal.aborted) return
         setAccount({ displayName: user.displayName?.trim() || null, email: user.email })
+        setAnsweredFor(owner)
       })
       .catch(() => {
         // The header is a courtesy: every section below reports its own failures.
+        if (!controller.signal.aborted) setAnsweredFor(owner)
       })
     return () => controller.abort()
   }, [owner])

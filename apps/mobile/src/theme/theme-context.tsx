@@ -226,3 +226,12 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
 export function useAppTheme(): AppThemeValue {
   return useContext(AppThemeContext) ?? FALLBACK_VALUE
 }
+
+/**
+ * Story CC-7.7: whether the reader's palette has an answer to wait for. Without a provider the
+ * fallback stays `loading` for good, so a screen gate must not wait on it.
+ */
+export function useAppThemeSettled(): boolean {
+  const context = useContext(AppThemeContext)
+  return context === null || context.status !== 'loading'
+}

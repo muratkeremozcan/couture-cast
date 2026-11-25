@@ -23,6 +23,7 @@ import {
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 /**
  * `hero-theme.ts` carries neither the premium gold accent nor the community
@@ -59,6 +60,7 @@ export function CommunityReportModal({
   onClose,
   onSubmit,
 }: CommunityReportModalProps) {
+  const modalAnimation = useModalAnimation('fade')
   const { t } = useTranslation()
   const palette = useHeroPalette()
   // R66: while the keyboard is up for the details field the reasons leave the layout,
@@ -106,7 +108,7 @@ export function CommunityReportModal({
   return (
     <EdgeToEdgeModal
       visible={visible && !suspended}
-      animationType="fade"
+      animationType={modalAnimation}
       onRequestClose={onClose}
       testID="community-report-modal"
       scrim="rgba(0, 0, 0, 0.6)"

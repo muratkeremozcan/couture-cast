@@ -32,6 +32,7 @@ import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
 import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import {
   underModalAccessibility,
@@ -55,6 +56,19 @@ export {
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
+}
+
+/**
+ * Story CC-7.7 D6: stack transitions last 200 ms, and none plays under the OS reduced-motion
+ * setting. A modal presentation keeps its system timing while motion is on.
+ */
+export function rootStackMotionOptions(reduceMotion: boolean): {
+  animationDuration: number
+  animation?: 'none'
+} {
+  return reduceMotion
+    ? { animationDuration: 200, animation: 'none' }
+    : { animationDuration: 200 }
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -121,6 +135,7 @@ function RootLayoutNav() {
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
   const { t, i18n } = useTranslation()
   const modalOpen = useEdgeToEdgeModalOpen()
+  const reduceMotion = useReducedMotion()
 
   const router = useRouter()
   const navigation = useRootNavigationState()
@@ -270,6 +285,7 @@ function RootLayoutNav() {
                   <Stack
                     screenOptions={{
                       headerBackTitle: t('common.back'),
+                      ...rootStackMotionOptions(reduceMotion),
                     }}
                   >
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

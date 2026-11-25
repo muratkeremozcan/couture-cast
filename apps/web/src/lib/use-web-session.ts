@@ -113,12 +113,46 @@ function sameState(a: WebSessionState, b: WebSessionState): boolean {
   return a.status !== 'signed_in' || a.owner === (b as typeof a).owner
 }
 
+const subscribeNothing = () => () => undefined
+
+/**
+ * True on the server and while React hydrates server HTML; false for a render that only the
+ * client does (a client-side navigation, or any render after hydration). A first render that
+ * must match the server's HTML reads it before it uses anything only the browser knows.
+ */
+export function useHydrating(): boolean {
+  return useSyncExternalStore(
+    subscribeNothing,
+    () => false,
+    () => true
+  )
+}
+
+const CHECKING: WebSessionState = { status: 'checking' }
+const NO_SEED_RETRY = () => undefined
+
+/**
+ * Where a mount starts (Story CC-7.7 D5). Hydration starts at `checking`, as the server did. A
+ * client-side mount (a tab switch) starts from what the session bridge already knows: a member
+ * it named, or no stored session at all. Only a stored session it has not verified yet starts
+ * at `checking`, so a tab return never shows a checking state for a known member.
+ */
+function seedWebSessionState(hydrating: boolean): WebSessionState {
+  if (hydrating) return CHECKING
+  // An outcome of `pending` never yields `unavailable`, so the retry is never offered.
+  return readWebSessionState('pending', NO_SEED_RETRY)
+}
+
 /**
  * The verified web session, following every change. Starts at `checking` on the server and on
- * the first client render, so a signed-in member never sees a signed-out state flash past.
+ * the hydrating client render, so a signed-in member never sees a signed-out state flash past;
+ * a client-side remount starts from the session it already knows (`seedWebSessionState`).
  */
 export function useWebSession(): WebSessionState {
-  const [state, setState] = useState<WebSessionState>({ status: 'checking' })
+  const hydrating = useHydrating()
+  const [state, setState] = useState<WebSessionState>(() =>
+    seedWebSessionState(hydrating)
+  )
 
   useEffect(() => {
     let active = true

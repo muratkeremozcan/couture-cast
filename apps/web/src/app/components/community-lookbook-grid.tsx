@@ -74,7 +74,14 @@ import {
   type CommunityFailureReason,
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
-import { useMemberSession } from '../../lib/use-web-session'
+import {
+  isLiveOwner,
+  useHydrating,
+  useMemberSession,
+  useWebSessionOwner,
+} from '../../lib/use-web-session'
+import { screenSnapshot } from '../../lib/screen-snapshot'
+import { useScreenGateRead, useScreenGateScreen } from './screen-gate'
 import { SessionRetryButton } from './session-retry-button'
 import { CommunityPostTextEditor } from './community-post-text-editor'
 import {
@@ -93,6 +100,7 @@ import {
   CommunitySpotlightSection,
   SPOTLIGHT_CARD_SCOPE,
   useCommunitySpotlight,
+  type CommunitySpotlightState,
 } from './community-spotlight'
 
 import React, {
@@ -712,7 +720,7 @@ function LookbookCardImageSurface({
           onError={() => {
             onImageError(item)
           }}
-          className="object-cover motion-safe:transition-transform motion-safe:duration-300 motion-safe:hover:scale-[1.02] motion-reduce:transition-none"
+          className="object-cover motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-[1.02] motion-reduce:transition-none"
         />
       )}
 
@@ -1001,7 +1009,7 @@ function LookbookCard({
         item.sponsorship ? `${titleId} ${sponsoredDisclosureId(scope, item.id)}` : titleId
       }
       data-highlighted={isHighlighted ? 'true' : 'false'}
-      className={`flex flex-col overflow-hidden rounded-[8px] border bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
+      className={`flex flex-col overflow-hidden rounded-[8px] border bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
         isHighlighted
           ? 'border-[color:var(--theme-secondary)] outline outline-2 outline-[color:var(--theme-primary)] ring-2 ring-[color:var(--theme-secondary)] ring-offset-2 shadow-lg'
           : 'border-[color:var(--theme-card-border)]'
@@ -2446,6 +2454,103 @@ function CommunitySettingsLink({
   )
 }
 
+/**
+ * Story CC-7.7 D5: the feed and spotlight a member last saw on a tab (Home or Community), for a
+ * return in the same session. Kept in memory only (lib/screen-snapshot.ts). It is used only when
+ * the return asks for the same filter and the same session identity.
+ */
+type CommunityGridSnapshot = {
+  mode: FilterCategory
+  scope: string | null
+  items: CommunityFeedItem[]
+  authorStates: CommunityAuthorPostState[]
+  nextCursor: string | null
+  servedMode: CommunityFeedMode | null
+  viewerBand: ClimateBand | null
+  bandResolved: boolean
+  bandUnresolvedReason: CommunityBandUnresolvedReason | null
+  experimentVariant: CommunityExperimentVariant | null
+  activeChallenge: EmbeddedCommunityChallenge | null
+  spotlight: CommunitySpotlightState
+}
+
+const GRID_SNAPSHOT_PART = 'community-grid'
+
+/** Where a mount with no matching snapshot starts. */
+const EMPTY_GRID_START: Omit<CommunityGridSnapshot, 'mode' | 'scope' | 'spotlight'> = {
+  items: [],
+  authorStates: [],
+  nextCursor: null,
+  servedMode: null,
+  viewerBand: null,
+  bandResolved: true,
+  bandUnresolvedReason: null,
+  experimentVariant: null,
+  activeChallenge: null,
+}
+
+/**
+ * Where a mount starts: the snapshot of this tab for this member when it matches the mount's
+ * filter and session identity, else nothing loaded.
+ */
+function useGridStart(
+  activeTab: FilterCategory,
+  initialScope: string | null
+): {
+  restored: boolean
+  start: typeof EMPTY_GRID_START
+  spotlight: CommunitySpotlightState | undefined
+} {
+  const screen = useScreenGateScreen()
+  const owner = useWebSessionOwner()
+  const [start] = useState(() => {
+    const stored =
+      screen && owner
+        ? screenSnapshot.recall<CommunityGridSnapshot>(owner, screen, GRID_SNAPSHOT_PART)
+        : undefined
+    const matches = stored?.mode === activeTab && stored.scope === initialScope
+    return matches
+      ? { restored: true, start: stored, spotlight: stored.spotlight }
+      : { restored: false, start: EMPTY_GRID_START, spotlight: undefined }
+  })
+  return start
+}
+
+/** Reports this section's two reads to a screen gate around it, once the session is known. */
+function useGridGateReads({
+  feedSettled,
+  spotlightSettled,
+  sessionStatus,
+}: {
+  feedSettled: boolean
+  spotlightSettled: boolean
+  sessionStatus: string
+}) {
+  const sessionKnown = sessionStatus !== 'checking'
+  useScreenGateRead('feed', feedSettled && sessionKnown)
+  useScreenGateRead('spotlight', spotlightSettled && sessionKnown)
+}
+
+/** The first load's skeleton shows; a return's refresh keeps what is on screen. */
+const firstLoadShowing = (isLoading: boolean, restoring: boolean) =>
+  isLoading && !restoring
+
+/**
+ * Story CC-7.7 D3: the spotlight read has answered for the member (rows kept from a snapshot
+ * count while they refresh), or no member will read it.
+ */
+function spotlightReadSettled(
+  visible: boolean,
+  sessionScope: string | null,
+  state: CommunitySpotlightState,
+  sessionStatus: string
+): boolean {
+  if (!visible) return true
+  if (!sessionScope)
+    return sessionStatus === 'signed_out' || sessionStatus === 'unavailable'
+  return state.items.length > 0 || (state.status !== 'idle' && state.status !== 'loading')
+}
+
 export function CommunityLookbookGrid({
   activeTab = 'auto',
   onTabChange,
@@ -2460,6 +2565,18 @@ export function CommunityLookbookGrid({
 }: CommunityLookbookGridProps) {
   const { t, i18n } = useCommunityTranslation()
   const locale = useResolvedLocale(i18n.language)
+  // Story CC-7.7 D5: a client-side mount (a return to the tab) knows the session identity at
+  // once, so its spotlight reads without waiting a render; hydration starts from none, as the
+  // server rendered.
+  const hydrating = useHydrating()
+  const [initialScope] = useState<string | null>(() =>
+    hydrating ? null : communityCommentsSessionFromWeb()
+  )
+  const {
+    restored,
+    start,
+    spotlight: startSpotlight,
+  } = useGridStart(activeTab, initialScope)
 
   const [currentMode, setCurrentMode] = useState<FilterCategory>(activeTab)
   /**
@@ -2469,7 +2586,7 @@ export function CommunityLookbookGrid({
    * resolved to the viewer's experiment arm, so half the cohort asks for `auto`
    * and is served `all`.
    */
-  const [servedMode, setServedMode] = useState<CommunityFeedMode | null>(null)
+  const [servedMode, setServedMode] = useState<CommunityFeedMode | null>(start.servedMode)
   const [communityAvailable, setCommunityAvailable] = useState(true)
   const [newLooks, setNewLooks] = useState<CommunityFeedItem[]>([])
   const newLooksRef = useRef(newLooks)
@@ -2486,20 +2603,22 @@ export function CommunityLookbookGrid({
     scope: feedScopeRef,
   })
 
-  const [items, setItems] = useState<CommunityFeedItem[]>([])
-  const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
-  const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
-  const [bandResolved, setBandResolved] = useState(true)
+  const [items, setItems] = useState<CommunityFeedItem[]>(start.items)
+  const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>(
+    start.authorStates
+  )
+  const [viewerBand, setViewerBand] = useState<ClimateBand | null>(start.viewerBand)
+  const [bandResolved, setBandResolved] = useState(start.bandResolved)
   const [bandUnresolvedReason, setBandUnresolvedReason] =
-    useState<CommunityBandUnresolvedReason | null>(null)
+    useState<CommunityBandUnresolvedReason | null>(start.bandUnresolvedReason)
   /**
    * The arm this client was serving, held so a card-open can be attributed to
    * the feed the viewer actually saw. `null` until a feed lands, and no card can
    * be opened before then, so there is never a default to invent.
    */
   const [experimentVariant, setExperimentVariant] =
-    useState<CommunityExperimentVariant | null>(null)
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+    useState<CommunityExperimentVariant | null>(start.experimentVariant)
+  const [nextCursor, setNextCursor] = useState<string | null>(start.nextCursor)
   /**
    * A deep-link target that is not on the page the grid is holding. Resolved
    * from `GET /posts/{postId}` and rendered at the head of the feed, because the
@@ -2601,8 +2720,22 @@ export function CommunityLookbookGrid({
     [liveSponsorships]
   )
   const [activeChallenge, setActiveChallenge] =
-    useState<EmbeddedCommunityChallenge | null>(null)
+    useState<EmbeddedCommunityChallenge | null>(start.activeChallenge)
   const [isLoading, setIsLoading] = useState(false)
+  /**
+   * Story CC-7.7 D3: the first feed read for this session scope has answered (a page, an error or
+   * a ban). The Community gate waits for it, and only the first read shows the skeleton: a
+   * refresh keeps what is on screen until its answer replaces it.
+   */
+  const [feedSettled, setFeedSettled] = useState(restored)
+  /** A return to the tab refreshes its snapshot without the first load's skeleton. */
+  const [restoring, setRestoring] = useState(restored)
+  /** The first page of a read (not an append) answered: the feed counts as settled. */
+  const settleFirstPage = useCallback((append: boolean) => {
+    if (append) return
+    setFeedSettled(true)
+    setRestoring(false)
+  }, [])
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
   // Story 6.11: the member's own ban replaces the feed with a notice.
@@ -2634,6 +2767,7 @@ export function CommunityLookbookGrid({
       postTextLedger.clear()
       setIsLoading(false)
       setIsLoadingMore(false)
+      setFeedSettled(true)
       actionControllerRef.current?.abort()
       setBannedSanction(sanction)
       setItems([])
@@ -2719,7 +2853,7 @@ export function CommunityLookbookGrid({
   /** The realtime sync was denied and stopped; Retry restarts it (`realtimeEpoch`). */
   const realtimeDeniedRef = useRef(false)
   const [realtimeEpoch, setRealtimeEpoch] = useState(0)
-  const [sessionScope, setSessionScope] = useState<string | null>(null)
+  const [sessionScope, setSessionScope] = useState<string | null>(initialScope)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
   // A stored session the API answered 401 is signed out for this surface: it gets the Sign in
   // link and none of the member actions (New post, challenge entry, the composer, share, report),
@@ -2740,6 +2874,7 @@ export function CommunityLookbookGrid({
     textStamp: number
   }>({
     scope: sessionScope,
+    initial: startSpotlight,
     onBanned: closeForBan,
     beginRead: () => ({
       ticket: reactionState.beginRead(),
@@ -3061,6 +3196,7 @@ export function CommunityLookbookGrid({
         if (!controller.signal.aborted && generation === feedGenerationRef.current) {
           setIsLoading(false)
           setIsLoadingMore(false)
+          settleFirstPage(append)
         }
       }
     },
@@ -3073,6 +3209,7 @@ export function CommunityLookbookGrid({
       reactionState,
       reportFeedFailure,
       revalidateHighlighted,
+      settleFirstPage,
     ]
   )
 
@@ -3099,6 +3236,8 @@ export function CommunityLookbookGrid({
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
+      setFeedSettled(false)
+      setRestoring(false)
       // The band and why it did not resolve describe the member who left; the
       // notice and its add-location action go with them.
       setViewerBand(null)
@@ -3150,12 +3289,15 @@ export function CommunityLookbookGrid({
     postTextLedger,
   ])
 
+  // A return to the tab keeps the served mode it shows while the refresh reads (CC-7.7 D5).
+  const keepServedModeOnceRef = useRef(restored)
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
     // clicked while the server is deciding what to serve for it, and correct
     // themselves when it answers. Holding the previous served mode instead would
     // leave the click looking like it did nothing.
-    setServedMode(null)
+    if (keepServedModeOnceRef.current) keepServedModeOnceRef.current = false
+    else setServedMode(null)
     // Looks buffered under the previous filter are not part of this feed. Target
     // resolution stays filter-agnostic, so the buffer itself has to be dropped.
     feedScopeRef.current++
@@ -4127,6 +4269,67 @@ export function CommunityLookbookGrid({
     setAnnouncement,
   ])
 
+  // Story CC-7.7 D3: the reads a screen gate around this section waits for. The feed's first
+  // page counts once the session is known (a stored session's first read may still run as a
+  // guest); the spotlight counts once it answered for the member, or when no member will read
+  // it. A gate that does not list a read ignores it.
+  const spotlightState = spotlight.state
+  useGridGateReads({
+    feedSettled,
+    spotlightSettled: spotlightReadSettled(
+      feedVisible(communityAvailable, bannedSanction),
+      sessionScope,
+      spotlightState,
+      sessionState.status
+    ),
+    sessionStatus: sessionState.status,
+  })
+
+  // Story CC-7.7 D5: what a return to this tab shows first, kept for the member who sees it.
+  const gateScreen = useScreenGateScreen()
+  const liveOwner = useWebSessionOwner()
+  useEffect(() => {
+    if (!gateScreen || !liveOwner || !isLiveOwner(liveOwner)) return
+    if (!feedSettled || isLoading || banned || spotlightState.status === 'loading') return
+    screenSnapshot.remember(liveOwner, gateScreen, GRID_SNAPSHOT_PART, {
+      mode: currentMode,
+      scope: sessionScope,
+      items,
+      authorStates,
+      nextCursor,
+      servedMode,
+      viewerBand,
+      bandResolved,
+      bandUnresolvedReason,
+      experimentVariant,
+      activeChallenge,
+      spotlight: {
+        ...spotlightState,
+        loadingMore: false,
+        moreFailed: false,
+        focusTargetId: null,
+      },
+    } satisfies CommunityGridSnapshot)
+  }, [
+    activeChallenge,
+    authorStates,
+    bandResolved,
+    bandUnresolvedReason,
+    banned,
+    currentMode,
+    experimentVariant,
+    feedSettled,
+    gateScreen,
+    isLoading,
+    items,
+    liveOwner,
+    nextCursor,
+    servedMode,
+    sessionScope,
+    spotlightState,
+    viewerBand,
+  ])
+
   const presentation = communityPresentation(
     feedVisible(communityAvailable, bannedSanction),
     memberSession,
@@ -4268,7 +4471,7 @@ export function CommunityLookbookGrid({
           />
         ) : (
           <CommunityFeedStates
-            isLoading={isLoading}
+            isLoading={firstLoadShowing(isLoading, restoring)}
             errorText={renderMessage(feedError, t, viewerBand)}
             retryable={feedError?.key !== FAILURE_KEYS.signed_out}
             itemCount={displayedItems.length}
@@ -4281,51 +4484,61 @@ export function CommunityLookbookGrid({
           />
         )}
 
-        <div
-          ref={gridRef}
-          data-testid="community-card-grid"
-          data-chip-category={chipCategory}
-          aria-busy={isLoading || isLoadingMore}
-          className={`grid gap-6 ${gridColumns}`}
-        >
-          {presentation.items.map((item) => (
-            <LookbookCard
-              reactionControls={reactionState.controls(item.id)}
-              key={item.id}
-              item={item}
-              isHighlighted={item.id === highlightedCardId}
-              isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
-              isReported={reportedPostIds.has(item.id)}
-              canAct={presentation.canAct}
-              t={t}
-              sponsored={sponsoredHost('community_feed')}
-              onImageError={handleImageError}
-              onImageRetry={handleImageRetry}
-              onOpen={handleOpenCard}
-              onComments={(item) => handleOpenCard(item, true)}
-              onReport={(postId) => {
-                setReportError(null)
-                setReportingPostId(postId)
-              }}
-              onWithdraw={(postId) => {
-                void handleWithdrawPost(postId)
-              }}
-            />
-          ))}
+        {/* Story CC-7.7 D4: the new-looks pill is an overlay pinned to the top of the list. It
+            used to sit below the cards and push everything after it down when realtime looks
+            arrived; now it takes no space, and the cards never move for it. */}
+        <div className="relative">
+          <div className="pointer-events-none sticky top-20 z-20 h-0">
+            {presentation.showNewLooks && (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  data-testid="community-new-looks-pill"
+                  className="pointer-events-auto rounded-full border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] px-4 py-3 text-[color:var(--theme-card-text)] shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+                  disabled={isInsertingLooks}
+                  onClick={() => {
+                    void insertNewLooks()
+                  }}
+                >
+                  {t('community.realtime.showNewLooks', { count: newLooks.length })}
+                </button>
+              </div>
+            )}
+          </div>
+          <div
+            ref={gridRef}
+            data-testid="community-card-grid"
+            data-chip-category={chipCategory}
+            aria-busy={isLoading || isLoadingMore}
+            className={`grid gap-6 ${gridColumns}`}
+          >
+            {presentation.items.map((item) => (
+              <LookbookCard
+                reactionControls={reactionState.controls(item.id)}
+                key={item.id}
+                item={item}
+                isHighlighted={item.id === highlightedCardId}
+                isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
+                isReported={reportedPostIds.has(item.id)}
+                canAct={presentation.canAct}
+                t={t}
+                sponsored={sponsoredHost('community_feed')}
+                onImageError={handleImageError}
+                onImageRetry={handleImageRetry}
+                onOpen={handleOpenCard}
+                onComments={(item) => handleOpenCard(item, true)}
+                onReport={(postId) => {
+                  setReportError(null)
+                  setReportingPostId(postId)
+                }}
+                onWithdraw={(postId) => {
+                  void handleWithdrawPost(postId)
+                }}
+              />
+            ))}
+          </div>
         </div>
 
-        {presentation.showNewLooks && (
-          <button
-            type="button"
-            className="rounded-full border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
-            disabled={isInsertingLooks}
-            onClick={() => {
-              void insertNewLooks()
-            }}
-          >
-            {t('community.realtime.showNewLooks', { count: newLooks.length })}
-          </button>
-        )}
         <AuthorStatesSection states={presentation.authorStates} t={t} />
         <CommunityExampleInspiration
           available={feedVisible(communityAvailable, bannedSanction)}

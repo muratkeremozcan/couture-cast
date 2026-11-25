@@ -10,7 +10,16 @@ import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type * as EdgeToEdgeModalModule from '@/components/edge-to-edge-modal'
 import { setViewport } from '@/src/test-utils/viewport'
@@ -246,6 +255,8 @@ async function expectCardPhoto(id: string, url: string) {
       url
     )
   )
+  // Story CC-7.7: the card shows once the Closet gate's reads (inventory, onboarding) settle.
+  await waitFor(() => expect(screen.getByTestId(`garment-card-${id}`)).toBeVisible())
 }
 
 function deferred() {
@@ -375,6 +386,56 @@ describe('WardrobeHubScreen', () => {
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
     vi.clearAllMocks()
+  })
+
+  it('7.7-NAT-003 the Closet gate waits for the inventory and onboarding reads, then a refresh keeps the closet in place', async () => {
+    let releaseOnboarding!: () => void
+    const onboardingHeld = new Promise<void>((resolve) => {
+      releaseOnboarding = resolve
+    })
+    onTestFinished(() => releaseOnboarding())
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', async () => {
+        await onboardingHeld
+        return HttpResponse.json({ data: onboardingNotCompleted })
+      })
+    )
+    renderScreen()
+
+    // The inventory answered (empty), the onboarding state has not: the placeholder holds.
+    const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
+    expect(emptyTitle).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
+
+    act(() => releaseOnboarding())
+
+    // The setup card is in place when the closet appears: nothing is inserted above it later.
+    expect(await screen.findByTestId('wardrobe-onboarding-card')).toBeVisible()
+    expect(emptyTitle).toBeVisible()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+
+    // A refresh (a tag save elsewhere) never returns to the first-load spinner.
+    let garmentReads = 0
+    let releaseGarments!: () => void
+    const garmentsHeld = new Promise<void>((resolve) => {
+      releaseGarments = resolve
+    })
+    onTestFinished(() => releaseGarments())
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        garmentReads += 1
+        await garmentsHeld
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    act(() => notifyWardrobeChanged())
+    await waitFor(() => expect(garmentReads).toBe(1))
+
+    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
+    expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 
   it('4.4-MOB-HUB-01 renders the wardrobe hub header and empty state (regression)', async () => {

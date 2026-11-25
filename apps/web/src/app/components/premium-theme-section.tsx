@@ -51,6 +51,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import { useGuestFirstPaint, useScreenGateRead } from './screen-gate'
 
 const UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
 
@@ -302,12 +303,20 @@ function usePaletteNameList(): string {
   )
 }
 
-function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
+function LockedPanel({
+  isSignedOut,
+  landing,
+}: {
+  isSignedOut: boolean
+  /** `guest` while a signed-out first paint stands in for the session check (CC-7.7). */
+  landing?: 'guest'
+}) {
   const { t } = useTranslation()
   const palettes = usePaletteNameList()
 
   return (
     <div
+      data-landing={landing}
       className="mt-6 space-y-3 rounded-lg border border-neutral-700 bg-neutral-900 p-4"
       data-testid="premium-theme-locked"
     >
@@ -539,7 +548,13 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     }
   }
 
-  const view = resolveSectionView(sectionState, theme)
+  // Story CC-7.7: Profile's screen gate waits for this read. While the session is checked, a
+  // signed-out page paints the locked panel it will keep (hidden by globals.css on a page
+  // painted for a stored session), so the panel never lands late and pushes the page.
+  useScreenGateRead('theme', sectionState !== 'checking' && sectionState !== 'loading')
+  const guestFirstPaint = useGuestFirstPaint()
+  const guestStandIn = sectionState === 'checking' && guestFirstPaint
+  const view = resolveSectionView(guestStandIn ? 'signed_out' : sectionState, theme)
 
   return (
     <section
@@ -611,7 +626,12 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         </>
       )}
 
-      {view.showLocked && <LockedPanel isSignedOut={sectionState === 'signed_out'} />}
+      {view.showLocked && (
+        <LockedPanel
+          isSignedOut={sectionState === 'signed_out' || guestStandIn}
+          landing={guestStandIn ? 'guest' : undefined}
+        />
+      )}
 
       {error && (
         <p

@@ -353,7 +353,7 @@ function UploadingStep({
     <div className="mt-8 flex flex-col items-center gap-4 py-6">
       <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
         <div
-          className="h-full bg-emerald-600 transition-all duration-300"
+          className="h-full bg-emerald-600 transition-all duration-200"
           style={{ width: `${uploadProgress}%` }}
         />
       </div>
