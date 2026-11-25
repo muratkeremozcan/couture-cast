@@ -466,6 +466,23 @@
       "loading": "Chargement de votre vêtement...",
       "pending_desc": "Décrivez ce vêtement avec une catégorie et une plage de confort.",
       "manual_desc": "Choisissez la catégorie et la plage de confort qui conviennent à ce vêtement. La matière est facultative."
+    },
+    "detail": {
+      "back": "Retour à la penderie",
+      "category": "Catégorie",
+      "material": "Matière",
+      "comfort": "Plage de confort",
+      "noMaterial": "Aucune matière",
+      "editTags": "Modifier les étiquettes",
+      "done": "Terminé",
+      "cancel": "Annuler",
+      "noChanges": "Aucun changement",
+      "conflict": "Cette pièce a changé sur un autre appareil. Vérifie les étiquettes et réessaie.",
+      "notAllowed": "Un parent ou tuteur doit d'abord approuver les changements de ta penderie.",
+      "undoFailed": "Impossible d'annuler. Réessaie.",
+      "missing": "Cette pièce n'est plus dans ta penderie.",
+      "loading": "Chargement de la pièce...",
+      "loadFailed": "Impossible de charger cette pièce. Réessaie."
     }
   },
   "community": {

@@ -21,6 +21,7 @@ import {
   type GarmentTagSuggestionSnapshot,
   type CreateGarmentItemInput,
   type CreateGarmentUploadUrlInput,
+  type GarmentColorFamilyContract,
   type GarmentItemResponse,
   type SuggestGarmentTagsResponse,
   type UpdateGarmentTagsInput,
@@ -28,6 +29,7 @@ import {
 import {
   buildGarmentObjectPath,
   buildWardrobeStagingObjectPath,
+  colorFamilyFromHex,
   isWardrobePathSegment,
 } from '@couture/utils'
 
@@ -429,6 +431,39 @@ function garmentData(
   }
 }
 
+/**
+ * Story CC-7.5 D1: a request opts in to `colorFamily` with `x-couture-garment-color: 1`.
+ * Without it the garment keeps the strict legacy shape, key for key.
+ */
+export interface GarmentReadOptions {
+  includeColor?: boolean
+}
+
+/** A garment as the API returns it, with `colorFamily` when the request opted in. */
+export type GarmentResponseData = GarmentItemResponse['data'] & {
+  colorFamily?: GarmentColorFamilyContract | null
+}
+
+/** The family of the dominant hex the color processor stored; null when there is none. */
+export function garmentColorFamily(
+  garment: Pick<GarmentItem, 'color_palette'>
+): GarmentColorFamilyContract | null {
+  const palette = garment.color_palette
+  if (!palette || typeof palette !== 'object' || Array.isArray(palette)) return null
+  const dominant = (palette as Record<string, unknown>).dominant
+  return colorFamilyFromHex(typeof dominant === 'string' ? dominant : null)
+}
+
+function withGarmentColor(
+  garment: GarmentItem,
+  data: GarmentItemResponse['data'],
+  options: GarmentReadOptions
+): GarmentResponseData {
+  return options.includeColor
+    ? { ...data, colorFamily: garmentColorFamily(garment) }
+    : data
+}
+
 @Injectable()
 export class WardrobeService {
   private readonly logger = createBaseLogger().child({ feature: 'wardrobe' })
@@ -608,7 +643,10 @@ export class WardrobeService {
     }
   }
 
-  async listGarments(userId: string): Promise<{ data: GarmentItemResponse['data'][] }> {
+  async listGarments(
+    userId: string,
+    options: GarmentReadOptions = {}
+  ): Promise<{ data: GarmentResponseData[] }> {
     const garments = await this.prisma.garmentItem.findMany({
       where: {
         user_id: userId,
@@ -620,7 +658,11 @@ export class WardrobeService {
       take: 100,
     })
     return {
-      data: await Promise.all(garments.map((garment) => this.toListedGarment(garment))),
+      data: await Promise.all(
+        garments.map(async (garment) =>
+          withGarmentColor(garment, await this.toListedGarment(garment), options)
+        )
+      ),
     }
   }
 
@@ -677,8 +719,9 @@ export class WardrobeService {
     userId: string,
     role: ApiRole,
     garmentId: string,
-    input: UpdateGarmentTagsInput
-  ): Promise<GarmentItemResponse> {
+    input: UpdateGarmentTagsInput,
+    options: GarmentReadOptions = {}
+  ): Promise<{ data: GarmentResponseData }> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
     const result = await this.confirmTagsTransaction(userId, garmentId, input)
 
@@ -719,7 +762,8 @@ export class WardrobeService {
       }
     }
 
-    return this.toResponse(result.updated)
+    const response = await this.toResponse(result.updated)
+    return { data: withGarmentColor(result.updated, response.data, options) }
   }
 
   private async confirmTagsTransaction(

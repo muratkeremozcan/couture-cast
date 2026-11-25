@@ -5,10 +5,11 @@
 'use client'
 
 import Link from 'next/link'
-import React, { useCallback, useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
+  GarmentWithColor,
   SavedLookContract,
   WardrobeOnboardingStatus,
 } from '@couture/api-client/contracts/http'
@@ -33,6 +34,8 @@ import {
   useWebSessionOwner,
 } from '../../lib/use-web-session'
 import {
+  formatGarmentAlt,
+  formatGarmentTagLabels,
   getGuestPreviewStrings,
   getStylePieceStrings,
   nextStylePiecePhotoExpiry,
@@ -45,6 +48,22 @@ import {
 } from '../../lib/saved-looks'
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-detail'
+
+/** D2: the open garment detail lives in the URL, so a reload reopens it. */
+const GARMENT_DETAIL_PARAM = 'garment'
+
+function readGarmentDetailParam(): string | null {
+  if (typeof window === 'undefined') return null
+  return new URLSearchParams(window.location.search).get(GARMENT_DETAIL_PARAM) || null
+}
+
+/** The visible card label: localized category and material, or "Untagged garment". */
+function garmentCardLabel(locale: string, garment: ClosetGarment): string {
+  if (!garment.category) return formatGarmentAlt(locale, { category: null })
+  const labels = formatGarmentTagLabels(locale, garment)
+  return [labels.category, labels.material].filter(Boolean).join(' · ')
+}
 
 export default function WardrobePage() {
   const owner = useWebSessionOwner()
@@ -92,6 +111,34 @@ function WardrobeLoadError({
         {strings.chrome.retry}
       </button>
     </div>
+  )
+}
+
+function GarmentCardPhoto({
+  garment,
+  locale,
+}: {
+  garment: ClosetGarment
+  locale: string
+}) {
+  if (!garment.imageAccess) {
+    return (
+      <div
+        role="img"
+        aria-label={garmentPhotoAlt(locale, garment)}
+        className="flex aspect-[3/4] w-full items-center justify-center text-3xl"
+      >
+        <span aria-hidden="true">👗</span>
+      </div>
+    )
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={garment.imageAccess.url}
+      alt={garmentPhotoAlt(locale, garment)}
+      className="aspect-[3/4] w-full object-cover"
+    />
   )
 }
 
@@ -152,12 +199,84 @@ function resolveEffectiveSavedLooksOwner(
   return null
 }
 
+function findReadyGarment(
+  garments: readonly ClosetGarment[],
+  garmentId: string | null
+): ClosetGarment | null {
+  if (!garmentId) return null
+  return (
+    garments.find((garment) => garment.id === garmentId && garment.status === 'ready') ??
+    null
+  )
+}
+
+/**
+ * D2: `/wardrobe?garment=<id>` opens the detail in place. Opening pushes a history entry, so
+ * the browser Back button and the detail's back control both return to the grid at the
+ * scroll position the member left, with focus on the card they opened.
+ */
+function useGarmentDetailRoute(
+  garmentOpenRefs: React.RefObject<Map<string, HTMLButtonElement>>
+) {
+  const [detailGarmentId, setDetailGarmentId] = useState<string | null>(null)
+  const detailPushedRef = useRef(false)
+  const gridScrollRef = useRef(0)
+  const lastDetailIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    setDetailGarmentId(readGarmentDetailParam())
+    const onPopState = () => {
+      const next = readGarmentDetailParam()
+      if (!next) detailPushedRef.current = false
+      setDetailGarmentId(next)
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  // Back returns to the grid where the member left it, with focus on the card they opened.
+  useLayoutEffect(() => {
+    const previous = lastDetailIdRef.current
+    lastDetailIdRef.current = detailGarmentId
+    if (detailGarmentId) {
+      if (!previous) window.scrollTo(0, 0)
+      return
+    }
+    if (!previous) return
+    window.scrollTo(0, gridScrollRef.current)
+    garmentOpenRefs.current.get(previous)?.focus({ preventScroll: true })
+  }, [detailGarmentId, garmentOpenRefs])
+
+  const openGarmentDetail = (garmentId: string) => {
+    gridScrollRef.current = window.scrollY
+    const url = new URL(window.location.href)
+    url.searchParams.set(GARMENT_DETAIL_PARAM, garmentId)
+    window.history.pushState(window.history.state, '', url)
+    detailPushedRef.current = true
+    setDetailGarmentId(garmentId)
+  }
+
+  const closeGarmentDetail = () => {
+    if (detailPushedRef.current) {
+      // The popstate handler above closes the detail, so browser Back and this control agree.
+      window.history.back()
+      return
+    }
+    const url = new URL(window.location.href)
+    url.searchParams.delete(GARMENT_DETAIL_PARAM)
+    window.history.replaceState(window.history.state, '', url)
+    setDetailGarmentId(null)
+  }
+
+  return { detailGarmentId, openGarmentDetail, closeGarmentDetail }
+}
+
 function WardrobeHubView({ owner }: { owner: string | null }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false)
   const [taggingGarmentId, setTaggingGarmentId] = useState<string | null>(null)
-  const [garments, setGarments] = useState<GarmentItemContract[]>([])
+  const [garments, setGarments] = useState<ClosetGarment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -216,6 +335,19 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     },
     [owner]
   )
+
+  const garmentOpenRefs = useRef(new Map<string, HTMLButtonElement>())
+  const { detailGarmentId, openGarmentDetail, closeGarmentDetail } =
+    useGarmentDetailRoute(garmentOpenRefs)
+
+  const handleDetailTagsSaved = (updated: GarmentWithColor) => {
+    inventoryVersion.current++
+    setGarments((current) =>
+      current.map((item) => (item.id === updated.id ? updated : item))
+    )
+  }
+
+  const detailGarment = findReadyGarment(garments, detailGarmentId)
 
   const addGarmentButtonRef = useRef<HTMLButtonElement | null>(null)
   const captureInvokerRef = useRef<HTMLElement | null>(null)
@@ -615,193 +747,212 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
           tabIndex={-1}
           className="mx-auto max-w-5xl px-6 py-8 pb-24 outline-none md:pb-8"
         >
-          {userIdError && (
-            <p
-              role="alert"
-              className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-800"
-            >
-              Unable to load your account, so Silhouette settings are unavailable right
-              now. Reload the page to try again.
-            </p>
-          )}
-
-          {onboardingStatusError && (
-            <div
-              role="alert"
-              className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-800"
-            >
-              <span>Unable to check your closet setup progress.</span>
-              <button
-                type="button"
-                onClick={retryOnboardingStatus}
-                className="min-h-[44px] font-semibold underline"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {onboardingStatus && onboardingStatus !== 'completed' && (
-            <Link
-              href="/wardrobe/onboarding"
-              className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-gold-500/40 bg-gold-500/10 px-6 py-4 text-sm font-semibold text-zinc-900 transition hover:bg-gold-500/20 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:text-zinc-100"
-            >
-              {t('wardrobe.onboarding.title')}
-              <span aria-hidden="true">→</span>
-            </Link>
-          )}
-
-          <ClosetSavedLooksRow
-            owner={owner}
-            savedLooks={savedLooks}
-            totalCount={savedLooksTotal}
-            hasMore={savedLooks.length < savedLooksTotal}
-            isLoadingMore={savedLooksLoadingMore}
-            onLoadMore={loadMoreSavedLooks}
-            isLoading={savedLooksLoading}
-            loadError={savedLooksError}
-            garments={garments}
-            onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-            onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-            onReopenStylePiece={(look, invoker) => {
-              const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-              if (!anchor || !anchor.category || !anchor.comfortRange) return
-              styleInvoker.current = invoker as HTMLButtonElement
-              setInitialSavedLook(look)
-              setStyleSelection({
-                id: anchor.id,
-                category: anchor.category,
-                comfortRange: anchor.comfortRange,
-              })
-            }}
-          />
-
-          <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Your Digital Closet
-            </h2>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Photograph or upload clothing items to power personalized weather guidance.
-            </p>
-
-            <WardrobeLoadError
-              loadError={loadError}
-              hasGarments={garments.length > 0}
-              isLoading={isLoading}
-              strings={strings}
-              onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+          {detailGarmentId && (
+            <GarmentDetail
+              garment={detailGarment}
+              owner={owner}
+              hasLoaded={hasLoaded}
+              loadFailed={Boolean(loadError)}
+              loading={isLoading}
+              onBack={closeGarmentDetail}
+              onTagsSaved={handleDetailTagsSaved}
+              onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+              onStylePiece={(selection, button) => {
+                styleInvoker.current = button
+                setStyleSelection(selection)
+              }}
             />
-            {garmentError && (
-              <p role="alert" className="mt-4 text-sm">
-                {garmentError}
+          )}
+          {/* D2: the grid stays mounted under the detail, so Back keeps its scroll and state. */}
+          <div hidden={Boolean(detailGarmentId)} data-testid="wardrobe-closet-view">
+            {userIdError && (
+              <p
+                role="alert"
+                className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-800"
+              >
+                Unable to load your account, so Silhouette settings are unavailable right
+                now. Reload the page to try again.
               </p>
             )}
-            {confirmedGarment && (
-              <Link
-                href="/"
-                className="inline-flex min-h-11 items-center text-sm underline"
+
+            {onboardingStatusError && (
+              <div
+                role="alert"
+                className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-red-200 bg-red-50 px-6 py-4 text-sm text-red-800"
               >
-                {strings.firstUse.backToOutfit}
+                <span>Unable to check your closet setup progress.</span>
+                <button
+                  type="button"
+                  onClick={retryOnboardingStatus}
+                  className="min-h-[44px] font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {onboardingStatus && onboardingStatus !== 'completed' && (
+              <Link
+                href="/wardrobe/onboarding"
+                className="mb-6 flex min-h-[44px] items-center justify-between rounded-xl border border-gold-500/40 bg-gold-500/10 px-6 py-4 text-sm font-semibold text-zinc-900 transition hover:bg-gold-500/20 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:text-zinc-100"
+              >
+                {t('wardrobe.onboarding.title')}
+                <span aria-hidden="true">→</span>
               </Link>
             )}
 
-            {garments.length === 0 ? (
-              <WardrobeEmptyState
-                isLoading={isLoading}
-                hasLoaded={hasLoaded}
+            <ClosetSavedLooksRow
+              owner={owner}
+              savedLooks={savedLooks}
+              totalCount={savedLooksTotal}
+              hasMore={savedLooks.length < savedLooksTotal}
+              isLoadingMore={savedLooksLoadingMore}
+              onLoadMore={loadMoreSavedLooks}
+              isLoading={savedLooksLoading}
+              loadError={savedLooksError}
+              garments={garments}
+              onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+              onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+              onReopenStylePiece={(look, invoker) => {
+                const anchor = garments.find((item) => item.id === look.anchorGarmentId)
+                if (!anchor || !anchor.category || !anchor.comfortRange) return
+                styleInvoker.current = invoker as HTMLButtonElement
+                setInitialSavedLook(look)
+                setStyleSelection({
+                  id: anchor.id,
+                  category: anchor.category,
+                  comfortRange: anchor.comfortRange,
+                })
+              }}
+            />
+
+            <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                Your Digital Closet
+              </h2>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Photograph or upload clothing items to power personalized weather
+                guidance.
+              </p>
+
+              <WardrobeLoadError
                 loadError={loadError}
-                openCapture={openCapture}
+                hasGarments={garments.length > 0}
+                isLoading={isLoading}
+                strings={strings}
+                onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
               />
-            ) : (
-              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {garments.map((garment) => (
-                  <div
-                    key={garment.id}
-                    data-testid={`garment-card-${garment.id}`}
-                    className="flex flex-col justify-between overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
-                  >
-                    {garment.imageAccess ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={garment.imageAccess.url}
-                        alt="Uploaded garment"
-                        className="aspect-[3/4] w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex aspect-[3/4] items-center justify-center text-3xl">
-                        👗
-                      </div>
-                    )}
-                    <div className="flex flex-col gap-2 p-3">
+              {garmentError && (
+                <p role="alert" className="mt-4 text-sm">
+                  {garmentError}
+                </p>
+              )}
+              {confirmedGarment && (
+                <Link
+                  href="/"
+                  className="inline-flex min-h-11 items-center text-sm underline"
+                >
+                  {strings.firstUse.backToOutfit}
+                </Link>
+              )}
+
+              {garments.length === 0 ? (
+                <WardrobeEmptyState
+                  isLoading={isLoading}
+                  hasLoaded={hasLoaded}
+                  loadError={loadError}
+                  openCapture={openCapture}
+                />
+              ) : (
+                <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                  {garments.map((garment) => (
+                    <div
+                      key={garment.id}
+                      data-testid={`garment-card-${garment.id}`}
+                      className="relative flex flex-col justify-between overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
+                    >
+                      <GarmentCardPhoto garment={garment} locale={i18n.language} />
                       <span
                         data-testid="garment-card-label"
-                        className="block truncate text-sm font-medium capitalize text-zinc-700 dark:text-zinc-200"
+                        className="block truncate px-3 pt-3 text-sm font-medium text-zinc-700 dark:text-zinc-200"
                       >
-                        {garment.category
-                          ? [garment.category, garment.material]
-                              .filter(Boolean)
-                              .join(' · ')
-                              .replace(/_/g, ' ')
-                          : 'Untagged'}
+                        {garmentCardLabel(i18n.language, garment)}
                       </span>
-                      <div className="flex flex-wrap items-center gap-1">
-                        <span
-                          data-testid={`garment-status-${garment.status}`}
-                          className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
-                        >
-                          {garment.status.replace('_', ' ')}
-                        </span>
-                        {garment.status === 'awaiting_tags' && (
-                          <button
-                            ref={(element) => {
-                              if (element)
-                                taggingButtonRefs.current.set(garment.id, element)
-                              else taggingButtonRefs.current.delete(garment.id)
-                            }}
-                            onClick={(event) =>
-                              openTagging(garment.id, event.currentTarget)
-                            }
-                            className="min-h-[44px] min-w-[44px] rounded bg-gold-500/20 px-2 py-1 text-xs font-semibold text-gold-700 hover:bg-gold-500/30 dark:text-gold-300"
+                      {/* A ready card opens its detail. The button covers the card, so the photo
+                          keeps its own alt text outside it, and the actions below sit above it. */}
+                      {garment.status === 'ready' && (
+                        <button
+                          type="button"
+                          ref={(element) => {
+                            if (element) garmentOpenRefs.current.set(garment.id, element)
+                            else garmentOpenRefs.current.delete(garment.id)
+                          }}
+                          data-testid={`garment-open-${garment.id}`}
+                          aria-label={garmentPhotoAlt(i18n.language, garment)}
+                          onClick={() => openGarmentDetail(garment.id)}
+                          className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+                        />
+                      )}
+                      <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-3 [&_button]:pointer-events-auto">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span
+                            data-testid={`garment-status-${garment.status}`}
+                            className="inline-block rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
                           >
-                            Needs tags
-                          </button>
-                        )}
-                        {garment.status === 'failed' && (
-                          <button
-                            type="button"
-                            className="min-h-11 px-2 text-left text-xs font-semibold underline"
-                            onClick={(event) => openCapture(event.currentTarget)}
-                          >
-                            {strings.firstUse.replaceGarment}
-                          </button>
-                        )}
-                        {garment.status === 'processing' && (
-                          <button
-                            type="button"
-                            onClick={() => pollCommittedGarment(garment.id)}
-                            className="min-h-11 px-2 text-xs font-semibold underline"
-                          >
-                            {strings.firstUse.checkGarment}
-                          </button>
-                        )}
+                            {garment.status.replace('_', ' ')}
+                          </span>
+                          {garment.status === 'awaiting_tags' && (
+                            <button
+                              ref={(element) => {
+                                if (element)
+                                  taggingButtonRefs.current.set(garment.id, element)
+                                else taggingButtonRefs.current.delete(garment.id)
+                              }}
+                              onClick={(event) =>
+                                openTagging(garment.id, event.currentTarget)
+                              }
+                              className="min-h-[44px] min-w-[44px] rounded bg-gold-500/20 px-2 py-1 text-xs font-semibold text-gold-700 hover:bg-gold-500/30 dark:text-gold-300"
+                            >
+                              Needs tags
+                            </button>
+                          )}
+                          {garment.status === 'failed' && (
+                            <button
+                              type="button"
+                              className="min-h-11 px-2 text-left text-xs font-semibold underline"
+                              onClick={(event) => openCapture(event.currentTarget)}
+                            >
+                              {strings.firstUse.replaceGarment}
+                            </button>
+                          )}
+                          {garment.status === 'processing' && (
+                            <button
+                              type="button"
+                              onClick={() => pollCommittedGarment(garment.id)}
+                              className="min-h-11 px-2 text-xs font-semibold underline"
+                            >
+                              {strings.firstUse.checkGarment}
+                            </button>
+                          )}
+                        </div>
+                        <StylePieceEntry
+                          garment={garment}
+                          owner={owner}
+                          unavailable={Boolean(loadError)}
+                          loading={isLoading}
+                          labels={styleLabels}
+                          onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                          onOpen={(selection, button) => {
+                            styleInvoker.current = button
+                            setStyleSelection(selection)
+                          }}
+                        />
                       </div>
-                      <StylePieceEntry
-                        garment={garment}
-                        owner={owner}
-                        unavailable={Boolean(loadError)}
-                        loading={isLoading}
-                        labels={styleLabels}
-                        onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                        onOpen={(selection, button) => {
-                          styleInvoker.current = button
-                          setStyleSelection(selection)
-                        }}
-                      />
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </main>
 

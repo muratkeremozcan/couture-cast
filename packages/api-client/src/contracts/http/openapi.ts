@@ -171,7 +171,10 @@ export function generateHttpOpenApiDocument() {
       // documented 409 message on checkout. No existing operation narrows.
       // Story CC-7.2 bumps the minor: four additive account-backed saved-looks
       // operations under /api/v1/wardrobe/saved-looks. No existing operation narrows.
-      version: '1.9.0',
+      // Story CC-7.5 bumps the minor: an optional x-couture-garment-color header on the
+      // garment list and tag update adds colorFamily for clients that send it. Responses
+      // without the header keep their strict legacy shape.
+      version: '1.10.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

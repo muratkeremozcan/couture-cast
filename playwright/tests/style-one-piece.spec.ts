@@ -60,8 +60,10 @@ test.describe('Style this piece on a phone', () => {
 
     await page.goto('/wardrobe')
     await expect(
+      // Story CC-7.5 D6: the mocked garment has no color, so its category names the photo.
       page.getByTestId(`garment-card-${garment.id}`).getByRole('img', {
-        name: 'Uploaded garment',
+        name: 'Top',
+        exact: true,
       })
     ).toHaveAttribute('src', photo)
     const panel = await openStylePanel(page, garment.id)

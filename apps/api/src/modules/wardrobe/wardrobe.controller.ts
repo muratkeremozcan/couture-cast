@@ -22,9 +22,12 @@ import {
   createGarmentItemInputSchema,
   createGarmentUploadUrlInputSchema,
   garmentIdPathParamsSchema,
+  garmentListWithColorResponseSchema,
   suggestGarmentTagsWireResponseSchema,
   updateGarmentTagsInputSchema,
   updateGarmentTagsResponseSchema,
+  updateGarmentTagsWithColorResponseSchema,
+  WARDROBE_GARMENT_COLOR_HEADER,
 } from '@couture/api-client/contracts/http'
 import { AuthContext } from '../auth/security.decorators'
 import { RequestAuthGuard } from '../auth/security.guards'
@@ -40,6 +43,14 @@ function validationMessage(prefix: string, error: z.ZodError): string {
   return `${prefix}: ${details}`
 }
 
+/**
+ * Story CC-7.5 D1: only the exact value `1` opts in to `colorFamily`. Anything else, `0`,
+ * `true` and an empty value included, keeps the strict legacy shape installed builds parse.
+ */
+function wantsGarmentColor(header: string | string[] | undefined): boolean {
+  return header === '1'
+}
+
 @Controller('/api/v1/wardrobe')
 @UseGuards(RequestAuthGuard, WardrobeUploadGuard)
 export class WardrobeController {
@@ -51,8 +62,16 @@ export class WardrobeController {
 
   @Get('garments')
   @Header('Cache-Control', 'private, no-store')
-  async listGarments(@AuthContext() auth: RequestAuthContext) {
-    return await this.wardrobeService.listGarments(auth.userId)
+  async listGarments(
+    @AuthContext() auth: RequestAuthContext,
+    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[]
+  ) {
+    if (!wantsGarmentColor(colorHeader)) {
+      return await this.wardrobeService.listGarments(auth.userId)
+    }
+    return garmentListWithColorResponseSchema.parse(
+      await this.wardrobeService.listGarments(auth.userId, { includeColor: true })
+    )
   }
 
   @Post('upload-url')
@@ -155,7 +174,8 @@ export class WardrobeController {
   async updateGarmentTags(
     @AuthContext() auth: RequestAuthContext,
     @Param('garmentId') garmentId: string,
-    @Body() payload: unknown
+    @Body() payload: unknown,
+    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[]
   ) {
     const parsedPath = garmentIdPathParamsSchema.safeParse({ garmentId })
     if (!parsedPath.success) {
@@ -171,12 +191,23 @@ export class WardrobeController {
       )
     }
 
-    return updateGarmentTagsResponseSchema.parse(
+    if (!wantsGarmentColor(colorHeader)) {
+      return updateGarmentTagsResponseSchema.parse(
+        await this.wardrobeService.updateGarmentTags(
+          auth.userId,
+          auth.role,
+          parsedPath.data.garmentId,
+          parsedBody.data
+        )
+      )
+    }
+    return updateGarmentTagsWithColorResponseSchema.parse(
       await this.wardrobeService.updateGarmentTags(
         auth.userId,
         auth.role,
         parsedPath.data.garmentId,
-        parsedBody.data
+        parsedBody.data,
+        { includeColor: true }
       )
     )
   }

@@ -10,6 +10,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Learning path Step 58: Hosted wardrobe workers and manual tagging.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#hosted-wardrobe-workers-and-manual-tagging
+// Learning path Step 63: Garment detail and tag edit (7.5-CMP-001, opt-in colorFamily).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // @vitest-environment jsdom
 import { Blob as NodeBlob } from 'node:buffer'
 import {
@@ -172,9 +174,15 @@ describe('uploadGarmentImageFromWeb & listGarmentsFromWeb', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/v1/wardrobe/garments'),
       expect.objectContaining({
-        headers: { Authorization: 'Bearer test-access-token' },
+        // Story 7.5: every garment read opts in to colorFamily.
+        headers: {
+          Authorization: 'Bearer test-access-token',
+          'x-couture-garment-color': '1',
+        },
       })
     )
+    // The legacy answer of an API from before the header reads as colorFamily null.
+    expect(result[0]?.colorFamily).toBeNull()
   })
 
   it('handles HTTP error response when listing garments', async () => {
@@ -1288,6 +1296,68 @@ describe('garment tagging wrappers', () => {
       comfortRange: 'mild',
     })
   })
+
+  it('[P0] [7.5-CMP-001] opts in to colorFamily on the tag update and returns it', async () => {
+    authenticate()
+    const saved = {
+      ...garmentFixture,
+      status: 'ready',
+      category: 'outerwear',
+      material: null,
+      comfortRange: 'cold',
+      tagsConfirmedAt: '2026-08-06T10:00:00.000Z',
+      colorFamily: 'blue',
+    }
+    const fetchMock = stubFetchOnce(jsonResponse({ data: saved }))
+
+    const result = await updateGarmentTagsFromWeb('garment-1', {
+      category: 'outerwear',
+      material: null,
+      comfortRange: 'cold',
+    })
+
+    expect(result).toMatchObject({
+      category: 'outerwear',
+      material: null,
+      colorFamily: 'blue',
+    })
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(init.headers).toMatchObject({ 'x-couture-garment-color': '1' })
+  })
+
+  it('[P0] [7.5-CMP-001] lists garments with their colorFamily', async () => {
+    authenticate()
+    stubFetchOnce(
+      jsonResponse({
+        data: [
+          { ...garmentFixture, status: 'ready', category: 'top', colorFamily: 'blue' },
+        ],
+      })
+    )
+
+    const [garment] = await listGarmentsFromWeb()
+
+    expect(garment).toMatchObject({ id: 'garment-1', colorFamily: 'blue' })
+  })
+
+  it.each([
+    [409, 'CONCURRENT_TAG_UPDATE'],
+    [403, 'GUARDIAN_CONSENT_REQUIRED'],
+  ])(
+    '[P1] [7.5-CMP-001] keeps the status %i and code %s of a refused tag update',
+    async (status, message) => {
+      authenticate()
+      stubFetchOnce(jsonResponse({ statusCode: status, message }, status))
+
+      const failure = updateGarmentTagsFromWeb('garment-1', {
+        category: 'top',
+        comfortRange: 'mild',
+      })
+
+      await expect(failure).rejects.toBeInstanceOf(WardrobeRequestError)
+      await expect(failure).rejects.toMatchObject({ code: message, status })
+    }
+  )
 
   it('surfaces a save failure with the server message', async () => {
     authenticate()

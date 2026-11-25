@@ -466,6 +466,23 @@
       "loading": "A carregar a sua peça...",
       "pending_desc": "Descreva esta peça com uma categoria e um nível de conforto.",
       "manual_desc": "Escolha a categoria e o nível de conforto que servem a esta peça. O material é opcional."
+    },
+    "detail": {
+      "back": "Voltar ao roupeiro",
+      "category": "Categoria",
+      "material": "Tecido",
+      "comfort": "Intervalo de conforto",
+      "noMaterial": "Sem tecido",
+      "editTags": "Editar etiquetas",
+      "done": "Concluir",
+      "cancel": "Cancelar",
+      "noChanges": "Sem alterações",
+      "conflict": "Esta peça mudou noutro dispositivo. Verifica as etiquetas e tenta novamente.",
+      "notAllowed": "Um encarregado de educação tem de aprovar primeiro as alterações no roupeiro.",
+      "undoFailed": "Não foi possível anular. Tenta novamente.",
+      "missing": "Esta peça já não está no teu roupeiro.",
+      "loading": "A carregar a peça...",
+      "loadFailed": "Não foi possível carregar esta peça. Tenta novamente."
     }
   },
   "community": {

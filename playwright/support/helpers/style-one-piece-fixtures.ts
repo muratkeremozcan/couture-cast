@@ -4,12 +4,13 @@ import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/
 import {
   createSavedLookInputSchema,
   federatedSignupStatusResponseSchema,
-  garmentListResponseSchema,
+  parseGarmentListWithColorResponse,
   savedLookListResponseSchema,
   savedLookResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   type GarmentItemContract,
+  type GarmentWithColor,
   type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import {
@@ -68,7 +69,9 @@ export async function mockStyleWardrobe(
   page: Page,
   baseURL: string,
   intercept: InterceptNetworkCallFn,
-  inventory: Record<string, GarmentItemContract[]>
+  // Story 7.5: web lists garments with x-couture-garment-color: 1, so an inventory entry may
+  // carry colorFamily; one without it answers as a legacy garment would (colorFamily null).
+  inventory: Record<string, (GarmentItemContract | GarmentWithColor)[]>
 ) {
   const origin = new URL(baseURL).origin
   const writes: string[] = []
@@ -141,7 +144,7 @@ export async function mockStyleWardrobe(
     })
   )
   mockRead('wardrobe/garments', (id) =>
-    garmentListResponseSchema.parse({ data: inventory[id] })
+    parseGarmentListWithColorResponse({ data: inventory[id] })
   )
   mockRead('auth/signup/federated', () =>
     federatedSignupStatusResponseSchema.parse({ status: 'complete' })

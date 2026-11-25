@@ -466,6 +466,23 @@
       "loading": "Caricamento del tuo capo...",
       "pending_desc": "Descrivi questo capo con una categoria e una fascia di comfort.",
       "manual_desc": "Scegli la categoria e la fascia di comfort adatte a questo capo. Il materiale è facoltativo."
+    },
+    "detail": {
+      "back": "Torna all'armadio",
+      "category": "Categoria",
+      "material": "Tessuto",
+      "comfort": "Fascia di comfort",
+      "noMaterial": "Nessun tessuto",
+      "editTags": "Modifica etichette",
+      "done": "Fatto",
+      "cancel": "Annulla",
+      "noChanges": "Nessuna modifica",
+      "conflict": "Questo capo è cambiato su un altro dispositivo. Controlla le etichette e riprova.",
+      "notAllowed": "Un genitore o tutore deve prima approvare le modifiche all'armadio.",
+      "undoFailed": "Impossibile annullare. Riprova.",
+      "missing": "Questo capo non è più nel tuo armadio.",
+      "loading": "Caricamento del capo...",
+      "loadFailed": "Impossibile caricare questo capo. Riprova."
     }
   },
   "community": {

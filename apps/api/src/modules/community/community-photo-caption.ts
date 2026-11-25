@@ -1,19 +1,14 @@
 import type { SupportedLocale } from '@couture/api-client/contracts/http'
+import {
+  classifyRgbColorFamily,
+  GARMENT_COLOR_FAMILIES,
+  type GarmentColorFamily,
+} from '@couture/utils'
 
-const COLORS = [
-  'black',
-  'gray',
-  'white',
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'blue',
-  'purple',
-  'pink',
-  'brown',
-] as const
-type Color = (typeof COLORS)[number]
+// Story CC-7.5 D1: the classifier and its families live in @couture/utils, shared with the
+// garment `colorFamily` field, so a garment and a community photo name a color the same way.
+const COLORS = GARMENT_COLOR_FAMILIES
+type Color = GarmentColorFamily
 
 const COPY: Record<SupportedLocale, { sentence: string; colors: readonly string[] }> = {
   'en-US': { sentence: 'This photo features {colors} tones.', colors: COLORS },
@@ -163,28 +158,6 @@ const COPY: Record<SupportedLocale, { sentence: string; colors: readonly string[
   },
 }
 
-function hueOf(red: number, green: number, blue: number, max: number, chroma: number) {
-  if (max === red) return (360 + (60 * (green - blue)) / chroma) % 360
-  if (max === green) return 120 + (60 * (blue - red)) / chroma
-  return 240 + (60 * (red - green)) / chroma
-}
-
-function pixelColor(red: number, green: number, blue: number): Color {
-  const max = Math.max(red, green, blue)
-  const min = Math.min(red, green, blue)
-  const chroma = max - min
-  if (max < 45) return 'black'
-  if (chroma < 24) return min > 220 ? 'white' : 'gray'
-  const hue = hueOf(red, green, blue, max, chroma)
-  if (hue < 20 || hue >= 345) return min > 110 ? 'pink' : 'red'
-  if (hue < 50) return max < 160 ? 'brown' : 'orange'
-  if (hue < 70) return 'yellow'
-  if (hue < 168) return 'green'
-  if (hue < 253) return 'blue'
-  if (hue < 313) return 'purple'
-  return 'pink'
-}
-
 export function buildCommunityPhotoCaption(
   { rgba, width, height }: { rgba: Buffer; width: number; height: number },
   locale: SupportedLocale
@@ -198,7 +171,7 @@ export function buildCommunityPhotoCaption(
     const x = (spot % width) / width
     const y = Math.floor(spot / width) / height
     const weight = x > 0.22 && x < 0.78 && y > 0.24 && y < 0.88 ? 4 : 1
-    const color = pixelColor(
+    const color = classifyRgbColorFamily(
       rgba[offset] ?? 0,
       rgba[offset + 1] ?? 0,
       rgba[offset + 2] ?? 0

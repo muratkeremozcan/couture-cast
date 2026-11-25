@@ -324,6 +324,23 @@
         "confirm_required": "Confirma la indicación sobre la ropa base antes de subir la foto.",
         "session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto."
       }
+    },
+    "detail": {
+      "back": "Volver al clóset",
+      "category": "Categoría",
+      "material": "Tela",
+      "comfort": "Rango de comodidad",
+      "noMaterial": "Sin tela",
+      "editTags": "Editar etiquetas",
+      "done": "Listo",
+      "cancel": "Cancelar",
+      "noChanges": "Sin cambios",
+      "conflict": "Esta prenda cambió en otro dispositivo. Revisa las etiquetas e inténtalo de nuevo.",
+      "notAllowed": "Un tutor debe aprobar primero los cambios en tu clóset.",
+      "undoFailed": "No se pudo deshacer. Inténtalo de nuevo.",
+      "missing": "Esta prenda ya no está en tu clóset.",
+      "loading": "Cargando la prenda...",
+      "loadFailed": "No se pudo cargar la prenda. Inténtalo de nuevo."
     }
   },
   "commerce": {

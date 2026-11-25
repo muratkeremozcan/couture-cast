@@ -324,6 +324,23 @@
         "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst.",
         "session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus."
       }
+    },
+    "detail": {
+      "back": "Zurück zum Schrank",
+      "category": "Kategorie",
+      "material": "Stoff",
+      "comfort": "Komfortbereich",
+      "noMaterial": "Kein Stoff",
+      "editTags": "Tags bearbeiten",
+      "done": "Fertig",
+      "cancel": "Abbrechen",
+      "noChanges": "Keine Änderungen",
+      "conflict": "Dieses Teil wurde auf einem anderen Gerät geändert. Prüfe die Tags und versuche es erneut.",
+      "notAllowed": "Eine erziehungsberechtigte Person muss Änderungen am Schrank zuerst erlauben.",
+      "undoFailed": "Rückgängig machen hat nicht geklappt. Versuche es erneut.",
+      "missing": "Dieses Teil ist nicht mehr in deinem Schrank.",
+      "loading": "Teil wird geladen...",
+      "loadFailed": "Dieses Teil konnte nicht geladen werden. Versuche es erneut."
     }
   },
   "commerce": {

@@ -1,6 +1,9 @@
 import type { ApiRole } from '../../../../apps/api/src/modules/auth/security.types'
 import type { WardrobeRetentionService } from '../../../../apps/api/src/modules/wardrobe/wardrobe-retention.service'
-import type { WardrobeService } from '../../../../apps/api/src/modules/wardrobe/wardrobe.service'
+import type {
+  GarmentReadOptions,
+  WardrobeService,
+} from '../../../../apps/api/src/modules/wardrobe/wardrobe.service'
 import {
   GARMENT_TAGGING_ANALYSIS_VERSION,
   type GarmentCategory,
@@ -23,6 +26,37 @@ import { getProviderWardrobeState } from '../state'
  * registers is returned; the scenario readers and response shapers stay private
  * to this module.
  */
+/** The ready garment every wardrobe provider double answers with. */
+function readyGarmentData(
+  garmentId: string,
+  tags: {
+    category: GarmentCategory
+    material: GarmentMaterial | null
+    comfortRange: GarmentComfortRange
+  }
+) {
+  return {
+    id: garmentId,
+    status: 'ready',
+    ...tags,
+    tagsConfirmedAt: '2026-08-05T12:00:00.000Z',
+    fileSizeBytes: 1024,
+    mimeType: 'image/png',
+    retentionStatus: 'active',
+    createdAt: '2026-08-05T10:00:00.000Z',
+    committedAt: '2026-08-05T10:01:00.000Z',
+    imageAccess: {
+      url: 'https://example.com/read.png',
+      expiresAt: '2026-08-05T12:15:00.000Z',
+    },
+  }
+}
+
+/** Story 7.5: the provider garment's stored dominant color is blue; added only on opt-in. */
+function withProviderColor<T extends object>(data: T, options: GarmentReadOptions) {
+  return options.includeColor ? { ...data, colorFamily: 'blue' as const } : data
+}
+
 export function createWardrobeDoubles() {
   const assertProviderWardrobeState = (userId: string, garmentId: string) => {
     if (
@@ -58,6 +92,26 @@ export function createWardrobeDoubles() {
         },
       })
     },
+    // Story 7.5: the garment the 'A ready blue garment exists for user' state names. The real
+    // service derives colorFamily from color_palette.dominant only when the request opts in.
+    listGarments: (userId: string, options: GarmentReadOptions = {}) => {
+      const state = getProviderWardrobeState()
+      if (state.outcome !== 'success' || state.userId !== userId || !state.garmentId) {
+        return Promise.resolve({ data: [] })
+      }
+      return Promise.resolve({
+        data: [
+          withProviderColor(
+            readyGarmentData(state.garmentId, {
+              category: 'top',
+              material: 'cotton',
+              comfortRange: 'mild',
+            }),
+            options
+          ),
+        ],
+      })
+    },
     updateGarmentTags: (
       userId: string,
       _role: ApiRole,
@@ -66,30 +120,22 @@ export function createWardrobeDoubles() {
         category: GarmentCategory
         material?: GarmentMaterial | null
         comfortRange: GarmentComfortRange
-      }
+      },
+      options: GarmentReadOptions = {}
     ) => {
       assertProviderWardrobeState(userId, garmentId)
       const categoryValue = input.category
       const materialValue = input.material ?? null
       const comfortValue = input.comfortRange
       return Promise.resolve({
-        data: {
-          id: garmentId,
-          status: 'ready',
-          category: categoryValue,
-          material: materialValue,
-          comfortRange: comfortValue,
-          tagsConfirmedAt: '2026-08-05T12:00:00.000Z',
-          fileSizeBytes: 1024,
-          mimeType: 'image/png',
-          retentionStatus: 'active',
-          createdAt: '2026-08-05T10:00:00.000Z',
-          committedAt: '2026-08-05T10:01:00.000Z',
-          imageAccess: {
-            url: 'https://example.com/read.png',
-            expiresAt: '2026-08-05T12:15:00.000Z',
-          },
-        },
+        data: withProviderColor(
+          readyGarmentData(garmentId, {
+            category: categoryValue,
+            material: materialValue,
+            comfortRange: comfortValue,
+          }),
+          options
+        ),
       })
     },
   } as unknown as WardrobeService

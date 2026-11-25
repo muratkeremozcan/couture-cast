@@ -1,0 +1,361 @@
+// Story 7.5 test plan 7.5-E2E-001..003: garment detail and tag edit on a phone (390x844).
+// - E2E-001 drives the real local API and wardrobe worker: open a ready garment, edit its tags,
+//   Done, Saved, Undo, reload, and read the persisted tags back on the detail, the grid and the
+//   API. The photo alt is color plus category from the server's colorFamily.
+// - E2E-002 mocks the wardrobe reads to pin the "Blue top" alt text and each failure state.
+// - E2E-003 runs axe on the detail and the open editor.
+// Learning path Step 63: Garment detail and tag edit.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+import type { Page } from '@playwright/test'
+import {
+  garmentListWithColorResponseSchema,
+  type GarmentWithColor,
+} from '@couture/api-client/contracts/http'
+import { formatGarmentAlt } from '@couture/utils'
+import { resolveEnvironmentConfig } from '../config/environments'
+import { expect, test } from '../support/fixtures/merged-fixtures'
+import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
+import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
+import {
+  seedReadyGarment,
+  signUpAdultMember,
+  type SeededMember,
+} from '../support/helpers/ready-garment'
+import {
+  memberA,
+  mockStyleWardrobe,
+  photographedGarment,
+} from '../support/helpers/style-one-piece-fixtures'
+import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
+
+const environment = resolveEnvironmentConfig('local')
+const phone = {
+  viewport: { width: 390, height: 844 },
+  isMobile: true,
+  hasTouch: true,
+  serviceWorkers: 'block' as const,
+}
+
+async function openDetail(page: Page, garmentId: string, name: string) {
+  const open = page.getByTestId(`garment-open-${garmentId}`)
+  await expect(open).toHaveAccessibleName(name)
+  await open.click()
+  const detail = page.getByTestId('garment-detail')
+  await expect(detail).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`[?&]garment=${garmentId}(?:&|$)`))
+  return detail
+}
+
+async function expectTags(
+  page: Page,
+  tags: { category: string; material: string; comfort: string }
+) {
+  await expect(page.getByTestId('garment-detail-category')).toHaveText(tags.category)
+  await expect(page.getByTestId('garment-detail-material')).toHaveText(tags.material)
+  await expect(page.getByTestId('garment-detail-comfort')).toHaveText(tags.comfort)
+}
+
+const realTest = test.extend<{ member: SeededMember }>({
+  member: async ({ apiRequest }, use, testInfo) => {
+    const member = await signUpAdultMember(
+      apiRequest,
+      environment.apiBaseUrl,
+      `${buildUniqueId('garment-detail', testInfo)}@example.test`
+    )
+    try {
+      await use(member)
+    } finally {
+      await cleanupWardrobeUserTestData(
+        apiRequest,
+        member.accessToken,
+        member.userId,
+        environment.apiBaseUrl
+      )
+    }
+  },
+})
+
+realTest.describe('Garment detail and tag edit against the local API', () => {
+  realTest.use({ authSessionEnabled: false, ...phone })
+
+  realTest.beforeEach(({}, testInfo) => {
+    realTest.skip(
+      isNonLocalEnvironment(testInfo),
+      'Seeds garments through the local wardrobe worker and signs in with the local E2E token.'
+    )
+  })
+
+  realTest(
+    '[P0] [7.5-E2E-001] edits tags with Saved and Undo, and the change survives a reload',
+    async ({ apiRequest, interceptNetworkCall, member, page }) => {
+      const auth = { Authorization: `Bearer ${member.accessToken}` }
+      const garment = await realTest.step('Seed a ready top', () =>
+        seedReadyGarment(apiRequest, environment.apiBaseUrl, member, {
+          category: 'top',
+          material: 'cotton',
+          comfortRange: 'mild',
+        })
+      )
+
+      const readBack = async () => {
+        const response = await apiRequest({
+          method: 'GET',
+          path: '/api/v1/wardrobe/garments',
+          baseUrl: environment.apiBaseUrl,
+          headers: { ...auth, 'x-couture-garment-color': '1' },
+        })
+        expect(response.status).toBe(200)
+        const [stored] = garmentListWithColorResponseSchema
+          .parse(response.body)
+          .data.filter((item) => item.id === garment.id)
+        expect(stored).toBeDefined()
+        return stored!
+      }
+      // The oracle for the alt text is the color the server classified for this photo.
+      const { colorFamily } = await readBack()
+      const topAlt = formatGarmentAlt('en-US', { colorFamily, category: 'top' })
+
+      await realTest.step('Open the garment from the closet grid', async () => {
+        await page.addInitScript((token) => {
+          window.sessionStorage.setItem('couturecast.access-token', token)
+        }, member.accessToken)
+        await page.setExtraHTTPHeaders(auth)
+        await page.goto('/wardrobe')
+        await waitForAccessibilityReady(page)
+        const detail = await openDetail(page, garment.id, topAlt)
+        await expect(detail.getByRole('img', { name: topAlt })).toBeVisible()
+        await expect(detail.getByTestId('garment-detail-back')).toBeVisible()
+        await expect(detail.getByTestId('style-piece-open')).toBeVisible()
+        await expectTags(page, { category: 'Top', material: 'Cotton', comfort: 'Mild' })
+      })
+
+      await realTest.step('Edit material and comfort, then Done', async () => {
+        await page.getByTestId('garment-edit-tags').click()
+        await page.getByTestId('garment-tag-option-material-wool').click()
+        await page.getByTestId('garment-tag-option-comfort-cold').click()
+        const save = interceptNetworkCall({
+          method: 'PATCH',
+          url: `**/api/v1/wardrobe/garments/${garment.id}/tags`,
+        })
+        await page.getByTestId('garment-tag-done').click()
+        const { status, requestJson } = await save
+        expect(status).toBe(200)
+        expect(requestJson).toEqual({
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+        })
+        await expect(page.getByTestId('status-feedback-bar')).toContainText('Saved')
+        await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Cold' })
+      })
+
+      await realTest.step('Undo a second edit back to the saved tags', async () => {
+        await page.getByTestId('garment-edit-tags').click()
+        await page.getByTestId('garment-tag-option-comfort-hot').click()
+        const save = interceptNetworkCall({
+          method: 'PATCH',
+          url: `**/api/v1/wardrobe/garments/${garment.id}/tags`,
+        })
+        await page.getByTestId('garment-tag-done').click()
+        expect((await save).status).toBe(200)
+        await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Hot' })
+
+        const undo = interceptNetworkCall({
+          method: 'PATCH',
+          url: `**/api/v1/wardrobe/garments/${garment.id}/tags`,
+        })
+        await page.getByTestId('status-bar-action-undo').click()
+        const { status, requestJson } = await undo
+        expect(status).toBe(200)
+        expect(requestJson).toEqual({
+          category: 'top',
+          material: 'wool',
+          comfortRange: 'cold',
+        })
+        await expect(page.getByTestId('status-feedback-bar')).toContainText(
+          'Change undone.'
+        )
+        await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Cold' })
+      })
+
+      await realTest.step(
+        'Reload reopens the detail with the persisted tags',
+        async () => {
+          await page.reload()
+          await expect(page.getByTestId('garment-detail')).toBeVisible()
+          await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Cold' })
+          expect(await readBack()).toMatchObject({
+            category: 'top',
+            material: 'wool',
+            comfortRange: 'cold',
+            colorFamily,
+          })
+        }
+      )
+
+      await realTest.step('Back shows the grid with the new tags', async () => {
+        await page.getByTestId('garment-detail-back').click()
+        await expect(page.getByTestId('garment-detail')).toHaveCount(0)
+        await expect(page).not.toHaveURL(/[?&]garment=/)
+        const card = page.getByTestId(`garment-card-${garment.id}`)
+        await expect(card.getByTestId('garment-card-label')).toContainText('Wool')
+        await expect(page.getByTestId(`garment-open-${garment.id}`)).toBeFocused()
+      })
+    }
+  )
+})
+
+test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
+  test.use({ authSessionEnabled: false, ...phone })
+
+  test.beforeEach(({ baseURL }, testInfo) => {
+    test.skip(isNonLocalEnvironment(testInfo), 'Uses synthetic loopback-only fixtures.')
+    expect(new URL(baseURL!).hostname).toMatch(/^(?:127\.0\.0\.1|localhost|\[::1\])$/)
+  })
+
+  async function mockCloset(
+    page: Page,
+    baseURL: string,
+    interceptNetworkCall: Parameters<typeof mockStyleWardrobe>[2]
+  ) {
+    const blueTop: GarmentWithColor = {
+      ...photographedGarment(baseURL, 'detail-blue-top'),
+      colorFamily: 'blue',
+    }
+    const writes = await mockStyleWardrobe(page, baseURL, interceptNetworkCall, {
+      [memberA]: [blueTop],
+    })
+    return { blueTop, writes }
+  }
+
+  test('[P1] [7.5-E2E-002] names the photo "Blue top" and says "No changes" without a request', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const { blueTop, writes } = await mockCloset(page, baseURL!, interceptNetworkCall)
+    await page.goto('/wardrobe')
+
+    await expect(
+      page
+        .getByTestId(`garment-card-${blueTop.id}`)
+        .getByRole('img', { name: 'Blue top' })
+    ).toBeVisible()
+    const detail = await openDetail(page, blueTop.id, 'Blue top')
+    await expect(detail.getByRole('img', { name: 'Blue top' })).toBeVisible()
+    await expect(detail.getByRole('heading', { name: 'Blue top' })).toBeVisible()
+
+    await page.getByTestId('garment-edit-tags').click()
+    await page.getByTestId('garment-tag-done').click()
+    await expect(page.getByTestId('status-feedback-bar')).toContainText('No changes')
+    expect(writes).toEqual([])
+  })
+
+  for (const failure of [
+    {
+      name: 'a concurrent update',
+      status: 409,
+      message: 'CONCURRENT_TAG_UPDATE',
+      copy: 'This piece changed on another device. Check the tags and try again.',
+    },
+    {
+      name: 'a guardian block',
+      status: 403,
+      message: 'GUARDIAN_CONSENT_REQUIRED',
+      copy: 'A guardian has to approve closet changes first.',
+    },
+  ]) {
+    test(`[P1] [7.5-E2E-002] shows ${failure.name} in its own words and keeps the draft`, async ({
+      baseURL,
+      interceptNetworkCall,
+      page,
+    }) => {
+      const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
+      const refused = interceptNetworkCall({
+        method: 'PATCH',
+        url: `**/api/v1/wardrobe/garments/${blueTop.id}/tags`,
+        fulfillResponse: {
+          status: failure.status,
+          body: { statusCode: failure.status, message: failure.message },
+        },
+      })
+      await page.goto('/wardrobe')
+      await openDetail(page, blueTop.id, 'Blue top')
+
+      await page.getByTestId('garment-edit-tags').click()
+      await page.getByTestId('garment-tag-option-material-wool').click()
+      await page.getByTestId('garment-tag-done').click()
+      expect((await refused).status).toBe(failure.status)
+
+      await expect(page.getByTestId('garment-tag-error')).toHaveText(failure.copy)
+      await expect(page.getByTestId('garment-tag-option-material-wool')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      await expect(page.getByTestId('garment-detail-material')).toHaveText('Cotton')
+    })
+  }
+
+  test('[P1] [7.5-E2E-002] a dropped connection reads as offline and keeps the draft', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
+    await page.goto('/wardrobe')
+    await openDetail(page, blueTop.id, 'Blue top')
+    // No PATCH handler: the wardrobe mock aborts every unhandled API write.
+    await page.getByTestId('garment-edit-tags').click()
+    await page.getByTestId('garment-tag-option-comfort-cold').click()
+    await page.getByTestId('garment-tag-done').click()
+
+    await expect(page.getByTestId('garment-tag-error')).toHaveAttribute(
+      'data-failure',
+      'offline'
+    )
+    await expect(page.getByTestId('garment-tag-option-comfort-cold')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
+  test('[P1] [7.5-E2E-002] Style this piece opens from the detail', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
+    await page.goto('/wardrobe')
+    const detail = await openDetail(page, blueTop.id, 'Blue top')
+
+    await detail.getByTestId('style-piece-open').click()
+
+    const panel = page.getByTestId('style-piece-panel')
+    await expect(panel).toBeVisible()
+    await expect(panel.getByTestId('style-piece-look')).toHaveCount(3)
+  })
+
+  test('[P1] [7.5-E2E-003] the detail and the open editor pass axe', async ({
+    baseURL,
+    interceptNetworkCall,
+    page,
+  }) => {
+    const { blueTop } = await mockCloset(page, baseURL!, interceptNetworkCall)
+    await page.goto('/wardrobe')
+    await openDetail(page, blueTop.id, 'Blue top')
+    await checkA11y(page)
+
+    await page.getByTestId('garment-edit-tags').click()
+    await expect(page.getByTestId('garment-tag-editor')).toBeVisible()
+    await checkA11y(page)
+
+    // The back control and the tag choices are reachable and operable by keyboard.
+    const back = page.getByTestId('garment-detail-back')
+    await back.focus()
+    await expect(back).toBeFocused()
+    const wool = page.getByTestId('garment-tag-option-material-wool')
+    await wool.focus()
+    await page.keyboard.press('Enter')
+    await expect(wool).toHaveAttribute('aria-pressed', 'true')
+  })
+})

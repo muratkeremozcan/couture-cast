@@ -324,6 +324,23 @@
         "confirm_required": "Confirm the basewear guidance before uploading.",
         "session_changed": "You signed out or switched accounts during this upload. Choose the photo again."
       }
+    },
+    "detail": {
+      "back": "Back to closet",
+      "category": "Category",
+      "material": "Material",
+      "comfort": "Comfort range",
+      "noMaterial": "No material",
+      "editTags": "Edit tags",
+      "done": "Done",
+      "cancel": "Cancel",
+      "noChanges": "No changes",
+      "conflict": "This piece changed on another device. Check the tags and try again.",
+      "notAllowed": "A guardian has to approve closet changes first.",
+      "undoFailed": "Could not undo. Try again.",
+      "missing": "This piece is no longer in your closet.",
+      "loading": "Loading this piece...",
+      "loadFailed": "Could not load this piece. Try again."
     }
   },
   "commerce": {

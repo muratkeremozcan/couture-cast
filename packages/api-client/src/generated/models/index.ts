@@ -1897,6 +1897,32 @@ export interface ApiV1HealthQueuesGet200ResponseMetrics {
 /**
  *
  * @export
+ * @interface ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response
+ */
+export interface ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response {
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInner}
+   * @memberof ApiV1WardrobeGarmentsGarmentIdTagsPatch200Response
+   */
+  data: GarmentListWithColorResponseDataInner
+}
+/**
+ *
+ * @export
+ * @interface ApiV1WardrobeGarmentsGet200Response
+ */
+export interface ApiV1WardrobeGarmentsGet200Response {
+  /**
+   *
+   * @type {Array<GarmentListWithColorResponseDataInner>}
+   * @memberof ApiV1WardrobeGarmentsGet200Response
+   */
+  data: Array<GarmentListWithColorResponseDataInner>
+}
+/**
+ *
+ * @export
  * @interface ApplyModerationDecision200Response
  */
 export interface ApplyModerationDecision200Response {
@@ -8153,6 +8179,204 @@ export interface GarmentListResponse {
    */
   data: Array<CreateGarmentItemResponseData>
 }
+/**
+ *
+ * @export
+ * @interface GarmentListWithColorResponse
+ */
+export interface GarmentListWithColorResponse {
+  /**
+   *
+   * @type {Array<GarmentListWithColorResponseDataInner>}
+   * @memberof GarmentListWithColorResponse
+   */
+  data: Array<GarmentListWithColorResponseDataInner>
+}
+/**
+ *
+ * @export
+ * @interface GarmentListWithColorResponseDataInner
+ */
+export interface GarmentListWithColorResponseDataInner {
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  id: string
+  /**
+   * Open set. New lifecycle states are added as the tagging and moderation pipeline evolves, and this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized status as pass-through rather than an error, and do not exhaustively switch on it without a default branch.
+   * @type {GarmentListWithColorResponseDataInnerStatusEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  status: GarmentListWithColorResponseDataInnerStatusEnum
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInnerCategoryEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  category: GarmentListWithColorResponseDataInnerCategoryEnum | null
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInnerMaterialEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  material: GarmentListWithColorResponseDataInnerMaterialEnum | null
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInnerComfortRangeEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  comfortRange: GarmentListWithColorResponseDataInnerComfortRangeEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  tagsConfirmedAt: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  fileSizeBytes: number | null
+  /**
+   * Open set. Supported image formats track what the upload pipeline can decode and may gain values, so this property is intentionally exempt from breaking-change enforcement for enum values. Treat an unrecognized MIME type as pass-through rather than an error.
+   * @type {GarmentListWithColorResponseDataInnerMimeTypeEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  mimeType: GarmentListWithColorResponseDataInnerMimeTypeEnum | null
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInnerRetentionStatusEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  retentionStatus: GarmentListWithColorResponseDataInnerRetentionStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  committedAt: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
+  /**
+   * Color family of the stored dominant garment color. null when no color was computed. Present only when the request sends x-couture-garment-color: 1.
+   * @type {GarmentListWithColorResponseDataInnerColorFamilyEnum}
+   * @memberof GarmentListWithColorResponseDataInner
+   */
+  colorFamily: GarmentListWithColorResponseDataInnerColorFamilyEnum | null
+}
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerStatusEnum = {
+  pending_upload: 'pending_upload',
+  bytes_uploaded: 'bytes_uploaded',
+  processing: 'processing',
+  awaiting_tags: 'awaiting_tags',
+  ready: 'ready',
+  failed: 'failed',
+} as const
+export type GarmentListWithColorResponseDataInnerStatusEnum =
+  (typeof GarmentListWithColorResponseDataInnerStatusEnum)[keyof typeof GarmentListWithColorResponseDataInnerStatusEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type GarmentListWithColorResponseDataInnerCategoryEnum =
+  (typeof GarmentListWithColorResponseDataInnerCategoryEnum)[keyof typeof GarmentListWithColorResponseDataInnerCategoryEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerMaterialEnum = {
+  cotton: 'cotton',
+  wool: 'wool',
+  linen: 'linen',
+  leather: 'leather',
+  denim: 'denim',
+  fleece: 'fleece',
+  synthetic: 'synthetic',
+  down: 'down',
+  silk: 'silk',
+} as const
+export type GarmentListWithColorResponseDataInnerMaterialEnum =
+  (typeof GarmentListWithColorResponseDataInnerMaterialEnum)[keyof typeof GarmentListWithColorResponseDataInnerMaterialEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerComfortRangeEnum = {
+  cold: 'cold',
+  cool: 'cool',
+  mild: 'mild',
+  warm: 'warm',
+  hot: 'hot',
+} as const
+export type GarmentListWithColorResponseDataInnerComfortRangeEnum =
+  (typeof GarmentListWithColorResponseDataInnerComfortRangeEnum)[keyof typeof GarmentListWithColorResponseDataInnerComfortRangeEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerMimeTypeEnum = {
+  image_jpeg: 'image/jpeg',
+  image_png: 'image/png',
+  image_webp: 'image/webp',
+} as const
+export type GarmentListWithColorResponseDataInnerMimeTypeEnum =
+  (typeof GarmentListWithColorResponseDataInnerMimeTypeEnum)[keyof typeof GarmentListWithColorResponseDataInnerMimeTypeEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerRetentionStatusEnum = {
+  active: 'active',
+  deletion_pending: 'deletion_pending',
+  legal_hold: 'legal_hold',
+} as const
+export type GarmentListWithColorResponseDataInnerRetentionStatusEnum =
+  (typeof GarmentListWithColorResponseDataInnerRetentionStatusEnum)[keyof typeof GarmentListWithColorResponseDataInnerRetentionStatusEnum]
+
+/**
+ * @export
+ */
+export const GarmentListWithColorResponseDataInnerColorFamilyEnum = {
+  black: 'black',
+  gray: 'gray',
+  white: 'white',
+  red: 'red',
+  orange: 'orange',
+  yellow: 'yellow',
+  green: 'green',
+  blue: 'blue',
+  purple: 'purple',
+  pink: 'pink',
+  brown: 'brown',
+} as const
+export type GarmentListWithColorResponseDataInnerColorFamilyEnum =
+  (typeof GarmentListWithColorResponseDataInnerColorFamilyEnum)[keyof typeof GarmentListWithColorResponseDataInnerColorFamilyEnum]
+
 /**
  *
  * @export
@@ -20793,6 +21017,19 @@ export interface UpdateGarmentTagsResponse {
    * @memberof UpdateGarmentTagsResponse
    */
   data: CreateGarmentItemResponseData
+}
+/**
+ *
+ * @export
+ * @interface UpdateGarmentTagsWithColorResponse
+ */
+export interface UpdateGarmentTagsWithColorResponse {
+  /**
+   *
+   * @type {GarmentListWithColorResponseDataInner}
+   * @memberof UpdateGarmentTagsWithColorResponse
+   */
+  data: GarmentListWithColorResponseDataInner
 }
 /**
  * Cross-field invariant enforced at runtime and NOT expressible in this schema: when quietHoursEnabled is true, quietHoursStart and quietHoursEnd must differ. JSON Schema has no operator comparing two sibling properties, so this rule is only visible here and in the 400 returned when it is violated.

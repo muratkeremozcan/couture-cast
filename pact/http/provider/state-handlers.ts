@@ -443,6 +443,12 @@ export const stateHandlers: StateHandlers = {
       description: 'Configured garment awaiting tags with suggestions',
     })
   },
+  // Story 7.5: a ready garment whose stored dominant color is blue (7.5-PACT-001..002).
+  'A ready blue garment exists for user': (parameters?: unknown) => {
+    const { garmentId, userId } = parameters as GarmentStateParams
+    configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })
+    return Promise.resolve({ description: 'Configured ready blue garment' })
+  },
   'A garment in awaiting_tags status exists for user': (parameters?: unknown) => {
     const { garmentId, userId } = parameters as GarmentStateParams
     configureProviderWardrobeState({ garmentId, userId, outcome: 'success' })

@@ -5,6 +5,7 @@ import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 // Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper
 // Story 4.2 Task 4 step 1 owner: define suggestGarmentTags and updateGarmentTags HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
 import { z } from 'zod'
+import { GARMENT_COLOR_FAMILIES } from '@couture/utils'
 import {
   isoTimestampSchema,
   nonEmptyStringSchema,
@@ -304,6 +305,75 @@ export const updateGarmentTagsResponseSchema = z
     data: garmentItemSchema,
   })
   .strict()
+
+/**
+ * Story CC-7.5 D1: the garment color family is opt-in per request with this header, set to
+ * exactly `1`, like the community reactions and sponsorship headers. Web and native parse
+ * garment responses with strict schemas, so installed builds that do not send it keep
+ * receiving today's shape, which has no `colorFamily` key. Any other value, `0` and `true`
+ * included, also keeps the legacy shape.
+ */
+export const WARDROBE_GARMENT_COLOR_HEADER = 'x-couture-garment-color'
+
+/** The color families `classifyRgbColorFamily` in `@couture/utils` names. */
+export const garmentColorFamilyEnum = z.enum(GARMENT_COLOR_FAMILIES)
+
+/** `garmentItemSchema` plus `colorFamily`; the shape a request opted in with the header gets. */
+export const garmentItemWithColorSchema = garmentItemSchema
+  .extend({
+    colorFamily: garmentColorFamilyEnum.nullable().openapi({
+      description:
+        'Color family of the stored dominant garment color. Null when no color was computed. Present only when the request sends x-couture-garment-color: 1.',
+    }),
+  })
+  .strict()
+
+export const garmentListWithColorResponseSchema = z
+  .object({
+    data: z.array(garmentItemWithColorSchema),
+  })
+  .strict()
+
+export const updateGarmentTagsWithColorResponseSchema = z
+  .object({
+    data: garmentItemWithColorSchema,
+  })
+  .strict()
+
+/**
+ * What web and native read after sending the header. A server that predates the header (a
+ * rollback, or a client deployed before the API) answers with the legacy shape, which reads as
+ * `colorFamily: null` instead of failing the member's whole closet. Both sides stay strict:
+ * an unknown key or color family still fails the parse.
+ */
+export function parseGarmentListWithColorResponse(
+  response: unknown
+): z.infer<typeof garmentListWithColorResponseSchema> {
+  const opted = garmentListWithColorResponseSchema.safeParse(response)
+  if (opted.success) return opted.data
+  const legacy = garmentListResponseSchema.safeParse(response)
+  if (!legacy.success) throw opted.error
+  return { data: legacy.data.data.map((garment) => ({ ...garment, colorFamily: null })) }
+}
+
+/** The tag update counterpart of `parseGarmentListWithColorResponse`. */
+export function parseUpdateGarmentTagsWithColorResponse(
+  response: unknown
+): z.infer<typeof updateGarmentTagsWithColorResponseSchema> {
+  const opted = updateGarmentTagsWithColorResponseSchema.safeParse(response)
+  if (opted.success) return opted.data
+  const legacy = updateGarmentTagsResponseSchema.safeParse(response)
+  if (!legacy.success) throw opted.error
+  return { data: { ...legacy.data.data, colorFamily: null } }
+}
+
+/** The request header schema both garment reads and the tag update publish. */
+const garmentColorHeaderSchema = z.object({
+  [WARDROBE_GARMENT_COLOR_HEADER]: z.enum(['1']).optional().openapi({
+    description:
+      'Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.',
+  }),
+})
 
 const garmentIdBadRequestErrorSchema = z
   .object({
@@ -681,6 +751,14 @@ export type SuggestGarmentTagsResponse = z.infer<
 >
 export type UpdateGarmentTagsInput = z.infer<typeof updateGarmentTagsInputSchema>
 export type UpdateGarmentTagsResponse = z.infer<typeof updateGarmentTagsResponseSchema>
+export type GarmentColorFamilyContract = z.infer<typeof garmentColorFamilyEnum>
+export type GarmentWithColor = z.infer<typeof garmentItemWithColorSchema>
+export type GarmentListWithColorResponse = z.infer<
+  typeof garmentListWithColorResponseSchema
+>
+export type UpdateGarmentTagsWithColorResponse = z.infer<
+  typeof updateGarmentTagsWithColorResponseSchema
+>
 export type CreateOutfitCapsuleInput = z.infer<typeof createOutfitCapsuleInputSchema>
 export type CapsuleGarmentContract = z.infer<typeof capsuleGarmentSchema>
 export type OutfitCapsuleContract = z.infer<typeof outfitCapsuleSchema>
@@ -1168,6 +1246,10 @@ export function registerWardrobeContracts(
     'GarmentListResponse',
     garmentListResponseSchema
   )
+  const registeredGarmentListWithColorResponse = registry.register(
+    'GarmentListWithColorResponse',
+    garmentListWithColorResponseSchema
+  )
   const registeredSuggestGarmentTagsResponse = registry.register(
     'SuggestGarmentTagsResponse',
     suggestGarmentTagsWireResponseSchema
@@ -1179,6 +1261,10 @@ export function registerWardrobeContracts(
   const registeredUpdateGarmentTagsResponse = registry.register(
     'UpdateGarmentTagsResponse',
     updateGarmentTagsResponseSchema
+  )
+  const registeredUpdateGarmentTagsWithColorResponse = registry.register(
+    'UpdateGarmentTagsWithColorResponse',
+    updateGarmentTagsWithColorResponseSchema
   )
   const registeredGarmentIdBadRequestError = registry.register(
     'GarmentIdBadRequestError',
@@ -1219,12 +1305,19 @@ export function registerWardrobeContracts(
     tags: ['wardrobe'],
     summary: 'List persisted garments for the authenticated wardrobe',
     security: [{ bearerAuth: [] }],
+    request: {
+      headers: garmentColorHeaderSchema,
+    },
     responses: {
       200: {
-        description: 'Persisted wardrobe garments.',
+        description:
+          'Persisted wardrobe garments. Each garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
         content: {
           'application/json': {
-            schema: registeredGarmentListResponse,
+            schema: z.union([
+              registeredGarmentListResponse,
+              registeredGarmentListWithColorResponse,
+            ]),
           },
         },
       },
@@ -1323,6 +1416,7 @@ export function registerWardrobeContracts(
     security: [{ bearerAuth: [] }],
     request: {
       params: garmentIdPathParamsSchema,
+      headers: garmentColorHeaderSchema,
       body: {
         required: true,
         content: {
@@ -1334,10 +1428,14 @@ export function registerWardrobeContracts(
     },
     responses: {
       200: {
-        description: 'Garment tags updated successfully.',
+        description:
+          'Garment tags updated successfully. The garment carries colorFamily only when the request sends x-couture-garment-color: 1.',
         content: {
           'application/json': {
-            schema: registeredUpdateGarmentTagsResponse,
+            schema: z.union([
+              registeredUpdateGarmentTagsResponse,
+              registeredUpdateGarmentTagsWithColorResponse,
+            ]),
           },
         },
       },

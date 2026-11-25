@@ -324,6 +324,23 @@
         "confirm_required": "Confirme a indicação sobre a roupa base antes de enviar.",
         "session_changed": "Terminou sessão ou mudou de conta durante este envio. Escolha a fotografia novamente."
       }
+    },
+    "detail": {
+      "back": "Voltar ao roupeiro",
+      "category": "Categoria",
+      "material": "Tecido",
+      "comfort": "Intervalo de conforto",
+      "noMaterial": "Sem tecido",
+      "editTags": "Editar etiquetas",
+      "done": "Concluir",
+      "cancel": "Cancelar",
+      "noChanges": "Sem alterações",
+      "conflict": "Esta peça mudou noutro dispositivo. Verifica as etiquetas e tenta novamente.",
+      "notAllowed": "Um encarregado de educação tem de aprovar primeiro as alterações no roupeiro.",
+      "undoFailed": "Não foi possível anular. Tenta novamente.",
+      "missing": "Esta peça já não está no teu roupeiro.",
+      "loading": "A carregar a peça...",
+      "loadFailed": "Não foi possível carregar esta peça. Tenta novamente."
     }
   },
   "commerce": {

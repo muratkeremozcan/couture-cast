@@ -322,8 +322,9 @@ describe('WardrobePage garment card label', () => {
     render(<WardrobePage />)
 
     const card = await screen.findByTestId(`garment-card-${tagged.id}`)
+    // Story CC-7.5: the label is localized, with the singular category noun.
     expect(within(card).getByTestId('garment-card-label')).toHaveTextContent(
-      'top · cotton'
+      'Top · Cotton'
     )
     expect(card).not.toHaveTextContent(tagged.id)
   })

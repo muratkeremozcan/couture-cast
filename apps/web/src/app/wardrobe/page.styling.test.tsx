@@ -333,7 +333,9 @@ describe('Wardrobe styling', () => {
 
       await completeRead(reply, list(renewed))
       expect(await openButton()).toBeEnabled()
-      expect(screen.getByRole('img', { name: 'Uploaded garment' })).toHaveAttribute(
+      // Story CC-7.5 D6: color plus category alt text; this legacy fixture has no color, so
+      // the category alone names the photo.
+      expect(screen.getByRole('img', { name: 'Top' })).toHaveAttribute(
         'src',
         renewed.imageAccess.url
       )

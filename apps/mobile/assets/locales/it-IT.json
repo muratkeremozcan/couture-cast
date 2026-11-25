@@ -324,6 +324,23 @@
         "confirm_required": "Conferma le indicazioni sull'abbigliamento di base prima di caricare.",
         "session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto."
       }
+    },
+    "detail": {
+      "back": "Torna all'armadio",
+      "category": "Categoria",
+      "material": "Tessuto",
+      "comfort": "Fascia di comfort",
+      "noMaterial": "Nessun tessuto",
+      "editTags": "Modifica etichette",
+      "done": "Fatto",
+      "cancel": "Annulla",
+      "noChanges": "Nessuna modifica",
+      "conflict": "Questo capo è cambiato su un altro dispositivo. Controlla le etichette e riprova.",
+      "notAllowed": "Un genitore o tutore deve prima approvare le modifiche all'armadio.",
+      "undoFailed": "Impossibile annullare. Riprova.",
+      "missing": "Questo capo non è più nel tuo armadio.",
+      "loading": "Caricamento del capo...",
+      "loadFailed": "Impossibile caricare questo capo. Riprova."
     }
   },
   "commerce": {
