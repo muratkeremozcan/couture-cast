@@ -544,7 +544,51 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-comfort').textContent).toBe('Mild')
   })
 
+  it('[P0] [7.5-NAT-007] an Undo answer that lands after a newer Done committed leaves that Done in place', async () => {
+    let releaseUndo!: () => void
+    const undoHeld = new Promise<void>((resolve) => {
+      releaseUndo = resolve
+    })
+    let undoAnswered = false
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    // The Undo (back to cotton) is held and answers without touching the stored closet; every
+    // other save answers at once.
+    reply = async (body) => {
+      if (body.material !== 'cotton') return acceptTags(body)
+      await undoHeld
+      undoAnswered = true
+      return HttpResponse.json({ data: blueTop })
+    }
+
+    await browserUser.click(tag('status-bar-action-undo'))
+    await waitFor(() => expect(patches).toHaveLength(2))
+    await openEditorAndPick('garment-tag-option-comfort-cold')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(patches).toHaveLength(3))
+    await waitFor(() => expect(tag('garment-detail-comfort').textContent).toBe('Cold'))
+
+    releaseUndo()
+    await waitFor(() => expect(undoAnswered).toBe(true))
+    // Let the held answer reach the screen before checking that it changed nothing.
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 50)))
+
+    // The stale Undo answer (cotton, mild) never replaces the newer Done's garment.
+    expect(tag('garment-detail-material').textContent).toBe('Wool')
+    expect(tag('garment-detail-comfort').textContent).toBe('Cold')
+    expect(tag('status-feedback-bar')).not.toHaveTextContent('Change undone.')
+  })
+
   it('[P1] [7.5-NAT-007] an Undo refused because the piece changed elsewhere says so without Retry', async () => {
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () => {
+        reads += 1
+        return HttpResponse.json({ data: closet })
+      })
+    )
     renderDetail()
     await openEditorAndPick('garment-tag-option-material-wool')
     await browserUser.click(tag('garment-tag-done'))
@@ -555,6 +599,9 @@ describe('GarmentDetailScreen', () => {
         { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
         { status: 409 }
       )
+    // Let any reload the Done started finish, so only the conflict's re-read is counted.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    const readsBefore = reads
 
     await browserUser.click(await screen.findByTestId('status-bar-action-undo'))
 
@@ -565,6 +612,24 @@ describe('GarmentDetailScreen', () => {
     )
     expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
     expect(tag('garment-detail-material').textContent).toBe('Wool')
+    // The closet reads the piece again once, so the rows show what is stored now.
+    await waitFor(() => expect(reads).toBe(readsBefore + 1))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(reads).toBe(readsBefore + 1)
+  })
+
+  it('[P1] [7.5-NAT-013] an account change drops the detail notice and its Undo', async () => {
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+    await browserUser.click(tag('garment-tag-done'))
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
+    expect(tag('status-bar-action-undo')).toBeVisible()
+
+    act(() => setMobileApplicationUserId('another-member'))
+
+    await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
+    expect(screen.queryByText('Saved')).toBeNull()
+    expect(patches).toHaveLength(1)
   })
 
   it('[P1] [7.5-NAT-008] a slow save reads Saving, then Still saving, then Saved (Codex P2.3)', async () => {

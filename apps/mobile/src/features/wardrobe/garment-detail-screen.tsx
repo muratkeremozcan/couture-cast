@@ -112,10 +112,11 @@ export function GarmentDetailScreen({ garmentId }: { garmentId: string | undefin
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
   // The root provider's floating bar sits under a pushed native stack screen on Android, so the
   // detail always owns its bar. It floats over this screen (the route zeroes the tab bar
-  // clearance) and forwards announcements to the root provider when one is mounted.
+  // clearance) and forwards announcements to the root provider when one is mounted. Keyed by
+  // the identity epoch, so another account never sees this account's notice or Undo.
   return (
-    <SaveFeedbackProvider renderOfflineLine={false}>
-      <MemberGarmentDetail key={epoch} epoch={epoch} garmentId={garmentId} />
+    <SaveFeedbackProvider key={epoch} renderOfflineLine={false}>
+      <MemberGarmentDetail epoch={epoch} garmentId={garmentId} />
     </SaveFeedbackProvider>
   )
 }
@@ -352,6 +353,9 @@ function useGarmentTagEditor({
   const undoRef = useRef<{ noticeId: string; epoch: number } | null>(null)
   const undoEpochRef = useRef(0)
   const undoInFlightRef = useRef(false)
+  // Counts committed Done saves. An Undo answer that lands after a newer Done committed must
+  // not replace that Done's garment.
+  const doneCommitsRef = useRef(0)
   // The tags the editor opened with. A background list read can change `saved` while the
   // editor is open; No changes, `expected` and the Undo target all use this snapshot instead.
   const baselineRef = useRef<GarmentTagDraft | null>(null)
@@ -424,7 +428,8 @@ function useGarmentTagEditor({
   const saveTags = async (
     actionOwner: string | null,
     target: GarmentTagDraft,
-    expected: GarmentTagDraft
+    expected: GarmentTagDraft,
+    applies: () => boolean
   ) => {
     const token = await resolveMobileAccessToken()
     if (!token) throw new Error('AUTHENTICATION_REQUIRED')
@@ -432,7 +437,7 @@ function useGarmentTagEditor({
       ...target,
       expected,
     })
-    if (isActiveOwner(actionOwner)) onTagsSaved(updated)
+    if (applies() && isActiveOwner(actionOwner)) onTagsSaved(updated)
     return updated
   }
 
@@ -460,7 +465,13 @@ function useGarmentTagEditor({
         })
         return
       }
-      await saveTags(actionOwner, previous, savedTags)
+      const doneCommits = doneCommitsRef.current
+      await saveTags(
+        actionOwner,
+        previous,
+        savedTags,
+        () => doneCommitsRef.current === doneCommits
+      )
       // A newer Done retired this Undo while it ran; its notice must not cover that Saved.
       if (undoEpoch !== undoEpochRef.current) return
       retireUndo()
@@ -471,6 +482,8 @@ function useGarmentTagEditor({
     } catch (error) {
       if (undoEpoch !== undoEpochRef.current) return
       const kind = classifyGarmentTagSaveError(error, getNetworkOnline())
+      // Another device changed the tags: show what is stored now. The rejected Undo stays final.
+      if (kind === 'conflict') onRefresh()
       showNotice(actionOwner, `undo-${kind}`, {
         message:
           kind === 'offline'
@@ -573,7 +586,10 @@ function useGarmentTagEditor({
         if (isActiveOwner(actionOwner)) failSave(actionOwner, 'offline')
         return
       }
-      updated = await saveTags(actionOwner, target, previous)
+      updated = await saveTags(actionOwner, target, previous, () => {
+        doneCommitsRef.current++
+        return true
+      })
     } catch (error) {
       if (!isCurrentRun()) return
       clearSlowTimer()

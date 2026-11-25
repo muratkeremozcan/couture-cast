@@ -599,9 +599,48 @@ describe('GarmentDetail', () => {
     expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Mild$/)
   })
 
+  it('[P0] [7.5-CMP-013] an Undo answer that lands after a newer Done committed leaves that Done in place', async () => {
+    const user = userEvent.setup()
+    const undoAnswer = Promise.withResolvers<void>()
+    let undoAnswered = false
+    render(<Harness />)
+    await editTo(user, { material: 'wool' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    expect(await statusBar()).toHaveTextContent('Saved')
+    // The Undo (back to cotton) is held; every other save answers at once.
+    reply = async (body) => {
+      if (body.material !== 'cotton') return acceptTags(body)
+      await undoAnswer.promise
+      undoAnswered = true
+      return acceptTags(body)
+    }
+
+    await user.click(screen.getByTestId('status-bar-action-undo'))
+    await waitFor(() => expect(patches).toHaveLength(2))
+    await editTo(user, { comfort: 'cold' })
+    await user.click(screen.getByTestId('garment-tag-done'))
+    await waitFor(() => expect(patches).toHaveLength(3))
+    await waitFor(() =>
+      expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Cold$/)
+    )
+
+    undoAnswer.resolve()
+    await waitFor(() => expect(undoAnswered).toBe(true))
+    // Let the held answer reach the screen before checking that it changed nothing.
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 50)))
+
+    // The stale Undo answer (cotton, mild) never replaces the newer Done's garment.
+    expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
+    expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Cold$/)
+    expect(screen.getByTestId('status-feedback-bar')).not.toHaveTextContent(
+      'Change undone.'
+    )
+  })
+
   it('[P1] [7.5-CMP-013] an Undo refused because the piece changed elsewhere says so without Retry', async () => {
     const user = userEvent.setup()
-    render(<Harness />)
+    const onRefresh = vi.fn()
+    render(<Harness onRefresh={onRefresh} />)
     await editTo(user, { material: 'wool' })
     await user.click(screen.getByTestId('garment-tag-done'))
     // The save settles before the next reply is set, so only the Undo meets it.
@@ -621,6 +660,8 @@ describe('GarmentDetail', () => {
     )
     expect(screen.queryByTestId('status-bar-action-retry')).toBeNull()
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Wool$/)
+    // The closet reads the piece again once, so the rows show what is stored now.
+    expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 
   it('[P1] [7.5-CMP-014] a slow save shows Saving, then Still saving, then Saved (Codex P2.3)', async () => {

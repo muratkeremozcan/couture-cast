@@ -175,6 +175,9 @@ function useGarmentTagEditor({
   const undoRef = useRef<{ noticeId: string; epoch: number } | null>(null)
   const undoEpochRef = useRef(0)
   const undoInFlightRef = useRef(false)
+  // Counts committed Done saves. An Undo answer that lands after a newer Done committed must
+  // not replace that Done's garment.
+  const doneCommitsRef = useRef(0)
   const editorRef = useRef<HTMLDivElement | null>(null)
   // The tags the editor opened with. A background closet read can change `saved` while the
   // editor is open; No changes, `expected` and the Undo target all use this snapshot instead.
@@ -287,12 +290,13 @@ function useGarmentTagEditor({
   const saveTags = (
     actionOwner: string | null,
     target: GarmentTagDraft,
-    expected: GarmentTagDraft
+    expected: GarmentTagDraft,
+    applies: () => boolean
   ): Promise<GarmentWithColor> => {
     const startToken = onTagSaveStart?.()
     return updateGarmentTagsFromWeb(garment.id, { ...target, expected }).then(
       (updated) => {
-        if (isActiveOwner(actionOwner)) onTagsSaved(updated, startToken)
+        if (applies() && isActiveOwner(actionOwner)) onTagsSaved(updated, startToken)
         return updated
       }
     )
@@ -322,7 +326,13 @@ function useGarmentTagEditor({
     }
     undoInFlightRef.current = true
     try {
-      await saveTags(actionOwner, previous, savedTags)
+      const doneCommits = doneCommitsRef.current
+      await saveTags(
+        actionOwner,
+        previous,
+        savedTags,
+        () => doneCommitsRef.current === doneCommits
+      )
       // A newer Done retired this Undo while it ran; its notice must not cover that Saved.
       if (epoch !== undoEpochRef.current) return
       retireUndo()
@@ -333,6 +343,8 @@ function useGarmentTagEditor({
     } catch (error) {
       if (epoch !== undoEpochRef.current) return
       const kind = classifyGarmentTagSaveError(error, readLiveOnline())
+      // Another device changed the tags: show what is stored now. The rejected Undo stays final.
+      if (kind === 'conflict') onRefresh()
       showNotice(actionOwner, `undo-${kind}`, {
         message:
           kind === 'offline'
@@ -425,7 +437,10 @@ function useGarmentTagEditor({
     }, SAVE_FEEDBACK_TIMINGS.stillSavingAfterMs)
     let updated: GarmentWithColor
     try {
-      updated = await saveTags(actionOwner, target, previous)
+      updated = await saveTags(actionOwner, target, previous, () => {
+        doneCommitsRef.current++
+        return true
+      })
     } catch (error) {
       if (!isCurrentRun()) return
       clearSlowTimer()
