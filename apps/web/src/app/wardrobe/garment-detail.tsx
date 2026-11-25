@@ -56,7 +56,12 @@ export type GarmentDetailProps = {
   loadFailed: boolean
   loading: boolean
   onBack: () => void
-  onTagsSaved: (garment: GarmentWithColor) => void
+  /**
+   * Called when a tag save is sent; whatever it returns comes back with that save's
+   * `onTagsSaved`, so the page can tell whether a newer closet read landed meanwhile.
+   */
+  onTagSaveStart?: () => number
+  onTagsSaved: (garment: GarmentWithColor, startToken?: number) => void
   onRefresh: () => void
   onStylePiece: (selection: StylePieceSelection, button: HTMLButtonElement) => void
 }
@@ -84,10 +89,12 @@ function GarmentDetailUnavailable({
 }: GarmentDetailProps) {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const retry = getGuestPreviewStrings(i18n.language).chrome.retry
-  const failed = !hasLoaded && loadFailed && !loading
+  // A current read failure comes first: an id missing from an older read may be back.
+  const failed = loadFailed && !loading
+  const missing = hasLoaded && !failed
   return (
     <section
-      data-testid={hasLoaded ? 'garment-detail-missing' : 'garment-detail-loading'}
+      data-testid={missing ? 'garment-detail-missing' : 'garment-detail-loading'}
       className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
     >
       <button
@@ -98,7 +105,7 @@ function GarmentDetailUnavailable({
       >
         <span aria-hidden="true">←</span> {t('wardrobe.detail.back')}
       </button>
-      {hasLoaded ? (
+      {missing ? (
         <p className="mt-4 text-base font-semibold text-zinc-800 dark:text-zinc-100">
           {t('wardrobe.detail.missing')}
         </p>
@@ -143,11 +150,15 @@ type GarmentTagSaveState = 'idle' | 'saving' | 'still-saving'
 function useGarmentTagEditor({
   garment,
   owner,
+  onTagSaveStart,
   onTagsSaved,
+  onRefresh,
 }: {
   garment: ClosetGarment
   owner: string | null
-  onTagsSaved: (garment: GarmentWithColor) => void
+  onTagSaveStart?: () => number
+  onTagsSaved: (garment: GarmentWithColor, startToken?: number) => void
+  onRefresh: () => void
 }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const statusBar = useStatusBar()
@@ -164,11 +175,16 @@ function useGarmentTagEditor({
   const undoRef = useRef<{ noticeId: string; epoch: number } | null>(null)
   const undoEpochRef = useRef(0)
   const undoInFlightRef = useRef(false)
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  // The tags the editor opened with. A background closet read can change `saved` while the
+  // editor is open; No changes, `expected` and the Undo target all use this snapshot instead.
+  const baselineRef = useRef<GarmentTagDraft | null>(null)
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
   const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
   const garmentId = garment.id
   const saved = garmentTagDraft(garment)
+  const editorOpen = draft !== null
 
   const clearSlowTimer = () => {
     if (slowTimerRef.current !== null) clearTimeout(slowTimerRef.current)
@@ -191,12 +207,20 @@ function useGarmentTagEditor({
     setSaveState('idle')
   }, [garmentId])
 
+  // Opening the editor moves focus to its first control, the selected category; closing it
+  // returns focus to Edit tags.
   useEffect(() => {
-    if (draft === null && focusEditAfterCloseRef.current) {
+    if (editorOpen) {
+      editorRef.current
+        ?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')
+        ?.focus()
+      return
+    }
+    if (focusEditAfterCloseRef.current) {
       focusEditAfterCloseRef.current = false
       editButtonRef.current?.focus()
     }
-  }, [draft])
+  }, [editorOpen])
 
   const isActiveOwner = (actionOwner: string | null) => {
     if (!actionOwner || ownerRef.current !== actionOwner) return false
@@ -253,11 +277,15 @@ function useGarmentTagEditor({
     actionOwner: string | null,
     target: GarmentTagDraft,
     expected: GarmentTagDraft
-  ): Promise<GarmentWithColor> =>
-    updateGarmentTagsFromWeb(garment.id, { ...target, expected }).then((updated) => {
-      if (isActiveOwner(actionOwner)) onTagsSaved(updated)
-      return updated
-    })
+  ): Promise<GarmentWithColor> => {
+    const startToken = onTagSaveStart?.()
+    return updateGarmentTagsFromWeb(garment.id, { ...target, expected }).then(
+      (updated) => {
+        if (isActiveOwner(actionOwner)) onTagsSaved(updated, startToken)
+        return updated
+      }
+    )
+  }
 
   const runUndo = async (
     actionOwner: string | null,
@@ -284,12 +312,15 @@ function useGarmentTagEditor({
     undoInFlightRef.current = true
     try {
       await saveTags(actionOwner, previous, savedTags)
-      if (epoch === undoEpochRef.current) retireUndo()
+      // A newer Done retired this Undo while it ran; its notice must not cover that Saved.
+      if (epoch !== undoEpochRef.current) return
+      retireUndo()
       showNotice(actionOwner, 'undone', {
         message: t('feedback.undone'),
         tone: 'neutral',
       })
     } catch (error) {
+      if (epoch !== undoEpochRef.current) return
       const kind = classifyGarmentTagSaveError(error, readLiveOnline())
       showNotice(actionOwner, `undo-${kind}`, {
         message:
@@ -306,14 +337,16 @@ function useGarmentTagEditor({
     }
   }
 
-  const closeEditor = () => {
+  const closeEditor = (keepFailure = false) => {
     focusEditAfterCloseRef.current = true
+    baselineRef.current = null
     setDraft(null)
-    setFailure(null)
+    if (!keepFailure) setFailure(null)
   }
 
   const openEditor = () => {
     if (!saved) return
+    baselineRef.current = saved
     setFailure(null)
     setDraft(saved)
   }
@@ -321,6 +354,12 @@ function useGarmentTagEditor({
   const failSave = (actionOwner: string | null, kind: GarmentTagSaveFailure) => {
     setSaveState('idle')
     setFailure(kind)
+    // Another edit landed first: close the editor on its stale tags and read the current ones,
+    // so the member reopens it from what is stored now. The conflict message stays.
+    if (kind === 'conflict') {
+      closeEditor(true)
+      onRefresh()
+    }
     showNotice(actionOwner, kind, {
       message: failureMessage(kind),
       tone: kind === 'offline' ? 'offline' : 'error',
@@ -339,11 +378,12 @@ function useGarmentTagEditor({
   }
 
   const handleDone = async () => {
-    if (!draft || !saved || saveState !== 'idle') return
+    const baseline = baselineRef.current
+    if (!draft || !baseline || saveState !== 'idle') return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
     retireUndo()
-    if (garmentTagsEqual(draft, saved)) {
+    if (garmentTagsEqual(draft, baseline)) {
       closeEditor()
       showNotice(actionOwner, 'unchanged', {
         message: t('wardrobe.detail.noChanges'),
@@ -355,7 +395,7 @@ function useGarmentTagEditor({
       failSave(actionOwner, 'offline')
       return
     }
-    const previous = saved
+    const previous = baseline
     const target = draft
     const runId = nextGarmentTagSeq()
     saveRunRef.current = runId
@@ -411,8 +451,9 @@ function useGarmentTagEditor({
     failureMessage,
     editButtonRef,
     canEdit: Boolean(saved),
+    editorRef,
     openEditor,
-    closeEditor,
+    closeEditor: () => closeEditor(),
     handleDone,
   }
 }
@@ -490,6 +531,7 @@ function GarmentDetailInner({
   loadFailed,
   loading,
   onBack,
+  onTagSaveStart,
   onTagsSaved,
   onRefresh,
   onStylePiece,
@@ -499,7 +541,13 @@ function GarmentDetailInner({
   const styleLabels = getStylePieceStrings(locale)
   const samples = getGuestPreviewStrings(locale)
   const headingRef = useRef<HTMLHeadingElement | null>(null)
-  const editor = useGarmentTagEditor({ garment, owner, onTagsSaved })
+  const editor = useGarmentTagEditor({
+    garment,
+    owner,
+    onTagSaveStart,
+    onTagsSaved,
+    onRefresh,
+  })
   const { draft, setDraft, failure, saveState } = editor
   const busy = saveState !== 'idle'
   const garmentId = garment.id
@@ -608,7 +656,7 @@ function GarmentDetailInner({
           </dl>
 
           {draft ? (
-            <div data-testid="garment-tag-editor" className="mt-2">
+            <div data-testid="garment-tag-editor" ref={editor.editorRef} className="mt-2">
               {field(
                 'category',
                 t('wardrobe.detail.category'),
@@ -685,27 +733,38 @@ function GarmentDetailInner({
               </div>
             </div>
           ) : (
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                ref={editor.editButtonRef}
-                type="button"
-                data-testid="garment-edit-tags"
-                disabled={!editor.canEdit}
-                onClick={editor.openEditor}
-                className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-800 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100"
-              >
-                {t('wardrobe.detail.editTags')}
-              </button>
-              <StylePieceEntry
-                garment={garment}
-                owner={owner}
-                unavailable={loadFailed}
-                loading={loading}
-                labels={styleLabels}
-                onRefresh={onRefresh}
-                onOpen={onStylePiece}
-              />
-            </div>
+            <>
+              {failure && (
+                <p
+                  data-testid="garment-tag-error"
+                  data-failure={failure}
+                  className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/60 dark:text-red-200"
+                >
+                  {editor.failureMessage(failure)}
+                </p>
+              )}
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <button
+                  ref={editor.editButtonRef}
+                  type="button"
+                  data-testid="garment-edit-tags"
+                  disabled={!editor.canEdit}
+                  onClick={editor.openEditor}
+                  className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-800 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100"
+                >
+                  {t('wardrobe.detail.editTags')}
+                </button>
+                <StylePieceEntry
+                  garment={garment}
+                  owner={owner}
+                  unavailable={loadFailed}
+                  loading={loading}
+                  labels={styleLabels}
+                  onRefresh={onRefresh}
+                  onOpen={onStylePiece}
+                />
+              </div>
+            </>
           )}
         </div>
       </div>

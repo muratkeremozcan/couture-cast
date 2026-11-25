@@ -146,10 +146,12 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         await page.getByTestId('garment-tag-done').click()
         const { status, requestJson } = await save
         expect(status).toBe(200)
+        // Done names the tags the editor opened with, so a newer edit is never overwritten.
         expect(requestJson).toEqual({
           category: 'top',
           material: 'wool',
           comfortRange: 'cold',
+          expected: { category: 'top', material: 'cotton', comfortRange: 'mild' },
         })
         await expect(page.getByTestId('status-feedback-bar')).toContainText('Saved')
         await expectTags(page, { category: 'Top', material: 'Wool', comfort: 'Cold' })
@@ -173,10 +175,12 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         await page.getByTestId('status-bar-action-undo').click()
         const { status, requestJson } = await undo
         expect(status).toBe(200)
+        // Undo restores the tags before this save and names the tags this save wrote.
         expect(requestJson).toEqual({
           category: 'top',
           material: 'wool',
           comfortRange: 'cold',
+          expected: { category: 'top', material: 'wool', comfortRange: 'hot' },
         })
         await expect(page.getByTestId('status-feedback-bar')).toContainText(
           'Change undone.'
@@ -417,9 +421,8 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
       },
       colorFamily: 'blue',
     }
-    await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, {
-      [memberA]: [expiring],
-    })
+    const inventory = { [memberA]: [expiring] }
+    await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, inventory)
     let listReads = 0
     page.on('request', (request) => {
       if (
@@ -431,13 +434,25 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     await page.goto('/wardrobe')
     await expect(page.getByTestId(`garment-open-${expiring.id}`)).toBeVisible()
     const readsBeforeOpen = listReads
+    // The next read hands out a fresh lease for the same photo.
+    const renewedUrl = new URL(
+      '/style-piece-fixture-photo/detail-expiring-top-renewed',
+      baseURL
+    ).href
+    inventory[memberA] = [
+      {
+        ...expiring,
+        imageAccess: { url: renewedUrl, expiresAt: '2099-12-31T00:00:00.000Z' },
+      },
+    ]
 
     await openDetail(page, expiring.id, 'Blue top')
 
     await expect.poll(() => listReads).toBe(readsBeforeOpen + 1)
-    await expect(page.getByTestId('garment-detail-photo')).toHaveAccessibleName(
-      'Blue top'
-    )
+    const photo = page.getByTestId('garment-detail-photo')
+    await expect(photo).toHaveAttribute('src', renewedUrl)
+    await expect(photo).toHaveAccessibleName('Blue top')
+    await expect(photo).toHaveJSProperty('naturalWidth', 256)
   })
 
   test('[P1] [7.5-E2E-003] the detail and the open editor pass axe', async ({

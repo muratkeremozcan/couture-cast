@@ -165,7 +165,15 @@ function useClosetGarments(epoch: number) {
   const replaceGarment = useCallback((updated: GarmentWithColor) => {
     revision.current++
     setGarments((current) =>
-      current ? current.map((item) => (item.id === updated.id ? updated : item)) : current
+      current
+        ? current.map((item) =>
+            item.id === updated.id
+              ? // A photo the API could not sign this time keeps the one already shown,
+                // which still renews on expiry or on a load error.
+                { ...updated, imageAccess: updated.imageAccess ?? item.imageAccess }
+              : item
+          )
+        : current
     )
   }, [])
 
@@ -205,8 +213,9 @@ function MemberGarmentDetail({
   )
 
   if (!garment) {
-    const settled = closet.garments !== null
-    const failed = !settled && closet.loadFailed && !closet.loading
+    // A current read failure comes first: an id missing from an older read may be back.
+    const failed = closet.loadFailed && !closet.loading
+    const settled = closet.garments !== null && !failed
     return (
       <View
         style={[styles.screen, themed.screen]}
@@ -255,6 +264,7 @@ function MemberGarmentDetail({
             garment={garment}
             owner={owner}
             epoch={epoch}
+            onRefresh={closet.reload}
             onTagsSaved={(updated) => {
               closet.replaceGarment(updated)
               notifyWardrobeChanged()
@@ -323,11 +333,13 @@ function useGarmentTagEditor({
   owner,
   epoch,
   onTagsSaved,
+  onRefresh,
 }: {
   garment: ClosetGarment
   owner: string | null
   epoch: number
   onTagsSaved: (garment: GarmentWithColor) => void
+  onRefresh: () => void
 }) {
   const { t } = useTranslation()
   const statusBar = useStatusBar()
@@ -340,6 +352,9 @@ function useGarmentTagEditor({
   const undoRef = useRef<{ noticeId: string; epoch: number } | null>(null)
   const undoEpochRef = useRef(0)
   const undoInFlightRef = useRef(false)
+  // The tags the editor opened with. A background list read can change `saved` while the
+  // editor is open; No changes, `expected` and the Undo target all use this snapshot instead.
+  const baselineRef = useRef<GarmentTagDraft | null>(null)
   const [draft, setDraft] = useState<GarmentTagDraft | null>(null)
   const [saveState, setSaveState] = useState<GarmentTagSaveState>('idle')
   const [failure, setFailure] = useState<GarmentTagSaveFailure | null>(null)
@@ -444,12 +459,15 @@ function useGarmentTagEditor({
         return
       }
       await saveTags(actionOwner, previous, savedTags)
-      if (undoEpoch === undoEpochRef.current) retireUndo()
+      // A newer Done retired this Undo while it ran; its notice must not cover that Saved.
+      if (undoEpoch !== undoEpochRef.current) return
+      retireUndo()
       showNotice(actionOwner, 'undone', {
         message: t('feedback.undone'),
         tone: 'neutral',
       })
     } catch (error) {
+      if (undoEpoch !== undoEpochRef.current) return
       const kind = classifyGarmentTagSaveError(error, getNetworkOnline())
       showNotice(actionOwner, `undo-${kind}`, {
         message:
@@ -466,13 +484,15 @@ function useGarmentTagEditor({
     }
   }
 
-  const closeEditor = () => {
+  const closeEditor = (keepFailure = false) => {
+    baselineRef.current = null
     setDraft(null)
-    setFailure(null)
+    if (!keepFailure) setFailure(null)
   }
 
   const openEditor = () => {
     if (!saved) return
+    baselineRef.current = saved
     setFailure(null)
     setDraft(saved)
   }
@@ -480,6 +500,12 @@ function useGarmentTagEditor({
   const failSave = (actionOwner: string | null, kind: GarmentTagSaveFailure) => {
     setSaveState('idle')
     setFailure(kind)
+    // Another edit landed first: close the editor on its stale tags and read the current ones,
+    // so the member reopens it from what is stored now. The conflict message stays.
+    if (kind === 'conflict') {
+      closeEditor(true)
+      onRefresh()
+    }
     showNotice(actionOwner, kind, {
       message: failureMessage(kind),
       tone: kind === 'offline' ? 'offline' : 'error',
@@ -498,11 +524,12 @@ function useGarmentTagEditor({
   }
 
   const handleDone = async () => {
-    if (!draft || !saved || saveState !== 'idle') return
+    const baseline = baselineRef.current
+    if (!draft || !baseline || saveState !== 'idle') return
     const actionOwner = owner
     if (!isActiveOwner(actionOwner)) return
     retireUndo()
-    if (garmentTagsEqual(draft, saved)) {
+    if (garmentTagsEqual(draft, baseline)) {
       closeEditor()
       showNotice(actionOwner, 'unchanged', {
         message: t('wardrobe.detail.noChanges'),
@@ -510,7 +537,7 @@ function useGarmentTagEditor({
       })
       return
     }
-    const previous = saved
+    const previous = baseline
     const target = draft
     const runId = nextGarmentTagSeq()
     saveRunRef.current = runId
@@ -573,7 +600,7 @@ function useGarmentTagEditor({
     failureMessage,
     canEdit: Boolean(saved),
     openEditor,
-    closeEditor,
+    closeEditor: () => closeEditor(),
     handleDone,
   }
 }
@@ -664,12 +691,14 @@ function GarmentTagPanel({
   garment,
   owner,
   epoch,
+  onRefresh,
   onTagsSaved,
   styleEntry,
 }: {
   garment: ClosetGarment
   owner: string | null
   epoch: number
+  onRefresh: () => void
   onTagsSaved: (garment: GarmentWithColor) => void
   styleEntry: ReactNode
 }) {
@@ -678,7 +707,7 @@ function GarmentTagPanel({
   const themed = useThemedStyles()
   const values = getGuestPreviewStrings(locale).values
   const labels = formatGarmentTagLabels(locale, garment)
-  const editor = useGarmentTagEditor({ garment, owner, epoch, onTagsSaved })
+  const editor = useGarmentTagEditor({ garment, owner, epoch, onTagsSaved, onRefresh })
   const { draft, setDraft, failure, saveState } = editor
   const saving = saveState !== 'idle'
 
@@ -819,21 +848,30 @@ function GarmentTagPanel({
           </View>
         </View>
       ) : (
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ disabled: !editor.canEdit }}
-            disabled={!editor.canEdit}
-            testID="garment-edit-tags"
-            onPress={editor.openEditor}
-            style={[styles.secondaryButton, themed.secondaryButton]}
-          >
-            <Text style={[styles.secondaryButtonText, themed.text]}>
-              {t('wardrobe.detail.editTags')}
-            </Text>
-          </Pressable>
-          {styleEntry}
-        </View>
+        <>
+          {failure ? (
+            <View style={[styles.errorBox, themed.errorBox]}>
+              <Text testID="garment-tag-error" style={themed.errorText}>
+                {editor.failureMessage(failure)}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !editor.canEdit }}
+              disabled={!editor.canEdit}
+              testID="garment-edit-tags"
+              onPress={editor.openEditor}
+              style={[styles.secondaryButton, themed.secondaryButton]}
+            >
+              <Text style={[styles.secondaryButtonText, themed.text]}>
+                {t('wardrobe.detail.editTags')}
+              </Text>
+            </Pressable>
+            {styleEntry}
+          </View>
+        </>
       )}
     </View>
   )

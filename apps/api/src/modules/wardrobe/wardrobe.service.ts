@@ -818,6 +818,14 @@ export class WardrobeService {
     })
     assertTaggableGarment(garment)
 
+    // Story CC-7.5: an editor that says which tags it saw is refused when another edit landed
+    // first, so Done or Undo never overwrites a newer edit. Checked on the row this
+    // serializable transaction read, before the unchanged no-op and the guarded write, so a
+    // stale `expected` always answers 409, as the contract publishes.
+    if (input.expected && !storedTagsMatch(garment, input.expected)) {
+      throw new ConflictException(GARMENT_TAGS_CHANGED_MESSAGE)
+    }
+
     const targetMaterial = resolveTargetMaterial(garment, input)
     if (isUnchangedTagConfirmation(garment, input, targetMaterial)) {
       return {
@@ -825,12 +833,6 @@ export class WardrobeService {
         telemetryProperties: null,
         cacheInvalidationRequired: false,
       }
-    }
-    // Story CC-7.5: an editor that says which tags it saw is refused when another edit landed
-    // first, so Done or Undo never overwrites a newer edit. Checked on the row this
-    // serializable transaction read, before the guarded write.
-    if (input.expected && !storedTagsMatch(garment, input.expected)) {
-      throw new ConflictException(GARMENT_TAGS_CHANGED_MESSAGE)
     }
 
     const { suggestion, hasMalformedSuggestion } = parseTagSuggestion(garment)

@@ -230,6 +230,8 @@ describe('GarmentDetail', () => {
     render(<Harness />)
     await editTo(user, { material: 'wool' })
     await user.click(screen.getByTestId('garment-tag-done'))
+    // The save settles before the next reply is set, so only the Undo meets it.
+    expect(await statusBar()).toHaveTextContent('Saved')
     reply = () => HttpResponse.json({ statusCode: 500, message: 'boom' }, { status: 500 })
     await user.click(await screen.findByTestId('status-bar-action-undo'))
 
@@ -273,20 +275,42 @@ describe('GarmentDetail', () => {
   })
 
   it.each([
-    [
-      'tags another device changed',
-      409,
-      'GARMENT_TAGS_CHANGED',
-      'conflict',
-      'This piece changed on another device. Check the tags and try again.',
-    ],
-    [
-      'a concurrent update',
-      409,
-      'CONCURRENT_TAG_UPDATE',
-      'conflict',
-      'This piece changed on another device. Check the tags and try again.',
-    ],
+    ['tags another device changed', 'GARMENT_TAGS_CHANGED'],
+    ['a concurrent update', 'CONCURRENT_TAG_UPDATE'],
+  ])(
+    '[P1] [7.5-CMP-009] names %s as a conflict, closes the editor and reads the piece again',
+    async (_case, message) => {
+      const user = userEvent.setup()
+      const onRefresh = vi.fn()
+      reply = () =>
+        HttpResponse.json(
+          { statusCode: 409, message, error: 'Conflict' },
+          { status: 409 }
+        )
+      render(<Harness onRefresh={onRefresh} />)
+
+      await editTo(user, { material: 'wool', comfort: 'cold' })
+      await user.click(screen.getByTestId('garment-tag-done'))
+
+      const copy = 'This piece changed on another device. Check the tags and try again.'
+      const error = await screen.findByTestId('garment-tag-error')
+      expect(error).toHaveAttribute('data-failure', 'conflict')
+      expect(error).toHaveTextContent(copy)
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(copy)
+      // A stale draft is not kept: the editor closes and the closet re-reads the piece.
+      expect(screen.queryByTestId('garment-tag-editor')).toBeNull()
+      expect(onRefresh).toHaveBeenCalledTimes(1)
+      expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(
+        /^Cotton$/
+      )
+
+      // Opening the editor again starts clean.
+      await user.click(screen.getByTestId('garment-edit-tags'))
+      expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+    }
+  )
+
+  it.each([
     [
       'a guardian block',
       403,
@@ -499,6 +523,8 @@ describe('GarmentDetail', () => {
     render(<Harness />)
     await editTo(user, { material: 'wool' })
     await user.click(screen.getByTestId('garment-tag-done'))
+    // The save settles before the next reply is set, so only the Undo meets it.
+    expect(await statusBar()).toHaveTextContent('Saved')
     reply = () =>
       HttpResponse.json(
         { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
@@ -647,5 +673,81 @@ describe('GarmentDetail', () => {
     fireEvent.error(retried)
     expect(onRefresh).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId('garment-detail-photo').tagName).not.toBe('IMG')
+  })
+
+  it('[P1] [7.5-CMP-018] the editor compares and sends the tags it opened with, even if the piece reloads meanwhile', async () => {
+    const user = userEvent.setup()
+    let update!: (garment: ClosetGarment) => void
+    function Reloading() {
+      const [garment, setGarment] = useState<ClosetGarment>(blueTop)
+      update = setGarment
+      return (
+        <SaveFeedbackProvider>
+          <GarmentDetail
+            garment={garment}
+            owner={owner}
+            hasLoaded
+            loadFailed={false}
+            loading={false}
+            onBack={vi.fn()}
+            onTagsSaved={setGarment}
+            onRefresh={vi.fn()}
+            onStylePiece={vi.fn()}
+          />
+        </SaveFeedbackProvider>
+      )
+    }
+    render(<Reloading />)
+
+    await user.click(screen.getByTestId('garment-edit-tags'))
+    // A background read brings another device's material while the editor is open.
+    act(() => update({ ...blueTop, material: 'linen' }))
+    await user.click(screen.getByTestId('garment-tag-option-comfort-cold'))
+    await user.click(screen.getByTestId('garment-tag-done'))
+
+    expect(await statusBar()).toHaveTextContent('Saved')
+    expect(patches.map(({ body }) => body)).toEqual([
+      { category: 'top', material: 'cotton', comfortRange: 'cold', expected: loaded },
+    ])
+  })
+
+  it('[P1] [7.5-CMP-018] focus moves to the selected category on open and back to Edit tags on close', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+
+    await user.click(screen.getByTestId('garment-edit-tags'))
+    const selected = screen.getByTestId('garment-tag-option-category-top')
+    expect(selected).toHaveAttribute('aria-pressed', 'true')
+    expect(selected).toHaveFocus()
+
+    await user.click(screen.getByTestId('garment-tag-cancel'))
+    expect(screen.getByTestId('garment-edit-tags')).toHaveFocus()
+  })
+
+  it('[P1] [7.5-CMP-019] a failed closet read offers Retry instead of saying the piece is gone', async () => {
+    const user = userEvent.setup()
+    const onRefresh = vi.fn()
+    render(
+      <SaveFeedbackProvider>
+        <GarmentDetail
+          garment={null}
+          owner={owner}
+          hasLoaded
+          loadFailed
+          loading={false}
+          onBack={vi.fn()}
+          onTagsSaved={vi.fn()}
+          onRefresh={onRefresh}
+          onStylePiece={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    expect(screen.queryByTestId('garment-detail-missing')).toBeNull()
+    expect(screen.getByTestId('garment-detail-loading')).toHaveTextContent(
+      'Could not load this piece. Try again.'
+    )
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
   })
 })

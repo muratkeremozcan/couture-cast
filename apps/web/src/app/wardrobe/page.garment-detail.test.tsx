@@ -3,7 +3,16 @@
 // category.
 // Learning path Step 63: Garment detail and tag edit.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
+import { useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -27,7 +36,36 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => session.owner,
 }))
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/wardrobe' }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/wardrobe',
+  // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
+  // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
+  useSearchParams: () => useMockSearchParams(),
+}))
+
+/** A useSearchParams stand-in that re-renders on pushState, replaceState and popstate. */
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange)
+      window.addEventListener('test:history', onChange)
+      return () => {
+        window.removeEventListener('popstate', onChange)
+        window.removeEventListener('test:history', onChange)
+      }
+    },
+    () => window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    original(...args)
+    window.dispatchEvent(new Event('test:history'))
+  }
+}
 
 const api = 'http://wardrobe-detail-page.test/api/v1'
 const owner = 'closet-member'
@@ -371,5 +409,89 @@ describe('Closet garment detail', () => {
     expect(back).toHaveBeenCalledTimes(1)
     expect(replace).not.toHaveBeenCalled()
     expect(window.location.search).toBe('')
+  })
+
+  it('[P1] [7.5-CMP-020] a saved answer without a signed photo keeps the photo already shown', async () => {
+    const user = userEvent.setup()
+    render(<WardrobePage />)
+    signIn()
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    // Signing failed after the write: the API answers the committed tags without a photo.
+    useMswHandlers(
+      http.patch(`${api}/wardrobe/garments/:id/tags`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>
+        delete body.expected
+        const updated = { ...blueTop, ...body, imageAccess: null }
+        closet = closet.map((item) => (item.id === blueTop.id ? updated : item))
+        return HttpResponse.json({ data: updated })
+      })
+    )
+
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    await user.click(screen.getByTestId('garment-tag-option-material-wool'))
+    await user.click(screen.getByTestId('garment-tag-done'))
+
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+    const detail = screen.getByTestId('garment-detail')
+    expect(within(detail).getByTestId('garment-detail-material')).toHaveTextContent(
+      'Wool'
+    )
+    expect(within(detail).getByRole('img', { name: 'Blue top' })).toHaveAttribute(
+      'src',
+      blueTop.imageAccess!.url
+    )
+  })
+
+  it('[P1] [7.5-CMP-020] a Done answer older than a closet read is set aside and the closet reads again', async () => {
+    const user = userEvent.setup()
+    const held = Promise.withResolvers<void>()
+    let reads = 0
+    useMswHandlers(
+      http.get(`${api}/wardrobe/garments`, () => {
+        reads += 1
+        return HttpResponse.json({ data: closet })
+      }),
+      http.patch(`${api}/wardrobe/garments/:id/tags`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>
+        await held.promise
+        // The stored row keeps the comfort another device set meanwhile; the answer is built
+        // from the request, so it is older than the read that already landed.
+        const stored = closet.find((item) => item.id === blueTop.id)!
+        closet = closet.map((item) =>
+          item.id === blueTop.id ? { ...stored, material: 'wool' } : item
+        )
+        delete body.expected
+        return HttpResponse.json({ data: { ...blueTop, ...body } })
+      })
+    )
+    render(<WardrobePage />)
+    signIn()
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
+    await user.click(await screen.findByTestId('garment-edit-tags'))
+    await user.click(screen.getByTestId('garment-tag-option-material-wool'))
+    await user.click(screen.getByTestId('garment-tag-done'))
+
+    // While the save is in flight, another device changes comfort and the closet re-reads it
+    // (a photo load error asks for a fresh read).
+    closet = closet.map((item) =>
+      item.id === blueTop.id ? { ...item, comfortRange: 'hot' } : item
+    )
+    const readsBefore = reads
+    fireEvent.error(
+      within(screen.getByTestId('garment-detail')).getByRole('img', { name: 'Blue top' })
+    )
+    await waitFor(() => expect(reads).toBe(readsBefore + 1))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-detail-comfort')).toHaveTextContent('Hot')
+    )
+
+    held.resolve()
+
+    // The delayed answer (comfort Mild) is not applied; the closet reads again instead.
+    await waitFor(() => expect(reads).toBe(readsBefore + 2))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-detail-material')).toHaveTextContent('Wool')
+    )
+    expect(screen.getByTestId('garment-detail-comfort')).toHaveTextContent('Hot')
   })
 })

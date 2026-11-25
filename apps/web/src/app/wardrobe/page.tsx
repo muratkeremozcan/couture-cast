@@ -5,7 +5,15 @@
 'use client'
 
 import Link from 'next/link'
-import React, { useCallback, useEffect, useLayoutEffect, useState, useRef } from 'react'
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+} from 'react'
+import { useSearchParams } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
@@ -61,9 +69,19 @@ function readHistoryState(): Record<string, unknown> {
   return state && typeof state === 'object' ? (state as Record<string, unknown>) : {}
 }
 
-function readGarmentDetailParam(): string | null {
-  if (typeof window === 'undefined') return null
-  return new URLSearchParams(window.location.search).get(GARMENT_DETAIL_PARAM) || null
+/**
+ * Reports the `garment` search param. It reads `useSearchParams`, which Next keeps in sync with
+ * native History API calls and with browser Back and Forward, so it renders inside its own
+ * Suspense boundary and the closet itself still prerenders.
+ */
+function GarmentDetailParamSync({
+  onChange,
+}: {
+  onChange: (garmentId: string | null) => void
+}) {
+  const garmentId = useSearchParams()?.get(GARMENT_DETAIL_PARAM) || null
+  useEffect(() => onChange(garmentId), [garmentId, onChange])
+  return null
 }
 
 /** The visible card label: localized category and material, or "Untagged garment". */
@@ -230,15 +248,11 @@ function useGarmentDetailRoute(
   const gridScrollRef = useRef(0)
   const lastDetailIdRef = useRef<string | null>(null)
 
-  useEffect(() => {
-    setDetailGarmentId(readGarmentDetailParam())
-    const onPopState = () => {
-      const next = readGarmentDetailParam()
-      setDetailGarmentId(next)
-    }
-    window.addEventListener('popstate', onPopState)
-    return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  const paramSync = (
+    <Suspense fallback={null}>
+      <GarmentDetailParamSync onChange={setDetailGarmentId} />
+    </Suspense>
+  )
 
   // Back returns to the grid where the member left it, with focus on the card they opened.
   useLayoutEffect(() => {
@@ -258,28 +272,27 @@ function useGarmentDetailRoute(
     const url = new URL(window.location.href)
     url.searchParams.set(GARMENT_DETAIL_PARAM, garmentId)
     // The entry records that this page pushed it, so the detail's back control can step back
-    // to the grid entry even after browser Back and Forward.
-    window.history.pushState(
-      { ...readHistoryState(), [GARMENT_DETAIL_HISTORY_KEY]: garmentId },
-      '',
-      url
-    )
+    // to the grid entry even after browser Back and Forward. Only app-owned state is passed:
+    // Next adds its own router state to a native History API call and syncs the URL.
+    window.history.pushState({ [GARMENT_DETAIL_HISTORY_KEY]: garmentId }, '', url)
     setDetailGarmentId(garmentId)
   }
 
   const closeGarmentDetail = () => {
     if (readHistoryState()[GARMENT_DETAIL_HISTORY_KEY]) {
-      // The popstate handler above closes the detail, so browser Back and this control agree.
+      // Back lands on the grid entry; the search param sync closes the detail, so browser Back
+      // and this control agree.
       window.history.back()
       return
     }
+    // A direct link to the detail has no grid entry behind it: replace this one with the grid.
     const url = new URL(window.location.href)
     url.searchParams.delete(GARMENT_DETAIL_PARAM)
-    window.history.replaceState(window.history.state, '', url)
+    window.history.replaceState(null, '', url)
     setDetailGarmentId(null)
   }
 
-  return { detailGarmentId, openGarmentDetail, closeGarmentDetail }
+  return { detailGarmentId, openGarmentDetail, closeGarmentDetail, paramSync }
 }
 
 function WardrobeHubView({ owner }: { owner: string | null }) {
@@ -348,16 +361,28 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   )
 
   const garmentOpenRefs = useRef(new Map<string, HTMLButtonElement>())
-  const { detailGarmentId, openGarmentDetail, closeGarmentDetail } =
+  const { detailGarmentId, openGarmentDetail, closeGarmentDetail, paramSync } =
     useGarmentDetailRoute(garmentOpenRefs)
 
-  const handleDetailTagsSaved = (updated: GarmentWithColor) => {
-    inventoryVersion.current++
-    setGarments((current) =>
-      current.map((item) => (item.id === updated.id ? updated : item))
-    )
+  const handleDetailTagsSaved = (updated: GarmentWithColor, startedVersion?: number) => {
     // A saved look's Ready or Needs review status follows its anchor's live tags.
     setSavedLooksAttempt((attempt) => attempt + 1)
+    // A closet read that landed while the save was in flight is newer than this answer for
+    // every other field, so keep it and read again instead of applying a stale row.
+    if (startedVersion !== undefined && startedVersion !== inventoryVersion.current) {
+      setLoadAttempt((attempt) => attempt + 1)
+      return
+    }
+    inventoryVersion.current++
+    setGarments((current) =>
+      current.map((item) =>
+        item.id === updated.id
+          ? // A photo the API could not sign this time keeps the one already shown, which
+            // still renews on expiry or on a load error.
+            { ...updated, imageAccess: updated.imageAccess ?? item.imageAccess }
+          : item
+      )
+    )
   }
 
   const detailGarment = findReadyGarment(garments, detailGarmentId)
@@ -641,7 +666,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
     directEntryConsumed.current = true
     const url = new URL(window.location.href)
     url.searchParams.delete('entry')
-    window.history.replaceState(window.history.state, '', url)
+    window.history.replaceState(null, '', url)
     const awaitingTags = garments.find((garment) => garment.status === 'awaiting_tags')
     if (awaitingTags) {
       openTagging(awaitingTags.id)
@@ -701,6 +726,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
       >
         <SkipToContent />
+        {paramSync}
 
         <header className="border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
           {/* Owner report 2026-11-16, iPhone 16 Safari: on one row the actions squeezed the
@@ -768,6 +794,7 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
               loadFailed={Boolean(loadError)}
               loading={isLoading}
               onBack={closeGarmentDetail}
+              onTagSaveStart={() => inventoryVersion.current}
               onTagsSaved={handleDetailTagsSaved}
               onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
               onStylePiece={(selection, button) => {

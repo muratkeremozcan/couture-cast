@@ -9,7 +9,7 @@
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
-import React from 'react'
+import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -63,7 +63,34 @@ const {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/wardrobe',
+  // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
+  // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
+  useSearchParams: () => useMockSearchParams(),
 }))
+
+/** A useSearchParams stand-in that re-renders on pushState, replaceState and popstate. */
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange)
+      window.addEventListener('test:history', onChange)
+      return () => {
+        window.removeEventListener('popstate', onChange)
+        window.removeEventListener('test:history', onChange)
+      }
+    },
+    () => window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    original(...args)
+    window.dispatchEvent(new Event('test:history'))
+  }
+}
 
 const verifiedSession = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../lib/web-session', async (importOriginal) => ({

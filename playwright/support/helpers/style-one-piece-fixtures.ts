@@ -143,8 +143,15 @@ export async function mockStyleWardrobe(
       data: createCompletedOnboardingStateFixture(),
     })
   )
+  // An opted-in answer has one shape: an entry without colorFamily answers as a garment whose
+  // color was never computed, so a mixed inventory never fails the parse.
   mockRead('wardrobe/garments', (id) =>
-    parseGarmentListWithColorResponse({ data: inventory[id] })
+    parseGarmentListWithColorResponse({
+      data: (inventory[id] ?? []).map((garment) => ({
+        ...garment,
+        colorFamily: 'colorFamily' in garment ? garment.colorFamily : null,
+      })),
+    })
   )
   mockRead('auth/signup/federated', () =>
     federatedSignupStatusResponseSchema.parse({ status: 'complete' })

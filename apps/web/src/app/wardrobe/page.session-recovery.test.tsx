@@ -6,7 +6,7 @@
 // verified bearer stayed on "Your session expired" with Silhouette disabled. A failed mount read
 // now reads again when the verified identity is published (`couture:session` with a member).
 // @vitest-environment jsdom
-import React from 'react'
+import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -32,7 +32,35 @@ const session = vi.hoisted(() => ({ member: null as string | null }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/wardrobe',
+  // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
+  // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
+  useSearchParams: () => useMockSearchParams(),
 }))
+
+/** A useSearchParams stand-in that re-renders on pushState, replaceState and popstate. */
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener('popstate', onChange)
+      window.addEventListener('test:history', onChange)
+      return () => {
+        window.removeEventListener('popstate', onChange)
+        window.removeEventListener('test:history', onChange)
+      }
+    },
+    () => window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+for (const method of ['pushState', 'replaceState'] as const) {
+  const original = window.history[method].bind(window.history)
+  window.history[method] = (...args: Parameters<History['pushState']>) => {
+    original(...args)
+    window.dispatchEvent(new Event('test:history'))
+  }
+}
+
 vi.mock('../../lib/wardrobe', () => ({
   ...wardrobe,
   advanceOnboardingStepFromWeb: vi.fn(),

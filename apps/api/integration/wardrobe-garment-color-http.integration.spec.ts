@@ -333,17 +333,25 @@ describe('7.5 stale edits and signing outages over HTTP (pg17)', () => {
     expect(await storedTags(garmentId)).toEqual(saved)
   })
 
-  it('[P1] [7.5-INT-006] an unchanged request still answers 200, and a request without expected applies as before', async () => {
+  it('[P1] [7.5-INT-006] a stale expected wins over an unchanged request, and a request without expected applies as before', async () => {
     vi.stubEnv('TEST_ENV', 'local')
     const owner = await member()
     const garmentId = await readyGarment(owner.userId, BLUE_HEX)
 
-    // Stored already equals the request: the no-op wins over a stale expected.
+    // CodeRabbit: the editor's view is checked first, so a stale editor learns the tags
+    // changed even when its request happens to equal the stored row.
     const unchanged = await api
       .patch(tagsPath(garmentId))
       .set('Authorization', owner.auth)
       .send({ ...seen, expected: { ...seen, material: 'linen' } })
-    expect(unchanged.status).toBe(200)
+    expect(unchanged.status).toBe(409)
+    expect(unchanged.body).toMatchObject({ message: GARMENT_TAGS_CHANGED_MESSAGE })
+
+    const current = await api
+      .patch(tagsPath(garmentId))
+      .set('Authorization', owner.auth)
+      .send({ ...seen, expected: seen })
+    expect(current.status).toBe(200)
 
     const legacy = await api
       .patch(tagsPath(garmentId))

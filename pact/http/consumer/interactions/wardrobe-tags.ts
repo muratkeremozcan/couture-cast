@@ -520,7 +520,8 @@ export async function verifyUpdateGarmentTagsWithColorInteraction(
       })
       expect(updateGarmentTagsWithColorResponseSchema.parse(response).data).toMatchObject(
         {
-          ...input,
+          // The answer carries the saved tags; `expected` is a request-only field.
+          ...tags,
           colorFamily: 'blue',
         }
       )

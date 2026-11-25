@@ -204,7 +204,6 @@ import {
 } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
-import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
@@ -1621,6 +1620,8 @@ describe('WardrobeHubScreen', () => {
       const wool = { ...blueTop, material: 'wool' }
       const pollStarted = deferred()
       const poll = deferred()
+      // Reads after the held one stay open, so the screen can only show what reads 1 to 3 said.
+      const later = deferred()
       let reads = 0
       server.use(
         http.get('*/api/v1/wardrobe/garments', async () => {
@@ -1631,6 +1632,7 @@ describe('WardrobeHubScreen', () => {
             await poll.promise
             return HttpResponse.json({ data: [blueTop, processing] })
           }
+          if (read >= 4) await later.promise
           return HttpResponse.json({ data: read === 1 ? [blueTop, processing] : [wool] })
         })
       )
@@ -1650,12 +1652,13 @@ describe('WardrobeHubScreen', () => {
         await waitFor(() => expect(label()).toBe('Top · Wool'))
 
         poll.resolve()
-        await waitFor(() => expect(reads).toBeGreaterThanOrEqual(3))
-        // Let the late pre-save snapshot reach the hub; it must be discarded.
-        for (let turn = 0; turn < 5; turn += 1) await act(drainMacrotask)
+        // The status poll reads again only after it has consumed the held pre-save answer,
+        // so read 4 starting proves that answer settled; it must not have replaced Wool.
+        await waitFor(() => expect(reads).toBeGreaterThanOrEqual(4))
         expect(label()).toBe('Top · Wool')
       } finally {
         poll.resolve()
+        later.resolve()
       }
     })
 

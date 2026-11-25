@@ -152,9 +152,29 @@ function renderDetail(id: string | undefined = garmentId, withProvider = true) {
 
 const tag = (testId: string) => screen.getByTestId(testId)
 
+/** The visible group and choice names a member hears for each tag option. */
+const TAG_CHOICES: Record<string, readonly [group: string, choice: string]> = {
+  'garment-tag-option-category-outerwear': ['Category', 'Outer layer'],
+  'garment-tag-option-material-wool': ['Material', 'Wool'],
+  'garment-tag-option-material-cotton': ['Material', 'Cotton'],
+  'garment-tag-option-material-none': ['Material', 'No material'],
+  'garment-tag-option-comfort-cold': ['Comfort range', 'Cold'],
+}
+
+const editTagsButton = () => screen.findByRole('button', { name: 'Edit tags' })
+
+/** Opens the editor and picks options the way a screen reader user names them. */
 async function openEditorAndPick(...testIds: string[]) {
-  await browserUser.click(await screen.findByTestId('garment-edit-tags'))
-  for (const testId of testIds) await browserUser.click(tag(testId))
+  await browserUser.click(await editTagsButton())
+  for (const testId of testIds) {
+    const [group, choice] = TAG_CHOICES[testId]!
+    const option = within(screen.getByRole('radiogroup', { name: group })).getByRole(
+      'radio',
+      { name: choice }
+    )
+    expect(option).toHaveAttribute('data-testid', testId)
+    await browserUser.click(option)
+  }
 }
 
 describe('GarmentDetailScreen', () => {
@@ -207,7 +227,7 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-category').textContent).toBe('Top')
     expect(tag('garment-detail-material').textContent).toBe('Cotton')
     expect(tag('garment-detail-comfort').textContent).toBe('Mild')
-    expect(tag('garment-edit-tags')).toHaveTextContent('Edit tags')
+    expect(await editTagsButton()).toHaveAttribute('data-testid', 'garment-edit-tags')
     expect(tag('style-piece-open')).toBeVisible()
 
     await browserUser.click(tag('garment-detail-back'))
@@ -312,13 +332,41 @@ describe('GarmentDetailScreen', () => {
     expect(changes).toBe(0)
   })
 
+  it.each([['GARMENT_TAGS_CHANGED'], ['CONCURRENT_TAG_UPDATE']])(
+    '[P1] [7.5-NAT-005] a %s conflict says so, closes the editor and reads the piece again',
+    async (message) => {
+      let reads = 0
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () => {
+          reads += 1
+          return HttpResponse.json({ data: closet })
+        })
+      )
+      reply = () =>
+        HttpResponse.json(
+          { statusCode: 409, message, error: 'Conflict' },
+          { status: 409 }
+        )
+      renderDetail()
+      await openEditorAndPick('garment-tag-option-material-wool')
+      const readsBefore = reads
+
+      await browserUser.click(tag('garment-tag-done'))
+
+      expect(await screen.findByTestId('garment-tag-error')).toHaveTextContent(
+        'This piece changed on another device. Check the tags and try again.'
+      )
+      expect(screen.queryByTestId('garment-tag-editor')).toBeNull()
+      await waitFor(() => expect(reads).toBe(readsBefore + 1))
+      expect(tag('garment-detail-material').textContent).toBe('Cotton')
+
+      // Opening the editor again starts clean.
+      await browserUser.click(await editTagsButton())
+      expect(screen.queryByTestId('garment-tag-error')).toBeNull()
+    }
+  )
+
   it.each([
-    [
-      'a concurrent update',
-      409,
-      'CONCURRENT_TAG_UPDATE',
-      'This piece changed on another device. Check the tags and try again.',
-    ],
     [
       'a guardian block',
       403,
@@ -364,7 +412,7 @@ describe('GarmentDetailScreen', () => {
 
   it('[P1] [7.5-NAT-004] material clears to null and the editor offers singular categories', async () => {
     renderDetail()
-    await browserUser.click(await screen.findByTestId('garment-edit-tags'))
+    await browserUser.click(await editTagsButton())
     expect(tag('garment-tag-option-category-top').textContent).toBe('Top')
     expect(tag('garment-tag-option-category-dress').textContent).toBe('Dress')
     expect(screen.queryByTestId('garment-tag-option-category-none')).toBeNull()
@@ -428,6 +476,8 @@ describe('GarmentDetailScreen', () => {
     renderDetail()
     await openEditorAndPick('garment-tag-option-material-wool')
     await browserUser.click(tag('garment-tag-done'))
+    // The save settles before the next reply is set, so only the Undo meets it.
+    await waitFor(() => expect(tag('status-feedback-bar')).toHaveTextContent('Saved'))
     reply = () =>
       HttpResponse.json(
         { statusCode: 409, message: 'GARMENT_TAGS_CHANGED', error: 'Conflict' },
@@ -490,5 +540,64 @@ describe('GarmentDetailScreen', () => {
     await screen.findByTestId('garment-detail')
     await waitFor(() => expect(reads).toBe(2))
     expect(tag('garment-detail-photo')).toHaveAccessibleName('Blue top')
+  })
+
+  it('[P1] [7.5-NAT-012] the editor compares and sends the tags it opened with, even if the piece reloads meanwhile', async () => {
+    // An expiring photo lease makes the detail read the closet again as it opens; that read is
+    // held until the editor is open, then brings another device's material.
+    const expiring = {
+      ...blueTop,
+      imageAccess: {
+        ...blueTop.imageAccess!,
+        expiresAt: new Date(Date.now() + 30_000).toISOString(),
+      },
+    }
+    const held = Promise.withResolvers<void>()
+    const reloadStarted = Promise.withResolvers<void>()
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        reads += 1
+        if (reads === 1) return HttpResponse.json({ data: [expiring] })
+        reloadStarted.resolve()
+        await held.promise
+        return HttpResponse.json({ data: [{ ...blueTop, material: 'linen' }] })
+      })
+    )
+    renderDetail()
+    await reloadStarted.promise
+    await browserUser.click(await editTagsButton())
+
+    held.resolve()
+    await waitFor(() => expect(tag('garment-detail-material').textContent).toBe('Linen'))
+    const cold = within(
+      screen.getByRole('radiogroup', { name: 'Comfort range' })
+    ).getByRole('radio', { name: 'Cold' })
+    await browserUser.click(cold)
+    await browserUser.click(tag('garment-tag-done'))
+
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+    expect(patches.map(({ body }) => body)).toEqual([
+      { category: 'top', material: 'cotton', comfortRange: 'cold', expected: loaded },
+    ])
+  })
+
+  it('[P1] [7.5-NAT-012] a saved answer without a signed photo keeps the photo already shown', async () => {
+    reply = (body) => {
+      const tags = { ...body }
+      delete tags.expected
+      return HttpResponse.json({ data: { ...blueTop, ...tags, imageAccess: null } })
+    }
+    renderDetail()
+    await openEditorAndPick('garment-tag-option-material-wool')
+
+    await browserUser.click(tag('garment-tag-done'))
+
+    expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
+    expect(tag('garment-detail-material').textContent).toBe('Wool')
+    expect(tag('garment-detail-photo').querySelector('img')).toHaveAttribute(
+      'src',
+      blueTop.imageAccess!.url
+    )
   })
 })
