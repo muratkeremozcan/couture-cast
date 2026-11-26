@@ -165,6 +165,9 @@ export function MobileGarmentCaptureModal({
   useUploadSessionChange(resetCapture)
 
   const handleClose = () => {
+    // Story CC-7.11 D13 (busy guard): while a photo uploads, X, back and swipe keep the sheet
+    // open; Cancel is the one way to stop an upload.
+    if (step === 'uploading') return
     const close = () => {
       resetCapture()
       onClose()
@@ -450,6 +453,8 @@ export function MobileGarmentCaptureModal({
             accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
             testID="garment-capture-close"
             onPress={handleClose}
+            disabled={step === 'uploading'}
+            aria-disabled={step === 'uploading'}
           >
             <Text style={[styles.closeButton, themed.text]}>✕</Text>
           </Pressable>

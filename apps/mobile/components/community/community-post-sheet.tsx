@@ -423,7 +423,11 @@ export function CommunityPostSheet({
   // Story CC-7.11 D13: X, system back and a swipe down share one guarded close. A draft with a
   // photo or any text asks before it is dropped; an empty one closes at once.
   const dirty = composeDraftDirty({ asset, caption, title, altText })
+  // Story CC-7.11 D13 (busy guard): while a post publishes, X, back and swipe keep the sheet
+  // open, so closing never abandons a publish half way.
+  const publishing = publishState === 'publishing'
   const requestClose = useCallback(() => {
+    if (publishing) return
     if (!dirty) {
       handleClose()
       return
@@ -436,7 +440,7 @@ export function CommunityPostSheet({
         onPress: handleClose,
       },
     ])
-  }, [dirty, handleClose, t])
+  }, [dirty, handleClose, publishing, t])
 
   const handlePickImage = useCallback(async () => {
     if (access.current.suspended || !access.current.visible) return
@@ -692,6 +696,8 @@ export function CommunityPostSheet({
               testID="community-post-sheet-close"
               style={styles.closeButton}
               onPress={requestClose}
+              disabled={publishing}
+              aria-disabled={publishing}
               accessibilityRole="button"
               accessibilityLabel={t('community.compose.close')}
             >
