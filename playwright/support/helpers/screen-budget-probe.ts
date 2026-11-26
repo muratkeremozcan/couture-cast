@@ -95,6 +95,13 @@ export function listProbeTargets(
     const textEntry = (el: Element) =>
       el.matches('textarea, select, [contenteditable]:not([contenteditable="false"])') ||
       (el.tagName === 'INPUT' && !BUTTON_INPUTS.includes((el as HTMLInputElement).type))
+    // An option that is already selected does nothing when chosen again, by design: it is
+    // the current state, not a control to prove (CI a45f15a1 flagged the active chip).
+    const selected = (el: Element) =>
+      ['aria-pressed', 'aria-selected', 'aria-checked'].some(
+        (attribute) => el.getAttribute(attribute) === 'true'
+      ) ||
+      (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
     const excluded = (el: Element) =>
       textEntry(el) || exclude.some((s) => el.closest(s) !== null)
     const found: Element[] = []
@@ -112,26 +119,31 @@ export function listProbeTargets(
       return true
     })
     const seen = new Map<string, number>()
-    return Array.from(new Set(outermost)).map((el) => {
-      const testId = el.getAttribute('data-testid')
-      const name =
-        (el.textContent ?? '').replace(/\s+/g, ' ').trim() ||
-        el.getAttribute('aria-label') ||
-        ''
-      const tag = el.tagName.toLowerCase()
-      const identity = testId ?? `${tag} ${name}`
-      const index = seen.get(identity) ?? 0
-      seen.set(identity, index + 1)
-      const base = testId ?? (name ? `${tag} "${name.slice(0, 40)}"` : tag)
-      return {
-        key: index ? `${base} #${index + 1}` : base,
-        testId,
-        tag,
-        role: el.getAttribute('role'),
-        name,
-        index,
-      }
-    })
+    return Array.from(new Set(outermost))
+      .map((el) => {
+        const testId = el.getAttribute('data-testid')
+        const name =
+          (el.textContent ?? '').replace(/\s+/g, ' ').trim() ||
+          el.getAttribute('aria-label') ||
+          ''
+        const tag = el.tagName.toLowerCase()
+        const identity = testId ?? `${tag} ${name}`
+        const index = seen.get(identity) ?? 0
+        seen.set(identity, index + 1)
+        const base = testId ?? (name ? `${tag} "${name.slice(0, 40)}"` : tag)
+        return {
+          key: index ? `${base} #${index + 1}` : base,
+          testId,
+          tag,
+          role: el.getAttribute('role'),
+          name,
+          index,
+          // Skipped after its index is counted, so a selected twin keeps the others' positions.
+          skip: selected(el),
+        }
+      })
+      .filter((target) => !target.skip)
+      .map(({ skip: _skip, ...target }) => target)
   }, excludeSelectors)
 }
 
@@ -174,8 +186,15 @@ export async function probeTarget(
     ;(window as unknown as { __budgetProbe: typeof state }).__budgetProbe = state
     new MutationObserver((records) => {
       for (const record of records) {
-        if (state.clicked) state.after.push(record.target)
-        else state.churn.add(record.target)
+        // Inserted nodes are new, so a parent that also changes on its own cannot hide them.
+        const nodes =
+          record.type === 'childList' && record.addedNodes.length
+            ? Array.from(record.addedNodes)
+            : [record.target]
+        for (const node of nodes) {
+          if (state.clicked) state.after.push(node)
+          else state.churn.add(node)
+        }
       }
     }).observe(document, {
       subtree: true,

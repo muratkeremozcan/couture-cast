@@ -106,6 +106,8 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 | 7.10-RULE-021 | Chips wrapped in `li` under one `ul` flex row are one row; a horizontally scrolled row with chips off screen still counts                                                    | P2     |
 | 7.10-RULE-022 | Not a chip row: pill CTAs without selection state; a single pill; square tabs (radius under half height)                                                                     | D3     |
 | 7.10-RULE-023 | Reaction rows (role group, aria-pressed pills) inside tiles are excluded                                                                                                     | P1     |
+| 7.10-RULE-024 | P11: an underline aria-pressed filter row is a chip row; a segment tablist, a vertical stack of toggles and switches or checkboxes are not                                   | 2, P11 |
+| 7.10-RULE-025 | P11: two underline filter rows count as two chip rows                                                                                                                        | 2, P11 |
 | 7.10-RULE-030 | Card in a card fails; sibling cards pass; a card-coloured input or button is not a card                                                                                      | 2, D3  |
 | 7.10-RULE-031 | Card detection: card background, cardMuted background, card shadow each with a radius; under 64 x 64 or radius 0 is not a card                                               | D3, P4 |
 | 7.10-RULE-032 | Card in a card inside a tile still fails                                                                                                                                     | P1     |
@@ -117,20 +119,25 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 
 ### Rule: analytics-only probe (Chromium, synthetic DOM)
 
-| ID            | Scenario                                                                                                                                                                      | AC / D |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 7.10-RULE-060 | A link whose handler only posts to `/ingest/e` is analytics-only                                                                                                              | 3, D4  |
-| 7.10-RULE-061 | `href="#"` and `#missing` hash links with no scroll are analytics-only; `#present` that scrolls is an effect                                                                  | D4     |
-| 7.10-RULE-062 | Effects: path or search change, a non-analytics request, a `dialog` or `role=dialog`, focus moved elsewhere, a popup, a download, a DOM change outside the control within 1 s | D4, P6 |
-| 7.10-RULE-063 | File chooser label: opening the chooser is not an effect; a 1 x 1 PNG with an analytics-only change handler is analytics-only; one that renders a preview is an effect        | P6     |
-| 7.10-RULE-064 | Background churn (a ticking clock node) without a click is ignored. Known limit: a click that only changes a node that also churns on its own is not attributed to the click  | P6     |
-| 7.10-RULE-065 | A change inside the control only (its own pressed state, label) is not an effect                                                                                              | D4     |
-| 7.10-RULE-066 | A target not re-found in its fresh load fails with its key                                                                                                                    | P6     |
+| ID            | Scenario                                                                                                                                                                                                 | AC / D |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 7.10-RULE-060 | A link whose handler only posts to `/ingest/e` is analytics-only                                                                                                                                         | 3, D4  |
+| 7.10-RULE-061 | `href="#"` and `#missing` hash links with no scroll are analytics-only; `#present` that scrolls is an effect                                                                                             | D4     |
+| 7.10-RULE-062 | Effects: path or search change, a non-analytics request, a `dialog` or `role=dialog`, focus moved elsewhere, a popup, a download, a DOM change outside the control within 1 s                            | D4, P6 |
+| 7.10-RULE-063 | File chooser label: opening the chooser is not an effect; a 1 x 1 PNG with an analytics-only change handler is analytics-only; one that renders a preview is an effect                                   | P6     |
+| 7.10-RULE-064 | Background churn (a ticking clock node) without a click is ignored. Known limit: a click that only changes a node that also churns on its own is not attributed to the click                             | P6     |
+| 7.10-RULE-065 | A change inside the control only (its own pressed state, label) is not an effect                                                                                                                         | D4     |
+| 7.10-RULE-066 | A target not re-found in its fresh load fails with its key                                                                                                                                               | P6     |
+| 7.10-RULE-067 | An already selected option (aria-pressed, aria-selected, aria-checked true, aria-current) is not probed; twins keep their positions (CI a45f15a1: the active chip and the current scenario were flagged) | D4     |
+| 7.10-RULE-068 | A panel inserted under a parent that churns on its own is still an effect (inserted nodes are new)                                                                                                       | P6     |
 
 Probe scope as built: text entry (fields, text areas, selects, editable regions) is typed into,
 not clicked, so it is not probed; a label handing focus to its own control is the click landing,
 not an effect; GET requests to a path the page already requested before the click (polls) are
-not effects.
+not effects. An option that is already selected is not probed: choosing the current state again
+does nothing by design. The web probe runs in 4 chunk tests per fixture (control i in chunk
+i % 4) so sharding spreads the fresh loads; each chunk is judged against the known entries for its
+own controls, and chunk 1 fails on a known control that no longer exists.
 
 ### E2E audit, web (12 tests)
 

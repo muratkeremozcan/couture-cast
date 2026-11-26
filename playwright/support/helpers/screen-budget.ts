@@ -12,6 +12,7 @@ import {
   type ScreenBudgetAuditMeasurement,
   type ScreenBudgetEvaluation,
   type ScreenBudgetFixture,
+  type ScreenBudgetKnownViolation,
   type ScreenBudgetMeasurement,
   type ScreenBudgetScreen,
 } from '@couture/utils'
@@ -95,18 +96,21 @@ export async function expectWithinBudget(
   testInfo: TestInfo,
   screen: ScreenBudgetScreen,
   fixture: ScreenBudgetFixture,
-  measurement: ScreenBudgetAuditMeasurement
+  measurement: ScreenBudgetAuditMeasurement,
+  options: { known?: readonly ScreenBudgetKnownViolation[]; label?: string } = {}
 ): Promise<ScreenBudgetEvaluation> {
-  const evaluation = evaluateScreenBudget({
-    platform: 'web',
-    screen,
-    fixture,
-    measurement,
-  })
-  await testInfo.attach(`screen-budget-web-${screen}-${fixture}.json`, {
-    body: JSON.stringify({ evaluation, measurement }, null, 2),
-    contentType: 'application/json',
-  })
+  const evaluation = evaluateScreenBudget(
+    { platform: 'web', screen, fixture, measurement },
+    screenBudget.limits,
+    options.known ?? screenBudget.known
+  )
+  await testInfo.attach(
+    `screen-budget-web-${screen}-${fixture}${options.label ?? ''}.json`,
+    {
+      body: JSON.stringify({ evaluation, measurement }, null, 2),
+      contentType: 'application/json',
+    }
+  )
   const messages = evaluation.failures.map((failure) => failure.message)
   expect(messages, `screen budget: web ${screen} (${fixture})`).toEqual([])
   return evaluation

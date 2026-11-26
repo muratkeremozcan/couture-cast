@@ -320,6 +320,45 @@ test.describe('CC-7.10 screen budget measure rules @local-lane', () => {
     expect(result.chipRows).toEqual([])
   })
 
+  // P11 (CI a45f15a1): web Community's filters are underline buttons with aria-pressed at
+  // phone width, not pills; a toggle filter row counts whatever its shape, segments do not.
+  const underlineRow = (id: string) =>
+    `<div class="row" data-testid="${id}">
+       <button style="border:0;border-bottom:2px solid #111;background:none" aria-pressed="true">Auto</button>
+       <button style="border:0;background:none" aria-pressed="false">All</button>
+       <button style="border:0;background:none" aria-pressed="false">Cold</button>
+     </div>`
+
+  test('[P0] [7.10-RULE-024] an underline aria-pressed filter row is a chip row; a segment tablist and a stack of toggles are not (P11)', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `${underlineRow('filters')}
+       <div class="row" role="tablist">
+         <button role="tab" aria-selected="true" class="btn">Saved</button>
+         <button role="tab" aria-selected="false" class="btn">Ideas</button>
+         <button role="tab" aria-selected="false" class="btn">Plan</button>
+       </div>
+       <div style="display:flex;flex-direction:column" role="group">
+         <button class="btn" aria-pressed="false">Alerts</button>
+         <button class="btn" aria-pressed="true">Digest</button>
+       </div>
+       <div class="row">
+         <div role="switch" aria-checked="true" tabindex="0" class="btn">Ads</div>
+         <div role="checkbox" aria-checked="false" tabindex="0" class="btn">Tips</div>
+       </div>`
+    )
+    expect(keys(result.chipRows)).toEqual(['filters'])
+  })
+
+  test('[P1] [7.10-RULE-025] two underline filter rows count as two chip rows (P11)', async ({
+    page,
+  }) => {
+    const result = await measure(page, underlineRow('row-a') + underlineRow('row-b'))
+    expect(keys(result.chipRows)).toEqual(['row-a', 'row-b'])
+  })
+
   test('[P0] [7.10-RULE-030] a card inside a card is reported; sibling cards pass; a card-coloured control is not a card', async ({
     page,
   }) => {
@@ -621,6 +660,37 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
                onclick="this.setAttribute('aria-pressed', 'true'); this.textContent = 'Pressed'; ${CAPTURE}">Press</button>`
     )
     expect(byKey(results, 'self').effects).toEqual([])
+  })
+
+  test('[P1] [7.10-RULE-067] an option that is already selected is not probed; its unselected twins keep their positions', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<div role="group">
+         <button data-testid="chip" aria-pressed="true" onclick="${CAPTURE}">Personal</button>
+         <button data-testid="chip" aria-pressed="false" onclick="document.getElementById('out').textContent = 'community'">Community</button>
+       </div>
+       <a href="/next" aria-current="page" data-testid="current">Here</a>
+       <p id="out"></p>`
+    )
+    expect(results.map((result) => result.target.key)).toEqual(['chip #2'])
+    expect(byKey(results, 'chip #2').effects.join(' ')).toMatch(/dom \d+ change/)
+    expect(probeErrors(results)).toEqual([])
+  })
+
+  test('[P1] [7.10-RULE-068] a panel inserted under a parent that changes on its own is still an effect', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<div id="group">
+         <button data-testid="expander" aria-expanded="false"
+                 onclick="this.setAttribute('aria-expanded', 'true'); this.insertAdjacentHTML('afterend', '<div>Panel</div>')">More</button>
+       </div>
+       <script>let t = 0; setInterval(() => document.getElementById('group').setAttribute('data-tick', String(++t)), 100)</script>`
+    )
+    expect(byKey(results, 'expander').effects.join(' ')).toMatch(/dom \d+ change/)
   })
 
   test('[P1] [7.10-RULE-066] a target that is not found in its fresh load is a probe error, never a silent skip', async ({

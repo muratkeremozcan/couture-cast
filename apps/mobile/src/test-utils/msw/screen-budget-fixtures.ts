@@ -11,7 +11,7 @@
 import { http, HttpResponse } from 'msw'
 import type { z } from 'zod'
 import {
-  communityFeedResponseSchema,
+  communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   garmentListWireResponseSchema,
   listSavedLocationsResponseSchema,
@@ -237,7 +237,7 @@ export function serveScreenBudgetFixture(mode: ScreenBudgetMode, memberId: strin
       })
     ),
     http.get('*/api/v1/community/feed', () =>
-      parsed(communityFeedResponseSchema, {
+      parsed(communityReactionFeedResponseSchema, {
         data: {
           items: feedItems,
           authorStates: [],

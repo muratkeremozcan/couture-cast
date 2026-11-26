@@ -332,28 +332,54 @@ export async function measureScreenBudget(
   const selectable = (el: Element) =>
     SELECTION_ATTRIBUTES.some((attribute) => el.hasAttribute(attribute)) ||
     SELECTION_ROLES.includes(el.getAttribute('role') ?? '')
+  // P11: a toggle filter is a chip whatever its shape (web Community's underline filter row).
+  // Tabs, `aria-selected` and options count only as pills, so a segment control is not a chip
+  // row; switches and checkboxes are form controls, never chips.
+  const TOGGLE_FILTER_ROLES = ['radio', 'menuitemradio']
+  const FORM_CONTROL_ROLES = ['switch', 'checkbox']
+  const toggleFilter = (el: Element) =>
+    el.hasAttribute('aria-pressed') ||
+    TOGGLE_FILTER_ROLES.includes(el.getAttribute('role') ?? '')
+  const chipCandidate = (el: Element) => {
+    if (inTile(el)) return false
+    if (FORM_CONTROL_ROLES.includes(el.getAttribute('role') ?? '')) return false
+    if (el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio'))
+      return el.type === 'radio'
+    return toggleFilter(el) || isPill(el)
+  }
   const ROW_ROLES = ['group', 'radiogroup', 'tablist', 'listbox']
   const rowContainer = (el: Element) => {
     if (ROW_ROLES.includes(el.getAttribute('role') ?? '')) return true
     return /^(inline-)?(flex|grid)$/.test(style(el).display)
   }
-  // A row is two or more pills in one container, at least one carrying a selection state: a
-  // row of links marks only its active chip (`aria-current`), and a row of CTA pills with no
-  // selected member is not a chip row (M3).
+  // Chips on the first member's visual line (P11): a flex column of toggles is not a row, a
+  // horizontal scroller with chips off to the right still is.
+  const onOneLine = (members: readonly Element[]) => {
+    const first = members[0]?.getBoundingClientRect()
+    if (!first) return []
+    return members.filter((member) => {
+      const rect = member.getBoundingClientRect()
+      return rect.top < first.bottom && rect.bottom > first.top
+    })
+  }
+  // A row is two or more chips in one container on one line, at least one carrying a selection
+  // state: a row of links marks only its active chip (`aria-current`), and a row of CTA pills
+  // with no selected member is not a chip row (M3).
   const measureChipRows = () => {
-    const pills = uniqueTargets.filter((el) => !inTile(el) && isPill(el))
+    const chips = uniqueTargets.filter(chipCandidate)
     const rows = new Map<Element, Element[]>()
-    for (const pill of pills) {
-      for (let node = pill.parentElement; node; node = node.parentElement) {
+    for (const chip of chips) {
+      for (let node = chip.parentElement; node; node = node.parentElement) {
         if (!rowContainer(node)) continue
-        if (!pills.some((other) => other !== pill && node.contains(other))) continue
+        if (!chips.some((other) => other !== chip && node.contains(other))) continue
         const members = rows.get(node)
-        if (members) members.push(pill)
-        else rows.set(node, [pill])
+        if (members) members.push(chip)
+        else rows.set(node, [chip])
         break
       }
     }
     return Array.from(rows)
+      .map(([row, members]) => [row, onOneLine(members)] as const)
       .filter(([, members]) => members.length >= 2 && members.some(selectable))
       .map(([row, members]) => ({ key: keyOf(row), detail: `${members.length} chips` }))
   }

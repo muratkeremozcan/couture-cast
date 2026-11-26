@@ -245,6 +245,11 @@ known)`; `packages/utils/src/screen-budget.json` (new) -- D5; export both from t
     ScrollView's existing testID: RN `ScrollView` has no testID prop for its content container,
     and the scroll element's `scrollHeight` is its content height. New anchors: web
     `closet-garment-grid` and `closet-empty-state`, native `wardrobe-empty-state`.
+- 2026-11-26, TEA P11 (round 2 baseline, a45f15a1): a chip is a pill with any selection state
+  or a toggle filter of any shape (`aria-pressed`, role radio or menuitemradio); tabs,
+  `aria-selected` and options count only as pills, so a segment control is not a chip row;
+  switches and checkboxes never are chips. A row counts the chips on its first member's visual
+  line. Web Community's underline filter row now reads one chip row, as native does.
 
 ## Screen budget decisions
 

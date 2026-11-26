@@ -112,6 +112,8 @@ interface NativeProbeTarget {
   readonly testId: string | null
   readonly name: string
   readonly index: number
+  /** Already selected: listed so the others keep their positions, never pressed. */
+  readonly skip: boolean
 }
 
 const TARGET_SELECTOR = [
@@ -139,6 +141,13 @@ function visible(el: Element) {
 }
 
 /** Text entry is typed into, not pressed (as on web): fields are not probed. */
+/** An already selected option does nothing when chosen again, by design (as on web). */
+const selected = (el: Element) =>
+  ['aria-pressed', 'aria-selected', 'aria-checked'].some(
+    (attribute) => el.getAttribute(attribute) === 'true'
+  ) ||
+  (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
+
 const textEntry = (el: Element) =>
   el.matches('textarea, select, [contenteditable]:not([contenteditable="false"])') ||
   (el.tagName === 'INPUT' &&
@@ -146,8 +155,8 @@ const textEntry = (el: Element) =>
       (el as HTMLInputElement).type
     ))
 
-/** Every visible outermost target in document order, with what finds it again. */
-function listTargets(): NativeProbeTarget[] {
+/** Every visible outermost target in document order, each with its element. */
+function collectTargets(): { target: NativeProbeTarget; el: HTMLElement }[] {
   const found = Array.from(document.body.querySelectorAll(TARGET_SELECTOR)).filter(
     (el) => !textEntry(el) && visible(el)
   )
@@ -173,34 +182,25 @@ function listTargets(): NativeProbeTarget[] {
         (name
           ? `${el.tagName.toLowerCase()} "${name.slice(0, 40)}"`
           : el.tagName.toLowerCase())
-      return { key: index ? `${base} #${index + 1}` : base, testId, name, index }
+      const target = {
+        key: index ? `${base} #${index + 1}` : base,
+        testId,
+        name,
+        index,
+        skip: selected(el),
+      }
+      return { target, el: el as HTMLElement }
     })
 }
 
+/** The same target in a fresh render: same identity, same position among its twins. */
 function find(target: NativeProbeTarget): HTMLElement | null {
-  const candidates = listTargets()
-  const match = candidates.filter((candidate) =>
-    target.testId
-      ? candidate.testId === target.testId
-      : !candidate.testId && candidate.name === target.name
-  )[target.index]
-  if (!match) return null
-  if (match.testId)
-    return (
-      (Array.from(
-        document.querySelectorAll(`[data-testid="${CSS.escape(match.testId)}"]`)
-      ).filter(visible)[match.index] as HTMLElement | undefined) ?? null
-    )
-  return (
-    (Array.from(document.body.querySelectorAll(TARGET_SELECTOR)).filter(
-      (el) =>
-        visible(el) &&
-        !el.getAttribute('data-testid') &&
-        ((el.textContent ?? '').replace(/\s+/g, ' ').trim() ||
-          el.getAttribute('aria-label') ||
-          '') === match.name
-    )[match.index] as HTMLElement | undefined) ?? null
-  )
+  const same = (other: NativeProbeTarget) =>
+    other.index === target.index &&
+    (target.testId
+      ? other.testId === target.testId
+      : !other.testId && other.name === target.name)
+  return collectTargets().find(({ target: other }) => same(other))?.el ?? null
 }
 
 export interface NativeProbeOptions {
@@ -227,7 +227,9 @@ export interface NativeProbeResult {
  */
 export async function probeNativeScreen(options: NativeProbeOptions) {
   const unmountFirst = await options.mount()
-  const targets = listTargets()
+  const targets = collectTargets()
+    .map(({ target }) => target)
+    .filter((target) => !target.skip)
   unmountFirst()
   const results: NativeProbeResult[] = []
   for (const target of targets) {
@@ -254,8 +256,15 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       let pressed = false
       const observer = new MutationObserver((records) => {
         for (const record of records) {
-          if (pressed) after.push(record.target)
-          else churn.add(record.target)
+          // Inserted nodes are new, so a parent that also changes on its own cannot hide them.
+          const nodes =
+            record.type === 'childList' && record.addedNodes.length
+              ? Array.from(record.addedNodes)
+              : [record.target]
+          for (const node of nodes) {
+            if (pressed) after.push(node)
+            else churn.add(node)
+          }
         }
       })
       observer.observe(document.body, {
