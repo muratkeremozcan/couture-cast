@@ -475,6 +475,49 @@ export interface LookbookFilterNavProps {
   chipsPending?: boolean
 }
 
+/**
+ * WCAG 2.4.11 (technique C43): the sticky stack (Home's chip bar, then this nav once it sticks)
+ * covers the top of the page, so the page's scroll padding names how far down it reaches. A
+ * focus scroll, keyboard or `focus()`, then never leaves a control under the stack: CI 48c7a01e
+ * (community-reactions, 1280x720) focused a reaction button the stuck nav covered to its middle,
+ * with half its focus ring hidden. Until the nav sticks, only the bar above it (`stickyTop`) is
+ * in the way.
+ */
+function useStickyStackScrollPadding(
+  navRef: React.RefObject<HTMLElement | null>,
+  stickyTop: number,
+  active: boolean
+) {
+  useEffect(() => {
+    const nav = navRef.current
+    if (!active || !nav) return
+    const root = document.documentElement
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const box = nav.getBoundingClientRect()
+      const stuck = box.top <= stickyTop + 0.5 && box.bottom > stickyTop
+      root.style.scrollPaddingTop = `${Math.ceil(stuck ? box.bottom : stickyTop)}px`
+    }
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    const resize =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    resize?.observe(nav)
+    return () => {
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      resize?.disconnect()
+      if (frame !== 0) cancelAnimationFrame(frame)
+      root.style.scrollPaddingTop = ''
+    }
+  }, [navRef, stickyTop, active])
+}
+
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
 // to. From 768 pixels the column has room for whole chips, so they wrap.
 const CHIP_ROW_SCROLL =
@@ -494,6 +537,8 @@ export function LookbookFilterNav({
   const { t } = useCommunityTranslation()
   // Per instance, so a nav only ever points at its own explainer.
   const explainerId = useId()
+  const navRef = useRef<HTMLElement | null>(null)
+  useStickyStackScrollPadding(navRef, stickyTop, !closed)
   if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
@@ -512,6 +557,7 @@ export function LookbookFilterNav({
 
   return (
     <nav
+      ref={navRef}
       aria-label={t('community.filters.label')}
       aria-describedby={explainerId}
       style={{ top: stickyTop }}

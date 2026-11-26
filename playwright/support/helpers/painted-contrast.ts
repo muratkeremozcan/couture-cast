@@ -392,7 +392,8 @@ type States = {
  */
 async function clipFor(
   target: Locator,
-  margin: number
+  margin: number,
+  coverRows: number[] = [0.5]
 ): Promise<Clip | null | 'detached'> {
   try {
     await target.scrollIntoViewIfNeeded({ timeout: 2_000 })
@@ -400,14 +401,19 @@ async function clipFor(
     if (/not attached|detached/i.test(String(error))) return 'detached'
     throw error
   }
-  const cover = await target.evaluate((el) => {
+  const cover = await target.evaluate((el, rows) => {
     // Centred first: scrolled only into view, text at the bottom edge lands under a fixed tab
     // bar (CC-7.9 shell spec, CI c9614d98) and would be refused as covered. Only the window
     // scrolls: scrollIntoView centres the element in every scrolling ancestor too, and a
     // horizontal row (overflow-x auto also scrolls vertically) moved its content up under its
     // own clip, so the hit landed on the section text above (CI 2e5b5628, spotlight row).
+    // The centre is that of the area below the page's scroll-padding-top: a stuck header stack
+    // declares its depth there (WCAG C43), and the window's own middle can sit under it.
     const before = el.getBoundingClientRect()
-    window.scrollBy(0, before.top + before.height / 2 - window.innerHeight / 2)
+    const padTop =
+      parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0
+    const middle = padTop + (window.innerHeight - padTop) / 2
+    window.scrollBy(0, before.top + before.height / 2 - middle)
     const r = el.getBoundingClientRect()
     // The measured element takes hit tests for the check, whatever its own or an ancestor's
     // pointer-events say: a decorative label (the spotlight rank pill, a badge row) is
@@ -418,8 +424,11 @@ async function clipFor(
     const priority = own.style.getPropertyPriority('pointer-events')
     own.style.setProperty('pointer-events', 'auto', 'important')
     try {
-      for (const fx of [0.5, 0.15, 0.85]) {
-        const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
+      const points = rows.flatMap((fy) =>
+        [0.5, 0.15, 0.85].map((fx) => [r.left + r.width * fx, r.top + r.height * fy])
+      )
+      for (const [px, py] of points) {
+        const hit = document.elementFromPoint(px!, py!)
         if (hit && !el.contains(hit) && !hit.contains(el)) {
           // Both sides named, so a cover reads from the log (CI fd692390, span in spotlight).
           const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
@@ -427,7 +436,7 @@ async function clipFor(
             const box = node.getBoundingClientRect()
             return `${node.outerHTML.slice(0, 160)} text "${(node.textContent ?? '').trim().slice(0, 40)}" box [${[box.x, box.y, box.width, box.height].map(Math.round).join(', ')}]`
           }
-          const point = [r.left + r.width * fx, r.top + r.height / 2].map(Math.round)
+          const point = [px!, py!].map(Math.round)
           return `${hit.tagName.toLowerCase()} in ${id}\n  cover: ${describe(hit)}\n  target: ${describe(el)}\n  at [${point.join(', ')}], scroll [${window.scrollX}, ${window.scrollY}]`
         }
       }
@@ -436,7 +445,7 @@ async function clipFor(
       if (previous) own.style.setProperty('pointer-events', previous, priority)
       else own.style.removeProperty('pointer-events')
     }
-  })
+  }, coverRows)
   if (cover)
     throw new Error(`painted-contrast: the measured element is covered by ${cover}`)
   const box = await target.boundingBox()
@@ -482,14 +491,14 @@ async function takeShots(
 async function measure(
   target: Locator,
   states: States,
-  options: { margin?: number; prepare?: () => Promise<void> } = {}
+  options: { margin?: number; prepare?: () => Promise<void>; coverRows?: number[] } = {}
 ): Promise<Ink | null> {
   const margin = options.margin ?? 0
   const page = target.page()
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await options.prepare?.()
     if ((await target.count()) === 0) continue
-    const clip = await clipFor(target, margin)
+    const clip = await clipFor(target, margin, options.coverRows)
     if (clip === 'detached') continue
     if (!clip) return null
     const handle = await target.elementHandle()
@@ -614,7 +623,9 @@ export async function focusRing(
       withShots: true,
       outsideOnly: true,
     },
-    { margin: 10 }
+    // A control is sampled on three rows, not only its middle line: a band over its top half
+    // read as a short ring instead of a cover (CI 48c7a01e, applause pill).
+    { margin: 10, coverRows: [0.25, 0.5, 0.75] }
   )
   // Every ring's area goes to the log, so a pass shows how far it cleared the minimum.
   const area = ink?.required ? (ink.qualifying ?? 0) / ink.required : 0

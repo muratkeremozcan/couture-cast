@@ -78,9 +78,9 @@ test.describe('painted-contrast probe @local-lane', () => {
     button { margin: 40px; width: 96px; height: 40px; border: 1px solid #111111;
       border-radius: 8px; background: #ffffff; color: #111111; font: 16px sans-serif; }
     button:focus { outline: none; }`
-  const ring = async (page: Page, css: string) => {
+  const ring = async (page: Page, css: string, extra = '') => {
     await page.setContent(
-      PAGE('<button type="button">Applaud</button>', BUTTON_CSS + css)
+      PAGE(`<button type="button">Applaud</button>${extra}`, BUTTON_CSS + css)
     )
     const button = page.getByRole('button', { name: 'Applaud' })
     // A keyboard Tab first, so a later programmatic focus matches :focus-visible.
@@ -125,5 +125,20 @@ test.describe('painted-contrast probe @local-lane', () => {
     )
     expect(result!.painted).toBeGreaterThan(0)
     expect(result!.qualifying).toBeLessThan(result!.required!)
+  })
+
+  // CI 48c7a01e: a white band over the top half of the applause pill left the ring only on the
+  // bottom half; it read as a short ring, not as the cover it is.
+  test('[P1] [7.9-PROBE-007] a layer over the top half of the control is refused as a cover', async ({
+    page,
+  }) => {
+    await expect(
+      ring(
+        page,
+        `button:focus-visible { outline: 2px solid #111111; outline-offset: 2px; }
+        .band { position: absolute; left: 0; right: 0; top: 30px; height: 26px; background: #ffffff; }`,
+        '<div class="band"></div>'
+      )
+    ).rejects.toThrow(/covered by div/)
   })
 })

@@ -135,6 +135,7 @@ inline garment detail, sign-in, not-found.
 | 7.9-PROBE-004     | Focus ring negative control: focus that paints nothing falls short of the area                                                                                                                                      | D3            |
 | 7.9-PROBE-005     | Focus ring negative control: focus that moves the control is refused before scoring                                                                                                                                 | D3            |
 | 7.9-PROBE-006     | Focus ring negative control: a faint ring below 3:1 falls short of the area                                                                                                                                         | D3            |
+| 7.9-PROBE-007     | Focus ring: a layer over the top half of the control is refused as a cover, sampled on three rows (CI 48c7a01e applause pill)                                                                                       | D3            |
 
 ### Coordinator add-ons in this PR (TEA)
 
