@@ -1,4 +1,5 @@
 'use client'
+// Story CC-7.12 D6: moved from `/wardrobe/capsules`, which now redirects to Looks.
 // Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
 import { getGuestPreviewStrings } from '@couture/utils'
@@ -96,7 +97,11 @@ export default function WardrobeCapsulesPage() {
       {/* Story CC-7.9 D6, D7, D8: the shared top bar and page surface render outside the
           member scope, so the bar sits in its final place while the session is read. */}
       <AppPage>
-        <AppTopBar titleKey="wardrobe.capsules.title" parentHref="/looks" />
+        {/* Story CC-7.12 D6: the manager lives under Looks; back returns to Saved > Capsules. */}
+        <AppTopBar
+          titleKey="wardrobe.capsules.title"
+          parentHref="/looks?segment=saved&filter=capsules"
+        />
         <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
         {/* Story CC-7.11 (TEA e): the tab bar, as on every other sub-screen. */}
         <StickyBottomNav />
@@ -220,6 +225,25 @@ function CapsulesView({ session }: { session: MemberSession }) {
   }, [fetchCapsules])
 
   useEffect(() => () => inFlightRef.current?.abort(), [])
+
+  // Story CC-7.12 D6: a Looks capsule tile opens the manager on its card. The id is matched by
+  // equality against the loaded capsules (TEA P7), and only the first load moves focus.
+  const [focusCapsuleId] = useState<string | null>(() =>
+    typeof window === 'undefined'
+      ? null
+      : new URL(window.location.href).searchParams.get('capsule')
+  )
+  const focusedCapsuleRef = useRef(false)
+  const cardRefs = useRef(new Map<string, HTMLDivElement>())
+  useEffect(() => {
+    if (!focusCapsuleId || focusedCapsuleRef.current || isLoading) return
+    const match = capsules.find((capsule) => capsule.id === focusCapsuleId)
+    if (!match) return
+    focusedCapsuleRef.current = true
+    const card = cardRefs.current.get(match.id)
+    card?.scrollIntoView({ block: 'center' })
+    card?.focus({ preventScroll: true })
+  }, [focusCapsuleId, capsules, isLoading])
 
   /**
    * Another client's committed changes appear on refocus, which is the
@@ -410,6 +434,11 @@ function CapsulesView({ session }: { session: MemberSession }) {
             {capsules.map((capsule) => (
               <div
                 key={capsule.id}
+                ref={(element) => {
+                  if (element) cardRefs.current.set(capsule.id, element)
+                  else cardRefs.current.delete(capsule.id)
+                }}
+                tabIndex={capsule.id === focusCapsuleId ? -1 : undefined}
                 data-surface="card"
                 className="flex flex-col justify-between rounded-xl border border-line bg-card p-5 shadow-card"
                 data-testid={`capsule-card-${capsule.id}`}

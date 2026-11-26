@@ -693,6 +693,9 @@ export const outfitCapsuleResponseSchema = z
   })
   .strict()
 
+/** Story CC-7.12 D3: `created_desc` orders by created_at desc, then id asc. */
+export const capsuleListSortEnum = z.enum(['created_desc'])
+
 export const listOutfitCapsulesQuerySchema = z
   .object({
     q: graphemeBoundedText(120)
@@ -710,6 +713,9 @@ export const listOutfitCapsulesQuerySchema = z
     comfortRange: garmentComfortRangeEnum.optional().openapi({
       enum: [...garmentComfortRangeEnum.options, null],
     }),
+    // Story CC-7.12 D3: opt-in newest-saved order for the Looks tab; omitted keeps favorites
+    // first, then updated_at desc.
+    sort: capsuleListSortEnum.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).max(10000).default(0),
   })

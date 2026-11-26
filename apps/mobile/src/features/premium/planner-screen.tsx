@@ -19,13 +19,17 @@
 // It lives under `src/features` rather than `app/` for the same reason
 // `palette-advisor-screen.tsx` does: it stays covered by the component test runner, and
 // it deliberately does not render `<Stack.Screen>` itself, since that import chain pulls
-// in native-only modules the browser-based runner cannot polyfill. The thin
-// `app/planner.tsx` route sets the nav title instead.
+// in native-only modules the browser-based runner cannot polyfill.
+// Story CC-7.12 D10, D11: Looks' Plan segment renders `PlannerBody`, and `app/planner.tsx` is a
+// redirect to it. The locked and signed-out states render the free preview (a sample week and
+// one Upgrade) in place of the old lock panel.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
-import { getGuestPreviewStrings } from '@couture/utils'
+import { getGuestPreviewStrings, sampleLookText, sampleWeek } from '@couture/utils'
 import { onLocationsChanged } from '@/src/lib/locations'
 import {
   mobileIdentityEpoch,
@@ -42,6 +46,8 @@ import {
 
 import { createSchemeStyles, Text, View } from '@/components/themed'
 import { useAppTheme } from '@/src/theme/theme-context'
+import { useTokens } from '@/src/theme/tokens'
+import { SampleGarmentArt } from '@/src/features/preview/guest-preview-parts'
 import { formatTemperature } from '@/src/lib/formatters'
 import {
   formatPlannerDayLabel,
@@ -74,21 +80,76 @@ function replaceDay(
   return days.map((day) => (day.planDate === next.planDate ? next : day))
 }
 
-function LockedPanel() {
-  const { t } = useTranslation()
+/**
+ * Story CC-7.12 D10, P4, P5: the free Plan preview for a member without Premium and for a
+ * signed-out visitor. The one line and Upgrade (the screen's primary) sit above a sample week of
+ * seven days starting today. Upgrade opens Profile's Premium section, or sign-in when signed out;
+ * it never calls a purchase or entitlement endpoint.
+ */
+function FreePlanPreview({ signedOut }: { signedOut: boolean }) {
+  const { t, i18n } = useTranslation()
+  const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  const locale = i18n.resolvedLanguage ?? i18n.language
+  const strings = getGuestPreviewStrings(locale)
+  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' })
+  const today = new Date()
   return (
-    <View style={styles.panel} testID="planner-locked">
-      <Text style={styles.panelTitle}>{t('commerce.premium.plannerLocked.title')}</Text>
-      <Pressable
-        accessibilityRole="link"
-        style={styles.primaryButton}
-        testID="planner-locked-cta"
-        onPress={() => router.push('/settings')}
-      >
-        <Text style={styles.primaryButtonText}>
-          {t('commerce.premium.plannerLocked.cta')}
+    <View style={{ gap: space[4] }} testID="plan-free-preview">
+      <View style={{ gap: space[3] }}>
+        <Text style={styles.body}>{t('looks.freePlan.line')}</Text>
+        <Pressable
+          accessibilityRole="link"
+          testID="plan-upgrade"
+          style={[
+            styles.upgradeButton,
+            {
+              minHeight: shell.touchTarget,
+              borderRadius: radius.md,
+              paddingHorizontal: space[4],
+              backgroundColor: colors.primary,
+            },
+          ]}
+          onPress={() => router.push(signedOut ? '/signin' : '/settings')}
+        >
+          <Text
+            style={{
+              color: colors.onPrimary,
+              fontSize: type.base.fontSize,
+              fontWeight: fontWeight.semibold,
+            }}
+          >
+            {t('looks.freePlan.upgrade')}
+          </Text>
+        </Pressable>
+      </View>
+      <View style={{ gap: space[1] }}>
+        <Text style={[styles.weekLabel, { color: colors.inkMuted }]}>
+          {t('looks.freePlan.week')}
         </Text>
-      </Pressable>
+        {sampleWeek().map(({ offset, idea }) => {
+          const date = new Date(today)
+          date.setDate(today.getDate() + offset)
+          const garment = idea.garments[0]
+          return (
+            <View
+              key={offset}
+              testID={`plan-free-day-${offset}`}
+              style={[styles.dayRow, { gap: space[3], borderBottomColor: colors.line }]}
+            >
+              {garment ? <SampleGarmentArt garment={garment} size={24} /> : null}
+              <Text style={[styles.dayName, { color: colors.ink }]}>
+                {weekday.format(date)}
+              </Text>
+              <Text
+                style={[styles.dayLook, { color: colors.inkMuted }]}
+                numberOfLines={1}
+              >
+                {sampleLookText(idea.look, strings).name}
+              </Text>
+            </View>
+          )
+        })}
+      </View>
     </View>
   )
 }
@@ -284,12 +345,27 @@ function ReadyDayCard({
   )
 }
 
+/** The planner as its own scrolling screen; Looks' Plan segment renders {@link PlannerBody}. */
 export function PlannerScreen() {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
-  return <MemberPlannerScreen key={epoch} />
+  const { t } = useTranslation()
+  return (
+    <ScrollView
+      contentContainerStyle={styles.screen}
+      testID="planner-screen"
+      accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
+    >
+      <PlannerBody />
+    </ScrollView>
+  )
 }
 
-function MemberPlannerScreen() {
+/** Story CC-7.12 D10: the planner's states without a scroll view, for the Looks Plan segment. */
+export function PlannerBody() {
+  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  return <MemberPlannerBody key={epoch} />
+}
+
+function MemberPlannerBody() {
   const { t, i18n } = useTranslation()
   const { palette } = useAppTheme()
   const tone = useTone()
@@ -436,15 +512,16 @@ function MemberPlannerScreen() {
     [activeLocale, busyDate, refresh, t, week]
   )
 
+  const freePreview = screenState === 'signed_out' || screenState === 'locked'
   return (
-    <ScrollView
-      contentContainerStyle={styles.screen}
-      testID="planner-screen"
-      accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
-    >
-      {/* Story CC-7.9 D6: the stack's AppTopBar carries the title; the labeled scroll view keeps
-        the section name, and the body repeats it in no heading of its own. */}
-      <Text style={styles.body}>{t('commerce.premium.planner.intro')}</Text>
+    <>
+      {/* Story CC-7.9 D6: the top bar or the Looks segment names the section, so the body
+        repeats it in no heading of its own. The free preview's line replaces the intro. */}
+      {freePreview ? (
+        <FreePlanPreview signedOut={screenState === 'signed_out'} />
+      ) : (
+        <Text style={styles.body}>{t('commerce.premium.planner.intro')}</Text>
+      )}
 
       {screenState === 'loading' ? (
         <ActivityIndicator
@@ -452,8 +529,6 @@ function MemberPlannerScreen() {
           testID="planner-loading"
         />
       ) : null}
-
-      {screenState === 'signed_out' || screenState === 'locked' ? <LockedPanel /> : null}
 
       {screenState === 'disabled' ? (
         <Text style={styles.body} testID="planner-disabled">
@@ -521,7 +596,7 @@ function MemberPlannerScreen() {
             )
           )
         : null}
-    </ScrollView>
+    </>
   )
 }
 
@@ -538,8 +613,16 @@ const useTone = createSchemeStyles((colors) => ({
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12 },
   body: { fontSize: 14, lineHeight: 20 },
-  panel: { gap: 8, paddingVertical: 8 },
-  panelTitle: { fontSize: 18, fontWeight: '600' },
+  upgradeButton: { alignItems: 'center', justifyContent: 'center' },
+  weekLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase' },
+  dayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dayName: { fontSize: 14, fontWeight: '600', minWidth: 96 },
+  dayLook: { flex: 1, fontSize: 14 },
   card: { gap: 8, padding: 12, borderRadius: 8, borderWidth: 1 },
   dayLabel: { fontSize: 16, fontWeight: '700' },
   starterBadge: { fontSize: 12, fontStyle: 'italic' },
@@ -553,8 +636,6 @@ const styles = StyleSheet.create({
   garmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   garmentTile: { width: 48, height: 48 },
   garmentImage: { width: 48, height: 48, borderRadius: 8 },
-  primaryButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
-  primaryButtonText: { fontSize: 14, fontWeight: '600' },
   secondaryButton: {
     minHeight: 44,
     justifyContent: 'center',

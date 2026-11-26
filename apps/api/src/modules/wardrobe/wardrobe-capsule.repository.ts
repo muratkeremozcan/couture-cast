@@ -377,7 +377,11 @@ export class WardrobeCapsuleRepository {
       this.prisma.outfitCapsule.findMany({
         where,
         include: CAPSULE_INCLUDE,
-        orderBy: [{ is_favorite: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
+        // Story CC-7.12 D3: the Looks tab asks for newest saved first, favorites unpinned.
+        orderBy:
+          query.sort === 'created_desc'
+            ? [{ created_at: 'desc' }, { id: 'asc' }]
+            : [{ is_favorite: 'desc' }, { updated_at: 'desc' }, { id: 'asc' }],
         take: query.limit,
         skip: query.offset,
       }),

@@ -49,10 +49,6 @@
       "errorNoWebSubscription": "Não há assinatura web nesta conta para gerenciar.",
       "errorSubscribeDisabled": "As novas assinaturas Premium estão pausadas agora. Tente novamente em breve.",
       "signedOutHint": "Faça login para assinar ou gerenciar o Premium",
-      "plannerLocked": {
-        "title": "O planejador de 7 dias é um recurso Premium",
-        "cta": "Assinar Premium"
-      },
       "planner": {
         "sectionTitle": "Planejador de looks de 7 dias",
         "openControl": "Planejar a semana",
@@ -1687,7 +1683,39 @@
   },
   "looks": {
     "empty": "Salve um look para vê-lo aqui",
-    "capsules": "Cápsulas",
-    "plan": "Plano"
+    "segments": {
+      "label": "Seções de looks",
+      "saved": "Salvos",
+      "ideas": "Ideias",
+      "plan": "Plano"
+    },
+    "filters": {
+      "label": "Filtrar looks salvos",
+      "all": "Todos",
+      "today": "Hoje",
+      "capsules": "Cápsulas"
+    },
+    "filterEmpty": {
+      "today": "Ainda não há looks de Hoje",
+      "capsules": "Ainda não há cápsulas"
+    },
+    "manageCapsules": "Gerenciar cápsulas",
+    "state": {
+      "missing_one": "Falta 1 peça",
+      "missing_other": "Faltam {{count}} peças",
+      "needsReview": "Revisar",
+      "savedOn": "Salvo em {{date}}"
+    },
+    "detail": {
+      "gone": "Este look não está mais salvo",
+      "signIn": "Entre para ver seus looks salvos",
+      "signInAction": "Entrar"
+    },
+    "freePlan": {
+      "week": "Semana de exemplo",
+      "line": "O Premium planeja sua semana inteira com base na previsão do tempo.",
+      "upgrade": "Assinar Premium"
+    },
+    "loadMore": "Mostrar mais"
   }
 }

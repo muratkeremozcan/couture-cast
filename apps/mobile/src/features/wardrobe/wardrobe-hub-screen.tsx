@@ -8,6 +8,9 @@
 // the grid until CC-7.12.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.12 D8: the saved looks row is gone; saved looks live on the Looks tab.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import {
   useCallback,
   useEffect,
@@ -30,10 +33,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native'
-import type {
-  GarmentItemContract,
-  SavedLookContract,
-} from '@couture/api-client/contracts/http'
+import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import {
   getGuestPreviewStrings,
   getStylePieceStrings,
@@ -65,8 +65,6 @@ import {
 } from '@/src/lib/wardrobe'
 import { ensureMobileLegacySavedLooksMigration } from '@/src/lib/saved-looks'
 import { ClosetMoreSheet, ClosetTopBarActions } from './closet-top-bar'
-import { ClosetSavedLooksRow } from './saved-looks-row'
-import { useSavedLooks } from './use-saved-looks'
 import { garmentDeletion, type MobileGarmentDeletion } from './garment-deletion'
 import {
   garmentCardLabel,
@@ -166,15 +164,6 @@ function useHubGarmentDeletion({
   return pendingIds
 }
 
-/**
- * Story CC-7.7 D3, D4: the Closet gate's reads are the inventory and the first Saved Looks page,
- * so the row below the grid never appears after the closet. Story CC-7.11 D4: the onboarding
- * state only names the More sheet's setup row now, so the gate no longer waits for it.
- */
-function closetGateReady(inventorySettled: boolean, savedLooksSettled: boolean) {
-  return inventorySettled && savedLooksSettled
-}
-
 /** Only the first inventory read shows the spinner, and only over an empty grid. */
 function showFirstReadSpinner(
   isLoading: boolean,
@@ -236,10 +225,7 @@ function MemberWardrobeHub({
   // Story CC-7.7 D3: the Closet gate waits for the first inventory read.
   const [inventorySettled, setInventorySettled] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
-  const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const owner = mobileApplicationUserId()
-  const savedLooksState = useSavedLooks({ owner, epoch })
-  const reloadSavedLooks = savedLooksState.reload
   const [styleClosing, setStyleClosing] = useState(false)
   const styleSelectionRef = useRef<StylePieceSelection | null>(null)
   const taggingOpen = useRef(false)
@@ -261,9 +247,8 @@ function MemberWardrobeHub({
   const moreButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const directEntryConsumed = useRef(false)
   // Story CC-7.11 D13: the control that opened capture (top bar Add, empty-state Add or a
-  // piece's Replace) and the Reopen that opened the Style piece editor take focus back.
+  // piece's Replace) takes focus back.
   const captureInvokerRef = useRef<ElementRef<typeof Pressable> | null>(null)
-  const styleOpenerRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const openCapture = (invoker: ElementRef<typeof Pressable> | null) => {
     captureInvokerRef.current = invoker
     setIsCaptureOpen(true)
@@ -295,14 +280,11 @@ function MemberWardrobeHub({
 
   const finishStyleDismissal = (selection: StylePieceSelection) => {
     if (epoch !== mobileIdentityEpoch() || styleSelectionRef.current !== selection) return
-    const opener = styleOpenerRef.current
-    styleOpenerRef.current = null
     const styleInvoker = () =>
-      opener ?? styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
+      styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
     const invoker = styleInvoker()
     styleSelectionRef.current = null
     setStyleSelection(null)
-    setInitialSavedLook(null)
     setStyleClosing(false)
     const pending = pendingTagging.current
     pendingTagging.current = null
@@ -343,10 +325,8 @@ function MemberWardrobeHub({
         // pre-save snapshot that settles late cannot win over the reload below.
         inventoryRevision.current++
         setLoadAttempt((attempt) => attempt + 1)
-        // A saved look's Ready or Needs review status follows its anchor's live tags.
-        reloadSavedLooks()
       }),
-    [epoch, reloadSavedLooks]
+    [epoch]
   )
 
   useEffect(() => {
@@ -368,9 +348,8 @@ function MemberWardrobeHub({
       // (a hub that remounted while the DELETE was out) that read is the grid itself, so
       // read again: the server already answers without the deleted piece.
       if (!hasLoadedRef.current) setLoadAttempt((attempt) => attempt + 1)
-      // A saved look holding the piece now shows it as missing (CC-7.2).
-      reloadSavedLooks()
-      // Other screens (capsules, Today) read the closet again.
+      // Other screens (Looks, capsules, Today) read the closet again; a saved look holding
+      // the piece now shows it as missing (CC-7.2).
       notifyingWardrobeRef.current = true
       try {
         notifyWardrobeChanged()
@@ -435,21 +414,20 @@ function MemberWardrobeHub({
   )
 
   // Story CC-7.7 D5: tabs stay mounted, so returning to the Closet is a focus, never a mount.
-  // It reads the inventory and the Saved Looks again in place: the grid, the row and the
-  // scroll position stay, and only the first read ever shows the spinner. The first focus is
-  // the mount, whose reads are already running.
+  // It reads the inventory again in place: the grid and the scroll position stay, and only the
+  // first read ever shows the spinner. The first focus is the mount, whose reads are already
+  // running.
   const leftClosetRef = useRef(false)
   useFocusEffect(
     useCallback(() => {
       if (leftClosetRef.current && epoch === mobileIdentityEpoch()) {
         setLoadAttempt((attempt) => attempt + 1)
-        reloadSavedLooks()
       }
       leftClosetRef.current = false
       return () => {
         leftClosetRef.current = true
       }
-    }, [epoch, reloadSavedLooks])
+    }, [epoch])
   )
 
   useEffect(() => {
@@ -613,9 +591,11 @@ function MemberWardrobeHub({
         <ScrollView contentContainerStyle={styles.content}>
           <ScreenGate
             screen="closet"
-            ready={closetGateReady(inventorySettled, savedLooksState.settled)}
-            // The ScrollView's 24-point gap reaches only its direct children; the notices, the
-            // inventory and Saved Looks keep the same spacing inside the gate body.
+            // Story CC-7.7 D3: the Closet gate waits for the first inventory read. Story CC-7.12
+            // D8: saved looks left the Closet for the Looks tab, so the gate no longer waits on them.
+            ready={inventorySettled}
+            // The ScrollView's 24-point gap reaches only its direct children; the notices and
+            // the inventory keep the same spacing inside the gate body.
             style={styles.gatedBody}
           >
             {errorMessage ? (
@@ -801,36 +781,6 @@ function MemberWardrobeHub({
                 </View>
               </View>
             )}
-
-            {/* D4: below the grid until CC-7.12 deletes it; the Looks tab lists the same looks. */}
-            <ClosetSavedLooksRow
-              owner={owner}
-              savedLooks={savedLooksState.savedLooks}
-              totalCount={savedLooksState.total}
-              hasMore={savedLooksState.hasMore}
-              isLoadingMore={savedLooksState.loadingMore}
-              onLoadMore={savedLooksState.loadMore}
-              // Story CC-7.7 D5: only the first page shows the loading count; a refresh keeps
-              // the count on screen until its answer lands.
-              isLoading={savedLooksState.loading && !savedLooksState.settled}
-              loadError={savedLooksState.error}
-              garments={garments}
-              onRetry={reloadSavedLooks}
-              onChanged={reloadSavedLooks}
-              onReopenStylePiece={(look, opener) => {
-                const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-                if (!anchor || !anchor.category || !anchor.comfortRange) return
-                if (styleSelectionRef.current) return
-                setInitialSavedLook(look)
-                openStylePanel({
-                  id: anchor.id,
-                  category: anchor.category,
-                  comfortRange: anchor.comfortRange,
-                })
-                // Only an editor that opened hands focus back to this Reopen.
-                if (styleSelectionRef.current) styleOpenerRef.current = opener
-              }}
-            />
           </ScreenGate>
         </ScrollView>
 
@@ -871,14 +821,12 @@ function MemberWardrobeHub({
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
-          initialSavedLook={initialSavedLook}
           inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
           loadInventory={loadGarments}
           visible={!styleClosing}
           owner={owner}
           epoch={epoch}
           locale={i18n.language}
-          onSavedLooksChanged={reloadSavedLooks}
           onClose={() => setStyleClosing(true)}
           onDismiss={() => finishStyleDismissal(styleSelection)}
         />

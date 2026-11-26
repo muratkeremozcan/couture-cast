@@ -75,6 +75,8 @@ export function renderTabTopBar(props: NavigatorHeaderProps) {
 export const PARENT_TAB: Readonly<Record<string, Href>> = {
   // Story CC-7.11 D10: Capsules and Plan live under Looks; Style under Profile.
   'wardrobe-capsules': '/looks',
+  // Story CC-7.12 D5: a saved look's direct entry goes back to Looks on Saved.
+  'saved-look/[savedLookId]': { pathname: '/looks', params: { segment: 'saved' } },
   locations: '/settings',
   'notification-settings': '/settings',
   'palette-advisor': '/settings',

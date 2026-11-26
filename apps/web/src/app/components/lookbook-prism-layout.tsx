@@ -1,5 +1,5 @@
 // Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in apps/web/src/app/components/lookbook-prism-layout.tsx
-// Story 5.5 Task 7 step 3 owner: own the Plan week control in `apps/web/src/app/components/lookbook-prism-layout.tsx` (Story CC-7.11 D9: it links to `/looks/plan`)
+// Story 5.5 Task 7 step 3 owner: own the Plan week control in `apps/web/src/app/components/lookbook-prism-layout.tsx` (Story CC-7.12 D11: it opens Looks on Plan)
 'use client'
 
 import { HomeRitual } from './home-ritual'
@@ -96,8 +96,8 @@ export function LookbookPrismLayout() {
   const alertRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
-  // Story CC-7.11 D9: Plan is the `/looks/plan` route, so Home no longer holds the planner
-  // drawer; its "Plan week" controls link there and `/?planner=1` redirects (next.config.ts).
+  // Story CC-7.12 D11: Plan is a Looks segment (CC-7.11 moved it off Home), so Home no longer
+  // holds the planner drawer; its "Plan week" controls link there and `/?planner=1` redirects (next.config.ts).
   //
   // The viewport flags below start from a literal while hydrating: SSR has no `window`, and
   // React reuses the same initializer for the client's first hydration render, so a measured
@@ -289,7 +289,7 @@ export function LookbookPrismLayout() {
           actions". Story CC-7.11 D9: it links to the Plan route under Looks.
         */}
         <Link
-          href="/looks/plan"
+          href="/looks?segment=plan"
           data-testid="planner-open-control"
           className="flex min-h-11 items-center rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink"
         >
@@ -344,7 +344,7 @@ export function LookbookPrismLayout() {
               {i18n.t('landing.lookbook.alert.adjustOutfit')}
             </button>
             <Link
-              href="/looks/plan"
+              href="/looks?segment=plan"
               className="rounded-lg border border-line-strong bg-transparent px-4 py-2 text-xs font-semibold text-ink hover:bg-ink/5"
             >
               {i18n.t('commerce.premium.planner.openControl')}

@@ -716,10 +716,6 @@
         },
         "openControl": "Planifier la semaine"
       },
-      "plannerLocked": {
-        "title": "Le planificateur sur 7 jours est une fonctionnalité Premium",
-        "cta": "Obtenir Premium"
-      },
       "signedOutHint": "Connectez-vous pour vous abonner ou gérer Premium"
     }
   },
@@ -1263,7 +1259,39 @@
   },
   "looks": {
     "empty": "Enregistre un look pour le voir ici",
-    "capsules": "Capsules",
-    "plan": "Plan"
+    "segments": {
+      "label": "Sections des looks",
+      "saved": "Enregistrés",
+      "ideas": "Idées",
+      "plan": "Plan"
+    },
+    "filters": {
+      "label": "Filtrer les looks enregistrés",
+      "all": "Tous",
+      "today": "Aujourd'hui",
+      "capsules": "Capsules"
+    },
+    "filterEmpty": {
+      "today": "Aucun look d'Aujourd'hui pour le moment",
+      "capsules": "Aucune capsule pour le moment"
+    },
+    "manageCapsules": "Gérer les capsules",
+    "state": {
+      "missing_one": "1 pièce manquante",
+      "missing_other": "{{count}} pièces manquantes",
+      "needsReview": "À vérifier",
+      "savedOn": "Enregistré le {{date}}"
+    },
+    "detail": {
+      "gone": "Ce look n'est plus enregistré",
+      "signIn": "Connecte-toi pour voir tes looks enregistrés",
+      "signInAction": "Se connecter"
+    },
+    "freePlan": {
+      "week": "Semaine exemple",
+      "line": "Premium planifie toute ta semaine selon ta météo.",
+      "upgrade": "Passer à Premium"
+    },
+    "loadMore": "Afficher plus"
   }
 }

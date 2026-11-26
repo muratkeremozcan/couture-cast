@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -33,6 +34,7 @@ import {
   type SampleOutfitResult,
   type StatusBarNoticeInput,
 } from '@couture/utils'
+import { savedLookHref } from './looks/looks-address'
 import { getI18n } from '../../i18n'
 import { formatPlannerTemperature } from '../../lib/planner'
 import { captureLocationCredentials, listLocationsFromWeb } from '../../lib/locations'
@@ -191,6 +193,7 @@ function SampleOutfitInner({
   actions: ReactNode
 }) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
+  const router = useRouter()
   const statusBar = useStatusBar()
   const [result, setResult] = useState(() =>
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
@@ -527,9 +530,9 @@ function SampleOutfitInner({
           return true
         }}
         onViewSaved={() => {
-          document
-            .querySelector<HTMLElement>('[data-testid="sample-saved-looks"]')
-            ?.scrollIntoView?.({ block: 'nearest' })
+          // Story CC-7.12 D7: View opens the saved look in Looks.
+          const created = lastCreatedRef.current
+          if (created) router.push(savedLookHref(created.id))
         }}
         onOpen={(bookmark) => {
           const selected = bookmark as SampleBookmark & {

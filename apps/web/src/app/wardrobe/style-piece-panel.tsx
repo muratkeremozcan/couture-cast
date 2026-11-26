@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { withRequestDeadline } from '@couture/api-client'
 import type {
@@ -39,6 +40,7 @@ import {
   type StylePieceSelection,
   type StylePieceRecipe,
 } from '@couture/utils'
+import { savedLookHref } from '../components/looks/looks-address'
 import { getI18n } from '../../i18n'
 import {
   createSavedLookFromWeb,
@@ -338,6 +340,7 @@ function StylePieceIdeas({
   onSavedLooksChanged?: () => void
 }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
+  const router = useRouter()
   const statusBar = useStatusBar()
   const { category, comfortRange } = piece
   const photo = anchor?.photo
@@ -684,8 +687,9 @@ function StylePieceIdeas({
               return true
             }}
             onViewSaved={() => {
-              savedSectionRef.current?.scrollIntoView?.({ block: 'nearest' })
-              savedSectionRef.current?.focus()
+              // Story CC-7.12 D7: View opens the saved look in Looks.
+              const created = lastCreatedRef.current[`${recipeKey}:${compositionKey}`]
+              if (created) router.push(savedLookHref(created.id))
             }}
             onSwap={(category, id) => {
               draftRevision.current += 1

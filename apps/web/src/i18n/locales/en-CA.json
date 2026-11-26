@@ -49,10 +49,6 @@
       "errorNoWebSubscription": "There is no web subscription on this account to manage.",
       "errorSubscribeDisabled": "New Premium subscriptions are paused right now. Please try again shortly.",
       "signedOutHint": "Sign in to subscribe or manage Premium",
-      "plannerLocked": {
-        "title": "The 7-Day Planner is a Premium feature",
-        "cta": "Get Premium"
-      },
       "planner": {
         "sectionTitle": "7-Day Outfit Planner",
         "openControl": "Plan week",
@@ -1687,7 +1683,39 @@
   },
   "looks": {
     "empty": "Save a look to see it here",
-    "capsules": "Capsules",
-    "plan": "Plan"
+    "segments": {
+      "label": "Looks sections",
+      "saved": "Saved",
+      "ideas": "Ideas",
+      "plan": "Plan"
+    },
+    "filters": {
+      "label": "Filter saved looks",
+      "all": "All",
+      "today": "Today",
+      "capsules": "Capsules"
+    },
+    "filterEmpty": {
+      "today": "No looks from Today yet",
+      "capsules": "No capsules yet"
+    },
+    "manageCapsules": "Manage capsules",
+    "state": {
+      "missing_one": "1 piece missing",
+      "missing_other": "{{count}} pieces missing",
+      "needsReview": "Needs review",
+      "savedOn": "Saved {{date}}"
+    },
+    "detail": {
+      "gone": "This look is no longer saved",
+      "signIn": "Sign in to see your saved looks",
+      "signInAction": "Sign in"
+    },
+    "freePlan": {
+      "week": "Sample week",
+      "line": "Premium plans your whole week around your forecast.",
+      "upgrade": "Upgrade"
+    },
+    "loadMore": "Show more"
   }
 }

@@ -19,11 +19,14 @@ let state: {
   userId: string
   savedLookId: string
   garmentId: string
+  /** Story CC-7.12 D3: the list order the controller must hand the service, when set. */
+  sort: 'created_desc' | null
 } = {
   scenario: 'ready',
   userId: 'guardian-1',
   savedLookId: 'saved-look-pact-1',
   garmentId: 'garment-pact-1',
+  sort: null,
 }
 
 export function resetProviderSavedLookState() {
@@ -32,6 +35,7 @@ export function resetProviderSavedLookState() {
     userId: 'guardian-1',
     savedLookId: 'saved-look-pact-1',
     garmentId: 'garment-pact-1',
+    sort: null,
   }
 }
 
@@ -112,13 +116,22 @@ export function createSavedLookDoubles() {
         data: buildContract(),
         isReplay: state.scenario === 'replay',
       }),
-    listSavedLooks: () =>
-      Promise.resolve({
+    listSavedLooks: (_actor: unknown, query?: { sort?: string }) => {
+      // Story CC-7.12 D3: the created-order state proves `sort` survives the strict query pipe.
+      if (state.sort && query?.sort !== state.sort) {
+        return Promise.reject(
+          new Error(
+            `listSavedLooks got sort ${String(query?.sort)}, expected ${state.sort}`
+          )
+        )
+      }
+      return Promise.resolve({
         data: state.scenario === 'missing' ? [] : [buildContract()],
         total: state.scenario === 'missing' ? 0 : 1,
         limit: 50,
         offset: 0,
-      }),
+      })
+    },
     getSavedLook: (_actor: unknown, savedLookId: string) => {
       if (state.scenario === 'missing' || savedLookId !== state.savedLookId) {
         return Promise.reject(new NotFoundException('SAVED_LOOK_NOT_FOUND'))

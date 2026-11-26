@@ -661,7 +661,11 @@ export class WardrobeSavedLookService {
     const [rows, total] = await Promise.all([
       this.prisma.savedLook.findMany({
         where,
-        orderBy: [{ updated_at: 'desc' }, { id: 'asc' }],
+        // Story CC-7.12 D3: the Looks tab asks for newest saved first.
+        orderBy:
+          query.sort === 'created_desc'
+            ? [{ created_at: 'desc' }, { id: 'asc' }]
+            : [{ updated_at: 'desc' }, { id: 'asc' }],
         take: query.limit,
         skip: query.offset,
       }),

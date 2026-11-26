@@ -1883,8 +1883,8 @@ function LocationsLinkRow() {
  *
  * Follows `PaletteAdvisorLinkRow` exactly, for the same reason: a link row rather than a
  * fourth/fifth inline section, not entitlement-gated at the entry point because the
- * destination renders its own locked panel for a non-entitled or signed-out reader
- * (Decision 7).
+ * destination renders its own free preview for a non-entitled or signed-out reader
+ * (Decision 7). Story CC-7.12 D11: it opens the Looks tab on Plan in one tap.
  */
 function PlannerLinkRow() {
   const { t } = useTranslation()
@@ -1896,7 +1896,7 @@ function PlannerLinkRow() {
       accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
       style={[styles.actionButton, tone.actionButton]}
       testID="planner-link"
-      onPress={() => router.push('/planner')}
+      onPress={() => router.navigate({ pathname: '/looks', params: { segment: 'plan' } })}
     >
       <Text style={styles.actionText}>{t('commerce.premium.planner.sectionTitle')}</Text>
     </Pressable>

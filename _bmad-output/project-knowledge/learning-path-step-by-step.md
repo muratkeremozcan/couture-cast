@@ -32,7 +32,8 @@ Added Steps 40 to 67:
 - Step 65: Story 7.7, signed-in shell without flashes, `812cadce` (PR #292), merged on 2026-11-25.
 - Step 66: Story 7.9, one app shell and visual system, `6d8b1db3` (PR #293), merged on 2026-11-26.
 - Step 67: Story 7.10, screen budget guard, `4e5702c3` (PR #294), merged on 2026-11-26.
-- Step 68: Story 7.11, five-tab navigation and back pattern, in review on `feat/epic7-story-7-11-five-tab-navigation-back-pattern`.
+- Step 68: Story 7.11, five-tab navigation and back pattern, `a8863b05` (PR #295), merged on 2026-11-26.
+- Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, in review on `feat/epic7-story-7-12-looks-tab-saved-looks-ideas-plans`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -40,6 +41,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR is in review, and moved Step 68 to merged (`a8863b05`, PR #295).
 Added Step 68 for Story CC-7.11 (five-tab navigation and back pattern) while its PR is in review, and moved Step 67 to merged (`4e5702c3`, PR #294).
 Added Step 67 for Story CC-7.10 (screen budget guard) while its PR is in review, and moved Step 66 to merged (`6d8b1db3`, PR #293).
 Added Step 66 for Story CC-7.9 (one app shell and visual system) while its PR is in review, and moved Step 65 to merged (`812cadce`, PR #292).
@@ -162,11 +164,11 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 68, Story CC-7.11, five-tab navigation and back pattern, status `in-progress` on `feat/epic7-story-7-11-five-tab-navigation-back-pattern`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-11-five-tab-navigation-back-pattern.md`.
-  Step 68 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+- Latest step: Step 69, Story CC-7.12, Looks tab for saved looks, ideas and plans, status `in-progress` on `feat/epic7-story-7-12-looks-tab-saved-looks-ideas-plans`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-12-looks-tab-saved-looks-ideas-plans.md`.
+  Step 69 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 67, Stories CC-7.1 to CC-7.7, CC-7.9 and CC-7.10, merged on `main` (the last, Step 67, as `4e5702c3`, PR #294).
+- Previous completed steps: Steps 59 to 68, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.11, merged on `main` (the last, Step 68, as `a8863b05`, PR #295).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -22150,3 +22152,104 @@ Evidence boundaries:
   ESLint `--max-warnings=0` on touched files, the design token guard and the screen budget
   decisions check.
 - Unit, Playwright, native and Maestro suites run in CI on the PR.
+
+## Step 69: Looks tab for saved looks, ideas and plans
+
+User/business impact:
+
+- Looks has three segments, Saved, Ideas and Plan. It opens on Saved when the member has a saved
+  look or capsule and on Ideas otherwise, once both first reads answer, so it never flips.
+- Saved is one picture-tile grid of saved looks and capsules, newest saved first. Each tile shows
+  a collage of its first four pieces, its name and one state line: "1 piece missing",
+  "Needs review" or "Saved Nov 26". All, Today (looks saved from the Today tab) and Capsules
+  filter it.
+- Every saved look has its own address (`/looks/saved/<id>`, native `saved-look/<id>`). View on
+  every save confirmation, every Saved tile and a deep link open it; back returns to the Saved
+  filter it came from. It keeps Reopen in Style this piece and Remove with Undo.
+- Ideas shows the sample looks as pictures until CC-7.22 ships the lookbook.
+- Plan holds the planner. Free and signed-out members see one line on what Premium adds, one
+  Upgrade button and a sample week; no screen shows a Planner lock any more. Today's Plan
+  controls and Profile's planner link open Plan in one tap.
+- The Closet saved looks row is gone. `/wardrobe/capsules`, `/looks/plan` and `/?planner=1`
+  redirect into Looks, and the capsule manager lives at `/looks/capsules`.
+
+Technical architecture:
+
+- Both list endpoints take an opt-in `sort=created_desc` (`created_at desc, id asc`), backed by
+  `SavedLook_user_id_created_at_id_idx` and `OutfitCapsule_user_id_created_at_id_idx`.
+- `packages/utils/src/looks-feed.ts` `mergeLooksFeed`: interleaves the two paged lists, shows only
+  items that no unloaded item can precede, and names the list Load more reads next. It also holds
+  the tile state rules, the Ideas source and the sample week, shared by web and native.
+- The segment and filter live in the address (`/looks?segment=saved&filter=capsules`); a change
+  replaces the entry. Web reads them through a Suspense-wrapped `useSearchParams` sync.
+- Each filter is its own feed: All reads both lists, Today reads saved looks with
+  `source=home_sample`, Capsules reads capsules; merged pages are never filtered on the client.
+- The planner's locked state renders `FreePlanPreview` in place of the lock panel.
+
+Hard-won lessons from the implementation of this story:
+
+- Postgres does not treat `deleted_at IS NULL` as an equality for index order, so an index with
+  `deleted_at` before `created_at` still sorts; the saved looks index leaves it out.
+- Paging two lists into one order needs a boundary: a loaded item shows only when it sorts at or
+  before the last loaded item of every list that still has pages.
+- Deleting the Closet row also deleted CC-7.2's Reopen in Style this piece; the rule moved to a
+  shared module and the saved look screen hosts the editor.
+
+Story/Task mapping:
+
+- Story CC-7.12: Looks tab for saved looks, ideas and plans (Epic 7 Lane B clarity).
+- Follows CC-7.11 (the Looks tab and back pattern) and CC-7.2 (saved looks on the account).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.12: Looks tab for saved looks, ideas and plans**`)
+- `_bmad-output/implementation-artifacts/spec-7-12-looks-tab-saved-looks-ideas-plans.md`
+- `_bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md`
+
+Cross-links:
+
+- Step 68 (`#step-68-five-tab-navigation-and-back-pattern`): the Looks tab, top bar back and
+  history this story builds on.
+- Step 60 (`#step-60-saved-looks-follow-the-account`): the saved look contract, its states and
+  Reopen.
+- Step 67 (`#step-67-screen-budget-guard`): the budget the new tiles join as tile selectors.
+
+Sequence to follow:
+
+1. Add `sort=created_desc` to both list contracts and services, the indexes, and regenerate the
+   SDK.
+2. Add `looks-feed.ts` to `packages/utils` and export it.
+3. Build the segment control, filters, tiles, Ideas and the Plan segment on web and native.
+4. Add the saved look screen with Reopen and Remove, and point every View at it.
+5. Move the capsule manager, add the redirects and the one-tap Plan links.
+6. Remove the Closet saved looks row and its read.
+7. Add the catalog keys in the 10 web and 10 mobile locales and the tile selectors.
+
+Task owner map:
+
+- Step 69 step 1 owner: `packages/api-client/src/contracts/http/saved-looks.ts`,
+  `apps/api/src/modules/wardrobe/wardrobe-saved-look.service.ts` and
+  `packages/db/prisma/migrations/20261126120000_looks_feed_created_order/migration.sql`.
+- Step 69 step 2 owner: `packages/utils/src/looks-feed.ts`.
+- Step 69 step 3 owner: `apps/web/src/app/components/looks-screen.tsx`,
+  `apps/web/src/app/components/looks/looks-tile.tsx` and
+  `apps/mobile/src/features/looks/looks-screen.tsx`.
+- Step 69 step 4 owner: `apps/web/src/app/components/looks/saved-look-detail-screen.tsx` and
+  `apps/web/src/app/components/looks/saved-look-reopen.ts`.
+- Step 69 step 5 owner: `apps/web/next.config.ts` and `apps/web/src/app/looks/capsules/page.tsx`.
+- Step 69 step 6 owner: `apps/web/src/app/wardrobe/page.tsx` and
+  `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.tsx`.
+
+Tests that cover this step:
+
+- [`packages/utils/src/looks-feed.test.ts`](../../packages/utils/src/looks-feed.test.ts) and
+  [`apps/api/integration/looks-feed-created-order.integration.spec.ts`](../../apps/api/integration/looks-feed-created-order.integration.spec.ts).
+- [`playwright/tests/looks-tab.spec.ts`](../../playwright/tests/looks-tab.spec.ts).
+- The full list, native and Maestro included, is in
+  `_bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md`.
+
+Evidence boundaries:
+
+- Locally: `tsc --noEmit` in packages/utils, apps/api, apps/web and apps/mobile (product code
+  clean) and ESLint on touched files.
+- Unit, integration, pact, Playwright, native and Maestro suites run in CI on the PR.

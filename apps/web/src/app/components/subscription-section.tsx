@@ -690,6 +690,8 @@ function MemberSubscriptionSection({
 
   return (
     <section
+      // Story CC-7.12 D10: Looks > Plan's Upgrade lands here.
+      id="premium"
       aria-labelledby="premium-subscription-title"
       data-testid="premium-subscription-section"
       aria-busy={sectionState === 'checking' || sectionState === 'loading'}

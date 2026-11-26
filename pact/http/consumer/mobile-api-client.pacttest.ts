@@ -90,6 +90,7 @@ import {
   verifyCreateCapsuleInteraction,
   verifyCapsuleIdempotentReplayInteraction,
   verifyListCapsulesInteraction,
+  verifyListCapsulesCreatedOrderInteraction,
   verifyCapsuleDetailInteraction,
   verifyUpdateCapsuleInteraction,
   verifyFavoriteCapsuleInteraction,
@@ -97,6 +98,7 @@ import {
   verifyCreateSavedLookInteraction,
   verifySavedLookIdempotentReplayInteraction,
   verifyListSavedLooksInteraction,
+  verifyListSavedLooksCreatedOrderInteraction,
   verifyDeleteSavedLookInteraction,
   verifyCapsuleErrorInteraction,
   capsuleErrorInteractions,
@@ -355,6 +357,10 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('lists and filters outfit capsules', async () => {
     await verifyListCapsulesInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('lists outfit capsules newest saved first (CC-7.12)', async () => {
+    await verifyListCapsulesCreatedOrderInteraction(pact, createMobileClientForMockServer)
   })
 
   it('reads one outfit capsule', async () => {
@@ -1034,6 +1040,12 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   })
   it('lists account-backed saved looks', async () => {
     await verifyListSavedLooksInteraction(pact, createMobileClientForMockServer)
+  })
+  it('lists account-backed saved looks newest saved first (CC-7.12)', async () => {
+    await verifyListSavedLooksCreatedOrderInteraction(
+      pact,
+      createMobileClientForMockServer
+    )
   })
   it('removes a saved look with matching If-Match revision', async () => {
     await verifyDeleteSavedLookInteraction(pact, createMobileClientForMockServer)

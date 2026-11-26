@@ -98,13 +98,21 @@ const nextConfig: NextConfig = {
       },
     ])
   },
-  // Story CC-7.11 D9: Plan is a route under Looks. The old Home drawer deep link opens it.
+  // Story CC-7.12 D6, D11: Plan is a Looks segment and capsules are a Saved filter. The old
+  // Home drawer deep link, the CC-7.11 Plan route and the capsules address open them; Next keeps
+  // the source query, and Looks drops the legacy `planner` key.
   redirects() {
     return Promise.resolve([
       {
         source: '/',
         has: [{ type: 'query' as const, key: 'planner', value: '1' }],
-        destination: '/looks/plan',
+        destination: '/looks?segment=plan',
+        permanent: false,
+      },
+      { source: '/looks/plan', destination: '/looks?segment=plan', permanent: false },
+      {
+        source: '/wardrobe/capsules',
+        destination: '/looks?segment=saved&filter=capsules',
         permanent: false,
       },
     ])

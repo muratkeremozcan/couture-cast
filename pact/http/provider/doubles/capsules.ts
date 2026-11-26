@@ -82,8 +82,12 @@ export function createCapsulesDoubles() {
 
       return Promise.resolve({ data: capsuleRepresentation(1), isReplay: false })
     },
-    listCapsules: () => {
-      requireCapsuleScenario()
+    listCapsules: (_actor: unknown, _ownerUserId: string, query?: { sort?: string }) => {
+      const { sort } = requireCapsuleScenario()
+      // Story CC-7.12 D3: the created-order state proves `sort` survives the strict query pipe.
+      if (sort && query?.sort !== sort) {
+        throw new Error(`listCapsules got sort ${String(query?.sort)}, expected ${sort}`)
+      }
       return Promise.resolve({
         data: [capsuleRepresentation(1)],
         total: 1,

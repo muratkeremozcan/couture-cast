@@ -253,6 +253,58 @@ export async function verifyListSavedLooksInteraction(
     })
 }
 
+/**
+ * Story CC-7.12 D3 (7.12-PACT-001): the Looks tab pages saved looks newest saved first with
+ * `sort=created_desc`. The provider state makes the double reject any other order, so the
+ * verification proves the strict query pipe accepts `sort` and hands it to the service.
+ */
+export async function verifyListSavedLooksCreatedOrderInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Member has account saved looks in created order',
+        params: { userId: SAVED_LOOK_OWNER_ID, savedLookId: SAVED_LOOK_ID },
+      })
+    )
+    .uponReceiving('a request to list account saved looks newest saved first')
+    .withRequest(
+      'GET',
+      '/api/v1/wardrobe/saved-looks',
+      setJsonContent({
+        headers: pactEventHeaders,
+        query: { sort: 'created_desc', limit: '50', offset: '0' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: {
+          'Cache-Control': 'private, no-store',
+        },
+        body: {
+          data: [savedLookContractBody()],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeSavedLooksGet({
+        sort: 'created_desc',
+        limit: 50,
+        offset: 0,
+      })
+      const parsed = savedLookListResponseSchema.parse(response)
+      expect(parsed.data[0]?.id).toBe(SAVED_LOOK_ID)
+      expect(parsed.data[0]?.createdAt).toEqual(expect.any(String))
+    })
+}
+
 export async function verifyDeleteSavedLookInteraction(
   pact: PactV4,
   createClient: CreateClient

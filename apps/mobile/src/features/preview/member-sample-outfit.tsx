@@ -50,6 +50,7 @@ import {
   restoreSavedLookFromMobile,
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
+import { savedLookRoute } from '@/src/features/looks/looks-routes'
 import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
 
@@ -154,6 +155,7 @@ export function HomeAddGarment() {
   )
 }
 
+/** Story CC-7.12 D11: Plan your week opens the Looks tab on Plan in one tap. */
 export function HomePlannerLink() {
   const { t } = useTranslation()
   const palette = useHeroPalette()
@@ -163,7 +165,9 @@ export function HomePlannerLink() {
         label={t('commerce.premium.planner.openControl')}
         testID="home-plan-week"
         palette={palette}
-        onPress={() => router.push('/planner')}
+        onPress={() =>
+          router.navigate({ pathname: '/looks', params: { segment: 'plan' } })
+        }
       />
     </View>
   )
@@ -196,6 +200,8 @@ export function MemberSampleOutfit({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  // Story CC-7.12 D7: the look the last save confirmed, which the confirmation's View opens.
+  const viewSavedLookIdRef = useRef<string | null>(null)
   const saveRunSeqRef = useRef(0)
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
@@ -241,6 +247,7 @@ export function MemberSampleOutfit({
     deletedIdsRef.current.clear()
     saveRunSeqRef.current += 1
     lastCreatedRef.current = null
+    viewSavedLookIdRef.current = null
     if (!owner) {
       savedLooksRef.current = []
       setSavedLooks([])
@@ -474,6 +481,7 @@ export function MemberSampleOutfit({
             if (!isLiveSession(owner, actionEpoch)) return false
             if (verified) {
               if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              viewSavedLookIdRef.current = existingMatch.id
               setBookmarkStorage('ready')
               return { saved: true, undoable: false }
             }
@@ -503,6 +511,7 @@ export function MemberSampleOutfit({
           if (saveRunSeqRef.current === saveSeq) {
             lastCreatedRef.current = created
           }
+          viewSavedLookIdRef.current = created.id
           const next = [
             created,
             ...savedLooksRef.current.filter((item) => item.id !== created.id),
@@ -534,11 +543,17 @@ export function MemberSampleOutfit({
           deletedIdsRef.current.add(created.id)
           mutationVersionRef.current += 1
           lastCreatedRef.current = null
+          if (viewSavedLookIdRef.current === created.id) viewSavedLookIdRef.current = null
           const next = savedLooksRef.current.filter((item) => item.id !== created.id)
           savedLooksRef.current = next
           setSavedLooks(next)
           notifyMobileSavedLooksChanged(owner)
           return true
+        }}
+        onViewSaved={() => {
+          const savedLookId = viewSavedLookIdRef.current
+          if (savedLookId && isLiveSession(owner, mobileIdentityEpoch()))
+            router.push(savedLookRoute(savedLookId))
         }}
         onOpen={(bookmark) => {
           const selected = bookmark as SampleBookmark & {

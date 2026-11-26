@@ -716,10 +716,6 @@
         },
         "openControl": "Haftayı planla"
       },
-      "plannerLocked": {
-        "title": "7 günlük planlayıcı bir Premium özelliğidir",
-        "cta": "Premium al"
-      },
       "signedOutHint": "Premium'a abone olmak veya yönetmek için giriş yapın"
     }
   },
@@ -1263,7 +1259,39 @@
   },
   "looks": {
     "empty": "Burada görmek için bir kombin kaydet",
-    "capsules": "Kapsüller",
-    "plan": "Plan"
+    "segments": {
+      "label": "Kombin bölümleri",
+      "saved": "Kaydedilenler",
+      "ideas": "Fikirler",
+      "plan": "Plan"
+    },
+    "filters": {
+      "label": "Kaydedilen kombinleri filtrele",
+      "all": "Tümü",
+      "today": "Bugün",
+      "capsules": "Kapsüller"
+    },
+    "filterEmpty": {
+      "today": "Henüz Bugün'den kombin yok",
+      "capsules": "Henüz kapsül yok"
+    },
+    "manageCapsules": "Kapsülleri yönet",
+    "state": {
+      "missing_one": "1 parça eksik",
+      "missing_other": "{{count}} parça eksik",
+      "needsReview": "Gözden geçir",
+      "savedOn": "{{date}} tarihinde kaydedildi"
+    },
+    "detail": {
+      "gone": "Bu kombin artık kayıtlı değil",
+      "signIn": "Kaydettiğin kombinleri görmek için giriş yap",
+      "signInAction": "Giriş yap"
+    },
+    "freePlan": {
+      "week": "Örnek hafta",
+      "line": "Premium tüm haftanı hava tahminine göre planlar.",
+      "upgrade": "Premium'a geç"
+    },
+    "loadMore": "Daha fazla göster"
   }
 }

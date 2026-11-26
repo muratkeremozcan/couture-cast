@@ -716,10 +716,6 @@
         },
         "openControl": "Woche planen"
       },
-      "plannerLocked": {
-        "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
-        "cta": "Premium holen"
-      },
       "signedOutHint": "Melden Sie sich an, um Premium zu abonnieren oder zu verwalten"
     }
   },
@@ -1263,7 +1259,39 @@
   },
   "looks": {
     "empty": "Speichere einen Look, um ihn hier zu sehen",
-    "capsules": "Kapseln",
-    "plan": "Plan"
+    "segments": {
+      "label": "Looks-Bereiche",
+      "saved": "Gespeichert",
+      "ideas": "Ideen",
+      "plan": "Plan"
+    },
+    "filters": {
+      "label": "Gespeicherte Looks filtern",
+      "all": "Alle",
+      "today": "Heute",
+      "capsules": "Kapseln"
+    },
+    "filterEmpty": {
+      "today": "Noch keine Looks aus Heute",
+      "capsules": "Noch keine Kapseln"
+    },
+    "manageCapsules": "Kapseln verwalten",
+    "state": {
+      "missing_one": "1 Teil fehlt",
+      "missing_other": "{{count}} Teile fehlen",
+      "needsReview": "Prüfen",
+      "savedOn": "Gespeichert am {{date}}"
+    },
+    "detail": {
+      "gone": "Dieser Look ist nicht mehr gespeichert",
+      "signIn": "Melde dich an, um deine gespeicherten Looks zu sehen",
+      "signInAction": "Anmelden"
+    },
+    "freePlan": {
+      "week": "Beispielwoche",
+      "line": "Premium plant deine ganze Woche nach deiner Wettervorhersage.",
+      "upgrade": "Upgrade"
+    },
+    "loadMore": "Mehr anzeigen"
   }
 }

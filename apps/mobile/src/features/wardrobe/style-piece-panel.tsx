@@ -1,3 +1,5 @@
+// Story CC-7.12 D7: a save confirmation's View closes the panel and opens the saved look's screen.
+import { router } from 'expo-router'
 import {
   useEffect,
   useLayoutEffect,
@@ -86,6 +88,7 @@ import {
   notifyMobileSavedLooksChanged,
   restoreSavedLookFromMobile,
 } from '@/src/lib/saved-looks'
+import { savedLookRoute } from '@/src/features/looks/looks-routes'
 import {
   PreviewButton,
   SampleGarmentArt,
@@ -267,6 +270,12 @@ export function StylePiecePanel({
     onClose()
   }
 
+  // D7: the panel closes first, so the saved look's screen is not pushed under its layer.
+  const viewSavedLook = (savedLookId: string) => {
+    close()
+    requestAnimationFrame(() => router.push(savedLookRoute(savedLookId)))
+  }
+
   return (
     <EdgeToEdgeModal
       visible={visible}
@@ -329,6 +338,7 @@ export function StylePiecePanel({
             samples={samples}
             palette={palette}
             onSavedLooksChanged={onSavedLooksChanged}
+            onViewSavedLook={viewSavedLook}
           />
         </SaveFeedbackProvider>
       </View>
@@ -388,6 +398,7 @@ function StylePieceIdeas({
   samples,
   palette,
   onSavedLooksChanged,
+  onViewSavedLook,
 }: {
   anchor: StylePiecePhotoAnchor | null | undefined
   piece: StylePieceAnchor
@@ -403,6 +414,7 @@ function StylePieceIdeas({
   samples: SampleLabels
   palette: PreviewPalette
   onSavedLooksChanged?: () => void
+  onViewSavedLook: (savedLookId: string) => void
 }) {
   const { t } = useTranslation()
   const statusBar = useStatusBar()
@@ -438,6 +450,8 @@ function StylePieceIdeas({
   const swapRevisionRef = useRef(0)
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
+  // D7: per look and composition, the saved look the last save confirmed (View opens it).
+  const viewIdsRef = useRef<Record<string, string>>({})
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const statusBarRef = useRef(statusBar)
@@ -685,6 +699,7 @@ function StylePieceIdeas({
               const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
                 delete lastCreatedRef.current[attemptKey]
+                viewIdsRef.current[attemptKey] = existingMatch.id
                 setSavedState('ready')
                 if (swapRevisionRef.current === startSwapRevision) {
                   swapUndoStackRef.current = []
@@ -716,6 +731,7 @@ function StylePieceIdeas({
               deletedIdsRef.current.delete(created.id)
               mutationVersionRef.current += 1
               lastCreatedRef.current[attemptKey] = created
+              viewIdsRef.current[attemptKey] = created.id
               setSaved((current) => [
                 created,
                 ...current.filter((item) => item.id !== created.id),
@@ -750,13 +766,16 @@ function StylePieceIdeas({
               deletedIdsRef.current.add(created.id)
               mutationVersionRef.current += 1
               delete lastCreatedRef.current[attemptKey]
+              if (viewIdsRef.current[attemptKey] === created.id)
+                delete viewIdsRef.current[attemptKey]
               setSaved((current) => current.filter((item) => item.id !== created.id))
               onSavedLooksChanged?.()
               notifyMobileSavedLooksChanged(owner)
               return true
             }}
             onViewSaved={() => {
-              scroll.current?.scrollToEnd?.({ animated: false })
+              const savedLookId = viewIdsRef.current[`${recipeKey}:${compositionKey}`]
+              if (savedLookId && isCurrentSession()) onViewSavedLook(savedLookId)
             }}
             onSwap={(category, id) => {
               reopenAction.current++

@@ -1,6 +1,11 @@
 // Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
 // Story CC-7.9 D6: the root stack's AppTopBar carries the title (set in app/_layout.tsx) and the
 // back control; D9: every member-facing string comes from the catalogs.
+// Story CC-7.12 D6, P7: a Looks capsule tile opens this screen with `capsule=<id>`; the id is
+// matched by equality against the loaded capsules, and that card scrolls into view and takes
+// focus. An unknown id does nothing. Back goes to Looks (PARENT_TAB).
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import {
   useCallback,
   useEffect,
@@ -9,9 +14,12 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react'
+import { useLocalSearchParams } from 'expo-router'
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -78,6 +86,7 @@ export default function WardrobeCapsulesScreen() {
 
 function MemberCapsulesScreen({ epoch }: { epoch: number }) {
   const { t } = useTranslation()
+  const { capsule: capsuleParam } = useLocalSearchParams<{ capsule?: string }>()
   const colors = useSchemeColors()
   const themed = useThemedStyles()
   const insets = useSafeAreaInsets()
@@ -97,6 +106,32 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
   const [editingCapsule, setEditingCapsule] = useState<OutfitCapsuleContract | null>(null)
   const [createNodeHandle, setCreateNodeHandle] = useState<number | null>(null)
 
+  // D6: the capsule a Looks tile asked for, focused once its card has laid out.
+  const focusTargetRef = useRef(typeof capsuleParam === 'string' ? capsuleParam : null)
+  const listRef = useRef<ScrollView | null>(null)
+  const cardRefs = useRef(new Map<string, View>())
+  const titleRefs = useRef(new Map<string, Text>())
+  const cardOffsets = useRef(new Map<string, number>())
+  const focusCapsule = useCallback((capsuleId: string) => {
+    const target = focusTargetRef.current
+    // P7: equality against a loaded id only; the raw value never builds a selector.
+    if (target === null || target !== capsuleId) return
+    const y = cardOffsets.current.get(capsuleId)
+    const card = cardRefs.current.get(capsuleId)
+    const title = titleRefs.current.get(capsuleId)
+    if (y === undefined || !card) return
+    focusTargetRef.current = null
+    listRef.current?.scrollTo({ y, animated: false })
+    requestAnimationFrame(() => {
+      if (Platform.OS === 'web') {
+        ;(card as unknown as { focus?: () => void }).focus?.()
+        return
+      }
+      // Native screen readers land on the card's name, its first readable element.
+      const node = safeFindNodeHandle(title ?? card)
+      if (node != null) AccessibilityInfo.setAccessibilityFocus(node)
+    })
+  }, [])
   const inFlightRef = useRef<AbortController | null>(null)
   const mountRef = useRef<AbortController | null>(null)
   const current = useCallback(
@@ -460,16 +495,35 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
         </View>
       ) : (
         <ScrollView
+          ref={listRef}
           contentContainerStyle={[styles.list, { paddingBottom: 16 + insets.bottom }]}
         >
           {capsules.map((capsule) => (
             <View
               key={capsule.id}
+              ref={(node) => {
+                if (node) cardRefs.current.set(capsule.id, node)
+                else cardRefs.current.delete(capsule.id)
+              }}
+              onLayout={(event) => {
+                cardOffsets.current.set(capsule.id, event.nativeEvent.layout.y)
+                focusCapsule(capsule.id)
+              }}
+              // D6: only the asked-for card takes focus, so it alone joins the tab order.
+              focusable={focusTargetRef.current === capsule.id}
               style={[styles.card, themed.card]}
               testID={`capsule-card-${capsule.id}`}
             >
               <View style={styles.cardHeader}>
-                <Text style={[styles.cardTitle, themed.text]}>{capsule.name}</Text>
+                <Text
+                  ref={(node) => {
+                    if (node) titleRefs.current.set(capsule.id, node)
+                    else titleRefs.current.delete(capsule.id)
+                  }}
+                  style={[styles.cardTitle, themed.text]}
+                >
+                  {capsule.name}
+                </Text>
                 <Pressable
                   onPress={() => void handleToggleFavorite(capsule)}
                   accessibilityRole="button"

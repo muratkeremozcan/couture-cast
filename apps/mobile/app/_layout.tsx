@@ -325,6 +325,12 @@ function RootLayoutNav() {
                       name="wardrobe-capsules"
                       options={{ title: t('wardrobe.capsules.title') }}
                     />
+                    {/* Story CC-7.12 D5: a saved look's screen; it titles itself with the
+                      look's name once read, and stays untitled while gone or signed out. */}
+                    <Stack.Screen
+                      name="saved-look/[savedLookId]"
+                      options={{ title: '' }}
+                    />
                     {/* Story CC-7.11 D7, D10: Profile > Style, and the guardian and teen
                       dashboards, whose bars name them (the bodies drop their second title). */}
                     <Stack.Screen

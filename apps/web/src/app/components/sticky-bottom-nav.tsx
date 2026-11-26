@@ -39,7 +39,6 @@ export interface StickyBottomNavProps {
 
 /** D10: sub-screens whose parent tab differs from their path prefix. */
 const SUB_SCREEN_TABS: Readonly<Record<string, NavTabId>> = {
-  '/wardrobe/capsules': 'looks',
   '/palette': 'settings',
   '/notification-settings': 'settings',
   '/guardian/dashboard': 'settings',

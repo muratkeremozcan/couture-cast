@@ -8,6 +8,7 @@ import {
   type CreateSavedLookInput,
   type GarmentItemContract,
   type SavedLookContract,
+  type SavedLookListSort,
   type SavedLookSource,
 } from '@couture/api-client/contracts/http'
 import {
@@ -704,6 +705,8 @@ export async function listSavedLooksPageFromWeb(
     garments?: readonly GarmentItemContract[]
     source?: SavedLookSource
     anchorGarmentId?: string
+    /** Story CC-7.12 D3: `created_desc` for the Looks tab's newest-first feed. */
+    sort?: SavedLookListSort
     limit?: number
     offset?: number
     signal?: AbortSignal
@@ -735,6 +738,7 @@ export async function listSavedLooksPageFromWeb(
           {
             source: options.source,
             anchorGarmentId: options.anchorGarmentId,
+            sort: options.sort,
             limit: options.limit,
             offset: options.offset,
           },
