@@ -342,11 +342,23 @@ export function registerCommunityFeedCases() {
       await waitFor(() =>
         expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
       )
+      // Card focus lands a frame after it is asked for, so two frames pass before any
+      // call is read.
+      await act(async () => {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      })
       const liveHandle = handleOf(liveInvoker)
       expect(liveHandle).not.toBe(handleOf(feedInvoker))
       expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.lastCall).toEqual([
         liveHandle,
       ])
+      // The linked post arrived while the reader was in the sheet, so its card focus never
+      // runs: not behind the open sheet, and not after the close took focus back.
+      const card = within(highlight).getByTestId('community-post-card-post-a')
+      expect(
+        vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls
+      ).not.toContainEqual([handleOf(card)])
     } finally {
       release()
     }

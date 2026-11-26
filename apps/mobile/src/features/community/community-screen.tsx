@@ -842,9 +842,13 @@ export function CommunityScreen() {
     }
     if (focusedTargetRef.current === deepLinkPost.id) return
     focusedTargetRef.current = deepLinkPost.id
+    // A reader who opened comments before the linked post arrived has moved on. Focus
+    // stays in the open sheet, and closing it restores focus to its own invoker, so a
+    // card focus here would pull focus out of the sheet or take it back after the close.
+    if (commentsPostId !== null) return
     AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
     focusNode(targetRef.current)
-  }, [focusNode, deepLinkPost, commentTarget, t])
+  }, [focusNode, deepLinkPost, commentTarget, commentsPostId, t])
 
   /**
    * One in-flight feed request at a time, guarded twice: the `AbortController`

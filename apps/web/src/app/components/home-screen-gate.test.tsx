@@ -649,7 +649,7 @@ describe('7.7 Home screen gate', () => {
     )
 
     // Home is shown and the feed is still out: the row keeps its place, hidden and unfocusable.
-    const row = screen.getByTestId('community-filter-chips')
+    const row = screen.getByTestId('community-chip-row')
     const chips = within(row).getAllByRole('button', { hidden: true })
     expect(row).toHaveClass('invisible')
     expect(row).toHaveAttribute('aria-hidden', 'true')
@@ -668,7 +668,7 @@ describe('7.7 Home screen gate', () => {
     expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
       'Your climate: Temperate and dry'
     )
-    expect(screen.getByTestId('community-filter-chips')).toBe(row)
+    expect(screen.getByTestId('community-chip-row')).toBe(row)
     expect(within(row).getAllByRole('button')).toEqual(chips)
   })
 

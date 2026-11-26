@@ -541,7 +541,7 @@ export function LookbookFilterNav({
         {t('community.filters.explainer')}
       </p>
       <div
-        data-testid="community-filter-chips"
+        data-testid="community-chip-row"
         aria-hidden={chipsPending || undefined}
         className={`${isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}${chipsPending ? ' invisible' : ''}`}
       >
