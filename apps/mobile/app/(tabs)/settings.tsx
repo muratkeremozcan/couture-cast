@@ -1,4 +1,5 @@
 // Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`
+import { NavRow } from '@/src/components/nav-row'
 import {
   useCallback,
   useEffect,
@@ -1840,24 +1841,19 @@ function ProfileAccountHeader({
 
 /**
  * Story CC-7.11 D7: Profile > Style, the one row that opens Silhouette, closet setup and the
- * color palette. A link row like the ones below it; the rest of Profile's layout is CC-7.16's.
+ * color palette, as a list row with a chevron like web's; the rest of Profile's layout is CC-7.16's.
  * Learning path Step 68: Five-tab navigation and back pattern.
  * See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
  */
 function StyleLinkRow() {
   const { t } = useTranslation()
-  const tone = useSettingsTone()
 
   return (
-    <Pressable
-      accessibilityRole="link"
-      accessibilityLabel={t('settings.style.row')}
-      style={[styles.actionButton, tone.actionButton]}
+    <NavRow
       testID="profile-style-row"
+      label={t('settings.style.row')}
       onPress={() => router.push('/settings-style')}
-    >
-      <Text style={styles.actionText}>{t('settings.style.row')}</Text>
-    </Pressable>
+    />
   )
 }
 

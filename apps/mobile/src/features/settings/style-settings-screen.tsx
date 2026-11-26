@@ -4,8 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 import { router, type Href } from 'expo-router'
 import { useTranslation } from 'react-i18next'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { ShellIcon } from '@/src/components/shell-icons'
+import { ScrollView, StyleSheet, View } from 'react-native'
+import { NavRow } from '@/src/components/nav-row'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 
 const STYLE_ROWS: readonly { testID: string; labelKey: string; href: Href }[] = [
@@ -28,7 +28,7 @@ const STYLE_ROWS: readonly { testID: string; labelKey: string; href: Href }[] = 
 
 export function StyleSettingsScreen() {
   const { t } = useTranslation()
-  const { colors, shell, space, type } = useTokens()
+  const { colors, space } = useTokens()
   return (
     <ScrollView
       testID="settings-style-screen"
@@ -37,28 +37,12 @@ export function StyleSettingsScreen() {
     >
       <View style={[styles.rows, { borderTopColor: colors.line }]}>
         {STYLE_ROWS.map((row) => (
-          <Pressable
+          <NavRow
             key={row.testID}
             testID={row.testID}
-            accessibilityRole="link"
+            label={t(row.labelKey)}
             onPress={() => router.push(row.href)}
-            style={[
-              styles.row,
-              {
-                minHeight: shell.touchTarget,
-                gap: space[3],
-                paddingVertical: space[3],
-                borderBottomColor: colors.line,
-              },
-            ]}
-          >
-            <Text
-              style={[styles.label, { color: colors.ink, fontSize: type.base.fontSize }]}
-            >
-              {t(row.labelKey)}
-            </Text>
-            <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
-          </Pressable>
+          />
         ))}
       </View>
     </ScrollView>
@@ -68,10 +52,4 @@ export function StyleSettingsScreen() {
 const styles = StyleSheet.create({
   content: { paddingHorizontal: TAB_BODY_INSET },
   rows: { borderTopWidth: StyleSheet.hairlineWidth },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  label: { flex: 1 },
 })
