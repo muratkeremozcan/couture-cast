@@ -149,7 +149,15 @@ export function StylePieceEntry({
   )
 }
 
+/**
+ * How many times the panel has moved focus. Story CC-7.11 D13: the dialog's onShow focuses Close
+ * only when nothing inside the panel moved focus since it opened, so a photo check or retry that
+ * finishes before the slide-in ends keeps focus where it put it.
+ */
+let stylePieceFocusMoves = 0
+
 export function focusStylePieceControl(button: ComponentRef<typeof Pressable> | null) {
+  if (button) stylePieceFocusMoves++
   if (Platform.OS === 'web') button?.focus()
   else {
     const node = safeFindNodeHandle(button)
@@ -247,6 +255,13 @@ export function StylePiecePanel({
     return () => cancelAnimationFrame(frame)
   }, [visible])
 
+  // Story CC-7.11 D13: the focus count when the panel opened, read by onShow below. A layout
+  // effect, so it is taken before any content's frame-deferred focus.
+  const focusMovesAtOpen = useRef(0)
+  useLayoutEffect(() => {
+    if (visible) focusMovesAtOpen.current = stylePieceFocusMoves
+  }, [visible])
+
   const close = () => {
     refreshRef.current?.stop()
     onClose()
@@ -257,7 +272,10 @@ export function StylePiecePanel({
       visible={visible}
       transparent={false}
       animationType="none"
-      onShow={() => focusStylePieceControl(closeButton.current)}
+      onShow={() => {
+        if (stylePieceFocusMoves === focusMovesAtOpen.current)
+          focusStylePieceControl(closeButton.current)
+      }}
       onRequestClose={close}
       // Story CC-7.11 D13: the hub's finishStyleDismissal focuses the Style piece button.
       returnFocusRef={null}
