@@ -8,6 +8,7 @@ import {
   feedUrls,
   serveFeed,
   setMockParams,
+  communityGateOpen,
 } from './harness'
 import { userEvent as browserUser } from 'vitest/browser'
 import { CommunityReactionState } from '@couture/api-client'
@@ -350,6 +351,7 @@ export function registerCommunityReactionsCases() {
     )
     await render(<CommunityScreen />)
     const controls = await screen.findByTestId('community-reactions-post-a')
+    await communityGateOpen()
     controls.style.width = '260px'
     controls.querySelectorAll<HTMLElement>('[role="button"]').forEach((button) => {
       button.style.fontSize = '32px'
@@ -500,6 +502,8 @@ export function registerCommunityReactionsCases() {
           HttpResponse.json({ data: first })
         )
       )
+      // The second page is held, so the gate opens on the first page before the filter moves.
+      await communityGateOpen()
       await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
       await screen.findByTestId('highlighted-community-card-post-a')
       await waitFor(() => expect(feedUrls).toHaveLength(2))

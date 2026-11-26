@@ -51,6 +51,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const UNAVAILABLE_HINT_ID = 'premium-theme-unavailable-hint'
 
@@ -302,26 +308,41 @@ function usePaletteNameList(): string {
   )
 }
 
-function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
+function LockedPanel({
+  isSignedOut,
+  landing,
+}: {
+  isSignedOut: boolean
+  /** `guest` while a signed-out first paint stands in for the session check (CC-7.7). */
+  landing?: 'guest'
+}) {
   const { t } = useTranslation()
   const palettes = usePaletteNameList()
 
   return (
     <div
+      data-landing={landing}
       className="mt-6 space-y-3 rounded-lg border border-neutral-700 bg-neutral-900 p-4"
       data-testid="premium-theme-locked"
     >
       <p className="text-sm font-medium text-white">
         {t('commerce.premium.theme.locked.title')}
       </p>
-      <p className="text-sm text-neutral-300">
-        {t(
-          isSignedOut
-            ? 'commerce.premium.theme.locked.signedOutBody'
-            : 'commerce.premium.theme.locked.body',
-          { palettes }
-        )}
-      </p>
+      {landing ? (
+        <GuestText
+          text={t('commerce.premium.theme.locked.signedOutBody', { palettes })}
+          className="text-sm text-neutral-300"
+        />
+      ) : (
+        <p className="text-sm text-neutral-300">
+          {t(
+            isSignedOut
+              ? 'commerce.premium.theme.locked.signedOutBody'
+              : 'commerce.premium.theme.locked.body',
+            { palettes }
+          )}
+        </p>
+      )}
     </div>
   )
 }
@@ -346,8 +367,14 @@ export function PremiumThemeSection() {
 function MemberThemeSection({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
   const { status, owner } = session
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [theme, setTheme] = useState<PremiumTheme | null>(null)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's palettes at once
+  // and reads them again in place; a failed refresh keeps them.
+  const snapshot = useSectionSnapshot<PremiumTheme>('theme', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [theme, setTheme] = useState<PremiumTheme | null>(() => snapshot.restored ?? null)
   /** The `dataTheme` of the card whose save is in flight, or null when idle. */
   const [savingTheme, setSavingTheme] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -360,6 +387,14 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
    * of whatever page the reader had moved to, from a component that no longer existed.
    */
   const saveControllerRef = useRef<AbortController | null>(null)
+  /**
+   * Advances when a save starts and again when it settles, and `savePendingRef` marks the time
+   * between. A read that overlaps a save in any way (sent before it, or sent while it was out)
+   * may answer for the palette the save replaced, so it never replaces the one the save commits.
+   * A read sent after the save settled is current.
+   */
+  const saveGenerationRef = useRef(0)
+  const savePendingRef = useRef(false)
 
   useEffect(() => () => saveControllerRef.current?.abort(), [])
 
@@ -396,8 +431,15 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    const saveGeneration = saveGenerationRef.current
+    const superseded = () =>
+      saveGeneration !== saveGenerationRef.current || savePendingRef.current
+    beginRead()
     setError(null)
-    setSectionState('loading')
+    // CodeRabbit r3 on #8: a read sent while a save is out is superseded by that save, so it never
+    // takes the section to loading; nothing would bring a ready section back when it is dropped.
+    if (!inPlace && !savePendingRef.current) setSectionState('loading')
 
     void (async () => {
       try {
@@ -407,16 +449,18 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
           () => getThemeFromWeb(controller.signal),
           (error) => premiumThemeFailureReason(error) === 'signed_out'
         )
-        if (!current()) {
+        if (!current() || superseded()) {
           return
         }
         setTheme(next)
         applyMemberTheme(next.theme, owner)
         setSectionState('ready')
       } catch (loadError: unknown) {
-        if (!current()) {
+        if (!current() || superseded()) {
           return
         }
+        // A restored palette stays on screen when its refresh fails, unless the member is out.
+        if (inPlace && premiumThemeFailureReason(loadError) !== 'signed_out') return
         /*
          * AC 6: a failed read renders Default with a quiet inline error. It must not
          * block the rest of the settings page, and it must not leave the surface
@@ -436,7 +480,14 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage])
+  }, [status, owner, loadErrorMessage, restoredFor, beginRead])
+
+  // What a return to Profile shows first: the palettes once read, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready' && theme !== null) remember(theme)
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [remember, sectionState, theme])
 
   /**
    * The palette the server last confirmed, which is both what the gallery marks
@@ -477,6 +528,8 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     saveControllerRef.current = controller
+    saveGenerationRef.current++
+    savePendingRef.current = true
     setSavingTheme(option.dataTheme)
     setError(null)
 
@@ -493,6 +546,9 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       }
       applySaveFailure(saveError)
     } finally {
+      // Every read sent while this save was out is now older than the palette it settled on.
+      savePendingRef.current = false
+      saveGenerationRef.current++
       if (saveControllerRef.current === controller) {
         saveControllerRef.current = null
       }
@@ -539,7 +595,13 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     }
   }
 
-  const view = resolveSectionView(sectionState, theme)
+  // Story CC-7.7: Profile's screen gate waits for this read. While the session is checked, a
+  // signed-out page paints the locked panel it will keep (hidden by globals.css on a page
+  // painted for a stored session), so the panel never lands late and pushes the page.
+  useScreenGateRead('theme', sectionState !== 'checking' && sectionState !== 'loading')
+  const guestFirstPaint = useGuestFirstPaint()
+  const guestStandIn = sectionState === 'checking' && guestFirstPaint
+  const view = resolveSectionView(guestStandIn ? 'signed_out' : sectionState, theme)
 
   return (
     <section
@@ -611,7 +673,12 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         </>
       )}
 
-      {view.showLocked && <LockedPanel isSignedOut={sectionState === 'signed_out'} />}
+      {view.showLocked && (
+        <LockedPanel
+          isSignedOut={sectionState === 'signed_out' || guestStandIn}
+          landing={guestStandIn ? 'guest' : undefined}
+        />
+      )}
 
       {error && (
         <p

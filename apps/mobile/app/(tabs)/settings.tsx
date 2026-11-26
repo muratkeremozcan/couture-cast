@@ -1,7 +1,14 @@
 // Story 5.1 Tasks 6 and 7 step 1 owner: implement Mobile and Web preference controls in `apps/mobile/app/(tabs)/settings.tsx` and `apps/web/src/app/components/commerce-preferences-section.tsx`
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { Pressable, ScrollView, StyleSheet } from 'react-native'
-import { router } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -53,15 +60,19 @@ import {
   PREMIUM_THEME_KEYS,
 } from '@/src/lib/premium-theme'
 import {
+  mobileApplicationUserId,
+  mobileIdentityEpoch,
   resolveMobileAccessToken,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { getUserProfileFromMobile, updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
-import { useAppTheme } from '@/src/theme/theme-context'
+import { useAppTheme, useAppThemeSettled } from '@/src/theme/theme-context'
+import { useMemberSessionState } from '@/src/lib/member-session'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
+import { ScreenGate } from '@/src/components/screen-gate'
 
 /** Exported so the screen test advances virtual time by the real bound rather
  *  than by a copy of it that silently stops matching when this changes. */
@@ -146,6 +157,34 @@ function useMemberSignedIn(): boolean | null {
   return signedIn
 }
 
+/**
+ * Story CC-7.7 D5: how many times the member came back to Profile. Tabs stay mounted, so a
+ * return is a focus, never a mount; each one re-reads the sections in place. The first focus
+ * is the mount, whose reads are already running, and counts as zero.
+ */
+function useReturnFocusCount(): number {
+  const [returns, setReturns] = useState(0)
+  const leftRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (leftRef.current) setReturns((count) => count + 1)
+      leftRef.current = false
+      return () => {
+        leftRef.current = true
+      }
+    }, [])
+  )
+  return returns
+}
+
+/**
+ * Story CC-7.7 D5: whether a return read that started under `identity` still belongs to the
+ * member on screen. A sign-out or account switch in between drops its answer.
+ */
+function isSameMember(identity: number, signedIn: boolean | null): boolean {
+  return signedIn === true && mobileIdentityEpoch() === identity
+}
+
 export default function SettingsScreen() {
   const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
@@ -170,7 +209,28 @@ export default function SettingsScreen() {
     'commerce.settings.loadError' | 'commerce.settings.error' | null
   >(null)
   const commerceChangeInFlight = useRef(false)
+  // Advances when a toggle starts, so a return read that began before it never lands over it.
+  const commerceMutationRef = useRef(0)
   const signedIn = useMemberSignedIn()
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  const returns = useReturnFocusCount()
+  // Story CC-7.7 D3 (amended): the Profile gate waits for the account header, the shopping
+  // preference, the subscription with its store availability, and the palette read, so no
+  // section lands late above another.
+  const [gateSession] = useMemberSessionState()
+  const [accountSettled, setAccountSettled] = useState(false)
+  const [premiumSettled, setPremiumSettled] = useState(false)
+  const themeSettled = useAppThemeSettled()
+  const commerceSettled = affiliateCtasEnabled !== null || commerceError !== null
+  const profileGateReady = profileGateSettled({
+    session: gateSession,
+    signedIn,
+    accountSettled,
+    commerceSettled,
+    premiumSettled,
+    themeSettled,
+  })
 
   useEffect(() => {
     if (localeError) {
@@ -211,6 +271,31 @@ export default function SettingsScreen() {
     return () => controller.abort()
   }, [signedIn])
 
+  // Story CC-7.7 D5: a return re-reads the preference in place. The switch keeps its state
+  // until the answer lands; a failed re-read leaves it as it was, and a toggle in flight wins.
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || commerceChangeInFlight.current)
+      return
+    const controller = new AbortController()
+    const mutation = commerceMutationRef.current
+    const identity = mobileIdentityEpoch()
+    void getCommercePreferenceFromMobile(controller.signal)
+      .then((preference) => {
+        if (
+          controller.signal.aborted ||
+          commerceMutationRef.current !== mutation ||
+          !isSameMember(identity, signedInRef.current)
+        )
+          return
+        setAffiliateCtasEnabled(preference.affiliateCtasEnabled)
+        setCommerceError((current) =>
+          current === 'commerce.settings.loadError' ? null : current
+        )
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
+
   const handleAffiliateCtasToggle = async () => {
     if (commerceChangeInFlight.current || affiliateCtasEnabled === null) {
       return
@@ -219,6 +304,7 @@ export default function SettingsScreen() {
     const previous = affiliateCtasEnabled
     const next = !previous
     commerceChangeInFlight.current = true
+    commerceMutationRef.current += 1
     // Optimistic, then reverted on failure. The alternative leaves the switch
     // visually stuck under the user's finger for a whole round trip.
     setAffiliateCtasEnabled(next)
@@ -398,189 +484,208 @@ export default function SettingsScreen() {
           left it out of the hierarchy (live font run 43800364098, Settings at large after
           accessibility-medium). */}
       <LiveFontMountMarker scope="settings" />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      {/* Story CC-7.7 D1, D3: the placeholder shows while the stored session restores and the
+          member's sections load, so the signed-out account never flashes first. */}
+      <ScreenGate
+        screen="profile"
+        session={gateSession}
+        ready={profileGateReady}
+        style={styles.gateBody}
       >
-        <View style={styles.container} testID="settings-screen">
-          <ProfileAccountHeader signedIn={signedIn} />
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle} testID="settings-language-title">
-              {t('settings.language', { defaultValue: 'Language' })}
-            </Text>
-            <View style={styles.localeGrid}>
-              {availableLocales.map((locale) => {
-                const isSelected = currentLocale === locale.code
-                return (
-                  <Pressable
-                    key={locale.code}
-                    style={[
-                      styles.localeButton,
-                      tone.localeButton,
-                      isSelected && styles.selectedLocaleButton,
-                    ]}
-                    disabled={isChangingLocale || isSelected}
-                    onPress={() => {
-                      void handleLanguageChange(locale.code)
-                    }}
-                    testID={`locale-btn-${locale.code}`}
-                    accessibilityRole="button"
-                    accessibilityState={{
-                      disabled: isChangingLocale || isSelected,
-                      selected: isSelected,
-                    }}
-                  >
-                    <Text
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.container} testID="settings-screen">
+            <ProfileAccountHeader
+              signedIn={signedIn}
+              returns={returns}
+              onSettledChange={setAccountSettled}
+            />
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionTitle} testID="settings-language-title">
+                {t('settings.language', { defaultValue: 'Language' })}
+              </Text>
+              <View style={styles.localeGrid}>
+                {availableLocales.map((locale) => {
+                  const isSelected = currentLocale === locale.code
+                  return (
+                    <Pressable
+                      key={locale.code}
                       style={[
-                        styles.localeText,
-                        tone.localeText,
-                        isSelected && [
-                          styles.selectedLocaleText,
-                          tone.selectedLocaleText,
-                        ],
+                        styles.localeButton,
+                        tone.localeButton,
+                        isSelected && styles.selectedLocaleButton,
                       ]}
+                      disabled={isChangingLocale || isSelected}
+                      onPress={() => {
+                        void handleLanguageChange(locale.code)
+                      }}
+                      testID={`locale-btn-${locale.code}`}
+                      accessibilityRole="button"
+                      accessibilityState={{
+                        disabled: isChangingLocale || isSelected,
+                        selected: isSelected,
+                      }}
                     >
-                      {t(`settings.languages.${locale.code}`, {
-                        defaultValue: locale.label,
-                      })}
-                    </Text>
-                  </Pressable>
-                )
-              })}
+                      <Text
+                        style={[
+                          styles.localeText,
+                          tone.localeText,
+                          isSelected && [
+                            styles.selectedLocaleText,
+                            tone.selectedLocaleText,
+                          ],
+                        ]}
+                      >
+                        {t(`settings.languages.${locale.code}`, {
+                          defaultValue: locale.label,
+                        })}
+                      </Text>
+                    </Pressable>
+                  )
+                })}
+              </View>
             </View>
-          </View>
 
-          {localeError ? (
-            <Text
-              style={[styles.errorText, tone.errorText]}
-              accessibilityRole="alert"
-              accessibilityLiveRegion="assertive"
-            >
-              {localeError}
-            </Text>
-          ) : null}
-          {/* Shopping and partners. PRD NFR Security 4 requires an explicit
+            {localeError ? (
+              <Text
+                style={[styles.errorText, tone.errorText]}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                {localeError}
+              </Text>
+            ) : null}
+            {/* Shopping and partners. PRD NFR Security 4 requires an explicit
               third-party disclosure alongside the toggle, so the paragraph sits
               above the control and is never collapsed behind it. These
               endpoints are not gated by commerce_affiliate_enabled: a user must
               always be able to read and set their own preference. */}
-          <View style={styles.settingsSection} testID="commerce-settings-section">
-            <Text style={styles.sectionTitle}>{t('commerce.settings.sectionTitle')}</Text>
-            <Text
-              style={[styles.disclosureText, tone.disclosureText]}
-              testID="commerce-settings-disclosure"
-            >
-              {t('commerce.settings.disclosure')}
-            </Text>
-            {signedIn === false ? (
+            <View style={styles.settingsSection} testID="commerce-settings-section">
+              <Text style={styles.sectionTitle}>
+                {t('commerce.settings.sectionTitle')}
+              </Text>
               <Text
-                style={[styles.helpText, tone.helpText]}
-                testID="commerce-settings-signed-out"
+                style={[styles.disclosureText, tone.disclosureText]}
+                testID="commerce-settings-disclosure"
               >
-                {t('commerce.settings.signedOutHint')}
+                {t('commerce.settings.disclosure')}
               </Text>
-            ) : (
-              <>
-                <Pressable
-                  style={[
-                    styles.commerceToggle,
-                    tone.commerceToggle,
-                    affiliateCtasEnabled ? styles.commerceToggleOn : null,
-                  ]}
-                  disabled={affiliateCtasEnabled === null}
-                  onPress={() => {
-                    void handleAffiliateCtasToggle()
-                  }}
-                  testID="commerce-opt-out-toggle"
-                  accessibilityRole="switch"
-                  accessibilityState={{
-                    checked: affiliateCtasEnabled ?? false,
-                    disabled: affiliateCtasEnabled === null,
-                  }}
-                  // react-native-web does not project `accessibilityState` onto the
-                  // DOM, so the aria pair rides alongside it exactly as
-                  // `components/chip-navigation.tsx` does.
-                  aria-checked={affiliateCtasEnabled ?? false}
-                  aria-disabled={affiliateCtasEnabled === null}
-                  accessibilityLabel={t('commerce.settings.optOutLabel')}
-                  accessibilityHint={t('commerce.settings.optOutHelp')}
+              {signedIn === false ? (
+                <Text
+                  style={[styles.helpText, tone.helpText]}
+                  testID="commerce-settings-signed-out"
                 >
-                  <Text style={styles.commerceToggleLabel}>
-                    {t('commerce.settings.optOutLabel')}
-                  </Text>
-                </Pressable>
-                <Text style={[styles.helpText, tone.helpText]}>
-                  {t('commerce.settings.optOutHelp')}
+                  {t('commerce.settings.signedOutHint')}
                 </Text>
-                {commerceStatus ? (
-                  <Text
-                    style={[styles.statusText, tone.statusText]}
-                    testID="commerce-settings-status"
-                    accessibilityLiveRegion="polite"
+              ) : (
+                <>
+                  <Pressable
+                    style={[
+                      styles.commerceToggle,
+                      tone.commerceToggle,
+                      affiliateCtasEnabled ? styles.commerceToggleOn : null,
+                    ]}
+                    disabled={affiliateCtasEnabled === null}
+                    onPress={() => {
+                      void handleAffiliateCtasToggle()
+                    }}
+                    testID="commerce-opt-out-toggle"
+                    accessibilityRole="switch"
+                    accessibilityState={{
+                      checked: affiliateCtasEnabled ?? false,
+                      disabled: affiliateCtasEnabled === null,
+                    }}
+                    // react-native-web does not project `accessibilityState` onto the
+                    // DOM, so the aria pair rides alongside it exactly as
+                    // `components/chip-navigation.tsx` does.
+                    aria-checked={affiliateCtasEnabled ?? false}
+                    aria-disabled={affiliateCtasEnabled === null}
+                    accessibilityLabel={t('commerce.settings.optOutLabel')}
+                    accessibilityHint={t('commerce.settings.optOutHelp')}
                   >
-                    {commerceStatus}
+                    <Text style={styles.commerceToggleLabel}>
+                      {t('commerce.settings.optOutLabel')}
+                    </Text>
+                  </Pressable>
+                  <Text style={[styles.helpText, tone.helpText]}>
+                    {t('commerce.settings.optOutHelp')}
                   </Text>
-                ) : null}
-                {commerceError ? (
-                  <Text
-                    style={[styles.errorText, tone.errorText]}
-                    testID="commerce-settings-error"
-                    accessibilityRole="alert"
-                    accessibilityLiveRegion="assertive"
-                  >
-                    {t(commerceError)}
-                  </Text>
-                ) : null}
-              </>
-            )}
-          </View>
+                  {commerceStatus ? (
+                    <Text
+                      style={[styles.statusText, tone.statusText]}
+                      testID="commerce-settings-status"
+                      accessibilityLiveRegion="polite"
+                    >
+                      {commerceStatus}
+                    </Text>
+                  ) : null}
+                  {commerceError ? (
+                    <Text
+                      style={[styles.errorText, tone.errorText]}
+                      testID="commerce-settings-error"
+                      accessibilityRole="alert"
+                      accessibilityLiveRegion="assertive"
+                    >
+                      {t(commerceError)}
+                    </Text>
+                  ) : null}
+                </>
+              )}
+            </View>
 
-          <LocationsLinkRow />
+            <LocationsLinkRow />
 
-          <Pressable
-            accessibilityRole="link"
-            onPress={() => router.push('/notification-settings')}
-            style={styles.actionButton}
-          >
-            <Text style={styles.actionText}>{t('community.notifications.title')}</Text>
-          </Pressable>
-          <PremiumSettingsSection signedIn={signedIn} />
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => router.push('/notification-settings')}
+              style={styles.actionButton}
+            >
+              <Text style={styles.actionText}>{t('community.notifications.title')}</Text>
+            </Pressable>
+            <PremiumSettingsSection
+              signedIn={signedIn}
+              returns={returns}
+              onSettledChange={setPremiumSettled}
+            />
 
-          <PremiumThemeSection />
+            <PremiumThemeSection returns={returns} />
 
-          <PaletteAdvisorLinkRow />
+            <PaletteAdvisorLinkRow />
 
-          <PlannerLinkRow />
+            <PlannerLinkRow />
 
-          {isMobileAnalyticsDiagnosticsEnabled ? (
-            <>
-              <Text style={styles.infoText}>{apiHealthMessage}</Text>
-              <Text style={styles.infoText}>
-                {t('settings.diagnostic_info', {
-                  defaultValue:
-                    'alert_received tracking is wired to real push notification receipt listeners.',
-                })}
-              </Text>
-              <Pressable
-                style={styles.actionButton}
-                onPress={recordDiagnosticAlert}
-                accessibilityRole="button"
-                accessibilityLabel={t('settings.diagnostic_alert_btn', {
-                  defaultValue: 'Record weather alert analytics',
-                })}
-              >
-                <Text style={styles.actionText}>
-                  {t('settings.diagnostic_alert_btn', {
-                    defaultValue: 'Record weather alert analytics',
+            {isMobileAnalyticsDiagnosticsEnabled ? (
+              <>
+                <Text style={styles.infoText}>{apiHealthMessage}</Text>
+                <Text style={styles.infoText}>
+                  {t('settings.diagnostic_info', {
+                    defaultValue:
+                      'alert_received tracking is wired to real push notification receipt listeners.',
                   })}
                 </Text>
-              </Pressable>
-            </>
-          ) : null}
-          <MobileAnalyticsDiagnosticsPanel />
-        </View>
-      </ScrollView>
+                <Pressable
+                  style={styles.actionButton}
+                  onPress={recordDiagnosticAlert}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('settings.diagnostic_alert_btn', {
+                    defaultValue: 'Record weather alert analytics',
+                  })}
+                >
+                  <Text style={styles.actionText}>
+                    {t('settings.diagnostic_alert_btn', {
+                      defaultValue: 'Record weather alert analytics',
+                    })}
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+            <MobileAnalyticsDiagnosticsPanel />
+          </View>
+        </ScrollView>
+      </ScreenGate>
     </SafeAreaView>
   )
 }
@@ -686,12 +791,70 @@ function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
  * subscription — while `purchasesEnabled` (the only kill-switch exposure)
  * decides whether any subscribe control exists at all.
  */
-function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
+/** Tells the parent whether every read in `reads` settled, each time that answer changes. */
+function useReportSettled(
+  reads: readonly boolean[],
+  onSettledChange: ((settled: boolean) => void) | undefined
+) {
+  const settled = reads.every(Boolean)
+  const onSettledChangeRef = useRef(onSettledChange)
+  onSettledChangeRef.current = onSettledChange
+  useEffect(() => {
+    onSettledChangeRef.current?.(settled)
+  }, [settled])
+}
+
+/** Story CC-7.7 D3: whether every Profile gate read settled for the session on screen. */
+export function profileGateSettled({
+  session,
+  signedIn,
+  accountSettled,
+  commerceSettled,
+  premiumSettled,
+  themeSettled,
+}: {
+  session: ReturnType<typeof useMemberSessionState>[0]
+  signedIn: boolean | null
+  /** The account header's profile read, the first section on screen. */
+  accountSettled: boolean
+  commerceSettled: boolean
+  /** The subscription, premium access and, for a store purchaser, store availability. */
+  premiumSettled: boolean
+  /** The palette read for the member on screen, not an earlier one. */
+  themeSettled: boolean
+}): boolean {
+  // An unverifiable session has nothing more to wait for; the sections show their own states.
+  if (session === 'unavailable' || signedIn === false) return true
+  return (
+    signedIn === true &&
+    accountSettled &&
+    commerceSettled &&
+    premiumSettled &&
+    themeSettled
+  )
+}
+
+function PremiumSettingsSection({
+  signedIn,
+  returns = 0,
+  onSettledChange,
+}: {
+  signedIn: boolean | null
+  /** Story CC-7.7 D5: returns to Profile; each re-reads the subscription in place. */
+  returns?: number
+  /**
+   * Story CC-7.7: reports once the subscription and access reads settled and, unless the access
+   * is complimentary, the store answered whether purchases are available: the subscribe
+   * controls or the unavailable note appear with the section, never after it.
+   */
+  onSettledChange?: (settled: boolean) => void
+}) {
   const tone = useSettingsTone()
   const analytics = useMobileAnalytics()
   const { t, i18n } = useTranslation()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [subscriptionLoadFailed, setSubscriptionLoadFailed] = useState(false)
+  const [subscriptionSettled, setSubscriptionSettled] = useState(false)
   const [premiumAccess, setPremiumAccess] = useState<PremiumAccess | null>(null)
   // Story 6.14: the section holds its loading state until the access read settles, so a grantee
   // never sees the free or ended state first.
@@ -701,20 +864,30 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
   // the unavailable fallback after would flash a control that cannot work.
   const [purchasesAvailability, setPurchasesAvailability] =
     useState<PurchasesAvailability | null>(null)
+  const purchasesAvailabilityRef = useRef(purchasesAvailability)
+  purchasesAvailabilityRef.current = purchasesAvailability
+  const [purchasesSettled, setPurchasesSettled] = useState(false)
   const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
   const premiumFlowInFlight = useRef(false)
+  // Story CC-7.7: bumped when a purchase or restore starts and again when it ends. A return
+  // re-read captures it before its request; an answer that comes back after a store round trip
+  // started or ended predates that flow's own subscription read and is dropped.
+  const premiumFlowGeneration = useRef(0)
   const premiumPollAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (signedIn !== true) {
       setSubscription(null)
       setSubscriptionLoadFailed(false)
+      setSubscriptionSettled(false)
       // Story 6.14: the next account must never inherit this one's access answer.
       setPremiumAccess(null)
       setAccessSettled(false)
+      setPurchasesSettled(false)
       return
     }
     const controller = new AbortController()
+    setPurchasesSettled(false)
 
     void getSubscriptionFromMobile(controller.signal)
       .then((current) => {
@@ -726,6 +899,9 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
         if (!controller.signal.aborted) {
           setSubscriptionLoadFailed(true)
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSubscriptionSettled(true)
       })
 
     // Story 6.14 D6, TEA-07: the access source rides beside the subscription, and the store SDK
@@ -739,10 +915,17 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
         if (controller.signal.aborted) return
         setPremiumAccess(access)
         setAccessSettled(true)
-        if (isComplimentaryAccess(access)) return
-        const availability = await ensurePurchasesConfigured()
-        if (!controller.signal.aborted) {
-          setPurchasesAvailability(availability)
+        if (isComplimentaryAccess(access)) {
+          setPurchasesSettled(true)
+          return
+        }
+        try {
+          const availability = await ensurePurchasesConfigured()
+          if (!controller.signal.aborted) {
+            setPurchasesAvailability(availability)
+          }
+        } finally {
+          if (!controller.signal.aborted) setPurchasesSettled(true)
         }
       })
 
@@ -751,6 +934,52 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       premiumPollAbortRef.current?.abort()
     }
   }, [signedIn])
+
+  useReportSettled(
+    [subscriptionSettled, accessSettled, purchasesSettled],
+    onSettledChange
+  )
+
+  // Story CC-7.7 D5: a return re-reads the subscription and the access source in place. The
+  // section keeps what it shows until an answer lands; a failed re-read changes nothing, and a
+  // store round trip in flight owns the section until it ends.
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true || premiumFlowInFlight.current)
+      return
+    const controller = new AbortController()
+    const identity = mobileIdentityEpoch()
+    const stillCurrent = () =>
+      !controller.signal.aborted && isSameMember(identity, signedInRef.current)
+    const flowGeneration = premiumFlowGeneration.current
+    void getSubscriptionFromMobile(controller.signal)
+      .then((refreshed) => {
+        if (!stillCurrent() || flowGeneration !== premiumFlowGeneration.current) return
+        setSubscription(refreshed)
+        setSubscriptionLoadFailed(false)
+      })
+      .catch(() => undefined)
+    void getPremiumAccessFromMobile(controller.signal)
+      .then(async (access) => {
+        if (!stillCurrent() || !access) return
+        setPremiumAccess(access)
+        // Access that stopped being complimentary needs the store's answer the first read
+        // skipped, or the subscribe controls never appear. Complimentary access still never
+        // configures the store.
+        if (isComplimentaryAccess(access) || purchasesAvailabilityRef.current !== null)
+          return
+        setPurchasesSettled(false)
+        try {
+          const availability = await ensurePurchasesConfigured()
+          if (stillCurrent()) setPurchasesAvailability(availability)
+        } finally {
+          if (stillCurrent()) setPurchasesSettled(true)
+        }
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [returns])
 
   /**
    * Success-outcome follow-up only: refresh beats webhook latency, then the
@@ -789,6 +1018,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       return
     }
     premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
     setPremiumFlow('purchasing')
     trackMobilePremiumSubscribeTapped(
       analytics,
@@ -820,6 +1050,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       }
     } finally {
       premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
     }
   }
 
@@ -828,6 +1059,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       return
     }
     premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
     setPremiumFlow('restoring')
 
     try {
@@ -850,6 +1082,7 @@ function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
       }
     } finally {
       premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
     }
   }
 
@@ -1178,7 +1411,7 @@ function usePaletteNameList(): string {
  * this calls `refresh()` on entry, so opening settings costs one round trip and
  * the applied palette is the same fact here as everywhere else in the app.
  */
-function PremiumThemeSection() {
+function PremiumThemeSection({ returns = 0 }: { returns?: number }) {
   const tone = useSettingsTone()
   const { t } = useTranslation()
   const {
@@ -1203,14 +1436,21 @@ function PremiumThemeSection() {
    */
   const saveControllerRef = useRef<AbortController | null>(null)
 
+  // Story CC-7.7 D3: the member the palette is read for. A sign-in or an account switch with
+  // Profile mounted reads it again, so the Profile gate never opens on another member's answer.
+  const owner = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
   useEffect(() => {
     // Entering settings re-reads the preference. The provider's own read happens
     // once at app launch, and entitlement or the kill switch can have changed in
-    // the hours since. `refresh` is a stable callback, so this runs on entry
-    // rather than on every render.
+    // the hours since. `refresh` is a stable callback, so this runs on entry, on a
+    // member change and on each return to the tab (CC-7.7 D5), never on every render.
     void refresh()
-    return () => saveControllerRef.current?.abort()
-  }, [refresh])
+  }, [refresh, owner, returns])
+  useEffect(() => () => saveControllerRef.current?.abort(), [])
 
   const showGallery = status === 'ready' && isEntitled
   const showLocked = status === 'signed-out' || (status === 'ready' && !isEntitled)
@@ -1511,13 +1751,28 @@ function PaletteAdvisorLinkRow() {
  * under it; otherwise the email alone. Signed out, or until the profile answers,
  * it renders nothing, and a failed read leaves the rest of the screen as it was.
  */
-function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
+function ProfileAccountHeader({
+  signedIn,
+  returns = 0,
+  onSettledChange,
+}: {
+  signedIn: boolean | null
+  /** Story CC-7.7 D5: returns to Profile; each re-reads the profile in place. */
+  returns?: number
+  /** Story CC-7.7 D3: reports once the profile read settled (success or failure). */
+  onSettledChange?: (settled: boolean) => void
+}) {
   const { t } = useTranslation()
   const tone = useSettingsTone()
   const [account, setAccount] = useState<{
     displayName: string | null
     email: string
   } | null>(null)
+  // Signed out there is nothing to read, so nothing to wait for.
+  const [readSettled, setReadSettled] = useState(false)
+  useReportSettled([signedIn === false || readSettled], onSettledChange)
+  const signedInRef = useRef(signedIn)
+  signedInRef.current = signedIn
   // An account switch keeps `signedIn` true, so the application user is followed too.
   const [userGeneration, setUserGeneration] = useState(0)
 
@@ -1528,6 +1783,7 @@ function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
 
   useEffect(() => {
     setAccount(null)
+    setReadSettled(false)
     if (signedIn !== true) return
     let active = true
     void Promise.resolve()
@@ -1538,10 +1794,32 @@ function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
         setAccount({ displayName, email: profile.user.email })
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (active) setReadSettled(true)
+      })
     return () => {
       active = false
     }
   }, [signedIn, userGeneration])
+
+  // Story CC-7.7 D5: a return re-reads the profile with the header still on screen; a failed
+  // re-read keeps it as it was.
+  useEffect(() => {
+    if (returns === 0 || signedInRef.current !== true) return
+    let active = true
+    const identity = mobileIdentityEpoch()
+    void Promise.resolve()
+      .then(() => getUserProfileFromMobile())
+      .then((profile) => {
+        if (!active || !profile || !isSameMember(identity, signedInRef.current)) return
+        const displayName = profile.user.displayName?.trim() || null
+        setAccount({ displayName, email: profile.user.email })
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [returns])
 
   if (!account) return null
   return (
@@ -1612,6 +1890,9 @@ function PlannerLinkRow() {
 
 const styles = StyleSheet.create({
   safeArea: {
+    flex: 1,
+  },
+  gateBody: {
     flex: 1,
   },
   scrollView: {

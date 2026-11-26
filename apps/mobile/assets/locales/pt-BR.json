@@ -85,6 +85,7 @@
     "diagnostic_info": "O rastreamento de alert_received está conectado a receptores de notificações push reais."
   },
   "common": {
+    "loading": "Carregando",
     "cancel": "Cancelar",
     "dismiss_banner": "Fechar aviso",
     "invalid_link": "Este link é inválido, expirou ou não está mais disponível.",

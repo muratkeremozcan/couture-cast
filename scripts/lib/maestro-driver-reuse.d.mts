@@ -1,6 +1,8 @@
 export declare const MAESTRO_DRIVER_PACKAGES: readonly string[]
 export declare const MAESTRO_DRIVER_INSTRUMENTATION: string
 export declare const NO_REINSTALL_DRIVER_ARG: string
+export declare const DRIVER_CHECK_READS: number
+export declare const DRIVER_CHECK_PAUSE_MS: number
 
 export declare class MaestroDriverNotReady extends Error {
   constructor(device: string, missing: readonly string[])
@@ -18,6 +20,7 @@ export declare function createMaestroDriverReuse(options: {
   ) => Promise<{ packagesOutput: string; instrumentationOutput: string }>
   uninstall: (device: string, packageName: string) => Promise<unknown>
   settle?: (device: string, driverPort: number | null) => Promise<void>
+  pause?: (ms: number) => Promise<void>
 }): {
   argsFor(
     platform: 'android' | 'ios',

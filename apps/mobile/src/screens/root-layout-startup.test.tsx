@@ -23,6 +23,8 @@ const layout = vi.hoisted(() => {
   ;(globalThis as { require?: unknown }).require ??= () => 1
   return {
     screens: [] as { name: string; options?: Record<string, unknown> }[],
+    stackOptions: [] as Record<string, unknown>[],
+    reduceMotion: false,
     statusBars: [] as Record<string, unknown>[],
     // Plain counters: a `vi.fn` subscribes to every promise it returns (settledResults),
     // which would handle a rejection the layout forgot to catch and hide the bug.
@@ -79,7 +81,16 @@ vi.mock('expo-status-bar', () => ({
   },
 }))
 vi.mock('expo-router', () => {
-  const Stack = ({ children }: { children: ReactNode }) => children
+  const Stack = ({
+    children,
+    screenOptions,
+  }: {
+    children: ReactNode
+    screenOptions?: Record<string, unknown>
+  }) => {
+    if (screenOptions) layout.stackOptions.push(screenOptions)
+    return children
+  }
   Stack.Screen = (props: { name: string; options?: Record<string, unknown> }) => {
     layout.screens.push(props)
     return null
@@ -123,6 +134,10 @@ vi.mock('@/src/analytics/track-events', () => ({
 vi.mock('@/src/lib/i18n', () => ({ initI18n: () => Promise.resolve() }))
 vi.mock('@/src/lib/background-task', () => ({
   registerRitualBackgroundTaskAsync: () => Promise.resolve(),
+}))
+// Story CC-7.7 D6: the stack's transitions follow the OS reduced-motion setting.
+vi.mock('@/src/hooks/use-reduced-motion', () => ({
+  useReducedMotion: () => layout.reduceMotion,
 }))
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   AccessibilityAnnouncerProvider: ({ children }: { children: ReactNode }) => children,
@@ -168,6 +183,8 @@ async function mountLayout() {
 describe('RootLayout startup', () => {
   beforeEach(() => {
     layout.screens.length = 0
+    layout.stackOptions.length = 0
+    layout.reduceMotion = false
     layout.statusBars.length = 0
     layout.sweepCalls = 0
     layout.cleanupCalls = 0
@@ -219,6 +236,54 @@ describe('RootLayout startup', () => {
         title: '',
         headerShown: shown,
       })
+    }
+  )
+
+  // P2-9: the `default` animation ignores animationDuration (UIKit push on iOS, 450 ms tween
+  // XML on Android API 33+); `fade` ships 150 ms on Android and honors 200 ms on iOS.
+  it.each(['ios', 'android'])(
+    '7.7-NAT-005 gives the %s root stack the bounded fade transition while motion is on',
+    async (os) => {
+      setOS(os)
+      await mountLayout()
+
+      expect(layout.stackOptions.at(-1)).toMatchObject({
+        animationDuration: 200,
+        animation: 'fade',
+      })
+    }
+  )
+
+  it.each([
+    ['ios', 'default'],
+    ['android', undefined],
+  ])(
+    '7.7-NAT-005 the %s modal route keeps its platform presentation while motion is on',
+    async (os, animation) => {
+      setOS(os)
+      await mountLayout()
+
+      const modal = layout.screens.filter((screen) => screen.name === 'modal').at(-1)
+      // iOS keeps the system page sheet (D6 exception); `fade` would cross-dissolve it.
+      // Android draws the route as a stack screen and inherits the 150 ms fade.
+      expect(modal).toBeDefined()
+      expect(modal?.options?.animation).toBe(animation)
+    }
+  )
+
+  it.each(['ios', 'android'])(
+    '7.7-NAT-005 turns %s root stack and modal transitions off under reduced motion',
+    async (os) => {
+      setOS(os)
+      layout.reduceMotion = true
+      await mountLayout()
+
+      expect(layout.stackOptions.at(-1)).toMatchObject({
+        animationDuration: 200,
+        animation: 'none',
+      })
+      const modal = layout.screens.filter((screen) => screen.name === 'modal').at(-1)
+      expect(modal?.options).not.toHaveProperty('animation')
     }
   )
 

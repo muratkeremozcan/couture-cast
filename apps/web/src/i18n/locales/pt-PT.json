@@ -1325,7 +1325,8 @@
     "navigatedTo": "Separador {{label}} aberto"
   },
   "session": {
-    "retry": "Tentar novamente"
+    "retry": "Tentar novamente",
+    "loading": "A carregar"
   },
   "feedback": {
     "save": "Guardar",

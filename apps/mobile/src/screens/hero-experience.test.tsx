@@ -166,10 +166,13 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     }
   })
 
-  it('shows a labeled sample while loading, then current weather, the 48-hour ribbon and a live outfit', async () => {
+  // Story CC-7.7 D2 (7.7-NAT-002): the member sample no longer shows while loading; the gate's
+  // placeholder holds the body until the ritual read settles.
+  it('shows the placeholder while loading, then current weather, the 48-hour ribbon and a live outfit', async () => {
     await render(<TabOneScreen />)
 
-    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
     expect(screen.queryByTestId('weather-header')).toBeNull()
 
     await waitFor(() => {

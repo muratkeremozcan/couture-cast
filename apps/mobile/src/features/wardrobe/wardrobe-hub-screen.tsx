@@ -34,6 +34,7 @@ import {
 } from '@couture/utils'
 
 import { underModalAccessibility } from '@/components/edge-to-edge-modal'
+import { ScreenGate } from '@/src/components/screen-gate'
 import { useStatusBar } from '@/components/save-feedback'
 import { Text, View, useSchemeColors } from '@/components/themed'
 import {
@@ -157,6 +158,28 @@ function useHubGarmentDeletion({
   return pendingIds
 }
 
+/**
+ * Story CC-7.7 D3, D4: the Closet gate's reads are the inventory, the onboarding state and the
+ * first Saved Looks page. The Saved Looks row and its error with Retry sit above the inventory,
+ * so a page that landed after the gate opened would push the closet down.
+ */
+function closetGateReady(
+  inventorySettled: boolean,
+  onboardingSettled: boolean,
+  savedLooksSettled: boolean
+) {
+  return inventorySettled && onboardingSettled && savedLooksSettled
+}
+
+/** Only the first inventory read shows the spinner, and only over an empty grid. */
+function showFirstReadSpinner(
+  isLoading: boolean,
+  settled: boolean,
+  visibleCount: number
+) {
+  return isLoading && !settled && visibleCount === 0
+}
+
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
   return <MemberWardrobeHub key={epoch} epoch={epoch} {...props} />
@@ -192,6 +215,11 @@ function MemberWardrobeHub({
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showOnboardingCard, setShowOnboardingCard] = useState(false)
+  // Story CC-7.7 D3: the Closet gate waits for the first inventory read and the onboarding
+  // state, so the setup card is already in place when the closet appears.
+  const [inventorySettled, setInventorySettled] = useState(false)
+  const [onboardingSettled, setOnboardingSettled] = useState(false)
+  const [savedLooksSettled, setSavedLooksSettled] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
@@ -393,6 +421,7 @@ function MemberWardrobeHub({
       setSavedLooksTotal(0)
       setSavedLooksError(null)
       setSavedLooksLoading(false)
+      setSavedLooksSettled(true)
       return
     }
     const controller = new AbortController()
@@ -421,6 +450,7 @@ function MemberWardrobeHub({
       .finally(() => {
         if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
           setSavedLooksLoading(false)
+          setSavedLooksSettled(true)
         }
       })
     return () => controller.abort()
@@ -434,6 +464,24 @@ function MemberWardrobeHub({
       }
     })
   }, [owner])
+
+  // Story CC-7.7 D5: tabs stay mounted, so returning to the Closet is a focus, never a mount.
+  // It reads the inventory and the Saved Looks again in place: the grid, the row and the
+  // scroll position stay, and only the first read ever shows the spinner. The first focus is
+  // the mount, whose reads are already running.
+  const leftClosetRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (leftClosetRef.current && epoch === mobileIdentityEpoch()) {
+        setLoadAttempt((attempt) => attempt + 1)
+        setSavedLooksAttempt((attempt) => attempt + 1)
+      }
+      leftClosetRef.current = false
+      return () => {
+        leftClosetRef.current = true
+      }
+    }, [epoch])
+  )
 
   const loadMoreSavedLooks = useCallback(() => {
     if (
@@ -484,7 +532,9 @@ function MemberWardrobeHub({
         if (!controller.signal.aborted) setLoadFailed(true)
       })
       .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
+        if (controller.signal.aborted) return
+        setIsLoading(false)
+        setInventorySettled(true)
       })
     return () => controller.abort()
   }, [loadAttempt, loadGarments])
@@ -504,6 +554,9 @@ function MemberWardrobeHub({
         setShowOnboardingCard(state.status !== 'completed')
       })
       .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setOnboardingSettled(true)
+      })
     return () => {
       controller.abort()
       pollingAbortRef.current?.abort()
@@ -650,183 +703,207 @@ function MemberWardrobeHub({
             </View>
           </View>
 
-          {showOnboardingCard ? (
-            <Pressable
-              accessibilityRole="link"
-              testID="wardrobe-onboarding-card"
-              style={[styles.onboardingCard, notice]}
-              onPress={() => router.push('/wardrobe-onboarding')}
-            >
-              <Text style={[styles.onboardingCardTitle, { color: colors.noticeText }]}>
-                {t('wardrobe.onboarding.title')}
-              </Text>
-              <Text style={[styles.onboardingCardBody, { color: colors.noticeText }]}>
-                {t('wardrobe.onboarding.permission_body')}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          <ClosetSavedLooksRow
-            owner={owner}
-            savedLooks={savedLooks}
-            totalCount={savedLooksTotal}
-            hasMore={savedLooks.length < savedLooksTotal}
-            isLoadingMore={savedLooksLoadingMore}
-            onLoadMore={loadMoreSavedLooks}
-            isLoading={savedLooksLoading}
-            loadError={savedLooksError}
-            garments={garments}
-            onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-            onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-            onReopenStylePiece={(look) => {
-              const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-              if (!anchor || !anchor.category || !anchor.comfortRange) return
-              setInitialSavedLook(look)
-              openStylePanel({
-                id: anchor.id,
-                category: anchor.category,
-                comfortRange: anchor.comfortRange,
-              })
-            }}
-          />
-
-          {errorMessage ? (
-            <View
-              style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
-              accessibilityLiveRegion="assertive"
-              accessibilityRole="alert"
-              testID="wardrobe-error-banner"
-            >
-              <Text style={{ color: colors.dangerText }}>{errorMessage}</Text>
-            </View>
-          ) : null}
-          {loadFailed ? (
-            <View
-              style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
-              accessibilityLiveRegion="polite"
-            >
-              <Text style={{ color: colors.dangerText }}>
-                {garments.length > 0
-                  ? strings.firstUse.staleWardrobe
-                  : strings.firstUse.wardrobeFailed}
-              </Text>
+          <ScreenGate
+            screen="closet"
+            ready={closetGateReady(
+              inventorySettled,
+              onboardingSettled,
+              savedLooksSettled
+            )}
+            // The ScrollView's 24-point gap reaches only its direct children; the gated card,
+            // Saved Looks and inventory keep the same spacing inside the gate body.
+            style={styles.gatedBody}
+          >
+            {showOnboardingCard ? (
               <Pressable
-                accessibilityRole="button"
-                testID="wardrobe-list-retry"
-                disabled={isLoading}
-                style={secondaryButton}
-                onPress={() => setLoadAttempt((attempt) => attempt + 1)}
+                accessibilityRole="link"
+                testID="wardrobe-onboarding-card"
+                style={[styles.onboardingCard, notice]}
+                onPress={() => router.push('/wardrobe-onboarding')}
               >
-                <Text style={secondaryButtonText}>{strings.chrome.retry}</Text>
+                <Text style={[styles.onboardingCardTitle, { color: colors.noticeText }]}>
+                  {t('wardrobe.onboarding.title')}
+                </Text>
+                <Text style={[styles.onboardingCardBody, { color: colors.noticeText }]}>
+                  {t('wardrobe.onboarding.permission_body')}
+                </Text>
               </Pressable>
-            </View>
-          ) : null}
-          {confirmedGarment ? (
-            <Pressable
-              accessibilityRole="link"
-              style={secondaryButton}
-              onPress={() => router.navigate('/')}
-            >
-              <Text style={secondaryButtonText}>{strings.firstUse.backToOutfit}</Text>
-            </Pressable>
-          ) : null}
+            ) : null}
 
-          {isLoading && visibleGarments.length === 0 ? (
-            <ActivityIndicator accessibilityLabel="Loading wardrobe" />
-          ) : visibleGarments.length === 0 ? (
-            hasLoaded && !loadFailed ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
+            <ClosetSavedLooksRow
+              owner={owner}
+              savedLooks={savedLooks}
+              totalCount={savedLooksTotal}
+              hasMore={savedLooks.length < savedLooksTotal}
+              isLoadingMore={savedLooksLoadingMore}
+              onLoadMore={loadMoreSavedLooks}
+              // Story CC-7.7 D5: only the first page shows the loading count; a refresh keeps
+              // the count on screen until its answer lands.
+              isLoading={savedLooksLoading && !savedLooksSettled}
+              loadError={savedLooksError}
+              garments={garments}
+              onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+              onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+              onReopenStylePiece={(look) => {
+                const anchor = garments.find((item) => item.id === look.anchorGarmentId)
+                if (!anchor || !anchor.category || !anchor.comfortRange) return
+                setInitialSavedLook(look)
+                openStylePanel({
+                  id: anchor.id,
+                  category: anchor.category,
+                  comfortRange: anchor.comfortRange,
+                })
+              }}
+            />
+
+            {errorMessage ? (
+              <View
+                style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
+                accessibilityLiveRegion="assertive"
+                accessibilityRole="alert"
+                testID="wardrobe-error-banner"
+              >
+                <Text style={{ color: colors.dangerText }}>{errorMessage}</Text>
               </View>
-            ) : null
-          ) : (
-            <View style={styles.grid} testID="wardrobe-garment-list">
-              {visibleGarments.map((garment) => (
-                <View
-                  key={garment.id}
-                  style={styles.garmentCard}
-                  testID={`garment-card-${garment.id}`}
+            ) : null}
+            {loadFailed ? (
+              <View
+                style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
+                accessibilityLiveRegion="polite"
+              >
+                <Text style={{ color: colors.dangerText }}>
+                  {garments.length > 0
+                    ? strings.firstUse.staleWardrobe
+                    : strings.firstUse.wardrobeFailed}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="wardrobe-list-retry"
+                  disabled={isLoading}
+                  style={secondaryButton}
+                  onPress={() => setLoadAttempt((attempt) => attempt + 1)}
                 >
-                  {garment.status === 'ready' ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
-                      testID={`garment-open-${garment.id}`}
-                      onPress={() => {
-                        openingDetailRef.current = true
-                        router.push({
-                          pathname: '/wardrobe-garment',
-                          params: { id: garment.id },
-                        })
-                      }}
-                    >
-                      <GarmentCardFace garment={garment} locale={i18n.language} />
-                    </Pressable>
-                  ) : (
-                    <GarmentCardFace garment={garment} locale={i18n.language} />
-                  )}
-                  <Text testID={`garment-status-${garment.status}`}>
-                    {garment.status}
-                  </Text>
-                  {garment.status === 'awaiting_tags' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('wardrobe.tagging.needs_tags', {
-                        defaultValue: 'Needs tags',
-                      })}
-                      style={[styles.needsTagsBtn, notice]}
-                      onPress={(event) => {
-                        void openTaggingGarment(
-                          garment.id,
-                          safeFindNodeHandle(event.currentTarget)
-                        )
-                      }}
-                    >
-                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
-                        {t('wardrobe.tagging.needs_tags', { defaultValue: 'Needs tags' })}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {garment.status === 'failed' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={[styles.needsTagsBtn, notice]}
-                      onPress={() => setIsCaptureOpen(true)}
-                    >
-                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
-                        {strings.firstUse.replaceGarment}
-                      </Text>
-                    </Pressable>
-                  )}
-                  {garment.status === 'processing' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      style={[styles.needsTagsBtn, notice]}
-                      onPress={() => pollCommittedGarment(garment.id, accessToken)}
-                    >
-                      <Text style={[styles.needsTagsText, { color: colors.noticeText }]}>
-                        {strings.firstUse.checkGarment}
-                      </Text>
-                    </Pressable>
-                  )}
-                  <StylePieceEntry
-                    garment={garment}
-                    owner={owner}
-                    epoch={epoch}
-                    unavailable={loadFailed}
-                    loading={isLoading}
-                    labels={styleLabels}
-                    buttonRef={(button) => {
-                      if (button) styleButtons.current.set(garment.id, button)
-                      else styleButtons.current.delete(garment.id)
-                    }}
-                    onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                    onOpen={openStylePanel}
-                  />
+                  <Text style={secondaryButtonText}>{strings.chrome.retry}</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            {confirmedGarment ? (
+              <Pressable
+                accessibilityRole="link"
+                style={secondaryButton}
+                onPress={() => router.navigate('/')}
+              >
+                <Text style={secondaryButtonText}>{strings.firstUse.backToOutfit}</Text>
+              </Pressable>
+            ) : null}
+
+            {/* Story CC-7.7 D5: only the first read shows the spinner; a refresh after a tag
+              save, a delete or a Retry keeps the grid or the empty state in place. */}
+            {showFirstReadSpinner(isLoading, inventorySettled, visibleGarments.length) ? (
+              <ActivityIndicator accessibilityLabel="Loading wardrobe" />
+            ) : visibleGarments.length === 0 ? (
+              hasLoaded && !loadFailed ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
                 </View>
-              ))}
-            </View>
-          )}
+              ) : null
+            ) : (
+              <View style={styles.grid} testID="wardrobe-garment-list">
+                {visibleGarments.map((garment) => (
+                  <View
+                    key={garment.id}
+                    style={styles.garmentCard}
+                    testID={`garment-card-${garment.id}`}
+                  >
+                    {garment.status === 'ready' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
+                        testID={`garment-open-${garment.id}`}
+                        onPress={() => {
+                          openingDetailRef.current = true
+                          router.push({
+                            pathname: '/wardrobe-garment',
+                            params: { id: garment.id },
+                          })
+                        }}
+                      >
+                        <GarmentCardFace garment={garment} locale={i18n.language} />
+                      </Pressable>
+                    ) : (
+                      <GarmentCardFace garment={garment} locale={i18n.language} />
+                    )}
+                    <Text testID={`garment-status-${garment.status}`}>
+                      {garment.status}
+                    </Text>
+                    {garment.status === 'awaiting_tags' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('wardrobe.tagging.needs_tags', {
+                          defaultValue: 'Needs tags',
+                        })}
+                        style={[styles.needsTagsBtn, notice]}
+                        onPress={(event) => {
+                          void openTaggingGarment(
+                            garment.id,
+                            safeFindNodeHandle(event.currentTarget)
+                          )
+                        }}
+                      >
+                        <Text
+                          style={[styles.needsTagsText, { color: colors.noticeText }]}
+                        >
+                          {t('wardrobe.tagging.needs_tags', {
+                            defaultValue: 'Needs tags',
+                          })}
+                        </Text>
+                      </Pressable>
+                    )}
+                    {garment.status === 'failed' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={[styles.needsTagsBtn, notice]}
+                        onPress={() => setIsCaptureOpen(true)}
+                      >
+                        <Text
+                          style={[styles.needsTagsText, { color: colors.noticeText }]}
+                        >
+                          {strings.firstUse.replaceGarment}
+                        </Text>
+                      </Pressable>
+                    )}
+                    {garment.status === 'processing' && (
+                      <Pressable
+                        accessibilityRole="button"
+                        style={[styles.needsTagsBtn, notice]}
+                        onPress={() => pollCommittedGarment(garment.id, accessToken)}
+                      >
+                        <Text
+                          style={[styles.needsTagsText, { color: colors.noticeText }]}
+                        >
+                          {strings.firstUse.checkGarment}
+                        </Text>
+                      </Pressable>
+                    )}
+                    <StylePieceEntry
+                      garment={garment}
+                      owner={owner}
+                      epoch={epoch}
+                      unavailable={loadFailed}
+                      loading={isLoading}
+                      labels={styleLabels}
+                      buttonRef={(button) => {
+                        if (button) styleButtons.current.set(garment.id, button)
+                        else styleButtons.current.delete(garment.id)
+                      }}
+                      onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                      onOpen={openStylePanel}
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScreenGate>
         </ScrollView>
 
         <MobileGarmentCaptureModal
@@ -919,6 +996,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   content: { padding: 20, gap: 24 },
+  gatedBody: { gap: 24 },
   header: { gap: 16 },
   title: { fontSize: 28, fontWeight: '700' },
   subtitle: { marginTop: 6, opacity: 0.7 },

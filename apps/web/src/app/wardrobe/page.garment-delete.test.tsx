@@ -10,6 +10,7 @@ import { useEffect, useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { screenSnapshot } from '../../lib/screen-snapshot'
 import type { GarmentWithColor } from '@couture/api-client/contracts/http'
 import {
   createCompletedOnboardingStateFixture,
@@ -205,6 +206,9 @@ async function openAndDelete(user: ReturnType<typeof userEvent.setup>, id: strin
 }
 
 beforeEach(() => {
+  // Story CC-7.7: the Closet keeps a per-member snapshot in module memory, so one test's closet
+  // would open the next test's hub for the same member (CI, 61d7156e).
+  screenSnapshot.clear()
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', api.slice(0, -'/api/v1'.length))
   window.history.replaceState(null, '', '/wardrobe')
   closet = [blueTop, blackShoes, plainDress]

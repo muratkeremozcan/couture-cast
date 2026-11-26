@@ -12,7 +12,14 @@
 // 2026-11-19).
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import {
@@ -41,6 +48,12 @@ import {
   type MemberSession,
 } from '../../../lib/use-web-session'
 import { LocationSearchForm, type LocationClaim } from './location-search-form'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from '../screen-gate'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -51,26 +64,80 @@ function reasonOf(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
 }
 
+/** The guided city setup a link asked for (`?addLocation=1&returnTo=...`). */
+type GuidedEntry = { guided: boolean; returnTo: string | null }
+
+const NO_GUIDED_ENTRY: GuidedEntry = { guided: false, returnTo: null }
+
+/**
+ * Codex review P2-3: reads the guided-entry query on its own, inside its own Suspense boundary.
+ * A statically rendered `/settings` bails out of search params during prerender; only this
+ * reader waits for the client, so the section's chrome is in the first HTML and nothing of it
+ * is inserted above Profile's visible controls when the query arrives.
+ */
+function GuidedEntryQuery({ onRead }: { onRead: (entry: GuidedEntry) => void }) {
+  const searchParams = useSearchParams()
+  const guided = searchParams.get(ADD_LOCATION_QUERY) === '1'
+  const returnTo = searchParams.get(RETURN_TO_QUERY)
+  useLayoutEffect(() => {
+    onRead(guided || returnTo !== null ? { guided, returnTo } : NO_GUIDED_ENTRY)
+  }, [guided, returnTo, onRead])
+  return null
+}
+
 /**
  * Everything in the section belongs to the member the session bridge names right now: it is
  * keyed by that owner, so a change of member (or sign-out) discards the last member's rows,
  * editors, status, form and every handler they hold in the same render, before any effect runs.
  */
 export function LocationsSection() {
+  const [entry, setEntry] = useState<GuidedEntry>(NO_GUIDED_ENTRY)
   return (
-    <MemberScope>{(session) => <MemberLocationsSection session={session} />}</MemberScope>
+    <>
+      <Suspense fallback={null}>
+        <GuidedEntryQuery onRead={setEntry} />
+      </Suspense>
+      <MemberScope>
+        {(session) => <MemberLocationsSection session={session} entry={entry} />}
+      </MemberScope>
+    </>
   )
 }
 
-function MemberLocationsSection({ session }: { session: MemberSession }) {
+/**
+ * Guided setup belongs to a member's list: a signed-out page, whose gate is open from the first
+ * paint, never has its Cancel inserted above the hint when the query arrives (P2-3).
+ */
+function showGuidedCancel(
+  guided: boolean,
+  sectionState: SectionState,
+  guestHint: boolean
+): boolean {
+  return guided && sectionState !== 'signed_out' && !guestHint
+}
+
+/** The saved list a return to Profile shows first (Story CC-7.7 D5, Codex review P1-2). */
+type LocationsSnapshot = { locations: SavedLocation[] }
+
+function MemberLocationsSection({
+  session,
+  entry,
+}: {
+  session: MemberSession
+  entry: GuidedEntry
+}) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const locale = resolveSupportedLocale(i18n.language) ?? 'en-US'
-  const guided = searchParams.get(ADD_LOCATION_QUERY) === '1'
-  const returnTo = searchParams.get(RETURN_TO_QUERY)
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [locations, setLocations] = useState<SavedLocation[]>([])
+  const { guided, returnTo } = entry
+  const snapshot = useSectionSnapshot<LocationsSnapshot>('locations', session.owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [locations, setLocations] = useState<SavedLocation[]>(
+    () => snapshot.restored?.locations ?? []
+  )
   const [status, setStatus] = useState('')
   const [error, setError] = useState<LocationFailureReason | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -89,6 +156,8 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
    * section, or after sign out.
    */
   const ownerGenerationRef = useRef(0)
+  /** Only the newest list read lands; a mutation also retires the reads started before it. */
+  const reloadGenerationRef = useRef(0)
   /**
    * One ownership token for work started now for `startedFor`: it may still
    * touch this section while the section is mounted for the same member and
@@ -150,8 +219,11 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
       const { current } = claimed
       const credentials = claimed.credentials()
       if (!credentials) return false
+      const generation = ++reloadGenerationRef.current
       const next = await listLocationsFromWeb(signal, credentials)
       if (signal?.aborted || !current()) return false
+      // A newer list read, or a change the member started since, outranks this answer.
+      if (generation !== reloadGenerationRef.current) return false
       setLocations(next)
       setSectionState('ready')
       return true
@@ -167,17 +239,18 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
     []
   )
 
-  // A new member (or none) starts from an empty section.
+  // A new member (or none) starts from an empty section; the member a return restored keeps
+  // the list it shows.
   useEffect(() => {
     ownerGenerationRef.current += 1
-    setLocations([])
+    if (owner === null || owner !== restoredFor) setLocations([])
     setStatus('')
     setError(null)
     setBusyId(null)
     setRenamingId(null)
     setConfirmingId(null)
     pendingFocusRef.current = null
-  }, [owner])
+  }, [owner, restoredFor])
 
   // One list request per member: a session event that names the same member
   // again (a token refresh, the end of a verification already answered) asks
@@ -199,13 +272,23 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
     const claimed = claim()
     if (!claimed) return
     const controller = new AbortController()
-    setSectionState('loading')
+    // A restored list refreshes in place: no loading state, and a failed refresh keeps it.
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    beginRead()
+    if (!inPlace) setSectionState('loading')
     reload(claimed, controller.signal).catch(() => {
-      if (controller.signal.aborted || !claimed.current()) return
+      if (controller.signal.aborted || !claimed.current() || inPlace) return
       setSectionState('load_failed')
     })
     return () => controller.abort()
-  }, [reload, claim, session.status, owner, loadAttempt])
+  }, [reload, claim, session.status, owner, loadAttempt, restoredFor, beginRead])
+
+  // What a return to Profile shows first: the list once it is ready, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready') remember({ locations })
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [locations, remember, sectionState])
 
   function retryLoad() {
     if (session.status === 'unavailable') session.retry()
@@ -240,6 +323,8 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
     const claimed = claim()
     if (!claimed) return
     const { current } = claimed
+    // A list read still out (a return's in-place refresh) predates this change: drop it.
+    reloadGenerationRef.current++
     setBusyId(locationId)
     setError(null)
     try {
@@ -312,6 +397,15 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
+  // Story CC-7.7: Profile's screen gate waits for the list, which sits above the sections it
+  // would otherwise push down when it lands. A signed-out page paints the signed-out hint from
+  // its first frame (hidden by globals.css on a page painted for a stored session).
+  useScreenGateRead(
+    'locations',
+    sectionState !== 'checking' && sectionState !== 'loading'
+  )
+  const guestFirstPaint = useGuestFirstPaint()
+  const guestHint = sectionState === 'checking' && guestFirstPaint
 
   return (
     <section
@@ -333,7 +427,7 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
         {t('locations.intro')}
       </p>
 
-      {guided && (
+      {showGuidedCancel(guided, sectionState, guestHint) && (
         <button
           type="button"
           onClick={() =>
@@ -350,6 +444,12 @@ function MemberLocationsSection({ session }: { session: MemberSession }) {
         <p className="mt-4 text-sm text-neutral-300" data-testid="locations-signed-out">
           {t('locations.signedOutHint')}
         </p>
+      )}
+      {guestHint && (
+        <GuestText
+          text={t('locations.signedOutHint')}
+          className="mt-4 text-sm text-neutral-300"
+        />
       )}
 
       {sectionState === 'load_failed' && (

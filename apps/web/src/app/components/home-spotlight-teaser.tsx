@@ -13,6 +13,7 @@ import React, {
 } from 'react'
 import Image from 'next/image'
 import {
+  SPOTLIGHT_TEASER_EXPIRY_MS,
   SpotlightTeaserState,
   withRequestDeadline,
   type SpotlightTeaserValue,
@@ -32,6 +33,13 @@ import {
   type SponsoredShownRegistry,
 } from './community-sponsored-cta'
 import type { SpotlightFocusIntent } from './community-lookbook-grid'
+import { useScreenGateScreen } from './screen-gate'
+import { HOME_TEASER_SNAPSHOT_PART, screenSnapshot } from '../../lib/screen-snapshot'
+import {
+  currentWebSessionScope,
+  useHydrating,
+  useWebSessionScope,
+} from '../../lib/use-web-session'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -43,10 +51,15 @@ const SESSION_SYNC_MS = 1000
 
 /**
  * The member the grid spotlight reads for: the same session source, the same
- * one-second sync and the same session events. Undefined until mounted.
+ * one-second sync and the same session events. Undefined until mounted while hydrating; a
+ * client-side mount (a return to Home) knows it at once, so its remembered teaser is in the
+ * first frame and the gate never reveals Home before it (CC-7.7, Codex review P2-4).
  */
 function useCommunityMember(): string | null | undefined {
-  const [member, setMember] = useState<string | null | undefined>(undefined)
+  const hydrating = useHydrating()
+  const [member, setMember] = useState<string | null | undefined>(() =>
+    hydrating ? undefined : communityCommentsSessionFromWeb()
+  )
   useEffect(() => {
     const sync = () => setMember(communityCommentsSessionFromWeb())
     sync()
@@ -62,8 +75,9 @@ function useCommunityMember(): string | null | undefined {
   return member
 }
 
-function usePageVisible(): boolean {
-  const [visible, setVisible] = useState(false)
+/** Null until mounted, then whether the page is visible. */
+function usePageVisible(): boolean | null {
+  const [visible, setVisible] = useState<boolean | null>(null)
   useEffect(() => {
     const sync = () => setVisible(document.visibilityState === 'visible')
     sync()
@@ -76,8 +90,49 @@ function usePageVisible(): boolean {
 export interface HomeSpotlightTeaserLifecycle {
   value: SpotlightTeaserValue | null
   removeValue: () => void
+  /**
+   * Story CC-7.7 D4: the teaser's read for the current member has answered, or no read will run
+   * (no member, or a hidden page). Home's screen gate waits for it while the layout is stacked,
+   * so the teaser is in place when the body appears instead of pushing the page down later.
+   */
+  settled: boolean
+  /**
+   * CodeRabbit r2 #7: the height a return holds for the teaser while it has none to show,
+   * because the one it remembered expired and the fresh read is still out. Null otherwise.
+   */
+  reservedHeight: number | null
+  /** Reports the rendered teaser's height, kept with the snapshot for `reservedHeight`. */
+  measure: (height: number) => void
   /** Story 6.7b: shown blocks for this Home visit, kept across the teaser's unmount. */
   sponsoredShown: SponsoredShownRegistry
+}
+
+/**
+ * The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5), with the
+ * height it rendered at.
+ */
+type TeaserSnapshot = {
+  memberId: string
+  value: SpotlightTeaserValue | null
+  height?: number
+}
+
+function snapshotValueExpired(value: SpotlightTeaserValue | null, now: number): boolean {
+  return value !== null && value.completedAt + SPOTLIGHT_TEASER_EXPIRY_MS <= now
+}
+
+/**
+ * CodeRabbit r2 #7: the height a return holds for a remembered teaser that expired, until the
+ * fresh read answers (`live` ends then) or a live value takes the place.
+ */
+function reservedTeaserHeight(
+  snapshot: TeaserSnapshot | undefined,
+  live: boolean,
+  expired: boolean,
+  liveValue: SpotlightTeaserValue | null
+): number | null {
+  if (!live || !expired || liveValue !== null) return null
+  return snapshot?.height ?? null
 }
 
 /**
@@ -91,31 +146,125 @@ export function useHomeSpotlightTeaser({
 }: {
   stacked: boolean
 }): HomeSpotlightTeaserLifecycle {
+  // The member each read started for, so a settled read counts only for that member.
+  const readingForRef = useRef<string | null | undefined>(undefined)
+  const [settledFor, setSettledFor] = useState<string | null | undefined>(undefined)
+  /** The session scope of the read whose answer is shown (Codex review P2-1). */
+  const shownScopeRef = useRef<string | null>(null)
   const [state] = useState(
     () =>
       new SpotlightTeaserState({
-        read: (signal) =>
-          withRequestDeadline(SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS, [signal], (deadline) =>
-            getCommunitySpotlightFromWeb({
-              limit: 1,
-              surface: 'home_teaser',
-              signal: deadline,
-            })
-          ),
+        read: (signal) => {
+          const readFor = readingForRef.current
+          const readScope = currentWebSessionScope()
+          return withRequestDeadline(
+            SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS,
+            [signal],
+            (deadline) =>
+              getCommunitySpotlightFromWeb({
+                limit: 1,
+                surface: 'home_teaser',
+                signal: deadline,
+              })
+          ).finally(() => {
+            // After the state stored its answer (it does so as this promise settles), so the
+            // gate never opens on the settled flag before the value is there to render.
+            if (!signal.aborted)
+              setTimeout(() => {
+                shownScopeRef.current = readScope
+                setSettledFor(readFor)
+              }, 0)
+          })
+        },
         retryAfterSeconds: communityRetryAfterSeconds,
       })
   )
-  const value = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
+  const storedValue = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
   const sponsoredShown = useSponsoredShownRegistry()
   const member = useCommunityMember()
+  /*
+   * The member `state` reads for, set where `state.setMember` runs. Its value belongs to that
+   * member only: a member change (a fixture bearer switch keeps the owner) drops it in the same
+   * render, before the effect points `state` at the next member (CI 7.7-E2E-009 on d67800d2).
+   */
+  const [stateMember, setStateMember] = useState(member)
+  const liveValue = stateMember === member ? storedValue : null
   const visible = usePageVisible()
 
+  // Story CC-7.7 D5: a return to Home shows the teaser it last showed this member (or none)
+  // until the teaser's own read answers, then the read's answer, in place.
+  const screen = useScreenGateScreen()
+  const scope = useWebSessionScope()
+  const [snapshot] = useState(() =>
+    screen && scope
+      ? screenSnapshot.recall<TeaserSnapshot>(scope, screen, HOME_TEASER_SNAPSHOT_PART)
+      : undefined
+  )
+  const [snapshotDropped, setSnapshotDropped] = useState(false)
+  /** The remembered value has passed the expiry `SpotlightTeaserState` enforces on a live one. */
+  const [snapshotExpired, setSnapshotExpired] = useState(() =>
+    snapshotValueExpired(snapshot?.value ?? null, Date.now())
+  )
   useEffect(() => {
+    const remembered = snapshot?.value
+    if (!remembered || snapshotExpired) return
+    const timer = setTimeout(
+      () => setSnapshotExpired(true),
+      Math.max(0, remembered.completedAt + SPOTLIGHT_TEASER_EXPIRY_MS - Date.now())
+    )
+    return () => clearTimeout(timer)
+  }, [snapshot, snapshotExpired])
+  const memberSettled = member !== undefined && settledFor === member
+  const snapshotLive =
+    !snapshotDropped &&
+    !memberSettled &&
+    member !== undefined &&
+    member !== null &&
+    snapshot?.memberId === member
+  const value =
+    liveValue ?? (snapshotLive && !snapshotExpired ? (snapshot?.value ?? null) : null)
+  const settled = member === null || visible === false || memberSettled || snapshotLive
+  /*
+   * CodeRabbit r2 #7: a return whose remembered teaser expired shows none, and a return opens
+   * Home's gate from its snapshot at once, so the fresh teaser would land later and push the
+   * feed down. The expired teaser's place is held at its last height until the fresh read
+   * answers (`snapshotLive` ends then), and the answer takes that place.
+   */
+  const reservedHeight = reservedTeaserHeight(
+    snapshot,
+    snapshotLive,
+    snapshotExpired,
+    liveValue
+  )
+  /** The rendered teaser's height, once it is laid out (a closed gate lays out nothing). */
+  const [height, setHeight] = useState<number | undefined>(undefined)
+  const measure = useCallback((next: number) => {
+    if (next > 0) setHeight(next)
+  }, [])
+  const removeValue = useCallback(() => {
+    setSnapshotDropped(true)
+    state.removeValue()
+  }, [state])
+
+  useEffect(() => {
+    if (!screen || !scope || !member || !memberSettled) return
+    // Under the scope its read started in; the store drops it once that scope left, and while
+    // Community access is revoked (P3-1).
+    screenSnapshot.remember(shownScopeRef.current, screen, HOME_TEASER_SNAPSHOT_PART, {
+      memberId: member,
+      value: liveValue,
+      height: liveValue ? height : undefined,
+    } satisfies TeaserSnapshot)
+  }, [height, liveValue, member, memberSettled, scope, screen])
+
+  useEffect(() => {
+    readingForRef.current = member
     state.setMember(member)
+    setStateMember(member)
   }, [member, state])
 
   useEffect(() => {
-    state.setActive(stacked && visible)
+    state.setActive(stacked && visible === true)
   }, [stacked, visible, state])
 
   useEffect(
@@ -126,7 +275,7 @@ export function useHomeSpotlightTeaser({
     [state]
   )
 
-  return { value, removeValue: state.removeValue, sponsoredShown }
+  return { value, removeValue, sponsoredShown, settled, reservedHeight, measure }
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
@@ -182,6 +331,8 @@ export interface HomeSpotlightTeaserProps {
   onImageError: () => void
   /** Called when the teaser leaves while its link holds focus. */
   onLeaveWhileFocused: () => void
+  /** Called after each commit with the teaser's laid-out height (CodeRabbit r2 #7). */
+  onMeasure?: (height: number) => void
 }
 
 export function HomeSpotlightTeaser({
@@ -191,6 +342,7 @@ export function HomeSpotlightTeaser({
   onOpen,
   onImageError,
   onLeaveWhileFocused,
+  onMeasure,
 }: HomeSpotlightTeaserProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const leaveRef = useRef(onLeaveWhileFocused)
@@ -214,6 +366,12 @@ export function HomeSpotlightTeaser({
     }
   }, [])
 
+  // Every commit, so the height read once the gate shows the body (and after a wrap change)
+  // is the one kept. A hidden body measures 0, which `measure` ignores.
+  useLayoutEffect(() => {
+    if (rootRef.current) onMeasure?.(rootRef.current.offsetHeight)
+  })
+
   return (
     <div
       ref={rootRef}
@@ -227,7 +385,7 @@ export function HomeSpotlightTeaser({
           event.preventDefault()
           onOpen()
         }}
-        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
+        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-4 text-left motion-safe:transition-colors motion-safe:duration-200 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
       >
         <Image
           data-testid="home-spotlight-teaser-image"
@@ -322,8 +480,8 @@ export function HomeSpotlightTeaser({
 }
 
 /**
- * Mounted only while the layout is stacked and the value is valid; anything
- * else renders nothing and reserves no space.
+ * Mounted only while the layout is stacked and the value is valid. Without a value it
+ * renders nothing, except the held place of an expired teaser on a return (CodeRabbit r2 #7).
  */
 export function HomeSpotlightTeaserSlot({
   stacked,
@@ -336,7 +494,15 @@ export function HomeSpotlightTeaserSlot({
   t: Translate
   onLeaveWhileFocused: () => void
 }) {
-  if (!stacked || !teaser.value) return null
+  if (!stacked) return null
+  if (!teaser.value)
+    return teaser.reservedHeight ? (
+      <div
+        aria-hidden="true"
+        data-testid="home-spotlight-teaser-reserved"
+        style={{ height: teaser.reservedHeight }}
+      />
+    ) : null
   return (
     <HomeSpotlightTeaser
       value={teaser.value}
@@ -345,6 +511,7 @@ export function HomeSpotlightTeaserSlot({
       onOpen={teaser.open}
       onImageError={teaser.removeValue}
       onLeaveWhileFocused={onLeaveWhileFocused}
+      onMeasure={teaser.measure}
     />
   )
 }

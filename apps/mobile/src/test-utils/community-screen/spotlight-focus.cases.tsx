@@ -1,8 +1,8 @@
 // Story 6.7 owner: a Home teaser activation resolved by the mobile Community screen.
-import { item, setMockParams } from './harness'
+import { feedJson, item, serveFeed, setMockParams } from './harness'
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { screenFocus } from '../focus-effect'
-import { mockCapture, routing } from './mock-state'
+import { mockCapture, refreshEvents, routing } from './mock-state'
 import { act, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
@@ -15,6 +15,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 import {
   mobileApplicationUserId,
@@ -106,6 +107,229 @@ async function frames(count: number) {
 }
 
 export function registerCommunitySpotlightFocusCases() {
+  // Story CC-7.7 D3 (review P2-8): the module sits inside the screen gate, which also waits
+  // for the first feed page. The intent is consumed only once the entry is on screen, in
+  // either read order.
+  it('7.7-NAT-006 a Spotlight ready before the first feed page waits for the gate, then takes focus once', async () => {
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    let releaseFeed!: () => void
+    const feedHeld = new Promise<void>((resolve) => {
+      releaseFeed = resolve
+    })
+    onTestFinished(() => releaseFeed())
+    serveFeed(async () => {
+      await feedHeld
+      return feedJson()
+    })
+    serveSpotlight(() => page())
+    setMockParams(teaserIntent('spot-2', 'token-77-spotlight-first'))
+    await render(<CommunityScreen />)
+
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-2')
+    await frames(3)
+    // Ready behind the closed gate: nothing is focused, announced or reported yet.
+    expect(rank).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+
+    act(() => releaseFeed())
+
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    )
+    expect(rank).toBeVisible()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
+
+  it('7.7-NAT-006 a first feed page before the Spotlight waits for the Spotlight, then takes focus once', async () => {
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    let releaseSpotlight!: () => void
+    const spotlightHeld = new Promise<void>((resolve) => {
+      releaseSpotlight = resolve
+    })
+    onTestFinished(() => releaseSpotlight())
+    let feedReads = 0
+    serveFeed(() => {
+      feedReads += 1
+      return feedJson()
+    })
+    serveSpotlight(async () => {
+      await spotlightHeld
+      return page()
+    })
+    setMockParams(teaserIntent('spot-2', 'token-77-feed-first'))
+    await render(<CommunityScreen />)
+
+    await waitFor(() => expect(feedReads).toBe(1))
+    await frames(3)
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+
+    act(() => releaseSpotlight())
+
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-2')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    )
+    expect(rank).toBeVisible()
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
+
+  // CodeRabbit r1: a pull to refresh replaces page one in place. View more pages nothing from
+  // the cursor that read is about to replace, and pages from the fresh cursor once it lands.
+  it('7.7-NAT-011 View more waits while a refresh replaces page one, then pages from the fresh cursor', async () => {
+    const cursors: (string | null)[] = []
+    let releaseRefresh!: () => void
+    const refreshHeld = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    onTestFinished(() => releaseRefresh())
+    server.use(
+      http.get(SPOTLIGHT_ROUTE, async ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        cursors.push(cursor)
+        if (cursor !== null)
+          return page({ items: [spotlightItem(`after-${cursor}`, 3)], nextCursor: null })
+        if (cursors.length === 1) return page({ nextCursor: 'first-cursor' })
+        await refreshHeld
+        return page({
+          items: [spotlightItem('fresh-1', 1), spotlightItem('fresh-2', 2)],
+          nextCursor: 'fresh-cursor',
+        })
+      })
+    )
+    await render(<CommunityScreen />)
+    const viewMore = await screen.findByTestId('community-spotlight-view-more')
+    await waitFor(() => expect(viewMore).toBeVisible())
+    expect(viewMore).not.toHaveAttribute('aria-disabled', 'true')
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+    await waitFor(() => expect(cursors).toEqual([null, null]))
+
+    // The refresh is still in flight: View more stays put, disabled, and reads nothing.
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-view-more')).toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+    press(screen.getByTestId('community-spotlight-view-more'))
+    await frames(3)
+    expect(cursors).toEqual([null, null])
+    expect(screen.queryByTestId('community-spotlight-loading-more')).toBeNull()
+
+    act(() => releaseRefresh())
+    expect(await screen.findByTestId('community-spotlight-item-fresh-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-view-more')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+
+    press(screen.getByTestId('community-spotlight-view-more'))
+
+    expect(
+      await screen.findByTestId('community-spotlight-item-after-fresh-cursor')
+    ).toBeVisible()
+    expect(cursors).toEqual([null, null, 'fresh-cursor'])
+    expect(screen.queryByTestId('community-spotlight-item-after-first-cursor')).toBeNull()
+  })
+
+  // CodeRabbit r1: the notice sits inside the screen gate. An intent that times out while the
+  // gate still shows the placeholder focuses its notice once the gate opens, here at the gate's
+  // own deadline, never while the notice is hidden.
+  it('7.7-NAT-012 a destination notice reported behind the closed gate takes focus once the gate opens', async () => {
+    const held: (() => void)[] = []
+    onTestFinished(() => {
+      for (const release of held) release()
+    })
+    serveFeed(
+      () =>
+        new Promise<Response>((resolve) => {
+          held.push(() => resolve(feedJson()))
+        })
+    )
+    serveSpotlight(
+      () =>
+        new Promise<Response>((resolve) => {
+          held.push(() => resolve(page()))
+        })
+    )
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    const startedAt = Date.now()
+    let now = startedAt
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    // The stored session takes 2 seconds to restore, so the gate's own 10-second deadline ends
+    // 2 seconds after the intent's.
+    const restoreToken = setMobileAccessTokenResolver(
+      () =>
+        new Promise<string>((resolve) => {
+          setTimeout(() => resolve('session-token'), 2_000)
+        })
+    )
+    try {
+      setMockParams(teaserIntent('spot-1', 'token-77-gate-deadline'))
+      await render(<CommunityScreen />)
+      now = startedAt + 2_000
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      now = startedAt + 10_000
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8_000)
+      })
+
+      // The intent timed out while the gate still waits on the feed: the notice is there,
+      // hidden, and takes no focus.
+      const notice = screen.getByTestId('deep-link-info-banner-message')
+      expect(notice.getAttribute('aria-label')).toBe(DESTINATION_UNAVAILABLE)
+      expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+      expect(notice).not.toBeVisible()
+      await frames(3)
+      expect(findNodeHandle).not.toHaveBeenCalledWith(notice)
+      expect(handles.has(notice)).toBe(false)
+
+      now = startedAt + 12_000
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000)
+      })
+      vi.useRealTimers()
+
+      expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+      await waitFor(() =>
+        expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(
+          handles.get(notice)
+        )
+      )
+      expect(notice).toBeVisible()
+      expect(
+        vi
+          .mocked(AccessibilityInfo.setAccessibilityFocus)
+          .mock.calls.filter(([handle]) => handle === handles.get(notice))
+      ).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+      restoreToken()
+      dateNow.mockRestore()
+    }
+  })
+
   it('6.7-MOB-020 an entry present takes focus with one announcement and the params clear', async () => {
     const handles = iosFocusHandles()
     vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()

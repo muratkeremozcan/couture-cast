@@ -21,6 +21,8 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import { SaveFeedbackProvider } from '@/components/save-feedback'
+import enUS from '@/assets/locales/en-US.json'
 
 const SPOTLIGHT_ROUTE = '*/api/v1/community/spotlight'
 
@@ -550,6 +552,39 @@ export function registerCommunitySpotlightCases() {
     expect(await screen.findByTestId('community-spotlight-item-after-1')).toBeVisible()
     expect(screen.queryByTestId('community-spotlight-item-before-1')).toBeNull()
     expect(reads).toBe(2)
+  })
+
+  // Story CC-7.7 D4 (review P2-7): a failed refresh keeps the shown row, inserts nothing
+  // above the feed, and offers Retry in the root status bar's floating slot.
+  it('7.7-NAT-004 a failed Spotlight refresh keeps the row and reports in the status bar with Retry', async () => {
+    let reads = 0
+    serveSpotlight(() => {
+      reads += 1
+      if (reads === 2) return errorEnvelope(500, 'Internal server error')
+      return page({ items: [rankedLook(reads === 1 ? 'before-1' : 'after-1', 1)] })
+    })
+    await render(
+      <SaveFeedbackProvider>
+        <CommunityScreen />
+      </SaveFeedbackProvider>
+    )
+    const shown = await screen.findByTestId('community-spotlight-item-before-1')
+    await waitFor(() => expect(shown).toBeVisible())
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+
+    const bar = await screen.findByTestId('status-feedback-bar')
+    expect(bar).toHaveTextContent(enUS.community.spotlight.error)
+    expect(reads).toBe(2)
+    // The row kept its card and grew no inline error above the feed.
+    expect(screen.getByTestId('community-spotlight-item-before-1')).toBe(shown)
+    expect(shown).toBeVisible()
+    expect(screen.queryByTestId('community-spotlight-retry')).toBeNull()
+
+    press(screen.getByTestId('status-bar-action-retry'))
+
+    expect(await screen.findByTestId('community-spotlight-item-after-1')).toBeVisible()
+    expect(reads).toBe(3)
   })
 
   it('6.6-MOB-080 pull to refresh while signed out reads no spotlight', async () => {

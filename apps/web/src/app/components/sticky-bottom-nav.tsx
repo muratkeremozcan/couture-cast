@@ -135,6 +135,9 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
             <Link
               key={tab.id}
               href={tab.href}
+              // Story CC-7.7 D5: a tab switch keeps the window where it is; the screen gate of the
+              // tab it opens restores that tab's own scroll, or starts a first visit at the top.
+              scroll={false}
               data-testid={`bottom-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}

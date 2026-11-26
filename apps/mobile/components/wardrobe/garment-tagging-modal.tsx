@@ -27,6 +27,7 @@ import { useAccessibilityAnnouncer } from '../../src/hooks/use-accessibility-ann
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { createSchemeStyles, useSchemeColors } from '@/components/themed'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export interface MobileGarmentTaggingModalProps {
   visible: boolean
@@ -115,6 +116,7 @@ export function MobileGarmentTaggingModal({
   updateTagsFn = updateGarmentTagsFromMobile,
   invokingNodeHandle,
 }: MobileGarmentTaggingModalProps) {
+  const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const insets = useModalInsets()
   const styles = useStyles()
@@ -320,7 +322,7 @@ export function MobileGarmentTaggingModal({
   return (
     <EdgeToEdgeModal
       visible={visible}
-      animationType="slide"
+      animationType={modalAnimation}
       onRequestClose={onClose}
       scrim="rgba(0, 0, 0, 0.5)"
     >

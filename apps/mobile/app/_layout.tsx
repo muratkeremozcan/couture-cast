@@ -32,6 +32,7 @@ import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
 import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import {
   underModalAccessibility,
@@ -55,6 +56,41 @@ export {
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
+}
+
+/**
+ * Story CC-7.7 D6: stack transitions last 200 ms or less, and none plays under the OS
+ * reduced-motion setting.
+ *
+ * `fade` is the one react-native-screens 4.16 transition whose shipped duration stays inside
+ * the budget on both platforms (checked in node_modules/react-native-screens):
+ * - Android ignores `animationDuration` (ScreenViewManager's setter is a no-op) and plays the
+ *   tween XML of the chosen animation. `fade` maps to res/base/anim/rns_fade_in.xml and
+ *   rns_fade_out.xml, 150 ms each (utils/FragmentTransactionKt.kt). The `default` animation
+ *   runs 450 ms on API 33+ (res/v33/anim-v33/rns_default_*.xml), and `slide_from_*` uses
+ *   config_mediumAnimTime (400 ms).
+ * - iOS runs `fade` through RNSScreenStackAnimator, a custom animator whose duration is the
+ *   screen's `animationDuration` in ms (transitionDuration:, 500 ms when unset). The `default`
+ *   animation is UIKit's own push, which ignores `animationDuration`.
+ */
+export function rootStackMotionOptions(reduceMotion: boolean): {
+  animationDuration: number
+  animation: 'fade' | 'none'
+} {
+  return { animationDuration: 200, animation: reduceMotion ? 'none' : 'fade' }
+}
+
+/**
+ * The `modal` route on iOS is a system page sheet; `fade` would turn it into a cross-dissolve
+ * (RNSScreen setStackAnimation). It keeps its system-timed sheet presentation while motion is on,
+ * the platform sheet exception in D6, and inherits `none` under reduced motion. Android shows the
+ * route as a stack screen, so it keeps the stack's 150 ms fade.
+ */
+export function rootModalMotionOptions(
+  reduceMotion: boolean,
+  os: typeof Platform.OS = Platform.OS
+): { animation?: 'default' } {
+  return os === 'ios' && !reduceMotion ? { animation: 'default' } : {}
 }
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
@@ -121,6 +157,7 @@ function RootLayoutNav() {
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
   const { t, i18n } = useTranslation()
   const modalOpen = useEdgeToEdgeModalOpen()
+  const reduceMotion = useReducedMotion()
 
   const router = useRouter()
   const navigation = useRootNavigationState()
@@ -270,6 +307,7 @@ function RootLayoutNav() {
                   <Stack
                     screenOptions={{
                       headerBackTitle: t('common.back'),
+                      ...rootStackMotionOptions(reduceMotion),
                     }}
                   >
                     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -282,6 +320,7 @@ function RootLayoutNav() {
                         presentation: 'modal',
                         title: '',
                         headerShown: Platform.OS !== 'ios',
+                        ...rootModalMotionOptions(reduceMotion),
                       }}
                     />
                     <Stack.Screen

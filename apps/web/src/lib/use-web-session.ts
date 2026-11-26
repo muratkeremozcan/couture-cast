@@ -113,12 +113,46 @@ function sameState(a: WebSessionState, b: WebSessionState): boolean {
   return a.status !== 'signed_in' || a.owner === (b as typeof a).owner
 }
 
+const subscribeNothing = () => () => undefined
+
+/**
+ * True on the server and while React hydrates server HTML; false for a render that only the
+ * client does (a client-side navigation, or any render after hydration). A first render that
+ * must match the server's HTML reads it before it uses anything only the browser knows.
+ */
+export function useHydrating(): boolean {
+  return useSyncExternalStore(
+    subscribeNothing,
+    () => false,
+    () => true
+  )
+}
+
+const CHECKING: WebSessionState = { status: 'checking' }
+const NO_SEED_RETRY = () => undefined
+
+/**
+ * Where a mount starts (Story CC-7.7 D5). Hydration starts at `checking`, as the server did. A
+ * client-side mount (a tab switch) starts from what the session bridge already knows: a member
+ * it named, or no stored session at all. Only a stored session it has not verified yet starts
+ * at `checking`, so a tab return never shows a checking state for a known member.
+ */
+function seedWebSessionState(hydrating: boolean): WebSessionState {
+  if (hydrating) return CHECKING
+  // An outcome of `pending` never yields `unavailable`, so the retry is never offered.
+  return readWebSessionState('pending', NO_SEED_RETRY)
+}
+
 /**
  * The verified web session, following every change. Starts at `checking` on the server and on
- * the first client render, so a signed-in member never sees a signed-out state flash past.
+ * the hydrating client render, so a signed-in member never sees a signed-out state flash past;
+ * a client-side remount starts from the session it already knows (`seedWebSessionState`).
  */
 export function useWebSession(): WebSessionState {
-  const [state, setState] = useState<WebSessionState>({ status: 'checking' })
+  const hydrating = useHydrating()
+  const [state, setState] = useState<WebSessionState>(() =>
+    seedWebSessionState(hydrating)
+  )
 
   useEffect(() => {
     let active = true
@@ -244,6 +278,33 @@ export function MemberScope({
 /** The bearer this tab holds right now, read where a member request reads it. */
 export function currentWebSessionBearer(): string | null {
   return fixtureBearer()
+}
+
+/**
+ * Story CC-7.7 D5 (Codex P2-1): whose content a read belongs to. A verified member is their
+ * owner alone, so a token refresh keeps their scope (and their tab snapshots). The e2e fixture
+ * bearers all share one owner (`UNVERIFIED_BEARER_OWNER`), so the fixture scope adds the bearer:
+ * a read captures it when it starts, and an answer whose scope is no longer live is dropped.
+ * The scope lives in memory only and is only ever compared.
+ */
+export function currentWebSessionScope(): string | null {
+  const owner = currentWebSessionOwner()
+  if (owner !== UNVERIFIED_BEARER_OWNER) return owner
+  return `${UNVERIFIED_BEARER_OWNER}\u0000${fixtureBearer() ?? ''}`
+}
+
+/** True only while `scope` is the one `currentWebSessionScope` names right now. */
+export function isLiveScope(scope: string | null): scope is string {
+  return scope !== null && currentWebSessionScope() === scope
+}
+
+/** `currentWebSessionScope`, read as an external store like `useWebSessionOwner`. */
+export function useWebSessionScope(): string | null {
+  return useSyncExternalStore(
+    subscribeWebSessionOwner,
+    currentWebSessionScope,
+    () => null
+  )
 }
 
 /**

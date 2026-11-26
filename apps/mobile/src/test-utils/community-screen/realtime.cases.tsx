@@ -733,6 +733,31 @@ export function registerCommunityRealtimeCases() {
     )
     expect(published).toBe(1)
   })
+  // Story CC-7.7 D4 (TEA design 7.7-NAT-004): arriving looks never push the feed down.
+  it('7.7-NAT-004 shows the new-looks pill as an overlay that leaves the list where it was', async () => {
+    const feeds = twoFilterFeeds()
+    await render(<CommunityScreen />)
+    press(await screen.findByTestId('community-filter-chip-cold_dry'))
+    const card = await screen.findByTestId('community-post-card-post-cold')
+    await waitFor(() => expect(card).toBeVisible())
+    const listTop = screen.getByTestId('community-feed-list').getBoundingClientRect().top
+    const cardTop = card.getBoundingClientRect().top
+    await act(async () => {
+      await feeds.syncs.at(-1)!.catchUp()
+    })
+    feeds.state.published = true
+    await act(async () => {
+      await feeds.syncs.at(-1)!.catchUp()
+    })
+
+    const pill = await screen.findByTestId('community-new-looks-pill')
+    expect(pill).toBeVisible()
+    expect(getComputedStyle(pill.parentElement!).position).toBe('absolute')
+    expect(screen.getByTestId('community-feed-list').getBoundingClientRect().top).toBe(
+      listTop
+    )
+    expect(card.getBoundingClientRect().top).toBe(cardTop)
+  })
   it('drops new looks buffered under the previous filter when the filter changes', async () => {
     const feeds = twoFilterFeeds()
     await bufferColdLook(feeds)

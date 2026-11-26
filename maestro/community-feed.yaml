@@ -292,21 +292,21 @@ tags:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
     label: 'The newest feed-seed post renders in the feed'
-# The card can stop with only its top padding inside the list and the author row
-# just past the bottom edge (CI job 120691261993 logged the row at y 2224 against
-# a list ending at 2190). A short, slow drag lifts it into view; it moves the
-# list far less than its height, so the row cannot pass the list top.
-- repeat:
-    while:
-      notVisible:
-        id: 'community-card-author-lookbook-5'
-    times: 3
-    commands:
-      - swipe:
-          start: '50%, 70%'
-          end: '50%, 55%'
-          duration: 1500
-      - waitForAnimationToEnd
+# The card can stop with its author row on the list's bottom edge. Maestro counts
+# a clipped node as visible: CI job 139596881183 reported the author row and the
+# climate pill visible at 3 px and 11 px tall (list ending at y 2190), while the
+# band label inside the pill had no height and its text assertion failed. A
+# visibility check on the row cannot tell that apart, so the pill is scrolled to
+# the middle of the screen, fully shown, slowly so the scroll cannot overshoot it
+# under the filter strip.
+- scrollUntilVisible:
+    element:
+      id: 'community-card-climate-pill-lookbook-5'
+    direction: DOWN
+    centerElement: true
+    visibilityPercentage: 100
+    speed: 10
+    timeout: 20000
 - assertVisible:
     id: 'community-card-author-lookbook-5'
     label: 'The author line renders a pseudonym rather than being absent'

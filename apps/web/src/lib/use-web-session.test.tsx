@@ -21,6 +21,7 @@ import {
   type MemberSession,
   useMountSignal,
   useSessionRecheck,
+  useWebSession,
 } from './use-web-session'
 
 /** The session bridge's state, driven by hand: who verification named, and each pending check. */
@@ -295,5 +296,56 @@ describe('recovery after a failed recheck', () => {
     const error = await result.catch((caught: unknown) => caught)
     expect(isSessionRecheckError(error)).toBe(true)
     expect(read).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Story CC-7.7 D5 (7.7-UNIT-013): a tab switch remounts the tab's sections. A remount while the
+// bridge already names the member starts from that member, so a return never flashes the
+// checking state (or the placeholder that follows it).
+describe('useWebSession remount seed', () => {
+  // The previous describe leaves its checks in `session.pending` (CI, 61d7156e): start empty.
+  beforeEach(() => {
+    session.identity = null
+    session.stored = false
+    session.pending = []
+    window.sessionStorage.clear()
+  })
+
+  afterEach(() => {
+    session.identity = null
+    session.stored = false
+    session.pending = []
+    window.sessionStorage.clear()
+  })
+
+  function StatusLog({ log }: { log: string[] }) {
+    const state = useWebSession()
+    log.push(state.status === 'signed_in' ? `signed_in:${state.owner}` : state.status)
+    return null
+  }
+
+  it('7.7-UNIT-013 a remount with a known session starts at the member, never checking', () => {
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+
+    const first: string[] = []
+    const { unmount } = render(<StatusLog log={first} />)
+    unmount()
+    const second: string[] = []
+    render(<StatusLog log={second} />)
+
+    expect(first.length).toBeGreaterThan(0)
+    expect(second.length).toBeGreaterThan(0)
+    for (const status of [...first, ...second]) expect(status).toBe('signed_in:member-1')
+    // Nothing to verify: the bridge already named the member.
+    expect(session.pending).toHaveLength(0)
+  })
+
+  it('7.7-UNIT-013 a stored session the bridge has not named yet still starts at checking', () => {
+    session.stored = true
+    const log: string[] = []
+    render(<StatusLog log={log} />)
+    expect(log[0]).toBe('checking')
   })
 })

@@ -11,7 +11,7 @@
 // a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   getCommercePreferenceFromWeb,
@@ -27,6 +27,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
 const HELP_ID = 'commerce-affiliate-ctas-help'
@@ -63,8 +69,27 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     markFailed: markRecheckFailed,
     clear: clearRecheck,
   } = recheck
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [enabled, setEnabled] = useState(true)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's setting at once
+  // and reads it again in place; a failed refresh keeps it.
+  const snapshot = useSectionSnapshot<{ enabled: boolean }>('commerce', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [enabled, setEnabled] = useState(() => snapshot.restored?.enabled ?? true)
+  /**
+   * The value the server last confirmed (a read or a save), kept apart from the optimistic
+   * `enabled`: a return, or a refresh that fails, starts from what the server holds.
+   */
+  const [confirmed, setConfirmed] = useState(() => snapshot.restored?.enabled ?? true)
+  /**
+   * Advances when a save starts and again when it settles, and `savePendingRef` marks the time
+   * between. A read that overlaps a save in any way (sent before it, or sent while it was out)
+   * may answer for the value the save replaced, so it never touches the control, the confirmed
+   * value or the snapshot. A read sent after the save settled is current.
+   */
+  const saveGenerationRef = useRef(0)
+  const savePendingRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -114,8 +139,15 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
 
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    const saveGeneration = saveGenerationRef.current
+    const overlapsSave = () =>
+      saveGeneration !== saveGenerationRef.current || savePendingRef.current
+    beginRead()
     setError(null)
-    setSectionState('loading')
+    // CodeRabbit r3 on #8: a read sent while a save is out is superseded by that save, so it never
+    // takes the section to loading; nothing would bring a ready section back when it is dropped.
+    if (!inPlace && !savePendingRef.current) setSectionState('loading')
 
     void (async () => {
       try {
@@ -129,7 +161,13 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         if (!current()) {
           return
         }
+        if (overlapsSave()) {
+          // A save overlapped this read: its answer is the newer value.
+          setSectionState('ready')
+          return
+        }
         setEnabled(preference.affiliateCtasEnabled)
+        setConfirmed(preference.affiliateCtasEnabled)
         setSectionState('ready')
       } catch (loadError: unknown) {
         if (!current()) {
@@ -149,6 +187,9 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
           setSectionState('signed_out')
           return
         }
+        // A restored setting stays on screen when its refresh fails, and a save started since
+        // owns the control.
+        if (inPlace || overlapsSave()) return
         /*
          * The catalog string, unconditionally — the server's own message is
          * deliberately NOT shown.
@@ -168,7 +209,24 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage, loadAttempt, clearRecheck, markRecheckFailed])
+  }, [
+    status,
+    owner,
+    loadErrorMessage,
+    loadAttempt,
+    clearRecheck,
+    markRecheckFailed,
+    restoredFor,
+    beginRead,
+  ])
+
+  // What a return to Profile shows first: the setting the server last confirmed, never a save
+  // still in flight, and nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready') remember({ enabled: confirmed })
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [confirmed, remember, sectionState])
 
   /**
    * Optimistic, and reverted on failure.
@@ -191,6 +249,8 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     }
 
     const previous = enabled
+    saveGenerationRef.current++
+    savePendingRef.current = true
     setEnabled(nextEnabled)
     setIsSaving(true)
     setError(null)
@@ -202,6 +262,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       })
       if (!isLiveOwner(owner)) return
       setEnabled(saved.affiliateCtasEnabled)
+      setConfirmed(saved.affiliateCtasEnabled)
       setConfirmation(t('commerce.settings.saved'))
     } catch {
       if (!isLiveOwner(owner)) return
@@ -209,11 +270,19 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       // Catalog copy, not the server's English. See the read path above.
       setError(genericErrorMessage)
     } finally {
+      // Every read sent while this save was out is now older than the value it settled on.
+      savePendingRef.current = false
+      saveGenerationRef.current++
       if (isLiveOwner(owner)) setIsSaving(false)
     }
   }
 
   const isSignedOut = sectionState === 'signed_out'
+  // Story CC-7.7: Profile's screen gate waits for this read; a signed-out page paints the hint
+  // from its first frame instead of inserting it when the session check ends.
+  useScreenGateRead('commerce', sectionState !== 'checking' && sectionState !== 'loading')
+  const guestFirstPaint = useGuestFirstPaint()
+  const showGuestHint = sectionState === 'checking' && guestFirstPaint
   /*
    * A read that failed leaves the control disabled on purpose. Falling back to
    * the default `true` would render an opted-out account as opted in, which
@@ -292,6 +361,12 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         >
           {t('commerce.settings.signedOutHint')}
         </p>
+      )}
+      {showGuestHint && (
+        <GuestText
+          text={t('commerce.settings.signedOutHint')}
+          className="mt-2 text-sm text-neutral-300"
+        />
       )}
 
       {/*

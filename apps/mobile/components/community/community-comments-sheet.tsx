@@ -36,6 +36,7 @@ import type {
   CommunityCommentDraft,
   CommunityCommentDrafts,
 } from '@/src/features/community/community-comment-drafts'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 /**
  * The author line of a comment, by the community card's rule: the alias, else
@@ -110,6 +111,7 @@ export function CommunityCommentsSheet({
   locale: SupportedLocale
   onClose: () => void
 }) {
+  const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const palette = useHeroPalette()
   const threadVersion = useSyncExternalStore(
@@ -397,7 +399,7 @@ export function CommunityCommentsSheet({
   return (
     <EdgeToEdgeModal
       visible
-      animationType="slide"
+      animationType={modalAnimation}
       scrim="rgba(0,0,0,0.5)"
       scrimTestID="comments-scrim"
       onRequestClose={() => {

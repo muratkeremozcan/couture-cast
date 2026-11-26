@@ -7,9 +7,9 @@
 // section through all five purchase outcomes and the per-status renders. The
 // bounded poll is mocked at the boundary (its timing contract is fake-timer
 // tested in the lib suite), so nothing here sleeps.
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type { Subscription } from '@couture/api-client/contracts/http'
 import type * as PremiumModule from '../lib/premium'
 
@@ -21,7 +21,11 @@ import type * as PremiumModule from '../lib/premium'
  * stub it. Navigation itself is not what these suites are about; the row's own
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -101,6 +105,8 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   resolveMobileAccessToken: () => Promise.resolve('member-token'),
   subscribeMobileApplicationUser: () => () => undefined,
   mobileApplicationUserId: () => null,
+  // Settings drops a return read whose member changed; no member change happens here.
+  mobileIdentityEpoch: () => 0,
   setMobileApplicationUserId: () => undefined,
   setMobileAccessTokenResolver: () => undefined,
 }))
@@ -123,6 +129,7 @@ vi.mock('@/src/lib/premium', () => ({
 import i18n, { initI18n } from '../lib/i18n'
 import { mockSubscriptionActive, mockSubscriptionNone } from '../test-utils/msw/handlers'
 import SettingsScreen from '../../app/(tabs)/settings'
+import { screenFocus } from '../test-utils/focus-effect'
 
 type EntitledSubscription = Exclude<Subscription, { status: 'none' }>
 
@@ -477,6 +484,49 @@ describe('SettingsScreen premium section', () => {
       fireEvent.click(await screen.findByTestId('premium-restore'))
 
       expect(await screen.findByTestId('premium-unavailable')).toBeTruthy()
+    })
+
+    // Story CC-7.7, CodeRabbit r2: a return to Profile re-reads the subscription. A restore that
+    // starts and lands while that read is out owns the answer; the older read is dropped.
+    it('7.7-NAT-017 a return read that answers after a restore keeps the restored subscription', async () => {
+      onTestFinished(() => screenFocus.reset())
+      restorePremiumPurchasesMock.mockResolvedValue({ kind: 'success' })
+      refreshSubscriptionMock.mockResolvedValue(entitled())
+      const statusLine = () => screen.getByTestId('premium-status-line').textContent
+
+      await render(<SettingsScreen />)
+      await screen.findByTestId('premium-restore')
+      const noneStatus = statusLine()
+      expect(noneStatus).not.toContain('Premium Monthly')
+
+      let answerReturnRead!: (subscription: Subscription) => void
+      getSubscriptionMock.mockReturnValueOnce(
+        new Promise<Subscription>((resolve) => {
+          answerReturnRead = resolve
+        })
+      )
+      const readsBeforeReturn = getSubscriptionMock.mock.calls.length
+      act(() => screenFocus.set(false))
+      act(() => screenFocus.set(true))
+      await waitFor(() =>
+        expect(getSubscriptionMock).toHaveBeenCalledTimes(readsBeforeReturn + 1)
+      )
+
+      fireEvent.click(screen.getByTestId('premium-restore'))
+      await waitFor(() => expect(statusLine()).toContain('Premium Monthly'))
+      expect(refreshSubscriptionMock).toHaveBeenCalledTimes(1)
+
+      // The return read answers with the pre-restore subscription, after the restore ended.
+      await act(async () => {
+        answerReturnRead(mockSubscriptionNone.data)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(statusLine()).toContain('Premium Monthly')
+
+      // A return with no store round trip during its read still lands its answer.
+      act(() => screenFocus.set(false))
+      act(() => screenFocus.set(true))
+      await waitFor(() => expect(statusLine()).toBe(noneStatus))
     })
   })
 })

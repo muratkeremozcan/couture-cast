@@ -1,3 +1,5 @@
+// Learning path Step 65: Signed-in shell without flashes.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Learning path Step 26: Chip navigation and sticky bottom nav.
@@ -5,6 +7,8 @@
 // Learning path Step 58: Production follow-ups after the project close.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
+import { createElement, type ComponentProps } from 'react'
+import type * as NextLinkModule from 'next/link'
 import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { getI18n } from '../../i18n'
@@ -27,6 +31,24 @@ vi.mock('posthog-js', () => ({
 vi.mock('next/navigation', () => ({
   usePathname: () => navigationMocks.pathname,
 }))
+
+// Story CC-7.7 D5 (7.7-CMP-009): Next renders `scroll` into no attribute, so the props each tab
+// link is built with are recorded here; the real Link still renders, so the other cases see the
+// same anchors as before.
+const linkProps = vi.hoisted(() => new Map<string, Record<string, unknown>>())
+
+vi.mock('next/link', async (importOriginal) => {
+  const actual = await importOriginal<typeof NextLinkModule>()
+  const Link = actual.default
+  return {
+    ...actual,
+    default: (props: ComponentProps<typeof Link>) => {
+      const testId = (props as unknown as Record<string, unknown>)['data-testid']
+      linkProps.set(String(testId), { href: props.href, scroll: props.scroll })
+      return createElement(Link, props)
+    },
+  }
+})
 
 function BottomNavHarness({ isMobilePreview = false }: { isMobilePreview?: boolean }) {
   return <StickyBottomNav isMobilePreview={isMobilePreview} />
@@ -223,5 +245,26 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
       expect(link).toHaveAccessibleName('Profil')
       expect(link).toHaveAttribute('data-ph-label', 'Profile')
     })
+  })
+})
+
+// Story CC-7.7 D5 test owner: a bottom-nav tab switch keeps the window where it is, so the screen
+// gate of the tab it opens restores that tab's own scroll (or starts a first visit at the top).
+// Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md
+// (7.7-CMP-009). The return itself is 7.7-CMP-001 and 7.7-E2E-008.
+describe('StickyBottomNav scroll (Story CC-7.7)', () => {
+  beforeEach(() => {
+    linkProps.clear()
+    navigationMocks.pathname = '/'
+  })
+
+  it('7.7-CMP-009 every tab link renders with scroll={false}', () => {
+    render(<StickyBottomNav />)
+
+    const tabs = ['home', 'wardrobe', 'community', 'settings']
+    for (const tab of tabs) expect(screen.getByTestId(`bottom-nav-${tab}`)).toBeVisible()
+    const tabLinks = [...linkProps.keys()].filter((key) => key.startsWith('bottom-nav-'))
+    expect(tabLinks.sort()).toEqual(tabs.map((tab) => `bottom-nav-${tab}`).sort())
+    for (const key of tabLinks) expect(linkProps.get(key)?.scroll).toBe(false)
   })
 })

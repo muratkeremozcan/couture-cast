@@ -88,6 +88,25 @@ async function watchSignInHints(page: Page) {
       childList: true,
       characterData: true,
     })
+    // Story CC-7.7 (Codex review of the PS-1 change): a section's signed-out first paint draws
+    // its hint from `data-guest-text` through CSS, so the words never enter the text the
+    // observer reads. Every frame, from before the first paint on, a guest stand-in that
+    // actually shows (a box, not display:none or hidden) on a page painted for a stored session
+    // counts as a seen hint. The hidden prerender stand-ins pass.
+    const frame = () => {
+      const session = document.documentElement?.getAttribute('data-session')
+      if (session === 'member' || session === 'pending') {
+        for (const node of Array.from(document.querySelectorAll('[data-guest-text]'))) {
+          const box = node.getBoundingClientRect()
+          const shows = node.checkVisibility({ visibilityProperty: true })
+          const label = `guest-text:${node.getAttribute('data-guest-text') ?? ''}`
+          if (shows && box.width > 0 && box.height > 0 && !seen.includes(label))
+            seen.push(label)
+        }
+      }
+      requestAnimationFrame(frame)
+    }
+    requestAnimationFrame(frame)
   }, SIGN_IN_HINTS)
 }
 
@@ -170,9 +189,23 @@ async function expectSignedInSettings(
     const palettes = page.getByTestId('premium-theme-section')
 
     await expect.poll(() => profileChecks.length).toBeGreaterThan(0)
-    await expect(commerce).toBeVisible()
-    await expect(premium).toBeVisible()
-    await expect(palettes).toBeVisible()
+    if (restored) {
+      await expect(commerce).toBeVisible()
+      await expect(premium).toBeVisible()
+      await expect(palettes).toBeVisible()
+    } else {
+      // Story CC-7.7 D1: a new tab has no member yet, so while verification runs the Profile body
+      // is the neutral placeholder; the sections are mounted behind it and paint nothing signed
+      // out. They used to be visible here, but no section can settle before verification answers.
+      await expect(page.getByTestId('screen-placeholder')).toBeVisible()
+      await expect(page.getByTestId('screen-placeholder')).toHaveAttribute(
+        'aria-busy',
+        'true'
+      )
+      await expect(commerce).toBeHidden()
+      await expect(premium).toBeHidden()
+      await expect(palettes).toBeHidden()
+    }
     // Verification is pending: nobody is signed out yet.
     expect(await signInHintsSeen(page)).toEqual([])
     if (restored) {
@@ -190,6 +223,11 @@ async function expectSignedInSettings(
     }
 
     release()
+    if (!restored) {
+      await expect(commerce).toBeVisible()
+      await expect(premium).toBeVisible()
+      await expect(palettes).toBeVisible()
+    }
     await expect(commerce.getByTestId('commerce-opt-out-toggle')).toBeVisible()
     await expect(premium.getByTestId('premium-subscribe-monthly')).toBeVisible()
     await expect(premium.getByTestId('premium-subscribe-annual')).toBeVisible()

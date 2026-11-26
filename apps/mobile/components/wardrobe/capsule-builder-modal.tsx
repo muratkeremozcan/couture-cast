@@ -21,6 +21,7 @@ import type {
 } from '@couture/api-client/contracts/http'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export interface MobileCapsuleSaveOptions {
   /** Present only when editing; the current strong entity tag. */
@@ -77,6 +78,7 @@ export function MobileCapsuleBuilderModal({
   initialCapsule,
   invokingNodeHandle,
 }: MobileCapsuleBuilderModalProps) {
+  const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const styles = useStyles()
   const insets = useModalInsets()
@@ -262,7 +264,7 @@ export function MobileCapsuleBuilderModal({
   return (
     <EdgeToEdgeModal
       visible={visible}
-      animationType="slide"
+      animationType={modalAnimation}
       onRequestClose={onClose}
       scrim="rgba(0,0,0,0.5)"
     >

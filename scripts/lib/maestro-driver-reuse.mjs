@@ -36,6 +36,10 @@ export const MAESTRO_DRIVER_INSTRUMENTATION =
 
 export const NO_REINSTALL_DRIVER_ARG = '--no-reinstall-driver'
 
+/** Listings a reuse check takes before it calls a driver part missing, and the wait between. */
+export const DRIVER_CHECK_READS = 3
+export const DRIVER_CHECK_PAUSE_MS = 2_000
+
 export class MaestroDriverNotReady extends Error {
   /**
    * @param {string} device
@@ -93,9 +97,15 @@ function presentDriverPackages(packagesOutput) {
  *   inspect: (device: string) => Promise<{ packagesOutput: string, instrumentationOutput: string }>
  *   uninstall: (device: string, packageName: string) => Promise<unknown>
  *   settle?: (device: string, driverPort: number | null) => Promise<void>
+ *   pause?: (ms: number) => Promise<void>
  * }} options
  */
-export function createMaestroDriverReuse({ inspect, uninstall, settle }) {
+export function createMaestroDriverReuse({
+  inspect,
+  uninstall,
+  settle,
+  pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
   /** Devices whose driver an earlier invocation of this run installed. */
   const installed = new Set()
 
@@ -120,14 +130,28 @@ export function createMaestroDriverReuse({ inspect, uninstall, settle }) {
       )
   }
 
-  /** Checks the driver an earlier flow installed is still complete. */
-  const checkReusable = async (device) => {
-    let missing
+  /** What one listing says the driver lacks; a listing adb could not take lacks everything. */
+  const readMissing = async (device) => {
     try {
       const { packagesOutput, instrumentationOutput } = await inspect(device)
-      missing = missingMaestroDriverParts(packagesOutput, instrumentationOutput)
+      return missingMaestroDriverParts(packagesOutput, instrumentationOutput)
     } catch (error) {
-      missing = [`adb could not list the driver (${error.message})`]
+      return [`adb could not list the driver (${error.message})`]
+    }
+  }
+
+  /**
+   * Checks the driver an earlier flow installed is still complete. One listing can come back
+   * short while the package manager is busy: CI run 45736490697 (shard 2) read both packages
+   * as missing while their instrumentation was still registered, which an uninstalled test
+   * app cannot leave behind, and failed a flow on a driver that was there. A part is
+   * missing only when every listing of the check says so.
+   */
+  const checkReusable = async (device) => {
+    let missing = await readMissing(device)
+    for (let read = 1; read < DRIVER_CHECK_READS && missing.length > 0; read++) {
+      await pause(DRIVER_CHECK_PAUSE_MS)
+      missing = await readMissing(device)
     }
     if (missing.length > 0) {
       installed.delete(device)

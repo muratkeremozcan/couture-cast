@@ -40,6 +40,7 @@ import {
 import { EdgeToEdgeModal } from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export type PreviewPalette = ReturnType<typeof useHeroPalette>
 export type PreviewControl = 'weather' | 'thermal' | 'wind' | 'rain'
@@ -844,10 +845,11 @@ export function PreviewSheet({
   testID: string
   children: React.ReactNode
 }) {
+  const modalAnimation = useModalAnimation('slide')
   return (
     <EdgeToEdgeModal
       visible={visible}
-      animationType="slide"
+      animationType={modalAnimation}
       onRequestClose={onClose}
       scrim="rgba(0,0,0,0.45)"
     >

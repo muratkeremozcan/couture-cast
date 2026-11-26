@@ -85,6 +85,7 @@
     "diagnostic_info": "alert_received tracking is wired to real push notification receipt listeners."
   },
   "common": {
+    "loading": "Loading",
     "cancel": "Cancel",
     "dismiss_banner": "Dismiss banner",
     "invalid_link": "This link is invalid, expired, or no longer available.",

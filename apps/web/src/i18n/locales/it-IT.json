@@ -1325,7 +1325,8 @@
     "navigatedTo": "Scheda {{label}} aperta"
   },
   "session": {
-    "retry": "Riprova"
+    "retry": "Riprova",
+    "loading": "Caricamento"
   },
   "feedback": {
     "save": "Salva",

@@ -494,7 +494,10 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     }
   })
 
-  it('6.6-WEB-074 the loading skeleton takes the row shape and stays out of the accessibility tree (R42)', async () => {
+  // Story CC-7.7 replaced the two-card skeleton: it collapsed into the real row and moved the
+  // feed below it. The tab's screen gate now holds the first load (7.7-CMP-007); while a read
+  // runs the section keeps its heading and an empty, decorative marker.
+  it('6.6-WEB-074 7.7 the loading state shows no skeleton cards and stays out of the accessibility tree', async () => {
     signIn()
     let release!: () => void
     const held = new Promise<void>((resolve) => {
@@ -509,9 +512,10 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     )
     renderGrid()
 
-    const skeleton = await screen.findByTestId('community-spotlight-loading')
-    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
-    expect(skeleton.children).toHaveLength(2)
+    const loading = await screen.findByTestId('community-spotlight-loading')
+    expect(loading).toHaveAttribute('aria-hidden', 'true')
+    expect(loading.children).toHaveLength(0)
+    expect(screen.getByTestId('community-spotlight-heading')).toBeInTheDocument()
     expect(screen.getByTestId('community-spotlight')).toHaveAttribute('aria-busy', 'true')
     expect(screen.queryByTestId('community-spotlight-row')).not.toBeInTheDocument()
 

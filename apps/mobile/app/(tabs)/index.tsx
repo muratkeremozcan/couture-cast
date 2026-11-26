@@ -84,10 +84,13 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { ScreenGate } from '@/src/components/screen-gate'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
+import { useStatusBar } from '@/components/save-feedback'
 import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
 import {
   HomeAddGarment,
@@ -130,6 +133,14 @@ async function classifyRitualError(error: unknown): Promise<HeroLoadError> {
   }
 }
 const modalFocusRestorationDelayMs = 400
+
+/**
+ * Story CC-7.7 D5: whether a ritual read brought back the answer already on screen. Both sides
+ * are parsed JSON from the same endpoint, so their serialized forms compare field by field.
+ */
+function sameRitualAnswer(shown: unknown, fetched: unknown): boolean {
+  return JSON.stringify(shown) === JSON.stringify(fetched)
+}
 
 function focusAccessibilityTarget(
   target: ComponentRef<typeof Pressable> | null,
@@ -233,14 +244,82 @@ function activeHomeLocale(i18n: { resolvedLanguage?: string; language: string })
   )
 }
 
+/**
+ * Story CC-7.7 D2: the member sample appears only after the ritual read settled without a
+ * usable outfit. Before that the member sees the gate's placeholder, never the sample first.
+ */
 function showSampleOutfit(
   session: ReturnType<typeof useMemberSessionState>[0],
+  settled: boolean,
   outfit: RitualResponse['data']['outfits'][number] | undefined
 ) {
-  return session === 'member' && !outfit?.garmentIds.length
+  return session === 'member' && settled && !outfit?.garmentIds.length
 }
 
-type OwnedRitual = { owner: string | null; data: RitualResponse }
+/**
+ * Story CC-7.7 D3: Home's gate reads are the ritual and its weather (one request). A signed-out
+ * or unverifiable session has nothing to wait for.
+ */
+function homeGateReady(
+  session: ReturnType<typeof useMemberSessionState>[0],
+  settled: boolean
+) {
+  return session === 'signed-out' || session === 'unavailable' || settled
+}
+
+/** `readAt`: when the read that produced `data` began, which fixes the ritual's day. */
+type OwnedRitual = { owner: string | null; data: RitualResponse; readAt: number }
+
+/** Story 5.5 Decision 2: from 08:00 local the server's ritual is the next day's. */
+const ritualRolloverHour = 8
+const dayMs = 24 * 60 * 60 * 1000
+
+function localDateAndHour(at: number, timeZone: string) {
+  const format = (zone: string) =>
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at))
+  let parts: Intl.DateTimeFormatPart[]
+  try {
+    parts = format(timeZone)
+  } catch {
+    // An unknown zone name: UTC still separates one day from the next.
+    parts = format('UTC')
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? ''
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    hour: Number(part('hour')),
+  }
+}
+
+/**
+ * Story CC-7.7: which ritual a read answered. The server keys a ritual by the saved location and
+ * its anchor day in that location's zone (before 08:00 local today's, from 08:00 the next
+ * day's), taken when the read began. A member's garment swap belongs to one such ritual.
+ */
+function ritualIdentity(ritual: RitualResponse, readAt: number): string {
+  const { locationKey, timezone } = ritual.data.weather
+  const { hour } = localDateAndHour(readAt, timezone)
+  const anchorAt = hour >= ritualRolloverHour ? readAt + dayMs : readAt
+  return `${locationKey}|${localDateAndHour(anchorAt, timezone).date}`
+}
+
+/** The garments a member swapped on one ritual, per scenario, as the swap left them. */
+type MemberSwaps = {
+  owner: string | null
+  ritual: string
+  outfits: Map<
+    string,
+    Pick<RitualResponse['data']['outfits'][number], 'garmentIds' | 'displayGarments'>
+  >
+}
 
 function ritualForOwner(record: OwnedRitual | null, owner: string | null) {
   return record?.owner === owner ? record.data : null
@@ -306,7 +385,9 @@ export default function TabOneScreen() {
   const palette = useHeroPalette()
   const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
+  const statusBar = useStatusBar()
   const reduceMotion = useReducedMotion()
+  const swapModalAnimation = useModalAnimation('slide')
   const latestLoadId = useRef(0)
   const hasTrackedTabView = useRef(false)
   // Keyed on recommendation id, not on mount: the impression effect re-runs
@@ -326,6 +407,16 @@ export default function TabOneScreen() {
 
   const [ownedRitual, setOwnedRitual] = useState<OwnedRitual | null>(null)
   const ritual = ritualForOwner(ownedRitual, applicationUserId)
+  const ritualRef = useRef(ritual)
+  ritualRef.current = ritual
+  // Story CC-7.7: a member's garment swaps stay in place for the ritual they were made on. Any
+  // ritual read that lands for the same location and day, one that began before the swap
+  // included, carries them; a ritual for another day or location replaces them.
+  const memberSwapsRef = useRef<MemberSwaps | null>(null)
+  // Story CC-7.7: the member whose first ritual read settled (success, empty or error). Keyed
+  // by member, so the next member's first render is unsettled before any effect runs.
+  const [settledOwner, setSettledOwner] = useState<string | null | undefined>(undefined)
+  const ritualSettled = settledOwner === applicationUserId
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<HeroLoadError | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
@@ -354,12 +445,18 @@ export default function TabOneScreen() {
     setShareCardSource(null)
     setShareCardOpen(false)
     setOwnedRitual(null)
+    memberSwapsRef.current = null
+    // Cleared when the member leaves, so the same member returning (A, signed out, A) is
+    // unsettled until their new ritual read settles: no sample outfit before it.
+    setSettledOwner(undefined)
     setAlertPreferences(undefined)
     setError(null)
     setIsCacheServed(false)
     setIsStale(false)
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
+    // The next member's own first load starts from the initial loading state.
+    setIsLoading(true)
   }, [applicationUserId])
 
   const fetchRitual = async () => {
@@ -388,13 +485,80 @@ export default function TabOneScreen() {
     }
   }
 
-  const loadData = async (forceRefresh = false, allowCacheFallback = true) => {
+  /** A ritual read the member asked for, or the first: counted, and announced on a Retry. */
+  const reportFreshRitual = (data: RitualResponse, forceRefresh: boolean) => {
+    trackMobileRitualCreated(analytics, {
+      userId: analyticsUserId,
+      locationId: data.data.weather.locationKey,
+      ritualType: 'daily_outfit',
+      weatherContext: data.data.weather.current.condition,
+    })
+    if (forceRefresh) {
+      announce(
+        'refresh',
+        t(`hero.conditions.${data.data.weather.current.condition}`, {
+          defaultValue: data.data.weather.current.condition,
+        })
+      )
+    }
+  }
+
+  /** A refresh that failed over a shown outfit: reported with Retry in the root status bar. */
+  const reportRefreshFailure = () => {
+    statusBar.showNotice({
+      id: 'home-ritual-refresh-failed',
+      message: t('hero.load_error'),
+      tone: 'error',
+      actions: [
+        {
+          id: 'home-ritual-refresh-retry',
+          kind: 'retry',
+          label: t('hero.retry'),
+          onPress: () => void latestLoadDataRef.current(true),
+        },
+      ],
+    })
+  }
+
+  /** A ritual read's answer with the member's swaps for that same ritual laid over it. */
+  const withMemberSwaps = (data: RitualResponse, readAt: number): RitualResponse => {
+    const swaps = memberSwapsRef.current
+    if (!swaps || swaps.owner !== applicationUserId) return data
+    if (swaps.ritual !== ritualIdentity(data, readAt)) {
+      memberSwapsRef.current = null
+      return data
+    }
+    return {
+      ...data,
+      data: {
+        ...data.data,
+        outfits: data.data.outfits.map((outfit) => {
+          const swapped = swaps.outfits.get(outfit.scenario)
+          return swapped ? { ...outfit, ...swapped } : outfit
+        }),
+      },
+    }
+  }
+
+  const loadData = async (
+    forceRefresh = false,
+    allowCacheFallback = true,
+    // A tab-return refresh: no announcement, and no new ritual counted in analytics.
+    background = false
+  ) => {
     const loadId = ++latestLoadId.current
     const isCurrent = () =>
       loadId === latestLoadId.current && applicationUserId === mobileApplicationUserId()
-    setIsLoading(true)
-    setError(null)
-    setIsStale(false)
+    // Story CC-7.7 D5: a refresh with the member's outfit on screen (a locale or analytics
+    // identity change, a retry) refreshes in place. It never returns to the initial loading
+    // state, and the banners stay as they are until the answer lands.
+    const inPlace = ritualRef.current !== null
+    if (!inPlace) {
+      setIsLoading(true)
+      setError(null)
+      setIsStale(false)
+    }
+    const settle = () => setSettledOwner(applicationUserId)
 
     const cached = allowCacheFallback
       ? await readLatestRitualCache(cacheOwner, activeLocale)
@@ -403,20 +567,44 @@ export default function TabOneScreen() {
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
-      setOwnedRitual({ owner: applicationUserId, data: cached.data })
+      setOwnedRitual({
+        owner: applicationUserId,
+        data: withMemberSwaps(cached.data, cached.timestamp),
+        readAt: cached.timestamp,
+      })
       setAlertPreferences(cached.alertPreferences)
       setIsCacheServed(true)
+      setError(null)
+      setIsStale(false)
       setIsLoading(false)
+      settle()
       return
     }
 
     try {
-      const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
+      const { data: fetched, alertPreferences: fetchedPreferences } = await fetchRitual()
       if (!isCurrent()) return
+      // The server never stores a swap, so its answer comes back without one; the member's
+      // swaps for this ritual go back over it before it shows or enters the cache.
+      const data = withMemberSwaps(fetched, now)
 
-      setOwnedRitual({ owner: applicationUserId, data })
-      setAlertPreferences(fetchedPreferences)
+      // A tab return re-reads in place; an unchanged answer for the same ritual keeps the state
+      // it already has, so the outfit card and the rest of Home do not render again for the same
+      // outfit. An identical payload across the 08:00 rollover is the next day's ritual: it takes
+      // this read's time, or a swap made on it would be keyed to the previous day.
+      setOwnedRitual((shown) =>
+        shown?.owner === applicationUserId &&
+        sameRitualAnswer(shown.data, data) &&
+        ritualIdentity(shown.data, shown.readAt) === ritualIdentity(data, now)
+          ? shown
+          : { owner: applicationUserId, data, readAt: now }
+      )
+      setAlertPreferences((shown) =>
+        sameRitualAnswer(shown, fetchedPreferences) ? shown : fetchedPreferences
+      )
       setIsCacheServed(false)
+      setError(null)
+      setIsStale(false)
       void saveRitualCache(cacheOwner, activeLocale, {
         // Decision 6: the commerce block never enters the device cache, or the
         // CTA outlives an opt-out by fifteen minutes online and indefinitely
@@ -426,27 +614,25 @@ export default function TabOneScreen() {
         alertPreferences: fetchedPreferences,
       }).catch(() => undefined)
 
-      trackMobileRitualCreated(analytics, {
-        userId: analyticsUserId,
-        locationId: data.data.weather.locationKey,
-        ritualType: 'daily_outfit',
-        weatherContext: data.data.weather.current.condition,
-      })
-      if (forceRefresh) {
-        announce(
-          'refresh',
-          t(`hero.conditions.${data.data.weather.current.condition}`, {
-            defaultValue: data.data.weather.current.condition,
-          })
-        )
-      }
+      if (!background) reportFreshRitual(data, forceRefresh)
     } catch (loadError) {
       const errorKind = await classifyRitualError(loadError)
       if (!isCurrent()) return
 
+      // Story CC-7.7: a refresh that fails keeps the outfit already on screen, and inserts no
+      // banner above it after the member started using the screen. The failure and its Retry
+      // show in the root status bar, a floating slot that moves no content.
+      if (inPlace && ritualRef.current !== null) {
+        reportRefreshFailure()
+        return
+      }
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
-        setOwnedRitual({ owner: applicationUserId, data: cached.data })
+        setOwnedRitual({
+          owner: applicationUserId,
+          data: withMemberSwaps(cached.data, cached.timestamp),
+          readAt: cached.timestamp,
+        })
         setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
         setIsCacheServed(true)
@@ -459,9 +645,15 @@ export default function TabOneScreen() {
     } finally {
       if (isCurrent()) {
         setIsLoading(false)
+        settle()
       }
     }
   }
+
+  // The status bar's Retry runs after later renders; it reads with the screen's current
+  // member and locale.
+  const latestLoadDataRef = useRef(loadData)
+  latestLoadDataRef.current = loadData
 
   // Story 1.2b: a saved, switched or deleted location changes the ritual. The
   // previous primary's ritual leaves the screen and the device cache at once, and
@@ -471,6 +663,11 @@ export default function TabOneScreen() {
     latestLoadId.current += 1
     setIsLoading(true)
     setOwnedRitual(null)
+    // A wardrobe change can remove a swapped-in garment, and a location change is another
+    // ritual: the swaps go with the previous ritual.
+    memberSwapsRef.current = null
+    // The previous ritual is gone, so the reload below is not a refresh in place.
+    ritualRef.current = null
     setIsCacheServed(false)
     setIsStale(false)
     await forgetLatestRitual(cacheOwner)
@@ -489,6 +686,28 @@ export default function TabOneScreen() {
       unsubscribeWardrobe()
     }
   }, [])
+
+  // Story CC-7.7 D5: tabs stay mounted, so returning to Home is a focus, never a mount. With
+  // the member's outfit on screen the return refreshes it in place: the outfit and the scroll
+  // stay, and the initial loading state never returns. The first focus is the mount, whose
+  // read the effect below already started.
+  const leftHomeRef = useRef(false)
+  const refreshOnReturnRef = useRef<() => void>(() => undefined)
+  refreshOnReturnRef.current = () => {
+    // Past the 15-minute device cache: a cached answer would mark the outfit cache-served and
+    // take its Shop this look away. In the background: unlike Retry, it announces nothing.
+    if (sessionState === 'member' && ritualRef.current !== null)
+      void loadData(true, true, true)
+  }
+  useFocusEffect(
+    useCallback(() => {
+      if (leftHomeRef.current) refreshOnReturnRef.current()
+      leftHomeRef.current = false
+      return () => {
+        leftHomeRef.current = true
+      }
+    }, [])
+  )
 
   useEffect(() => {
     // Track when user views Tab One - top of the engagement funnel
@@ -713,7 +932,7 @@ export default function TabOneScreen() {
   }
 
   const performSwap = (newGarmentId: string) => {
-    if (!ritual || !swappingGarmentId) return
+    if (!ritual || !ownedRitual || !swappingGarmentId) return
 
     // Update state local model copy
     const nextOutfits = ritual.data.outfits.map((outfit) => {
@@ -736,7 +955,25 @@ export default function TabOneScreen() {
       },
     }
 
-    setOwnedRitual({ owner: applicationUserId, data: updatedRitual })
+    setOwnedRitual({
+      owner: applicationUserId,
+      data: updatedRitual,
+      readAt: ownedRitual.readAt,
+    })
+    const swappedOutfit = nextOutfits.find((outfit) => outfit.scenario === activeScenario)
+    if (swappedOutfit) {
+      const identity = ritualIdentity(ritual, ownedRitual.readAt)
+      const current = memberSwapsRef.current
+      const swaps: MemberSwaps =
+        current?.owner === applicationUserId && current.ritual === identity
+          ? current
+          : { owner: applicationUserId, ritual: identity, outfits: new Map() }
+      swaps.outfits.set(activeScenario, {
+        garmentIds: swappedOutfit.garmentIds,
+        displayGarments: swappedOutfit.displayGarments,
+      })
+      memberSwapsRef.current = swaps
+    }
 
     void saveRitualCache(cacheOwner, activeLocale, {
       // A swap rewrites a network payload, so this write can carry a commerce
@@ -800,6 +1037,103 @@ export default function TabOneScreen() {
       ?.category
   )
 
+  // The hero for the session on screen, in its own function to keep the screen's branching
+  // readable. Story CC-7.7 D2: a member's slot stays empty until the ritual read settles.
+  const renderHero = () =>
+    sessionState === 'signed-out' ? (
+      <SignedOutWelcome />
+    ) : sessionState === 'unavailable' ? (
+      <View
+        style={[
+          styles.errorState,
+          { backgroundColor: palette.surface, borderColor: palette.divider },
+        ]}
+        testID="home-session-unavailable"
+      >
+        <Text style={[styles.errorText, { color: palette.text }]}>
+          {getGuestPreviewStrings(i18n.language).chrome.sessionUnavailable}
+        </Text>
+        <Pressable
+          style={[styles.retryButton, { backgroundColor: palette.text }]}
+          onPress={retrySession}
+          accessibilityRole="button"
+          testID="home-session-retry"
+        >
+          <Text style={[styles.retryText, { color: palette.background }]}>
+            {getGuestPreviewStrings(i18n.language).chrome.retry}
+          </Text>
+        </Pressable>
+      </View>
+    ) : sessionState !== 'member' || !ritualSettled ? null : showSampleOutfit(
+        sessionState,
+        ritualSettled,
+        activeOutfit
+      ) ? (
+      <>
+        <HomePlannerLink />
+        <MemberSampleOutfit
+          key={applicationUserId}
+          owner={applicationUserId}
+          error={error}
+          busy={isLoading}
+          onRetry={handleRetry}
+        />
+      </>
+    ) : (
+      <>
+        {/* Weather Alert Banner */}
+        {ritual?.data.weather.alerts && (
+          <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
+        )}
+
+        {sessionState === 'member' && <HomePlannerLink />}
+
+        {/* Weather Header */}
+        <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
+
+        {/* Hourly Forecast Ribbon */}
+        <HourlyForecastRibbon
+          hourly={ritual?.data.weather.hourly}
+          isLoading={isLoading}
+          onToggleExpand={handleRibbonToggle}
+        />
+
+        {/* Scenario Quick Toggles */}
+        {!isLoading && ritual && (
+          <ScenarioToggles
+            activeScenario={activeScenario}
+            onScenarioChange={handleScenarioChange}
+          />
+        )}
+
+        {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
+
+        {/* Primary Outfit Card */}
+        <OutfitRecommendationCard
+          outfit={activeOutfit}
+          onExport={(recommendationId, opener) => {
+            if (
+              openAndroidShareCard({ kind: 'outfit', recommendationId }, 'outfit', opener)
+            )
+              return
+            shareCardInvoker.current = {
+              node: opener,
+              member: mobileApplicationUserId(),
+            }
+            setShareCardSource({ kind: 'outfit', recommendationId })
+            setShareCardOpen(true)
+            traceShareCardOpener('state-open')
+          }}
+          onSwapGarment={handleSwapGarment}
+          onGarmentRef={(garmentId, element) => {
+            garmentRefs.current.set(garmentId, element)
+          }}
+          isLoading={isLoading}
+          isCacheServed={isCacheServed}
+        />
+      </>
+    )
+
   return (
     // Side insets only: the native header and the tab bar already cover top and bottom,
     // and a second top inset left an empty band above the chips.
@@ -856,125 +1190,41 @@ export default function TabOneScreen() {
           </NativeView>
         )}
 
-        {/* Stale Cache Banner */}
-        {isStale && (
-          <View style={styles.staleBanner} testID="stale-cache-banner">
-            <Text style={styles.staleText}>
-              {t('hero.offline_toast', {
-                defaultValue: 'Using recently cached weather data',
-              })}
-            </Text>
-          </View>
-        )}
-
-        {sessionState === 'signed-out' ? (
-          <SignedOutWelcome />
-        ) : sessionState === 'unavailable' ? (
-          <View
-            style={[
-              styles.errorState,
-              { backgroundColor: palette.surface, borderColor: palette.divider },
-            ]}
-            testID="home-session-unavailable"
-          >
-            <Text style={[styles.errorText, { color: palette.text }]}>
-              {getGuestPreviewStrings(i18n.language).chrome.sessionUnavailable}
-            </Text>
-            <Pressable
-              style={[styles.retryButton, { backgroundColor: palette.text }]}
-              onPress={retrySession}
-              accessibilityRole="button"
-              testID="home-session-retry"
-            >
-              <Text style={[styles.retryText, { color: palette.background }]}>
-                {getGuestPreviewStrings(i18n.language).chrome.retry}
+        {/* Story CC-7.7 D3, D4: the body, stale and weather alert banners included, appears
+            once the ritual read settles, so nothing is inserted above the outfit later. */}
+        <ScreenGate
+          screen="home"
+          session={sessionState}
+          ready={homeGateReady(sessionState, ritualSettled)}
+        >
+          {/* Stale Cache Banner */}
+          {isStale && (
+            <View style={styles.staleBanner} testID="stale-cache-banner">
+              <Text style={styles.staleText}>
+                {t('hero.offline_toast', {
+                  defaultValue: 'Using recently cached weather data',
+                })}
               </Text>
-            </Pressable>
-          </View>
-        ) : showSampleOutfit(sessionState, activeOutfit) ? (
-          <>
-            <HomePlannerLink />
-            <MemberSampleOutfit
-              key={applicationUserId}
-              owner={applicationUserId}
-              error={error}
-              busy={isLoading}
-              onRetry={handleRetry}
-            />
-          </>
-        ) : (
-          <>
-            {/* Weather Alert Banner */}
-            {ritual?.data.weather.alerts && (
-              <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
-            )}
+            </View>
+          )}
 
-            {sessionState === 'member' && <HomePlannerLink />}
+          {renderHero()}
 
-            {/* Weather Header */}
-            <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
-
-            {/* Hourly Forecast Ribbon */}
-            <HourlyForecastRibbon
-              hourly={ritual?.data.weather.hourly}
-              isLoading={isLoading}
-              onToggleExpand={handleRibbonToggle}
-            />
-
-            {/* Scenario Quick Toggles */}
-            {!isLoading && ritual && (
-              <ScenarioToggles
-                activeScenario={activeScenario}
-                onScenarioChange={handleScenarioChange}
-              />
-            )}
-
-            {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
-
-            {/* Primary Outfit Card */}
-            <OutfitRecommendationCard
-              outfit={activeOutfit}
-              onExport={(recommendationId, opener) => {
-                if (
-                  openAndroidShareCard(
-                    { kind: 'outfit', recommendationId },
-                    'outfit',
-                    opener
-                  )
-                )
-                  return
-                shareCardInvoker.current = {
-                  node: opener,
-                  member: mobileApplicationUserId(),
-                }
-                setShareCardSource({ kind: 'outfit', recommendationId })
-                setShareCardOpen(true)
-                traceShareCardOpener('state-open')
-              }}
-              onSwapGarment={handleSwapGarment}
-              onGarmentRef={(garmentId, element) => {
-                garmentRefs.current.set(garmentId, element)
-              }}
-              isLoading={isLoading}
-              isCacheServed={isCacheServed}
-            />
-          </>
-        )}
-
-        {/*
+          {/*
           Story 6.7: after the whole hero conditional, so it follows in focus
           order. It reads on its own and never waits on, hides or re-renders the hero.
         */}
-        <HomeSpotlightTeaserSlot
-          applicationUserId={applicationUserId}
-          scrollViewRef={scrollViewRef}
-        />
+          <HomeSpotlightTeaserSlot
+            applicationUserId={applicationUserId}
+            scrollViewRef={scrollViewRef}
+          />
+        </ScreenGate>
       </ScrollView>
 
       {/* Garment Swap Modal */}
       <EdgeToEdgeModal
         visible={isSwapModalVisible}
-        animationType={reduceMotion ? 'none' : 'slide'}
+        animationType={swapModalAnimation}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
         scrim="rgba(0,0,0,0.5)"

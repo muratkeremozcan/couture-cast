@@ -52,6 +52,12 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
+import {
+  GuestText,
+  useGuestFirstPaint,
+  useScreenGateRead,
+  useSectionSnapshot,
+} from './screen-gate'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 
@@ -140,10 +146,13 @@ function SubscribeControls({
   isSignedOut,
   isRedirecting,
   onSubscribe,
+  landing,
 }: {
   isSignedOut: boolean
   isRedirecting: boolean
   onSubscribe: (plan: SubscriptionPlan) => void
+  /** `guest` while a signed-out first paint stands in for the session check (CC-7.7). */
+  landing?: 'guest'
 }) {
   const { t } = useTranslation()
   const plans: { plan: SubscriptionPlan; label: string; testId: string }[] = [
@@ -160,7 +169,7 @@ function SubscribeControls({
   ]
 
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-3">
+    <div data-landing={landing} className="mt-6 flex flex-wrap items-center gap-3">
       {plans.map(({ plan, label, testId }) => (
         <button
           key={plan}
@@ -366,6 +375,27 @@ function useBillingReturn(): (owner: string) => BillingReturn {
   }, [])
 }
 
+/**
+ * Story CC-7.7: reports this read to Profile's screen gate, and while the session is checked on
+ * a signed-out page, shows the signed-out section it will keep, each piece marked
+ * `data-landing="guest"` (hidden by globals.css on a page painted for a stored session), so
+ * nothing lands late and pushes the page.
+ */
+function useSignedOutStandIn(sectionState: SectionState): {
+  landing: 'guest' | undefined
+  shownState: SectionState
+} {
+  useScreenGateRead(
+    'subscription',
+    sectionState !== 'checking' && sectionState !== 'loading'
+  )
+  const guestFirstPaint = useGuestFirstPaint()
+  const standIn = sectionState === 'checking' && guestFirstPaint
+  return standIn
+    ? { landing: 'guest', shownState: 'signed_out' }
+    : { landing: undefined, shownState: sectionState }
+}
+
 export function SubscriptionSection() {
   const claimBillingReturn = useBillingReturn()
   return (
@@ -389,9 +419,22 @@ function MemberSubscriptionSection({
 }) {
   const { t } = useTranslation()
   const { status, owner } = session
-  const [sectionState, setSectionState] = useState<SectionState>('checking')
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [access, setAccess] = useState<PremiumAccess | null>(null)
+  // Story CC-7.7 D5 (Codex review P1-2): a return to Profile shows this member's plan at once and
+  // reads it again in place; a failed refresh keeps it.
+  const snapshot = useSectionSnapshot<{
+    subscription: Subscription
+    access: PremiumAccess | null
+  }>('subscription', owner)
+  const { beginRead, remember, restoredFor } = snapshot
+  const [sectionState, setSectionState] = useState<SectionState>(snapshot.startState)
+  const sectionStateRef = useRef(sectionState)
+  sectionStateRef.current = sectionState
+  const [subscription, setSubscription] = useState<Subscription | null>(
+    () => snapshot.restored?.subscription ?? null
+  )
+  const [access, setAccess] = useState<PremiumAccess | null>(
+    () => snapshot.restored?.access ?? null
+  )
   const [activationState, setActivationState] = useState<ActivationState>('idle')
   const [showPortalLagHint, setShowPortalLagHint] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -486,7 +529,9 @@ function MemberSubscriptionSection({
 
     const isPortalReturn = billingReturn === 'portal'
     const isDenial = (error: unknown) => premiumFailureReason(error) === 'signed_out'
-    setSectionState('loading')
+    const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
+    beginRead()
+    if (!inPlace) setSectionState('loading')
     setShowPortalLagHint(isPortalReturn)
 
     void (async () => {
@@ -543,6 +588,8 @@ function MemberSubscriptionSection({
           setSectionState('signed_out')
           return
         }
+        // A restored plan stays on screen when its refresh fails.
+        if (inPlace) return
         // `status_unavailable` (the 503 ledger pull) and `unknown` both render
         // `errorLoad`, so no reason lookup is needed here — which is what keeps
         // `t` out of this effect and the dependency array down to one value.
@@ -552,7 +599,15 @@ function MemberSubscriptionSection({
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage, claimBillingReturn])
+  }, [status, owner, loadErrorMessage, claimBillingReturn, restoredFor, beginRead])
+
+  // What a return to Profile shows first: the plan once read, nothing after a failure.
+  useEffect(() => {
+    if (sectionState === 'ready' && subscription !== null)
+      remember({ subscription, access })
+    else if (sectionState === 'load_failed' || sectionState === 'signed_out')
+      remember(undefined)
+  }, [access, remember, sectionState, subscription])
 
   /**
    * Turns a rejection into localized copy, or into the signed-out state.
@@ -623,10 +678,11 @@ function MemberSubscriptionSection({
     }
   }
 
-  const isSignedOut = sectionState === 'signed_out'
+  const { landing, shownState } = useSignedOutStandIn(sectionState)
+  const isSignedOut = shownState === 'signed_out'
   const complimentary = access?.source === 'complimentary'
   const view = resolveSectionView(
-    sectionState,
+    shownState,
     activationState,
     subscription,
     complimentary
@@ -654,6 +710,7 @@ function MemberSubscriptionSection({
       */}
       {view.showDisclosure && (
         <p
+          data-landing={landing}
           className="mt-3 text-sm leading-relaxed text-neutral-200"
           data-testid="premium-disclosure"
         >
@@ -662,7 +719,11 @@ function MemberSubscriptionSection({
       )}
 
       {view.showStatusLine && (
-        <p className="mt-6 text-base text-white" data-testid="premium-status-line">
+        <p
+          data-landing={landing}
+          className="mt-6 text-base text-white"
+          data-testid="premium-status-line"
+        >
           {statusLineFor(t, subscription, complimentary)}
         </p>
       )}
@@ -682,6 +743,7 @@ function MemberSubscriptionSection({
 
       {view.showSubscribeControls && (
         <SubscribeControls
+          landing={landing}
           isSignedOut={isSignedOut}
           isRedirecting={isRedirecting}
           onSubscribe={(plan) => {
@@ -700,15 +762,22 @@ function MemberSubscriptionSection({
         />
       )}
 
-      {isSignedOut && (
-        <p
-          id={SIGNED_OUT_HINT_ID}
-          className="mt-2 text-sm text-neutral-300"
-          data-testid="premium-signed-out-hint"
-        >
-          {t('commerce.premium.signedOutHint')}
-        </p>
-      )}
+      {isSignedOut &&
+        (landing ? (
+          <GuestText
+            id={SIGNED_OUT_HINT_ID}
+            text={t('commerce.premium.signedOutHint')}
+            className="mt-2 text-sm text-neutral-300"
+          />
+        ) : (
+          <p
+            id={SIGNED_OUT_HINT_ID}
+            className="mt-2 text-sm text-neutral-300"
+            data-testid="premium-signed-out-hint"
+          >
+            {t('commerce.premium.signedOutHint')}
+          </p>
+        ))}
 
       {showPortalLagHint && (
         <p

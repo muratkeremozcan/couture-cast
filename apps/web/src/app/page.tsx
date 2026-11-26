@@ -8,6 +8,7 @@ import {
 import { LegalLinks } from './components/legal-page'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
 import { ProfileNavLink } from './components/profile-nav-link'
+import { ScreenGate } from './components/screen-gate'
 import { StickyBottomNav } from './components/sticky-bottom-nav'
 
 const navLinks = [
@@ -25,7 +26,10 @@ export default function Home() {
       data-focus-surface="dark"
       className="min-h-screen overflow-x-clip bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]"
     >
-      <header className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-4 sm:flex-row sm:items-center md:py-6">
+      <header
+        data-testid="app-header"
+        className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-4 sm:flex-row sm:items-center md:py-6"
+      >
         <div className="flex flex-col gap-2">
           <p
             data-testid="app-badge"
@@ -66,41 +70,61 @@ export default function Home() {
         tabIndex={-1}
         className="max-w-6xl mx-auto flex flex-col gap-16 px-6 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none"
       >
-        <GuestPreviewEntry />
-        {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd widths
-            and blends the dark page into column 0. */}
-        <div className="relative mx-[calc(50%-min(50vw,720px))] w-[min(100vw,1440px)]">
-          <LookbookPrismLayout />
-        </div>
-        <StickyBottomNav />
-
-        <section id="ritual" data-testid="hero-section" className="space-y-6">
-          <p className="text-xs uppercase tracking-[0.4em] text-amber-300">
-            Daily ritual
-          </p>
-          <h1
-            data-testid="hero-headline"
-            className="text-4xl sm:text-5xl font-semibold leading-tight"
-          >
-            Plan confident outfits in under 90 seconds.
-          </h1>
-          <p className="text-lg text-neutral-300 max-w-2xl">
-            CoutureCast blends hyperlocal weather, your wardrobe archive, and community
-            insight to recommend looks that respect the commute, the meeting, and the
-            vibe.
-          </p>
-          {/* TEA P3: one gap for the whole stack of landing actions, sign-in and analytics alike. */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-4" data-landing="member">
-              <MemberWardrobeActions />
-            </div>
-            <AnalyticsEventActions />
+        {/* Story CC-7.7 D3: the body appears once the member's outfit (the ritual read with its
+            city line), the Spotlight teaser in the hero, the City Spotlight above the feed and
+            any deep link above the grid have answered; the feed is the last section and fills
+            in below them. */}
+        <ScreenGate
+          screen="home"
+          reads={HOME_GATE_READS}
+          placeholderClassName={HOME_PLACEHOLDER_CLASS}
+        >
+          <GuestPreviewEntry />
+          {/* Margins bleed to the viewport edge. A -50% transform lands on a half pixel at odd
+              widths and blends the dark page into column 0. */}
+          <div className="relative mx-[calc(50%-min(50vw,720px))] w-[min(100vw,1440px)]">
+            <LookbookPrismLayout />
           </div>
-        </section>
-
+        </ScreenGate>
+        {/* The hero reads nothing, and its landing actions follow <html data-session> from first
+            paint, so it stays outside the gate: a pending session shows the hero with neither
+            set of actions while it is verified (real-session L-10), instead of a hidden body that
+            a verification timeout later reveals as the signed-out landing. The placeholder
+            fills the viewport, so the body appearing above it moves nothing on screen. */}
+        <HomeHero />
         <LegalLinks className="text-neutral-300" />
+        <StickyBottomNav />
       </main>
       <PostHogClickTracker />
     </div>
+  )
+}
+
+const HOME_GATE_READS = ['ritual', 'teaser', 'spotlight', 'deeplink'] as const
+const HOME_PLACEHOLDER_CLASS =
+  'min-h-screen w-full rounded-[16px] bg-[var(--screen-placeholder-surface)]'
+
+function HomeHero() {
+  return (
+    <section id="ritual" data-testid="hero-section" className="space-y-6">
+      <p className="text-xs uppercase tracking-[0.4em] text-amber-300">Daily ritual</p>
+      <h1
+        data-testid="hero-headline"
+        className="text-4xl sm:text-5xl font-semibold leading-tight"
+      >
+        Plan confident outfits in under 90 seconds.
+      </h1>
+      <p className="text-lg text-neutral-300 max-w-2xl">
+        CoutureCast blends hyperlocal weather, your wardrobe archive, and community
+        insight to recommend looks that respect the commute, the meeting, and the vibe.
+      </p>
+      {/* TEA P3: one gap for the whole stack of landing actions, sign-in and analytics alike. */}
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-4" data-landing="member">
+          <MemberWardrobeActions />
+        </div>
+        <AnalyticsEventActions />
+      </div>
+    </section>
   )
 }

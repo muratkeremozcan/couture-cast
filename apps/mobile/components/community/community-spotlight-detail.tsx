@@ -14,6 +14,7 @@ import type { CommunityReactionSpotlightItem } from '@couture/api-client/contrac
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export interface CommunitySpotlightDetailProps {
   item: CommunityReactionSpotlightItem | null
@@ -35,6 +36,7 @@ export function CommunitySpotlightDetail({
   onDismissed,
   renderCard,
 }: CommunitySpotlightDetailProps) {
+  const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const palette = useHeroPalette()
   const insets = useModalInsets()
@@ -49,7 +51,7 @@ export function CommunitySpotlightDetail({
   return (
     <EdgeToEdgeModal
       visible={item !== null}
-      animationType="slide"
+      animationType={modalAnimation}
       onRequestClose={onClose}
       onDismiss={onDismissed}
       scrim="rgba(0,0,0,0.5)"

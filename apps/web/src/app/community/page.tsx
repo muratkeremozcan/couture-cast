@@ -10,6 +10,7 @@ import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommunityLookbookGrid } from '../components/community-lookbook-grid'
+import { ScreenGate } from '../components/screen-gate'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 
 export default function CommunityPage() {
@@ -25,31 +26,43 @@ export default function CommunityPage() {
         data-testid="community-page"
         className="mx-auto max-w-3xl px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none sm:px-6"
       >
-        {/* The bottom nav hides from 768 px, so wider screens get the same brand link Home's
-            header shows, or a desktop reader who opened /community has no way back. */}
-        <Link
-          href="/"
-          data-testid="community-page-home-link"
-          className="inline-flex min-h-[44px] items-center text-xs uppercase tracking-[0.3em] text-neutral-400 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
+        <header data-testid="app-header">
+          {/* The bottom nav hides from 768 px, so wider screens get the same brand link Home's
+              header shows, or a desktop reader who opened /community has no way back. */}
+          <Link
+            href="/"
+            data-testid="community-page-home-link"
+            className="inline-flex min-h-[44px] items-center text-xs uppercase tracking-[0.3em] text-neutral-400 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
+          >
+            CoutureCast
+          </Link>
+          <h1 className="mb-6 text-3xl font-semibold">{t('community.title')}</h1>
+        </header>
+        {/* Story CC-7.7 D3: the lookbook appears once its first feed page and the City Spotlight
+            above it have answered, so neither moves the other when it lands. */}
+        <ScreenGate
+          screen="community"
+          reads={COMMUNITY_GATE_READS}
+          placeholderClassName="min-h-[60vh] w-full rounded-[16px] bg-[var(--lookbook-surface)] opacity-60"
         >
-          CoutureCast
-        </Link>
-        <h1 className="mb-6 text-3xl font-semibold">{t('community.title')}</h1>
-        {/* The same lookbook surface Home's prism container gives the grid. The wrapper
-            clips with overflow-x-clip: overflow-x-hidden makes it a scroll container, and the
-            sticky filter nav would then stick to it and scroll off the screen. */}
-        <div
-          data-focus-surface="light"
-          className="lookbook-body rounded-[16px] bg-[var(--lookbook-surface)] px-4 py-6 text-[color:var(--lookbook-ink)] sm:px-6"
-        >
-          <CommunityLookbookGrid
-            showFilterNav
-            filterNavStickyTop={0}
-            returnPath="/community"
-          />
-        </div>
+          {/* The same lookbook surface Home's prism container gives the grid. The wrapper
+              clips with overflow-x-clip: overflow-x-hidden makes it a scroll container, and the
+              sticky filter nav would then stick to it and scroll off the screen. */}
+          <div
+            data-focus-surface="light"
+            className="lookbook-body rounded-[16px] bg-[var(--lookbook-surface)] px-4 py-6 text-[color:var(--lookbook-ink)] sm:px-6"
+          >
+            <CommunityLookbookGrid
+              showFilterNav
+              filterNavStickyTop={0}
+              returnPath="/community"
+            />
+          </div>
+        </ScreenGate>
       </main>
       <StickyBottomNav />
     </div>
   )
 }
+
+const COMMUNITY_GATE_READS = ['feed', 'spotlight'] as const

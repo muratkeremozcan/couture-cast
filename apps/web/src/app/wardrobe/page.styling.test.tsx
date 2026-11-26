@@ -17,6 +17,7 @@ import { HttpResponse, http } from 'msw'
 import type * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { screenSnapshot } from '../../lib/screen-snapshot'
 import {
   createCompletedOnboardingStateFixture,
   createReadyGarmentFixture,
@@ -163,6 +164,9 @@ function firstLook(dialog: HTMLElement) {
 }
 
 beforeEach(() => {
+  // Story CC-7.7: the Closet keeps a per-member snapshot in module memory, so one test's closet
+  // would open the next test's hub for the same member (CI, 61d7156e).
+  screenSnapshot.clear()
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', api.slice(0, -'/api/v1'.length))
   inventory.mockReset().mockImplementation(() => list(garment))
   const savedLooksMsw = createSavedLooksMswHandlers([], `${api}/wardrobe/saved-looks`)

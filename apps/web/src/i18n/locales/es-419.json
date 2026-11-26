@@ -1325,7 +1325,8 @@
     "navigatedTo": "Pestaña {{label}} abierta"
   },
   "session": {
-    "retry": "Intentar de nuevo"
+    "retry": "Intentar de nuevo",
+    "loading": "Cargando"
   },
   "feedback": {
     "save": "Guardar",

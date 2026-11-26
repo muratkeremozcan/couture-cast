@@ -85,6 +85,7 @@
     "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır."
   },
   "common": {
+    "loading": "Yükleniyor",
     "cancel": "İptal",
     "dismiss_banner": "Bildirimi kapat",
     "invalid_link": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor.",

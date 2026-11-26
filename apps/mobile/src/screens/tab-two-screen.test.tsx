@@ -23,7 +23,11 @@ import type * as PremiumModule from '../lib/premium'
  * stub it. Navigation itself is not what these suites are about; the row's own
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
-vi.mock('expo-router', () => ({ router: { push: vi.fn() } }))
+vi.mock('expo-router', async () => ({
+  router: { push: vi.fn() },
+  // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -45,6 +49,7 @@ const {
   premiumPassthroughMocks,
   resolveMobileAccessTokenMock,
   getUserProfileMock,
+  identityEpochMock,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
@@ -65,6 +70,7 @@ const {
   },
   resolveMobileAccessTokenMock: vi.fn(),
   getUserProfileMock: vi.fn(),
+  identityEpochMock: vi.fn<() => number>(),
 }))
 
 // The member's session is a boundary too: shopping preferences and the subscription
@@ -73,6 +79,8 @@ vi.mock('@/src/lib/mobile-auth', () => ({
   resolveMobileAccessToken: resolveMobileAccessTokenMock,
   subscribeMobileApplicationUser: () => () => undefined,
   mobileApplicationUserId: () => null,
+  // Advances on a sign-out or account switch; a case moves it to change hands mid-read.
+  mobileIdentityEpoch: identityEpochMock,
   setMobileApplicationUserId: vi.fn(),
   setMobileAccessTokenResolver: vi.fn(),
 }))
@@ -128,6 +136,7 @@ import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
 import { router } from 'expo-router'
 import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
+import { screenFocus } from '../test-utils/focus-effect'
 
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
 
@@ -167,6 +176,8 @@ describe('SettingsScreen', () => {
     resolveMobileAccessTokenMock.mockResolvedValue('member-token')
     getUserProfileMock.mockReset()
     getUserProfileMock.mockResolvedValue(memberProfile(null))
+    identityEpochMock.mockReset()
+    identityEpochMock.mockReturnValue(0)
     getCommercePreferenceMock.mockReset()
     getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: true })
     updateCommercePreferenceMock.mockReset()
@@ -190,6 +201,172 @@ describe('SettingsScreen', () => {
   afterEach(() => {
     vi.useRealTimers()
     setMobileAnalyticsDiagnosticsEnabled(false)
+    screenFocus.reset()
+  })
+
+  /** A promise the test answers by hand, so one read can be held while the others settle. */
+  function held<T>() {
+    let release!: (value: T) => void
+    const promise = new Promise<T>((resolve) => {
+      release = resolve
+    })
+    return { promise, release }
+  }
+
+  const placeholder = () => screen.queryByTestId('screen-placeholder')
+
+  it('7.7-NAT-004 the Profile gate waits for the account header read, the first section', async () => {
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    await render(<SettingsScreen />)
+
+    // Every other gate read answered: the preference, the subscription, the store.
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
+    expect(await screen.findByTestId('premium-restore')).not.toBeVisible()
+    expect(placeholder()).toBeVisible()
+    expect(screen.queryByTestId('profile-account')).toBeNull()
+
+    act(() => profile.release(memberProfile('Jade')))
+
+    // The header arrives with the body, so it never pushes the sections below it down. The
+    // name mounts with the read's answer; the gate opens on the settle that follows it.
+    const name = await screen.findByTestId('profile-account-name')
+    await waitFor(() => expect(name).toBeVisible())
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-004 the Profile gate waits for the store to answer whether purchases are available', async () => {
+    const store = held<'ready'>()
+    ensurePurchasesConfiguredMock.mockReturnValue(store.promise)
+    await render(<SettingsScreen />)
+
+    // Every other gate read answered: the header, the preference, the subscription access.
+    expect(await screen.findByTestId('profile-account')).not.toBeVisible()
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
+    await waitFor(() => expect(ensurePurchasesConfiguredMock).toHaveBeenCalled())
+    expect(screen.getByTestId('premium-settings-section')).not.toBeVisible()
+    expect(screen.queryByTestId('premium-restore')).toBeNull()
+    expect(placeholder()).toBeVisible()
+
+    act(() => store.release('ready'))
+
+    // The subscribe controls appear with the section, never under the member's finger.
+    const restore = await screen.findByTestId('premium-restore')
+    await waitFor(() => expect(restore).toBeVisible())
+    expect(placeholder()).toBeNull()
+  })
+
+  it('7.7-NAT-003 a return to Profile re-reads its sections in place', async () => {
+    await render(<SettingsScreen />)
+    const email = await screen.findByTestId('profile-account-email')
+    await waitFor(() => expect(email).toBeVisible())
+    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
+    expect(getCommercePreferenceMock).toHaveBeenCalledTimes(1)
+    expect(getSubscriptionMock).toHaveBeenCalledTimes(1)
+
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    // Leaving reads nothing: only the return does.
+    act(() => screenFocus.set(false))
+    expect(getUserProfileMock).toHaveBeenCalledTimes(1)
+    act(() => screenFocus.set(true))
+
+    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(getSubscriptionMock).toHaveBeenCalledTimes(2))
+    // The header and the sections stay while the reads run: no placeholder, no empty header.
+    expect(placeholder()).toBeNull()
+    expect(screen.getByTestId('profile-account-email')).toBe(email)
+    expect(email).toBeVisible()
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+
+    act(() => profile.release(memberProfile('Jade')))
+    expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')
+    expect(placeholder()).toBeNull()
+  })
+
+  /** Leaves Profile and comes back: the return re-reads every section in place. */
+  function leaveAndReturn() {
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+  }
+
+  // CodeRabbit r1: a return read that began before a toggle answers with the value the toggle
+  // replaced. The saved choice stays.
+  it('7.7-NAT-013 a return read that started before a toggle never lands over the saved choice', async () => {
+    await render(<SettingsScreen />)
+    const toggle = await screen.findByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(toggle).toBeVisible()
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
+    })
+    const stale = held<{ affiliateCtasEnabled: boolean }>()
+    getCommercePreferenceMock.mockReturnValue(stale.promise)
+    leaveAndReturn()
+    await waitFor(() => expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2))
+
+    // react-native-web hands the enabled state to its press responder in a passive effect.
+    await act(() => Promise.resolve())
+    fireEvent.click(screen.getByTestId('commerce-opt-out-toggle'))
+    await screen.findByText('Shopping preferences updated')
+    expect(updateCommercePreferenceMock).toHaveBeenCalledWith(false)
+
+    // The read from before the toggle answers with the old value.
+    await act(async () => {
+      stale.release({ affiliateCtasEnabled: true })
+      // A task boundary: every promise step of the read's chain runs before it.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+  })
+
+  // CodeRabbit r1: a return read belongs to the member it started for. One that answers after
+  // the device changed hands restores nothing of theirs.
+  it('7.7-NAT-015 return reads that answer after the member changed leave the screen as it is', async () => {
+    await render(<SettingsScreen />)
+    const email = await screen.findByTestId('profile-account-email')
+    const toggle = screen.getByTestId('commerce-opt-out-toggle')
+    await waitFor(() => {
+      expect(email).toBeVisible()
+      expect(toggle).toHaveAttribute('aria-checked', 'true')
+    })
+    const profile = held<ReturnType<typeof memberProfile>>()
+    getUserProfileMock.mockReturnValue(profile.promise)
+    const preference = held<{ affiliateCtasEnabled: boolean }>()
+    getCommercePreferenceMock.mockReturnValue(preference.promise)
+    leaveAndReturn()
+    await waitFor(() => {
+      expect(getUserProfileMock).toHaveBeenCalledTimes(2)
+      expect(getCommercePreferenceMock).toHaveBeenCalledTimes(2)
+    })
+
+    // Another identity takes the device while both reads are in flight.
+    identityEpochMock.mockReturnValue(1)
+    const previous = memberProfile('Previous member')
+    await act(async () => {
+      profile.release({
+        ...previous,
+        user: { ...previous.user, email: 'previous@example.test' },
+      })
+      preference.release({ affiliateCtasEnabled: false })
+      // A task boundary: every promise step of both reads' chains runs before it.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      'jade@example.test'
+    )
+    expect(screen.getByTestId('commerce-opt-out-toggle')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
   })
 
   it('6.5-MOB-POLISH-07 keeps API health and wiring notes out of the user build', async () => {
@@ -357,8 +534,9 @@ describe('SettingsScreen', () => {
 
     await render(<SettingsScreen />)
 
+    // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
-      screen.getByRole('button', { name: 'Record weather alert analytics' })
+      await screen.findByRole('button', { name: 'Record weather alert analytics' })
     )
 
     expect(analyticsCaptureMock).toHaveBeenCalledWith(
@@ -378,8 +556,9 @@ describe('SettingsScreen', () => {
 
     await render(<SettingsScreen />)
 
+    // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
-      screen.getByRole('button', { name: 'Record weather alert analytics' })
+      await screen.findByRole('button', { name: 'Record weather alert analytics' })
     )
     expect(analyticsCaptureMock).toHaveBeenCalledWith(
       'alert_received',

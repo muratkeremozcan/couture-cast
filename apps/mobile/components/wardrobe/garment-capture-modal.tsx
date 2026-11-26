@@ -51,6 +51,7 @@ import {
 } from '@/src/lib/upload-attempts'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
 
@@ -114,6 +115,7 @@ export function MobileGarmentCaptureModal({
   invokingNodeHandle,
   confirmDiscard = false,
 }: MobileGarmentCaptureModalProps) {
+  const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language).firstUse
   const colors = useSchemeColors()
@@ -416,7 +418,7 @@ export function MobileGarmentCaptureModal({
   return (
     <EdgeToEdgeModal
       transparent={false}
-      animationType="slide"
+      animationType={modalAnimation}
       visible={visible}
       onRequestClose={handleClose}
     >

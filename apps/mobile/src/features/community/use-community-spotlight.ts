@@ -43,6 +43,11 @@ export interface CommunitySpotlightView {
   items: CommunityReactionSpotlightItem[]
   hasMore: boolean
   isLoadingMore: boolean
+  /**
+   * Story CC-7.7 D5: a page-one read is replacing the shown row in place. View more stays in
+   * place but disabled until it lands, so it never pages from the cursor being replaced.
+   */
+  isReplacing: boolean
   loadMoreFailed: boolean
   focusRequest: SpotlightFocusRequest | null
   reload: () => void
@@ -109,9 +114,15 @@ export function useCommunitySpotlight({
   sponsorships,
   postTextLedger,
   onBanned,
+  onRefreshFailed,
 }: {
   /** Story 6.11: a read refused for a ban closes the whole community screen, on any page. */
   onBanned?: (sanction: CommunityBannedError['sanction']) => void
+  /**
+   * Story CC-7.7: a refresh in place failed and the row kept its cards. The screen reports it
+   * in a slot that moves no content; the row itself never inserts an error above the feed.
+   */
+  onRefreshFailed?: (retry: () => void) => void
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
   reactionState: CommunityReactionState
@@ -123,6 +134,8 @@ export function useCommunitySpotlight({
   const [fallbackTextLedger] = useState(() => new CommunityPostTextLedger())
   const textLedger = postTextLedger ?? fallbackTextLedger
   const [status, setStatus] = useState<SpotlightStatus>('loading')
+  const statusRef = useRef(status)
+  statusRef.current = status
   const [level, setLevel] = useState<CommunitySpotlightLevel>('none')
   const [label, setLabel] = useState<string | null>(null)
   const [items, setItems] = useState<CommunityReactionSpotlightItem[]>([])
@@ -131,6 +144,8 @@ export function useCommunitySpotlight({
   const [loadMoreFailed, setLoadMoreFailed] = useState(false)
   const onBannedRef = useRef(onBanned)
   onBannedRef.current = onBanned
+  const onRefreshFailedRef = useRef(onRefreshFailed)
+  onRefreshFailedRef.current = onRefreshFailed
   const [focusRequest, setFocusRequest] = useState<SpotlightFocusRequest | null>(null)
   // A page settles after later renders, so it compares against the cards shown now.
   const itemsRef = useRef(items)
@@ -141,7 +156,17 @@ export function useCommunitySpotlight({
   const generationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
   const loadingMoreRef = useRef(false)
+  // Story CC-7.7 D5: true while a page-one read replaces the shown row in place. View more
+  // would page from the cursor that read is about to replace, so it waits until the row lands.
+  const replacingRef = useRef(false)
+  const [isReplacing, setIsReplacingState] = useState(false)
+  const setReplacing = useCallback((value: boolean) => {
+    replacingRef.current = value
+    setIsReplacingState(value)
+  }, [])
   const focusSerialRef = useRef(0)
+  // The refresh-failure Retry runs after later renders; it reads with the latest reload.
+  const reloadRef = useRef<() => void>(() => undefined)
   // Single-post image refreshes run beside paging, so a View more never cancels
   // one. A session change or unmount aborts them all.
   const itemRefreshesRef = useRef(new Map<string, AbortController>())
@@ -173,14 +198,17 @@ export function useCommunitySpotlight({
   }, [])
 
   const load = useCallback(
-    async (restarted = false) => {
+    async (restarted = false, inPlace = false) => {
       const ticket = reactionState.beginRead()
       const textStamp = textLedger.begin()
       const { controller, isCurrent } = begin()
       loadingMoreRef.current = false
+      setReplacing(inPlace)
       setIsLoadingMore(false)
       setLoadMoreFailed(false)
-      setStatus('loading')
+      // Story CC-7.7 D5: a pull to refresh or a location change over a shown row refreshes in
+      // place. The row never collapses into the loading line, so the feed below stays put.
+      if (!inPlace) setStatus('loading')
       try {
         const stamp = sponsorships.begin()
         const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
@@ -216,27 +244,43 @@ export function useCommunitySpotlight({
         setStatus('ready')
       } catch (error: unknown) {
         if (!isCurrent()) return
+        const sanction = communitySanctionOf(error)
+        // A failed refresh keeps the row on screen; a ban or a disabled Spotlight still closes it.
+        if (inPlace && !sanction && !isDisabledRefusal(error)) {
+          onRefreshFailedRef.current?.(() => reloadRef.current())
+          return
+        }
         setItems([])
         setNextCursor(null)
         setFocusRequest(null)
-        const sanction = communitySanctionOf(error)
         if (sanction) onBannedRef.current?.(sanction)
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
+      } finally {
+        if (isCurrent()) setReplacing(false)
       }
     },
-    [begin, reactionState, readItems, setNextCursor, sponsorships, textLedger]
+    [
+      begin,
+      reactionState,
+      readItems,
+      setNextCursor,
+      setReplacing,
+      sponsorships,
+      textLedger,
+    ]
   )
 
   // Pull to refresh and Retry read page one only for a signed-in member.
   const sessionScopeRef = useRef(sessionScope)
   sessionScopeRef.current = sessionScope
   const reload = useCallback(() => {
-    if (sessionScopeRef.current) void load()
+    if (sessionScopeRef.current) void load(false, statusRef.current === 'ready')
   }, [load])
+  reloadRef.current = reload
 
   const loadMore = useCallback(() => {
     const cursor = nextCursorRef.current
-    if (!cursor || loadingMoreRef.current) return
+    if (!cursor || loadingMoreRef.current || replacingRef.current) return
     loadingMoreRef.current = true
     const ticket = reactionState.beginRead()
     const textStamp = textLedger.begin()
@@ -326,6 +370,7 @@ export function useCommunitySpotlight({
     controllerRef.current?.abort()
     generationRef.current += 1
     loadingMoreRef.current = false
+    setReplacing(false)
     setIsLoadingMore(false)
     setLoadMoreFailed(false)
     setStatus('idle')
@@ -336,6 +381,7 @@ export function useCommunitySpotlight({
     postTextLedger,
     sessionScope,
     setNextCursor,
+    setReplacing,
   ])
   useEffect(
     () => () => {
@@ -474,6 +520,7 @@ export function useCommunitySpotlight({
     items,
     hasMore: nextCursor !== null,
     isLoadingMore,
+    isReplacing,
     loadMoreFailed,
     focusRequest,
     reload,

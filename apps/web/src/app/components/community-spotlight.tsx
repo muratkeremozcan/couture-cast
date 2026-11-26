@@ -93,6 +93,11 @@ export interface UseCommunitySpotlightOptions<Token = number> {
     token: Token
   ) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
+  /**
+   * Story CC-7.7 D5: the state a return to the tab starts from (its last settled spotlight for
+   * this member). The first read then refreshes it in place.
+   */
+  initial?: CommunitySpotlightState
 }
 
 /**
@@ -127,8 +132,9 @@ export function useCommunitySpotlight<Token = number>({
   beginRead,
   reconcile,
   announce,
+  initial,
 }: UseCommunitySpotlightOptions<Token>) {
-  const [state, setState] = useState<CommunitySpotlightState>(IDLE)
+  const [state, setState] = useState<CommunitySpotlightState>(initial ?? IDLE)
   const stateRef = useRef(state)
   stateRef.current = state
   const beginReadRef = useRef(beginRead)
@@ -148,6 +154,12 @@ export function useCommunitySpotlight<Token = number>({
   const itemControllersRef = useRef(new Set<AbortController>())
   const textClockRef = useRef(0)
   const textFenceRef = useRef(new Map<string, number>())
+  /**
+   * CC-7.7 D5: a return started from a remembered row, which may hold several pages. Its first
+   * page-one read refreshes that row in place and keeps its cursor; a reset, a failed read or a
+   * cursor restart ends it.
+   */
+  const restoringRef = useRef((initial?.items.length ?? 0) > 0)
 
   const preserveNewerText = useCallback(
     (
@@ -189,6 +201,8 @@ export function useCommunitySpotlight<Token = number>({
     async (restarted = false) => {
       const request = begin()
       const startClock = textClockRef.current
+      const inPlace =
+        !restarted && restoringRef.current && stateRef.current.items.length > 0
       setState((previous) => ({
         ...previous,
         status: 'loading',
@@ -201,8 +215,33 @@ export function useCommunitySpotlight<Token = number>({
         const page = await getCommunitySpotlightFromWeb({ signal: request.signal })
         if (!request.current()) return
         const items = reconcileRef.current(page.items, ticket)
+        restoringRef.current = false
         setState((previous) => {
           const previousById = new Map(previous.items.map((item) => [item.id, item]))
+          // CodeRabbit r2 #5: only a row for the same area is kept. A refresh that answers for
+          // another level or label (the member moved) replaces it, cards and cursor alike.
+          if (inPlace && previous.level === page.level && previous.label === page.label) {
+            // The remembered row keeps every page it showed and its cursor: the looks on this
+            // page take its answer where they are, and any new one joins at the end of the row.
+            const pageById = new Map(items.map((item) => [item.id, item]))
+            const kept = previous.items.map((item) => {
+              const fresh = pageById.get(item.id)
+              return fresh ? preserveNewerText(fresh, item, startClock) : item
+            })
+            return {
+              ...previous,
+              status: 'ready',
+              level: page.level,
+              label: page.label,
+              items: [...kept, ...newEntries(previous.items, items)],
+              // The cursor of the pages the row showed stays; a row restored without one takes
+              // the fresh page's (CodeRabbit on PR 292).
+              nextCursor: previous.nextCursor ?? page.nextCursor,
+              loadingMore: false,
+              moreFailed: false,
+              focusTargetId: null,
+            }
+          }
           const merged = items.map((item) =>
             preserveNewerText(item, previousById.get(item.id), startClock)
           )
@@ -221,6 +260,7 @@ export function useCommunitySpotlight<Token = number>({
           announceRef.current({ key: 'community.spotlight.announceRefreshed' })
       } catch (error: unknown) {
         if (!request.current()) return
+        restoringRef.current = false
         const sanction = bannedSanctionOf(error)
         if (sanction) onBannedRef.current?.(sanction)
         setState({ ...IDLE, status: isDisabledRefusal(error) ? 'disabled' : 'error' })
@@ -230,8 +270,9 @@ export function useCommunitySpotlight<Token = number>({
   )
 
   const loadMore = useCallback(async () => {
-    const { nextCursor, loadingMore } = stateRef.current
-    if (!nextCursor || loadingMore) return
+    const { nextCursor, loadingMore, status } = stateRef.current
+    // A page-one read still out (a return's in-place refresh) would be cancelled by this one.
+    if (!nextCursor || loadingMore || status === 'loading') return
     const request = begin()
     const startClock = textClockRef.current
     setState((previous) => ({ ...previous, loadingMore: true, moreFailed: false }))
@@ -298,6 +339,7 @@ export function useCommunitySpotlight<Token = number>({
     controllerRef.current?.abort()
     abortItemRefreshes()
     generationRef.current++
+    restoringRef.current = false
     textClockRef.current++
     textFenceRef.current.clear()
     setState(IDLE)
@@ -466,28 +508,15 @@ function focusSpotlightCard(postId: string) {
 
 function SpotlightStates({
   state,
-  isMobilePreview,
   t,
   onRetry,
-}: Pick<CommunitySpotlightSectionProps, 'state' | 'isMobilePreview' | 't' | 'onRetry'>) {
+}: Pick<CommunitySpotlightSectionProps, 'state' | 't' | 'onRetry'>) {
   if (state.status === 'loading') {
-    // Decorative. The section carries `aria-busy`, and the grid's single live
-    // region stays free for the feed's own loading announcement. The skeleton
-    // takes the row's shape, so the feed below does not jump when cards land.
-    return (
-      <div
-        data-testid="community-spotlight-loading"
-        aria-hidden="true"
-        className="flex gap-4 overflow-hidden p-1 [container-type:inline-size]"
-      >
-        {[1, 2].map((n) => (
-          <div
-            key={n}
-            className={`h-72 shrink-0 animate-pulse rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] ${cardWidth(isMobilePreview)}`}
-          />
-        ))}
-      </div>
-    )
+    // Story CC-7.7: no skeleton. A skeleton that collapsed into the real row moved the feed below
+    // it; the tab's screen gate now holds the whole body until this read settles, so the first
+    // load never shows here, and a retry keeps the section's heading while it reads. The empty
+    // marker stays for the tests and the section's `aria-busy`.
+    return <div data-testid="community-spotlight-loading" aria-hidden="true" />
   }
   if (state.status === 'disabled') {
     return (
@@ -547,10 +576,12 @@ function SpotlightViewMore({
   if (state.nextCursor === null) return null
   return (
     <div className="flex shrink-0 snap-start items-center px-2">
+      {/* CC-7.7 D5: a return's in-place refresh keeps the control in its slot, disabled until
+          page one answered, so the row never changes shape while it refreshes. */}
       <button
         type="button"
         data-testid="community-spotlight-view-more"
-        disabled={state.loadingMore}
+        disabled={state.loadingMore || state.status === 'loading'}
         onClick={onLoadMore}
         className="min-h-[44px] whitespace-nowrap rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
       >
@@ -645,7 +676,10 @@ export function CommunitySpotlightSection({
 
   if (state.status === 'idle' || !available) return null
 
-  const ready = state.status === 'ready'
+  // A refresh of a shown row (a return to the tab, or a session recheck) keeps the row in place
+  // while it reads, instead of collapsing it (CC-7.7 D5).
+  const refreshing = state.status === 'loading' && state.items.length > 0
+  const ready = state.status === 'ready' || refreshing
   const hasArea = ready && state.level !== 'none' && state.label
   // A page can arrive with every post filtered while ranks remain behind its
   // cursor. The empty state is for a spotlight with nothing left to show.
@@ -686,12 +720,7 @@ export function CommunitySpotlightSection({
           renderCard={renderCard}
         />
       ) : (
-        <SpotlightStates
-          state={state}
-          isMobilePreview={isMobilePreview}
-          t={t}
-          onRetry={onRetry}
-        />
+        <SpotlightStates state={state} t={t} onRetry={onRetry} />
       )}
     </section>
   )

@@ -12,7 +12,7 @@
 import React, { useSyncExternalStore } from 'react'
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type {
   GarmentItemContract,
   SilhouetteProfileContract,
@@ -22,6 +22,8 @@ import type {
 } from '@couture/api-client/contracts/http'
 import { createSuggestGarmentTagsDataFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
+import { screenSnapshot } from '../../lib/screen-snapshot'
+import { currentWebSessionScope } from '../../lib/use-web-session'
 import type { UploadGarmentImageInput } from '../../lib/wardrobe'
 import type * as WebSession from '../../lib/web-session'
 import { stubGarmentPreviewUrl } from '../../test-utils/garment-capture'
@@ -151,6 +153,8 @@ vi.mock('../../lib/saved-looks', () => ({
 import WardrobePage from './page'
 
 beforeEach(stubGarmentPreviewUrl)
+// Story CC-7.7: the Closet snapshot lives in module memory; each test starts without one.
+beforeEach(() => screenSnapshot.clear())
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -427,6 +431,47 @@ describe('WardrobePage onboarding entry card', () => {
 
     await screen.findByRole('link', { name: 'Set up your closet' })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  // CodeRabbit round 2 on PR 292 (#10): the automatic read and Retry share one request sequence.
+  it('7.7-CMP-053 an automatic onboarding read that is older than a Retry never overwrites its answer', async () => {
+    const user = userEvent.setup()
+    verifiedSession.owner = 'onboarding-member'
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'test-token-onboarding-member'
+    )
+    onTestFinished(() => {
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    })
+    const automatic = Promise.withResolvers<WardrobeOnboardingStateContract>()
+    getOnboardingStateFromWeb
+      // The mount's read fails, so the page reads again once the session is verified.
+      .mockRejectedValueOnce(new Error('network down'))
+      // That automatic read is slow.
+      .mockReturnValueOnce(automatic.promise)
+      // The member's Retry, sent after it, answers first.
+      .mockResolvedValueOnce(onboardingState({ status: 'in_progress' }))
+    render(<WardrobePage />)
+    await screen.findByRole('alert')
+
+    // The same member is verified again: the automatic read goes out, and Retry is still offered.
+    act(() => {
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByRole('link', { name: 'Set up your closet' })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    // The older automatic read fails late: the Retry's answer stays, with no error.
+    await act(async () => {
+      automatic.reject(new Error('late onboarding failure'))
+      await automatic.promise.catch(() => undefined)
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeInTheDocument()
   })
 
   it('opens the silhouette settings in an accessible modal and restores focus on close', async () => {
@@ -1460,5 +1505,294 @@ describe('WardrobePage commit deduplication', () => {
         offset: 0,
       })
     }
+  })
+})
+
+// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet and the setup progress
+// have answered, so the setup banner is already above the grid at reveal and nothing is inserted
+// there afterwards. The measured budget is 7.7-E2E-001.
+describe('WardrobePage screen gate', () => {
+  beforeEach(() => {
+    resetWardrobeMocks()
+    document.documentElement.setAttribute('data-session', 'member')
+    verifiedSession.owner = 'gate-member'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-gate-member')
+    window.dispatchEvent(new Event('couture:session'))
+  })
+
+  afterEach(() => {
+    cleanup()
+    verifiedSession.owner = null
+    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    document.documentElement.removeAttribute('data-session')
+  })
+
+  it('7.7-CMP-006 waits for the closet and the setup progress, and reveals with the setup banner in place', async () => {
+    const inventory = Promise.withResolvers<GarmentItemContract[]>()
+    const onboarding = Promise.withResolvers<WardrobeOnboardingStateContract>()
+    listGarmentsFromWeb.mockReset().mockReturnValue(inventory.promise)
+    getOnboardingStateFromWeb.mockReset().mockReturnValue(onboarding.promise)
+    render(<WardrobePage />)
+
+    const gate = screen.getByTestId('screen-gate')
+    expect(gate).toHaveAttribute('data-screen', 'closet')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.getByTestId('wardrobe-closet-view')).not.toBeVisible()
+
+    await act(async () => {
+      inventory.resolve([])
+      await inventory.promise
+    })
+    // The closet answered; the setup progress has not, so the body stays hidden.
+    expect(gate).not.toHaveAttribute('data-ready')
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+
+    await act(async () => {
+      onboarding.resolve(onboardingState({ status: 'in_progress' }))
+      await onboarding.promise
+    })
+    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+  })
+
+  // A total only the answered page can carry, so "3 saved" proves the read landed (the row
+  // starts at "0 saved" and reads "…" while it loads).
+  const SAVED_LOOKS_PAGE = { data: [], total: 3, limit: 50, offset: 0 }
+  type GateRead = 'garments' | 'onboarding' | 'profile' | 'savedLooks'
+  const GATE_READS: GateRead[] = ['garments', 'onboarding', 'profile', 'savedLooks']
+
+  /**
+   * Holds one of the gate's four reads (or none, the control); the others answer at once with
+   * values that leave evidence on the page. Returns the release.
+   */
+  function holdOneRead(read: GateRead | 'none') {
+    const held = Promise.withResolvers<void>()
+    const answer = <T,>(name: GateRead, value: T) =>
+      read === name ? held.promise.then(() => value) : Promise.resolve(value)
+    listGarmentsFromWeb
+      .mockReset()
+      .mockImplementation(() => answer('garments', [persistedGarment]))
+    getOnboardingStateFromWeb
+      .mockReset()
+      .mockImplementation(() =>
+        answer('onboarding', onboardingState({ status: 'in_progress' }))
+      )
+    resolveCurrentUserId
+      .mockReset()
+      .mockImplementation(() => answer('profile', 'user-hub-1'))
+    savedLooksMocks.listSavedLooksPageFromWeb.mockImplementationOnce(() =>
+      answer('savedLooks', SAVED_LOOKS_PAGE)
+    )
+    return held
+  }
+
+  /** Positive evidence that an answered read landed, rendered under the closed gate. */
+  function expectLanded(read: GateRead) {
+    switch (read) {
+      case 'garments':
+        expect(listGarmentsFromWeb).toHaveBeenCalled()
+        expect(
+          screen.getByTestId(`garment-card-${persistedGarment.id}`)
+        ).toBeInTheDocument()
+        return
+      case 'onboarding':
+        expect(getOnboardingStateFromWeb).toHaveBeenCalled()
+        expect(
+          screen.getByRole('link', { name: 'Set up your closet', hidden: true })
+        ).toBeInTheDocument()
+        return
+      case 'profile':
+        // The header sits outside the gate: Silhouette enables once the account read answers.
+        expect(resolveCurrentUserId).toHaveBeenCalled()
+        expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+        return
+      case 'savedLooks':
+        expect(savedLooksMocks.listSavedLooksPageFromWeb).toHaveBeenCalled()
+        expect(screen.getByText('3 saved')).toBeInTheDocument()
+    }
+  }
+
+  it('7.7-CMP-006 control: with every read answered the gate opens once they land', async () => {
+    holdOneRead('none')
+    render(<WardrobePage />)
+    const gate = screen.getByTestId('screen-gate')
+
+    await waitFor(() => {
+      for (const read of GATE_READS) expectLanded(read)
+    })
+    await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+    expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+  })
+
+  it.each(GATE_READS)(
+    '7.7-CMP-006 stays closed while the %s read is unanswered and the others have landed, then opens',
+    async (read) => {
+      const held = holdOneRead(read)
+      render(<WardrobePage />)
+      const gate = screen.getByTestId('screen-gate')
+
+      // Judge the gate only once every answered read has visibly landed under it.
+      await waitFor(() => {
+        for (const other of GATE_READS) if (other !== read) expectLanded(other)
+      })
+      expect(gate).not.toHaveAttribute('data-ready')
+      expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+      expect(screen.getByTestId('wardrobe-closet-view')).not.toBeVisible()
+
+      await act(async () => {
+        held.resolve()
+        await held.promise
+      })
+      await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+      expectLanded(read)
+      expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+      expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+    }
+  )
+
+  // Codex review of 8327b4fb, P2-1: the e2e fixture bearers share one owner, so the owner check
+  // alone let a closet read sent with one fixture bearer land for the next.
+  it('7.7-CMP-019 a closet read sent with one fixture bearer never lands for the next, on screen or in the snapshot', async () => {
+    screenSnapshot.clear()
+    onTestFinished(() => {
+      screenSnapshot.clear()
+      vi.unstubAllEnvs()
+    })
+    verifiedSession.owner = null
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-a')
+    window.dispatchEvent(new Event('couture:session'))
+    const fixtureA = garmentFixture('garment-fixture-a', 'ready')
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockResolvedValue([fixtureB])
+    render(<WardrobePage />)
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+
+    // The tab switches fixture members while A's closet read is still out.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([fixtureA])
+      await listForA.promise
+    })
+
+    expect(await screen.findByTestId(`garment-card-${fixtureB.id}`)).toBeInTheDocument()
+    expect(screen.queryByTestId(`garment-card-${fixtureA.id}`)).not.toBeInTheDocument()
+    expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
+    await waitFor(() =>
+      expect(
+        screenSnapshot
+          .recall<{
+            garments: GarmentItemContract[]
+          }>(currentWebSessionScope(), 'closet', 'closet')
+          ?.garments.map((garment) => garment.id)
+      ).toEqual([fixtureB.id])
+    )
+  })
+
+  /** The e2e fixture member, with its first bearer in the tab. */
+  function signInFixtureA() {
+    screenSnapshot.clear()
+    onTestFinished(() => {
+      screenSnapshot.clear()
+      vi.unstubAllEnvs()
+    })
+    verifiedSession.owner = null
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-fixture-a')
+    window.dispatchEvent(new Event('couture:session'))
+  }
+
+  /** The tab switches fixture members (one owner, a new bearer), as the e2e fixtures do. */
+  const switchBearer = (token: string) =>
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
+
+  // CodeRabbit round 1 on PR 292 (#14): the closet read is retried once for the bearer the tab
+  // holds; when that one is overtaken too, the read used to return with nothing on screen.
+  it('7.7-CMP-040 a closet read overtaken by a second bearer switch shows the load error and Retry, never a blank closet', async () => {
+    signInFixtureA()
+    const fixtureA = garmentFixture('garment-fixture-a', 'ready')
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    const listForB = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockReturnValueOnce(listForB.promise)
+      .mockResolvedValue([])
+    render(<WardrobePage />)
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(1))
+
+    switchBearer('test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([fixtureA])
+      await listForA.promise
+    })
+    await waitFor(() => expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2))
+    switchBearer('test-token-fixture-c')
+    await act(async () => {
+      listForB.resolve([fixtureB])
+      await listForB.promise
+    })
+
+    expect(await screen.findByTestId('wardrobe-list-retry')).toBeVisible()
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    expect(screen.queryByTestId(`garment-card-${fixtureA.id}`)).toBeNull()
+    expect(screen.queryByTestId(`garment-card-${fixtureB.id}`)).toBeNull()
+    expect(listGarmentsFromWeb).toHaveBeenCalledTimes(2)
+  })
+
+  // CodeRabbit round 1 on PR 292 (#15): the account read had no scope guard, so an answer read
+  // with the last fixture bearer landed for the next, on screen and in its Closet snapshot.
+  it('7.7-CMP-041 an account read sent with one fixture bearer never lands for the next, on screen or in the snapshot', async () => {
+    signInFixtureA()
+    const remember = vi.spyOn(screenSnapshot, 'remember')
+    onTestFinished(() => remember.mockRestore())
+    const fixtureB = garmentFixture('garment-fixture-b', 'ready')
+    const accountForA = Promise.withResolvers<string>()
+    resolveCurrentUserId
+      .mockReset()
+      .mockReturnValueOnce(accountForA.promise)
+      .mockResolvedValue('user-fixture-b')
+    const listForA = Promise.withResolvers<GarmentItemContract[]>()
+    listGarmentsFromWeb
+      .mockReset()
+      .mockReturnValueOnce(listForA.promise)
+      .mockResolvedValue([fixtureB])
+    render(<WardrobePage />)
+    await waitFor(() => expect(resolveCurrentUserId).toHaveBeenCalledTimes(1))
+
+    // The bearer switches while A's account read is out; the closet reloads for B.
+    switchBearer('test-token-fixture-b')
+    await act(async () => {
+      listForA.resolve([])
+      await listForA.promise
+    })
+    expect(await screen.findByTestId(`garment-card-${fixtureB.id}`)).toBeInTheDocument()
+
+    // A's account read answers last: it is dropped and the account is read again for B.
+    await act(async () => {
+      accountForA.resolve('user-fixture-a')
+      await accountForA.promise
+    })
+    await waitFor(() => expect(resolveCurrentUserId).toHaveBeenCalledTimes(2))
+    const keptUserId = () =>
+      screenSnapshot.recall<{ userId: string | null }>(
+        currentWebSessionScope(),
+        'closet',
+        'closet'
+      )?.userId
+    await waitFor(() => expect(keptUserId()).toBe('user-fixture-b'))
+    expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+    const storedUserIds = remember.mock.calls
+      .filter(([, screenName, part]) => screenName === 'closet' && part === 'closet')
+      .map(([, , , value]) => (value as { userId: string | null }).userId)
+    expect(storedUserIds).not.toContain('user-fixture-a')
   })
 })

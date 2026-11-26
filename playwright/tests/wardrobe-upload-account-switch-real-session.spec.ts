@@ -486,6 +486,38 @@ test.describe('Upload state follows the signed-in account', () => {
         await delivery.catch(() => undefined)
       },
     })
+    // The worker can finish before the commit answers (run 45734058635: ready 4 ms before the
+    // commit returned), and a commit that already says ready starts no poll, so there would be
+    // no poll answer to hold. That commit answer is delivered as the processing state the
+    // worker reports on every slower run, so the ready photo always arrives through a poll.
+    void interceptNetworkCall({
+      method: 'POST',
+      url: '**/api/v1/wardrobe/silhouette/my-form/commit',
+      handler: async (route) => {
+        const response = await route.fetch()
+        const body = (await response.json().catch(() => null)) as {
+          data?: { myForm?: { status?: string; committedAt?: string } | null }
+        } | null
+        const myForm = body?.data?.myForm
+        if (!body?.data || !myForm || !isReadyMyForm(body))
+          return route.fulfill({ response })
+        return route.fulfill({
+          response,
+          json: {
+            ...body,
+            data: {
+              ...body.data,
+              myForm: {
+                status: 'processing',
+                failureReason: null,
+                committedAt: myForm.committedAt,
+                imageAccess: null,
+              },
+            },
+          },
+        })
+      },
+    })
 
     const dialog = await openMyForm(page)
     await dialog

@@ -10,7 +10,16 @@ import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type * as EdgeToEdgeModalModule from '@/components/edge-to-edge-modal'
 import { setViewport } from '@/src/test-utils/viewport'
@@ -208,6 +217,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
+import { screenFocus } from '@/src/test-utils/focus-effect'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
 
 /**
@@ -246,6 +256,8 @@ async function expectCardPhoto(id: string, url: string) {
       url
     )
   )
+  // Story CC-7.7: the card shows once the Closet gate's reads (inventory, onboarding) settle.
+  await waitFor(() => expect(screen.getByTestId(`garment-card-${id}`)).toBeVisible())
 }
 
 function deferred() {
@@ -375,6 +387,158 @@ describe('WardrobeHubScreen', () => {
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
     vi.clearAllMocks()
+  })
+
+  it('7.7-NAT-003 the Closet gate waits for the inventory and onboarding reads, then a refresh keeps the closet in place', async () => {
+    let releaseOnboarding!: () => void
+    const onboardingHeld = new Promise<void>((resolve) => {
+      releaseOnboarding = resolve
+    })
+    onTestFinished(() => releaseOnboarding())
+    server.use(
+      http.get('*/api/v1/wardrobe/onboarding', async () => {
+        await onboardingHeld
+        return HttpResponse.json({ data: onboardingNotCompleted })
+      })
+    )
+    renderScreen()
+
+    // The inventory answered (empty), the onboarding state has not: the placeholder holds.
+    const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
+    expect(emptyTitle).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
+
+    act(() => releaseOnboarding())
+
+    // The setup card is in place when the closet appears: nothing is inserted above it later.
+    expect(await screen.findByTestId('wardrobe-onboarding-card')).toBeVisible()
+    expect(emptyTitle).toBeVisible()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+
+    // A refresh (a tag save elsewhere) never returns to the first-load spinner.
+    let garmentReads = 0
+    let releaseGarments!: () => void
+    const garmentsHeld = new Promise<void>((resolve) => {
+      releaseGarments = resolve
+    })
+    onTestFinished(() => releaseGarments())
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        garmentReads += 1
+        await garmentsHeld
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    act(() => notifyWardrobeChanged())
+    await waitFor(() => expect(garmentReads).toBe(1))
+
+    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
+    expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+  })
+
+  it('7.7-NAT-004 the Closet gate waits for the first Saved Looks page, so its Retry never pushes the closet down', async () => {
+    setMobileApplicationUserId('closet-gate-saved-looks-owner')
+    let savedLookReads = 0
+    let releaseSavedLooks!: () => void
+    const savedLooksHeld = new Promise<void>((resolve) => {
+      releaseSavedLooks = resolve
+    })
+    onTestFinished(() => releaseSavedLooks())
+    server.use(
+      http.get('*/api/v1/wardrobe/saved-looks', async () => {
+        savedLookReads += 1
+        await savedLooksHeld
+        return HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+      })
+    )
+    renderScreen()
+
+    // Inventory and onboarding answered; only the Saved Looks page is out.
+    const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
+    const setupCard = await screen.findByTestId('wardrobe-onboarding-card')
+    await waitFor(() => expect(savedLookReads).toBe(1))
+    expect(emptyTitle).not.toBeVisible()
+    expect(setupCard).not.toBeVisible()
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+
+    act(() => releaseSavedLooks())
+
+    // The row's error and Retry arrive with the closet in one commit, above nothing shown yet.
+    expect(await screen.findByTestId('saved-looks-retry')).toBeVisible()
+    expect(setupCard).toBeVisible()
+    expect(emptyTitle).toBeVisible()
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+  })
+
+  it('7.7-NAT-003 a return to the Closet re-reads the inventory and Saved Looks in place', async () => {
+    onTestFinished(() => screenFocus.reset())
+    setMobileApplicationUserId('closet-return-owner')
+    renderScreen()
+    const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
+    await waitFor(() => expect(emptyTitle).toBeVisible())
+    const body = screen.getByTestId('screen-gate-body-closet')
+
+    let garmentReads = 0
+    let savedLookReads = 0
+    let releaseReads!: () => void
+    const readsHeld = new Promise<void>((resolve) => {
+      releaseReads = resolve
+    })
+    onTestFinished(() => releaseReads())
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        garmentReads += 1
+        await readsHeld
+        return HttpResponse.json({ data: [] })
+      }),
+      http.get('*/api/v1/wardrobe/saved-looks', async () => {
+        savedLookReads += 1
+        await readsHeld
+        return HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
+      })
+    )
+
+    // Leaving reads nothing: only the return does.
+    act(() => screenFocus.set(false))
+    expect(garmentReads).toBe(0)
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(garmentReads).toBe(1))
+    await waitFor(() => expect(savedLookReads).toBe(1))
+
+    // The closet stays as it was while the reads run: same mounted body (so its scroll
+    // position), no placeholder, no first-read spinner.
+    expect(screen.getByTestId('screen-gate-body-closet')).toBe(body)
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(emptyTitle).toBeVisible()
+    const row = screen.getByTestId('closet-saved-looks-row')
+    expect(row).toBeVisible()
+    // The row keeps its count while the page re-reads; only the first read shows the ellipsis.
+    expect(row).toHaveTextContent(i18n.t('savedLooks.count', { count: 0 }))
+  })
+
+  it('7.7-NAT-004 keeps the 24-point gap between the setup card, Saved Looks and the closet inside the gate', async () => {
+    // Saved Looks belong to a member: without one the row renders nothing to measure.
+    setMobileApplicationUserId('closet-gate-gap-owner')
+    renderScreen()
+    const setupCard = await screen.findByTestId('wardrobe-onboarding-card')
+    await waitFor(() => expect(setupCard).toBeVisible())
+    const body = screen.getByTestId('screen-gate-body-closet')
+
+    // The ScrollView's gap reaches only its direct children; the gate body carries its own.
+    expect(setupCard.parentElement).toBe(body)
+    expect(getComputedStyle(body).rowGap).toBe('24px')
+    const savedLooks = screen.getByTestId('closet-saved-looks-row')
+    const cardBottom = setupCard.getBoundingClientRect().bottom
+    // The row's container is the body's next child; its header starts at the container top.
+    const rowContainer = Array.from(body.children).find((child) =>
+      child.contains(savedLooks)
+    )
+    expect(rowContainer).toBeDefined()
+    expect(rowContainer!.getBoundingClientRect().top - cardBottom).toBeCloseTo(24, 0)
   })
 
   it('4.4-MOB-HUB-01 renders the wardrobe hub header and empty state (regression)', async () => {

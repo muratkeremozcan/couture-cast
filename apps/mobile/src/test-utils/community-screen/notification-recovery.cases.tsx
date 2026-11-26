@@ -18,6 +18,7 @@ import {
   setMockParams,
   mockCapture,
   errorEnvelope,
+  communityGateOpen,
 } from './harness'
 
 vi.mock('socket.io-client', () => ({
@@ -292,6 +293,7 @@ export function registerCommunityNotificationRecoveryCases() {
         await waitFor(() =>
           expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
         )
+        await communityGateOpen()
         expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
         if (opened === 'post-b') {
           expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
@@ -322,6 +324,7 @@ export function registerCommunityNotificationRecoveryCases() {
         held.release()
         await Promise.allSettled(f.pending)
       })
+      await communityGateOpen()
       expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
       expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
       expect(screen.queryByTestId('comment-target-reply')).toBeNull()
@@ -347,6 +350,7 @@ export function registerCommunityNotificationRecoveryCases() {
     )
     expect(f.rootRequests).toHaveLength(before)
     expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    await communityGateOpen()
     expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
     expect(screen.getByTestId('community-card-comments-post-b')).not.toHaveAttribute(
       'aria-disabled',
@@ -415,6 +419,7 @@ export function registerCommunityNotificationRecoveryCases() {
           })
           expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
           expect(f.rootRequests).toHaveLength(0)
+          await communityGateOpen()
           expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
         }
         expect(
@@ -498,6 +503,7 @@ export function registerCommunityNotificationRecoveryCases() {
       await waitFor(() => expect(f.state.notificationCalls).toBe(1))
       // The notification is held, so waiting for the feed card here cannot race
       // past the fence; the spotlight read on mount may land first.
+      await communityGateOpen()
       press(
         within(await screen.findByTestId('community-post-card-post-a')).getByRole(
           'button',
@@ -562,6 +568,7 @@ export function registerCommunityNotificationRecoveryCases() {
         expect(f.rootRequests).toHaveLength(before)
         if (kind === 'missing-card') {
           expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+          await communityGateOpen()
           expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
         } else {
           if (kind === 'card')

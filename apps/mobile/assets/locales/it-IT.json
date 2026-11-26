@@ -85,6 +85,7 @@
     "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
   },
   "common": {
+    "loading": "Caricamento",
     "cancel": "Annulla",
     "dismiss_banner": "Chiudi banner",
     "invalid_link": "Questo link non è valido, è scaduto o non è più disponibile.",

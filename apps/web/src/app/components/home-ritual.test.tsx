@@ -773,3 +773,61 @@ it('shows inline Needs review badge for unresolved Home saved looks and avoids s
     view.unmount()
   }
 })
+
+// Story CC-7.7 D2 (7.7-CMP-003, 7.7-CMP-004): a member never sees the sample outfit before their
+// own ritual read settles. It appears only when that read answers without a usable outfit, or
+// fails (with the failure copy and Retry in place).
+function ritualWithoutOutfit(): RitualResponse {
+  const response = ritual()
+  return {
+    data: {
+      ...response.data,
+      outfits: response.data.outfits.map(({ displayGarments: _unused, ...outfit }) => ({
+        ...outfit,
+        garmentIds: [],
+      })),
+    },
+  }
+}
+
+it('7.7-CMP-003 renders no sample outfit while the member ritual read is unsettled', async () => {
+  const held = Promise.withResolvers<void>()
+  useMswHandlers(
+    http.get('/api/v1/ritual', async () => {
+      await held.promise
+      return HttpResponse.json(ritualWithoutOutfit())
+    })
+  )
+  publishMember('unsettled-member')
+  renderHome()
+  await settle()
+
+  expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
+  expect(screen.queryByTestId('home-live-outfit')).toBeNull()
+  expect(screen.queryByText('Visitor outfit demo')).toBeNull()
+
+  held.resolve()
+  expect(await screen.findByTestId('member-sample-outfit')).toBeVisible()
+})
+
+it('7.7-CMP-004 a ritual with no usable outfit shows the member sample outfit', async () => {
+  useMswHandlers(
+    http.get('/api/v1/ritual', () => HttpResponse.json(ritualWithoutOutfit()))
+  )
+  publishMember('empty-ritual-member')
+  renderHome()
+
+  expect(await screen.findByTestId('member-sample-outfit')).toBeVisible()
+  expect(screen.queryByTestId('home-live-outfit')).toBeNull()
+  expect(screen.queryByTestId('home-outfit-retry')).toBeNull()
+})
+
+it('7.7-CMP-004 a failed ritual shows the sample with the failure copy and Retry', async () => {
+  useMswHandlers(http.get('/api/v1/ritual', serviceUnavailable))
+  publishMember('failed-ritual-member')
+  renderHome()
+
+  expect(await screen.findByText("Unable to load today's outfit.")).toBeVisible()
+  expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+  expect(screen.getByTestId('home-outfit-retry')).toBeVisible()
+})
