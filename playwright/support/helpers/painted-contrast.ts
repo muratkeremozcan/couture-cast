@@ -816,6 +816,66 @@ function failureFor(target: Target, ink: Ink | null): ContrastFailure | null {
   }
 }
 
+/**
+ * A text failure's evidence on the report (CI db90edaa, "Cold and dry" at 4.452): the run
+ * measured once more with its shots kept (bare, inked, and the diff with the weakest group in
+ * red), plus what the browser computed for it: its color, the first painted background up its
+ * ancestors, font, opacity and where it sits.
+ */
+async function attachTextEvidence(target: Locator, failure: ContrastFailure) {
+  const page = target.page()
+  const again = await measure(target, { ...textStates(page), withShots: true }).catch(
+    (error: unknown) => ({ error: String(error) })
+  )
+  const computed = await target
+    .evaluate((el) => {
+      const style = getComputedStyle(el)
+      let backdrop = 'none'
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const background = getComputedStyle(node).backgroundColor
+        if (!/rgba\(0, 0, 0, 0\)|transparent/.test(background)) {
+          const id = node.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
+          backdrop = `${background} on ${node.tagName.toLowerCase()} in ${id}`
+          break
+        }
+      }
+      const box = el.getBoundingClientRect()
+      return {
+        html: el.outerHTML.slice(0, 200),
+        testid: el.closest('[data-testid]')?.getAttribute('data-testid') ?? '',
+        color: style.color,
+        backdrop,
+        font: `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`,
+        opacity: style.opacity,
+        theme: document.documentElement.getAttribute('data-theme'),
+        scheme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+        box: [box.x, box.y, box.width, box.height].map(Math.round),
+      }
+    })
+    .catch((error: unknown) => ({ error: String(error) }))
+  const info = test.info()
+  const name = `text-contrast-${info.attachments.length}`
+  const shots = again && 'shots' in again ? again.shots : undefined
+  if (shots)
+    for (const [label, body] of Object.entries(shots))
+      await info.attach(`${name}-${label}.png`, {
+        body: Buffer.from(body, 'base64'),
+        contentType: 'image/png',
+      })
+  const measured =
+    again === null
+      ? null
+      : 'error' in again
+        ? again
+        : { ratio: again.ratio, painted: again.painted, weakest: again.weakest }
+  const report = { failure, measured, computed }
+  await info.attach(`${name}.json`, {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  })
+  console.log(`[painted-contrast] text failure ${JSON.stringify(report)}`)
+}
+
 /** One scan over a settled target list; throws TargetsChanged when the list moves under it. */
 async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailure[]> {
   const page = root.page()
@@ -830,9 +890,21 @@ async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailur
       failures.push({ text: target.text, ratio: 0, required: 4.5, painted: 0 })
       continue
     }
-    const ink = await inkOfText(page.locator(`[${TARGET}="${target.index}"]`), settled)
+    const locator = page.locator(`[${TARGET}="${target.index}"]`)
+    // Re-enumerated only when this target's mark is gone (a re-render replaced the node): one
+    // enumeration per target walked the whole root with getComputedStyle each time, which made
+    // a full-page scan quadratic (about 38 s per shell tab, CC-7.9 burn-in over 20 min on CI
+    // db90edaa). A list that changed anywhere is still caught: by the re-enumeration when a mark
+    // is lost, and by the check after the loop, and either restarts the scan.
+    const prepare = async () => {
+      if ((await locator.count()) === 0) await settled()
+    }
+    const ink = await inkOfText(locator, prepare)
     const failure = failureFor(target, ink)
-    if (failure) failures.push(failure)
+    if (failure) {
+      failures.push(failure)
+      await attachTextEvidence(locator, failure)
+    }
   }
   await settled()
   if (targets.length === 0 && rootText)
@@ -850,7 +922,8 @@ async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailur
  * below its WCAG minimum, not painted at all, or painted over a background that is not uniform
  * (refused: the best pixel would not stand for the run). Disabled controls are skipped (WCAG 1.4.3
  * exempts an inactive control), and so is visually hidden text: a 1 px box (`sr-only`), or
- * text inside one, clipped by clip rect(0 0 0 0), clip-path inset(50%) or a 1 px overflow box. An empty field is refused: the caller fills it, and measures its placeholder with
+ * text inside one, clipped by clip rect(0 0 0 0), clip-path inset(50%) or a 1 px overflow box.
+ * An empty field is refused: the caller fills it, and measures its placeholder with
  * `placeholderContrastFailures` first. A target re-rendered mid-measurement is found again by
  * enumerating `root` once more; a changed list of targets restarts the scan. A root that is not
  * shown, or that holds text none of which renders, fails.
