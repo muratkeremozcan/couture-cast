@@ -120,7 +120,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
       }`}
     >
-      <div className="mx-auto flex h-tab-bar w-full max-w-md items-center justify-around px-1">
+      <div className="mx-auto flex h-tab-bar w-full max-w-md items-center justify-around">
         {NAV_TABS.map((tab) => {
           const isActive = activeTab === tab.id
 
@@ -135,10 +135,11 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
               // Story CC-7.11 D3, P6: the active tab is gold (`tabActive`), semibold and
-              // underlined; the icon takes the label color. Five tabs share the row equally, so
-              // 320 px still fits them.
+              // underlined; the icon takes the label color. Five tabs share the row equally with no
+              // side padding, so at 320 px each has 64 px and "Community" (about 62 px at 12 px)
+              // stays on one line; a longer label wraps (D3).
               data-gold={isActive ? 'tab' : undefined}
-              className={`relative flex h-full min-h-touch min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-0.5 ${
+              className={`relative flex h-full min-h-touch min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md ${
                 isActive ? 'font-semibold text-tab-active' : 'font-medium text-ink-muted'
               }`}
             >
@@ -147,7 +148,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
                   tab wraps to a second line, inside a word when it must ("Community" at 320 px
                   has about 58 px), hyphenated where the language allows; it is never cut,
                   overflowed or shrunk below 12 px. */}
-              <span className="max-w-full hyphens-auto text-center text-xs leading-tight [overflow-wrap:anywhere]">
+              <span className="max-w-full hyphens-auto text-center text-xs leading-tight tracking-tight [overflow-wrap:anywhere]">
                 {t(tab.labelKey)}
               </span>
               {isActive && (
