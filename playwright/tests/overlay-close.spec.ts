@@ -167,6 +167,8 @@ test.describe('CC-7.11 overlays close and return focus @local-lane', () => {
       await waitForShellSettled(page, router)
       setScreen(overlay.screen)
       await page.getByTestId(SHELL_TABS[overlay.screen].nav).click()
+      // The client navigation commits after the click; read the URL only once it has.
+      await expect(page).toHaveURL(new RegExp(`${SHELL_TABS[overlay.screen].path}$`))
       await waitForShellSettled(page, router)
       const url = page.url()
 
