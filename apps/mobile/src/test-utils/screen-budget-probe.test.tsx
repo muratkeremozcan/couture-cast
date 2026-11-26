@@ -194,7 +194,7 @@ describe('the native probe: links, focus and current choices', () => {
     expect(keysOf(results)).toEqual(['switch-on', 'checkbox-on'])
   }, 30_000)
 
-  it('[P0] [7.10-NAT-021] probes a standalone pressed toggle whose press only tracks', async () => {
+  it('[P0] [7.10-NAT-021] probes a standalone pressed toggle and two pressed siblings whose presses only track', async () => {
     const track = vi.fn()
     function Toggle() {
       const [note, setNote] = useState('')
@@ -219,6 +219,22 @@ describe('the native probe: links, focus and current choices', () => {
             Save
           </button>
           <p data-testid="toggle-note">{note}</p>
+          {/* Two pressed siblings are independent toggles: neither is the one current choice. */}
+          <div>
+            {['bold', 'italic'].map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-pressed="true"
+                data-testid={`style-${name}`}
+                onClick={() => {
+                  track(name)
+                }}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
         </div>
       )
     }
@@ -228,9 +244,13 @@ describe('the native probe: links, focus and current choices', () => {
     expect(targets.map((target) => target.key)).toEqual([
       'toggle-pressed',
       'toggle-neighbor',
+      'style-bold',
+      'style-italic',
     ])
     expect(track).toHaveBeenCalledWith('toggle')
-    expect(keysOf(results)).toEqual(['toggle-pressed'])
+    expect(track).toHaveBeenCalledWith('bold')
+    expect(track).toHaveBeenCalledWith('italic')
+    expect(keysOf(results)).toEqual(['toggle-pressed', 'style-bold', 'style-italic'])
   }, 30_000)
 
   it('[P0] [7.10-NAT-022] skips only the current choice of a chip group and a radio group', async () => {
@@ -282,7 +302,7 @@ describe('the native probe: links, focus and current choices', () => {
     expect(keysOf(results)).toEqual([])
   }, 30_000)
 
-  it('[P0] [7.10-NAT-023] counts a write request and flags a press whose only request is a read', async () => {
+  it('[P0] [7.10-NAT-023] counts a write request, hands a Request body on unread and flags a press whose only request is a read', async () => {
     const served = vi.fn()
     server.use(
       http.get('*/api/v1/budget-probe/read', () => {
@@ -291,6 +311,10 @@ describe('the native probe: links, focus and current choices', () => {
       }),
       http.post('*/api/v1/budget-probe/write', () => {
         served('POST')
+        return HttpResponse.json({ ok: true })
+      }),
+      http.post('*/api/v1/budget-probe/body', async ({ request }) => {
+        served('POST body', await request.json())
         return HttpResponse.json({ ok: true })
       })
     )
@@ -311,6 +335,22 @@ describe('the native probe: links, focus and current choices', () => {
         >
           Write
         </button>
+        <button
+          type="button"
+          data-testid="request-body"
+          // A Request input carries its own body: the probe must hand it on unread.
+          onClick={() =>
+            void fetch(
+              new Request(new URL('/api/v1/budget-probe/body', window.location.href), {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ look: 'saved' }),
+              })
+            )
+          }
+        >
+          Body
+        </button>
       </div>
     )
 
@@ -322,6 +362,10 @@ describe('the native probe: links, focus and current choices', () => {
     expect(keysOf(results)).toEqual(['request-read'])
     expect(effectsOf(results, 'request-write')).toEqual([
       'request POST /api/v1/budget-probe/write',
+    ])
+    expect(served).toHaveBeenCalledWith('POST body', { look: 'saved' })
+    expect(effectsOf(results, 'request-body')).toEqual([
+      'request POST /api/v1/budget-probe/body',
     ])
   }, 30_000)
 })

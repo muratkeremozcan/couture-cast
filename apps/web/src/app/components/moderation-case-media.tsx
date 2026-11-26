@@ -43,9 +43,20 @@ export function CaseMedia({
     }
     setExpired(false)
     // A delay above the 32-bit timer limit fires at once and would show a live link as
-    // expired, so a link that outlives the limit arms no timer.
-    if (wait > MAX_TIMER_DELAY_MS) return
-    const timer = window.setTimeout(() => setExpired(true), wait)
+    // expired, so a long wait runs in steps of at most the limit, each re-reading the clock,
+    // until the link expires.
+    let timer: number | undefined
+    const arm = (remaining: number) => {
+      timer = window.setTimeout(
+        () => {
+          const left = expiresAt - (Date.now() + clockOffsetMs)
+          if (left <= 0) setExpired(true)
+          else arm(left)
+        },
+        Math.min(remaining, MAX_TIMER_DELAY_MS)
+      )
+    }
+    arm(wait)
     return () => window.clearTimeout(timer)
   }, [expiresAt, clockOffsetMs])
 

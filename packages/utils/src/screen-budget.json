@@ -69,13 +69,13 @@
       "host": "*.posthog.com"
     },
     {
-      "path": "**/v1/traces"
+      "path": "/v1/traces"
     },
     {
-      "path": "**/v1/logs"
+      "path": "/v1/logs"
     },
     {
-      "path": "**/v1/metrics"
+      "path": "/v1/metrics"
     }
   ],
   "known": [

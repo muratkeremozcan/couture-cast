@@ -105,15 +105,17 @@ export async function measureScreenBudget(
   if (doc.fonts) await doc.fonts.ready
 
   const errors: string[] = []
-  const root: Element =
-    (config.rootSelector ? doc.querySelector(config.rootSelector) : null) ?? doc.body
-  if (config.rootSelector && root === doc.body)
+  // A selector that matches `body` is found; only a selector that matches nothing is missing.
+  const matchedRoot = config.rootSelector ? doc.querySelector(config.rootSelector) : null
+  if (config.rootSelector && !matchedRoot)
     errors.push(`root ${config.rootSelector} missing`)
+  const root: Element = matchedRoot ?? doc.body
   const viewW = config.viewport.width
   const viewH = config.viewport.height
   const startX = win.scrollX
   const startY = win.scrollY
-  win.scrollTo(0, 0)
+  // Instant, so a page with `scroll-behavior: smooth` is at scroll 0 before anything is read.
+  win.scrollTo({ left: 0, top: 0, behavior: 'instant' })
 
   const transparent = (value: string) =>
     value === 'transparent' ||
@@ -213,6 +215,30 @@ export async function measureScreenBudget(
     if (srOnly(el, rect)) return false
     return painted(el)
   }
+  // An overflow container clips at its padding box (the overflow clip edge), inside its borders
+  // and any scrollbar. Client metrics give that box; an SVG element reports none, so its border
+  // box less the computed borders stands in.
+  const clipEdge = (node: Element, cs: CSSStyleDeclaration) => {
+    const box = node.getBoundingClientRect()
+    const border = (side: 'Top' | 'Right' | 'Bottom' | 'Left') =>
+      Number.parseFloat(cs[`border${side}Width`]) || 0
+    if (node.clientWidth > 0 || node.clientHeight > 0) {
+      const left = box.left + node.clientLeft
+      const top = box.top + node.clientTop
+      return {
+        left,
+        top,
+        right: left + node.clientWidth,
+        bottom: top + node.clientHeight,
+      }
+    }
+    return {
+      left: box.left + border('Left'),
+      top: box.top + border('Top'),
+      right: box.right - border('Right'),
+      bottom: box.bottom - border('Bottom'),
+    }
+  }
   // P3: in the viewport at scroll 0 and not clipped away by an overflow ancestor (a horizontal
   // scroller, a collapsed panel).
   const inView = (el: Element) => {
@@ -228,7 +254,9 @@ export async function measureScreenBudget(
     ) {
       const cs = style(node)
       if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue
-      const clip = node.getBoundingClientRect()
+      // Overflow does not apply to an inline or `contents` box.
+      if (cs.display === 'inline' || cs.display === 'contents') continue
+      const clip = clipEdge(node, cs)
       if (cs.overflowX !== 'visible') {
         left = Math.max(left, clip.left)
         right = Math.min(right, clip.right)
@@ -249,9 +277,20 @@ export async function measureScreenBudget(
     'select',
     'textarea',
     'summary',
-    ...['button', 'link', 'tab', 'checkbox', 'radio', 'switch', 'menuitem', 'option'].map(
-      (role) => `[role="${role}"]`
-    ),
+    // menuitemradio and menuitemcheckbox are menuitem kinds, so a toggle filter row reaches
+    // chip discovery whichever of its items holds the tab stop (P11).
+    ...[
+      'button',
+      'link',
+      'tab',
+      'checkbox',
+      'radio',
+      'switch',
+      'menuitem',
+      'menuitemradio',
+      'menuitemcheckbox',
+      'option',
+    ].map((role) => `[role="${role}"]`),
   ].join(', ')
   const isTarget = (el: Element) => {
     if (el.matches(TARGET_SELECTOR)) return true
@@ -278,10 +317,12 @@ export async function measureScreenBudget(
         resolvedTargets.push(el)
         continue
       }
+      // Only a label inside the measured root stands in for its control.
       const labels = (el as HTMLInputElement).labels
       if (labels)
         for (const label of Array.from(labels))
-          if (!inTabBar(label) && rendered(label)) resolvedTargets.push(label)
+          if (root.contains(label) && !inTabBar(label) && rendered(label))
+            resolvedTargets.push(label)
     }
     const uniqueTargets = Array.from(new Set(resolvedTargets))
     const targetSet = new Set(uniqueTargets)
@@ -523,13 +564,24 @@ export async function measureScreenBudget(
     }
     return lines
   }
+  // A hidden inline run keeps its line boxes but paints nothing: its parent's visibility (an
+  // inherited property) is not visible, or an inline element between it and its block has
+  // opacity 0. The block itself is judged by `rendered` in `isParagraph`.
+  const hiddenRun = (text: Node, owner: Element) => {
+    const parent = text.parentElement
+    if (!parent) return false
+    if (style(parent).visibility !== 'visible') return true
+    for (let el: Element | null = parent; el && el !== owner; el = el.parentElement)
+      if (Number(style(el).opacity) === 0) return true
+    return false
+  }
   const measureParagraphs = () => {
     const textNodes = new Map<Element, Text[]>()
     const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (!(node.textContent ?? '').trim()) continue
       const owner = blockOwner(node)
-      if (!owner) continue
+      if (!owner || hiddenRun(node, owner)) continue
       const list = textNodes.get(owner)
       if (list) list.push(node as Text)
       else textNodes.set(owner, [node as Text])
@@ -561,9 +613,10 @@ export async function measureScreenBudget(
     : undefined
 
   const measureClosetChrome = (anchors: readonly string[]) => {
+    // Every match of every anchor: a hidden layout variant ahead of the visible one is skipped.
     const found = anchors
-      .map((selector) => doc.querySelector(selector))
-      .filter((el): el is Element => el !== null && rendered(el))
+      .flatMap((selector) => Array.from(doc.querySelectorAll(selector)))
+      .filter(rendered)
       .map((el) => ({ el, top: el.getBoundingClientRect().top + win.scrollY }))
       .sort((a, b) => a.top - b.top)
     const highest = found[0]
@@ -576,7 +629,7 @@ export async function measureScreenBudget(
     ? measureClosetChrome(config.closetChrome.anchors)
     : undefined
 
-  win.scrollTo(startX, startY)
+  win.scrollTo({ left: startX, top: startY, behavior: 'instant' })
   return {
     targetsAboveFold,
     primaryButtons,

@@ -131,6 +131,44 @@ describe('C-WEB-Q-MEDIA: expiry on the server clock', () => {
     expect(screen.queryByText('The image link expired.')).not.toBeInTheDocument()
   })
 
+  // Story CC-7.10 test owner (TEA): the neighbour of 7.10-UNIT-013. A link that outlives the
+  // timer limit must still expire, so the wait runs in steps of at most the limit and re-reads
+  // the clock each step. The old guard armed no timer at all, so this link stayed live forever.
+  // Faked Date moves with every timer advance, so each step sees the clock it waited for.
+  it('[P1] [7.10-UNIT-013b] expires a link that outlives the timer limit once its time has passed', async () => {
+    const maxTimerDelayMs = 2_147_483_647
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000
+    pinBrowserClock()
+    render(
+      <CaseMedia
+        media={available(thirtyDaysMs)}
+        clockOffsetMs={0}
+        onReload={() => undefined}
+      />
+    )
+    expect(screen.getByRole('img')).toBeInTheDocument()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(maxTimerDelayMs)
+    })
+    expect(Date.now()).toBe(SERVER + maxTimerDelayMs)
+    expect(screen.getByRole('img')).toBeInTheDocument()
+    expect(screen.queryByText('The image link expired.')).not.toBeInTheDocument()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(thirtyDaysMs - maxTimerDelayMs - 1)
+    })
+    expect(screen.getByRole('img')).toBeInTheDocument()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(Date.now()).toBe(SERVER + thirtyDaysMs)
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.getByText('The image link expired.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reload image' })).toBeInTheDocument()
+  })
+
   it('shows the expired state at once when the link had expired before it rendered', () => {
     pinBrowserClock()
     render(

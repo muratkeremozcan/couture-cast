@@ -15,15 +15,17 @@
 //     - D-ID: `rule=<rule> scope=limit max=<value>`
 //   Any scope segment may be `*`. `max` caps a known value (or the limit), `lines` caps every
 //   paragraph of a `paragraph-lines` entry and is required there. One decision may record
-//   several terms; a line whose text after `D-ID:` does not start with `rule=` is prose;
+//   several terms; a line whose text after `D-ID:` does not start with `rule=` is prose, and a
+//   line inside a fenced code block or an HTML comment is neither a term nor a mention;
 // - an increase against the base (a raised limit, an added `known` entry, a raised known value,
 //   a new element key, a known paragraph with more lines) cites a decision id the base
-//   revision's budget already used, so every increase needs a new decision. Lowering or deleting
-//   needs none (P7). When the base has no budget file, every entry still needs its recorded
-//   decision and its terms.
+//   revision's budget, or the base branch's tip, already used, so every increase needs a new
+//   decision. Lowering or deleting needs none (P7). When the base has no budget file, every entry
+//   still needs its recorded decision and its terms.
 //
 // The base is `--base <ref>`, else origin/$GITHUB_BASE_REF, else origin/main, taken at its
-// merge base with HEAD. In CI an unresolvable base fails; locally it warns and checks without it.
+// merge base with HEAD; raises are measured against the merge base. In CI a base that cannot be
+// found, or that shares no merge base with HEAD, fails; locally it warns and checks without it.
 //
 // Usage: node scripts/check-screen-budget-decisions.mjs [--base <ref>]
 import { spawnSync } from 'node:child_process'
@@ -77,9 +79,47 @@ const WHOLE_NUMBER = /^\d+$/
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** The text under `## Screen budget decisions`, up to the next level-2 heading. */
+const FENCE = /^ {0,3}(`{3,}|~{3,})/
+
+/**
+ * The document's lines with fenced code blocks and HTML comments blanked, so an example shown
+ * in a fence or a comment is neither a heading nor a decision (CodeRabbit r1). A fence closes
+ * with a run of its own character at least as long, and an unclosed one runs to the end, as in
+ * CommonMark.
+ */
+function renderedLines(markdown) {
+  const lines = markdown.replace(/<!--[\s\S]*?(?:-->|$)/g, (comment) =>
+    comment.replace(/[^\n]/g, '')
+  )
+  let fence = null
+  return lines.split(/\r?\n/).map((line) => {
+    const marker = FENCE.exec(line)?.[1]
+    if (fence) {
+      const closes =
+        marker &&
+        marker[0] === fence[0] &&
+        marker.length >= fence.length &&
+        !line.trim().slice(marker.length).trim()
+      if (closes) fence = null
+      return ''
+    }
+    if (
+      marker &&
+      !(marker[0] === '`' && line.trim().slice(marker.length).includes('`'))
+    ) {
+      fence = marker
+      return ''
+    }
+    return line
+  })
+}
+
+/**
+ * The text under `## Screen budget decisions`, up to the next level-2 heading, outside fenced
+ * code blocks and HTML comments.
+ */
 export function decisionsSection(markdown) {
-  const lines = markdown.split(/\r?\n/)
+  const lines = renderedLines(markdown)
   const start = lines.findIndex((line) => line.trim() === DECISIONS_HEADING)
   if (start === -1) return null
   const rest = lines.slice(start + 1)
@@ -99,7 +139,7 @@ export function mentionsDecision(text, id) {
  */
 export function decisionTerms(section) {
   const terms = new Map()
-  for (const line of section.split(/\r?\n/)) {
+  for (const line of renderedLines(section)) {
     const match = TERM_LINE.exec(line)
     if (!match) continue
     const [, id, quoted, bare] = match
@@ -202,10 +242,11 @@ const paragraphLines = (entry) =>
     typeof element === 'string' ? [element, undefined] : [element?.key, element?.lines]
   )
 
-function decisionIds(budget) {
-  if (!budget) return new Set()
+/** The decision ids `budgets` cite in `known` and `limitDecisions`. */
+function decisionIds(...budgets) {
   return new Set(
-    [...(budget.known ?? []), ...(budget.limitDecisions ?? [])]
+    budgets
+      .flatMap((budget) => [...(budget?.known ?? []), ...(budget?.limitDecisions ?? [])])
       .map((entry) => entry?.decision)
       .filter((id) => typeof id === 'string')
   )
@@ -332,21 +373,25 @@ function limitProblems(budget, base, context) {
     const raised = value > before
     if (!raised && value <= AC_LIMITS[rule]) continue
     const what = `limits.${rule} ${value} (base ${before}, AC ${AC_LIMITS[rule]})`
-    const decision = limitDecisions.find(
+    const candidates = limitDecisions.filter(
       (entry) => entry?.limit === rule && Number(entry.value) >= value
     )
-    if (!decision) {
+    if (!candidates.length) {
       problems.push(
         `${what}: ${raised ? `raised from ${before}` : 'above the AC value'} without a` +
           ' limitDecisions entry allowing it'
       )
       continue
     }
-    problems.push(
-      ...context.citation(what, decision, raised, (id, terms) =>
+    // Any entry that passes allows the limit, whatever the order: an older entry with a higher
+    // JSON ceiling does not hide the new decision that allows the raise (CodeRabbit r1).
+    const verdicts = candidates.map((decision) =>
+      context.citation(what, decision, raised, (id, terms) =>
         limitCoverage(rule, value, id, terms)
       )
     )
+    if (verdicts.some((verdict) => verdict.length === 0)) continue
+    problems.push(...verdicts.flat())
   }
   return problems
 }
@@ -364,6 +409,13 @@ function knownShapeProblems(entry, budget) {
   if (!OWNING_STORIES.includes(entry?.story))
     unknown.push(`story ${entry?.story} (owning stories: ${OWNING_STORIES.join(', ')})`)
   return unknown.length ? [`unknown ${unknown.join(', ')}`] : []
+}
+
+function withinLimit(entry, limits) {
+  const limit = limits[entry.rule]
+  return Number.isInteger(limit) && entry.value <= limit
+    ? [`value ${entry.value} is within the limit ${limit}, so it is not a violation`]
+    : []
 }
 
 function knownValueProblems(entry, limits) {
@@ -399,16 +451,15 @@ function knownValueProblems(entry, limits) {
       return [
         `value ${entry.value} must equal the ${elements.length} element key(s) and be 1 or more`,
       ]
-    return []
+    // A paragraph-lines limit counts lines, not paragraphs; each paragraph's lines are checked
+    // above. The other per-element rules count elements, so the value must exceed the limit as
+    // the audit's violation does (CodeRabbit r1).
+    return isParagraphRule(entry.rule) ? [] : withinLimit(entry, limits)
   }
-  const problems = []
-  if (entry.elements !== undefined) problems.push('only per-element rules list elements')
-  const limit = limits[entry.rule]
-  if (Number.isInteger(limit) && entry.value <= limit)
-    problems.push(
-      `value ${entry.value} is within the limit ${limit}, so it is not a violation`
-    )
-  return problems
+  return [
+    ...(entry.elements !== undefined ? ['only per-element rules list elements'] : []),
+    ...withinLimit(entry, limits),
+  ]
 }
 
 /** Whether a paragraph-lines entry gives a known paragraph more lines than its base entry. */
@@ -477,12 +528,15 @@ function knownProblems(budget, base, context) {
 }
 
 /**
- * Every problem with `budget` against its base. `base` is the base revision's budget, or null
- * when the base has none. Spec files are read from `root`/`specDir`.
+ * Every problem with `budget` against its base. `base` is the merge-base budget, or null when
+ * the base has none; raises are measured against it. `baseTip` is the base branch's budget at
+ * its tip: a decision it cites, added after the fork point, is used too, so a raise cannot
+ * re-cite it (CodeRabbit r1). Spec files are read from `root`/`specDir`.
  */
 export function checkScreenBudgetDecisions({
   budget,
   base = null,
+  baseTip = null,
   root = REPOSITORY,
   specDir = SPEC_DIR,
 }) {
@@ -491,7 +545,7 @@ export function checkScreenBudgetDecisions({
     if (!specs.has(story)) specs.set(story, findStorySpec(story, { root, specDir }))
     return specs.get(story)
   }
-  const baseIds = decisionIds(base)
+  const baseIds = decisionIds(base, baseTip)
   const context = {
     /**
      * A cited decision must be recorded with a term that covers the value (`covers` returns the
@@ -521,9 +575,17 @@ export function checkScreenBudgetDecisions({
 const git = (args, root) =>
   spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
 
+/** The budget file at `revision`, or null when that revision has none. */
+function budgetAt(revision, root) {
+  const shown = git(['show', `${revision}:${BUDGET_PATH}`], root)
+  return shown.status === 0 ? JSON.parse(shown.stdout) : null
+}
+
 /**
- * The base budget: `{ budget, description }`, `budget` null when the base has no file. Throws
- * when the base revision cannot be found.
+ * The base budgets: `{ budget, tip, description }`. `budget` is the file at the merge base of
+ * HEAD and the base ref, `tip` the file at the ref itself; each is null when that revision has
+ * none. Throws when the ref cannot be found or shares no merge base with HEAD (a shallow or
+ * unrelated history): the tip is not a merge base, so it never stands in for one (CodeRabbit r1).
  */
 export function loadBaseBudget({ root = REPOSITORY, ref } = {}) {
   const wanted =
@@ -533,20 +595,30 @@ export function loadBaseBudget({ root = REPOSITORY, ref } = {}) {
       : 'origin/main')
   const commit = git(['rev-parse', '--verify', '--quiet', `${wanted}^{commit}`], root)
   if (commit.status !== 0) throw new Error(`base revision ${wanted} not found`)
-  const mergeBase = git(['merge-base', 'HEAD', commit.stdout.trim()], root)
-  const revision = mergeBase.status === 0 ? mergeBase.stdout.trim() : commit.stdout.trim()
+  const tipRevision = commit.stdout.trim()
+  const mergeBase = git(['merge-base', 'HEAD', tipRevision], root)
+  if (mergeBase.status !== 0) throw new Error(`no merge base between HEAD and ${wanted}`)
+  const revision = mergeBase.stdout.trim()
   const description = `${wanted} at ${revision.slice(0, 12)}`
-  const shown = git(['show', `${revision}:${BUDGET_PATH}`], root)
-  if (shown.status !== 0)
-    return { budget: null, description: `${description} (no budget file)` }
-  return { budget: JSON.parse(shown.stdout), description }
+  const budget = budgetAt(revision, root)
+  return {
+    budget,
+    tip: budgetAt(tipRevision, root),
+    description: budget ? description : `${description} (no budget file)`,
+  }
 }
 
 function main(argv) {
   let ref
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--base') {
-      ref = argv[index + 1]
+      const value = argv[index + 1]
+      // A missing ref would silently fall back to the default base.
+      if (!value || value.startsWith('-')) {
+        console.error('check-screen-budget-decisions: --base needs a ref')
+        return 2
+      }
+      ref = value
       index += 1
     } else {
       console.error(`check-screen-budget-decisions: unknown argument ${argv[index]}`)
@@ -555,9 +627,10 @@ function main(argv) {
   }
   const budget = JSON.parse(fs.readFileSync(path.join(REPOSITORY, BUDGET_PATH), 'utf8'))
   let base = null
+  let baseTip = null
   let description = 'none'
   try {
-    ;({ budget: base, description } = loadBaseBudget({ ref }))
+    ;({ budget: base, tip: baseTip, description } = loadBaseBudget({ ref }))
   } catch (error) {
     if (process.env.CI) {
       console.error(
@@ -569,7 +642,7 @@ function main(argv) {
       `check-screen-budget-decisions: ${error.message}; every entry needs its recorded decision`
     )
   }
-  const problems = checkScreenBudgetDecisions({ budget, base })
+  const problems = checkScreenBudgetDecisions({ budget, base, baseTip })
   for (const problem of problems) console.error(`${BUDGET_PATH}: ${problem}`)
   if (problems.length) {
     console.error(`\ncheck-screen-budget-decisions: ${problems.length} problem(s)`)

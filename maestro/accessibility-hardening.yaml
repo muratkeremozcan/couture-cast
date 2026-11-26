@@ -80,9 +80,11 @@ tags:
     visible:
       id: 'garment-swap-modal'
     timeout: 15000
+# Story CC-7.10: the swap options are radios, so the current one is checked (aria-checked, which
+# Android reports as isChecked); a radio carries no selected state under ARIA.
 - assertVisible:
     id: 'swap-option-.*'
-    selected: true
+    checked: true
 - tapOn:
     id: 'swap-option-.*'
     index: 1

@@ -282,6 +282,32 @@ decisions`); a cited JSON value outside every term fails, and so does a decision
     elements and its failure messages.
   - #13 The Playwright report reads the matrix's shard count through one YAML anchor
     (`pw-shard-total`), pinned by `scripts/ci/pr-pipeline-shape.test.mjs`.
+- 2026-11-26, CodeRabbit round 1 (PR 294), builder findings on the measure, limits file,
+  decisions check and two product files:
+  - Measure: scroll reset and restore use `behavior: 'instant'`; a `rootSelector` that
+    matches `body` is found, and only an unmatched selector is missing; a label outside the
+    measured root never stands in for a hidden control; overflow ancestors clip at their
+    padding box (client metrics, border box less borders for SVG) and inline or `contents`
+    boxes do not clip; `menuitemradio` and `menuitemcheckbox` are targets, so P11's toggle
+    filters reach chip discovery whatever their tab stop; text runs whose visibility is not
+    visible or with an opacity 0 inline ancestor are not counted as paragraph lines; Closet
+    takes every match of each anchor before picking the highest rendered one. No checked-in
+    `known` value is expected to move: no audited screen uses those roles, hidden inline
+    text, a rootSelector or bordered scroll containers with targets under the border.
+  - Limits file: the OTLP allow-list paths are `/v1/traces|logs|metrics` at the origin root,
+    so an app route such as `/api/v1/logs` counts as an effect. The browser sends no OTLP
+    (OpenTelemetry runs in the API only), so there is no collector host to pin.
+  - Decisions check: fenced code blocks and HTML comments are blanked before the section and
+    its terms are read (DEC-013); a limit passes when any applicable `limitDecisions` entry
+    passes, whatever the order (DEC-014); a `nested-cards` or `analytics-only` entry at or
+    below its limit fails as no violation (DEC-015); decision ids the base branch's tip
+    cites are used too, while raises still compare with the merge base (DEC-016); a missing
+    merge base throws, so CI fails and a local run warns, and the tip never stands in for it
+    (DEC-017); `--base` with no ref exits 2 (DEC-018).
+  - Web moderation media: a link that outlives the 32-bit timer limit now waits in bounded
+    steps that re-read the clock, so it still shows the Reload control at expiry.
+  - Native save button: `disabled={disabled || busy}`, since Pressable's `disabled` prop
+    replaces the computed accessibility state; a pending save announces as disabled.
 
 ## Screen budget decisions
 

@@ -1,7 +1,9 @@
 // Story CC-7.10 D6: a screen budget limit or `known` entry moves only with a recorded decision.
 // Cases 7.10-DEC-001..008 from _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md;
 // 7.10-DEC-009..012 from the CC-7.10 Codex review (#2: raises against the base, decision terms
-// that bind rule, scope and ceiling; #8: per-paragraph line counts; #10: AC values as fixtures).
+// that bind rule, scope and ceiling; #8: per-paragraph line counts; #10: AC values as fixtures);
+// 7.10-DEC-013..018 from CodeRabbit round 1 (fenced examples, order-free limit decisions,
+// per-element values within the limit, base tip decision ids, merge base, --base parsing).
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 import assert from 'node:assert/strict'
@@ -17,6 +19,7 @@ import {
   checkScreenBudgetDecisions,
   decisionsSection,
   decisionTerms,
+  loadBaseBudget,
   mentionsDecision,
   PER_ELEMENT_RULES,
   RULES,
@@ -639,5 +642,245 @@ describe('check-screen-budget-decisions', () => {
     ])
     // A prose line after a decision id is ignored by the term parser.
     assert.equal(decisionTerms(SPEC_7_10).has('D-PROSE-7.10'), false)
+  })
+  test('7.10-DEC-013 a decision shown in a fenced block or an HTML comment is not recorded', () => {
+    const spec = `${SPEC_DIR}/spec-7-13-calm-today.md`
+    const fenced = [
+      '# Story CC-7.13',
+      '',
+      '## Screen budget decisions',
+      '',
+      'The term format, as an example:',
+      '',
+      '```md',
+      '- D-FENCE-7.13: `rule=targets-above-fold scope=web/today/* max=10`',
+      '## Not a heading inside the fence',
+      '```',
+      '',
+      '~~~',
+      '- D-TILDE-7.13: `rule=targets-above-fold scope=web/today/* max=10`',
+      '~~~',
+      '',
+      '<!--',
+      '- D-COMMENT-7.13: `rule=targets-above-fold scope=web/today/* max=10`',
+      '-->',
+      '',
+      '- D-REAL-7.13: `rule=targets-above-fold scope=web/today/* max=10`',
+      '',
+      '## Design Notes',
+      '',
+    ].join('\n')
+    const root = specRoot({ 'spec-7-13-calm-today.md': fenced })
+    const cite = (decision) =>
+      check(
+        budgetWith({ known: [knownTargets({ decision, decidedIn: '7.13' })] }),
+        null,
+        root
+      )
+    for (const id of ['D-FENCE-7.13', 'D-TILDE-7.13', 'D-COMMENT-7.13'])
+      assert.deepEqual(cite(id), [
+        `known[0] web today populated targets-above-fold: decision ${id} is not recorded under "## Screen budget decisions" in ${spec}`,
+      ])
+    // A heading inside a fence does not end the section, so the term after it still counts.
+    assert.deepEqual(cite('D-REAL-7.13'), [])
+    assert.deepEqual([...decisionTerms(fenced).keys()], ['D-REAL-7.13'])
+    // An unclosed fence hides the rest of the document.
+    const unclosed =
+      '## Screen budget decisions\n\n```\n- D-OPEN-7.13: `rule=chip-rows scope=limit max=2`\n'
+    assert.equal(decisionTerms(decisionsSection(unclosed)).has('D-OPEN-7.13'), false)
+    // A line with an inline code span of three backticks is text, not a fence.
+    const inline =
+      '## Screen budget decisions\n\n```inline``` is prose\n- D-AFTER-7.13: `rule=chip-rows scope=limit max=2`\n'
+    assert.equal(decisionTerms(decisionsSection(inline)).has('D-AFTER-7.13'), true)
+  })
+
+  test('7.10-DEC-014 a limit raise passes when any applicable limit decision allows it, in any order', () => {
+    const root = specRoot({
+      'spec-7-13-calm-today.md': [
+        '# Story CC-7.13',
+        '',
+        '## Screen budget decisions',
+        '',
+        '- D-TARGETS-7.13: `rule=targets-above-fold scope=limit max=8`',
+        '- D-NINE-7.13: `rule=targets-above-fold scope=limit max=9`',
+        '',
+      ].join('\n'),
+    })
+    const old = {
+      limit: 'targets-above-fold',
+      value: 10,
+      decision: 'D-TARGETS-7.13',
+      decidedIn: '7.13',
+    }
+    const nine = {
+      limit: 'targets-above-fold',
+      value: 9,
+      decision: 'D-NINE-7.13',
+      decidedIn: '7.13',
+    }
+    const base = budgetWith({
+      limits: { 'targets-above-fold': 8 },
+      limitDecisions: [old],
+    })
+    const raised = (limitDecisions) =>
+      checkScreenBudgetDecisions({
+        budget: budgetWith({ limits: { 'targets-above-fold': 9 }, limitDecisions }),
+        base,
+        root,
+      })
+    assert.deepEqual(raised([old, nine]), [])
+    assert.deepEqual(raised([nine, old]), [])
+    // With no passing candidate, each candidate's problems are reported.
+    const spec = `${SPEC_DIR}/spec-7-13-calm-today.md`
+    assert.deepEqual(raised([old]), [
+      `limits.targets-above-fold 9 (base 8, AC 7): limit 9 is above the max 8 of D-TARGETS-7.13 "rule=targets-above-fold scope=limit max=8" (${spec})`,
+      'limits.targets-above-fold 9 (base 8, AC 7): raised or added under decision D-TARGETS-7.13, which the base already used; record a new decision',
+    ])
+  })
+
+  test('7.10-DEC-015 a per-element known entry within its raised limit is not a violation', () => {
+    const root = specRoot({
+      'spec-7-13-calm-today.md': [
+        '# Story CC-7.13',
+        '',
+        '## Screen budget decisions',
+        '',
+        '- D-CARDS-7.13: `rule=nested-cards scope=limit max=1`',
+        '- D-CARDS-7.13: `rule=nested-cards scope=web/today/* max=2`',
+        '- D-CARDS-7.13: `rule=analytics-only scope=limit max=1`',
+        '- D-CARDS-7.13: `rule=analytics-only scope=web/today/* max=2`',
+        '',
+      ].join('\n'),
+    })
+    const limitDecisions = ['nested-cards', 'analytics-only'].map((limit) => ({
+      limit,
+      value: 1,
+      decision: 'D-CARDS-7.13',
+      decidedIn: '7.13',
+    }))
+    const entry = (rule, elements) =>
+      knownTargets({
+        rule,
+        value: elements.length,
+        elements,
+        story: '7.13',
+        decision: 'D-CARDS-7.13',
+        decidedIn: '7.13',
+      })
+    const checkKnown = (known) =>
+      checkScreenBudgetDecisions({
+        budget: budgetWith({
+          limits: { 'nested-cards': 1, 'analytics-only': 1 },
+          limitDecisions,
+          known,
+        }),
+        base: null,
+        root,
+      })
+    assert.deepEqual(
+      checkKnown([entry('nested-cards', ['card-a']), entry('analytics-only', ['tap-a'])]),
+      [
+        'known[0] web today populated nested-cards: value 1 is within the limit 1, so it is not a violation',
+        'known[1] web today populated analytics-only: value 1 is within the limit 1, so it is not a violation',
+      ]
+    )
+    assert.deepEqual(
+      checkKnown([
+        entry('nested-cards', ['card-a', 'card-b']),
+        entry('analytics-only', ['tap-a', 'tap-b']),
+      ]),
+      []
+    )
+  })
+
+  test('7.10-DEC-016 a decision the base branch cited after the fork point cannot carry a raise', () => {
+    const root = specRoot()
+    const cite = { decision: 'D-TODAY-7.13', decidedIn: '7.13' }
+    const budget = budgetWith({ known: [knownTargets(cite)] })
+    const base = budgetWith()
+    const baseTip = budgetWith({ known: [knownTargets({ ...cite, fixture: 'empty' })] })
+    assert.deepEqual(checkScreenBudgetDecisions({ budget, base, root }), [])
+    assert.deepEqual(checkScreenBudgetDecisions({ budget, base, baseTip, root }), [
+      'known[0] web today populated targets-above-fold: raised or added under decision D-TODAY-7.13, which the base already used; record a new decision',
+    ])
+    // Raises still compare with the merge base: a value the tip lowered after the fork point
+    // is unchanged here, so it raises nothing.
+    const kept = budgetWith({ known: [knownTargets()] })
+    const lowered = budgetWith({ known: [knownTargets({ value: 8 })] })
+    assert.deepEqual(
+      checkScreenBudgetDecisions({ budget: kept, base: kept, baseTip: lowered, root }),
+      []
+    )
+  })
+
+  test('7.10-DEC-017 the base budget comes from the merge base, never the tip in its place', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'screen-budget-base-'))
+    roots.push(root)
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'screen budget test',
+      GIT_AUTHOR_EMAIL: 'screen-budget@example.test',
+      GIT_COMMITTER_NAME: 'screen budget test',
+      GIT_COMMITTER_EMAIL: 'screen-budget@example.test',
+      GIT_INDEX_FILE: path.join(root, 'test-index'),
+    }
+    const git = (args, input) => {
+      const result = spawnSync('git', ['-c', 'commit.gpgsign=false', ...args], {
+        cwd: root,
+        encoding: 'utf8',
+        env,
+        input,
+      })
+      assert.equal(result.status, 0, result.stderr)
+      return result.stdout.trim()
+    }
+    git(['init', '--quiet'])
+    // Plumbing only: no hooks run in the throwaway repository.
+    const commit = (budget, parents = []) => {
+      fs.rmSync(env.GIT_INDEX_FILE, { force: true })
+      const blob = git(['hash-object', '-w', '--stdin'], JSON.stringify(budget))
+      git(['update-index', '--add', '--cacheinfo', `100644,${blob},${BUDGET_PATH}`])
+      const tree = git(['write-tree'])
+      return git([
+        'commit-tree',
+        tree,
+        ...parents.flatMap((parent) => ['-p', parent]),
+        '-m',
+        'budget',
+      ])
+    }
+    const fork = commit(budgetWith({ known: [knownTargets()] }))
+    const tip = commit(
+      budgetWith({
+        known: [knownTargets({ decision: 'D-TIP-7.13', decidedIn: '7.13' })],
+      }),
+      [fork]
+    )
+    const head = commit(budgetWith(), [fork])
+    const unrelated = commit(budgetWith({ known: [knownTargets({ value: 12 })] }))
+    git(['update-ref', 'refs/heads/main', tip])
+    git(['update-ref', 'refs/heads/unrelated', unrelated])
+    git(['update-ref', 'refs/heads/feature', head])
+    git(['symbolic-ref', 'HEAD', 'refs/heads/feature'])
+
+    const loaded = loadBaseBudget({ root, ref: 'refs/heads/main' })
+    assert.equal(loaded.description, `refs/heads/main at ${fork.slice(0, 12)}`)
+    assert.equal(loaded.budget.known[0].decision, 'D-KNOWN-7.10')
+    assert.equal(loaded.tip.known[0].decision, 'D-TIP-7.13')
+    assert.throws(
+      () => loadBaseBudget({ root, ref: 'refs/heads/unrelated' }),
+      /no merge base between HEAD and refs\/heads\/unrelated/
+    )
+  })
+
+  test('7.10-DEC-018 --base without a ref exits 2 instead of using the default base', () => {
+    for (const args of [['--base'], ['--base', ''], ['--base', '--base']]) {
+      const result = spawnSync(process.execPath, [script, ...args], {
+        cwd: repository,
+        encoding: 'utf8',
+      })
+      assert.equal(result.status, 2, `${args.join(' ')}: ${result.stderr}`)
+      assert.match(result.stderr, /--base needs a ref/)
+    }
   })
 })

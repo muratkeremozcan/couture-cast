@@ -74,50 +74,58 @@ rule is proved in a real layout engine without the app. It is the coverage of re
 
 ### Unit: evaluate and ratchet (node)
 
-| ID            | Scenario                                                                                                                                                 | AC / D |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 7.10-UNIT-001 | Every rule at its limit passes; one over fails (targets 7/8, primary 1/2, chip rows 1/2, lines 2/3, Today 1,688/1,689, chrome 160/161, nested cards 0/1) | 2      |
-| 7.10-UNIT-002 | Failure message names platform, screen, fixture, rule, value, limit and element                                                                          | 2      |
-| 7.10-UNIT-003 | Violation in `known` with the same value passes                                                                                                          | D5     |
-| 7.10-UNIT-004 | Value above `known` fails (Home targets 9, known 8)                                                                                                      | D5     |
-| 7.10-UNIT-005 | Value below `known` fails with "lower the known value"; at the limit, "delete it"                                                                        | D5, P7 |
-| 7.10-UNIT-006 | Per-element rule: a new element key fails even at the known count                                                                                        | P7     |
-| 7.10-UNIT-007 | Per-element rule: a known key that no longer reproduces fails                                                                                            | P7     |
-| 7.10-UNIT-008 | A `known` entry for a screen or fixture that was not measured fails (stale entry)                                                                        | D5     |
-| 7.10-UNIT-009 | Limits file shape: limits equal the AC values, every `known` entry names an owning story in 7.11, 7.13, 7.15, 7.16, 7.17 and a decision id               | D5, D6 |
-| 7.10-UNIT-010 | Analytics allow list matches `/ingest/**`, `*.posthog.com`, OTEL paths; an API read does not match                                                       | D4, P6 |
+| ID             | Scenario                                                                                                                                                 | AC / D |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 7.10-UNIT-001  | Every rule at its limit passes; one over fails (targets 7/8, primary 1/2, chip rows 1/2, lines 2/3, Today 1,688/1,689, chrome 160/161, nested cards 0/1) | 2      |
+| 7.10-UNIT-002  | Failure message names platform, screen, fixture, rule, value, limit and element                                                                          | 2      |
+| 7.10-UNIT-003  | Violation in `known` with the same value passes                                                                                                          | D5     |
+| 7.10-UNIT-004  | Value above `known` fails (Home targets 9, known 8)                                                                                                      | D5     |
+| 7.10-UNIT-005  | Value below `known` fails with "lower the known value"; at the limit, "delete it"                                                                        | D5, P7 |
+| 7.10-UNIT-006  | Per-element rule: a new element key fails even at the known count                                                                                        | P7     |
+| 7.10-UNIT-007  | Per-element rule: a known key that no longer reproduces fails                                                                                            | P7     |
+| 7.10-UNIT-008  | A `known` entry for a screen or fixture that was not measured fails (stale entry)                                                                        | D5     |
+| 7.10-UNIT-009  | Limits file shape: limits equal the AC values, every `known` entry names an owning story in 7.11, 7.13, 7.15, 7.16, 7.17 and a decision id               | D5, D6 |
+| 7.10-UNIT-010  | Analytics allow list matches `/ingest/**`, `*.posthog.com`, OTEL paths; an API read does not match                                                       | D4, P6 |
+| 7.10-UNIT-008d | CodeRabbit r1: the checked-in web Today populated analytics-only keys pass with the default `known` and fail with an empty one                           | D5     |
 
 ### Rule: measure on synthetic DOM (Chromium)
 
 Each rule gets a passing control and a failing one, so a measure that sees nothing cannot pass.
 
-| ID            | Scenario                                                                                                                                                                     | AC / D |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 7.10-RULE-001 | Seven targets above the fold count 7; an eighth fails; one at top 844 is below the fold                                                                                      | 2, D3  |
-| 7.10-RULE-002 | Targets inside the bottom tab bar and inside each `tileSelectors` match are excluded                                                                                         | 2, D3  |
-| 7.10-RULE-003 | A button inside a link counts once; a `label[for]` of an sr-only file input counts as one target                                                                             | D3     |
-| 7.10-RULE-004 | Not counted: sr-only skip link, aria-hidden subtree, inert subtree, opacity 0, visibility hidden, clipped by an overflow ancestor, off to the right of a horizontal scroller | P3     |
-| 7.10-RULE-005 | Disabled and aria-disabled buttons still count                                                                                                                               | P3     |
-| 7.10-RULE-006 | Role and tabindex targets: role tab, switch, menuitem, option, `[tabindex=0]` count; `[tabindex=-1]` does not                                                                | D3     |
-| 7.10-RULE-010 | One gold primary passes; a second anywhere (below the fold too) fails and names both                                                                                         | 2, D3  |
-| 7.10-RULE-011 | Gold resolved from the live CSS variable: change `--color-primary` on `:root` and the new gold is the primary; a near-gold one channel off is not                            | P4     |
-| 7.10-RULE-012 | Primary inside a tile still counts                                                                                                                                           | P1     |
-| 7.10-RULE-020 | One chip row of aria-pressed pills passes; a second row fails                                                                                                                | 2, D3  |
-| 7.10-RULE-021 | Chips wrapped in `li` under one `ul` flex row are one row; a horizontally scrolled row with chips off screen still counts                                                    | P2     |
-| 7.10-RULE-022 | Not a chip row: pill CTAs without selection state; a single pill; square tabs (radius under half height)                                                                     | D3     |
-| 7.10-RULE-023 | Reaction rows (role group, aria-pressed pills) inside tiles are excluded                                                                                                     | P1     |
-| 7.10-RULE-024 | P11: an underline aria-pressed filter row is a chip row; a segment tablist, a vertical stack of toggles and switches or checkboxes are not                                   | 2, P11 |
-| 7.10-RULE-025 | P11: two underline filter rows count as two chip rows                                                                                                                        | 2, P11 |
-| 7.10-RULE-026 | Codex #7: a wrapping group with one wide chip on line one and two toggles on line two is one row                                                                             | 2      |
-| 7.10-RULE-027 | Codex #7: a wrapping group with two chips on each of two lines is two rows                                                                                                   | 2      |
-| 7.10-RULE-030 | Card in a card fails; sibling cards pass; a card-coloured input or button is not a card                                                                                      | 2, D3  |
-| 7.10-RULE-031 | Card detection: card background, cardMuted background, card shadow each with a radius; under 64 x 64 or radius 0 is not a card                                               | D3, P4 |
-| 7.10-RULE-032 | Card in a card inside a tile still fails                                                                                                                                     | P1     |
-| 7.10-RULE-040 | Two-line paragraph passes; three lines fail; inline `strong` and `a` stay part of the block                                                                                  | 2, P5  |
-| 7.10-RULE-041 | Headings, buttons, labels of controls and tile captions are not paragraphs; line-clamp 2 passes                                                                              | D3, P1 |
-| 7.10-RULE-042 | Lines measured after web fonts load (fonts.ready awaited inside the measure)                                                                                                 | P5     |
-| 7.10-RULE-050 | Today height from the document scroll height; 1,688 passes, 1,689 fails                                                                                                      | 2      |
-| 7.10-RULE-051 | Closet chrome: grid top at 160 passes, 161 fails; empty Add block measured the same; neither present fails as "closet anchor missing"                                        | 2      |
+| ID             | Scenario                                                                                                                                                                     | AC / D |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 7.10-RULE-001  | Seven targets above the fold count 7; an eighth fails; one at top 844 is below the fold                                                                                      | 2, D3  |
+| 7.10-RULE-002  | Targets inside the bottom tab bar and inside each `tileSelectors` match are excluded                                                                                         | 2, D3  |
+| 7.10-RULE-003  | A button inside a link counts once; a `label[for]` of an sr-only file input counts as one target                                                                             | D3     |
+| 7.10-RULE-003b | CodeRabbit r1: a label outside the measured root does not stand in for its control                                                                                           | D3     |
+| 7.10-RULE-004  | Not counted: sr-only skip link, aria-hidden subtree, inert subtree, opacity 0, visibility hidden, clipped by an overflow ancestor, off to the right of a horizontal scroller | P3     |
+| 7.10-RULE-004b | CodeRabbit r1: an overflow container clips at its padding box; a control over its border is hidden                                                                           | P3     |
+| 7.10-RULE-005  | Disabled and aria-disabled buttons still count                                                                                                                               | P3     |
+| 7.10-RULE-006  | Role and tabindex targets: role tab, switch, menuitem, option, `[tabindex=0]` count; `[tabindex=-1]` does not                                                                | D3     |
+| 7.10-RULE-007  | CodeRabbit r1: a root selector matching `body` is found; one matching nothing is an error                                                                                    | R1     |
+| 7.10-RULE-010  | One gold primary passes; a second anywhere (below the fold too) fails and names both                                                                                         | 2, D3  |
+| 7.10-RULE-011  | Gold resolved from the live CSS variable: change `--color-primary` on `:root` and the new gold is the primary; a near-gold one channel off is not                            | P4     |
+| 7.10-RULE-012  | Primary inside a tile still counts                                                                                                                                           | P1     |
+| 7.10-RULE-020  | One chip row of aria-pressed pills passes; a second row fails                                                                                                                | 2, D3  |
+| 7.10-RULE-021  | Chips wrapped in `li` under one `ul` flex row are one row; a horizontally scrolled row with chips off screen still counts                                                    | P2     |
+| 7.10-RULE-022  | Not a chip row: pill CTAs without selection state; a single pill; square tabs (radius under half height)                                                                     | D3     |
+| 7.10-RULE-023  | Reaction rows (role group, aria-pressed pills) inside tiles are excluded                                                                                                     | P1     |
+| 7.10-RULE-024  | P11: an underline aria-pressed filter row is a chip row; a segment tablist, a vertical stack of toggles and switches or checkboxes are not                                   | 2, P11 |
+| 7.10-RULE-025  | P11: two underline filter rows count as two chip rows                                                                                                                        | 2, P11 |
+| 7.10-RULE-026  | Codex #7: a wrapping group with one wide chip on line one and two toggles on line two is one row                                                                             | 2      |
+| 7.10-RULE-027  | Codex #7: a wrapping group with two chips on each of two lines is two rows                                                                                                   | 2      |
+| 7.10-RULE-024b | CodeRabbit r1: menuitemradio and menuitemcheckbox rows with a roving tab stop are chip rows                                                                                  | 2, P11 |
+| 7.10-RULE-030  | Card in a card fails; sibling cards pass; a card-coloured input or button is not a card                                                                                      | 2, D3  |
+| 7.10-RULE-031  | Card detection: card background, cardMuted background, card shadow each with a radius; under 64 x 64 or radius 0 is not a card                                               | D3, P4 |
+| 7.10-RULE-032  | Card in a card inside a tile still fails                                                                                                                                     | P1     |
+| 7.10-RULE-040  | Two-line paragraph passes; three lines fail; inline `strong` and `a` stay part of the block                                                                                  | 2, P5  |
+| 7.10-RULE-041  | Headings, buttons, labels of controls and tile captions are not paragraphs; line-clamp 2 passes                                                                              | D3, P1 |
+| 7.10-RULE-042  | Lines measured after web fonts load: the measure stays pending while a held font loads (CodeRabbit r1)                                                                       | P5     |
+| 7.10-RULE-043  | CodeRabbit r1: hidden inline runs (visibility, opacity 0) add no paragraph lines                                                                                             | P5     |
+| 7.10-RULE-050  | Today height from the document scroll height; 1,688 passes, 1,689 fails                                                                                                      | 2      |
+| 7.10-RULE-051  | Closet chrome: grid top at 160 passes, 161 fails; empty Add block measured the same; neither present fails as "closet anchor missing"                                        | 2      |
+| 7.10-RULE-051b | CodeRabbit r1: Closet chrome reads the highest rendered match; a hidden layout variant first is skipped                                                                      | 2      |
+| 7.10-RULE-053  | CodeRabbit r1: a smooth scrolling page is measured at scroll 0 and restored at once                                                                                          | P3     |
 
 ### Rule: analytics-only probe (Chromium, synthetic DOM)
 
@@ -131,7 +139,7 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 | 7.10-RULE-065 | A change inside the control only (its own pressed state, label) is not an effect                                                                                                                         | D4     |
 | 7.10-RULE-066 | A target not re-found in its fresh load fails with its key                                                                                                                                               | P6     |
 | 7.10-RULE-069 | Codex #1: a control below the fold that only captures is analytics-only; the probe scrolls it into view first                                                                                            | D4     |
-| 7.10-RULE-070 | Codex #5: an on switch, a checked checkbox and a lone pressed toggle are probed; a checked radio is the current choice                                                                                   | D4     |
+| 7.10-RULE-070 | Codex #5: an on switch, a checked checkbox, a lone pressed toggle and two pressed siblings are probed; a checked radio is the current choice                                                             | D4     |
 | 7.10-RULE-071 | Codex #6: a fresh load resolves the target by the listing rules: no hidden copy, no same-name control of another role                                                                                    | P6     |
 | 7.10-RULE-072 | A read alone is no effect; a bare # link below the fold that jumps to the top is analytics-only                                                                                                          | D4     |
 | 7.10-RULE-067 | An already selected option (aria-pressed, aria-selected, aria-checked true, aria-current) is not probed; twins keep their positions (CI a45f15a1: the active chip and the current scenario were flagged) | D4     |
@@ -182,6 +190,9 @@ at least one primary on the screens whose CC-7.9 one gold action is present (Hom
 | 7.10-NAT-013..015 | Home probe per fixture: presses with the router mock and MSW; effect = router call, non-analytics request, DOM change outside the control                                                                                | 3, D4  |
 | 7.10-NAT-016      | Product fix found by the fixture: a Community image signed past setTimeout's 32-bit limit stays on screen and arms no refresh (community-card.test.tsx)                                                                  | D1     |
 | 7.10-UNIT-013     | Same class on web: moderation case media whose link expires past the timer limit stays on screen (moderation-case-media.test.tsx)                                                                                        | D1     |
+| 7.10-UNIT-013b    | CodeRabbit r1: a 30-day moderation link stays live past one timer step and expires on time                                                                                                                               | D1     |
+| 7.10-NAT-017..023 | Native probe proofs on synthetic screens: links, dead fragments, prior focus, toggles, independent pressed siblings, exclusive groups, write vs read requests, a Request body handed on unread                           | 3, D4  |
+| 7.10-NAT-024      | CodeRabbit r1: a busy SaveActionButton reads disabled and ignores presses                                                                                                                                                | D1     |
 
 ### Decisions check (builder, TEA reviews)
 

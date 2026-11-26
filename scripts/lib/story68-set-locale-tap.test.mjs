@@ -69,7 +69,9 @@ test('the product disables a language button that is selected or changing', () =
     'utf8'
   )
   assert.match(settings, /disabled=\{isChangingLocale \|\| isSelected\}/)
-  assert.match(settings, /disabled: isChangingLocale \|\| isSelected,/)
+  // Story CC-7.10: the accessible disabled state moved from accessibilityState to the aria prop
+  // (react-native-web drops accessibilityState; RN maps aria-disabled natively).
+  assert.match(settings, /aria-disabled=\{isChangingLocale \|\| isSelected\}/)
 })
 
 test('the process budget covers the settings opener, the scroll and every tap attempt', () => {

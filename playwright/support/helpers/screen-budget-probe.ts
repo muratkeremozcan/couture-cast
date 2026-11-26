@@ -57,6 +57,8 @@ const PNG = Buffer.from(
  */
 /** The attribute that marks the one element a fresh load resolves a target to (Codex #6). */
 const MARK = 'data-budget-probe-target'
+/** The rendered label that stands in for a covered control. */
+const STAND_IN = 'data-budget-probe-stand-in'
 
 /**
  * Every visible, outermost interactive target on the page outside `exclude` (the tab bar), in
@@ -149,9 +151,16 @@ function inventory({
     )
       return true
     if (el.getAttribute('aria-pressed') !== 'true') return false
-    const group = el.parentElement
-    return Array.from(group?.querySelectorAll('[aria-pressed]') ?? []).some(
-      (other) => other !== el && other.parentElement === group
+    // Exclusive only when it is the one pressed control among two or more pressable siblings
+    // (a chip row): two pressed siblings are independent toggles and both are probed
+    // (CodeRabbit r1).
+    const siblings = Array.from(el.parentElement?.children ?? []).filter((other) =>
+      other.hasAttribute('aria-pressed')
+    )
+    return (
+      siblings.length >= 2 &&
+      siblings.filter((other) => other.getAttribute('aria-pressed') === 'true').length ===
+        1
     )
   }
   const excluded = (el: Element) =>
@@ -254,6 +263,7 @@ export async function probeTarget(
       childChurn: new WeakMap<Node, number>(),
       after: [] as Node[],
       clicked: false,
+      focusBefore: null as Element | null,
     }
     ;(window as unknown as { __budgetProbe: typeof state }).__budgetProbe = state
     new MutationObserver((records) => {
@@ -293,7 +303,15 @@ export async function probeTarget(
       characterData: true,
     })
     await new Promise((resolve) => setTimeout(resolve, observeMs))
-    state.clicked = true
+    // The window opens when the click reaches the page (its first pointer event), so changes
+    // during Playwright's actionability wait stay noise (CodeRabbit r1). Focus is read here,
+    // before the click, so focus that was already elsewhere is not credited to it.
+    state.focusBefore = document.activeElement
+    const open = () => {
+      state.clicked = true
+    }
+    for (const type of ['pointerdown', 'mousedown', 'click'])
+      document.addEventListener(type, open, { capture: true, once: true })
   }, BASELINE_MS)
 
   const before = new URL(page.url())
@@ -336,50 +354,80 @@ export async function probeTarget(
   page.on('filechooser', onFileChooser)
   try {
     const handle = await control.elementHandle()
-    // A control drawn under its own visual (a styled checkbox) intercepts the pointer: the click
-    // lands on what covers it, as a member's would, through a dispatched click.
+    // A control drawn under its own visual (a styled checkbox) intercepts the pointer: a member
+    // clicks its rendered label instead. With no label to click, a member cannot reach it, so
+    // that is a probe error, never a synthetic click on the covered control (CodeRabbit r1).
     await control.click({ timeout: 5_000 }).catch(async (error: unknown) => {
       if (!/intercepts pointer events/.test(String(error))) throw error
-      await control.dispatchEvent('click')
+      const labelled = await page.evaluate(
+        ({ mark, standIn }) => {
+          const covered = document.querySelector<HTMLInputElement>(`[${mark}]`)
+          const label = Array.from(covered?.labels ?? []).find((candidate) => {
+            const box = candidate.getBoundingClientRect()
+            return box.width > 1 && box.height > 1
+          })
+          label?.setAttribute(standIn, '')
+          return Boolean(label)
+        },
+        { mark: MARK, standIn: STAND_IN }
+      )
+      if (!labelled)
+        throw new Error(
+          'covered by another element and has no label a member could click'
+        )
+      await page.locator(`[${STAND_IN}]`).click({ timeout: 5_000 })
     })
     const observation = page.evaluate(
       async ({ el, observeMs, scroll, start, href }) => {
         const deadline = performance.now() + observeMs
         const state = (
           window as unknown as {
-            __budgetProbe?: { churn: WeakSet<Node>; after: Node[] }
+            __budgetProbe?: {
+              churn: WeakSet<Node>
+              after: Node[]
+              focusBefore: Element | null
+            }
           }
         ).__budgetProbe
         // A label hands focus to its own control: that is the click landing, not an effect.
         const own = el instanceof HTMLLabelElement ? el.control : null
-        const check = () => {
-          const found: string[] = []
-          // A new document (a reload) has no probe state: that is an effect too.
-          if (!state) return ['document replaced']
-          const now = `${location.pathname}${location.search}`
-          if (now !== start) found.push(`navigation ${now}`)
-          // A jump to a fragment with no target (a bare `#`) is the browser's default, not the
-          // control's: the D4 matrix row "hash link no-op" (Preview outfits).
+        // An invalid escape (`#%`) is a fragment no element can match: read it raw.
+        const decodeFragment = (raw: string) => {
+          try {
+            return decodeURIComponent(raw)
+          } catch {
+            return raw
+          }
+        }
+        // A jump to a fragment with no target (a bare `#`) is the browser's default, not the
+        // control's: the D4 matrix row "hash link no-op" (Preview outfits). `href="#"` leaves
+        // location.hash empty, so the fragment change is read from the URL.
+        const scrolled = () => {
+          if (window.scrollX === scroll[0] && window.scrollY === scroll[1]) return false
+          if (location.href === href) return true
           const fragment =
-            location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : ''
-          // `href="#"` leaves location.hash empty, so the fragment change is read from the URL.
-          const deadHash =
-            location.href !== href &&
-            !(
-              fragment &&
+            location.hash.length > 1 ? decodeFragment(location.hash.slice(1)) : ''
+          return Boolean(
+            fragment &&
               (document.getElementById(fragment) ||
                 document.getElementsByName(fragment)[0])
-            )
-          if ((window.scrollX !== scroll[0] || window.scrollY !== scroll[1]) && !deadHash)
-            found.push('scroll')
-          const active = document.activeElement
-          if (
-            active &&
-            active !== document.body &&
-            !el.contains(active) &&
-            active !== own
           )
-            found.push(`focus ${active.tagName.toLowerCase()}`)
+        }
+        const focusMoved = (active: Element | null) =>
+          active !== null &&
+          active !== state?.focusBefore &&
+          active !== document.body &&
+          !el.contains(active) &&
+          active !== own
+        const check = () => {
+          // A new document (a reload) has no probe state: that is an effect too.
+          if (!state) return ['document replaced']
+          const found: string[] = []
+          const now = `${location.pathname}${location.search}`
+          if (now !== start) found.push(`navigation ${now}`)
+          if (scrolled()) found.push('scroll')
+          const active = document.activeElement
+          if (focusMoved(active)) found.push(`focus ${active?.tagName.toLowerCase()}`)
           const outside = state.after.filter(
             (node) =>
               // A label's own control (its file input) is part of the control it labels.

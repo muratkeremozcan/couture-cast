@@ -840,7 +840,9 @@ export function SaveActionButton({
         accessibilityLabel={accessibilityLabel ?? label}
         aria-disabled={disabled || busy}
         aria-busy={busy}
-        disabled={disabled}
+        // Pressable's disabled prop replaces the computed accessibility state, so it carries busy
+        // too: a pending save announces as disabled and takes no taps. Opacity stays on disabled.
+        disabled={disabled || busy}
         style={[
           styles.button,
           {

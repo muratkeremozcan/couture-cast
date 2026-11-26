@@ -491,19 +491,44 @@ Three</p>`
     ])
   })
 
-  test('[P2] [7.10-RULE-042] lines are counted after web fonts load', async ({
+  test('[P1] [7.10-RULE-042] the measure waits for web fonts: it stays pending while a font loads', async ({
     page,
   }) => {
-    // A font that never finishes loading would hang fonts.ready; this one is a data URI that
-    // fails fast, so the measure must still return.
-    const result = await measure(
-      page,
-      '<p style="font-family:BudgetFont" data-testid="f">x</p>',
-      {
-        css: '@font-face { font-family: BudgetFont; src: url(data:font/woff2;base64,AAAA); }',
-      }
+    let release: (() => void) | undefined
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    // A font host that answers only when the test releases it. The empty body fails to decode,
+    // so the font settles as failed and the measure returns.
+    await page.route('https://fonts.budget.test/held.woff2', async (route) => {
+      await held
+      await route.fulfill({
+        status: 200,
+        headers: { 'access-control-allow-origin': '*', 'content-type': 'font/woff2' },
+        body: '',
+      })
+    })
+    const fontRequested = page.waitForRequest('https://fonts.budget.test/held.woff2')
+    await page.setContent(
+      PAGE(
+        '<p style="font-family:Held" data-testid="f">x</p>',
+        '@font-face { font-family: Held; src: url(https://fonts.budget.test/held.woff2); }'
+      ),
+      { waitUntil: 'domcontentloaded' }
     )
-    expect(result.paragraphs).toEqual([])
+    await fontRequested
+    let settled = false
+    const measuring = page.evaluate(measureScreenBudget, CONFIG).then((result) => {
+      settled = true
+      return result
+    })
+    expect(await page.evaluate(() => document.fonts.status)).toBe('loading')
+    expect(settled).toBe(false)
+    release?.()
+    const result = await measuring
+    expect(settled).toBe(true)
+    expect(result.errors).toEqual([])
+    expect(await page.evaluate(() => document.fonts.status)).toBe('loaded')
   })
 
   test('[P0] [7.10-RULE-050] Today height reads the document scroll height or a named element', async ({
@@ -557,6 +582,126 @@ Three</p>`
     await page.evaluate(measureScreenBudget, CONFIG)
     expect(await page.evaluate(() => window.scrollY)).toBe(500)
   })
+  // CodeRabbit r1 measure fixes (builder): one case each, every case red on the old measure.
+  test('[P1] [7.10-RULE-053] smooth scrolling pages are measured at scroll 0 and restored at once', async ({
+    page,
+  }) => {
+    await page.setContent(
+      PAGE(
+        `<button class="btn" data-testid="top">Top</button>
+         <div style="height:3000px"></div>`,
+        'html { scroll-behavior: smooth; }'
+      )
+    )
+    await page.evaluate(() => window.scrollTo({ top: 500, behavior: 'instant' }))
+    const result = await page.evaluate(measureScreenBudget, CONFIG)
+    // A smooth scroll to 0 would still be at 500 when the measure reads the page.
+    expect(keys(result.targetsAboveFold)).toEqual(['top'])
+    expect(await page.evaluate(() => window.scrollY)).toBe(500)
+  })
+
+  test('[P1] [7.10-RULE-007] a root selector that matches body is found; one that matches nothing is an error', async ({
+    page,
+  }) => {
+    const body = await measure(page, '<button class="btn" data-testid="b">Go</button>', {
+      config: { rootSelector: 'body' },
+    })
+    expect(keys(body.targetsAboveFold)).toEqual(['b'])
+    await page.setContent(PAGE('<button class="btn">Go</button>'))
+    const missing = await page.evaluate(measureScreenBudget, {
+      ...CONFIG,
+      rootSelector: '[data-testid="nope"]',
+    })
+    expect(missing.errors).toEqual(['root [data-testid="nope"] missing'])
+  })
+
+  test('[P1] [7.10-RULE-003b] a label outside the measured root does not stand in for its control', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<header><label for="upload" data-testid="outside-label" class="btn">Upload</label></header>
+       <main data-testid="main">
+         <input id="upload" type="file" class="sr-only">
+         <button class="btn" data-testid="inside">Inside</button>
+       </main>`,
+      { config: { rootSelector: '[data-testid="main"]' } }
+    )
+    expect(keys(result.targetsAboveFold)).toEqual(['inside'])
+  })
+
+  test('[P1] [7.10-RULE-004b] an overflow container clips at its padding box: a control over its border is hidden', async ({
+    page,
+  }) => {
+    // Border box 0..94, padding box 50..94: the absolute button sits on the border, clipped.
+    const result = await measure(
+      page,
+      `<div style="position:relative;overflow:hidden;height:94px;border-top:50px solid #ccc">
+         <button class="btn" data-testid="on-border" style="position:absolute;top:-50px;left:0">Hidden</button>
+         <button class="btn" data-testid="in-padding">Shown</button>
+       </div>`
+    )
+    expect(keys(result.targetsAboveFold)).toEqual(['in-padding'])
+  })
+
+  test('[P1] [7.10-RULE-024b] menuitemradio and menuitemcheckbox rows with a roving tab stop are chip rows', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<div class="row" role="menu" data-testid="radios">
+         <div role="menuitemradio" aria-checked="true" tabindex="0" style="border-bottom:2px solid #111">Auto</div>
+         <div role="menuitemradio" aria-checked="false" tabindex="-1">Cold</div>
+         <div role="menuitemradio" aria-checked="false" tabindex="-1">Warm</div>
+       </div>
+       <div class="row" role="menu" data-testid="checks">
+         <div role="menuitemcheckbox" aria-checked="true" tabindex="0" class="pill">Rain</div>
+         <div role="menuitemcheckbox" aria-checked="false" tabindex="-1" class="pill">Sun</div>
+       </div>`
+    )
+    expect(keys(result.chipRows)).toEqual(['checks', 'radios'])
+  })
+
+  test('[P1] [7.10-RULE-043] hidden inline runs add no paragraph lines; the same run shown does', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<p class="w200" data-testid="invisible" style="white-space:pre-line">Visible line
+<span style="visibility:hidden">Hidden two
+Hidden three</span></p>
+       <p class="w200" data-testid="faded" style="white-space:pre-line">Visible line
+<span style="opacity:0">Faded two
+Faded three</span></p>
+       <p class="w200" data-testid="shown" style="white-space:pre-line">Visible line
+<span>Shown two
+Shown three</span></p>`
+    )
+    expect(result.paragraphs).toEqual([
+      expect.objectContaining({ key: 'shown', lines: 3 }),
+    ])
+  })
+
+  test('[P1] [7.10-RULE-051b] Closet chrome reads the highest rendered match: a hidden layout variant first is skipped', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<div data-testid="grid" style="display:none">hidden variant</div>
+       <div style="height:160px"></div>
+       <div data-testid="grid">grid</div>
+       <div data-testid="empty-add">add</div>`,
+      {
+        config: {
+          closetChrome: {
+            anchors: ['[data-testid="empty-add"]', '[data-testid="grid"]'],
+          },
+        },
+      }
+    )
+    expect(result.closetChrome).toBe(160)
+    expect(result.closetChromeElement).toEqual(expect.objectContaining({ key: 'grid' }))
+  })
 })
 
 // 7.10-RULE-060..066: the analytics-only probe (D4, P6) on inline pages served from a synthetic
@@ -565,8 +710,17 @@ Three</p>`
 const ORIGIN = 'https://budget.test'
 const SYNTHETIC_TAB_BAR = ['[data-testid="tab-bar"]']
 
-async function probeHtml(page: Page, body: string) {
-  await page.route(`${ORIGIN}/**`, async (route) => {
+/**
+ * Probes `body` served from the synthetic origin. The route is on the browser context, so a
+ * popup's first request is served too (CodeRabbit r1: page.route misses it); the context is the
+ * test's own and closes with it. Probe errors fail the test unless `allowErrors` (RULE-066).
+ */
+async function probeHtml(
+  page: Page,
+  body: string,
+  options: { allowErrors?: boolean } = {}
+) {
+  await page.context().route(`${ORIGIN}/**`, async (route) => {
     const { pathname } = new URL(route.request().url())
     if (pathname === '/' || pathname === '/next')
       return route.fulfill({ contentType: 'text/html', body: PAGE(body) })
@@ -583,6 +737,8 @@ async function probeHtml(page: Page, body: string) {
     await page.evaluate(() => document.fonts.ready.then(() => undefined))
   }
   const { results } = await probeScreen(page, open, SYNTHETIC_TAB_BAR)
+  // A click the probe could not land reads as "no effect": that must never pass as a result.
+  if (!options.allowErrors) expect(probeErrors(results), 'probe errors').toEqual([])
   return results
 }
 
@@ -743,6 +899,7 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
       `<div role="switch" tabindex="0" aria-checked="true" data-testid="switch" onclick="${CAPTURE}">Tips</div>
        <div role="checkbox" tabindex="0" aria-checked="true" data-testid="checkbox" onclick="${CAPTURE}">Daily</div>
        <section><button aria-pressed="true" data-testid="lone-toggle" onclick="${CAPTURE}">Follow</button></section>
+       <div><button aria-pressed="true" data-testid="bold" onclick="${CAPTURE}">Bold</button><button aria-pressed="true" data-testid="italic" onclick="${CAPTURE}">Italic</button></div>
        <div role="radiogroup">
          <div role="radio" tabindex="0" aria-checked="true" data-testid="radio-on">Cold</div>
          <div role="radio" tabindex="0" aria-checked="false" data-testid="radio-off"
@@ -754,7 +911,8 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
       analyticsOnly(results)
         .map((element) => element.key)
         .sort()
-    ).toEqual(['checkbox', 'lone-toggle', 'switch'])
+      // Two pressed siblings are independent toggles: neither is the one current choice.
+    ).toEqual(['bold', 'checkbox', 'italic', 'lone-toggle', 'switch'])
     // The checked radio is the current choice of an exclusive set: not probed.
     expect(results.map((result) => result.target.key)).not.toContain('radio-on')
     expect(byKey(results, 'radio-off').effects.join(' ')).toMatch(/dom \d+ change/)
@@ -822,7 +980,8 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
            sessionStorage.setItem('seen', '1')
            document.getElementById('slot').innerHTML = '<button data-testid="once">Once</button>'
          }
-       </script>`
+       </script>`,
+      { allowErrors: true }
     )
     expect(probeErrors(results)).toEqual(['probe once: not found in a fresh load'])
     expect(analyticsOnly(results)).toEqual([])

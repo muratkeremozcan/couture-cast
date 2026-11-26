@@ -197,7 +197,8 @@ function visible(el: Element) {
 /**
  * The current choice of an exclusive set, which does nothing when chosen again by design: the
  * selected tab or option, the current page, the checked radio, and the pressed chip of a group
- * (a parent holding at least one other `aria-pressed` control, an exclusive filter or chip row).
+ * (exactly one pressed among two or more `aria-pressed` siblings, an exclusive filter or chip
+ * row; two pressed siblings are independent toggles).
  * Everything that can still be turned off is probed: a standalone pressed toggle, a checked
  * checkbox, an on switch.
  */
@@ -213,10 +214,12 @@ function currentChoice(el: Element) {
     return true
   if (el instanceof HTMLInputElement && el.type === 'radio' && el.checked) return true
   if (el.getAttribute('aria-pressed') !== 'true') return false
-  const siblings = Array.from(el.parentElement?.children ?? [])
-  return siblings.some(
-    (other) =>
-      other !== el && other.hasAttribute('aria-pressed') && other.matches(TARGET_SELECTOR)
+  const siblings = Array.from(el.parentElement?.children ?? []).filter(
+    (other) => other.hasAttribute('aria-pressed') && other.matches(TARGET_SELECTOR)
+  )
+  return (
+    siblings.length >= 2 &&
+    siblings.filter((other) => other.getAttribute('aria-pressed') === 'true').length === 1
   )
 }
 
@@ -310,7 +313,13 @@ function windowNavigation(): EventTarget {
 
 /** A fragment that names nothing on the page scrolls nowhere: no target, a bare `#`, `#top`. */
 function hashTargetExists(url: URL) {
-  const id = decodeURIComponent(url.hash.slice(1))
+  const raw = url.hash.slice(1)
+  let id = raw
+  try {
+    id = decodeURIComponent(raw)
+  } catch {
+    // A malformed escape names the element by its raw text.
+  }
   if (!id || id.toLowerCase() === 'top') return false
   return Boolean(document.getElementById(id) ?? document.getElementsByName(id)[0])
 }
@@ -353,10 +362,14 @@ function retargetNewWindowLinks(): () => void {
 export async function probeNativeScreen(options: NativeProbeOptions) {
   const navigation = windowNavigation()
   const unmountFirst = await options.mount()
-  const targets = collectTargets()
-    .map(({ target }) => target)
-    .filter((target) => !target.skip)
-  unmountFirst()
+  let targets: NativeProbeTarget[]
+  try {
+    targets = collectTargets()
+      .map(({ target }) => target)
+      .filter((target) => !target.skip)
+  } finally {
+    unmountFirst()
+  }
   const results: NativeProbeResult[] = []
   for (const target of targets) {
     // The browser MSW shim has no lifecycle events, so the probe reads requests at fetch itself
@@ -364,10 +377,13 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
     const requested = new Set<string>()
     const realFetch = globalThis.fetch
     globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
-      const request = new Request(input, init)
-      requested.add(
-        `${request.method} ${new URL(request.url, window.location.href).pathname}`
-      )
+      // Read the method and URL without building a Request: that would consume a Request
+      // input's body before the real fetch sends it.
+      const url = input instanceof Request ? input.url : String(input)
+      const method = (
+        init?.method ?? (input instanceof Request ? input.method : 'GET')
+      ).toUpperCase()
+      requested.add(`${method} ${new URL(url, window.location.href).pathname}`)
       return realFetch(input, init)
     }
     // Held for the whole render: no navigation leaves the test frame, pressed or not.
@@ -393,6 +409,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       release()
       throw error
     })
+    let observer: MutationObserver | undefined
     try {
       const control = find(target)
       if (!control) {
@@ -402,7 +419,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       const churn = new WeakSet<Node>()
       const childChurn = new WeakMap<Node, number>()
       const after: Node[] = []
-      const observer = new MutationObserver((records) => {
+      observer = new MutationObserver((records) => {
         for (const record of records) {
           const list = record.type === 'childList'
           // Churn is kept per kind, as on web: children that change on their own hide later
@@ -444,6 +461,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       }
       await act(() => sleep(OBSERVE_MS))
       observer.disconnect()
+      observer = undefined
       const effects: string[] = []
       for (const url of followed) effects.push(`link ${url}`)
       if (options.outsideCalls() > calls) effects.push('outside call')
@@ -468,8 +486,12 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
         effects.push(`dom ${outside.length} change(s) outside the control`)
       results.push({ target, effects })
     } finally {
-      unmount()
-      release()
+      observer?.disconnect()
+      try {
+        unmount()
+      } finally {
+        release()
+      }
     }
   }
   return { targets, results }

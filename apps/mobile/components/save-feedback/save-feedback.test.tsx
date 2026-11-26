@@ -347,6 +347,41 @@ describe('mobile save-feedback components', () => {
     ])
   })
 
+  // Story CC-7.10 test owner (TEA): a pending save must read disabled to assistive tech and take
+  // no taps. React Native Web's Pressable writes aria-disabled from its own disabled prop over the
+  // one the button passes, so before busy reached that prop a pending save showed no
+  // aria-disabled at all. The second press pins that a tap on the pending button starts no
+  // second save, and the settled check pins that busy alone drives the disabled state.
+  it('[P1] [7.10-NAT-024] reports a pending save as disabled and ignores a press until it settles', async () => {
+    const pending = deferred<boolean>()
+    const onSave = vi.fn(() => pending.promise)
+
+    await render(
+      <SaveFeedbackProvider>
+        <SaveActionButton testID="save-btn" onSave={onSave} />
+      </SaveFeedbackProvider>
+    )
+
+    const button = screen.getByTestId('save-btn')
+    expect(button).not.toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(button)
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(button).toHaveTextContent('Saving')
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(button)
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(button).toHaveTextContent('Saving')
+
+    await act(async () => {
+      pending.resolve(true)
+      await pending.promise
+    })
+    expect(button).toHaveTextContent('Saved')
+    expect(button).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
   it('failed save & retry: keeps content intact, shows Failed + Retry bar, and retries cleanly', async () => {
     const onSave = vi
       .fn<() => Promise<boolean>>()
