@@ -810,9 +810,7 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
          }
        </script>`
     )
-    expect(probeErrors(results)).toEqual([
-      'probe once: not found in a fresh load (0 matches)',
-    ])
+    expect(probeErrors(results)).toEqual(['probe once: not found in a fresh load'])
     expect(analyticsOnly(results)).toEqual([])
   })
 })

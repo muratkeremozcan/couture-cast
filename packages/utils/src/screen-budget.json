@@ -403,6 +403,17 @@
       "platform": "web",
       "screen": "today",
       "fixture": "empty",
+      "rule": "analytics-only",
+      "value": 3,
+      "elements": ["cta-primary", "cta-secondary", "track-wardrobe-upload-started"],
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "empty",
       "rule": "chip-rows",
       "value": 2,
       "story": "7.13",
@@ -440,7 +451,18 @@
       "screen": "today",
       "fixture": "empty",
       "rule": "today-height",
-      "value": 3384,
+      "value": 3518,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "guardian-pending",
+      "rule": "analytics-only",
+      "value": 3,
+      "elements": ["cta-primary", "cta-secondary", "track-wardrobe-upload-started"],
       "story": "7.13",
       "decision": "D-KNOWN-7.10",
       "decidedIn": "7.10"
@@ -486,7 +508,18 @@
       "screen": "today",
       "fixture": "guardian-pending",
       "rule": "today-height",
-      "value": 4247,
+      "value": 3825,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "populated",
+      "rule": "analytics-only",
+      "value": 3,
+      "elements": ["cta-primary", "cta-secondary", "track-wardrobe-upload-started"],
       "story": "7.13",
       "decision": "D-KNOWN-7.10",
       "decidedIn": "7.10"

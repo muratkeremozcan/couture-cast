@@ -11,6 +11,7 @@ import {
   formatScreenBudgetFailures,
   isAnalyticsRequest,
   screenBudget,
+  screenBudgetKnownKeys,
   screenBudgetMeasureConfig,
   SCREEN_BUDGET_OWNING_STORIES,
   SCREEN_BUDGET_PER_ELEMENT_RULES,
@@ -251,6 +252,117 @@ describe('CC-7.10 evaluateScreenBudget', () => {
   it('[P1] [7.10-UNIT-008c] defaults read the checked-in limits and known list', () => {
     const result = evaluateScreenBudget(audit({ primaryButtons: els(1) }))
     expect(result.measures[0]?.limit).toBe(screenBudget.limits['primary-buttons'])
+  })
+})
+
+describe('CC-7.10 review #8 and #12 verdict details', () => {
+  const paragraph = (lines: number, key = 'hero') => ({
+    key,
+    lines,
+    detail: `${lines} lines`,
+  })
+
+  it('[P0] [7.10-UNIT-014] a known paragraph is ratcheted by its own line count (Codex #8)', () => {
+    const entry = known('paragraph-lines', 1, { elements: [{ key: 'hero', lines: 4 }] })
+    const same = evaluateScreenBudget(audit({ paragraphs: [paragraph(4)] }), AC_LIMITS, [
+      entry,
+    ])
+    expect(same.passed).toBe(true)
+    const longer = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(8)] }),
+      AC_LIMITS,
+      [entry]
+    )
+    expect(kinds(longer)).toEqual(['paragraph-lines:worse'])
+    expect(formatScreenBudgetFailures(longer)).toContain(
+      'hero has 8 lines, above known 4 lines'
+    )
+    const shorter = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(3)] }),
+      AC_LIMITS,
+      [entry]
+    )
+    expect(kinds(shorter)).toEqual(['paragraph-lines:lower'])
+    expect(formatScreenBudgetFailures(shorter)).toContain(
+      'lower the known value to 3 lines'
+    )
+    const renamed = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(4, 'subtitle')] }),
+      AC_LIMITS,
+      [entry]
+    )
+    expect(kinds(renamed)).toEqual([
+      'paragraph-lines:new-element',
+      'paragraph-lines:missing-element',
+    ])
+  })
+
+  it('[P1] [7.10-UNIT-015] a known paragraph with no recorded line count fails with the measured count', () => {
+    const result = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(5)] }),
+      AC_LIMITS,
+      [known('paragraph-lines', 1, { elements: ['hero'] })]
+    )
+    expect(kinds(result)).toEqual(['paragraph-lines:lines'])
+    expect(formatScreenBudgetFailures(result)).toContain(
+      'known paragraph hero records no line count; measured 5 lines'
+    )
+  })
+
+  it('[P1] [7.10-UNIT-016] two paragraphs under one key are each held to a recorded count', () => {
+    const entry = known('paragraph-lines', 2, {
+      elements: [
+        { key: 'p', lines: 3 },
+        { key: 'p', lines: 5 },
+      ],
+    })
+    const same = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(5, 'p'), paragraph(3, 'p')] }),
+      AC_LIMITS,
+      [entry]
+    )
+    expect(same.passed).toBe(true)
+    const worse = evaluateScreenBudget(
+      audit({ paragraphs: [paragraph(6, 'p'), paragraph(3, 'p')] }),
+      AC_LIMITS,
+      [entry]
+    )
+    expect(kinds(worse)).toEqual(['paragraph-lines:worse'])
+  })
+
+  it('[P1] [7.10-UNIT-017] pixel failures name what was measured: the document or the anchor (Codex #12)', () => {
+    const today = evaluateScreenBudget(
+      audit({ todayHeight: 3701, todayHeightElement: { key: 'document' } }),
+      AC_LIMITS,
+      []
+    )
+    expect(formatScreenBudgetFailures(today)).toBe(
+      'web today (populated) today-height: 3701 px > 1688 px: document'
+    )
+    const closet = evaluateScreenBudget(
+      audit(
+        { closetChrome: 390, closetChromeElement: { key: 'closet-garment-grid' } },
+        { screen: 'closet' }
+      ),
+      AC_LIMITS,
+      []
+    )
+    expect(closet.measures[0]?.elements).toEqual(['closet-garment-grid'])
+    expect(formatScreenBudgetFailures(closet)).toContain(
+      '390 px > 160 px: closet-garment-grid'
+    )
+  })
+
+  it('[P2] [7.10-UNIT-018] screenBudgetKnownKeys reads string keys and paragraph keys alike', () => {
+    expect(
+      screenBudgetKnownKeys(known('nested-cards', 1, { elements: ['inner'] }))
+    ).toEqual(['inner'])
+    expect(
+      screenBudgetKnownKeys(
+        known('paragraph-lines', 1, { elements: [{ key: 'hero', lines: 4 }] })
+      )
+    ).toEqual(['hero'])
+    expect(screenBudgetKnownKeys(known('chip-rows', 2))).toEqual([])
   })
 })
 

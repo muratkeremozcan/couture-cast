@@ -331,7 +331,7 @@ export async function probeTarget(
       await control.dispatchEvent('click')
     })
     const observation = page.evaluate(
-      async ({ el, observeMs, scroll, start, hash }) => {
+      async ({ el, observeMs, scroll, start, href }) => {
         const deadline = performance.now() + observeMs
         const state = (
           window as unknown as {
@@ -350,8 +350,9 @@ export async function probeTarget(
           // control's: the D4 matrix row "hash link no-op" (Preview outfits).
           const fragment =
             location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : ''
+          // `href="#"` leaves location.hash empty, so the fragment change is read from the URL.
           const deadHash =
-            location.hash !== hash &&
+            location.href !== href &&
             !(
               fragment &&
               (document.getElementById(fragment) ||
@@ -369,7 +370,11 @@ export async function probeTarget(
             found.push(`focus ${active.tagName.toLowerCase()}`)
           const outside = state.after.filter(
             (node) =>
-              !state.churn.has(node) && !el.contains(node) && node.isConnected !== false
+              // A label's own control (its file input) is part of the control it labels.
+              !state.churn.has(node) &&
+              !el.contains(node) &&
+              !(own && (own === node || own.contains(node))) &&
+              node.isConnected !== false
           )
           if (outside.length)
             found.push(`dom ${outside.length} change(s) outside the control`)
@@ -386,7 +391,7 @@ export async function probeTarget(
         observeMs: OBSERVE_MS,
         scroll: scrollBefore,
         start: `${before.pathname}${before.search}`,
-        hash: before.hash,
+        href: before.href,
       }
     )
     // A window the node side ended early keeps running in the page until the next load.

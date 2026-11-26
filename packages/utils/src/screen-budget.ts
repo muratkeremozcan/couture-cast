@@ -349,7 +349,10 @@ function judgeParagraphLines(
   entry: ScreenBudgetKnownViolation,
   fail: (kind: ScreenBudgetFailureKind, message: string) => void
 ): void {
-  const byKey = <T>(pairs: readonly (readonly [string, T])[]) => {
+  // A function declaration, not a generic arrow: the mobile Vite transform reads `.ts` as TSX,
+  // where `<T>(...) =>` parses as JSX and fails every suite that imports @couture/utils
+  // (CI fe6fc7c1, 205 mobile files).
+  function byKey<T>(pairs: readonly (readonly [string, T])[]) {
     const groups = new Map<string, T[]>()
     for (const [key, value] of pairs) {
       const group = groups.get(key)
