@@ -22,7 +22,7 @@ export type ContrastFailure = {
 /** `uniform`: the background under the changed pixels varies by under 15% in contrast terms. */
 /**
  * Where the ratio came from: the pixel group that rated lowest, by how it was rated (`exact`: one
- * background luminance and its strongest stem; `step`: a 2% luminance step held at its worst;
+ * background luminance, within 1%, and its strongest stem; `step`: a 2% luminance step held at its worst;
  * `small`: a glyph under both floors), its size, luminances and box in the shot (CSS pixels).
  */
 export type Weakest = {
@@ -232,8 +232,8 @@ async function compare(
             }
           : {}
       const rate = (glyphs: [number, number, number][]): Rated[] => {
-        // Each background region is rated on its own. Glyph pixels are grouped by the exact
-        // luminance under them, and each group by its strongest stem (the pixel whose ink differs
+        // Each background region is rated on its own. Glyph pixels are grouped by the luminance
+        // under them (within 1%, see `region`), and each group by its strongest stem (the pixel whose ink differs
         // most from its own background, which is where a translucent text color is painted over
         // that region); the text takes its weakest group. A group needs 3% of the glyph pixels
         // (and at least 8) to count, so a few antialiased pixels cannot decide the result. The glyph
@@ -277,14 +277,20 @@ async function compare(
             worst = Math.min(worst, contrast(group.ink, under))
           return worst
         }
+        // One background region is one luminance within 1% (of L + 0.05, a contrast change of
+        // under 1%), not one exact value: a translucent blurred bar varies by tiny amounts, split
+        // the text into slivers, and a sliver holding only a thin diagonal's antialiased edge
+        // rated 4.45 for #A1A1AA on #121214, about 7:1 (CI 5f2043f2, Community filter chip).
+        const region = (under: number) =>
+          Math.round(Math.log(under + 0.05) / Math.log(1.01))
         const exactKeys = new Set<number>()
         const rated: Rated[] = []
-        for (const group of groupBy(glyphs, (under) => under))
+        for (const group of groupBy(glyphs, region))
           if (group.count >= floor) {
             rated.push({ value: group.strongest, group, kind: 'exact' })
-            exactKeys.add(group.unders[0]!)
+            exactKeys.add(region(group.unders[0]!))
           }
-        const remainder = glyphs.filter(([under]) => !exactKeys.has(under))
+        const remainder = glyphs.filter(([under]) => !exactKeys.has(region(under)))
         if (remainder.length >= Math.max(8, 0.05 * glyphs.length)) {
           const steps = groupBy(remainder, (under) =>
             Math.round(Math.log(under + 0.05) / Math.log(1.02))

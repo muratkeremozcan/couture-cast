@@ -296,7 +296,12 @@ jobs:
       # out at precisely the times it is most needed. `save-always` is the
       # documented-but-deprecated patch for this; the restore/save split is
       # what the action's own docs point to instead.
+      # The visual shard (small_phone) keeps no AVD cache: its 1.5 GB entry pushed the repository
+      # to its 10 GB cache limit on CC-7.9 and evicted main's Gradle dependency cache, so the
+      # TalkBack job downloaded every artifact from Maven Central and hit 429s (CI 5f2043f2). It
+      # boots cold instead, inside its 20-minute limit (its job ran about 8 minutes with the cache).
       - name: Restore cached AVD and snapshot
+        if: ${{ matrix.lane != 'visual' }}
         uses: actions/cache/restore@v4
         id: avd-cache
         with:
@@ -316,7 +321,7 @@ jobs:
       # Every later run restores it, which is the whole point of the cache: the
       # old job passed `-no-snapshot` and so paid a full cold boot every time.
       - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+        if: ${{ matrix.lane != 'visual' && steps.avd-cache.outputs.cache-hit != 'true' }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ env.ANDROID_API_LEVEL }}
@@ -342,7 +347,7 @@ jobs:
       # failed, and a poisoned cache is worse than no cache because every later
       # run restores it instead of rebuilding.
       - name: Save AVD and snapshot to cache
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+        if: ${{ matrix.lane != 'visual' && steps.avd-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |

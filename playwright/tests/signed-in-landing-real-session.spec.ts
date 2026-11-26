@@ -306,6 +306,22 @@ async function traceLandingSession(page: Page) {
         attributeFilter: ['data-session'],
       })
       window.addEventListener('couture:session', () => record('couture:session', null))
+      // The Sign out press itself, captured before React sees it (CI 5f2043f2: the button was
+      // enabled and the page stayed the member page, so whether the press arrived matters).
+      document.addEventListener(
+        'click',
+        (event) => {
+          const button = (event.target as Element | null)?.closest?.(
+            '[data-testid="landing-sign-out"]'
+          )
+          if (button)
+            record(
+              'sign-out-click',
+              (button as HTMLButtonElement).disabled ? 'disabled' : 'enabled'
+            )
+        },
+        true
+      )
       window.addEventListener('pageshow', (event) =>
         record('pageshow', event.persisted ? 'persisted' : 'fresh')
       )
@@ -327,14 +343,26 @@ async function withLandingSessionTrace(page: Page, check: () => Promise<void>) {
           storedSession: window.localStorage.getItem(sessionKey) !== null,
           bearer: window.sessionStorage.getItem(bearerKey) !== null,
           trace:
-            (window as unknown as { __teaSessionTrace?: unknown[] }).__teaSessionTrace ??
-            [],
+            (window as unknown as { __teaSessionTrace?: { what: string; at: number }[] })
+              .__teaSessionTrace ?? [],
         }),
         [SESSION_KEY, 'couturecast.access-token'] as const
       )
       .catch((readError: unknown) => ({ unreadable: String(readError) }))
+    // The real-session harness keeps no attachments, so the same evidence goes to the job log as
+    // one line (booleans and state words only, no token or session value).
+    const trace = 'trace' in state ? state.trace : []
+    const click = trace.findIndex((entry) => entry.what === 'sign-out-click')
+    const summary = {
+      ...state,
+      clickAt: click === -1 ? null : trace[click]!.at,
+      sessionEventAfterClick:
+        click !== -1 &&
+        trace.slice(click + 1).some((entry) => entry.what === 'couture:session'),
+    }
+    console.log(`[landing-session-trace] ${JSON.stringify(summary)}`)
     await test.info().attach('landing-session-trace.json', {
-      body: JSON.stringify(state, null, 2),
+      body: JSON.stringify(summary, null, 2),
       contentType: 'application/json',
     })
     throw error

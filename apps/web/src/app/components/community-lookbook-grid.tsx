@@ -597,7 +597,9 @@ export function LookbookFilterNav({
           // colour, so it survives a monochrome or high-contrast rendering.
           const activeStyles = isActive
             ? 'border-inverse font-bold text-ink underline underline-offset-4'
-            : 'border-transparent font-medium text-ink-muted min-[768px]:border-line-strong min-[768px]:bg-page'
+            : // CC-7.9: ink-soft, not ink-muted. Muted 12 px uppercase paints below 4.5:1 on the dark
+              // page once antialiased (measured 4.45 in CI); selection still reads by weight and border.
+              'border-transparent font-medium text-ink-soft min-[768px]:border-line-strong min-[768px]:bg-page'
 
           return (
             <button

@@ -201,6 +201,8 @@ manual iOS lanes without pixel baselines: 360 x 640 dp is the smallest supported
 | 7.9-NVIS-U05..U10      | `scripts/ci/maestro-visual-lane.test.mjs`          | Flow kept out of the suite, `--lane visual`, the shard 11 row, device and cache key                                                   |
 | 7.9-VIS-U01..U04       | `scripts/visual-baselines/pull.test.mjs`           | Actual to baseline names, folder filter, workflows export what the script reads, a short set is named and nothing copied (Codex P1-1) |
 | 7.9-NVIS-U11..U13      | `scripts/visual-baselines/compare-native.test.mjs` | Noise tolerance, all eight reported in one run with diffs, flow capture-only, compare step before the upload                          |
+| 7.9-NVIS-U14b..U15     | `scripts/visual-baselines/compare-native.test.mjs` | Masks with reasons per tab; captures found under Maestro debug output, newest run, bundled baselines ignored                          |
+| 7.9-NVIS-U16           | `scripts/ci/maestro-visual-lane.test.mjs`          | The visual row keeps no AVD cache (its 1.5 GB entry evicted main Gradle caches, CI 5f2043f2)                                          |
 
 `scripts/ci/maestro-signed-out-lane.test.mjs` and `scripts/lib/native-maestro-flows.test.mjs`
 count the visual row and flow separately.

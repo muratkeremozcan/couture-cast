@@ -129,3 +129,22 @@ describe('pr-mobile-e2e.yml visual row', () => {
     )
   })
 })
+
+// CI 5f2043f2: the visual shard's own 1.5 GB AVD cache entry pushed the repository to its 10 GB
+// cache limit and evicted main's Gradle dependency cache. The visual row neither restores,
+// generates nor saves an AVD snapshot; every other row keeps the shared cache.
+test('[7.9-NVIS-U16] the visual row keeps no AVD cache, the other rows keep theirs', () => {
+  for (const name of [
+    'Restore cached AVD and snapshot',
+    'Create AVD and generate snapshot for caching',
+    'Save AVD and snapshot to cache',
+  ]) {
+    const row = step(name)
+    assert.ok(row, `${name} present`)
+    assert.match(String(row.if), /matrix\.lane != 'visual'/, name)
+  }
+  assert.match(
+    String(step('Create AVD and generate snapshot for caching').if),
+    /steps\.avd-cache\.outputs\.cache-hit != 'true'/
+  )
+})
