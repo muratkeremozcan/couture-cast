@@ -1,5 +1,9 @@
 # Test design: Story CC-7.11 five-tab navigation and back pattern
 
+Updated: 2026-11-26. CI rounds 1 to 3: mobile-viewport-overflow counts an svg icon as one box and lets
+a bottom tab label wrap to two lines (D3; Community is 67 px at 12 px against 64 px tabs at 320 px),
+never three, with the cut and outside-box checks unchanged. Native baselines and masks follow D16.
+
 Updated: 2026-11-26. Codex review (16 findings) and the first CI run: Codex #6, #9, #14, #15, #16
 added to the E2E specs; #1, #7, #11, #12, #14 at unit level; D14 proof opens a garment from depth.
 

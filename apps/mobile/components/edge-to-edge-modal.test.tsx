@@ -532,19 +532,17 @@ describe('Story CC-7.11 D13 EdgeToEdgeModal closes like a layer', () => {
     ).toHaveLength(1)
   }
 
-  it('[7.11-NAT-030] onRequestClose and returnFocusRef are required props', () => {
+  it('[7.11-NAT-030] onRequestClose is a required prop', () => {
     const layers = [
       // @ts-expect-error D13: a layer without onRequestClose would ignore Android back.
       <EdgeToEdgeModal key="no-close" visible returnFocusRef={null}>
         <Text>Sheet</Text>
       </EdgeToEdgeModal>,
-      // @ts-expect-error D13: a layer must name its opener, or null where it refocuses itself.
-      <EdgeToEdgeModal key="no-opener" visible onRequestClose={() => undefined}>
-        <Text>Sheet</Text>
-      </EdgeToEdgeModal>,
     ]
-    // The guard is the type check (tsc runs over this file); the elements stay unrendered.
-    expect(layers).toHaveLength(2)
+    // The guard is the type check (tsc runs over this file); the element stays unrendered.
+    // returnFocusRef is optional in the type since 08fb51ce (the iPad-pinned share-card
+    // composer omits it); 7.11-NAT-034's source scan requires it at every other caller.
+    expect(layers).toHaveLength(1)
   })
 
   it('[7.11-NAT-030] Android back closes the layer through onRequestClose and focus returns to the opener', async () => {

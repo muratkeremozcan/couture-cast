@@ -123,7 +123,11 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       const clip = clippedBy(control, box)
       if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
       const lines = lineCount(control)
-      if (lines > 1) problems.push(`"${name}" wraps onto ${lines} lines`)
+      // Story CC-7.11 D3 (and 7.9-CMP-NAV-001): a bottom tab label may wrap to a second line
+      // where five 64 px tabs leave too little width (Community at 320 px), never a third,
+      // and the cut and overflow checks below still apply to it.
+      const maxLines = control.closest('[data-testid="sticky-bottom-nav"]') ? 2 : 1
+      if (lines > maxLines) problems.push(`"${name}" wraps onto ${lines} lines`)
       // TEA P5, R2: a label cut by its own box, whatever its overflow: content wider than a box,
       // or text that reaches past the control's edges.
       // A screen-reader-only part is a 1 px clipped box on purpose.
