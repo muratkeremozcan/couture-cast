@@ -11,39 +11,58 @@ import {
   EdgeToEdgeModal,
   LayerSwipeHandle,
   useModalInsets,
+  type LayerFocusTarget,
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import { AppTopBar } from '@/src/components/app-top-bar'
+import { AppTopBar } from '@/src/components/app-top-bar-view'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
-export interface CommunitySpotlightDetailProps {
-  item: CommunityReactionSpotlightItem | null
+/** A post the detail can show: a Spotlight item carries its rank, a feed post none. */
+export type CommunityPostDetailItem = Pick<
+  CommunityReactionSpotlightItem,
+  'id' | 'title'
+> & {
+  rank?: number
+}
+
+export interface CommunitySpotlightDetailProps<
+  T extends CommunityPostDetailItem = CommunityReactionSpotlightItem,
+> {
+  item: T | null
   onClose: () => void
   /** iOS reports when the sheet has fully gone, so a follow-up modal can open. */
   onDismissed?: () => void
-  /** The same card the module renders, so the detail shows every reused control. */
-  renderCard: (item: CommunityReactionSpotlightItem) => React.ReactNode
+  /** The same card the list renders, so the detail shows every reused control. */
+  renderCard: (item: T) => React.ReactNode
+  /** Story CC-7.11 D12: the bar's title for an untitled post; the Spotlight label by default. */
+  fallbackTitle?: string
+  /** Story CC-7.11 D13: the card (or Spotlight rank) that opened the detail. */
+  returnFocusRef?: LayerFocusTarget | null
+  testID?: string
 }
 
 /**
- * Mobile has no separate post detail screen, so a spotlight card opens this
- * layer around the reused card. Opening moves focus to its title and announces
+ * Mobile has no separate post detail screen, so a Spotlight card or a feed card
+ * opens this layer around the reused card. Opening moves focus to its title and announces
  * the change once; closing hands focus back to the caller.
  */
-export function CommunitySpotlightDetail({
+export function CommunitySpotlightDetail<T extends CommunityPostDetailItem>({
   item,
   onClose,
   onDismissed,
   renderCard,
-}: CommunitySpotlightDetailProps) {
+  fallbackTitle,
+  returnFocusRef = null,
+  testID = 'community-spotlight-detail',
+}: CommunitySpotlightDetailProps<T>) {
   const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const palette = useHeroPalette()
   const insets = useModalInsets()
   const titleRef = useRef<Text>(null)
   // The sheet stays mounted while it animates away, showing the look it opened.
-  const shownRef = useRef<CommunityReactionSpotlightItem | null>(null)
+  const shownRef = useRef<T | null>(null)
   if (item) shownRef.current = item
   const shown = shownRef.current
 
@@ -54,8 +73,7 @@ export function CommunitySpotlightDetail({
       visible={item !== null}
       animationType={modalAnimation}
       onRequestClose={onClose}
-      // Story CC-7.11 D13: the Community screen's closeSpotlightDetail focuses the card's rank.
-      returnFocusRef={null}
+      returnFocusRef={returnFocusRef}
       onDismiss={onDismissed}
       transparent={false}
       onShow={() => {
@@ -68,7 +86,7 @@ export function CommunitySpotlightDetail({
       {/* Story CC-7.11 D12: a full-height layer. Its header is the app top bar with back and the
           look's title, and it is the swipe-down handle (D13). */}
       <View
-        testID="community-spotlight-detail"
+        testID={testID}
         style={[
           styles.layer,
           { backgroundColor: palette.page, paddingBottom: insets.bottom },
@@ -78,7 +96,10 @@ export function CommunitySpotlightDetail({
       >
         <LayerSwipeHandle>
           <AppTopBar
-            title={t('community.spotlight.eyebrow')}
+            // D12: the post's own title; the generic label only for an untitled post.
+            title={
+              shown.title?.trim() || fallbackTitle || t('community.spotlight.eyebrow')
+            }
             titleRef={titleRef}
             onBack={onClose}
           />
@@ -88,12 +109,14 @@ export function CommunitySpotlightDetail({
           accessible={false}
           contentContainerStyle={styles.content}
         >
-          <Text
-            testID="community-spotlight-detail-rank"
-            style={[styles.rank, { color: palette.inkMuted }]}
-          >
-            {t('community.spotlight.rank', { rank: shown.rank })}
-          </Text>
+          {shown.rank === undefined ? null : (
+            <Text
+              testID="community-spotlight-detail-rank"
+              style={[styles.rank, { color: palette.inkMuted }]}
+            >
+              {t('community.spotlight.rank', { rank: shown.rank })}
+            </Text>
+          )}
           {renderCard(shown)}
         </ScrollView>
       </View>

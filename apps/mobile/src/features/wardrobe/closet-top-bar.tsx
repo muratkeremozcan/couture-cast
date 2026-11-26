@@ -3,7 +3,6 @@
 // grid; More lists Closet setup and Silhouette, which used to sit above the grid.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { router, type Href } from 'expo-router'
 import type { ComponentRef, RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -14,6 +13,7 @@ import {
   useModalInsets,
 } from '@/components/edge-to-edge-modal'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { ShellIcon } from '@/src/components/shell-icons'
 import { useTokens } from '@/src/theme/tokens'
 
 type PressableRef = ComponentRef<typeof Pressable>
@@ -153,7 +153,7 @@ export function ClosetMoreSheet({
                 { minHeight: shell.touchTarget, minWidth: shell.touchTarget },
               ]}
             >
-              <FontAwesome name="close" size={type.lg.fontSize} color={colors.ink} />
+              <ShellIcon name="close" size={type.lg.fontSize} color={colors.ink} />
             </Pressable>
           </LayerSwipeHandle>
           <Pressable

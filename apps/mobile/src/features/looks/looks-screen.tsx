@@ -3,9 +3,15 @@
 // looks it shows one line and the two rows. Segments, filters and Ideas are CC-7.12's.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { router, useFocusEffect, type Href } from 'expo-router'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentRef,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type {
@@ -22,9 +28,13 @@ import {
 } from '@/src/lib/mobile-auth'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
+import { ShellIcon } from '@/src/components/shell-icons'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 import { ClosetSavedLooksRow } from '@/src/features/wardrobe/saved-looks-row'
-import { StylePiecePanel } from '@/src/features/wardrobe/style-piece-panel'
+import {
+  focusStylePieceControl,
+  StylePiecePanel,
+} from '@/src/features/wardrobe/style-piece-panel'
 import { useSavedLooks } from '@/src/features/wardrobe/use-saved-looks'
 
 /** One member's Looks tab; a sign-in, sign-out or account switch mounts a fresh one. */
@@ -76,6 +86,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [styleClosing, setStyleClosing] = useState(false)
+  const styleOpener = useRef<ComponentRef<typeof Pressable> | null>(null)
 
   // A tag edit or a delete elsewhere changes which looks can reopen and their status.
   const { reload: reloadLooks } = looks
@@ -122,7 +133,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
       onPress={() => router.push(href)}
     >
       <Text style={[styles.rowLabel, rowText]}>{label}</Text>
-      <FontAwesome name="chevron-right" size={type.sm.fontSize} color={colors.inkMuted} />
+      <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
     </Pressable>
   )
 
@@ -158,12 +169,13 @@ function MemberLooks({ epoch }: { epoch: number }) {
                   garments={closet.garments}
                   onRetry={reloadLooks}
                   onChanged={reloadLooks}
-                  onReopenStylePiece={(look) => {
+                  onReopenStylePiece={(look, opener) => {
                     const anchor = closet.garments.find(
                       (item) => item.id === look.anchorGarmentId
                     )
                     if (!anchor || !anchor.category || !anchor.comfortRange) return
                     if (styleSelection) return
+                    styleOpener.current = opener
                     setInitialSavedLook(look)
                     setStyleSelection({
                       id: anchor.id,
@@ -199,6 +211,10 @@ function MemberLooks({ epoch }: { epoch: number }) {
             setStyleSelection(null)
             setInitialSavedLook(null)
             setStyleClosing(false)
+            // D13: the Reopen that opened the editor takes focus back once it has gone.
+            const opener = styleOpener.current
+            styleOpener.current = null
+            requestAnimationFrame(() => focusStylePieceControl(opener))
           }}
         />
       )}

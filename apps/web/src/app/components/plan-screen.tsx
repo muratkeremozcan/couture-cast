@@ -18,14 +18,14 @@ const LEGACY_PLANNER_QUERY = 'planner'
 
 export function PlanScreen() {
   const router = useRouter()
-  // `/?planner=1` redirects here with its query; the address bar drops it in place, so the
-  // in-app history keeps one entry for this screen.
+  // `/?planner=1` redirects here with its query. A router replace drops it, so the router's own
+  // URL agrees with the address bar and the entry keeps its place in the in-app history.
   useEffect(() => {
     const url = new URL(window.location.href)
     if (!url.searchParams.has(LEGACY_PLANNER_QUERY)) return
     url.searchParams.delete(LEGACY_PLANNER_QUERY)
-    window.history.replaceState(window.history.state, '', url)
-  }, [])
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
+  }, [router])
 
   return (
     <I18nextProvider i18n={getI18n()}>
@@ -34,14 +34,7 @@ export function PlanScreen() {
         <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
           {/* The rail variant is ordinary page content (no focus trap); the top bar carries
               its title and back, so the rail's own heading row and X are hidden. */}
-          <PlannerRail
-            isOpen
-            variant="rail"
-            hideHeader
-            onClose={() => {
-              router.replace('/looks')
-            }}
-          />
+          <PlannerRail isOpen variant="rail" hideHeader />
         </main>
         <StickyBottomNav />
       </AppPage>

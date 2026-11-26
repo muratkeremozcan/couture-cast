@@ -640,6 +640,7 @@
     "menu": {
       "add": "Ekle",
       "more": "Daha fazla",
+      "moreLabel": "Daha fazla dolap seçeneği",
       "label": "Dolap seçenekleri",
       "setup": "Dolap kurulumu",
       "setupDone": "Dolap kurulumu: tamam",

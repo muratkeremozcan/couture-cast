@@ -640,6 +640,7 @@
     "menu": {
       "add": "Adicionar",
       "more": "Mais",
+      "moreLabel": "Mais opções do roupeiro",
       "label": "Opções do roupeiro",
       "setup": "Configurar roupeiro",
       "setupDone": "Configurar roupeiro: concluído",

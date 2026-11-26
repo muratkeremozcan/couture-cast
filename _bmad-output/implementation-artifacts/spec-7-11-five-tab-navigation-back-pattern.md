@@ -3,14 +3,14 @@ title: 'Story CC-7.11: Five-tab navigation and back pattern'
 type: feature
 ticket: '7-11-five-tab-navigation-back-pattern'
 created: '2026-11-26'
-status: in-progress
+status: in-review
 baseline_revision: '4e5702c3c130899d9c4a9b1548d6e911dc49744a'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: ['codex']
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -304,15 +304,21 @@ spec.ts:143-177`, `wardrobe-signed-out.spec.ts`; web unit `sticky-bottom-nav.tes
   the Closet list beside `wardrobe-garment-list`; each tab button reports selected.
 
 - 2026-11-26, builder, as built:
-  - D11: the URL stack also learns replaces from `history.replaceState` to another URL (the
-    tracker wraps it), which `router.replace` and the app's own URL edits both call;
-    `markAppHistoryReplace` stays for a replace that bypasses it.
-  - D13: a layer's history entry follows the layer being open and not suspended (not its modal
-    stack registration); pushes wait for this module's back steps to land, and a layer that
-    refuses a back close (busy, discard prompt) gets its entry again. Every `AccessibleModal`
-    header carries `layer-swipe-handle` and its scroll container `layer-body`.
+  - D11 (review #1): entry identity, not URL equality. The `pushState` and `replaceState`
+    wrappers in `lib/app-history.ts` stamp each entry's position (`__ccIdx`) into its state: a
+    push stamps the next position, a replace keeps the replaced entry's, a popstate reads the
+    landed one. Back stays in the app while the position is above this document's first one;
+    sign-out moves the first position up. The tracker component only loads the module.
+  - D13 (review #7): layer entries carry `__ccLayer` beside the position. A popstate closes the
+    live layers whose entries sit above the landed position; landing on the entry of a layer that
+    already closed (Forward) steps back over it. A layer steps back over its entry on close only
+    while that entry is on top at the same address. Pushes wait for this module's back steps to
+    land, and a layer that refuses a back close gets its entry again. Every `AccessibleModal`
+    header carries `layer-swipe-handle` and its scroll container `layer-body`; at scroll top
+    the scroll container pans `pan-x pan-down` only, so a downward drag is not taken by the
+    browser (review #6).
   - D9: `/?planner=1` redirects in `next.config.ts` (server side); the Plan screen drops the
-    passed-through `planner` query in place. `SET_CITY_FROM_PLANNER` returns to `/looks/plan`.
+    passed-through `planner` query with a router replace. `SET_CITY_FROM_PLANNER` returns to `/looks/plan`.
     The 320 px desktop rail column on Home left with the drawer.
   - D4: the top bar Add reads "+ Add" (`wardrobe.menu.add`) with the full add-garment label as
     its accessible name, so long locales keep the Closet title.
@@ -322,8 +328,61 @@ spec.ts:143-177`, `wardrobe-signed-out.spec.ts`; web unit `sticky-bottom-nav.tes
   - D8: `ScreenName` gains `looks` (snapshot cap 5) and the Looks list is snapshotted, so a
     return opens on its last list. Web Looks reopens a saved look in its detail layer (it reads
     no closet); native reopens Style this piece looks in the editor.
+  - Review round (7.11-codex-review.md, TEA unit sweep): Closet tiles have square photos with
+    the name and status on one row and the actions on the next, gap 12, so two rows of tagged
+    tiles end at about 598 px of the 608 px web fold; the Closet gate waits on the closet and
+    saved looks reads only, and the account and setup notices sit below the closet. Desktop
+    links show the tab icon, the label from 1024 px. Profile gains a Notifications row
+    (`profile-notifications-row`); Locations stays inline for CC-7.16. Leaving Silhouette lets
+    a started save or removal finish. Looks snapshots every loaded page and reads them all back
+    on a return. More's name is "More closet options" (`wardrobe.menu.moreLabel`), and an
+    outside click on plain chrome returns focus to More. Capsules shows the tab bar.
   - Screen budget: `selectors.<platform>.looksAnchors`; the native empty Closet anchor is
     `wardrobe-empty-state`, since Add moved into the top bar outside `wardrobe-screen`.
+
+- 2026-11-26, builder, D16 (owner delegated, AC2 on native at 360 x 640 dp): a tab's first own
+  content is the block that carries its job. Native Today opens on the weather header and the
+  outfit card; the hourly ribbon, scenario toggles, the add-first-piece prompt, the weather
+  alert and the Plan link move below the card (no section removed; CC-7.13 calms the rest).
+  Community's first own content is the City Spotlight when it shows looks, else the first feed
+  card or the empty state, on web and native (`community-first-content` follows it); the New
+  post row and filter chips stay above as Community's controls, and info, error, band and
+  challenge notices move after the first content (their removal is CC-7.15). The web top bar
+  stays non-sticky (D14): returning to a Closet scrolled before opening More lands where the
+  member was when they tapped More.
+
+## Review Triage Log
+
+- 2026-11-26, Codex review (7.11-codex-review.md, 16 findings through 58937e72), verdicts:
+  - #1 high, patch: URL equality treats a repeat visit as a back step, and a replace with
+    Next's own state can leave the replace flag set. Entries now carry an index stamped by the
+    pushState and replaceState wrappers; the stack is index to URL.
+  - #2 high, patch: two rows of tagged tiles exceed the 608 px web fold and the native band at
+    360 x 640 dp; tiles tightened.
+  - #3 high, patch: eight native overlays mounted no swipe handle; each header wired through
+    its guarded close.
+  - #4 medium, patch: desktop tab links lacked the shared icons.
+  - #5 high, TEA: Looks visual baselines and refreshed tab captures from CI.
+  - #6 medium, patch: a body drag at scrollTop 0 lost to browser panning; the downward gesture
+    is reserved at the top.
+  - #7 medium, patch: Forward onto a closed layer's entry left a dead Back, and any popstate
+    closed the top layer; layer entries are matched by index.
+  - #8 medium, patch: native focus returned to the top-bar Add or nowhere; each open records
+    its real opener.
+  - #9 medium, patch in part: web Profile gains a Notifications row. Web Locations stays inline:
+    its sub-screen is CC-7.16 (Profile rows open sub-screens), so it is not deferred work here.
+  - #10 medium, patch: native regular feed cards had no detail; they open the titled layer.
+  - #11 medium, patch: leaving the Silhouette route aborted an in-flight save; started saves
+    finish and pending edits flush.
+  - #12 low, patch: Looks restored scroll past page one; every loaded page is kept.
+  - #13, #15, #16 TEA: stale Maestro selectors, AC5 proof depth, keyboard and account-switch
+    assertions.
+  - #14 low, patch: an outside click dropped focus to the body; it returns to More.
+  - Codex Security: no findings, partial coverage (25 runtime files reviewed by changed area).
+- 2026-11-26, TEA unit sweep gaps, all patch: More's accessible name contains "More"; the
+  unreachable Plan `onClose` is removed; the Looks load-more read takes an owner and abort
+  signal; the onboarding read leaves the Closet gate; capsules renders the tab bar; post
+  detail drops the unused close label; back records a replace of the current entry.
 
 ## Design Notes
 

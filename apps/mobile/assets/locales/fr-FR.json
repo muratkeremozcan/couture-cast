@@ -431,6 +431,7 @@
     "menu": {
       "add": "Ajouter",
       "more": "Plus",
+      "moreLabel": "Plus d’options du dressing",
       "label": "Options du dressing",
       "setup": "Configuration du dressing",
       "setupDone": "Configuration du dressing : terminée",
@@ -776,7 +777,8 @@
       "loadMore": "Charger plus de looks",
       "loadingMore": "Chargement",
       "yourPostsTitle": "Vos looks en cours",
-      "yourPostsBody": "Vous seul les voyez tant que la vérification n’est pas terminée."
+      "yourPostsBody": "Vous seul les voyez tant que la vérification n’est pas terminée.",
+      "detailTitle": "Look partagé"
     },
     "card": {
       "label": "Look de {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "Vérification et publication",
       "uploading": "Envoi de votre photo",
       "cancel": "Annuler",
-      "success": "Votre look a été envoyé pour examen."
+      "success": "Votre look a été envoyé pour examen.",
+      "discardTitle": "Abandonner cette publication ?",
+      "discardKeep": "Continuer la modification",
+      "discard": "Abandonner"
     },
     "validation": {
       "photoRequired": "Choisissez une photo à partager.",

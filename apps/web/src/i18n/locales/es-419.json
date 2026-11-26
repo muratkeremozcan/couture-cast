@@ -640,6 +640,7 @@
     "menu": {
       "add": "Agregar",
       "more": "Más",
+      "moreLabel": "Más opciones del clóset",
       "label": "Opciones del clóset",
       "setup": "Configurar clóset",
       "setupDone": "Configurar clóset: listo",

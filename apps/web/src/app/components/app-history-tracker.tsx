@@ -1,27 +1,14 @@
-// Story CC-7.11 D11 owner: the one tracker that keeps the in-app URL stack, mounted in the root
-// layout.
+// Story CC-7.11 D11 owner: loads the in-app history from the root layout, so its history wrappers
+// are in place before the app router patches the same methods and before any navigation.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 'use client'
 
-import { Suspense, useEffect } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
-import { recordAppUrl } from '../../lib/app-history'
+import { installAppHistory } from '../../lib/app-history'
 
-function Tracker() {
-  const pathname = usePathname()
-  const search = useSearchParams()?.toString() ?? ''
-  useEffect(() => {
-    if (pathname) recordAppUrl(search ? `${pathname}?${search}` : pathname)
-  }, [pathname, search])
-  return null
-}
+installAppHistory()
 
-/** `useSearchParams` needs its own Suspense boundary so every page still prerenders. */
+/** Renders nothing; importing it installs the history tracking. */
 export function AppHistoryTracker() {
-  return (
-    <Suspense fallback={null}>
-      <Tracker />
-    </Suspense>
-  )
+  return null
 }

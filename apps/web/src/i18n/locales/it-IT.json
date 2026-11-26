@@ -640,6 +640,7 @@
     "menu": {
       "add": "Aggiungi",
       "more": "Altro",
+      "moreLabel": "Altro: opzioni dell’armadio",
       "label": "Opzioni dell'armadio",
       "setup": "Configura armadio",
       "setupDone": "Configura armadio: fatto",

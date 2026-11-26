@@ -640,6 +640,7 @@
     "menu": {
       "add": "Add",
       "more": "More",
+      "moreLabel": "More closet options",
       "label": "Closet options",
       "setup": "Closet setup",
       "setupDone": "Closet setup: done",

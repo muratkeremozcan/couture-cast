@@ -4,7 +4,14 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 
-import React, { useContext, useEffect, useId, useLayoutEffect, useRef } from 'react'
+import React, {
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
@@ -41,7 +48,10 @@ export interface AccessibleModalProps {
   fallbackFocusSelector?: string | readonly string[]
   /** The last resort, tried after the element that was focused when the dialog opened. */
   finalFocusSelector?: string
-  /** The close button's name; without one it reads the catalog's `shell.close`. */
+  /**
+   * The dialog X's name; without one it reads the catalog's `shell.close`. A `screen` layer has
+   * no X: its back arrow always reads `shell.back`.
+   */
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
@@ -141,7 +151,7 @@ export function AccessibleModal({
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const layerHistoryRef = useRef<LayerHistory | null>(null)
   const screen = presentation === 'screen'
-  const swipe = useLayerSwipe(
+  const { handlers: swipe, scroll: swipeScroll } = useLayerSwipe(
     headerRef,
     // The element that scrolls: the body below the bar, or the whole dialog panel.
     () => (screen ? bodyRef.current : dialogRef.current)?.scrollTop ?? 0,
@@ -336,7 +346,8 @@ export function AccessibleModal({
         ref={dialogRef}
         tabIndex={-1}
         {...swipe}
-        className={panelClassName(screen, surface, columnLayout)}
+        onScroll={screen ? undefined : swipeScroll.onScroll}
+        className={`${panelClassName(screen, surface, columnLayout)}${screen ? '' : swipeScroll.gestureClass}`}
         // A dialog scrolls as one panel; a full-height layer scrolls its body below the bar.
         data-testid={screen ? undefined : 'layer-body'}
       >
@@ -354,7 +365,8 @@ export function AccessibleModal({
             <div
               ref={bodyRef}
               data-testid="layer-body"
-              className="min-h-0 w-full flex-1 overflow-y-auto"
+              onScroll={swipeScroll.onScroll}
+              className={`min-h-0 w-full flex-1 overflow-y-auto${swipeScroll.gestureClass}`}
             >
               <div className="mx-auto w-full max-w-3xl px-4 pb-8 pt-4">
                 {description && (
@@ -412,7 +424,9 @@ function layerLinkDestination(
 /**
  * D13, TEA P3: a touch or pen drag of 80 px or more downward closes the layer when it starts in
  * the header, or anywhere while the scrolling element is at its top. Horizontal and upward drags
- * never close.
+ * never close. Review #6: while the scrolling element sits at its top, it lets the browser pan
+ * sideways and scroll down only (`touch-action: pan-x pan-down`), so a downward drag reaches us
+ * instead of ending in `pointercancel`; scrolled, it pans normally.
  */
 function useLayerSwipe(
   headerRef: React.RefObject<HTMLElement | null>,
@@ -422,10 +436,16 @@ function useLayerSwipe(
   const swipeRef = useRef<{ id: number; x: number; y: number; header: boolean } | null>(
     null
   )
+  const [atTop, setAtTop] = useState(true)
   const end = () => {
     swipeRef.current = null
   }
-  return {
+  const scroll = {
+    onScroll: (event: React.UIEvent<HTMLElement>) =>
+      setAtTop(event.currentTarget.scrollTop <= 0),
+    gestureClass: atTop ? ' touch-pan-x touch-pan-down overscroll-y-contain' : '',
+  }
+  const handlers = {
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return
       const header = headerRef.current?.contains(event.target as Node) ?? false
@@ -453,6 +473,7 @@ function useLayerSwipe(
     onPointerUp: end,
     onPointerCancel: end,
   }
+  return { handlers, scroll }
 }
 
 function BackGlyph() {

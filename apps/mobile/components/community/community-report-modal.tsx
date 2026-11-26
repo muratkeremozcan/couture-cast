@@ -18,8 +18,10 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   EdgeToEdgeModal,
+  LayerSwipeHandle,
   useKeyboardOpen,
   useModalInsets,
+  type LayerFocusTarget,
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
@@ -43,6 +45,8 @@ export interface CommunityReportModalProps {
     reason: CommunityReportReason,
     details?: string
   ) => void | Promise<void>
+  /** Story CC-7.11 D13: the control that opened the layer; it takes focus back on close. */
+  returnFocusRef?: LayerFocusTarget | null
 }
 
 export function CommunityReportModal({
@@ -53,6 +57,7 @@ export function CommunityReportModal({
   isSubmitting = false,
   onClose,
   onSubmit,
+  returnFocusRef = null,
 }: CommunityReportModalProps) {
   const modalAnimation = useModalAnimation('fade')
   const { t } = useTranslation()
@@ -104,9 +109,11 @@ export function CommunityReportModal({
     <EdgeToEdgeModal
       visible={visible && !suspended}
       animationType={modalAnimation}
-      onRequestClose={onClose}
-      // Story CC-7.11 D13: the Community screen's closeReportModal focuses the reported card.
-      returnFocusRef={null}
+      // Story CC-7.11 D13: back and a swipe follow Cancel, which waits out a sending report.
+      onRequestClose={() => {
+        if (!isSubmitting) onClose()
+      }}
+      returnFocusRef={returnFocusRef}
       testID="community-report-modal"
       scrim={scrim}
       scrimTestID="community-report-modal-scrim"
@@ -127,9 +134,12 @@ export function CommunityReportModal({
             { backgroundColor: palette.page, borderColor: palette.line },
           ]}
         >
-          <Text style={[styles.title, { color: palette.ink }]}>
-            {t('community.report.title')}
-          </Text>
+          {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+          <LayerSwipeHandle>
+            <Text style={[styles.title, { color: palette.ink }]}>
+              {t('community.report.title')}
+            </Text>
+          </LayerSwipeHandle>
           <Text style={[styles.subtitle, { color: palette.inkMuted }]}>
             {t('community.report.description')}
           </Text>

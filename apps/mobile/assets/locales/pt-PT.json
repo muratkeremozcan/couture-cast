@@ -431,6 +431,7 @@
     "menu": {
       "add": "Adicionar",
       "more": "Mais",
+      "moreLabel": "Mais opções do roupeiro",
       "label": "Opções do roupeiro",
       "setup": "Configurar roupeiro",
       "setupDone": "Configurar roupeiro: concluído",
@@ -776,7 +777,8 @@
       "loadMore": "Carregar mais visuais",
       "loadingMore": "A carregar",
       "yourPostsTitle": "Os seus visuais em curso",
-      "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar."
+      "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar.",
+      "detailTitle": "Visual partilhado"
     },
     "card": {
       "label": "Visual de {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "A verificar e a publicar",
       "uploading": "A carregar a sua fotografia",
       "cancel": "Cancelar",
-      "success": "O seu visual foi enviado para análise."
+      "success": "O seu visual foi enviado para análise.",
+      "discardTitle": "Descartar esta publicação?",
+      "discardKeep": "Continuar a editar",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Escolha uma fotografia para partilhar.",

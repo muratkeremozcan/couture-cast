@@ -431,6 +431,7 @@
     "menu": {
       "add": "Aggiungi",
       "more": "Altro",
+      "moreLabel": "Altro: opzioni dell’armadio",
       "label": "Opzioni dell'armadio",
       "setup": "Configura armadio",
       "setupDone": "Configura armadio: fatto",
@@ -776,7 +777,8 @@
       "loadMore": "Carica altri look",
       "loadingMore": "Caricamento",
       "yourPostsTitle": "I tuoi look in corso",
-      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso."
+      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso.",
+      "detailTitle": "Look condiviso"
     },
     "card": {
       "label": "Look di {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "Controllo e pubblicazione",
       "uploading": "Caricamento della tua foto",
       "cancel": "Annulla",
-      "success": "Il tuo look è stato inviato per la revisione."
+      "success": "Il tuo look è stato inviato per la revisione.",
+      "discardTitle": "Scartare questo post?",
+      "discardKeep": "Continua a modificare",
+      "discard": "Scarta"
     },
     "validation": {
       "photoRequired": "Scegli una foto da condividere.",

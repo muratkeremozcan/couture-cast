@@ -185,10 +185,9 @@ function OnboardingFlow({
         ])
         if (cancelled) return
         setUserId(uid)
-        if (loaded.status === 'completed') {
-          router.replace('/wardrobe')
-          return
-        }
+        // Story CC-7.11 D5, D10: a completed setup is reached on purpose now (More and Profile >
+        // Style read "Closet setup: done"), so it shows its completion step under the Closet
+        // setup top bar with back, where it used to bounce to the Closet.
         revisionRef.current = loaded.revision
         setOnboardingState(loaded)
         if (loaded.status === 'in_progress') {

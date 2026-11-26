@@ -55,7 +55,11 @@ import {
   type StylePieceSelection,
   type StylePieceRecipe,
 } from '@couture/utils'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
   checkNetworkOnlineForAction,
@@ -272,7 +276,8 @@ export function StylePiecePanel({
           },
         ]}
       >
-        <View style={styles.header}>
+        {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+        <LayerSwipeHandle style={styles.header}>
           <Text accessibilityRole="header" style={[styles.title, { color: palette.ink }]}>
             {labels.start}
           </Text>
@@ -283,7 +288,7 @@ export function StylePiecePanel({
             palette={palette}
             buttonRef={closeButton}
           />
-        </View>
+        </LayerSwipeHandle>
         <SaveFeedbackProvider inline renderOfflineLine>
           <StylePieceIdeas
             key={JSON.stringify([
@@ -1140,11 +1145,12 @@ function StylePieceCard({
 }
 
 const styles = StyleSheet.create({
+  // Story CC-7.11 review #2: a compact gap under the Closet tile's status line.
   entry: {
     minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
-    marginTop: 8,
+    marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     alignItems: 'center',

@@ -146,12 +146,9 @@ export function MobileGarmentCaptureModal({
             const node = safeFindNodeHandle(titleRef.current)
             if (node) AccessibilityInfo.setAccessibilityFocus(node)
           }, 150)
+    // Story CC-7.11 D13: EdgeToEdgeModal hands focus back to the invoker (returnFocusRef).
     return () => {
       if (focusTimer !== null) clearTimeout(focusTimer)
-      const invoker = invokingNodeHandleRef.current
-      if (Platform.OS !== 'web' && invoker) {
-        AccessibilityInfo.setAccessibilityFocus(invoker)
-      }
     }
   }, [visible])
 
@@ -425,8 +422,7 @@ export function MobileGarmentCaptureModal({
       animationType={modalAnimation}
       visible={visible}
       onRequestClose={handleClose}
-      // Story CC-7.11 D13: focus returns to invokingNodeHandle.
-      returnFocusRef={null}
+      returnFocusRef={invokingNodeHandleRef}
     >
       <View
         style={[

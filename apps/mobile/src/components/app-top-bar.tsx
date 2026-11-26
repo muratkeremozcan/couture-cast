@@ -6,111 +6,12 @@
 // the header of the full-height layers (saved look and post detail) with back and their title.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { router, type Href } from 'expo-router'
-import type { ReactNode, Ref } from 'react'
-import { useTranslation } from 'react-i18next'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import type { ReactNode } from 'react'
 import { useTokens } from '@/src/theme/tokens'
+import { AppTopBar } from './app-top-bar-view'
 
-export interface AppTopBarProps {
-  title: string
-  /** Shows the back control; omitted on a tab root. */
-  onBack?: () => void
-  /** Replaces the plain title text (the share card focus heading registers itself this way). */
-  titleNode?: ReactNode
-  trailing?: ReactNode
-  /**
-   * Whether the bar sits under the status bar and pads by the top safe-area inset (a header, a
-   * full-height layer). Default true.
-   */
-  safeAreaTop?: boolean
-  /** The plain title text, for a layer that moves accessibility focus to its title on open. */
-  titleRef?: Ref<Text>
-}
-
-/**
- * D6: 56 pt plus the top safe-area inset, one row: optional back, the title (header role) and an
- * optional trailing slot, on the `page` surface with a `line` rule below.
- */
-export function AppTopBar({
-  title,
-  onBack,
-  titleNode,
-  trailing,
-  safeAreaTop = true,
-  titleRef,
-}: AppTopBarProps) {
-  const { t } = useTranslation()
-  const insets = useSafeAreaInsets()
-  const { colors, shell, space, type, fontWeight } = useTokens()
-  const backLabel = t('shell.back')
-  const topInset = safeAreaTop ? insets.top : 0
-
-  return (
-    <View
-      testID="app-top-bar"
-      style={[
-        styles.bar,
-        {
-          height: shell.topBarHeight + topInset,
-          paddingTop: topInset,
-          paddingHorizontal: space[2],
-          backgroundColor: colors.page,
-          borderBottomColor: colors.line,
-        },
-      ]}
-    >
-      {onBack ? (
-        <Pressable
-          testID="app-top-bar-back"
-          accessibilityRole="button"
-          accessibilityLabel={backLabel}
-          onPress={onBack}
-          hitSlop={space[1]}
-          style={[
-            styles.back,
-            { minHeight: shell.touchTarget, minWidth: shell.touchTarget, gap: space[1] },
-          ]}
-        >
-          <FontAwesome name="chevron-left" size={type.base.fontSize} color={colors.ink} />
-          <Text
-            style={{
-              color: colors.ink,
-              fontSize: type.sm.fontSize,
-              fontWeight: fontWeight.medium,
-            }}
-          >
-            {backLabel}
-          </Text>
-        </Pressable>
-      ) : null}
-      {/* One `app-top-bar-title` either way, on the title Text itself (the tab heading carries it
-          too): Android reports the title as a sibling of the bar, so UI tests match id and text
-          on that one node. */}
-      <View style={[styles.title, { paddingHorizontal: space[2] }]}>
-        {titleNode ?? (
-          <Text
-            ref={titleRef}
-            testID="app-top-bar-title"
-            accessibilityRole="header"
-            numberOfLines={1}
-            style={{
-              color: colors.ink,
-              fontSize: type.lg.fontSize,
-              lineHeight: type.lg.lineHeight,
-              fontWeight: fontWeight.semibold,
-            }}
-          >
-            {title}
-          </Text>
-        )}
-      </View>
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-    </View>
-  )
-}
+export { AppTopBar, type AppTopBarProps } from './app-top-bar-view'
 
 type HeaderTitleOption =
   | string
@@ -266,24 +167,3 @@ export function renderStackTopBar(props: NavigatorHeaderProps) {
     <NavigatorTopBar {...props} navigation={{ ...props.navigation, goBack }} showBack />
   )
 }
-
-const styles = StyleSheet.create({
-  bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  back: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    flex: 1,
-    minWidth: 0,
-  },
-  trailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-})

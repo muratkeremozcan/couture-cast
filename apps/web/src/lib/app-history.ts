@@ -2,82 +2,105 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 //
-// A URL stack, since the Next app router owns `history.state`. It lives in memory only (TEA P1):
-// a reload or a typed URL starts a fresh document with an empty stack, so its back is a direct
-// entry and replaces to the parent tab. Sign-out clears it (TEA P8).
+// Entry identity, not URL equality (review #1): the `history.pushState` and `replaceState`
+// wrappers below stamp each entry's position into its state (`__ccIdx`). A push stamps the next
+// position, a replace keeps the position of the entry it replaces, and a popstate reads the
+// position it landed on. The Next app router owns the rest of `history.state`, so the stamp rides
+// alongside its keys. Memory only (TEA P1): this document's first position is where it loaded,
+// so a reload or a typed URL is a direct entry and its back replaces to the parent tab. Sign-out
+// moves the first position up to the current one (TEA P8).
 
-/** The URLs of this document's in-app history, oldest first; the last one is on screen. */
-let stack: string[] = []
-
-/** Set by a replace to another URL, so the next URL takes the top's place. */
-let replaceNext = false
-
-/**
- * Records the URL on screen: one equal to the entry below is a back step and pops; a new one
- * pushes, or takes the top's place after a replace.
- */
-export function recordAppUrl(url: string): void {
-  const replacing = replaceNext
-  replaceNext = false
-  if (stack[stack.length - 1] === url) return
-  if (replacing) {
-    stack[Math.max(stack.length - 1, 0)] = url
-    return
-  }
-  if (stack[stack.length - 2] === url) {
-    stack.pop()
-    return
-  }
-  stack.push(url)
-}
-
-/** Whether an in-app entry sits below the URL on screen, so a back step stays in the app. */
-export function hasAppHistoryBelow(): boolean {
-  return stack.length >= 2
-}
-
-/**
- * Marks the next URL as a replace. `history.replaceState` to another URL marks it already (see
- * `watchReplaces`); this is for a replace that does not go through it.
- */
-export function markAppHistoryReplace(): void {
-  replaceNext = true
-}
-
-/** Forgets every entry (sign-out, and test isolation). */
-export function clearAppHistory(): void {
-  stack = []
-  replaceNext = false
-}
+/** The state key that carries an entry's position in this tab's history. */
+export const APP_HISTORY_INDEX_KEY = '__ccIdx'
 
 /** The browser event sign-out dispatches; open layers close and the stack clears on it. */
 export const APP_SIGNED_OUT_EVENT = 'couture:signed-out'
 
+/** The position of the entry on screen. */
+let current = 0
+/** The position this document started at, or the last sign-out; nothing below it counts. */
+let first = 0
+let installed = false
+
+type HistoryState = Record<string, unknown>
+
+/** The position stamped into a history state, or undefined for an entry without one. */
+export function appHistoryIndexOf(state: unknown): number | undefined {
+  if (state === null || typeof state !== 'object') return undefined
+  const index = (state as HistoryState)[APP_HISTORY_INDEX_KEY]
+  return typeof index === 'number' && Number.isInteger(index) ? index : undefined
+}
+
 /**
- * Every replace to another URL goes through `history.replaceState`: `router.replace`, and the
- * app's own in-place URL edits (the garment detail closing on a direct entry, a consumed query).
- * The router also calls it with the URL already shown on each commit, which is no navigation.
+ * The state with its position stamped in. A null state passes through unstamped: the router
+ * reloads the page on a popstate to a non-null state without its own keys, so only a state that
+ * is already an object is extended.
  */
-function watchReplaces() {
-  const original = window.history.replaceState.bind(window.history)
-  window.history.replaceState = function replaceState(
+function stamped(data: unknown, index: number): unknown {
+  if (data === null || typeof data !== 'object') return data
+  return { ...(data as HistoryState), [APP_HISTORY_INDEX_KEY]: index }
+}
+
+/** The position of the entry on screen. */
+export function currentAppHistoryIndex(): number {
+  return current
+}
+
+/** Whether an in-app entry sits below the one on screen, so a back step stays in the app. */
+export function hasAppHistoryBelow(): boolean {
+  return current > first
+}
+
+/** Forgets every entry below the one on screen (sign-out, and test isolation). */
+export function clearAppHistory(): void {
+  first = current
+}
+
+/**
+ * Wraps `pushState` and `replaceState` and follows `popstate`. Runs once, when this module loads
+ * in the browser: before the app router patches the same methods, so the router's wrapper calls
+ * these and every navigation, the router's own included, is stamped.
+ */
+export function installAppHistory(): void {
+  if (installed || typeof window === 'undefined') return
+  installed = true
+  const { history } = window
+  const push = history.pushState.bind(history)
+  const replace = history.replaceState.bind(history)
+
+  const loaded = appHistoryIndexOf(history.state)
+  current = loaded ?? 0
+  first = current
+  if (loaded === undefined && history.state !== null && typeof history.state === 'object')
+    replace(stamped(history.state, current), '')
+
+  history.pushState = function pushState(
     data: unknown,
     unused: string,
     url?: string | URL | null
   ) {
-    if (url !== undefined && url !== null) {
-      // The tracker records path and query only, so a hash-only replace is no navigation: a
-      // mark left by one would turn the next real push into a replace.
-      const next = new URL(String(url), window.location.href)
-      const here = new URL(window.location.href)
-      if (next.pathname !== here.pathname || next.search !== here.search)
-        replaceNext = true
-    }
-    return original(data, unused, url)
+    const index = current + 1
+    push(stamped(data, index), unused, url)
+    current = index
   }
-}
-
-if (typeof window !== 'undefined') {
-  watchReplaces()
+  history.replaceState = function replaceState(
+    data: unknown,
+    unused: string,
+    url?: string | URL | null
+  ) {
+    replace(stamped(data, current), unused, url)
+  }
+  // Capture, so the position is known before any other popstate listener reads it.
+  window.addEventListener(
+    'popstate',
+    (event: PopStateEvent) => {
+      const index = appHistoryIndexOf(event.state)
+      current = index ?? first
+      if (current < first) first = current
+    },
+    true
+  )
   window.addEventListener(APP_SIGNED_OUT_EVENT, clearAppHistory)
 }
+
+installAppHistory()

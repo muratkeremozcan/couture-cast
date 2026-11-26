@@ -358,8 +358,17 @@ export function SilhouetteSettingsPanel({
     onBusyChange?.(isUploading || isPolling || isSliderDirty || isRemoving)
   }, [isUploading, isPolling, isSliderDirty, isRemoving, onBusyChange])
 
+  /** False after unmount: a mutation left to finish (review #11) lands in no screen. */
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   const applyProfile = useCallback(
     (next: SilhouetteProfileContract) => {
+      if (!mountedRef.current) return
       setProfile(next)
       revisionRef.current = next.revision
       setIsRevisionStale(false)
@@ -562,14 +571,18 @@ export function SilhouetteSettingsPanel({
   useEffect(() => {
     return () => {
       pollAbortRef.current?.abort()
-      sliderMutationAbortRef.current?.abort()
-      removeMutationAbortRef.current?.abort()
+      // Story CC-7.11 review #11: Silhouette is a route now, and its back stays available while
+      // a save runs, so leaving lets a started slider save or photo removal finish instead of
+      // aborting it; its late answer lands in no screen. An account change still aborts both
+      // (`resetForAccountChange`).
       if (sliderSaveTimerRef.current !== null) {
         window.clearTimeout(sliderSaveTimerRef.current)
         if (pendingSliderEditRef.current) {
           // Flush instead of discard: the debounce is a UI nicety, not a
           // reason to lose an edit the user already made — AC2 requires
-          // slider values to "persist... immediately".
+          // slider values to "persist... immediately". The flush starts its own
+          // request beside a save already on the wire, which keeps running.
+          sliderMutationAbortRef.current = null
           persistSliders(
             pendingSliderEditRef.current.height,
             pendingSliderEditRef.current.build

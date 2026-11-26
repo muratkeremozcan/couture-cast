@@ -640,6 +640,7 @@
     "menu": {
       "add": "Ajouter",
       "more": "Plus",
+      "moreLabel": "Plus d’options de garde-robe",
       "label": "Options de la garde-robe",
       "setup": "Configuration de la garde-robe",
       "setupDone": "Configuration de la garde-robe : terminée",

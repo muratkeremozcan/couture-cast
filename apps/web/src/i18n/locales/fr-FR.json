@@ -640,6 +640,7 @@
     "menu": {
       "add": "Ajouter",
       "more": "Plus",
+      "moreLabel": "Plus d’options du dressing",
       "label": "Options du dressing",
       "setup": "Configuration du dressing",
       "setupDone": "Configuration du dressing : terminée",

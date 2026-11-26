@@ -431,6 +431,7 @@
     "menu": {
       "add": "Ekle",
       "more": "Daha fazla",
+      "moreLabel": "Daha fazla dolap seçeneği",
       "label": "Dolap seçenekleri",
       "setup": "Dolap kurulumu",
       "setupDone": "Dolap kurulumu: tamam",
@@ -776,7 +777,8 @@
       "loadMore": "Daha fazla kombin yükle",
       "loadingMore": "Yükleniyor",
       "yourPostsTitle": "Sürmekte olan kombinlerin",
-      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün."
+      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün.",
+      "detailTitle": "Paylaşılan kombin"
     },
     "card": {
       "label": "{{author}} tarafından paylaşılan kombin",
@@ -884,7 +886,10 @@
       "publishing": "İnceleniyor ve yayımlanıyor",
       "uploading": "Fotoğrafın yükleniyor",
       "cancel": "İptal",
-      "success": "Kombinin incelenmek üzere gönderildi."
+      "success": "Kombinin incelenmek üzere gönderildi.",
+      "discardTitle": "Bu gönderiden vazgeçilsin mi?",
+      "discardKeep": "Düzenlemeye devam et",
+      "discard": "Vazgeç"
     },
     "validation": {
       "photoRequired": "Paylaşmak için bir fotoğraf seç.",

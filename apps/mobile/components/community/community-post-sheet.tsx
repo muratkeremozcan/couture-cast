@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -40,6 +41,7 @@ import {
   EdgeToEdgeModal,
   LayerSwipeHandle,
   useModalInsets,
+  type LayerFocusTarget,
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens } from '@/src/theme/tokens'
@@ -259,6 +261,19 @@ function ComposePhotoSection({
   )
 }
 
+/** Story CC-7.11 D13: a draft with a photo or any text is worth asking about before it is dropped. */
+function composeDraftDirty(draft: {
+  asset: unknown
+  caption: string
+  title: string
+  altText: string
+}): boolean {
+  return (
+    draft.asset !== null ||
+    [draft.caption, draft.title, draft.altText].some((text) => text.trim() !== '')
+  )
+}
+
 export interface CommunityPostSheetProps {
   /** Pause new server actions during access revalidation; retain this owned draft and native host. */
   suspended?: boolean
@@ -269,6 +284,8 @@ export interface CommunityPostSheetProps {
   defaultChallengeOptIn?: boolean
   onClose: () => void
   onPublished: (post: CommunityFeedItem) => void
+  /** Story CC-7.11 D13: the control that opened the layer; it takes focus back on close. */
+  returnFocusRef?: LayerFocusTarget | null
 }
 
 export function CommunityPostSheet({
@@ -278,6 +295,7 @@ export function CommunityPostSheet({
   defaultChallengeOptIn = false,
   onClose,
   onPublished,
+  returnFocusRef = null,
 }: CommunityPostSheetProps) {
   const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
@@ -401,6 +419,24 @@ export function CommunityPostSheet({
     resetState()
     onClose()
   }, [onClose, resetState])
+
+  // Story CC-7.11 D13: X, system back and a swipe down share one guarded close. A draft with a
+  // photo or any text asks before it is dropped; an empty one closes at once.
+  const dirty = composeDraftDirty({ asset, caption, title, altText })
+  const requestClose = useCallback(() => {
+    if (!dirty) {
+      handleClose()
+      return
+    }
+    Alert.alert(t('community.compose.discardTitle'), undefined, [
+      { text: t('community.compose.discardKeep'), style: 'cancel' },
+      {
+        text: t('community.compose.discard'),
+        style: 'destructive',
+        onPress: handleClose,
+      },
+    ])
+  }, [dirty, handleClose, t])
 
   const handlePickImage = useCallback(async () => {
     if (access.current.suspended || !access.current.visible) return
@@ -627,9 +663,8 @@ export function CommunityPostSheet({
       testID="community-post-sheet"
       visible={visible}
       animationType={modalAnimation}
-      onRequestClose={handleClose}
-      // Story CC-7.11 D13: the Community screen's closePostSheet focuses New post.
-      returnFocusRef={null}
+      onRequestClose={requestClose}
+      returnFocusRef={returnFocusRef}
       scrim={scrim}
     >
       <View style={styles.overlay}>
@@ -656,7 +691,7 @@ export function CommunityPostSheet({
             <TouchableOpacity
               testID="community-post-sheet-close"
               style={styles.closeButton}
-              onPress={handleClose}
+              onPress={requestClose}
               accessibilityRole="button"
               accessibilityLabel={t('community.compose.close')}
             >

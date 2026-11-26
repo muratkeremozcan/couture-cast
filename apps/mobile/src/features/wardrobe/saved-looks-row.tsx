@@ -36,7 +36,7 @@ import {
   LayerSwipeHandle,
   useModalInsets,
 } from '@/components/edge-to-edge-modal'
-import { AppTopBar } from '@/src/components/app-top-bar'
+import { AppTopBar } from '@/src/components/app-top-bar-view'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
   checkNetworkOnlineForAction,
@@ -249,7 +249,14 @@ export type ClosetSavedLooksRowProps = {
   garments: GarmentItemContract[]
   onRetry: () => void
   onChanged: () => void
-  onReopenStylePiece: (look: SavedLookContract) => void
+  /**
+   * Opens a Style piece look in its editor. `opener` is the Reopen button pressed, which takes
+   * focus back once the editor closes (Story CC-7.11 D13).
+   */
+  onReopenStylePiece: (
+    look: SavedLookContract,
+    opener: ComponentRef<typeof Pressable> | null
+  ) => void
   /**
    * `row` (default): the Closet's collapsible card. `list`: the Looks tab's open list, with no
    * toggle and no card around the looks, so they are the screen's own content.
@@ -374,11 +381,13 @@ function ClosetSavedLooksRowInner({
   }
 
   const handleReopen = (look: SavedLookContract) => {
+    // D13: the Reopen pressed takes focus back from whichever layer it opens.
+    const opener = reopenButtons.current.get(look.id) ?? null
     if (canReopenInStylePiece(look)) {
-      onReopenStylePiece(look)
+      onReopenStylePiece(look, opener)
       return
     }
-    detailOpener.current = reopenButtons.current.get(look.id) ?? null
+    detailOpener.current = opener
     setDetailLook(look)
     const needsPhotoRefresh = look.composition.some(
       (slot) =>

@@ -640,6 +640,7 @@
     "menu": {
       "add": "Hinzufügen",
       "more": "Mehr",
+      "moreLabel": "Mehr Schrankoptionen",
       "label": "Schrankoptionen",
       "setup": "Schrank einrichten",
       "setupDone": "Schrank einrichten: fertig",

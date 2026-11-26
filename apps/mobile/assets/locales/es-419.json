@@ -431,6 +431,7 @@
     "menu": {
       "add": "Agregar",
       "more": "Más",
+      "moreLabel": "Más opciones del clóset",
       "label": "Opciones del clóset",
       "setup": "Configurar clóset",
       "setupDone": "Configurar clóset: listo",
@@ -776,7 +777,8 @@
       "loadMore": "Cargar más looks",
       "loadingMore": "Cargando",
       "yourPostsTitle": "Tus looks en proceso",
-      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión."
+      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión.",
+      "detailTitle": "Look compartido"
     },
     "card": {
       "label": "Look de {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "Revisando y publicando",
       "uploading": "Subiendo tu foto",
       "cancel": "Cancelar",
-      "success": "Tu look se envió a revisión."
+      "success": "Tu look se envió a revisión.",
+      "discardTitle": "¿Descartar esta publicación?",
+      "discardKeep": "Seguir editando",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Elige una foto para compartir.",

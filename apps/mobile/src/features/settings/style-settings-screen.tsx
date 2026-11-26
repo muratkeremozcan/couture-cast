@@ -2,10 +2,10 @@
 // the color palette. The root stack's top bar carries its title and back (parent Profile).
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { router, type Href } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ShellIcon } from '@/src/components/shell-icons'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 
 const STYLE_ROWS: readonly { testID: string; labelKey: string; href: Href }[] = [
@@ -57,11 +57,7 @@ export function StyleSettingsScreen() {
             >
               {t(row.labelKey)}
             </Text>
-            <FontAwesome
-              name="chevron-right"
-              size={type.sm.fontSize}
-              color={colors.inkMuted}
-            />
+            <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
           </Pressable>
         ))}
       </View>

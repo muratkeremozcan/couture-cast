@@ -260,6 +260,15 @@ function MemberWardrobeHub({
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const moreButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const directEntryConsumed = useRef(false)
+  // Story CC-7.11 D13: the control that opened capture (top bar Add, empty-state Add or a
+  // piece's Replace) and the Reopen that opened the Style piece editor take focus back.
+  const captureInvokerRef = useRef<ElementRef<typeof Pressable> | null>(null)
+  const styleOpenerRef = useRef<ElementRef<typeof Pressable> | null>(null)
+  const openCapture = (invoker: ElementRef<typeof Pressable> | null) => {
+    captureInvokerRef.current = invoker
+    setIsCaptureOpen(true)
+  }
+  const captureInvoker = () => captureInvokerRef.current ?? addGarmentButtonRef.current
 
   const presentTagging = (id: string, invoker?: number | null) => {
     if (epoch !== mobileIdentityEpoch()) return
@@ -268,9 +277,7 @@ function MemberWardrobeHub({
       return
     }
     taggingOpen.current = true
-    setTaggingInvokerNodeHandle(
-      invoker ?? safeFindNodeHandle(addGarmentButtonRef.current)
-    )
+    setTaggingInvokerNodeHandle(invoker ?? safeFindNodeHandle(captureInvoker()))
     setTaggingGarmentId(id)
   }
 
@@ -288,7 +295,11 @@ function MemberWardrobeHub({
 
   const finishStyleDismissal = (selection: StylePieceSelection) => {
     if (epoch !== mobileIdentityEpoch() || styleSelectionRef.current !== selection) return
-    const invoker = styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
+    const opener = styleOpenerRef.current
+    styleOpenerRef.current = null
+    const styleInvoker = () =>
+      opener ?? styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
+    const invoker = styleInvoker()
     styleSelectionRef.current = null
     setStyleSelection(null)
     setInitialSavedLook(null)
@@ -306,9 +317,7 @@ function MemberWardrobeHub({
         !taggingOpen.current &&
         !isCaptureOpenRef.current
       )
-        focusStylePieceControl(
-          styleButtons.current.get(selection.id) ?? addGarmentButtonRef.current
-        )
+        focusStylePieceControl(styleInvoker())
     })
   }
 
@@ -501,7 +510,7 @@ function MemberWardrobeHub({
     if (awaitingTags) {
       presentTagging(awaitingTags.id)
     } else if (!garments.some((garment) => garment.status === 'processing')) {
-      setIsCaptureOpen(true)
+      openCapture(null)
     }
   }, [addEntry, garments, hasLoaded, isLoading, loadFailed])
 
@@ -577,7 +586,8 @@ function MemberWardrobeHub({
 
   // D4: Add and More fill the tab top bar's trailing slot. The latest press handler is read
   // through a ref, so the header element stays stable while the hub's state changes.
-  const openAdd = () => (visitor ? router.push('/signin') : setIsCaptureOpen(true))
+  const openAdd = (invoker: ElementRef<typeof Pressable> | null) =>
+    visitor ? router.push('/signin') : openCapture(invoker)
   const openAddRef = useRef(openAdd)
   openAddRef.current = openAdd
   useLayoutEffect(() => {
@@ -586,7 +596,7 @@ function MemberWardrobeHub({
         <ClosetTopBarActions
           addRef={addGarmentButtonRef}
           moreRef={moreButtonRef}
-          onAdd={() => openAddRef.current()}
+          onAdd={() => openAddRef.current(addGarmentButtonRef.current)}
           onMore={() => setMoreOpen(true)}
         />
       ),
@@ -669,7 +679,11 @@ function MemberWardrobeHub({
                     accessibilityRole="button"
                     testID="wardrobe-empty-add"
                     style={secondaryButton}
-                    onPress={() => openAddRef.current()}
+                    onPress={(event) =>
+                      openAddRef.current(
+                        event.currentTarget as unknown as ElementRef<typeof Pressable>
+                      )
+                    }
                   >
                     <Text style={secondaryButtonText}>{t('wardrobe.add_garment')}</Text>
                   </Pressable>
@@ -703,7 +717,10 @@ function MemberWardrobeHub({
                       ) : (
                         <GarmentCardFace garment={garment} locale={i18n.language} />
                       )}
-                      <Text testID={`garment-status-${garment.status}`}>
+                      <Text
+                        testID={`garment-status-${garment.status}`}
+                        style={styles.garmentStatus}
+                      >
                         {/* The status set is open (the contract says so): a new state reads as
                         in progress until the catalogs name it. */}
                         {t(`wardrobe.hub.status.${garment.status}`, {
@@ -737,7 +754,13 @@ function MemberWardrobeHub({
                         <Pressable
                           accessibilityRole="button"
                           style={[styles.needsTagsBtn, notice]}
-                          onPress={() => setIsCaptureOpen(true)}
+                          onPress={(event) =>
+                            openCapture(
+                              event.currentTarget as unknown as ElementRef<
+                                typeof Pressable
+                              >
+                            )
+                          }
                         >
                           <Text
                             style={[styles.needsTagsText, { color: colors.noticeInk }]}
@@ -794,15 +817,18 @@ function MemberWardrobeHub({
               garments={garments}
               onRetry={reloadSavedLooks}
               onChanged={reloadSavedLooks}
-              onReopenStylePiece={(look) => {
+              onReopenStylePiece={(look, opener) => {
                 const anchor = garments.find((item) => item.id === look.anchorGarmentId)
                 if (!anchor || !anchor.category || !anchor.comfortRange) return
+                if (styleSelectionRef.current) return
                 setInitialSavedLook(look)
                 openStylePanel({
                   id: anchor.id,
                   category: anchor.category,
                   comfortRange: anchor.comfortRange,
                 })
+                // Only an editor that opened hands focus back to this Reopen.
+                if (styleSelectionRef.current) styleOpenerRef.current = opener
               }}
             />
           </ScreenGate>
@@ -813,7 +839,7 @@ function MemberWardrobeHub({
           visible={isCaptureOpen}
           onClose={closeCapture}
           onGarmentCommitted={handleGarmentCommitted}
-          invokingNodeHandle={safeFindNodeHandle(addGarmentButtonRef.current)}
+          invokingNodeHandle={safeFindNodeHandle(captureInvoker())}
         />
       </View>
 
@@ -897,7 +923,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 8,
+    marginTop: 4,
     paddingHorizontal: 8,
   },
   needsTagsText: {
@@ -919,9 +945,13 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', borderRadius: 16, padding: 40, gap: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 12 },
-  garmentImage: { width: '100%', aspectRatio: 0.75, borderRadius: 8 },
-  garmentLabel: { marginTop: 8, fontSize: 14, fontWeight: '600' },
+  // Story CC-7.11 D4 (review #2): two rows of tagged tiles (photo, label, status, Style this
+  // piece) fit between the top bar and the tab bar at 360 x 640 dp, so the tile is compact: a
+  // landscape photo, a tight label and status, and the 44 pt actions kept.
+  garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 8 },
+  garmentImage: { width: '100%', aspectRatio: 4 / 3, borderRadius: 8 },
+  garmentLabel: { marginTop: 4, fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  garmentStatus: { fontSize: 12, lineHeight: 16 },
   errorBox: { borderRadius: 12, padding: 12, gap: 8 },
 })
 

@@ -11,6 +11,7 @@ import { APP_TABS } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { hasAppHistoryBelow } from '../../lib/app-history'
 import { resolveActiveNavTab } from './sticky-bottom-nav'
+import { TabIcon } from './tab-icon'
 
 export type AppTopBarProps = AppTopBarTitle & {
   /**
@@ -130,13 +131,18 @@ export function AppTopBar({
                   data-ph-event="nav_link_clicked"
                   data-ph-label={tab.label}
                   data-ph-href={tab.href}
-                  className={`flex min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm ${
+                  // Review #4: the shared icon on every desktop link. From 768 to 1023 px the
+                  // links show the icon alone (the name stays for assistive technology), so the
+                  // bar keeps one row beside a screen's trailing actions; the label joins at
+                  // 1024 px. The active link is semibold with a rule under it at every width.
+                  className={`flex min-h-touch min-w-touch items-center justify-center gap-1 whitespace-nowrap rounded-md border-b-2 px-2 text-sm ${
                     active
-                      ? 'font-semibold text-ink underline underline-offset-8'
-                      : 'font-medium text-ink-muted'
+                      ? 'border-ink font-semibold text-ink'
+                      : 'border-transparent font-medium text-ink-muted'
                   }`}
                 >
-                  {t(tab.labelKey)}
+                  <TabIcon id={tab.id} />
+                  <span className="sr-only lg:not-sr-only">{t(tab.labelKey)}</span>
                 </Link>
               )
             })}

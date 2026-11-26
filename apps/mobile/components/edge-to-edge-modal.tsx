@@ -291,9 +291,16 @@ export function LayerSwipeHandle({
   )
 }
 
-/** Moves accessibility focus (keyboard focus on web) to the layer's opener. */
+/**
+ * Moves accessibility focus (keyboard focus on web) to the layer's opener: an element, or a
+ * native node handle a caller kept from the press event.
+ */
 function focusOpener(target: unknown) {
-  if (!target) return
+  if (target == null) return
+  if (typeof target === 'number') {
+    if (Platform.OS !== 'web') AccessibilityInfo.setAccessibilityFocus(target)
+    return
+  }
   if (Platform.OS === 'web') {
     ;(target as { focus?: () => void }).focus?.()
     return
@@ -331,16 +338,26 @@ export function EdgeToEdgeModal({
   const animationType = visible && presentation.open ? presentation.animation : requested
   const returnFocus = useRef(returnFocusRef)
   returnFocus.current = returnFocusRef
+  // D13: the opener takes focus as the layer closes. An iOS sheet that closes by `visible` and
+  // is still animating away hands it over once more on onDismiss, when VoiceOver can reach the
+  // screen again; Android, web and any unmount focus once.
+  const mounted = useRef(true)
+  const focusOnDismiss = useRef<unknown>(null)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   useEffect(() => {
     if (!visible) return
     setOpenModals(1)
     return () => {
       setOpenModals(-1)
-      // D13: closed by `visible` or by unmounting; the opener takes focus once the screen under
-      // the layer is back in the accessibility tree (the next frame). iOS repeats it on
-      // onDismiss, after the sheet has fully gone.
       const opener = returnFocus.current?.current
-      if (opener) requestAnimationFrame(() => focusOpener(opener))
+      if (opener == null) return
+      focusOpener(opener)
+      if (Platform.OS === 'ios' && mounted.current) focusOnDismiss.current = opener
     }
   }, [visible])
   return (
@@ -348,7 +365,9 @@ export function EdgeToEdgeModal({
       transparent
       {...props}
       onDismiss={() => {
-        if (Platform.OS === 'ios') focusOpener(returnFocus.current?.current)
+        const opener = focusOnDismiss.current
+        focusOnDismiss.current = null
+        focusOpener(opener)
         onDismiss?.()
       }}
       animationType={animationType}

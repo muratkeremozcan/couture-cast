@@ -13,7 +13,8 @@ const ITEM_CLASS =
 
 /**
  * A neutral More button with a `menu` popover anchored below it. Escape, an outside click or a
- * Tab away closes it, and Escape returns focus to More. Arrow keys move between the items.
+ * Tab away closes it; Escape, and an outside click that lands on nothing focusable, return focus
+ * to More. Arrow keys move between the items.
  */
 export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
@@ -37,6 +38,15 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
       const target = event.target as Node
       if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return
       setOpen(false)
+      // Review #14: a press on something that takes focus keeps it; one on plain chrome would
+      // leave focus on the removed item, so it returns to More.
+      const focusable =
+        target instanceof Element &&
+        target.closest(
+          'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])'
+        )
+      // After the press's own focus change, which moves focus to the body.
+      if (!focusable) window.setTimeout(() => buttonRef.current?.focus(), 0)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
@@ -75,7 +85,8 @@ export function ClosetMoreMenu({ setupDone }: { setupDone: boolean }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label={t('wardrobe.menu.label')}
+        // WCAG 2.5.3: the name starts with the visible word ("More closet options").
+        aria-label={t('wardrobe.menu.moreLabel')}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown' && !open) {

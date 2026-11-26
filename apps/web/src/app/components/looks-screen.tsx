@@ -51,6 +51,33 @@ const NO_LOOKS: SavedLooksState = {
 }
 
 /**
+ * The first `wanted` saved looks (at least one page), page by page, so a refresh keeps every
+ * page the member had loaded.
+ */
+async function readSavedLooks(
+  owner: string,
+  wanted: number,
+  signal: AbortSignal
+): Promise<LooksSnapshot> {
+  const looks: SavedLookContract[] = []
+  let total = 0
+  do {
+    const page = await listSavedLooksPageFromWeb({
+      owner,
+      limit: PAGE_SIZE,
+      offset: looks.length,
+      signal,
+    })
+    total = page.total
+    const seen = new Set(looks.map((look) => look.id))
+    const fresh = page.data.filter((look) => !seen.has(look.id))
+    looks.push(...fresh)
+    if (fresh.length === 0) break
+  } while (looks.length < Math.min(wanted, total))
+  return { looks, total }
+}
+
+/**
  * The member's saved looks, read once per mount and again after a change. A page read for a
  * session scope the tab no longer holds is dropped and read again (as on Closet, Codex review
  * P2-1). Without a member nothing is read.
@@ -72,9 +99,14 @@ function useSavedLooksList(owner: string | null) {
   })
   const [loadingMore, setLoadingMore] = useState(false)
   const epochRef = useRef(0)
+  /** How many looks the screen shows; a refresh reads at least as many back (review #12). */
+  const shownRef = useRef(state.looks.length)
+  shownRef.current = state.looks.length
+  const loadMoreRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const epoch = ++epochRef.current
+    loadMoreRef.current?.abort()
     setLoadingMore(false)
     if (!owner) {
       setState({ ...NO_LOOKS, settled: true })
@@ -87,29 +119,15 @@ function useSavedLooksList(owner: string | null) {
       epochRef.current === epoch &&
       currentWebSessionOwner() === owner
     setState((previous) => ({ ...previous, loading: true }))
-    void listSavedLooksPageFromWeb({
-      owner,
-      limit: PAGE_SIZE,
-      offset: 0,
-      signal: controller.signal,
-    })
-      .then((page) => {
+    void readSavedLooks(owner, Math.max(PAGE_SIZE, shownRef.current), controller.signal)
+      .then((read) => {
         if (!current()) return
         if (scope !== currentWebSessionScope()) {
           setAttempt((count) => count + 1)
           return
         }
-        setState({
-          looks: page.data,
-          total: page.total,
-          error: null,
-          loading: false,
-          settled: true,
-        })
-        screenSnapshot.remember(scope, 'looks', LOOKS_SNAPSHOT_PART, {
-          looks: page.data,
-          total: page.total,
-        } satisfies LooksSnapshot)
+        setState({ ...read, error: null, loading: false, settled: true })
+        screenSnapshot.remember(scope, 'looks', LOOKS_SNAPSHOT_PART, read)
       })
       .catch((error: unknown) => {
         if (!current()) return
@@ -132,26 +150,49 @@ function useSavedLooksList(owner: string | null) {
     })
   }, [owner])
 
+  // The screen is keyed by member, so an unmount also covers a change of member.
+  useEffect(() => () => loadMoreRef.current?.abort(), [])
+
   const loadMore = useCallback(() => {
     if (!owner || state.loading || loadingMore || state.looks.length >= state.total)
       return
     setLoadingMore(true)
     const epoch = epochRef.current
-    void listSavedLooksPageFromWeb({ limit: PAGE_SIZE, offset: state.looks.length })
+    const scope = currentWebSessionScope()
+    const controller = new AbortController()
+    loadMoreRef.current = controller
+    void listSavedLooksPageFromWeb({
+      owner,
+      limit: PAGE_SIZE,
+      offset: state.looks.length,
+      signal: controller.signal,
+    })
       .then((page) => {
-        if (epochRef.current !== epoch || currentWebSessionOwner() !== owner) return
+        if (
+          controller.signal.aborted ||
+          epochRef.current !== epoch ||
+          currentWebSessionOwner() !== owner ||
+          scope !== currentWebSessionScope()
+        )
+          return
         setState((previous) => {
           const seen = new Set(previous.looks.map((look) => look.id))
-          return {
-            ...previous,
-            looks: [...previous.looks, ...page.data.filter((look) => !seen.has(look.id))],
+          const looks = [
+            ...previous.looks,
+            ...page.data.filter((look) => !seen.has(look.id)),
+          ]
+          // Review #12: every loaded page, so a return restores the list its scroll was in.
+          screenSnapshot.remember(scope, 'looks', LOOKS_SNAPSHOT_PART, {
+            looks,
             total: page.total,
-          }
+          } satisfies LooksSnapshot)
+          return { ...previous, looks, total: page.total }
         })
       })
       .catch(() => undefined)
       .finally(() => {
-        if (epochRef.current === epoch) setLoadingMore(false)
+        if (!controller.signal.aborted && epochRef.current === epoch)
+          setLoadingMore(false)
       })
   }, [owner, state.loading, state.looks.length, state.total, loadingMore])
 

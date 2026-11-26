@@ -27,6 +27,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   EdgeToEdgeModal,
+  LayerSwipeHandle,
   useKeyboardOpen,
   useModalInsets,
 } from '@/components/edge-to-edge-modal'
@@ -442,7 +443,9 @@ export function CommunityCommentsSheet({
           // the sheet.
           onAccessibilityEscape={() => (keyboardOpen ? dismissKeyboard() : close())}
         >
-          <View style={styles.row}>
+          {/* Story CC-7.11 D13: the header is the swipe-down handle; a swipe takes the Back
+              path, so an open keyboard closes first and the sheet stays. */}
+          <LayerSwipeHandle style={styles.row}>
             <Text
               ref={titleRef}
               accessibilityRole="header"
@@ -451,7 +454,7 @@ export function CommunityCommentsSheet({
               {t('community.comments.title')}
             </Text>
             {button(t('community.comments.close'), close, false, 'comments-close')}
-          </View>
+          </LayerSwipeHandle>
           <ScrollView
             testID="comments-thread"
             keyboardShouldPersistTaps="handled"

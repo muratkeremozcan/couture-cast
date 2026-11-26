@@ -431,6 +431,7 @@
     "menu": {
       "add": "Add",
       "more": "More",
+      "moreLabel": "More closet options",
       "label": "Closet options",
       "setup": "Closet setup",
       "setupDone": "Closet setup: done",
@@ -776,7 +777,8 @@
       "loadMore": "Load more looks",
       "loadingMore": "Loading",
       "yourPostsTitle": "Your looks in progress",
-      "yourPostsBody": "Only you can see these until screening finishes."
+      "yourPostsBody": "Only you can see these until screening finishes.",
+      "detailTitle": "Shared look"
     },
     "card": {
       "label": "Look by {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "Screening and publishing",
       "uploading": "Uploading your photo",
       "cancel": "Cancel",
-      "success": "Your look was submitted for review."
+      "success": "Your look was submitted for review.",
+      "discardTitle": "Discard this post?",
+      "discardKeep": "Keep editing",
+      "discard": "Discard"
     },
     "validation": {
       "photoRequired": "Choose a photo to share.",

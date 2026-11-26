@@ -38,7 +38,11 @@ import {
   type SampleVote,
   type GuestSampleWeatherKey,
 } from '@couture/utils'
-import { EdgeToEdgeModal, type LayerFocusTarget } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  type LayerFocusTarget,
+} from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens, withAlpha } from '@/src/theme/tokens'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
@@ -893,7 +897,8 @@ export function PreviewSheet({
         accessibilityViewIsModal
         style={[styles.sheet, { backgroundColor: palette.page }]}
       >
-        <View style={styles.sheetHeader}>
+        {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+        <LayerSwipeHandle style={styles.sheetHeader}>
           <Text
             accessibilityRole="header"
             style={[styles.heading, styles.sheetTitle, { color: palette.ink }]}
@@ -909,7 +914,7 @@ export function PreviewSheet({
           >
             <Text style={{ color: palette.ink, fontSize: 20 }}>{'×'}</Text>
           </Pressable>
-        </View>
+        </LayerSwipeHandle>
         <Text style={[styles.small, { color: palette.inkMuted }]}>
           {strings.chrome.sampleLabel}
         </Text>

@@ -255,7 +255,7 @@ function GarmentCardPhoto({
       <div
         role="img"
         aria-label={garmentPhotoAlt(locale, garment)}
-        className="flex aspect-[3/4] w-full items-center justify-center text-3xl"
+        className="flex aspect-square w-full items-center justify-center text-3xl"
       >
         <span aria-hidden="true">👗</span>
       </div>
@@ -266,7 +266,7 @@ function GarmentCardPhoto({
     <img
       src={garment.imageAccess.url}
       alt={garmentPhotoAlt(locale, garment)}
-      className="aspect-[3/4] w-full object-cover"
+      className="aspect-square w-full object-cover"
     />
   )
 }
@@ -559,56 +559,45 @@ function useClosetStart(owner: string | null): {
 }
 
 /**
- * Story CC-7.7 D3: the Closet body appears once the closet, the setup progress, the account and
- * the saved looks have answered for the member, so the setup banner and any error are in place
- * at reveal and nothing is inserted above the grid afterwards.
+ * Story CC-7.7 D3: the Closet body appears once the closet and the saved looks have answered for
+ * the member. Story CC-7.11 (TEA d): the setup progress only names the More menu's Closet setup
+ * item, which updates in place in the top bar, and the account and setup notices sit below the
+ * closet, so neither read holds the grid back and nothing is inserted above it afterwards.
  */
 function closetGateReady(reads: {
   owner: string | null
   hasLoaded: boolean
   loadError: string | null
-  onboardingStatus: WardrobeOnboardingStatus | null
-  onboardingStatusError: boolean
-  userId: string | null
-  userIdError: boolean
   savedLooksSettled: boolean
 }): boolean {
   return (
     reads.owner !== null &&
     (reads.hasLoaded || reads.loadError !== null) &&
-    (reads.onboardingStatus !== null || reads.onboardingStatusError) &&
-    (reads.userId !== null || reads.userIdError) &&
     reads.savedLooksSettled
   )
 }
 
 /**
- * The account and setup-progress notices. A member's sit above the closet, where the gate holds
- * them in place before the body appears. Without a member (a signed-out page, whose gate opens at
- * once) they land after the first paint, so the page puts them below the closet, where nothing
- * moves for them (D3 amendment, prod baseline Closet 0.1157).
+ * The account and setup-progress notices. They answer after the gate opens (Story CC-7.11, TEA
+ * d), so they sit below the closet, where nothing moves for them (CC-7.7 D3 amendment, prod
+ * baseline Closet 0.1157).
  */
 function ClosetAccountNotices({
-  placement,
   visitor,
-  hasMember,
   userIdError,
   onboardingStatusError,
   onRetryOnboarding,
 }: {
-  /** Where this copy sits: above the closet for a member, below it otherwise. */
-  placement: 'above' | 'below'
   /** A visitor who never signed in has no account or setup to fail (add-on B). */
   visitor: boolean
-  hasMember: boolean
   userIdError: boolean
   onboardingStatusError: boolean
   onRetryOnboarding: () => void
 }) {
   const { t } = useTranslation()
-  if (visitor || (placement === 'above') !== hasMember) return null
+  if (visitor) return null
   return (
-    <div className={placement === 'below' ? 'mt-6' : undefined}>
+    <div className="mt-6">
       {userIdError && (
         <p
           role="alert"
@@ -676,8 +665,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>(start.savedLooks)
   const [savedLooksTotal, setSavedLooksTotal] = useState(start.savedLooksTotal)
-  // Story CC-7.7 D4: the saved looks row sits above the grid, so the Closet gate waits for its
-  // first read too; its error would otherwise land above the closet after the body appeared.
+  // Story CC-7.7 D4: the Closet gate waits for the saved looks row's first read too, so the row
+  // (below the grid since CC-7.11) is in place at reveal.
   const [savedLooksSettled, setSavedLooksSettled] = useState(restored)
   const [savedLooksLoading, setSavedLooksLoading] = useState(false)
   const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
@@ -1168,10 +1157,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     owner,
     hasLoaded,
     loadError,
-    onboardingStatus,
-    onboardingStatusError,
-    userId,
-    userIdError,
     savedLooksSettled,
   })
 
@@ -1203,7 +1188,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
 
   const noticeProps = {
     visitor,
-    hasMember: owner !== null,
     userIdError,
     onboardingStatusError,
     onRetryOnboarding: retryOnboardingStatus,
@@ -1260,8 +1244,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
             )}
             {/* D2: the grid stays mounted under the detail, so Back keeps its scroll and state. */}
             <div hidden={Boolean(detailGarmentId)} data-testid="wardrobe-closet-view">
-              <ClosetAccountNotices placement="above" {...noticeProps} />
-
               {/* D7: the closet is a section on the page; its garment cards are the one card level. */}
               <section aria-labelledby="wardrobe-closet-heading">
                 {/* CC-7.11 D4: the visible heading and explainer left the space above the grid;
@@ -1311,7 +1293,10 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   // CC-7.10: the grid top the screen budget measures Closet chrome to.
                   <div
                     data-testid="closet-garment-grid"
-                    className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
+                    // Story CC-7.11 D4, P4: square photos and one compact row each for the name
+                    // and the actions, so two rows of tagged tiles sit above the 608 px fold at
+                    // 390 x 664.
+                    className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4"
                   >
                     {visibleGarments.map((garment) => (
                       <div
@@ -1321,12 +1306,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                         className="relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-card"
                       >
                         <GarmentCardPhoto garment={garment} locale={i18n.language} />
-                        <span
-                          data-testid="garment-card-label"
-                          className="block truncate px-3 pt-3 text-sm font-medium text-ink-soft"
-                        >
-                          {garmentCardLabel(i18n.language, garment)}
-                        </span>
                         {/* A ready card opens its detail. The button covers the card, so the photo
                           keeps its own alt text outside it, and the actions below sit above it.
                           The global focus rule draws its ring (D3). */}
@@ -1344,14 +1323,22 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                             className="absolute inset-0 z-0 rounded-lg"
                           />
                         )}
-                        <div className="pointer-events-none relative z-10 flex flex-col gap-2 p-3 [&_button]:pointer-events-auto">
-                          <div className="flex flex-wrap items-center gap-1">
+                        <div className="pointer-events-none relative z-10 flex flex-col gap-1 p-2 [&_button]:pointer-events-auto">
+                          <div className="flex min-w-0 items-center gap-1">
+                            <span
+                              data-testid="garment-card-label"
+                              className="min-w-0 flex-1 truncate text-sm font-medium text-ink-soft"
+                            >
+                              {garmentCardLabel(i18n.language, garment)}
+                            </span>
                             <span
                               data-testid={`garment-status-${garment.status}`}
-                              className="inline-block rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink-soft"
+                              className="shrink-0 rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink-soft"
                             >
                               {garmentStatusLabel(t, garment.status)}
                             </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1">
                             {garment.status === 'awaiting_tags' && (
                               <button
                                 ref={(element) => {
@@ -1385,19 +1372,19 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                                 {strings.firstUse.checkGarment}
                               </button>
                             )}
+                            <StylePieceEntry
+                              garment={garment}
+                              owner={owner}
+                              unavailable={Boolean(loadError)}
+                              loading={isLoading}
+                              labels={styleLabels}
+                              onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                              onOpen={(selection, button) => {
+                                styleInvoker.current = button
+                                setStyleSelection(selection)
+                              }}
+                            />
                           </div>
-                          <StylePieceEntry
-                            garment={garment}
-                            owner={owner}
-                            unavailable={Boolean(loadError)}
-                            loading={isLoading}
-                            labels={styleLabels}
-                            onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                            onOpen={(selection, button) => {
-                              styleInvoker.current = button
-                              setStyleSelection(selection)
-                            }}
-                          />
                         </div>
                       </div>
                     ))}
@@ -1433,7 +1420,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   }}
                 />
               </div>
-              <ClosetAccountNotices placement="below" {...noticeProps} />
+              <ClosetAccountNotices {...noticeProps} />
             </div>
           </ScreenGate>
         </main>

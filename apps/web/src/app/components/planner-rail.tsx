@@ -62,7 +62,8 @@ import { acquireScrollLock } from './modal-stack'
 
 export interface PlannerRailProps {
   isOpen: boolean
-  onClose: () => void
+  /** The rail's own X and the overlay's Escape; the Plan route hides both (`hideHeader`). */
+  onClose?: () => void
   variant: 'rail' | 'overlay'
   /** The control that opened the rail, so `overlay` can restore focus to it on close. */
   invokingElementRef?: React.RefObject<HTMLElement | null>
@@ -478,7 +479,7 @@ export function PlannerRail({
       if (variant !== 'overlay') return
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onClose?.()
         return
       }
       if (event.key !== 'Tab') return

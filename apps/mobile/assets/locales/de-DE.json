@@ -431,6 +431,7 @@
     "menu": {
       "add": "Hinzufügen",
       "more": "Mehr",
+      "moreLabel": "Mehr Schrankoptionen",
       "label": "Schrankoptionen",
       "setup": "Schrank einrichten",
       "setupDone": "Schrank einrichten: fertig",
@@ -776,7 +777,8 @@
       "loadMore": "Mehr Looks laden",
       "loadingMore": "Wird geladen",
       "yourPostsTitle": "Deine Looks in Bearbeitung",
-      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie."
+      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie.",
+      "detailTitle": "Geteilter Look"
     },
     "card": {
       "label": "Look von {{author}}",
@@ -884,7 +886,10 @@
       "publishing": "Wird geprüft und veröffentlicht",
       "uploading": "Dein Foto wird hochgeladen",
       "cancel": "Abbrechen",
-      "success": "Dein Look wurde zur Prüfung eingereicht."
+      "success": "Dein Look wurde zur Prüfung eingereicht.",
+      "discardTitle": "Diesen Beitrag verwerfen?",
+      "discardKeep": "Weiter bearbeiten",
+      "discard": "Verwerfen"
     },
     "validation": {
       "photoRequired": "Wähle ein Foto zum Teilen aus.",

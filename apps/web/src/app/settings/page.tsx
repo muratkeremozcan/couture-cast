@@ -47,7 +47,7 @@ export default function SettingsPage() {
             <ProfileAccount />
             {/* Story CC-7.11 D7: one Style row below the account header; the rest of Profile's
                 layout is CC-7.16's. */}
-            <ProfileStyleRow />
+            <ProfileRows />
             {/* Rendered in the first HTML: only its guided-entry query reader waits for the
                 client, inside its own boundary (Codex review P2-3). */}
             <LocationsSection />
@@ -62,14 +62,26 @@ export default function SettingsPage() {
   )
 }
 
-function ProfileStyleRow() {
+/**
+ * Story CC-7.11 D7: one Style row below the account header. Review #9: Notification settings is
+ * a Profile row too (the Community bell stays). Locations stays inline until CC-7.16 gives
+ * Profile its rows.
+ */
+function ProfileRows() {
   const { t } = useTranslation()
   return (
-    <NavRow
-      href="/settings/style"
-      label={t('settings.style.row')}
-      testId="profile-style-row"
-    />
+    <>
+      <NavRow
+        href="/settings/style"
+        label={t('settings.style.row')}
+        testId="profile-style-row"
+      />
+      <NavRow
+        href="/notification-settings"
+        label={t('community.notifications.title')}
+        testId="profile-notifications-row"
+      />
+    </>
   )
 }
 
