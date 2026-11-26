@@ -1,5 +1,10 @@
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the report dialog.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the report title is the
+// layer's swipe handle; a swipe follows Cancel, so a report in flight keeps the dialog.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
@@ -89,6 +94,8 @@ import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { CommunityReportModal } from './community-report-modal'
 import {
   EDGE_TO_EDGE_MODAL_PROPS,
@@ -311,6 +318,30 @@ describe('CommunityReportModal (Story 6.1)', () => {
 
     press(screen.getByTestId('cancel-report-button'))
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the title closes the dialog like Cancel', async () => {
+    const { onClose } = renderModal()
+    const handle = screen.getByTestId('layer-swipe-handle')
+    expect(handle.textContent).toBe(enUS.community.report.title)
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(onClose).not.toHaveBeenCalled()
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] while a report is sending, neither a swipe nor system back closes the dialog', async () => {
+    const { onClose } = renderModal({ isSubmitting: true })
+
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    act(() => (lastModalProps()!.onRequestClose as () => void)())
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('submit-report-button').getAttribute('aria-busy')).toBe(
+      'true'
+    )
   })
 
   it('6.1-MOB-058 forgets the reason and the details once it closes', async () => {

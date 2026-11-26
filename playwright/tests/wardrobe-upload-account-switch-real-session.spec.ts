@@ -453,6 +453,7 @@ test.describe('Upload state follows the signed-in account', () => {
   test('AS-3: member A ready My Form photo is cleared when member B signs in', async ({
     apiRequest,
     context,
+    interceptNetworkCall,
     page,
   }) => {
     const a = await member(apiRequest, 'upload-switch-a')
@@ -468,8 +469,42 @@ test.describe('Upload state follows the signed-in account', () => {
     await expect(screen.getByText('My Form photo ready')).toBeVisible({ timeout: 20_000 })
     await expect(screen.getByAltText('My Form')).toBeVisible()
 
+    // Codex 7.11 #16: hold B's first profile read, so A's photo is proved gone before B's
+    // profile can paint over it (not only after B's sliders arrived).
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let holdNext = false
+    let heldOne = false
+    let markHeld: () => void = () => undefined
+    const held = new Promise<void>((resolve) => {
+      markHeld = resolve
+    })
+    void interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/wardrobe/silhouette',
+      handler: async (route) => {
+        if (!holdNext || heldOne) return route.fallback()
+        heldOne = true
+        const response = await route.fetch()
+        markHeld()
+        await released
+        await route.fulfill({ response }).catch(() => undefined)
+      },
+    })
+
     const uploads = watchUploadRequests(context, page)
+    holdNext = true
     await switchToMemberB(context, b)
+    await held
+
+    await expect(
+      screen.getByAltText('My Form'),
+      'A photo gone while B loads'
+    ).toHaveCount(0)
+    await expect(screen.getByText('My Form photo ready')).toHaveCount(0)
+    release()
 
     await expectSilhouetteFollowsMemberB(page, screen)
     await expect(screen.getByAltText('My Form')).toHaveCount(0)

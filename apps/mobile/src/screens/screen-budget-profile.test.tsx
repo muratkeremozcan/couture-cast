@@ -3,19 +3,32 @@
 // Story CC-7.10 test owner (TEA): 7.10-NAT-004, 008, 012 (the native Profile tab within the
 // screen budget under the empty, populated and guardian-pending members).
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-010 and 040 (Profile's first content, the account
+// header, inside the 360 x 640 fold with nothing before it, every fixture) and the Profile half
+// of 7.11-NAT-013 (one Style row right below the account header opens `settings-style`).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 //
 // The libraries stay real and answer through MSW (the fixture serves the profile, subscription,
 // premium access and palette; the default handlers serve health and the shopping preference).
 // RevenueCat needs no double: on web `ensurePurchasesConfigured` answers `unavailable`, which is
 // the Premium section's Expo Go state.
 import React from 'react'
-import { configure, render, screen, waitFor } from '@testing-library/react'
+import { configure, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  navigate: vi.fn(),
+  setParams: vi.fn(),
+}))
 
 // As every suite that renders Settings: expo-router pulls in expo-asset, which this browser
 // bundle cannot evaluate.
 vi.mock('expo-router', async () => ({
-  router: { push: vi.fn(), replace: vi.fn(), navigate: vi.fn(), setParams: vi.fn() },
+  router: routerMock,
   // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
@@ -37,6 +50,14 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { AppTopBar } from '@/src/components/app-top-bar'
+import {
+  WithFoldScene,
+  chromeBefore,
+  expectFirstContentInFold,
+  setFoldViewport,
+  textBefore,
+} from '@/src/test-utils/fold-band'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import {
   serveScreenBudgetFixture,
@@ -58,15 +79,27 @@ const AUDITS: readonly (readonly [string, ScreenBudgetMode])[] = [
   ['7.10-NAT-012', 'guardian-pending'],
 ]
 
+const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode])[] = [
+  ['7.11-NAT-010', 'empty'],
+  ['7.11-NAT-010', 'populated'],
+  ['7.11-NAT-040', 'guardian-pending'],
+]
+
 /** Profile as the tab layout draws it: under the Profile top bar, inside the root providers. */
-function renderProfile() {
+function renderProfile(fold = false) {
   return render(
     <AccessibilityAnnouncerProvider>
       <AppThemeProvider>
         <SaveFeedbackProvider>
-          <WithTopBar title={i18n.t('tabs.profile')}>
-            <SettingsScreen />
-          </WithTopBar>
+          {fold ? (
+            <WithFoldScene header={<AppTopBar title={i18n.t('tabs.profile')} />}>
+              <SettingsScreen />
+            </WithFoldScene>
+          ) : (
+            <WithTopBar title={i18n.t('tabs.profile')}>
+              <SettingsScreen />
+            </WithTopBar>
+          )}
         </SaveFeedbackProvider>
       </AppThemeProvider>
     </AccessibilityAnnouncerProvider>
@@ -108,6 +141,7 @@ describe('Screen budget: native Profile', () => {
     restoreToken = undefined
     setMobileApplicationUserId(null)
     screenFocus.reset()
+    vi.clearAllMocks()
   })
 
   for (const [id, fixture] of AUDITS) {
@@ -121,4 +155,42 @@ describe('Screen budget: native Profile', () => {
       expectNativeWithinBudget('profile', fixture, measurement)
     }, 30_000)
   }
+
+  for (const [id, fixture] of FOLD_CASES) {
+    it(`[P0] [${id}] native profile (${fixture}) opens on its account header inside the 360 x 640 fold`, async () => {
+      await setFoldViewport()
+      serveScreenBudgetFixture(fixture, MEMBER)
+      renderProfile(true)
+      await profileSettled()
+
+      const first = screen.getByTestId('profile-account')
+      expectFirstContentInFold(first, 'Profile first content')
+      expect(chromeBefore(first), 'banners, alerts or setup before Profile').toEqual([])
+      expect(textBefore(first), 'text before Profile').toEqual([])
+      // D7: the Style row sits right below the account header, so it is in the fold too.
+      expectFirstContentInFold(screen.getByTestId('profile-style-row'), 'Style row')
+    }, 30_000)
+  }
+
+  it('[P1] [7.11-NAT-013] one Style row right below the account header opens the Style screen', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    renderProfile()
+    await profileSettled()
+
+    const account = screen.getByTestId('profile-account')
+    const rows = screen.getAllByTestId('profile-style-row')
+    expect(rows, 'one Style row').toHaveLength(1)
+    const row = rows[0]!
+    expect(row).toHaveTextContent(i18n.t('settings.style.row'))
+    expect(row).toHaveAccessibleName(i18n.t('settings.style.row'))
+    expect(i18n.t('settings.style.row')).toBe('Style')
+    // Directly below the account header: its next sibling in the Profile body.
+    expect(account.nextElementSibling).toBe(row)
+    expect(row.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      account.getBoundingClientRect().bottom - 0.5
+    )
+
+    fireEvent.click(row)
+    expect(routerMock.push).toHaveBeenCalledExactlyOnceWith('/settings-style')
+  })
 })

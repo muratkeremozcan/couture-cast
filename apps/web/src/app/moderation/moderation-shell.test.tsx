@@ -3,6 +3,10 @@
 // Story CC-7.9 test owner: the staff console routes sit in the one app shell (D6, D7). Each route
 // renders one page surface, the shared top bar whose title is the page's only h1, a back control
 // to the parent route, and the skip-link target under the bar.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar's history-aware back reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { render, screen, within } from '@testing-library/react'
 import { http, type RequestHandler } from 'msw'
 import type { ReactElement } from 'react'
@@ -24,7 +28,10 @@ import ModerationPage from './page'
 import ModerationSlaPage from './sla/page'
 
 const navigation = vi.hoisted(() => ({ pathname: '/moderation' }))
-vi.mock('next/navigation', () => ({ usePathname: () => navigation.pathname }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => navigation.pathname,
+  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+}))
 
 const copy = enUS.moderation
 

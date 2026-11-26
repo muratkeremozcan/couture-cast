@@ -8,10 +8,16 @@ import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.5 Task 6 step 3 owner: Lookbook Prism responsive layout, comparison mode, and focus rings.
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-HOME-PLAN-01..04 (D9: Plan week links to /looks/plan,
+// the Home drawer and the 320 px rail column are gone). The /?planner=1 server redirect is
+// app/looks/plan/legacy-redirect.test.ts; the planner gate cases (5.2-WEB-RAIL-01..03) render on
+// the Plan route in app/looks/plan/page.test.tsx.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
@@ -26,55 +32,9 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/',
 }))
 
-const PLANNER_PATH = '/api/v1/commerce/premium/planner'
-
-/** One valid seven-date, all-ready planner window, mirroring `packages/api-client/testing/planner-contract.spec.ts`'s fixture shape. */
-function buildPlannerResponse() {
-  const dates = [
-    '2026-09-10',
-    '2026-09-11',
-    '2026-09-12',
-    '2026-09-13',
-    '2026-09-14',
-    '2026-09-15',
-    '2026-09-16',
-  ]
-  return {
-    data: {
-      locationId: 'location-1',
-      timezone: 'America/New_York',
-      anchorDate: dates[0],
-      daysReady: 7,
-      days: dates.map((planDate) => ({
-        status: 'ready' as const,
-        planDate,
-        version: 1,
-        weather: {
-          confidence: 'hourly' as const,
-          freshness: 'fresh' as const,
-          condition: 'clear' as const,
-          temperatureLow: 15,
-          temperatureHigh: 22,
-        },
-        isStarterWardrobe: false,
-        outfits: (['morning', 'midday', 'evening'] as const).map((scenario) => ({
-          id: `${planDate}-${scenario}`,
-          scenario,
-          garmentIds: ['garment-1'],
-          reasoningBadges: [],
-          comfortNotes: 'Layer up; it will feel cooler than it reads.',
-          capsuleId: null,
-          capsuleName: null,
-          autoFilledGarmentIds: [],
-          displayGarments: [
-            { id: 'garment-1', category: 'top' as const, imageAccess: null },
-          ],
-          shopThisLook: null,
-        })),
-      })),
-    },
-  }
-}
+// Story CC-7.11 D9: Home no longer imports the planner; this stand-in proves it never mounts.
+const plannerRail = vi.hoisted(() => vi.fn(() => null))
+vi.mock('./planner-rail', () => ({ PlannerRail: plannerRail }))
 
 /**
  * Story 6.1: the community column reads `GET /api/v1/community/feed` through
@@ -134,7 +94,11 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
 
     const grid = screen.getByTestId('lookbook-prism-grid')
     expect(grid).toHaveClass('min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]')
-    expect(grid).toHaveClass('min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]')
+    // Story CC-7.11 D9: the 320 px planner rail column left with the drawer, so the grid holds
+    // two columns at every width.
+    expect(grid.className).not.toMatch(/min-\[1440px\]:grid-cols-/)
+    expect(grid.className).not.toContain('320px')
+    expect(grid.children).toHaveLength(2)
     expect(
       screen.getByRole('region', { name: /hero ritual canvas/i })
     ).toBeInTheDocument()
@@ -244,37 +208,31 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 5.5 Decision 7: the rail defaults closed and opens only from the
-   * "Plan week" control, so every planner test opens it first. Signed out,
-   * `PlannerRail` renders `locked` with no network request (`hasWebSession()`
-   * short-circuits before `getPlannerFromWeb`), so this needs no MSW handler.
+   * Story CC-7.11 D9 replaced the Home drawer (Story 5.5 Decision 7): "Plan week" is a link to the
+   * Plan route under Looks, so pressing it navigates and Home never mounts the planner itself.
    */
-  it('restores the planner after it is closed', () => {
+  it('7.11-CMP-HOME-PLAN-01 Plan week is a link to /looks/plan and opens no planner on Home', () => {
     render(<LookbookPrismLayout />)
 
-    fireEvent.click(screen.getByTestId('planner-open-control'))
-    expect(
-      screen.getByRole('complementary', { name: /planner rail/i })
-    ).toBeInTheDocument()
+    const control = screen.getByTestId('planner-open-control')
+    expect(control.tagName).toBe('A')
+    expect(control).toHaveAttribute('href', '/looks/plan')
+    expect(control).toHaveTextContent('Plan week')
 
-    fireEvent.click(screen.getByRole('button', { name: /close planner/i }))
+    fireEvent.click(control)
     expect(
       screen.queryByRole('complementary', { name: /planner rail/i })
     ).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByTestId('planner-open-control'))
     expect(
-      screen.getByRole('complementary', { name: /planner rail/i })
-    ).toBeInTheDocument()
+      screen.queryByRole('button', { name: /close planner/i })
+    ).not.toBeInTheDocument()
   })
 
   /**
-   * At >=1440px the rail renders through `DesktopPlannerRailSlot`, the inline
-   * third-column form. That is a distinct code path, with its own `onClose`
-   * closure, from every other test in this file: they run at jsdom's default
-   * 1024px width and so always exercise `PlannerOverlaySlot`.
+   * The >=1440px inline rail slot left with the drawer: a wide Home renders the same two
+   * columns and still holds no planner after Plan week is pressed.
    */
-  it('opens and closes through the desktop rail slot at 1440px and wider', () => {
+  it('7.11-CMP-HOME-PLAN-02 renders no rail slot at 1440px and wider', () => {
     const originalInnerWidth = window.innerWidth
     Object.defineProperty(window, 'innerWidth', {
       writable: true,
@@ -288,13 +246,9 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
 
       fireEvent.click(screen.getByTestId('planner-open-control'))
       expect(
-        screen.getByRole('complementary', { name: /planner rail/i })
-      ).toBeInTheDocument()
-
-      fireEvent.click(screen.getByRole('button', { name: /close planner/i }))
-      expect(
         screen.queryByRole('complementary', { name: /planner rail/i })
       ).not.toBeInTheDocument()
+      expect(screen.getByTestId('lookbook-prism-grid').children).toHaveLength(2)
     } finally {
       Object.defineProperty(window, 'innerWidth', {
         writable: true,
@@ -305,56 +259,50 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 5.2 Decision 2, extended by 5.5 Decision 7: the rail is the story's one
-   * real premium gate. With no session there is no entitlement request, so the
-   * locked upsell is the default, which is also what the signed-out accessibility
-   * run sees.
+   * Story 5.2 Decision 2's gate now renders on the Plan route (5.2-WEB-RAIL-01..03 in
+   * app/looks/plan/page.test.tsx). Home's part is to mount no planner at all, at either width,
+   * before or after Plan week is pressed.
    */
-  it('5.2-WEB-RAIL-01 renders the locked upsell signed out, with no request', () => {
-    render(<LookbookPrismLayout />)
-    fireEvent.click(screen.getByTestId('planner-open-control'))
-
-    const rail = screen.getByRole('complementary', { name: /planner rail/i })
-    expect(rail).toBeInTheDocument()
-    expect(screen.getByTestId('planner-rail-locked')).toHaveTextContent(
-      'The 7-Day Planner is a Premium feature'
-    )
-    const cta = screen.getByTestId('planner-rail-get-premium')
-    expect(cta).toHaveAttribute('href', '/settings')
-    expect(cta).toHaveTextContent('Get Premium')
-  })
-
-  it('5.2-WEB-RAIL-02 renders the planner shell for an entitled user', async () => {
-    signInFixtureMember()
-    useMswHandlers(
-      http.get(PLANNER_PATH, () => HttpResponse.json(buildPlannerResponse()))
-    )
-
-    render(<LookbookPrismLayout />)
-    fireEvent.click(screen.getByTestId('planner-open-control'))
-
-    await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
-    expect(screen.queryByTestId('planner-rail-locked')).not.toBeInTheDocument()
-  })
-
-  it('5.2-WEB-RAIL-03 keeps the locked upsell for a non-entitled caller', async () => {
-    signInFixtureMember()
-    const requested = vi.fn()
-    useMswHandlers(
-      http.get(PLANNER_PATH, () => {
-        requested()
-        return HttpResponse.json(
-          { statusCode: 403, message: PREMIUM_REQUIRED_MESSAGE, error: 'Forbidden' },
-          { status: 403 }
-        )
+  it('7.11-CMP-HOME-PLAN-03 never mounts the planner on Home, narrow or wide', () => {
+    const originalInnerWidth = window.innerWidth
+    try {
+      for (const width of [1024, 1440]) {
+        Object.defineProperty(window, 'innerWidth', {
+          writable: true,
+          configurable: true,
+          value: width,
+        })
+        const view = render(<LookbookPrismLayout />)
+        fireEvent(window, new Event('resize'))
+        fireEvent.click(screen.getByTestId('planner-open-control'))
+        view.unmount()
+      }
+      expect(plannerRail).not.toHaveBeenCalled()
+    } finally {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: originalInnerWidth,
       })
-    )
+    }
+  })
 
-    render(<LookbookPrismLayout />)
-    fireEvent.click(screen.getByTestId('planner-open-control'))
+  /**
+   * `/?planner=1` is answered by next.config.ts before Home renders, so Home neither opens a
+   * drawer for the query nor edits the address bar any more.
+   */
+  it('7.11-CMP-HOME-PLAN-04 leaves a planner=1 query alone and opens nothing on Home', () => {
+    window.history.replaceState(window.history.state, '', '/?planner=1')
+    try {
+      render(<LookbookPrismLayout />)
 
-    await waitFor(() => expect(requested).toHaveBeenCalled())
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+      expect(window.location.search).toBe('?planner=1')
+      expect(
+        screen.queryByRole('complementary', { name: /planner rail/i })
+      ).not.toBeInTheDocument()
+    } finally {
+      window.history.replaceState(window.history.state, '', '/')
+    }
   })
 
   /**

@@ -1,7 +1,12 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032, with the real EdgeToEdgeModal:
+// the composer's title is the layer's swipe handle, through the same close as Cancel.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as ReactNativeModule from 'react-native'
-import { render } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 const loadMocks = vi.hoisted(() => {
   // Expo packages read process.env.EXPO_OS when they load; the suite default is 'web'.
@@ -44,6 +49,8 @@ vi.mock('react-native', async (original) =>
 )
 import { Harness, installComposerHooks, ready } from './share-card-composer.test-support'
 import { liveFontMarkerPlacement } from '@/src/test-utils/edge-to-edge-modal'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from './edge-to-edge-modal'
 
 installComposerHooks()
 
@@ -55,5 +62,22 @@ describe('share-card composer live-font marker', () => {
     render(<Harness />)
     await ready()
     expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+})
+
+describe('share-card composer swipe close', () => {
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the title closes the composer; a short one does not', async () => {
+    render(<Harness />)
+    await ready()
+    const title = screen.getByTestId('share-card-title')
+    const handle = title.closest<HTMLElement>('[data-testid="layer-swipe-handle"]')
+    expect(handle, 'the title sits in the swipe handle').not.toBeNull()
+
+    await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(screen.getByTestId('share-card-preview')).toBeInTheDocument()
+
+    await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    await waitFor(() => expect(screen.queryByTestId('share-card-title')).toBeNull())
+    expect(screen.queryByTestId('share-card-preview')).toBeNull()
   })
 })

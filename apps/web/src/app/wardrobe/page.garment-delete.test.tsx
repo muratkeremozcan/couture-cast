@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): router stub for the history-aware top bar back (D11)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Story 7.6 test plan 7.6-CMP-002..011: garment delete from the Closet detail. An unused piece
 // hides with "Deleted" and Undo and is sent when the window ends; a piece in use asks once and is
 // sent at once; a failed send returns the piece with Retry; the grid keeps its scroll and focus
@@ -38,7 +42,17 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => session.owner,
 }))
 
+// Story CC-7.11 D11: the top bar back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   useSearchParams: () => useMockSearchParams(),
 }))

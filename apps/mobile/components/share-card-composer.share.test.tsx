@@ -1,6 +1,7 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeModalModule from './edge-to-edge-modal'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
@@ -47,7 +48,9 @@ vi.mock('@/src/lib/accessibility-focus', async () =>
 vi.mock('../modules/accessibility-focus', async () =>
   (await loadMocks()).accessibilityFocusModule()
 )
-vi.mock('./edge-to-edge-modal', async () => (await loadMocks()).modal())
+vi.mock('./edge-to-edge-modal', async (original) =>
+  (await loadMocks()).modal(await original<typeof EdgeToEdgeModalModule>())
+)
 vi.mock('react-native', async (original) =>
   (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
 )

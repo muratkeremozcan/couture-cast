@@ -146,7 +146,8 @@ describe('PlannerScreen (Story 5.5)', () => {
 
     const section = screen.getByTestId('planner-screen')
     expect(section).toHaveAttribute('aria-label', '7-Day Planner')
-    // The stack's AppTopBar shows '7-Day Planner'; the body has no second copy of it.
+    // The stack's AppTopBar shows the route title (Plan since CC-7.11 D9, app/planner.tsx); the
+    // body keeps no copy of the section name as a title.
     expect(within(section).queryByText('7-Day Planner')).toBeNull()
     expect(within(section).queryByRole('heading', { name: '7-Day Planner' })).toBeNull()
   })

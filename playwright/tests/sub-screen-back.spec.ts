@@ -11,10 +11,15 @@ import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   openFixtureShell,
   SHELL_TABS,
+  VISUAL_MEMBER_ID,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
-import type { ShellMode, ShellScreen } from '../support/helpers/shell-fixtures'
+import {
+  bodies,
+  type ShellMode,
+  type ShellScreen,
+} from '../support/helpers/shell-fixtures'
 
 test.use({
   authSessionEnabled: false,
@@ -31,6 +36,17 @@ type SubScreen = {
   title: RegExp
   /** How a member reaches it from its parent tab; null when no in-app link exists on web. */
   enter: ((page: Page) => Promise<void>) | null
+  /**
+   * Codex 7.11 #15: the screen's own content, so a direct entry proves more than a header
+   * outside its gate. Rows without one fall back to visible text in the page body.
+   */
+  content?: (page: Page, mode: ShellMode) => ReturnType<Page['getByTestId']>
+  /**
+   * The guardian and teen dashboards read the profile with the cookie session
+   * (`credentials: 'include'`, no bearer), which the shell router refuses with 401; they get
+   * the same fixture profile by path.
+   */
+  cookieProfile?: boolean
 }
 
 const viaMore = (item: string) => async (page: Page) => {
@@ -68,6 +84,7 @@ const SUB_SCREENS: SubScreen[] = [
     parent: 'closet',
     title: /^Silhouette$/,
     enter: viaMore('closet-more-silhouette'),
+    content: (page) => page.getByTestId('silhouette-settings-panel'),
   },
   {
     name: 'capsules',
@@ -75,6 +92,7 @@ const SUB_SCREENS: SubScreen[] = [
     parent: 'looks',
     title: /^Outfit capsules$/,
     enter: viaTestId('looks-capsules-row'),
+    content: (page) => page.getByTestId('create-capsule-button'),
   },
   {
     name: 'plan',
@@ -82,6 +100,7 @@ const SUB_SCREENS: SubScreen[] = [
     parent: 'looks',
     title: /^Plan$/,
     enter: viaTestId('looks-plan-row'),
+    content: (page) => page.getByRole('complementary', { name: 'Planner Rail' }),
   },
   {
     name: 'style',
@@ -89,6 +108,7 @@ const SUB_SCREENS: SubScreen[] = [
     parent: 'profile',
     title: /^Style$/,
     enter: viaTestId('profile-style-row'),
+    content: (page) => page.getByTestId('style-rows'),
   },
   {
     name: 'color palette',
@@ -102,12 +122,14 @@ const SUB_SCREENS: SubScreen[] = [
     path: '/notification-settings',
     parent: 'profile',
     title: /\S/,
-    enter: null,
+    // Codex 7.11 #9: Profile holds the entry; the Community header link stays as a second one.
+    enter: viaTestId('profile-notifications-row'),
   },
   {
     name: 'guardian dashboard',
     path: '/guardian/dashboard',
     parent: 'profile',
+    cookieProfile: true,
     title: /\S/,
     enter: null,
   },
@@ -115,8 +137,14 @@ const SUB_SCREENS: SubScreen[] = [
     name: 'teen dashboard',
     path: '/teen/dashboard',
     parent: 'profile',
+    cookieProfile: true,
     title: /\S/,
     enter: null,
+    // The guardian-pending teen sees the intended consent state, not a blank screen.
+    content: (page, mode) =>
+      mode === 'guardian-pending'
+        ? page.getByText('Guardian consent pending')
+        : page.locator('main'),
   },
 ]
 
@@ -137,15 +165,57 @@ async function open(
   page: Page,
   interceptNetworkCall: Parameters<typeof openFixtureShell>[1],
   screen: ShellScreen,
-  mode: ShellMode = 'populated'
+  mode: ShellMode = 'populated',
+  sub?: SubScreen
 ) {
   await serveUnknownReadsEmpty(page)
-  return openFixtureShell(page, interceptNetworkCall, { mode, screen })
+  const shell = await openFixtureShell(page, interceptNetworkCall, { mode, screen })
+  if (sub?.cookieProfile) {
+    const teenPending = mode === 'guardian-pending'
+    const { json } = bodies(
+      VISUAL_MEMBER_ID,
+      !teenPending && mode !== 'empty',
+      teenPending
+    )
+    await page.route('**/api/v1/user/profile', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: json.profile })
+        : route.fallback()
+    )
+  }
+  return shell
 }
 
+/** The top bar on screen: a layer's own when one is open, else the page's. */
 async function expectTopBar(page: Page, title: RegExp) {
-  await expect(page.getByTestId('app-top-bar-back')).toBeVisible()
-  await expect(page.getByTestId('app-top-bar-title')).toHaveText(title)
+  const scope = (await page.getByRole('dialog').count())
+    ? page.getByRole('dialog')
+    : page.getByTestId('app-header')
+  await expect(scope.getByTestId('app-top-bar-back')).toBeVisible()
+  await expect(scope.getByTestId('app-top-bar-title')).toHaveText(title)
+}
+
+/** The sub-screen rendered its own content below the top bar, not only its header. */
+async function expectOwnContent(page: Page, sub: SubScreen, mode: ShellMode) {
+  if (sub.content) {
+    await expect(sub.content(page, mode).first(), `${sub.name} content`).toBeVisible()
+    return
+  }
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const header = document.querySelector('[data-testid="app-header"]')
+          const main = document.querySelector('main') ?? document.body
+          return Array.from(
+            main.querySelectorAll<HTMLElement>('h2, h3, p, button, a, label')
+          )
+            .filter((node) => !header?.contains(node) && node.offsetParent !== null)
+            .filter((node) => (node.textContent ?? '').trim().length > 0).length
+        }),
+      { message: `${sub.name} renders content below its top bar` }
+    )
+    .toBeGreaterThan(0)
 }
 
 const scrollY = (page: Page) => page.evaluate(() => Math.round(window.scrollY))
@@ -181,9 +251,10 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
         page,
         interceptNetworkCall,
       }) => {
-        const { router } = await open(page, interceptNetworkCall, sub.parent, mode)
+        const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
         await page.goto(sub.path)
         await expectTopBar(page, sub.title)
+        await expectOwnContent(page, sub, mode)
         const entries = await page.evaluate(() => history.length)
 
         await page.getByTestId('app-top-bar-back').click()
@@ -202,28 +273,33 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
 
 test.describe('CC-7.11 parent scroll on return @local-lane', () => {
   for (const how of ['arrow', 'browser'] as const) {
-    test(`[P0] [7.11-E2E-030/031] Closet scrolled, open Silhouette, ${how} back: Closet at the same offset`, async ({
+    test(`[P0] [7.11-E2E-030/031] Closet scrolled, open a garment from depth, ${how} back: Closet at the same offset, focus on the tile`, async ({
       page,
       interceptNetworkCall,
     }) => {
+      // D14 and the spec's I/O row "Closet scrolled, open garment, back". The top bar does not
+      // stick (builder decision), so a sub-screen is opened from a control at depth: a tile
+      // far down the grid. Leaving through More scrolls to the top first, so it proves nothing.
       const { router, setScreen } = await open(page, interceptNetworkCall, 'closet')
       await page.goto(SHELL_TABS.closet.path)
       await waitForShellSettled(page, router)
-      await page.evaluate(() => window.scrollTo(0, 1200))
-      await expect.poll(() => scrollY(page)).toBe(1200)
+      const tile = page.getByTestId('garment-open-shell-garment-16')
+      await tile.scrollIntoViewIfNeeded()
+      const depth = await scrollY(page)
+      expect(depth, 'the tile sits well below the first screen').toBeGreaterThan(600)
 
-      // The More button rides in the sticky top bar, so it is reachable at any scroll.
-      await viaMore('closet-more-silhouette')(page)
-      await expect(page).toHaveURL(/\/wardrobe\/silhouette$/)
+      await tile.click()
+      await expect(page).toHaveURL(/\/wardrobe\?garment=shell-garment-16$/)
+      await expectTopBar(page, /\S/)
       setScreen('closet')
       if (how === 'arrow') await page.getByTestId('app-top-bar-back').click()
       else await page.goBack()
 
       await expect(page).toHaveURL(/\/wardrobe$/)
-      await waitForShellSettled(page, router)
       await expect
         .poll(() => scrollY(page), { message: 'Closet scroll restored' })
-        .toBe(1200)
+        .toBe(depth)
+      await expect(tile).toBeFocused()
     })
   }
 
@@ -307,6 +383,13 @@ test.describe('CC-7.11 parent scroll on return @local-lane', () => {
     await viaMore('closet-more-silhouette')(page)
     await expect(page).toHaveURL(/\/wardrobe\/silhouette$/)
 
+    // The opened tab gets the same fixture reads (routes on the page do not reach it).
+    await context.route('**/api/v1/**', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ json: { data: [], total: 0, limit: 20, offset: 0 } })
+        : route.fallback()
+    )
+    await context.route('**/api/v1/**', (route) => router.handler(route, route.request()))
     // P1: a link-opened tab shares sessionStorage (no noopener) but not history; the arrow must
     // not trust a stored stack there.
     const [opened] = await Promise.all([

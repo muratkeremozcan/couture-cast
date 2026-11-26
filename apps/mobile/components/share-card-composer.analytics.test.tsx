@@ -6,6 +6,7 @@
  * the first import, which is why this case has a file of its own.
  */
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeModalModule from './edge-to-edge-modal'
 import { screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import i18n from '@/src/lib/i18n'
@@ -58,7 +59,9 @@ vi.mock('@/src/lib/accessibility-focus', async () =>
 vi.mock('../modules/accessibility-focus', async () =>
   (await loadMocks()).accessibilityFocusModule()
 )
-vi.mock('./edge-to-edge-modal', async () => (await loadMocks()).modal())
+vi.mock('./edge-to-edge-modal', async (original) =>
+  (await loadMocks()).modal(await original<typeof EdgeToEdgeModalModule>())
+)
 vi.mock('react-native', async (original) =>
   (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
 )

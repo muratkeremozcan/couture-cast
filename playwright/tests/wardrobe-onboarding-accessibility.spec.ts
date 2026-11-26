@@ -242,9 +242,15 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
         await expect(more).toBeFocused()
       })
 
-      await test.step('The Silhouette item opens the Silhouette route', async () => {
+      await test.step('The Silhouette item opens the Silhouette route from the keyboard', async () => {
+        // Codex 7.11 #16: keyboard only, no click. The menu focuses its first item (Closet
+        // setup); ArrowDown moves to Silhouette and Enter activates it.
         await page.keyboard.press('Enter')
-        await page.getByRole('menu').getByRole('menuitem', { name: 'Silhouette' }).click()
+        const menu = page.getByRole('menu')
+        await expect(menu.getByRole('menuitem').first()).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(menu.getByRole('menuitem', { name: 'Silhouette' })).toBeFocused()
+        await page.keyboard.press('Enter')
         await expect(page).toHaveURL('/wardrobe/silhouette')
         await expect(
           page.getByTestId('app-header').getByRole('heading', { level: 1 })

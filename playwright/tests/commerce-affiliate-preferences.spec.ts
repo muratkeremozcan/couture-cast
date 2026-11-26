@@ -230,8 +230,26 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await expect(
       primaryNav.getByRole('link', { name: 'Profile', exact: true })
     ).toHaveAttribute('aria-current', 'page')
-    await page.keyboard.press('Tab')
-    await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
+    // Story CC-7.11 D7, D10: Profile's Style (and Notifications) rows sit between the tabs and
+    // the city search now. Tab through them; the Style row must be one of the stops.
+    const search = page.getByRole('combobox', { name: 'Search for a city' })
+    const stops: (string | null)[] = []
+    for (let index = 0; index < 6; index += 1) {
+      await page.keyboard.press('Tab')
+      if (await search.evaluate((node) => node === document.activeElement)) break
+      stops.push(
+        await page.evaluate(
+          () =>
+            document.activeElement
+              ?.closest('[data-testid]')
+              ?.getAttribute('data-testid') ?? null
+        )
+      )
+    }
+    expect(stops, 'Tab stops between the tabs and the city search').toContain(
+      'profile-style-row'
+    )
+    await expect(search).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Use my location' })).toBeFocused()
     await page.keyboard.press('Tab')

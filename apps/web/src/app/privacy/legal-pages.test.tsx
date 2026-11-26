@@ -4,11 +4,30 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.17 D12: the public legal pages render one h1, their sections as named regions, the
 // contact address and the links between them; legal-pages.spec.ts proves the served pages.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar's history-aware back reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import type * as NextNavigation from 'next/navigation'
 import PrivacyPage from './page'
 import TermsPage from '../terms/page'
 import { LEGAL_CONTACT_EMAIL } from '../components/legal-page'
+
+// Story CC-7.11 D11: the top bar's back reads the router. Outside a mounted app router the real
+// hook throws, so the test supplies one and keeps the rest of next/navigation.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => ({
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}))
 
 describe.each([
   ['Privacy Policy', PrivacyPage, 'Terms of Service'],

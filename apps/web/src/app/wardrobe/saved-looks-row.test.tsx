@@ -1,7 +1,13 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-SAVED-001 (D12: the saved look detail is a full-height
+// layer under a top bar with back and the look's title), 7.11-CMP-SAVED-002 (D8: the Looks tab
+// opens the list expanded).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import React from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -359,7 +365,8 @@ describe('ClosetSavedLooksRow (web)', () => {
         accessToken: undefined,
       })
     )
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    // CC-7.11 D12: the detail is a layer under a top bar; its back arrow closes it.
+    await user.click(screen.getByTestId('app-top-bar-back'))
     getSavedLookFromWeb.mockRejectedValueOnce(new Error('503'))
     await user.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     await waitFor(() => expect(getSavedLookFromWeb).toHaveBeenCalledTimes(2))
@@ -425,10 +432,12 @@ describe('ClosetSavedLooksRow (web)', () => {
       accessToken: undefined,
     })
 
-    // Opening missing-garment look renders detail modal with missing notice and close button.
+    // Opening missing-garment look renders detail layer with missing notice and a back arrow
+    // (CC-7.11 D12: the back arrow took the X's place).
     await user.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     expect(screen.getByTestId('saved-look-detail-missing')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull()
+    await user.click(screen.getByTestId('app-top-bar-back'))
     expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
 
     // Opening needs-review look renders detail modal with needs-review notice, and detail-remove closes modal.
@@ -481,5 +490,75 @@ describe('ClosetSavedLooksRow (web)', () => {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
     )
+  })
+
+  it('7.11-CMP-SAVED-001 opens the saved look detail as a full-height layer titled by the look, with back in place of the X', async () => {
+    const user = userEvent.setup()
+    const reviewLook = makeExactEditorLook({
+      id: 'sl-titled',
+      title: 'Rainy commute',
+      availabilityStatus: 'needs_review',
+      needsReviewReasons: ['category_changed'],
+    })
+    const opener = vi.fn()
+    render(
+      <ClosetSavedLooksRow
+        owner="user-1"
+        savedLooks={[reviewLook]}
+        isLoading={false}
+        loadError={null}
+        garments={[ACTIVE_GARMENT]}
+        onRetry={vi.fn()}
+        onChanged={vi.fn()}
+        onReopenStylePiece={opener}
+      />
+    )
+
+    await user.click(screen.getByTestId('closet-saved-looks-row'))
+    const reopen = screen.getByTestId('saved-look-reopen')
+    await user.click(reopen)
+
+    const layer = screen.getByRole('dialog', { name: 'Rainy commute' })
+    expect(layer).toHaveAttribute('data-presentation', 'screen')
+    expect(within(layer).getByTestId('app-top-bar-title')).toHaveTextContent(
+      /^Rainy commute$/
+    )
+    expect(within(layer).queryByText('Saved look')).toBeNull()
+    expect(within(layer).getByTestId('layer-swipe-handle')).toContainElement(
+      within(layer).getByTestId('app-top-bar-back')
+    )
+    expect(within(layer).getByTestId('layer-body')).toContainElement(
+      within(layer).getByTestId('saved-look-detail-modal')
+    )
+    expect(within(layer).queryByRole('button', { name: 'Close' })).toBeNull()
+
+    await user.click(within(layer).getByTestId('app-top-bar-back'))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(opener).not.toHaveBeenCalled()
+  })
+
+  it('7.11-CMP-SAVED-002 starts expanded on the Looks tab and still collapses on demand', async () => {
+    const user = userEvent.setup()
+    render(
+      <ClosetSavedLooksRow
+        owner="user-1"
+        savedLooks={[makeExactEditorLook()]}
+        isLoading={false}
+        loadError={null}
+        garments={[ACTIVE_GARMENT]}
+        onRetry={vi.fn()}
+        onChanged={vi.fn()}
+        onReopenStylePiece={vi.fn()}
+        initiallyExpanded
+      />
+    )
+
+    const toggle = screen.getByTestId('closet-saved-looks-row')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('closet-saved-looks-list')).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
   })
 })

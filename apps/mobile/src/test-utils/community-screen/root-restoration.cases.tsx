@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 D12 (TEA): the post detail's title and back are its app top bar's; the old detail
+// title and Back ids are gone, so presence and absence read the detail layer itself.
 import React, { useState } from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { expect, it } from 'vitest'
@@ -85,7 +89,7 @@ async function open() {
   const view = render(<Harness />)
   const entry = await screen.findByTestId('community-spotlight-item-restored-spot')
   press(within(entry).getByTestId('community-card-open-restored-spot'))
-  await screen.findByTestId('community-spotlight-detail-title')
+  await screen.findByTestId('community-spotlight-detail')
   return view
 }
 export function registerCommunityRootRestorationCases() {
@@ -96,16 +100,20 @@ export function registerCommunityRootRestorationCases() {
     render(<Harness />)
     const entry = await screen.findByTestId('community-spotlight-item-restored-spot')
     press(within(entry).getByTestId('community-card-open-restored-spot'))
-    const title = await screen.findByTestId('community-spotlight-detail-title')
+    const title = within(
+      await screen.findByTestId('community-spotlight-detail')
+    ).getByTestId('app-top-bar-title')
     expect(title).toBeVisible()
     expect(screen.getByTestId('community-spotlight-detail')).toHaveTextContent(
       'Original before font'
     )
-    press(screen.getByTestId('community-spotlight-detail-close'))
+    press(
+      within(screen.getByTestId('community-spotlight-detail')).getByTestId(
+        'app-top-bar-back'
+      )
+    )
     await waitFor(() =>
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
     )
     expect(androidNavigationSnapshot().checkpoint).toBeNull()
   })
@@ -148,9 +156,7 @@ export function registerCommunityRootRestorationCases() {
     const fresh = render(<Harness initialPath="/" />)
     try {
       await waitFor(() => expect(entered).toBe(true))
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
       expect(androidNavigationSnapshot().checkpoint).toEqual({
         member: 'root-member-a',
         path: '/community',
@@ -165,16 +171,18 @@ export function registerCommunityRootRestorationCases() {
         expect(within(detail).getByText('Fresh authorized Spotlight')).toBeVisible()
       )
       expect(opened).toBe(1)
-      press(screen.getByTestId('community-spotlight-detail-close'))
+      press(
+        within(screen.getByTestId('community-spotlight-detail')).getByTestId(
+          'app-top-bar-back'
+        )
+      )
       await waitFor(() =>
         expect(androidNavigationSnapshot().checkpoint?.detailId).toBeNull()
       )
       fresh.unmount()
       render(<Harness initialPath="/" />)
       await screen.findByTestId('community-spotlight-item-restored-spot')
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
     } finally {
       held.resolve()
       act(() => setMobileApplicationUserId(null))
@@ -204,9 +212,7 @@ export function registerCommunityRootRestorationCases() {
         await waitFor(() =>
           expect(androidNavigationSnapshot().checkpoint?.detailId).toBeNull()
         )
-        expect(
-          screen.queryByTestId('community-spotlight-detail-title')
-        ).not.toBeInTheDocument()
+        expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
       } finally {
         act(() => setMobileApplicationUserId(null))
       }
@@ -231,29 +237,23 @@ export function registerCommunityRootRestorationCases() {
       const late = trackJsonBodies('/api/v1/community/spotlight')
       held.resolve()
       await late.settled()
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
       act(() => setMobileApplicationUserId('root-member-b'))
       await screen.findByTestId('community-spotlight-item-restored-spot')
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
       press(
         within(screen.getByTestId('community-spotlight-item-restored-spot')).getByTestId(
           'community-card-open-restored-spot'
         )
       )
-      await screen.findByTestId('community-spotlight-detail-title')
+      await screen.findByTestId('community-spotlight-detail')
       press(screen.getByTestId('restoration-home'))
       expect(androidNavigationSnapshot().checkpoint).toEqual({
         member: 'root-member-b',
         path: '/',
         detailId: null,
       })
-      expect(
-        screen.queryByTestId('community-spotlight-detail-title')
-      ).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-spotlight-detail')).not.toBeInTheDocument()
     } finally {
       held.resolve()
       act(() => setMobileApplicationUserId(null))

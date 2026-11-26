@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar router stub (D11)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 65: Signed-in shell without flashes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
 // Story CC-7.7 D3 test owner: the Community screen gate waits for the first feed page and the
@@ -54,7 +58,12 @@ import { ScreenGate } from './screen-gate'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // The real Community page carries the shell top bar and bottom nav, which read the route.
-vi.mock('next/navigation', () => ({ usePathname: () => '/community' }))
+// Story CC-7.11 D11: the top bar reads the router for its history-aware back.
+const router = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/community',
+  useRouter: () => router,
+}))
 
 setupCommunityGridClock()
 

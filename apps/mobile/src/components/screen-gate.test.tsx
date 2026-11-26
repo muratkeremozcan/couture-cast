@@ -17,6 +17,7 @@ import type { MemberSessionState } from '@/src/lib/member-session'
 import { SCREEN_GATE_DEADLINE_MS, ScreenGate, screenGateSettled } from './screen-gate'
 import homeSource from '../../app/(tabs)/index.tsx?raw'
 import closetSource from '../features/wardrobe/wardrobe-hub-screen.tsx?raw'
+import looksSource from '../features/looks/looks-screen.tsx?raw'
 import communitySource from '../features/community/community-screen.tsx?raw'
 import profileSource from '../../app/(tabs)/settings.tsx?raw'
 import deDE from '../../assets/locales/de-DE.json'
@@ -290,8 +291,10 @@ describe('ScreenGate (native)', () => {
   // The tab navigator never waits for the session (the splash does not either): each tab body
   // carries its own gate, so the shell and tab bar render while every body shows the placeholder.
   it.each([
-    ['Home', homeSource, 'home'],
+    ['Today', homeSource, 'home'],
     ['Closet', closetSource, 'closet'],
+    // Story CC-7.11 D8: the Looks tab carries its own gate like the other four.
+    ['Looks', looksSource, 'looks'],
     ['Community', communitySource, 'community'],
     ['Profile', profileSource, 'profile'],
   ])('7.7-NAT-001 the %s tab wraps its body in its gate', (_tab, source, name) => {

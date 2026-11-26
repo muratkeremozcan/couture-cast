@@ -2,6 +2,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the swap sheet title is the
+// layer's swipe handle; a swipe closes it like Back, keeps the garment and refocuses the tile.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
@@ -27,6 +32,8 @@ import {
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { failOnConsoleWarnOrError } from '@/src/test-utils/console-guard'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 
 const mockRouter = { setParams: vi.fn() }
 
@@ -345,6 +352,38 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       scenario: 'morning',
       itemId: 'leather-jacket',
     })
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the swap sheet title closes it, keeps the garment and refocuses its tile', async () => {
+    await render(<TabOneScreen />)
+    await screen.findByText('Classic Trench Coat')
+
+    const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
+    swapButton.focus()
+    fireEvent.click(swapButton)
+    const sheet = screen.getByTestId('garment-swap-modal')
+    const title = screen.getByText(/Choose alternate outerwear/i)
+    expect(sheet.contains(title)).toBe(true)
+    const handle = title.closest<HTMLElement>('[data-testid="layer-swipe-handle"]')
+    expect(handle, 'the title sits in the swipe handle').not.toBeNull()
+    mockCapture.mockClear()
+
+    await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+
+    await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
+    // Closed without a choice: the garment stays and no swap is recorded.
+    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    expect(screen.queryByText('Leather Jacket')).toBeNull()
+    expect(mockCapture).not.toHaveBeenCalledWith(
+      'hero_interaction',
+      expect.objectContaining({ interactionType: 'garment_swap' })
+    )
+    // D13: the tile that opened the sheet takes focus back (returnFocusRef).
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveFocus()
+    )
   })
 
   it('verifies offline fallback banner and stale state display when API request fails', async () => {

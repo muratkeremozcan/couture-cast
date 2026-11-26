@@ -83,7 +83,8 @@ tags:
     timeout: 15000
 - assertVisible:
     id: 'app-top-bar-title'
-    text: 'Gardırobunu oluştur'
+    # Story CC-7.11 D5: the setup route is titled by wardrobe.menu.setup.
+    text: 'Dolap kurulumu'
     label: 'Setup screen title is localized'
 - extendedWaitUntil:
     visible:

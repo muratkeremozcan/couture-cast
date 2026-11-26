@@ -1,5 +1,12 @@
 // Learning path Step 58: Production status and nightly health.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): Codex 7.11 #10 (D12, D13): a regular feed card opens the
+// full-height post detail `community-post-detail` titled with the post's own title (the
+// `community.feed.detailTitle` label when it has none); top bar back, system back and a header
+// swipe close it, accessibility focus returns to the card, and the open is recorded once.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import {
   mockCapture,
   SDK_ERROR_MESSAGE,
@@ -28,6 +35,8 @@ import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { server } from '@/src/test-utils/msw/server'
 import { getCommunityPostFromMobile } from '@/src/lib/community'
 import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
@@ -37,6 +46,20 @@ import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
+
+/**
+ * iOS focus plumbing that only records: a node gets a handle when the screen asks for one, so a
+ * focus assertion on a node the screen never resolved fails.
+ */
+function iosRecordedHandles() {
+  Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+  const handles = new Map<unknown, number>()
+  vi.mocked(findNodeHandle).mockImplementation((node: unknown) => {
+    if (!handles.has(node)) handles.set(node, 900 + handles.size)
+    return handles.get(node) ?? null
+  })
+  return handles
+}
 
 /** Gives every host node its own native handle, so focus targets stay distinguishable. */
 function distinctNodeHandles() {
@@ -1075,4 +1098,112 @@ export function registerCommunityFeedCases() {
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(55)
     )
   })
+
+  it.each([
+    ['a titled post', { title: 'Charcoal commute' }, 'Charcoal commute'],
+    ['an untitled post', {}, enUS.community.feed.detailTitle],
+  ] as const)(
+    '[Codex 7.11 #10] [7.11-NAT-030] a feed card of %s opens the post detail under its title and records the open once',
+    async (_name, overrides, title) => {
+      const opened: { postId: string; body: unknown }[] = []
+      serveFeed(() => feedJson({ items: [item({ id: 'post-a', ...overrides })] }))
+      server.use(
+        http.post(
+          '*/api/v1/community/posts/:postId/opened',
+          async ({ params, request }) => {
+            opened.push({ postId: params.postId as string, body: await request.json() })
+            return HttpResponse.json({ tracked: true })
+          }
+        )
+      )
+
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-open-post-a'))
+
+      const detail = await screen.findByTestId('community-post-detail')
+      expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(title)
+      expect(within(detail).getByTestId('app-top-bar-back')).toBeVisible()
+      expect(within(detail).getByTestId('community-post-card-post-a')).toBeVisible()
+      // A feed post has no Spotlight rank, and the Spotlight's own layer stays closed.
+      expect(within(detail).queryByTestId('community-spotlight-detail-rank')).toBeNull()
+      expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
+      await waitFor(() =>
+        expect(opened).toEqual([
+          { postId: 'post-a', body: { experimentVariant: 'auto' } },
+        ])
+      )
+
+      press(within(detail).getByTestId('app-top-bar-back'))
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-post-detail')).toBeNull()
+      )
+      // The detail's own copy of the card cannot record a second open.
+      await delay(50)
+      expect(opened).toHaveLength(1)
+    }
+  )
+
+  it.each([
+    [
+      'its top bar back',
+      (detail: HTMLElement): void | Promise<void> => {
+        press(within(detail).getByTestId('app-top-bar-back'))
+      },
+    ],
+    [
+      'system back',
+      (): void | Promise<void> => {
+        // react-native-web calls the Modal's onRequestClose on Escape, as Android does on back.
+        fireEvent.keyUp(document.body, { key: 'Escape' })
+      },
+    ],
+    [
+      'a swipe down on its top bar',
+      async (detail: HTMLElement) => {
+        await dragFrom(within(detail).getByTestId('app-top-bar-title'), {
+          dy: LAYER_SWIPE_CLOSE_PX + 40,
+        })
+      },
+    ],
+  ] as const)(
+    '[Codex 7.11 #10] [7.11-NAT-031] %s closes the feed post detail and accessibility focus returns to the card',
+    async (_way, close) => {
+      const handles = iosRecordedHandles()
+      serveFeed(() =>
+        feedJson({
+          items: [
+            item({ id: 'post-a', title: 'Charcoal commute' }),
+            item({ id: 'post-b', title: 'Rain shell' }),
+          ],
+        })
+      )
+      server.use(
+        http.post('*/api/v1/community/posts/:postId/opened', () =>
+          HttpResponse.json({ tracked: true })
+        )
+      )
+
+      await render(<CommunityScreen />)
+      // The second card, so focus going to the first card or the list would fail.
+      press(await screen.findByTestId('community-card-open-post-b'))
+      const detail = await screen.findByTestId('community-post-detail')
+      expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(
+        'Rain shell'
+      )
+      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+
+      await close(detail)
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-post-detail')).toBeNull()
+      )
+      const card = screen.getByTestId('community-post-card-post-b')
+      await waitFor(() => {
+        expect(handles.get(card)).toBeTypeOf('number')
+        expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+          handles.get(card)
+        )
+      })
+    }
+  )
 }

@@ -102,13 +102,14 @@ tags:
         id: 'community-spotlight-view-more'
     times: 16
     commands:
+      # Story CC-7.11 D12: an accidentally opened detail layer closes with its top bar back.
       - runFlow:
           when:
             visible:
-              id: 'community-spotlight-detail-close'
+              id: 'community-spotlight-detail-rank'
           commands:
             - tapOn:
-                id: 'community-spotlight-detail-close'
+                id: 'app-top-bar-back'
             - waitForAnimationToEnd
       - swipe:
           start: '90%, 62%'
@@ -143,13 +144,14 @@ tags:
         id: 'community-spotlight-rank-seed-spotlight-1'
     times: 16
     commands:
+      # Story CC-7.11 D12: an accidentally opened detail layer closes with its top bar back.
       - runFlow:
           when:
             visible:
-              id: 'community-spotlight-detail-close'
+              id: 'community-spotlight-detail-rank'
           commands:
             - tapOn:
-                id: 'community-spotlight-detail-close'
+                id: 'app-top-bar-back'
             - waitForAnimationToEnd
       - swipe:
           start: '10%, 62%'
@@ -168,12 +170,16 @@ tags:
     index: 0
     label: 'Open the first spotlight card'
 
+# Story CC-7.11 D12: the detail is a layer whose header is the top bar with a back arrow and the
+# post's title, so the rank line is the detail's own anchor.
 - extendedWaitUntil:
     visible:
-      id: 'community-spotlight-detail-title'
-      text: 'City Spotlight'
+      id: 'community-spotlight-detail-rank'
     timeout: 10000
     label: 'The detail opened on top of the module'
+- assertVisible:
+    id: 'app-top-bar-back'
+    label: 'The detail layer has the top bar back arrow'
 
 - assertVisible:
     id: 'community-spotlight-detail-rank'
@@ -187,12 +193,12 @@ tags:
     label: 'The detail shows the reused card for the same post'
 
 - tapOn:
-    id: 'community-spotlight-detail-close'
+    id: 'app-top-bar-back'
     label: 'Return from the detail'
 
 - extendedWaitUntil:
     notVisible:
-      id: 'community-spotlight-detail-title'
+      id: 'community-spotlight-detail-rank'
     timeout: 10000
     label: 'The detail closed'
 

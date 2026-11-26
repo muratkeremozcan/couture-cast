@@ -5,8 +5,13 @@
 // (E-CANCEL at component level): the identity is deleted first, then the person goes back to
 // the door, or to the preview they came from.
 // Plan: _bmad-output/test-artifacts/test-design/cc617-google-sign-in-test-design.md
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar's history-aware back reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import type * as NextNavigation from 'next/navigation'
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
@@ -57,6 +62,20 @@ vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
   webGuestPreviewStore: () => ({ clear: preview.clear }),
 }))
 import { FinishSignupForm } from './finish-signup-form'
+
+// Story CC-7.11 D11: the top bar's back reads the router. Outside a mounted app router the real
+// hook throws, so the test supplies one and keeps the rest of next/navigation.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => ({
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}))
 
 const strings = getFederatedSignInStrings('en-US')
 const realLocation = window.location

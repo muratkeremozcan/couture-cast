@@ -92,7 +92,7 @@ describe('the tab shell reads the token roles', () => {
     const Header = () => (
       <>
         {header({
-          options: { title: 'Home' },
+          options: { title: 'Today' },
           route: { name: 'index' },
           navigation: { goBack: () => undefined, canGoBack: () => false },
         })}

@@ -1,5 +1,8 @@
 # Test design: Story CC-7.11 five-tab navigation and back pattern
 
+Updated: 2026-11-26. Codex review (16 findings) and the first CI run: Codex #6, #9, #14, #15, #16
+added to the E2E specs; #1, #7, #11, #12, #14 at unit level; D14 proof opens a garment from depth.
+
 Updated: 2026-11-26. Builder contract confirmed (titles, menu roles, Looks signed out shows the
 empty line and both rows, notification settings entered from Community); E2E-035, 044 and 045
 moved or dropped as noted in their rows.
@@ -143,17 +146,17 @@ nightly only (no macOS on PRs); PR proof for native is the RNW suite.
 
 One parameterised table over every D10 sub-screen. Each row runs two cases.
 
-| ID           | Scenario                                                                                                                    | AC / D |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 7.11-E2E-020 | In-app entry from the parent: top bar has back arrow and the screen title (h1); back returns to the parent URL              | 4, 5   |
-| 7.11-E2E-021 | Direct entry (cold `page.goto`): back arrow replaces to the parent tab; browser history length does not grow                | 4, 5   |
-| 7.11-E2E-030 | Closet scrolled to 1,200 px, open garment detail, back arrow: Closet at the same offset (+-2 px), focus on the opening tile | 4, D14 |
-| 7.11-E2E-031 | Same with browser back instead of the arrow                                                                                 | 4, D14 |
-| 7.11-E2E-032 | Community scrolled, open post detail layer, browser back: layer closed, same offset, URL unchanged                          | 4, D12 |
-| 7.11-E2E-033 | Two levels: Profile > Style > Palette, back, back: Style then Profile; arrow and browser back agree                         | 4, D11 |
-| 7.11-E2E-034 | Reload on a sub-screen after in-app entry: back still lands on the parent (no stuck arrow)                                  | 4, P1  |
-| 7.11-E2E-035 | Covered at unit level (UNIT-012: in-memory stack, `reset()` on sign-out); E2E-034 proves a fresh document has no stack      | P1, P8 |
-| 7.11-E2E-036 | Notification settings parent is Profile (moved from Community)                                                              | D10    |
+| ID           | Scenario                                                                                                                                                                                          | AC / D |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 7.11-E2E-020 | In-app entry from the parent: top bar has back arrow and the screen title (h1); back returns to the parent URL                                                                                    | 4, 5   |
+| 7.11-E2E-021 | Direct entry (cold `page.goto`): back arrow replaces to the parent tab; browser history length does not grow                                                                                      | 4, 5   |
+| 7.11-E2E-030 | Closet scrolled to a tile at depth (row 8), open its garment detail, back arrow: same offset, focus on the tile (top bar is not sticky, builder decision; More at depth scrolls to the top first) | 4, D14 |
+| 7.11-E2E-031 | Same with browser back instead of the arrow                                                                                                                                                       | 4, D14 |
+| 7.11-E2E-032 | Community scrolled, open post detail layer, browser back: layer closed, same offset, URL unchanged                                                                                                | 4, D12 |
+| 7.11-E2E-033 | Two levels: Profile > Style > Palette, back, back: Style then Profile; arrow and browser back agree                                                                                               | 4, D11 |
+| 7.11-E2E-034 | Reload on a sub-screen after in-app entry: back still lands on the parent (no stuck arrow)                                                                                                        | 4, P1  |
+| 7.11-E2E-035 | Covered at unit level (UNIT-012: in-memory stack, `reset()` on sign-out); E2E-034 proves a fresh document has no stack                                                                            | P1, P8 |
+| 7.11-E2E-036 | Notification settings parent is Profile (moved from Community)                                                                                                                                    | D10    |
 
 Rows: garment detail (Closet), saved look detail layer (Looks), post detail layer (Community),
 Plan (Looks), capsules (Looks), setup (Closet), Silhouette (Closet), Style (Profile), palette

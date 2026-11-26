@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar's history-aware back reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 65: Signed-in shell without flashes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
 // Story CC-7.7 D3 and D4 test owner: Home's screen gate waits for the member's ritual and, in a
@@ -41,7 +45,10 @@ import { ScreenGate } from './screen-gate'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 vi.mock('../../lib/community', { spy: true })
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+}))
 
 const date = '2026-11-25T12:00:00.000Z'
 

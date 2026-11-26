@@ -208,6 +208,22 @@ premiumSeededTest.describe(
           'the rail takes no focus on open'
         ).toBe(false)
 
+        // Codex 7.11 #16: a keyboard member Tabs into the rail and out again; nothing traps
+        // focus inside it any more.
+        await log.step('Tab enters the rail, then leaves it')
+        let entered = false
+        let left = false
+        for (let index = 0; index < 60 && !left; index += 1) {
+          await page.keyboard.press('Tab')
+          const inside = await planner.evaluate((node) =>
+            node.contains(document.activeElement)
+          )
+          if (inside) entered = true
+          else if (entered) left = true
+        }
+        expect(entered, 'Tab reaches a rail control').toBe(true)
+        expect(left, 'Tab moves past the rail').toBe(true)
+
         await log.step('Assert the live seven-day week rendered, not a static fixture')
         await assertLiveWeekRendered(page, data)
 

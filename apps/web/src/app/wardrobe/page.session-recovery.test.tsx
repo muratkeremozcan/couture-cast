@@ -1,3 +1,8 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-CLOSET-007 (D5, D6: setup progress and Silhouette moved
+// into the Closet More menu, so the recovered reads show there).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 //
@@ -7,7 +12,7 @@
 // now reads again when the verified identity is published (`couture:session` with a member).
 // @vitest-environment jsdom
 import React, { useSyncExternalStore } from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import type {
@@ -30,8 +35,16 @@ const wardrobe = vi.hoisted(() => ({
 /** The verified member the session layer reports; the page under test only reads it. */
 const session = vi.hoisted(() => ({ member: null as string | null }))
 
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
   // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
@@ -98,6 +111,22 @@ function inProgress(): WardrobeOnboardingStateContract {
     revision: 2,
   }
 }
+function completed(): WardrobeOnboardingStateContract {
+  return {
+    status: 'completed',
+    currentStep: 'complete',
+    usedStarterWardrobe: true,
+    garmentsCapturedCount: 0,
+    startedAt: '2026-11-19T09:00:00.000Z',
+    completedAt: '2026-11-19T09:30:00.000Z',
+    revision: 3,
+  }
+}
+/** Story CC-7.11 D5: opens the Closet top bar More menu if it is closed. */
+function openMore() {
+  const more = screen.getByTestId('closet-more-menu')
+  if (more.getAttribute('aria-expanded') !== 'true') fireEvent.click(more)
+}
 function silhouetteProfile(): SilhouetteProfileContract {
   return {
     mode: 'default_mannequin',
@@ -141,6 +170,9 @@ afterEach(() => cleanup())
 describe('Step 58 follow-up: mount-time reads recover when the verified identity arrives', () => {
   it('the hub reads the account, setup progress and closet again once a member is published', async () => {
     signedOutAtMount()
+    // CC-7.11 D5: the recovered progress is completed, so the More menu's setup item can only
+    // read done once the second read lands.
+    wardrobe.getOnboardingStateFromWeb.mockResolvedValue(completed())
     render(<WardrobePage />)
 
     expect(await screen.findByText(SIGNED_OUT_MESSAGE)).toBeInTheDocument()
@@ -148,7 +180,14 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     expect(
       await screen.findByText('Unable to check your closet setup progress.')
     ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Silhouette' })).toBeDisabled()
+    // CC-7.11 D6: Silhouette is a route link in the More menu, never gated on the account read.
+    expect(screen.queryByRole('button', { name: 'Silhouette' })).toBeNull()
+    openMore()
+    expect(screen.getByTestId('closet-more-silhouette')).toHaveAttribute(
+      'href',
+      '/wardrobe/silhouette'
+    )
+    expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(/^Closet setup$/)
 
     // A publication with no member (verification still running, or a sign-out) reads nothing.
     publishIdentity(null)
@@ -158,12 +197,16 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     publishIdentity('member-a')
 
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+      expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
     )
     expect(await screen.findByText('No garments added yet')).toBeInTheDocument()
-    expect(
-      await screen.findByRole('link', { name: 'Set up your closet' })
-    ).toBeInTheDocument()
+    openMore()
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
+    expect(screen.queryByRole('link', { name: 'Set up your closet' })).toBeNull()
     expect(screen.queryByText(SIGNED_OUT_MESSAGE)).not.toBeInTheDocument()
     expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
     expect(

@@ -1,11 +1,14 @@
 import type { Page, Request, Route } from '@playwright/test'
 import {
+  communityCommentsResponseSchema,
+  communityCommentSubmissionsResponseSchema,
   communityEventsResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   listSavedLocationsResponseSchema,
   resolveCommunityTargetsResponseSchema,
   ritualResponseSchema,
+  trackedResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   type ResolveCommunityTargetsInput,
@@ -61,6 +64,13 @@ export function readKey(url: string, method: string) {
   const path = pathname.replace(/^.*\/api\/v1\//, '')
   if (method === 'POST' && path === 'community/targets/resolve')
     return 'community-resolve'
+  // Story CC-7.11 D12: opening a post detail layer records the open and reads its comments.
+  if (method === 'POST' && /^community\/posts\/[^/]+\/opened$/.test(path))
+    return 'community-opened'
+  if (method === 'GET' && /^community\/posts\/[^/]+\/comments$/.test(path))
+    return 'community-comments'
+  if (method === 'GET' && /^community\/posts\/[^/]+\/comment-submissions$/.test(path))
+    return 'community-comment-submissions'
   if (method !== 'GET') return null
   if (path === 'community/spotlight')
     return searchParams.get('surface') === 'home_teaser'
@@ -93,7 +103,8 @@ export function readKey(url: string, method: string) {
 export const GATE_READS: Record<ShellScreen, string[]> = {
   // The ritual read counts as settled only once its city line (`locations`) answered too.
   home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
-  closet: ['profile', 'onboarding', 'garments', 'saved-looks'],
+  // Story CC-7.11: the onboarding read only labels the More menu now, outside the gate.
+  closet: ['profile', 'garments', 'saved-looks'],
   // Story CC-7.11 D8: Looks opens on the saved looks list (moved out of the Closet header).
   looks: ['saved-looks'],
   community: ['community-feed', 'community-spotlight'],
@@ -139,7 +150,7 @@ function feedItem(id: string, title: string) {
   }
 }
 
-function bodies(memberId: string, populated: boolean, teenPending = false) {
+export function bodies(memberId: string, populated: boolean, teenPending = false) {
   // Community content is other members' posts, so a pending teen with nothing of their own still
   // sees it (CC-7.10 D1).
   const community = populated || teenPending
@@ -353,6 +364,13 @@ function bodies(memberId: string, populated: boolean, teenPending = false) {
       offset: 0,
     },
     'events-poll': { events: [], nextSince: null },
+    'community-opened': checked(trackedResponseSchema, { tracked: true }),
+    'community-comments': checked(communityCommentsResponseSchema, {
+      data: { items: [], nextCursor: null, snapshot: 0, hasNewer: false },
+    }),
+    'community-comment-submissions': checked(communityCommentSubmissionsResponseSchema, {
+      data: { items: [], nextCursor: null },
+    }),
     'community-feed': checked(communityReactionFeedResponseSchema, { data: feedPage }),
     'community-spotlight': checked(communityReactionSpotlightResponseSchema, {
       data: spotlight,

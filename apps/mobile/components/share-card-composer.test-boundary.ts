@@ -1,6 +1,7 @@
 import type * as ReactNativeModule from 'react-native'
 import { createElement, useEffect, type ReactNode } from 'react'
 import { vi } from 'vitest'
+import type * as EdgeToEdgeModalModule from './edge-to-edge-modal'
 
 /**
  * The share-card composer tests' mocked boundary: the state every mock reads and the factory
@@ -138,7 +139,13 @@ export const composerMocks = {
       return Promise.resolve('focused')
     },
   }),
-  modal: () => ({
+  /**
+   * The modal is a plain dialog here; every other export stays the real one, so the composer's
+   * header keeps the real LayerSwipeHandle (Story CC-7.11 D13) and its layout. The swipe close
+   * itself runs against the real EdgeToEdgeModal in share-card-composer.marker.test.tsx.
+   */
+  modal: (actual: typeof EdgeToEdgeModalModule) => ({
+    ...actual,
     useModalInsets: () => ({ top: 10, bottom: 10, left: 0, right: 0 }),
     EdgeToEdgeModal: ({
       visible,

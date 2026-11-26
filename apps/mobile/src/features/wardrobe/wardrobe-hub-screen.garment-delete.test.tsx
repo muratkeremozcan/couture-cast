@@ -10,6 +10,10 @@
 // or a notice from the last account says nothing. With no hub mounted the deletion tells other
 // screens itself, and Capsules open over the hub reads its capsules again once a delete lands.
 // Every case drives a fresh controller on a manual timer.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 (TEA): the hub fills its tab top bar through `navigation.setOptions` (D4), and
+// Capsules opens from the Looks tab (D8), so the Closet blurs on that tab switch.
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -33,7 +37,11 @@ vi.mock('expo-router', async () => ({
   Stack: { Screen: () => null },
   // Imported, not importActual'd, so the hub and `screenFocus` share one module instance.
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
+  // Story CC-7.11 D4: the hub sets its top bar Add and More through setOptions.
+  useNavigation: (await import('../../test-utils/tab-navigation.js')).useTabNavigation,
 }))
+// The Closet More sheet's X imports the icon font, whose native module the browser lacks.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 
 vi.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: vi.fn(),
@@ -144,6 +152,7 @@ import {
 import { notifyWardrobeChanged, onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { server } from '@/src/test-utils/msw/server'
+import { tabNavigation } from '@/src/test-utils/tab-navigation'
 import WardrobeCapsulesScreen from '../../../app/wardrobe-capsules'
 import {
   createMobileGarmentDeletion,
@@ -529,6 +538,7 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     }
     resetGarmentDeletionForTests()
     screenFocus.reset()
+    tabNavigation.reset()
     stopWatching()
     restoreToken()
     setMobileApplicationUserId(null)
@@ -2034,9 +2044,10 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
       const view = await renderLoadedHub()
       requestDelete(blueTop.id)
 
-      // Capsules is pushed over the hub: the hub blurs and sends the delete, held at the server.
-      await browserUser.click(screen.getByTestId('wardrobe-capsules-link'))
-      expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-capsules')
+      // Story CC-7.11 D8: Capsules opens from the Looks tab (its row, 7.11-NAT-014), so the
+      // member leaves the Closet first: the hub blurs on that tab press and sends the delete,
+      // held at the server. The Closet offers no Capsules entry of its own any more.
+      expect(screen.queryByTestId('wardrobe-capsules-link')).toBeNull()
       setHubFocus(false)
       await waitFor(() => expect(deletes).toEqual([sentDelete(blueTop.id)]))
       view.rerender(hubTree(deletion, true))

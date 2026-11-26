@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): post detail closes from its layer back arrow (D12)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import { CommunitySyncState } from '@couture/api-client'
@@ -263,12 +267,14 @@ describe('community share host across card surfaces', () => {
   )
 })
 
+// Story CC-7.11 D12: post detail is a full-height layer; its top bar back arrow replaced the X.
+const detailBack = () =>
+  within(
+    document.querySelector<HTMLElement>('[aria-labelledby="community-detail-title"]')!
+  ).getByRole('button', { name: 'Back' })
+
 async function closeDetail() {
-  await userEvent.click(
-    within(
-      document.querySelector<HTMLElement>('[aria-labelledby="community-detail-title"]')!
-    ).getAllByRole('button', { name: 'Close this look' })[0]!
-  )
+  await userEvent.click(detailBack())
   await act(async () => {
     await Promise.resolve()
   })
@@ -407,11 +413,9 @@ describe('community share host above an open detail dialog', () => {
     expect(
       within(detailDialog() as HTMLElement).getByTestId('share-card-open')
     ).toHaveFocus()
-    await userEvent.click(
-      within(detailDialog() as HTMLElement).getAllByRole('button', {
-        name: 'Close this look',
-      })[0]!
-    )
+    const back = detailBack()
+    expect(back).toHaveAttribute('data-testid', 'app-top-bar-back')
+    await userEvent.click(back)
     await act(async () => {
       await Promise.resolve()
     })

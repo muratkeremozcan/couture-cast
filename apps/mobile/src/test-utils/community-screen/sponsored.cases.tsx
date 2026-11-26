@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 D12 (TEA): the post detail's title and back are its app top bar's; the old detail
+// title and Back ids are gone, so presence and absence read the detail layer itself.
 // Story 6.7b owner: sponsored community CTAs on the Community screen, through the
 // real HTTP boundary. Each card is found by its loaded content first, so every
 // absence asserted below is an absence on a rendered card.
@@ -208,7 +212,7 @@ export function registerCommunitySponsoredCases() {
     const moduleItem = await screen.findByTestId('community-spotlight-item-spot-1')
     await browserUser.click(within(moduleItem).getByTestId('community-card-shop-spot-1'))
     await browserUser.click(within(moduleItem).getByTestId('community-card-open-spot-1'))
-    await screen.findByTestId('community-spotlight-detail-title')
+    await screen.findByTestId('community-spotlight-detail')
     const copies = await screen.findAllByTestId('community-card-shop-spot-1')
     await browserUser.click(copies.find((copy) => !moduleItem.contains(copy))!)
     await waitFor(() => expect(bodies).toHaveLength(4))
@@ -228,7 +232,7 @@ export function registerCommunitySponsoredCases() {
     await waitFor(() => expect(bodies).toHaveLength(1))
 
     await browserUser.click(within(moduleItem).getByTestId('community-card-open-spot-1'))
-    await screen.findByTestId('community-spotlight-detail-title')
+    await screen.findByTestId('community-spotlight-detail')
     const copies = await screen.findAllByTestId('community-card-shop-spot-1')
     expect(copies).toHaveLength(2)
     const detailCopy = copies.find((copy) => !moduleItem.contains(copy))

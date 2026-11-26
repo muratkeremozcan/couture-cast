@@ -86,7 +86,8 @@ tags:
 # By id: Android reports the bar's title beside app-top-bar, not under it, so childOf never matches.
 - assertVisible:
     id: 'app-top-bar-title'
-    text: '7-Day Planner'
+    # Story CC-7.11 D9, D10: Plan is a sub-screen of Looks, titled looks.plan.
+    text: 'Plan'
     label: 'Localized screen title in the top bar'
 
 - assertVisible:

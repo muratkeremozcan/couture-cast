@@ -304,6 +304,8 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
       await expect(menu).toBeVisible()
       await page.mouse.click(195, 400)
       await expect(menu).toBeHidden()
+      // Codex 7.11 #14: an outside click on non-focusable chrome hands focus back to More.
+      await expect(more).toBeFocused()
       await expect(page).toHaveURL(/\/wardrobe$/)
     })
   }

@@ -6,6 +6,12 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
 // Learning path Step 63: Garment detail and tag edit (7.5-NAT-002, 7.5-NAT-006).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the Closet opens on its grid (D4, D5): Add and More sit in the
+// tab top bar the hub fills through `navigation.setOptions`, so every render here draws that bar
+// (`TabTopBar`) beside the hub. Setup and Silhouette moved into the More sheet, Capsules to Looks.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -37,7 +43,12 @@ vi.mock('expo-router', async () => ({
   router: routerMock,
   // Story 7.6: the hub flushes pending deletes when its screen blurs; these cases stay focused.
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
+  // Story CC-7.11 D4: the hub puts Add and More in its tab top bar through setOptions.
+  useNavigation: (await import('../../test-utils/tab-navigation.js')).useTabNavigation,
 }))
+// AppTopBar (drawn by TabTopBar) and the More sheet's X import the icon font, whose native
+// module the browser lacks.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 
 const imagePicker = vi.hoisted(() => ({
   requestCameraPermissionsAsync: vi.fn(),
@@ -62,6 +73,8 @@ const nativeStyleRuntime = vi.hoisted(() => ({
     ['style-piece-weather-cool-windy', 85],
     ['style-piece-weather-warm-rainy', 86],
   ]),
+  /** Handles for controls with no testID (a failed garment's Replace), keyed by element. */
+  nodeHandles: new Map<unknown, number>(),
   holdDismissal: false,
   finishDismissal: undefined as (() => void) | undefined,
   state: 'active' as ReactNativeModule.AppStateStatus,
@@ -174,7 +187,10 @@ vi.mock('react-native', async (importOriginal) => {
     },
     findNodeHandle: vi.fn((node: unknown) => {
       if (!nativeStyleRuntime.enabled || !(node instanceof HTMLElement)) return undefined
-      return nativeStyleRuntime.focusHandles.get(node.dataset.testid ?? '')
+      return (
+        nativeStyleRuntime.focusHandles.get(node.dataset.testid ?? '') ??
+        nativeStyleRuntime.nodeHandles.get(node)
+      )
     }),
     Modal: ({
       children,
@@ -218,8 +234,19 @@ import {
 import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import { TabTopBar, tabNavigation } from '@/src/test-utils/tab-navigation'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
-import { colorRoles } from '@couture/utils'
+import {
+  colorRoles,
+  getGuestPreviewStrings,
+  SAMPLE_CATALOG,
+  stylePieceAnchor,
+  stylePieceLooks,
+} from '@couture/utils'
+import type {
+  GarmentItemContract,
+  SavedLookContract,
+} from '@couture/api-client/contracts/http'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
 
 /** A `#RRGGBB` token as the browser's computed `rgb(r, g, b)`. */
@@ -293,10 +320,28 @@ const onboardingNotCompleted = {
   revision: 1,
 }
 
+/** The hub under its tab top bar, which carries Add and More (Story CC-7.11 D4). */
+function renderHub(hub: React.ReactElement) {
+  return render(
+    <>
+      <TabTopBar title={i18n.t('tabs.closet')} route="wardrobe" />
+      {hub}
+    </>
+  )
+}
+
 function renderScreen(pollOffsetsMs: readonly number[] = [1, 1, 1, 1]) {
   // pollOffsetsMs keeps the still-processing garment poll deterministic and
   // fast in tests instead of paying the real 1s/2s/4s/8s production schedule.
-  render(<WardrobeHubScreen pollOffsetsMs={pollOffsetsMs} />)
+  renderHub(<WardrobeHubScreen pollOffsetsMs={pollOffsetsMs} />)
+}
+
+const onboardingCompleted = {
+  ...onboardingNotCompleted,
+  status: 'completed' as const,
+  currentStep: 'complete' as const,
+  // `onboardingStateSchema` sets `completedAt` exactly when the status is `completed`.
+  completedAt: '2026-08-09T00:10:00.000Z',
 }
 
 function garmentFixture(overrides: Record<string, unknown> = {}) {
@@ -388,12 +433,14 @@ describe('WardrobeHubScreen', () => {
     nativeStyleRuntime.platform = 'ios'
     nativeStyleRuntime.files.clear()
     nativeStyleRuntime.read.mockReset()
+    nativeStyleRuntime.nodeHandles.clear()
     nativeStyleRuntime.holdDismissal = false
     nativeStyleRuntime.finishDismissal = undefined
     nativeStyleRuntime.state = 'active'
     nativeStyleRuntime.stateListeners.clear()
     routerMock.replace.mockClear()
     routerMock.push.mockClear()
+    tabNavigation.reset()
     vi.clearAllMocks()
   })
 
@@ -412,34 +459,46 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByText(i18n.t('wardrobe.title'))).toBeNull()
   })
 
-  it('7.7-NAT-003 the Closet gate waits for the inventory and onboarding reads, then a refresh keeps the closet in place', async () => {
+  it('7.7-NAT-003 [7.11 D4] the Closet gate waits for the inventory, never the onboarding read, then a refresh keeps the closet in place', async () => {
     let releaseOnboarding!: () => void
     const onboardingHeld = new Promise<void>((resolve) => {
       releaseOnboarding = resolve
     })
     onTestFinished(() => releaseOnboarding())
+    let releaseInventory!: () => void
+    const inventoryHeld = new Promise<void>((resolve) => {
+      releaseInventory = resolve
+    })
+    onTestFinished(() => releaseInventory())
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', async () => {
         await onboardingHeld
         return HttpResponse.json({ data: onboardingNotCompleted })
+      }),
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        await inventoryHeld
+        return HttpResponse.json({ data: [] })
       })
     )
     renderScreen()
 
-    // The inventory answered (empty), the onboarding state has not: the placeholder holds.
-    const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
-    expect(emptyTitle).not.toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
-    expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
+    // The inventory has not answered: the placeholder holds.
+    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
+
+    act(() => releaseInventory())
+
+    // D4: the onboarding state only names the More sheet's setup row, so the closet opens with
+    // that read still out, and nothing sits above the closet in the gate body.
+    const emptyState = await screen.findByTestId('wardrobe-empty-state')
+    await waitFor(() => expect(emptyState).toBeVisible())
+    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+    const body = screen.getByTestId('screen-gate-body-closet')
+    expect(body.firstElementChild).toBe(emptyState)
 
     act(() => releaseOnboarding())
-
-    // The setup card is in place when the closet appears: nothing is inserted above it later.
-    await waitFor(() =>
-      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
-    )
-    expect(emptyTitle).toBeVisible()
-    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+    await act(() => Promise.resolve())
+    expect(body.firstElementChild).toBe(screen.getByTestId('wardrobe-empty-state'))
 
     // A refresh (a tag save elsewhere) never returns to the first-load spinner.
     let garmentReads = 0
@@ -462,9 +521,7 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() =>
       expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
     )
-    await waitFor(() =>
-      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
-    )
+    expect(body.firstElementChild).toBe(screen.getByTestId('wardrobe-empty-state'))
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 
@@ -487,19 +544,25 @@ describe('WardrobeHubScreen', () => {
 
     // Inventory and onboarding answered; only the Saved Looks page is out.
     const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
-    const setupCard = await screen.findByTestId('wardrobe-onboarding-card')
     await waitFor(() => expect(savedLookReads).toBe(1))
     expect(emptyTitle).not.toBeVisible()
-    expect(setupCard).not.toBeVisible()
     expect(screen.getByTestId('screen-placeholder')).toBeVisible()
 
     act(() => releaseSavedLooks())
 
-    // The row's error and Retry arrive with the closet in one commit, above nothing shown yet.
-    await waitFor(() => expect(screen.getByTestId('saved-looks-retry')).toBeVisible())
-    expect(setupCard).toBeVisible()
+    // The row's error and Retry arrive with the closet in one commit; Story CC-7.11 D4 moved
+    // the row below the closet, so the closet opens first in the body and the Retry sits under it.
+    const retry = await screen.findByTestId('saved-looks-retry')
+    await waitFor(() => expect(retry).toBeVisible())
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
+    const emptyState = screen.getByTestId('wardrobe-empty-state')
+    expect(screen.getByTestId('screen-gate-body-closet').firstElementChild).toBe(
+      emptyState
+    )
+    expect(retry.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      emptyState.getBoundingClientRect().bottom
+    )
   })
 
   it('7.7-NAT-003 a return to the Closet re-reads the inventory and Saved Looks in place', async () => {
@@ -549,28 +612,32 @@ describe('WardrobeHubScreen', () => {
     expect(row).toHaveTextContent(i18n.t('savedLooks.count', { count: 0 }))
   })
 
-  it('7.7-NAT-004 keeps the 24-point gap between the setup card, Saved Looks and the closet inside the gate', async () => {
+  it('7.7-NAT-004 [7.11 D4] keeps the 24-point gap between the closet and the Saved Looks row below it inside the gate', async () => {
     // Saved Looks belong to a member: without one the row renders nothing to measure.
     setMobileApplicationUserId('closet-gate-gap-owner')
     renderScreen()
-    const setupCard = await screen.findByTestId('wardrobe-onboarding-card')
-    await waitFor(() => expect(setupCard).toBeVisible())
+    const emptyState = await screen.findByTestId('wardrobe-empty-state')
+    await waitFor(() => expect(emptyState).toBeVisible())
     const body = screen.getByTestId('screen-gate-body-closet')
 
     // The ScrollView's gap reaches only its direct children; the gate body carries its own.
-    expect(setupCard.parentElement).toBe(body)
+    expect(emptyState.parentElement).toBe(body)
+    expect(body.firstElementChild).toBe(emptyState)
     expect(getComputedStyle(body).rowGap).toBe('24px')
     const savedLooks = screen.getByTestId('closet-saved-looks-row')
-    const cardBottom = setupCard.getBoundingClientRect().bottom
-    // The row's container is the body's next child; its header starts at the container top.
+    // D4: the row moved below the closet; its container is the body's next child.
     const rowContainer = Array.from(body.children).find((child) =>
       child.contains(savedLooks)
     )
     expect(rowContainer).toBeDefined()
-    expect(rowContainer!.getBoundingClientRect().top - cardBottom).toBeCloseTo(24, 0)
+    expect(rowContainer!.previousElementSibling).toBe(emptyState)
+    expect(
+      rowContainer!.getBoundingClientRect().top -
+        emptyState.getBoundingClientRect().bottom
+    ).toBeCloseTo(24, 0)
   })
 
-  it('7.9-NAT-PRIMARY-001 fills Add Garment with the primary gold and keeps the two links neutral', async () => {
+  it('7.9-NAT-PRIMARY-001 [7.11 D4] fills the top bar Add with the primary gold and keeps More and the empty Add neutral', async () => {
     renderScreen()
     const add = await screen.findByTestId('garment-capture-open')
     const light = colorRoles.light
@@ -579,21 +646,27 @@ describe('WardrobeHubScreen', () => {
     expect(getComputedStyle(add.firstElementChild ?? add).color).toBe(
       rgb(light.onPrimary)
     )
-    for (const id of ['wardrobe-capsules-link', 'wardrobe-silhouette-link']) {
+    // CC-7.11 D4: Add lives in the tab top bar now, beside a neutral More.
+    const bar = screen.getByTestId('app-top-bar')
+    expect(bar.contains(add)).toBe(true)
+    expect(bar.contains(screen.getByTestId('closet-more-menu'))).toBe(true)
+    await waitFor(() => expect(screen.getByTestId('wardrobe-empty-add')).toBeVisible())
+    for (const id of ['closet-more-menu', 'wardrobe-empty-add']) {
       expect(getComputedStyle(screen.getByTestId(id)).backgroundColor).not.toBe(
         rgb(light.primary)
       )
     }
   })
 
-  it('7.9-NAT-INSET-002 insets the Wardrobe body 16 from each edge, the shared tab body inset', async () => {
+  it('7.9-NAT-INSET-002 insets the Closet body 16 from each edge, the shared tab body inset', async () => {
     renderScreen()
     const frame = (await screen.findByTestId('wardrobe-screen')).getBoundingClientRect()
-    const add = screen.getByTestId('garment-capture-open').getBoundingClientRect()
-    const capsules = screen.getByTestId('wardrobe-capsules-link').getBoundingClientRect()
-    // The header actions open the body at its left edge (Add Garment wraps to its own row on
-    // a phone, so either may lead).
-    expect(Math.min(add.left, capsules.left) - frame.left).toBeCloseTo(16, 0)
+    const emptyState = await screen.findByTestId('wardrobe-empty-state')
+    await waitFor(() => expect(emptyState).toBeVisible())
+    // CC-7.11 D4: the header actions left the body, so the closet itself opens it.
+    const closet = emptyState.getBoundingClientRect()
+    expect(closet.left - frame.left).toBeCloseTo(TAB_BODY_INSET, 0)
+    expect(frame.right - closet.right).toBeCloseTo(TAB_BODY_INSET, 0)
   })
 
   it('4.4-MOB-HUB-01 renders the wardrobe hub header and empty state (regression)', async () => {
@@ -1270,7 +1343,11 @@ describe('WardrobeHubScreen', () => {
     renderScreen()
 
     const retry = await screen.findByTestId('wardrobe-list-retry')
-    await screen.findByTestId('wardrobe-onboarding-card')
+    // CC-7.11 D4: the failure notice opens the gate body; no setup card sits above it.
+    await waitFor(() => expect(retry).toBeVisible())
+    expect(
+      screen.getByTestId('screen-gate-body-closet').firstElementChild?.contains(retry)
+    ).toBe(true)
     const empty = i18n.t('wardrobe.empty_title')
     expect(screen.queryByText(empty)).toBeNull()
     server.use(
@@ -1293,7 +1370,7 @@ describe('WardrobeHubScreen', () => {
       )
     )
 
-    render(<WardrobeHubScreen addEntry />)
+    renderHub(<WardrobeHubScreen addEntry />)
 
     await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
@@ -1316,7 +1393,7 @@ describe('WardrobeHubScreen', () => {
       )
     )
 
-    render(<WardrobeHubScreen addEntry pollOffsetsMs={[1]} />)
+    renderHub(<WardrobeHubScreen addEntry pollOffsetsMs={[1]} />)
 
     await waitFor(() =>
       expect(screen.getByTestId('garment-status-processing')).toBeVisible()
@@ -1400,64 +1477,91 @@ describe('WardrobeHubScreen', () => {
     }
   })
 
-  it('4.4-MOB-HUB-04 shows the onboarding entry-point card while onboarding is not completed', async () => {
+  /** Opens the Closet's More sheet from the top bar (Story CC-7.11 D5). */
+  async function openMoreSheet() {
+    const more = await screen.findByTestId('closet-more-menu')
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await act(() => Promise.resolve())
+    press(more)
+    return screen.findByTestId('closet-more-sheet')
+  }
+
+  it('4.4-MOB-HUB-04 [7.11 D5] lists Closet setup in the More sheet while onboarding is not completed and opens it', async () => {
     renderScreen()
+    const sheet = await openMoreSheet()
 
-    await waitFor(() => {
-      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeInTheDocument()
-    })
+    const setup = within(sheet).getByTestId('closet-more-setup')
+    await waitFor(() => expect(setup).toHaveTextContent(i18n.t('wardrobe.menu.setup')))
+    expect(setup).not.toHaveTextContent(i18n.t('wardrobe.menu.setupDone'))
+    // D4: no setup card sits in the Closet body any more.
+    expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
 
-    fireEvent.click(screen.getByTestId('wardrobe-onboarding-card'))
-    expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-onboarding')
+    fireEvent.click(setup)
+    expect(routerMock.push).toHaveBeenCalledExactlyOnceWith('/wardrobe-onboarding')
+    await waitFor(() => expect(screen.queryByTestId('closet-more-sheet')).toBeNull())
   })
 
-  it('4.4-MOB-HUB-05 hides the onboarding entry-point card once onboarding is completed', async () => {
+  it('4.4-MOB-HUB-05 [7.11 D5] reads "Closet setup: done" in the More sheet once onboarding is completed', async () => {
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
-        HttpResponse.json({
-          data: {
-            ...onboardingNotCompleted,
-            status: 'completed',
-            currentStep: 'complete',
-            // `onboardingStateSchema` sets `completedAt` exactly when the
-            // status is `completed`; without it the client rejects the
-            // response and the card would stay visible for the wrong reason.
-            completedAt: '2026-08-09T00:10:00.000Z',
-          },
-        })
+        HttpResponse.json({ data: onboardingCompleted })
       )
     )
     renderScreen()
-    await waitFor(() => screen.getByTestId('wardrobe-screen'))
+    const sheet = await openMoreSheet()
 
-    expect(screen.queryByTestId('wardrobe-onboarding-card')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(sheet).getByTestId('closet-more-setup')).toHaveTextContent(
+        i18n.t('wardrobe.menu.setupDone')
+      )
+    )
+    expect(i18n.t('wardrobe.menu.setupDone')).toBe('Closet setup: done')
+    expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
   })
 
-  it('4.4-MOB-HUB-06 links to the silhouette settings screen', async () => {
+  it('4.4-MOB-HUB-06 [7.11 D5] opens the silhouette settings screen from the More sheet', async () => {
     renderScreen()
-    await waitFor(() => screen.getByTestId('wardrobe-silhouette-link'))
+    const sheet = await openMoreSheet()
 
-    fireEvent.click(screen.getByTestId('wardrobe-silhouette-link'))
-    expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-silhouette')
+    const silhouette = within(sheet).getByTestId('closet-more-silhouette')
+    expect(silhouette).toHaveTextContent(i18n.t('wardrobe.menu.silhouette'))
+    fireEvent.click(silhouette)
+    expect(routerMock.push).toHaveBeenCalledExactlyOnceWith('/wardrobe-silhouette')
+    await waitFor(() => expect(screen.queryByTestId('closet-more-sheet')).toBeNull())
   })
 
-  it('4.4-MOB-HUB-07 links to outfit capsules (regression)', async () => {
+  it('4.4-MOB-HUB-07 [7.11 D5, D8] lists only setup and Silhouette in the More sheet: Capsules moved to Looks', async () => {
     renderScreen()
-    await waitFor(() => screen.getByTestId('wardrobe-capsules-link'))
+    const sheet = await openMoreSheet()
 
-    fireEvent.click(screen.getByTestId('wardrobe-capsules-link'))
-    expect(routerMock.push).toHaveBeenCalledWith('/wardrobe-capsules')
+    const rows = Array.from(sheet.querySelectorAll('[data-testid^="closet-more-"]'))
+      .map((row) => row.getAttribute('data-testid'))
+      .filter((id) => id !== 'closet-more-close')
+    expect(rows).toEqual(['closet-more-setup', 'closet-more-silhouette'])
+    expect(sheet).not.toHaveTextContent(i18n.t('wardrobe.capsules.title'))
+    // The Looks tab carries the Capsules row (screen-budget-looks.test.tsx, 7.11-NAT-014).
+    expect(screen.queryByTestId('wardrobe-capsules-link')).toBeNull()
+    expect(screen.queryByText(i18n.t('wardrobe.capsules.title'))).toBeNull()
   })
 
-  it('4.4-MOB-HUB-08 does not let a broken onboarding read hide the garment list (regression)', async () => {
+  it('4.4-MOB-HUB-08 [7.11 D4] does not let a broken onboarding read hide the garment list (regression)', async () => {
     server.use(http.get('*/api/v1/wardrobe/onboarding', () => HttpResponse.error()))
 
     renderScreen()
 
     await waitFor(() => {
-      expect(screen.getByTestId('wardrobe-screen')).toBeInTheDocument()
-      expect(screen.queryByTestId('wardrobe-onboarding-card')).not.toBeInTheDocument()
+      expect(screen.getByTestId('wardrobe-empty-state')).toBeVisible()
     })
+    // The failed read leaves the setup row as it was: not done.
+    const sheet = await openMoreSheet()
+    expect(within(sheet).getByTestId('closet-more-setup')).toHaveTextContent(
+      i18n.t('wardrobe.menu.setup')
+    )
+    expect(within(sheet).getByTestId('closet-more-setup')).not.toHaveTextContent(
+      i18n.t('wardrobe.menu.setupDone')
+    )
   })
 
   it("4.4-MOB-HUB-09 shows a recovery action when a member's wardrobe session is missing", async () => {
@@ -1730,17 +1834,25 @@ describe('WardrobeHubScreen', () => {
   })
 
   // Story 6.15 F-00i: at iOS accessibility-medium Add garment ran past the screen edge beside the
-  // two links. A narrow window stands in for the larger text: the actions wrap inside the screen.
-  it('6.15-MOB-WRAP-03 wraps the hub actions so Add garment stays inside a narrow screen', async () => {
+  // two links. A narrow window stands in for the larger text. Story CC-7.11 D4: Add and More sit
+  // in the top bar now; both stay inside it and the Closet title keeps its whole word.
+  it('6.15-MOB-WRAP-03 [7.11 D4] keeps Add, More and the whole Closet title inside a narrow top bar', async () => {
     await setViewport(260, 896)
     try {
       renderScreen()
       const add = await waitFor(() => screen.getByTestId('garment-capture-open'))
-      const screenBox = screen.getByTestId('wardrobe-screen').getBoundingClientRect()
+      const more = screen.getByTestId('closet-more-menu')
+      const barBox = screen.getByTestId('app-top-bar').getBoundingClientRect()
       const addBox = add.getBoundingClientRect()
-      // The content is padded by the shared tab body inset (16, CC-7.9) on each side.
-      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - TAB_BODY_INSET + 0.5)
-      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + TAB_BODY_INSET - 0.5)
+      const moreBox = more.getBoundingClientRect()
+      expect(addBox.left).toBeGreaterThanOrEqual(barBox.left - 0.5)
+      expect(moreBox.left).toBeGreaterThanOrEqual(addBox.right - 0.5)
+      expect(moreBox.right).toBeLessThanOrEqual(barBox.right + 0.5)
+      const title = screen.getByTestId('app-top-bar-title')
+      expect(title).toHaveTextContent(i18n.t('tabs.closet'))
+      // One line with an ellipsis would scroll wider than it shows.
+      expect(title.scrollWidth).toBeLessThanOrEqual(title.clientWidth)
+      expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(addBox.left + 0.5)
     } finally {
       await setViewport(414, 896)
     }
@@ -1857,6 +1969,161 @@ describe('WardrobeHubScreen', () => {
       expect(nativeStyleRuntime.files.has(ownOlderUri)).toBe(false)
     })
     expect(nativeStyleRuntime.files.has(otherMemberUri)).toBe(true)
+  })
+
+  // [Codex 7.11 #8] Story CC-7.11 D13: each layer hands accessibility focus back to the control
+  // that opened it, never to the top bar Add by default. Native iOS: the opener's handle reaches
+  // AccessibilityInfo.setAccessibilityFocus (nativeStyleRuntime.focus) after the layer closes.
+  describe('[Codex 7.11 #8] focus returns to the actual opener', () => {
+    const TOP_BAR_ADD = 91
+    const EMPTY_ADD = 92
+    const REPLACE = 93
+    const SAVED_LOOK_REOPEN = 94
+
+    /** Maps a testID to a fake native handle for this test only. */
+    function handleFor(testID: string, handle: number) {
+      nativeStyleRuntime.focusHandles.set(testID, handle)
+      onTestFinished(() => {
+        nativeStyleRuntime.focusHandles.delete(testID)
+      })
+    }
+
+    /** A style_piece look the editor reopens exactly: the anchor plus its generated companions. */
+    function exactStylePieceLook(garment: GarmentItemContract): SavedLookContract {
+      const selection = stylePieceAnchor(garment)!
+      const generated = stylePieceLooks(selection, 'warm-rainy', SAMPLE_CATALOG).looks[0]!
+      return {
+        id: 'hub-focus-look',
+        ownerUserId: ACCESS_TOKEN,
+        source: 'style_piece',
+        lookId: generated.recipe.lookId,
+        weather: 'warm-rainy',
+        title: null,
+        anchorGarmentId: garment.id,
+        anchorSnapshot: {
+          garmentId: garment.id,
+          category: selection.category,
+          comfortRange: selection.comfortRange,
+        },
+        composition: [
+          {
+            slotIndex: 0,
+            category: selection.category,
+            kind: 'garment',
+            itemId: garment.id,
+            label: null,
+            missing: false,
+            imageAccess: null,
+          },
+          ...generated.companions.map((companion, index) => ({
+            slotIndex: index + 1,
+            category: companion.category,
+            kind: 'catalog' as const,
+            itemId: companion.id,
+            label: null,
+            missing: false,
+            imageAccess: null,
+          })),
+        ],
+        swaps: generated.recipe.swaps,
+        collection: null,
+        comfort: null,
+        availabilityStatus: 'ready',
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: '2026-11-22T00:00:00.000Z',
+        updatedAt: '2026-11-22T00:00:00.000Z',
+      }
+    }
+
+    it('[P1] [Codex 7.11 #8] [7.11-NAT-031] the empty-state Add takes focus back when capture closes', async () => {
+      nativeStyleRuntime.enabled = true
+      setMobileApplicationUserId('focus-empty-add-owner')
+      handleFor('garment-capture-open', TOP_BAR_ADD)
+      handleFor('wardrobe-empty-add', EMPTY_ADD)
+      renderScreen()
+      const emptyAdd = await screen.findByTestId('wardrobe-empty-add')
+      await waitFor(() => expect(emptyAdd).toBeVisible())
+
+      await browserUser.click(emptyAdd)
+      const capture = await screen.findByTestId('garment-capture-modal')
+      nativeStyleRuntime.focus.mockClear()
+      await browserUser.click(within(capture).getByTestId('garment-capture-close'))
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+      )
+      await waitFor(() =>
+        expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(EMPTY_ADD)
+      )
+      expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(TOP_BAR_ADD)
+    })
+
+    it("[P1] [Codex 7.11 #8] [7.11-NAT-031] a failed garment's Replace takes focus back when capture closes", async () => {
+      nativeStyleRuntime.enabled = true
+      setMobileApplicationUserId('focus-replace-owner')
+      handleFor('garment-capture-open', TOP_BAR_ADD)
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () =>
+          HttpResponse.json({
+            data: [garmentFixture({ id: 'focus-failed-piece', status: 'failed' })],
+          })
+        )
+      )
+      renderScreen()
+      const card = await screen.findByTestId('garment-card-focus-failed-piece')
+      await waitFor(() => expect(card).toBeVisible())
+      const replace = within(card).getByRole('button', {
+        name: getGuestPreviewStrings(i18n.language).firstUse.replaceGarment,
+      })
+      nativeStyleRuntime.nodeHandles.set(replace, REPLACE)
+
+      await browserUser.click(replace)
+      const capture = await screen.findByTestId('garment-capture-modal')
+      nativeStyleRuntime.focus.mockClear()
+      await browserUser.click(within(capture).getByTestId('garment-capture-close'))
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+      )
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(REPLACE))
+      expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(TOP_BAR_ADD)
+    })
+
+    it('[P1] [Codex 7.11 #8] [7.11-NAT-031] the Style this piece editor reopened from a saved look returns focus to that Reopen', async () => {
+      nativeStyleRuntime.enabled = true
+      setMobileApplicationUserId('focus-saved-look-owner')
+      handleFor('saved-look-reopen', SAVED_LOOK_REOPEN)
+      const garment = createReadyGarmentFixture({
+        id: 'focus-saved-look-piece',
+        imageAccess: fixtureWardrobePhoto('#335577'),
+      })
+      const { handlers } = createSavedLooksMswHandlers([exactStylePieceLook(garment)])
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', () =>
+          HttpResponse.json({ data: [garment] })
+        ),
+        ...handlers
+      )
+      renderScreen()
+      await browserUser.click(await screen.findByTestId('closet-saved-looks-row'))
+      const reopen = await screen.findByTestId('saved-look-reopen')
+
+      await browserUser.click(reopen)
+      // The editor branch (not the look's detail layer) took the press.
+      const panel = await screen.findByTestId('style-piece-panel')
+      expect(screen.queryByTestId('saved-look-detail-modal')).toBeNull()
+      nativeStyleRuntime.focus.mockClear()
+      await browserUser.click(within(panel).getByTestId('style-piece-close'))
+
+      await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+      await waitFor(() =>
+        expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(SAVED_LOOK_REOPEN)
+      )
+      // The garment's own Style this piece button (82) did not open the editor this time.
+      expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(82)
+    })
   })
 
   describe('7.5 garment cards open the detail', () => {

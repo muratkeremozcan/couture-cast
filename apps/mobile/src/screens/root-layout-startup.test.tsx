@@ -1,5 +1,11 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-021, the root stack registers the titles of Style and
+// the guardian and teen dashboards (D7, D10) beside the existing sub-screens, under the shared
+// stack top bar, with the tab group's anchor listeners.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 /**
  * Story 6.9 G01: the root layout runs the share-card startup sweeps.
  *
@@ -148,6 +154,7 @@ vi.mock('@/src/lib/native-notification-fixture', () => ({
 
 import { Platform } from 'react-native'
 import RootLayout from '@/app/_layout'
+import { renderStackTopBar, tabsAnchorListeners } from '@/src/components/app-top-bar'
 
 const originalOS = Platform.OS
 function setOS(os: string) {
@@ -299,6 +306,32 @@ describe('RootLayout startup', () => {
       })
     }
   )
+
+  it('[P0] [7.11-NAT-021] titles Style and the guardian and teen dashboards under the shared stack top bar', async () => {
+    await mountLayout()
+
+    // The translation double returns the key, so each title names its catalog entry.
+    const title = (name: string) =>
+      layout.screens.filter((screen) => screen.name === name).at(-1)?.options?.title
+    expect(title('settings-style')).toBe('settings.style.title')
+    expect(title('guardian-dashboard')).toBe('guardian.dashboard.title')
+    expect(title('teen-dashboard')).toBe('teen.dashboard.title')
+    expect(title('wardrobe-capsules')).toBe('wardrobe.capsules.title')
+    expect(title('notification-settings')).toBe('community.notifications.title')
+    expect(title('locations')).toBe('locations.title')
+    // None of them hides its header or its back control.
+    for (const name of ['settings-style', 'guardian-dashboard', 'teen-dashboard']) {
+      const options = layout.screens
+        .filter((screen) => screen.name === name)
+        .at(-1)?.options
+      expect(options?.headerShown, `${name} header`).not.toBe(false)
+      expect(options?.headerBackVisible, `${name} back`).not.toBe(false)
+    }
+    expect(layout.stackOptions.at(-1)?.header).toBe(renderStackTopBar)
+    expect(
+      layout.screens.filter((screen) => screen.name === '(tabs)').at(-1)
+    ).toMatchObject({ listeners: tabsAnchorListeners })
+  })
 
   it('still sends screen views elsewhere', async () => {
     layout.pathname = '/settings'

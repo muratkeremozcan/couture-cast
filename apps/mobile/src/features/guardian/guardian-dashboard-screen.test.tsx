@@ -208,6 +208,9 @@ describe('GuardianDashboardScreen', () => {
     expect(
       screen.getByRole('heading', { name: 'guardian9@example.com' })
     ).toBeInTheDocument()
+    // Story CC-7.11 D10 (7.11-NAT-021): the stack top bar names the screen, so the body has no
+    // second title or eyebrow.
+    expect(screen.queryByText(i18n.t('guardian.dashboard.title'))).toBeNull()
   })
 
   it('shows a standalone error screen when the profile itself cannot load', async () => {

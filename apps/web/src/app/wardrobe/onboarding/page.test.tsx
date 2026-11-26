@@ -1,3 +1,9 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-SETUP-001 (D10: Closet setup sub-screen title and its
+// direct-entry back to Closet), 7.11-CMP-SETUP-002 (D5, D10: a completed setup stays on Closet
+// setup with its completion step).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 5 owner: unit-test the web wardrobe onboarding guided flow.
@@ -7,7 +13,14 @@
 // one file until it passed this repo's 1000-line test-file ceiling.
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -21,6 +34,7 @@ import {
   createSuggestGarmentTagsDataFixture,
 } from '@couture/api-client/testing/wardrobe-fixtures'
 import { stubGarmentPreviewUrl } from '../../../test-utils/garment-capture'
+import { clearAppHistory } from '../../../lib/app-history'
 
 const routerReplace = vi.fn()
 const routerPush = vi.fn()
@@ -89,8 +103,9 @@ function isStaleRevisionError(error: unknown): boolean {
   )
 }
 
+const routerBack = vi.fn()
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: routerReplace, push: routerPush }),
+  useRouter: () => ({ replace: routerReplace, push: routerPush, back: routerBack }),
   usePathname: () => '/wardrobe/onboarding',
 }))
 
@@ -261,13 +276,50 @@ afterEach(() => {
 })
 
 describe('WardrobeOnboardingPage', () => {
-  it('redirects to the wardrobe hub when onboarding is already completed', async () => {
+  // Story CC-7.11 D5, D10: More and Profile > Style link a completed setup on purpose, so it
+  // stays on Closet setup with its completion step (it used to replace to the Closet).
+  it('7.11-CMP-SETUP-002 a completed setup stays on Closet setup with its completion step, and Continue goes to the Closet', async () => {
     getOnboardingStateFromWeb.mockResolvedValue(
       state({ status: 'completed', currentStep: 'complete', revision: 5 })
     )
     render(<WardrobeOnboardingPage />)
 
-    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith('/wardrobe'))
+    expect(await screen.findByText('Your closet is ready')).toHaveAttribute(
+      'role',
+      'status'
+    )
+    const header = within(screen.getByTestId('app-header'))
+    expect(header.getByRole('heading', { level: 1 })).toHaveTextContent(/^Closet setup$/)
+    expect(header.getByTestId('app-top-bar-back')).toHaveAttribute('href', '/wardrobe')
+    expect(routerReplace).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    expect(
+      listGarmentsFromWeb,
+      'the completion step reads no closet'
+    ).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(routerPush).toHaveBeenCalledWith('/wardrobe')
+    expect(routerReplace).not.toHaveBeenCalled()
+  })
+
+  it('7.11-CMP-SETUP-001 titles the sub-screen Closet setup and a direct entry back replaces to Closet', async () => {
+    clearAppHistory()
+    routerBack.mockReset()
+    getOnboardingStateFromWeb.mockResolvedValue(state())
+    render(<WardrobeOnboardingPage />)
+
+    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    const header = within(screen.getByTestId('app-header'))
+    expect(header.getByRole('heading', { level: 1 })).toHaveTextContent(/^Closet setup$/)
+    const back = header.getByTestId('app-top-bar-back')
+    expect(back).toHaveAttribute('href', '/wardrobe')
+    expect(routerReplace).not.toHaveBeenCalled()
+
+    fireEvent.click(back)
+
+    expect(routerReplace).toHaveBeenCalledExactlyOnceWith('/wardrobe')
+    expect(routerBack).not.toHaveBeenCalled()
   })
 
   it('grants camera permission and advances to the capture step', async () => {

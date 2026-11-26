@@ -207,6 +207,23 @@ test.describe('CC-7.11 swipe down closes a layer @local-lane', () => {
     })
   }
 
+  test('[P1] [Codex 7.11 #6] a drag down that starts in the layer body at its top closes it, focus on the opener', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const overlay = OVERLAYS[1]!
+    await openParent(page, interceptNetworkCall, overlay.screen)
+    const cdp = await page.context().newCDPSession(page)
+    const { opener, dialog } = await openOverlay(page, overlay)
+    const body = dialog.getByTestId('layer-body')
+    expect(await body.evaluate((node) => node.scrollTop)).toBe(0)
+
+    const box = (await body.boundingBox())!
+    await touchDrag(cdp, { x: box.x + box.width / 2, y: box.y + 40 }, { x: 0, y: 120 })
+    await expect(dialog).toHaveCount(0)
+    await expect(opener).toBeFocused()
+  })
+
   test('[P1] [7.11-E2E-047] short, sideways and upward drags do not close', async ({
     page,
     interceptNetworkCall,

@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-PLAN-001 (the rail without its header on the Plan route)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Story 5.5 Task 7 owner: component tests for the live seven-day planner rail.
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -124,6 +128,27 @@ describe('PlannerRail', () => {
     renderRail()
     expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
     expect(requested).not.toHaveBeenCalled()
+  })
+
+  // Story CC-7.11 D9: on the Plan route the top bar carries the title and back, so the rail
+  // drops its own heading row and X; the default rail keeps both.
+  it('7.11-CMP-PLAN-001 hides its heading row and close button with hideHeader', () => {
+    const onClose = vi.fn()
+    const { unmount } = renderRail({ onClose })
+    const rail = screen.getByRole('complementary', { name: /planner rail/i })
+    expect(within(rail).getByRole('heading', { level: 3 })).toHaveTextContent(
+      getI18n().t('commerce.premium.planner.sectionTitle')
+    )
+    fireEvent.click(within(rail).getByRole('button', { name: /close planner/i }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+    unmount()
+
+    renderRail({ hideHeader: true })
+    const plain = screen.getByRole('complementary', { name: /planner rail/i })
+    expect(within(plain).queryByRole('heading', { level: 3 })).toBeNull()
+    expect(within(plain).queryByRole('button', { name: /close planner/i })).toBeNull()
+    // The week body still renders: signed out, the locked upsell.
+    expect(within(plain).getByTestId('planner-rail-locked')).toBeInTheDocument()
   })
 
   it('shows a checking skeleton before the request resolves', async () => {
