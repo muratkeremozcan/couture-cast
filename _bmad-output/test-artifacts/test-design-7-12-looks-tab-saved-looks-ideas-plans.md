@@ -1,5 +1,10 @@
 # Test design: Story CC-7.12 Looks tab for saved looks, ideas and plans
 
+Updated: 2026-11-26. Codex review (11 findings): tests added for #1 duplicate-save View, #3
+account switch on the detail, #4 capsule beyond the manager's first page, #5 native paged back,
+#6 native slow empty default, #7 image retry after a fresh URL, #8 offline Undo retry, #10 percent
+id (E2E-022 row), #11 Ideas prompt with an empty filter; T4 (View back lands on Saved) in E2E-020.
+
 Updated: 2026-11-26. Builder accepted P1 to P4, P6 to P11; P5 countered in part and accepted:
 signed-out Upgrade opens sign-in with no return path (a caller-supplied return address is its own
 open-redirect surface). P11 adds the created-order indexes and 7.12-INT-005.

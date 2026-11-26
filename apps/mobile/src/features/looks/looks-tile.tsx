@@ -99,18 +99,19 @@ export function useSavedLookName(): (look: SavedLookContract) => string {
 
 function Cell({ cell }: { cell: LooksTileCell | null }) {
   const { colors } = useTokens()
-  // P8: a failed photo swaps to the placeholder inside the same square, so nothing moves.
-  const [failed, setFailed] = useState(false)
+  // P8: a failed photo swaps to the placeholder inside the same square, so nothing moves. The
+  // failure belongs to that URL, so a refreshed signed URL for the piece shows again (Codex #7).
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const box = [styles.cell, { backgroundColor: colors.cardMuted }]
   if (!cell) return <View style={box} />
-  if (cell.kind === 'photo' && !failed) {
+  if (cell.kind === 'photo' && failedUrl !== cell.url) {
     return (
       <View style={box}>
         <Image
           source={{ uri: cell.url }}
           accessible={false}
           style={styles.photo}
-          onError={() => setFailed(true)}
+          onError={() => setFailedUrl(cell.url)}
         />
       </View>
     )

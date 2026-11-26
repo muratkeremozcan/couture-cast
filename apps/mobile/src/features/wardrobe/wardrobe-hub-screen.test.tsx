@@ -12,6 +12,13 @@
 // tab top bar the hub fills through `navigation.setOptions`, so every render here draws that bar
 // (`TabTopBar`) beside the hub. Setup and Silhouette moved into the More sheet, Capsules to Looks.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-024 (D8), the Closet renders no saved looks row and its
+// gate waits on the inventory read alone: no saved looks list read, no Retry, no row on a return;
+// device-saved looks still import from the Closet and the Looks feed hears of them; a saved look
+// the editor could reopen no longer surfaces a Reopen here (the saved look screen owns it).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import React, { useEffect, useRef } from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import type * as ReactNativeModule from 'react-native'
@@ -240,6 +247,7 @@ import {
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { createSavedLooksMswHandlers } from '@/src/test-utils/saved-looks-msw'
+import { subscribeMobileSavedLooksChanged } from '@/src/lib/saved-looks'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -540,7 +548,9 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 
-  it('7.7-NAT-004 the Closet gate waits for the first Saved Looks page, so its Retry never pushes the closet down', async () => {
+  // Replaces 7.7-NAT-004 "the gate waits for the first Saved Looks page": CC-7.12 D8 took saved
+  // looks off the Closet, so a saved looks list that never answers holds nothing back.
+  it('[P1] [7.12-NAT-024] 7.7-NAT-004 the Closet gate opens on the inventory read alone and reads no saved looks', async () => {
     setMobileApplicationUserId('closet-gate-saved-looks-owner')
     let savedLookReads = 0
     let releaseSavedLooks!: () => void
@@ -557,30 +567,24 @@ describe('WardrobeHubScreen', () => {
     )
     renderScreen()
 
-    // Inventory and onboarding answered; only the Saved Looks page is out.
+    // Inventory and onboarding answered: the closet opens with no Saved Looks page out.
     const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
-    await waitFor(() => expect(savedLookReads).toBe(1))
-    expect(emptyTitle).not.toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
-
-    act(() => releaseSavedLooks())
-
-    // The row's error and Retry arrive with the closet in one commit; Story CC-7.11 D4 moved
-    // the row below the closet, so the closet opens first in the body and the Retry sits under it.
-    const retry = await screen.findByTestId('saved-looks-retry')
-    await waitFor(() => expect(retry).toBeVisible())
-    expect(emptyTitle).toBeVisible()
+    await waitFor(() => expect(emptyTitle).toBeVisible())
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
     const emptyState = screen.getByTestId('wardrobe-empty-state')
-    expect(screen.getByTestId('screen-gate-body-closet').firstElementChild).toBe(
-      emptyState
-    )
-    expect(retry.getBoundingClientRect().top).toBeGreaterThanOrEqual(
-      emptyState.getBoundingClientRect().bottom
-    )
+    const body = screen.getByTestId('screen-gate-body-closet')
+    expect(body.firstElementChild).toBe(emptyState)
+    // Nothing follows the closet: no row, no list, no row error or Retry.
+    expect(body.lastElementChild).toBe(emptyState)
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
+    expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+    expect(savedLookReads).toBe(0)
   })
 
-  it('7.7-NAT-003 a return to the Closet re-reads the inventory and Saved Looks in place', async () => {
+  // CC-7.12 D8: the return re-reads the inventory only; the saved looks re-read (and the row
+  // that kept its count while it ran) left with the row.
+  it('[7.12-NAT-024] 7.7-NAT-003 a return to the Closet re-reads the inventory in place and no saved looks', async () => {
     onTestFinished(() => screenFocus.reset())
     setMobileApplicationUserId('closet-return-owner')
     renderScreen()
@@ -613,7 +617,6 @@ describe('WardrobeHubScreen', () => {
     expect(garmentReads).toBe(0)
     act(() => screenFocus.set(true))
     await waitFor(() => expect(garmentReads).toBe(1))
-    await waitFor(() => expect(savedLookReads).toBe(1))
 
     // The closet stays as it was while the reads run: same mounted body (so its scroll
     // position), no placeholder, no first-read spinner.
@@ -621,15 +624,23 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
     expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
     expect(emptyTitle).toBeVisible()
-    const row = screen.getByTestId('closet-saved-looks-row')
-    expect(row).toBeVisible()
-    // The row keeps its count while the page re-reads; only the first read shows the ellipsis.
-    expect(row).toHaveTextContent(i18n.t('savedLooks.count', { count: 0 }))
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
+    act(() => releaseReads())
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate-body-closet').lastElementChild).toBe(
+        screen.getByTestId('wardrobe-empty-state')
+      )
+    )
+    // The Looks tab reads saved looks on its own focus; the Closet's return sent none.
+    expect(savedLookReads).toBe(0)
   })
 
-  it('7.7-NAT-004 [7.11 D4] keeps the 24-point gap between the closet and the Saved Looks row below it inside the gate', async () => {
-    // Saved Looks belong to a member: without one the row renders nothing to measure.
+  // CC-7.12 D8: the row below the closet is gone, so the gap is held by the gate body's own
+  // style and the closet is the body's only child for a member with saved looks.
+  it('[7.12-NAT-024] 7.7-NAT-004 keeps the 24-point gate body gap with the closet as its only child, no Saved Looks row below', async () => {
     setMobileApplicationUserId('closet-gate-gap-owner')
+    const { handlers } = createSavedLooksMswHandlers()
+    server.use(...handlers)
     renderScreen()
     const emptyState = await screen.findByTestId('wardrobe-empty-state')
     await waitFor(() => expect(emptyState).toBeVisible())
@@ -639,17 +650,8 @@ describe('WardrobeHubScreen', () => {
     expect(emptyState.parentElement).toBe(body)
     expect(body.firstElementChild).toBe(emptyState)
     expect(getComputedStyle(body).rowGap).toBe('24px')
-    const savedLooks = screen.getByTestId('closet-saved-looks-row')
-    // D4: the row moved below the closet; its container is the body's next child.
-    const rowContainer = Array.from(body.children).find((child) =>
-      child.contains(savedLooks)
-    )
-    expect(rowContainer).toBeDefined()
-    expect(rowContainer!.previousElementSibling).toBe(emptyState)
-    expect(
-      rowContainer!.getBoundingClientRect().top -
-        emptyState.getBoundingClientRect().bottom
-    ).toBeCloseTo(24, 0)
+    expect(body.children).toHaveLength(1)
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
   })
 
   it('7.9-NAT-PRIMARY-001 [7.11 D4] fills the top bar Add with the primary gold and keeps More and the empty Add neutral', async () => {
@@ -1962,7 +1964,7 @@ describe('WardrobeHubScreen', () => {
     }
   })
 
-  it('imports native device-saved files for the active member into Closet Saved looks, marks unresolved looks Needs review, and leaves other accounts untouched', async () => {
+  it('[7.12-NAT-024] imports native device-saved files for the active member, marks unresolved looks Needs review, tells the Looks feed, and leaves other accounts untouched', async () => {
     nativeStyleRuntime.enabled = true
     const activeOwner = 'native-import-member-a'
     setMobileApplicationUserId(activeOwner)
@@ -2031,6 +2033,10 @@ describe('WardrobeHubScreen', () => {
       ])
     )
 
+    const savedLooksChanges: (string | null)[] = []
+    onTestFinished(
+      subscribeMobileSavedLooksChanged((owner) => savedLooksChanges.push(owner))
+    )
     const { store, handlers } = createSavedLooksMswHandlers()
     store.garmentTagsById.set(ownOlderGarmentId, {
       category: 'top',
@@ -2059,12 +2065,12 @@ describe('WardrobeHubScreen', () => {
         ?.availabilityStatus
     ).toBe('ready')
 
-    const row = await screen.findByTestId('closet-saved-looks-row')
-    await waitFor(() => expect(row).toHaveTextContent('3 saved'))
-    await browserUser.click(row)
-    expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
-      'Needs review'
-    )
+    // CC-7.12 D8: the imported looks show on the Looks tab, which reads again on this owner's
+    // change notice; the Closet itself shows no row and no Needs review badge.
+    await waitFor(() => expect(savedLooksChanges).toContain(activeOwner))
+    expect(savedLooksChanges.every((owner) => owner === activeOwner)).toBe(true)
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
+    expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
 
     // Active member's native files are deleted after import while other member's file remains intact
     await waitFor(() => {
@@ -2082,7 +2088,6 @@ describe('WardrobeHubScreen', () => {
     const TOP_BAR_ADD = 91
     const EMPTY_ADD = 92
     const REPLACE = 93
-    const SAVED_LOOK_REOPEN = 94
 
     /** Maps a testID to a fake native handle for this test only. */
     function handleFor(testID: string, handle: number) {
@@ -2195,10 +2200,13 @@ describe('WardrobeHubScreen', () => {
       expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(TOP_BAR_ADD)
     })
 
-    it('[P1] [Codex 7.11 #8] [7.11-NAT-031] the Style this piece editor reopened from a saved look returns focus to that Reopen', async () => {
+    // Replaces "the editor reopened from a saved look returns focus to that Reopen": CC-7.12 D8
+    // moved Reopen to the saved look screen (saved-look-detail.test.tsx); a Closet holding a look
+    // the editor reopens exactly shows no Reopen, and the editor hands focus back to the piece's
+    // own Style this piece.
+    it('[P1] [7.12-NAT-024] [7.11-NAT-031] with a reopenable saved look the Closet shows no Reopen, and the editor returns focus to Style this piece', async () => {
       nativeStyleRuntime.enabled = true
       setMobileApplicationUserId('focus-saved-look-owner')
-      handleFor('saved-look-reopen', SAVED_LOOK_REOPEN)
       const garment = createReadyGarmentFixture({
         id: 'focus-saved-look-piece',
         imageAccess: fixtureWardrobePhoto('#335577'),
@@ -2211,22 +2219,18 @@ describe('WardrobeHubScreen', () => {
         ...handlers
       )
       renderScreen()
-      await browserUser.click(await screen.findByTestId('closet-saved-looks-row'))
-      const reopen = await screen.findByTestId('saved-look-reopen')
+      const opener = await screen.findByTestId('style-piece-open')
+      expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
+      expect(screen.queryByTestId('saved-look-reopen')).toBeNull()
 
-      await browserUser.click(reopen)
-      // The editor branch (not the look's detail layer) took the press.
+      await browserUser.click(opener)
       const panel = await screen.findByTestId('style-piece-panel')
-      expect(screen.queryByTestId('saved-look-detail-modal')).toBeNull()
       nativeStyleRuntime.focus.mockClear()
       await browserUser.click(within(panel).getByTestId('style-piece-close'))
 
       await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
-      await waitFor(() =>
-        expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(SAVED_LOOK_REOPEN)
-      )
-      // The garment's own Style this piece button (82) did not open the editor this time.
-      expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(82)
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(82))
+      expect(nativeStyleRuntime.focus).not.toHaveBeenCalledWith(TOP_BAR_ADD)
     })
   })
 

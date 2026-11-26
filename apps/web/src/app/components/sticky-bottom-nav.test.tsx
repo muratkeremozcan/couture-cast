@@ -8,6 +8,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-061 (the saved look detail and the capsules manager
+// highlight Looks).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
 // Story CC-7.11 test owner (TEA): 7.11-UNIT-013 (resolveActiveNavTab), 7.11-UNIT-021 (five tabs,
 // catalog labels, shared svg icons, no emoji); five-tab updates to 3.6, 5.4, 7.7 and 7.9 cases.
@@ -142,7 +147,9 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
   it('5.4-WEB-030: resolves the active tab by longest prefix, with no tab for a route under none', () => {
     expect(resolveActiveNavTab('/')).toBe('home')
     expect(resolveActiveNavTab('/wardrobe')).toBe('wardrobe')
-    expect(resolveActiveNavTab('/wardrobe/capsules')).toBe('looks')
+    // CC-7.12 D6: the capsules manager moved to /looks/capsules; the old address is a server
+    // redirect, so it no longer names Looks here.
+    expect(resolveActiveNavTab('/looks/capsules')).toBe('looks')
     expect(resolveActiveNavTab('/wardrobe/onboarding')).toBe('wardrobe')
     expect(resolveActiveNavTab('/settings')).toBe('settings')
     expect(resolveActiveNavTab('/community')).toBe('community')
@@ -409,8 +416,9 @@ describe('7.11-UNIT-021 StickyBottomNav five tabs and shared icons', () => {
 describe('7.11-UNIT-013 resolveActiveNavTab for the five tabs and their sub-screens', () => {
   it.each([
     ['/looks', 'looks'],
-    ['/looks/plan', 'looks'],
-    ['/wardrobe/capsules', 'looks'],
+    // CC-7.12 D5, D6: the saved look detail and the capsules manager sit under Looks.
+    ['/looks/saved/sl-1', 'looks'],
+    ['/looks/capsules', 'looks'],
     ['/wardrobe/silhouette', 'wardrobe'],
     ['/wardrobe/onboarding', 'wardrobe'],
     ['/settings/style', 'settings'],
@@ -429,8 +437,24 @@ describe('7.11-UNIT-013 resolveActiveNavTab for the five tabs and their sub-scre
     expect(resolveActiveNavTab('/settings-style')).toBeNull()
   })
 
-  it('highlights Looks in the bar on the Plan route', () => {
-    navigationMocks.pathname = '/looks/plan'
+  it.each(['/looks/saved/sl-1', '/looks/capsules'])(
+    '7.12-UNIT-061 highlights Looks in the bar on %s',
+    (pathname) => {
+      navigationMocks.pathname = pathname
+      render(<StickyBottomNav />)
+
+      expect(screen.getByTestId('bottom-nav-looks')).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+      expect(screen.getByTestId('bottom-nav-wardrobe')).not.toHaveAttribute(
+        'aria-current'
+      )
+    }
+  )
+
+  it('highlights Looks in the bar on the Looks Plan segment', () => {
+    navigationMocks.pathname = '/looks'
     render(<StickyBottomNav />)
 
     expect(screen.getByTestId('bottom-nav-looks')).toHaveAttribute('aria-current', 'page')

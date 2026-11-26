@@ -1,5 +1,11 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-033 (D6, P7), the capsule manager's parent is Looks,
+// and a Looks capsule tile's `capsule` param scrolls to and focuses the card whose loaded id
+// equals it; an unknown id or a selector-shaped value does nothing and shows no error.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -16,9 +22,12 @@ vi.mock('expo-localization', () => ({
 }))
 
 const routerMock = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
+// Story CC-7.12 D6: the screen reads its `capsule` param.
+const searchParams = vi.hoisted(() => ({ current: {} as Record<string, string> }))
 vi.mock('expo-router', () => ({
   router: routerMock,
   Stack: { Screen: () => null },
+  useLocalSearchParams: () => searchParams.current,
 }))
 
 /**
@@ -47,6 +56,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import { deleteCapsuleFromMobile, listCapsulesFromMobile } from '@/src/lib/wardrobe'
 import WardrobeCapsulesScreen from '../../app/wardrobe-capsules'
+import { PARENT_TAB } from '@/src/components/app-top-bar'
 
 vi.mock('@/src/lib/wardrobe', { spy: true })
 
@@ -187,6 +197,7 @@ describe('WardrobeCapsulesScreen', () => {
     )
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     listRequests = []
+    searchParams.current = {}
     accessToken = ACCESS_TOKEN
     setMobileApplicationUserId('user-1')
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => accessToken)
@@ -698,5 +709,131 @@ describe('WardrobeCapsulesScreen', () => {
       ).not.toBeInTheDocument()
     })
     expect(createSpy).not.toHaveBeenCalled()
+  })
+
+  describe('Story CC-7.12 capsule focus from Looks', () => {
+    const CAPSULES = [
+      capsule({ id: 'cap-a', name: 'Office capsule' }),
+      capsule({ id: 'cap-b', name: 'Weekend capsule' }),
+      capsule({ id: 'cap-c', name: 'Travel capsule' }),
+    ]
+
+    /** Two animation frames: the screen focuses inside one after the card lays out. */
+    const nextFrames = () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+
+    it('[P1] [7.12-NAT-033] Capsules goes back to Looks on a direct entry', () => {
+      expect(PARENT_TAB['wardrobe-capsules']).toBe('/looks')
+    })
+
+    it('[P0] [7.12-NAT-033] a capsule param scrolls to that card and focuses it', async () => {
+      server.use(listHandler(CAPSULES))
+      searchParams.current = { capsule: 'cap-c' }
+      const scroll = vi.spyOn(Element.prototype, 'scroll')
+      render(<WardrobeCapsulesScreen />)
+
+      const card = await screen.findByTestId('capsule-card-cap-c')
+      await waitFor(() => expect(card).toHaveFocus())
+      // The list scrolled to the card's own offset in its content, not to the top.
+      const offset =
+        card.getBoundingClientRect().top - card.parentElement!.getBoundingClientRect().top
+      expect(offset).toBeGreaterThan(0)
+      const tops = scroll.mock.calls.map(([options]) => (options as ScrollToOptions).top)
+      expect(tops.some((top) => Math.abs((top ?? -1) - offset) < 1)).toBe(true)
+      // Only the asked-for card was focused; the others never joined the tab order.
+      expect(screen.getByTestId('capsule-card-cap-a')).not.toHaveFocus()
+      expect(screen.getByTestId('capsule-card-cap-a').getAttribute('tabindex')).not.toBe(
+        '0'
+      )
+      expect(screen.queryByTestId('capsule-error-banner')).toBeNull()
+    })
+
+    // Codex 7.12 #4 (D6): Looks pages capsules newest first, the manager reads its first 20 in
+    // its own order, so a tile's capsule can sit past that page. The manager reads it by id.
+    it('[P0] [7.12-NAT-033] [Codex 7.12 #4] a capsule outside the first page still shows and takes focus', async () => {
+      const firstPage = Array.from({ length: 20 }, (_, index) =>
+        capsule({ id: `cap-page-${index}`, name: `Page capsule ${index}` })
+      )
+      const target = capsule({ id: 'cap-target', name: 'Older capsule' })
+      const singleReads: string[] = []
+      server.use(
+        listHandler(firstPage, 21),
+        http.get(
+          '*/api/v1/wardrobe/:ownerUserId/capsules/:capsuleId',
+          ({ request, params }) => {
+            singleReads.push(new URL(request.url).pathname)
+            return params.capsuleId === 'cap-target'
+              ? HttpResponse.json({ data: target })
+              : HttpResponse.json({ message: 'Not found' }, { status: 404 })
+          }
+        )
+      )
+      searchParams.current = { capsule: 'cap-target' }
+      render(<WardrobeCapsulesScreen />)
+
+      const card = await screen.findByTestId('capsule-card-cap-target')
+      await waitFor(() => expect(card).toHaveFocus())
+      expect(card).toHaveTextContent('Older capsule')
+      // One owner-scoped read for the asked-for capsule, beside the list's first page.
+      expect(singleReads).toEqual(['/api/v1/wardrobe/user-1/capsules/cap-target'])
+      expect(listRequests.at(-1)?.searchParams.get('offset')).toBe('0')
+      expect(screen.getByTestId('capsule-card-cap-page-0')).not.toHaveFocus()
+      expect(screen.queryByTestId('capsule-error-banner')).toBeNull()
+    })
+
+    it('[P1] [7.12-NAT-033] [Codex 7.12 #4] a gone or foreign capsule outside the first page focuses nothing and shows no error', async () => {
+      server.use(
+        listHandler(CAPSULES, 21),
+        http.get('*/api/v1/wardrobe/:ownerUserId/capsules/:capsuleId', () =>
+          HttpResponse.json({ message: 'Not found' }, { status: 404 })
+        )
+      )
+      searchParams.current = { capsule: 'cap-foreign' }
+      render(<WardrobeCapsulesScreen />)
+
+      await screen.findByTestId('capsule-card-cap-c')
+      await nextFrames()
+      await nextFrames()
+      expect(screen.queryByTestId('capsule-card-cap-foreign')).toBeNull()
+      for (const id of ['cap-a', 'cap-b', 'cap-c'])
+        expect(screen.getByTestId(`capsule-card-${id}`), id).not.toHaveFocus()
+      expect(screen.queryByTestId('capsule-error-banner')).toBeNull()
+      expect(screen.getByText('Travel capsule')).toBeVisible()
+    })
+
+    it.each([
+      ['an unknown id', 'cap-missing'],
+      ['a selector-shaped value', '"]\'><img src=x onerror=alert(1)>'],
+      ['a prefix of a loaded id', 'cap-'],
+    ])(
+      '[P1] [7.12-NAT-033] %s focuses nothing and shows no error',
+      async (_case, value) => {
+        server.use(listHandler(CAPSULES))
+        searchParams.current = { capsule: value }
+        const scroll = vi.spyOn(Element.prototype, 'scroll')
+        render(<WardrobeCapsulesScreen />)
+
+        await screen.findByTestId('capsule-card-cap-c')
+        await nextFrames()
+        await nextFrames()
+
+        for (const id of ['cap-a', 'cap-b', 'cap-c']) {
+          const card = screen.getByTestId(`capsule-card-${id}`)
+          expect(card, id).not.toHaveFocus()
+          expect(card.getAttribute('tabindex'), id).not.toBe('0')
+        }
+        // P7: equality only, so the value never reaches a selector or the document.
+        expect(document.querySelector('img[src="x"]')).toBeNull()
+        expect(
+          scroll.mock.calls.filter(
+            ([options]) => ((options as ScrollToOptions).top ?? 0) > 0
+          )
+        ).toEqual([])
+        expect(screen.queryByTestId('capsule-error-banner')).toBeNull()
+        expect(screen.getByText('Travel capsule')).toBeVisible()
+      }
+    )
   })
 })

@@ -4,6 +4,11 @@
 // and the Closet More menu (wardrobe.menu.*) ship in all ten web locales, translated, with the
 // same keys. The tab labels and Profile > Style keys are profile-locales.spec.ts.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-070 (the looks.* tree is the 7.12 one in all ten web
+// locales, placeholders matching en-US) and 7.12-UNIT-071 (the removed keys are absent).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
@@ -71,16 +76,39 @@ const reference = newStrings(CATALOGS['en-US'])
 
 /**
  * Words a locale keeps from English because they are its own word: Plan in German, Spanish,
- * French and Turkish, Capsules in French, Silhouette in German, French and Italian.
+ * French and Turkish, Capsules in French, Silhouette in German, French and Italian, Ideas in
+ * Spanish and Upgrade in German (CC-7.12).
  */
-const SHARED_WORDS = new Set(['Plan', 'Capsules', 'Silhouette'])
+const SHARED_WORDS = new Set(['Plan', 'Capsules', 'Silhouette', 'Ideas', 'Upgrade'])
 
 describe('7.11 Looks tab and Closet More menu strings (web)', () => {
   it('7.11-I18N-WEB-01 holds the exact en-US strings the tests and the spec name', () => {
     expect(Object.fromEntries(reference)).toEqual({
       'looks.empty': 'Save a look to see it here',
-      'looks.capsules': 'Capsules',
-      'looks.plan': 'Plan',
+      // Story CC-7.12 D12: the CC-7.11 Capsules and Plan row labels (`looks.capsules`,
+      // `looks.plan`) left with the rows; the segment, filter, tile and preview strings came in.
+      'looks.segments.label': 'Looks sections',
+      'looks.segments.saved': 'Saved',
+      'looks.segments.ideas': 'Ideas',
+      'looks.segments.plan': 'Plan',
+      'looks.filters.label': 'Filter saved looks',
+      'looks.filters.all': 'All',
+      'looks.filters.today': 'Today',
+      'looks.filters.capsules': 'Capsules',
+      'looks.filterEmpty.today': 'No looks from Today yet',
+      'looks.filterEmpty.capsules': 'No capsules yet',
+      'looks.manageCapsules': 'Manage capsules',
+      'looks.state.missing_one': '1 piece missing',
+      'looks.state.missing_other': '{{count}} pieces missing',
+      'looks.state.needsReview': 'Needs review',
+      'looks.state.savedOn': 'Saved {{date}}',
+      'looks.detail.gone': 'This look is no longer saved',
+      'looks.detail.signIn': 'Sign in to see your saved looks',
+      'looks.detail.signInAction': 'Sign in',
+      'looks.freePlan.week': 'Sample week',
+      'looks.freePlan.line': 'Premium plans your whole week around your forecast.',
+      'looks.freePlan.upgrade': 'Upgrade',
+      'looks.loadMore': 'Show more',
       'wardrobe.menu.add': 'Add',
       'wardrobe.menu.more': 'More',
       // Codex 7.11 gap (a): the More button's name starts with its visible label (WCAG 2.5.3).
@@ -125,4 +153,37 @@ describe('7.11 Looks tab and Closet More menu strings (web)', () => {
     expect(done.startsWith(setup)).toBe(true)
     expect(done.length).toBeGreaterThan(setup.length)
   })
+
+  /** `{{token}}` placeholders must match en-US exactly, or interpolation breaks. */
+  const placeholders = (value: string) =>
+    [...value.matchAll(/\{\{(\w+)\}\}/g)].map((match) => match[1] ?? '').sort()
+
+  it.each(SUPPORTED_LOCALES)(
+    '7.12-UNIT-070 %s keeps every looks placeholder of en-US',
+    (locale) => {
+      const strings = newStrings(CATALOGS[locale])
+      for (const [key, english] of reference)
+        expect(placeholders(strings.get(key) ?? ''), `${locale}.${key}`).toEqual(
+          placeholders(english)
+        )
+      // The missing-pieces line keeps its count in the plural form.
+      expect(strings.get('looks.state.missing_other'), locale).toContain('{{count}}')
+      expect(strings.get('looks.state.savedOn'), locale).toContain('{{date}}')
+    }
+  )
+
+  it.each(SUPPORTED_LOCALES)(
+    '7.12-UNIT-071 %s carries none of the removed Looks row or Planner lock keys',
+    (locale) => {
+      const catalog = CATALOGS[locale]
+      for (const path of [
+        'looks.capsules',
+        'looks.plan',
+        'commerce.premium.plannerLocked',
+        'commerce.premium.plannerLocked.title',
+        'commerce.premium.plannerLocked.cta',
+      ])
+        expect(at(catalog, path), `${locale}.${path}`).toBeUndefined()
+    }
+  )
 })

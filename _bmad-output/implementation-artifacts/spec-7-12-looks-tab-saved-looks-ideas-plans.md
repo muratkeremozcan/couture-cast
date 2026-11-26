@@ -3,7 +3,7 @@ title: 'Story CC-7.12: Looks tab for saved looks, ideas and plans'
 type: feature
 ticket: '7-12-looks-tab-saved-looks-ideas-plans'
 created: '2026-11-26'
-status: in-progress
+status: done
 baseline_revision: 'a8863b05'
 route: full
 route_source: auto
@@ -268,6 +268,10 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
     ready Style this piece look whose anchor is in the closet and whose slots the editor rebuilds
     exactly) and hosts the Style this piece panel; the rule lives in
     `components/looks/saved-look-reopen.ts`.
+- 2026-11-26, TEA T4 (D5, I/O row View), patch: the top bar back of a look opened by View (no
+  `from`) replaces to `/looks?segment=saved` on web and dismisses to Looks Saved on native; a
+  tile entry keeps the history back and a cold entry the replace. Browser and system back still
+  return to the saving screen.
 - 2026-11-26, builder, as built:
   - D9: an Ideas tile's line is the sample look's one-line description; sample looks carry no
     weather.
@@ -280,6 +284,28 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
     and `/looks/saved/[savedLookId]`; mobile adds `/saved-look/[savedLookId]`.
 
 ## Review Triage Log
+
+- 2026-11-26, Codex review (7.12-codex-review.md, 11 findings), verdicts:
+  - #1 P1, patch: View after a save that confirmed an existing look did nothing; each save
+    surface keeps the confirmed look id (created or existing) for View.
+  - #2 P1, patch (TEA T4): the arrow of a View entry returns to Saved on web and native; browser
+    and system back return to the saving screen, as every other back in the app.
+  - #3 P2 Codex Security, patch: the web detail is keyed by the signed-in member, so an account
+    switch never shows the previous member's look while the new read is pending.
+  - #4 P2, patch: the capsule manager reads the tile's capsule on its own when its first page
+    lacks it and shows it first (web and native).
+  - #5 P2, patch: native refresh keeps the loaded depth of each list.
+  - #6 P2, patch: native chooses the default segment after the first reads settle, even when the
+    gate deadline opens first.
+  - #7 P2, patch: photo failure is keyed by the signed URL (tiles and detail), and the web
+    detail treats an expired URL as unusable.
+  - #8 P2, patch: web Undo keeps Undo offline and Retry after a failed restore, one restore at a
+    time.
+  - #9 P2, TEA: stale native row test and Community dark-mode Plan assertions.
+  - #10 P3, patch: the web route decodes safely; a malformed id reads as gone.
+  - #11 P3, patch: the Ideas first-save line follows an empty All only.
+  - Codex Security: one Medium (#3), 48 of 83 paths with full-file receipts, the rest in its
+    coverage ledger.
 
 ## Design Notes
 

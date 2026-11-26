@@ -206,6 +206,8 @@ function SampleOutfitInner({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  /** Story CC-7.12 D7: the look the last accepted save confirmed, created or existing. */
+  const viewLookIdRef = useRef<string | null>(null)
   const saveRunSeqRef = useRef(0)
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
@@ -461,7 +463,10 @@ function SampleOutfitInner({
             )
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
             if (verified) {
-              if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              if (saveRunSeqRef.current === saveSeq) {
+                lastCreatedRef.current = null
+                viewLookIdRef.current = existingMatch.id
+              }
               setBookmarksPersistent(true)
               return { saved: true, undoable: false }
             }
@@ -492,6 +497,7 @@ function SampleOutfitInner({
           mutationVersionRef.current += 1
           if (saveRunSeqRef.current === saveSeq) {
             lastCreatedRef.current = created
+            viewLookIdRef.current = created.id
           }
           const next = [
             created,
@@ -531,8 +537,9 @@ function SampleOutfitInner({
         }}
         onViewSaved={() => {
           // Story CC-7.12 D7: View opens the saved look in Looks.
-          const created = lastCreatedRef.current
-          if (created) router.push(savedLookHref(created.id))
+          // Codex #1: a save that confirmed an existing look views that look.
+          const id = viewLookIdRef.current
+          if (id) router.push(savedLookHref(id))
         }}
         onOpen={(bookmark) => {
           const selected = bookmark as SampleBookmark & {

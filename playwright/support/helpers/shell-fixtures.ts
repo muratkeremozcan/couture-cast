@@ -6,9 +6,12 @@ import {
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   listSavedLocationsResponseSchema,
+  outfitCapsuleListResponseSchema,
   plannerResponseSchema,
   resolveCommunityTargetsResponseSchema,
   ritualResponseSchema,
+  savedLookListResponseSchema,
+  savedLookResponseSchema,
   silhouetteProfileResponseSchema,
   trackedResponseSchema,
   userProfileResponseSchema,
@@ -17,6 +20,8 @@ import {
 } from '@couture/api-client/contracts/http'
 
 /**
+ * Story CC-7.12 (Step 69): capsules list and one-saved-look reads added; Looks gates on both lists.
+ *
  * Story CC-7.7 (AC5, spec D7): fixed responses for every API call the four signed-in web tabs
  * make on mount, for playwright/tests/signed-in-shell-layout-shift.spec.ts. Bodies follow the
  * strict client parsers (copied from jade-first-use.spec.ts, home-ritual.test.tsx and the web MSW
@@ -32,6 +37,8 @@ import {
  *   The Community sync channel (`community/events`, `community/targets/resolve`) answers after
  *   SYNC_DELAY_MS in both slow modes: past its own ~2 s deadline the feed hides as an outage,
  *   which is not what these modes measure.
+ *   Story CC-7.12 (Step 69): Looks reads saved looks and capsules (both `sort=created_desc`) before
+ *   its gate opens, and a Saved tile opens the one-look read (`saved-look`).
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
  *   guardian-pending  Story CC-7.10 D1: a 14 year old teen whose one linked guardian is still
  *              `pending`. Under the production consent policy `off` the API lets a teen waiting on
@@ -55,6 +62,9 @@ export const SYNC_DELAY_MS = 1000
 /** Text the Home outfit renders for one member, so a test can tell two members apart. */
 export const ownerMarker = (memberId: string) => `comfort note for ${memberId}`
 export const POPULATED_GARMENTS = 24
+/** Story CC-7.12: the populated member's one saved look and one capsule (Looks > Saved tiles). */
+export const SHELL_SAVED_LOOK_ID = 'shell-saved-look-1'
+export const SHELL_CAPSULE_ID = 'shell-capsule-1'
 
 const iso = '2026-11-20T12:00:00.000Z'
 const pixel =
@@ -74,6 +84,10 @@ export function readKey(url: string, method: string) {
   if (method === 'GET' && /^community\/posts\/[^/]+\/comment-submissions$/.test(path))
     return 'community-comment-submissions'
   if (method !== 'GET') return null
+  // Story CC-7.12 D2, D5: the Looks Saved grid reads the owner's capsules, and a Saved tile opens
+  // the one saved look.
+  if (/^wardrobe\/[^/]+\/capsules$/.test(path)) return 'capsules'
+  if (/^wardrobe\/saved-looks\/[^/]+$/.test(path)) return 'saved-look'
   if (path === 'community/spotlight')
     return searchParams.get('surface') === 'home_teaser'
       ? 'home-teaser'
@@ -102,16 +116,18 @@ export function readKey(url: string, method: string) {
 /**
  * Spec D3 (as built, 2026-11-25): the reads each screen's gate waits for. Home waits for the
  * City Spotlight page one because it sits above the Home feed (D4); the teaser read happens only
- * while stacked, which 390 px always is. Closet waits for the first saved-looks page because its
- * row sits above the grid.
+ * while stacked, which 390 px always is. Story CC-7.12 (Step 69): the Closet saved looks row is
+ * gone, so Closet waits on its closet read only, and Looks waits on both lists its Saved grid
+ * merges.
  */
 export const GATE_READS: Record<ShellScreen, string[]> = {
   // The ritual read counts as settled only once its city line (`locations`) answered too.
   home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
   // Story CC-7.11: the onboarding read only labels the More menu now, outside the gate.
-  closet: ['profile', 'garments', 'saved-looks'],
-  // Story CC-7.11 D8: Looks opens on the saved looks list (moved out of the Closet header).
-  looks: ['saved-looks'],
+  closet: ['profile', 'garments'],
+  // Story CC-7.12 D1, D3: Looks opens on Saved or Ideas only once both lists answered. The
+  // capsules read follows the profile read that names its owner.
+  looks: ['saved-looks', 'capsules'],
   community: ['community-feed', 'community-spotlight'],
   // The account header's profile read shares the session check, so it is not a gate read.
   profile: [
@@ -121,6 +137,24 @@ export const GATE_READS: Record<ShellScreen, string[]> = {
     'premium-access',
     'premium-theme',
   ],
+}
+
+/** One page of a member's list: the one item when populated, else none. */
+function listPage<T>(populated: boolean, item: T) {
+  const data = populated ? [item] : []
+  return { data, total: data.length, limit: 50, offset: 0 }
+}
+
+/** Story CC-7.12 D5: the one-look read answers 404 for any id but the populated member's look. */
+function savedLookMissing(request: Request, populated: boolean) {
+  const { pathname } = new URL(request.url())
+  return !populated || !pathname.endsWith(`/${encodeURIComponent(SHELL_SAVED_LOOK_ID)}`)
+}
+
+const SAVED_LOOK_NOT_FOUND = {
+  statusCode: 404,
+  message: 'SAVED_LOOK_NOT_FOUND',
+  error: 'Not Found',
 }
 
 /** The body, after the published schema accepts it. */
@@ -237,7 +271,7 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
     updatedAt: iso,
   }
   const savedLook = {
-    id: 'shell-saved-look-1',
+    id: SHELL_SAVED_LOOK_ID,
     ownerUserId: memberId,
     source: 'home_sample',
     lookId: 'sample:l:office-oxford',
@@ -271,6 +305,31 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
     revision: 0,
     createdAt: iso,
     updatedAt: iso,
+  }
+  // Story CC-7.12 D2: one capsule, saved a day before the look, so the newest-first Saved grid
+  // shows the look first and the capsule second.
+  const capsuleCreated = '2026-11-19T12:00:00.000Z'
+  const capsule = {
+    id: SHELL_CAPSULE_ID,
+    ownerUserId: memberId,
+    name: 'Office week',
+    description: null,
+    occasions: ['work'],
+    isFavorite: false,
+    revision: 0,
+    availabilityStatus: 'ready',
+    unavailableGarmentCount: 0,
+    garments: [0, 1].map((index) => ({
+      id: `shell-garment-${index + 1}`,
+      category: ['top', 'bottom'][index],
+      material: 'cotton',
+      comfortRange: 'mild',
+      imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
+      availabilityStatus: 'ready',
+      garmentOrder: index,
+    })),
+    createdAt: capsuleCreated,
+    updatedAt: capsuleCreated,
   }
   const garment = (index: number) => ({
     id: `shell-garment-${index + 1}`,
@@ -362,12 +421,10 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
     locations: checked(listSavedLocationsResponseSchema, {
       data: populated ? [location] : [],
     }),
-    'saved-looks': {
-      data: populated ? [savedLook] : [],
-      total: populated ? 1 : 0,
-      limit: 50,
-      offset: 0,
-    },
+    'saved-looks': checked(savedLookListResponseSchema, listPage(populated, savedLook)),
+    capsules: checked(outfitCapsuleListResponseSchema, listPage(populated, capsule)),
+    // Story CC-7.12 D5: the one-look read behind /looks/saved/<id>. Any other id is a 404.
+    'saved-look': checked(savedLookResponseSchema, { data: savedLook }),
     'events-poll': { events: [], nextSince: null },
     silhouette: checked(silhouetteProfileResponseSchema, {
       data: {
@@ -534,6 +591,24 @@ export function createShellRouter(options: {
     return held
   }
 
+  /** The fixture answer for one known read. */
+  const answerFor = (key: string, request: Request): Parameters<Route['fulfill']>[0] => {
+    const { json, resolve } = bodiesFor(request)
+    if (key === 'community-resolve') return { json: resolve(request) }
+    if (key === 'ritual' && !populated) return { status: 400, json: NO_CITY }
+    if (key === 'ritual' && mode === 'ritual-503')
+      return { status: 503, json: { statusCode: 503, message: 'Unavailable' } }
+    if (key === 'saved-look' && savedLookMissing(request, populated))
+      return { status: 404, json: SAVED_LOOK_NOT_FOUND }
+    if (key === 'community-feed') {
+      // The page names the filter it was asked for, as the API does.
+      const feed = json[key] as { data: Record<string, unknown> }
+      const requested = new URL(request.url()).searchParams.get('mode') ?? 'auto'
+      return { json: { data: { ...feed.data, mode: requested } } }
+    }
+    return { json: json[key] }
+  }
+
   const handler = async (route: Route, request: Request) => {
     const key = readKey(request.url(), request.method())
     if (key === null) {
@@ -560,24 +635,7 @@ export function createShellRouter(options: {
       if (gate) await gate
       const delay = delayFor(key)
       if (delay > 0) await new Promise((resolveDelay) => setTimeout(resolveDelay, delay))
-      const { json, resolve } = bodiesFor(request)
-      if (key === 'community-resolve') {
-        await route.fulfill({ json: resolve(request) })
-      } else if (key === 'ritual' && !populated) {
-        await route.fulfill({ status: 400, json: NO_CITY })
-      } else if (key === 'ritual' && mode === 'ritual-503') {
-        await route.fulfill({
-          status: 503,
-          json: { statusCode: 503, message: 'Unavailable' },
-        })
-      } else if (key === 'community-feed') {
-        // The page names the filter it was asked for, as the API does.
-        const feed = json[key] as { data: Record<string, unknown> }
-        const requested = new URL(request.url()).searchParams.get('mode') ?? 'auto'
-        await route.fulfill({ json: { data: { ...feed.data, mode: requested } } })
-      } else {
-        await route.fulfill({ json: json[key] })
-      }
+      await route.fulfill(answerFor(key, request))
     } catch {
       // The page closed or navigated while the stub waited: nothing to answer.
     } finally {

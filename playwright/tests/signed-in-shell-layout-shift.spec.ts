@@ -8,6 +8,8 @@
 // delayed responses (helpers/shell-fixtures.ts). The meter (helpers/layout-shift-meter.ts) sums
 // every layout-shift entry, the ones after input included, over the whole transition; above 0.1
 // fails and names what moved. The production measurement is the .prod.spec.ts beside this file.
+// Story CC-7.12 (Step 69): Looks opens on Saved (look and capsule tiles) or, with nothing saved,
+// on Ideas with the empty line.
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -34,6 +36,8 @@ import {
   createShellRouter,
   DELAY_MS,
   ownerMarker,
+  SHELL_CAPSULE_ID,
+  SHELL_SAVED_LOOK_ID,
   type ShellMode,
   type ShellScreen,
 } from '../support/helpers/shell-fixtures'
@@ -203,10 +207,27 @@ async function expectMemberContent(
     else await expect(page.getByTestId('garment-card-shell-garment-1')).toBeVisible()
   }
   if (screen === 'looks') {
-    // Story CC-7.11 D8: Looks opens on the saved looks list, or one line when there is none.
+    // Story CC-7.12 D1: Looks opens on Saved when the member has a saved look or capsule, and on
+    // Ideas with one line when there is none.
     const first = page.getByTestId('looks-first-content')
-    if (empty) await expect(first).toContainText('Save a look to see it here')
-    else await expect(first).toBeVisible()
+    if (empty || mode === 'guardian-pending') {
+      await expect(page.getByTestId('looks-segment-ideas')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+      await expect(first).toContainText('Save a look to see it here')
+    } else {
+      await expect(page.getByTestId('looks-segment-saved')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+      await expect(
+        first.getByTestId(`saved-look-card-${SHELL_SAVED_LOOK_ID}`)
+      ).toBeVisible()
+      await expect(
+        first.getByTestId(`looks-capsule-card-${SHELL_CAPSULE_ID}`)
+      ).toBeVisible()
+    }
   }
   if (screen === 'community') {
     if (empty) await expect(page.getByTestId('community-feed-empty')).toBeVisible()

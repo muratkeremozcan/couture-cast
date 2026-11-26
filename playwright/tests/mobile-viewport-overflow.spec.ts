@@ -1,3 +1,5 @@
+// Story CC-7.12 (Step 69): the Looks segments, the Saved Capsules filter and the capsule manager
+// at /looks/capsules are the member routes in place of /wardrobe/capsules.
 // Story CC-7.11 D4: the Closet actions now live in the top bar (Add and More); the row that
 // broke below is gone and `wardrobeHeaderProblems` holds the new placement.
 // Owner report 2026-11-16, iPhone 16 Safari: the Wardrobe Hub header put its title and three
@@ -15,12 +17,16 @@ import { seedWebSession } from '../support/helpers/commerce-session'
 
 const WIDTHS = [393, 320] as const
 const SCHEMES = ['light', 'dark'] as const
-// Story CC-7.11 D1: Looks is the new tab; its capsules row opens `/wardrobe/capsules`.
+// Story CC-7.11 D1: Looks is the new tab. Story CC-7.12 D1, D4, D6: its segments, the Saved
+// filter row and the capsule manager, which moved from `/wardrobe/capsules` to `/looks/capsules`.
 const MEMBER_ROUTES = [
   '/',
   '/wardrobe',
   '/looks',
-  '/wardrobe/capsules',
+  '/looks?segment=saved&filter=capsules',
+  '/looks?segment=ideas',
+  '/looks?segment=plan',
+  '/looks/capsules',
   '/community',
   '/settings',
 ]

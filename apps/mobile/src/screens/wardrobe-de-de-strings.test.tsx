@@ -24,6 +24,8 @@ vi.mock('expo-localization', () => ({
 vi.mock('expo-router', async () => ({
   router: { replace: vi.fn(), push: vi.fn(), setParams: vi.fn(), navigate: vi.fn() },
   Stack: { Screen: () => null },
+  // Story CC-7.12 D6: the capsule manager reads its `capsule` focus param; none here.
+  useLocalSearchParams: () => ({}),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
   useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))

@@ -3,8 +3,8 @@
 // Production follow-up (2026-11-19), same root cause as the owner's /settings report on
 // production 8b0fed06: the Home planner rail asked once, on mount, whether this tab held the
 // verified bearer. A new tab or a reload gets it only after the session bridge verifies the stored
-// session, so an entitled member saw the locked "Get Premium" panel and the rail never looked
-// again. It now follows the session: still checking (no locked panel, no read) while verification
+// session, so an entitled member saw the locked "Get Premium" panel (since CC-7.12 the free
+// preview, `plan-free-preview`) and the rail never looked again. It now follows the session: still checking (no free preview, no read) while verification
 // is pending, one read per member with that member's bearer, and nothing of one member kept for
 // the next. The /settings browser proof is playwright/tests/settings-sections-real-session.spec.ts.
 import { http, HttpResponse } from 'msw'
@@ -107,7 +107,7 @@ const WEEK = {
   },
 }
 
-const locked = () => screen.queryByTestId('planner-rail-locked')
+const freePreview = () => screen.queryByTestId('plan-free-preview')
 const days = () => screen.queryByTestId('planner-days')
 
 describe('PlannerRail follows the web session', () => {
@@ -137,12 +137,12 @@ describe('PlannerRail follows the web session', () => {
     renderSection()
     await settle()
 
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     expect(bearers).toEqual([])
 
     publish({ identity: 'member-1', bearer: 'token-1' })
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
 
     await finishVerification('token-1')
     publish({ identity: 'member-1', bearer: 'token-1' })
@@ -155,12 +155,12 @@ describe('PlannerRail follows the web session', () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'stale-token')
     renderSection()
     await settle()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     expect(bearers).toEqual([])
 
     publish({ identity: null, bearer: null })
     await settle()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
 
     publish({ identity: 'member-1', bearer: 'token-1' })
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
@@ -172,13 +172,13 @@ describe('PlannerRail follows the web session', () => {
     session.stored = true
     renderSection()
     await settle()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
 
     session.stored = false
     await finishVerification(undefined)
     publish({ identity: null, bearer: null })
 
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
     expect(bearers).toEqual([])
   })
 
@@ -191,7 +191,7 @@ describe('PlannerRail follows the web session', () => {
 
     publish({ identity: null, bearer: null })
     publish({ identity: 'member-2', bearer: 'token-2' })
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
     expect(days()).toBeNull()
     await settle()
     expect(bearers).toEqual(['Bearer token-1', 'Bearer token-2'])
@@ -199,7 +199,7 @@ describe('PlannerRail follows the web session', () => {
     session.stored = false
     publish({ identity: null, bearer: null })
     await settle()
-    expect(locked()).toBeInTheDocument()
+    expect(freePreview()).toBeInTheDocument()
     expect(days()).toBeNull()
     expect(bearers).toHaveLength(2)
   })
@@ -240,7 +240,7 @@ describe('PlannerRail follows the web session', () => {
     })
 
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 
@@ -276,7 +276,7 @@ describe('PlannerRail follows the web session', () => {
     })
 
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     await settle()
     expect(bearers).toEqual(['Bearer token-1a'])
   })
@@ -328,13 +328,13 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
       await Promise.resolve()
     })
     await settle()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a'])
 
     // The denial joined the bridge's verification while the old token is still installed.
     await waitFor(() => expect(session.verifiers.length).toBeGreaterThan(0))
     expect(window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)).toBe('token-1a')
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a'])
 
     // As the bridge does: install and publish member-1's fresh token, then answer the
@@ -342,11 +342,11 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     publish({ identity: 'member-1', bearer: 'token-1b' })
     await settle()
     expect(bearers).toEqual(['Bearer token-1a'])
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     await finishVerification('token-1b')
 
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
-    expect(locked()).toBeNull()
+    expect(freePreview()).toBeNull()
     await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })

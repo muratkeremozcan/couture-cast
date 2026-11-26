@@ -9,6 +9,11 @@
 // Learning path Step 58: Production follow-ups after the project close.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in apps/mobile/src/screens/tab-two-screen.test.tsx
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-031 (D11), Profile's `planner-link` opens the Looks
+// tab on Plan in one press.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
@@ -25,7 +30,8 @@ import type * as PremiumModule from '../lib/premium'
  * behaviour is covered by `palette-advisor-screen.test.tsx` and the Maestro flow.
  */
 vi.mock('expo-router', async () => ({
-  router: { push: vi.fn() },
+  // Story CC-7.12 D11: the planner row navigates to the Looks tab.
+  router: { push: vi.fn(), navigate: vi.fn() },
   // Story CC-7.7 D5: Profile re-reads its sections when the tab regains focus.
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
@@ -414,6 +420,20 @@ describe('SettingsScreen', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'Locations' }))
 
     expect(vi.mocked(router.push)).toHaveBeenCalledWith('/locations')
+  })
+
+  it('[P1] [7.12-NAT-031] opens Looks on Plan from the planner row in one press', async () => {
+    await render(<SettingsScreen />)
+
+    const row = await screen.findByTestId('planner-link')
+    expect(row).toHaveTextContent('7-Day Planner')
+    await userEvent.click(row)
+
+    expect(vi.mocked(router.navigate).mock.calls).toEqual([
+      [{ pathname: '/looks', params: { segment: 'plan' } }],
+    ])
+    // The old planner route is a redirect now; the row never pushes it.
+    expect(vi.mocked(router.push)).not.toHaveBeenCalledWith('/planner')
   })
 
   it('renders API health loaded from the generated client', async () => {

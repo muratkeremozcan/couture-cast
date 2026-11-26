@@ -90,7 +90,7 @@ describe('7.11 AppHistoryTracker', () => {
     const view = render(<AppHistoryTracker />)
     view.rerender(<AppHistoryTracker />)
     history.installAppHistory()
-    window.history.pushState({ __NA: true }, '', '/looks/plan')
+    window.history.pushState({ __NA: true }, '', '/looks/saved/sl-1')
 
     expect(Reflect.get(window.history, 'pushState')).toBe(wrapped)
     expect(history.currentAppHistoryIndex()).toBe(1)

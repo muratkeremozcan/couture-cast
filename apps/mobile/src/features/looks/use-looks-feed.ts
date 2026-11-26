@@ -54,6 +54,26 @@ function appendUnique<T extends { id: string }>(current: T[], next: readonly T[]
   return [...current, ...next.filter((item) => !seen.has(item.id))]
 }
 
+/**
+ * Codex #5: reads pages from offset 0 until at least `want` items (or the whole list) are in, so
+ * a refresh brings back every page the member had loaded.
+ */
+async function readPages<T extends { id: string }>(
+  readPage: (offset: number) => Promise<{ items: readonly T[]; total: number }>,
+  want: number
+): Promise<{ items: T[]; total: number }> {
+  let items: T[] = []
+  let total = 0
+  for (;;) {
+    const page = await readPage(items.length)
+    total = page.total
+    const before = items.length
+    items = appendUnique(items, page.items)
+    if (items.length === before || items.length >= want || items.length >= total) break
+  }
+  return { items, total }
+}
+
 /** A failed source reads as complete and empty, so the other list still shows (P1). */
 function forMerge<T extends { id: string; createdAt: string }>(
   source: Source<T>
@@ -85,12 +105,14 @@ export function useLooksFeed({
   const [attempt, setAttempt] = useState(0)
   const runRef = useRef(0)
   const filterRef = useRef(filter)
+  const stateRef = useRef(state)
 
   // A filter change starts from unread lists, so one filter never shows another's tiles.
   if (filterRef.current !== filter) {
     filterRef.current = filter
     setState(initial())
   }
+  stateRef.current = state
 
   const readLooks = useCallback(
     (offset: number, token: string, signal?: AbortSignal) =>
@@ -130,26 +152,41 @@ export function useLooksFeed({
     void (async () => {
       const token = (await resolveMobileAccessToken().catch(() => null)) ?? ''
       if (!live()) return
+      // A refresh keeps the tiles on screen until it lands, reads back as many items as are
+      // loaded, and keeps a loaded list when its refresh fails.
+      const previous = stateRef.current
+      const want = (source: Source<{ id: string }>) =>
+        Math.max(LOOKS_FEED_PAGE, source.loaded ? source.items.length : 0)
       const looks = readsLooks
-        ? readLooks(0, token, controller.signal).then(
-            (page): Source<SavedLookContract> => ({
-              items: page.data,
-              total: page.total,
+        ? readPages(
+            (offset) =>
+              readLooks(offset, token, controller.signal).then((page) => ({
+                items: page.data,
+                total: page.total,
+              })),
+            want(previous.looks)
+          ).then(
+            (read): Source<SavedLookContract> => ({
+              ...read,
               loaded: true,
               failed: false,
             }),
-            (): Source<SavedLookContract> => ({ ...SKIPPED, failed: true })
+            (): Source<SavedLookContract> =>
+              previous.looks.loaded ? previous.looks : { ...SKIPPED, failed: true }
           )
         : Promise.resolve<Source<SavedLookContract>>(SKIPPED)
       const capsules = readsCapsules
-        ? readCapsules(0, token, controller.signal).then(
-            (page): Source<OutfitCapsuleContract> => ({
-              items: page.items,
-              total: page.total,
+        ? readPages(
+            (offset) => readCapsules(offset, token, controller.signal),
+            want(previous.capsules)
+          ).then(
+            (read): Source<OutfitCapsuleContract> => ({
+              ...read,
               loaded: true,
               failed: false,
             }),
-            (): Source<OutfitCapsuleContract> => ({ ...SKIPPED, failed: true })
+            (): Source<OutfitCapsuleContract> =>
+              previous.capsules.loaded ? previous.capsules : { ...SKIPPED, failed: true }
           )
         : Promise.resolve<Source<OutfitCapsuleContract>>(SKIPPED)
       const [nextLooks, nextCapsules] = await Promise.all([looks, capsules])

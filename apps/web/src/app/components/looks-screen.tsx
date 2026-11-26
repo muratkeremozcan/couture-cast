@@ -611,7 +611,13 @@ function LooksBody({ owner }: { owner: string | null }) {
                 </>
               )}
               {segment === 'ideas' && (
-                <IdeasPanel showEmptyLine={!owner || (feed.settled && !feed.hasAny)} />
+                <IdeasPanel
+                  // Codex #11: only an empty All says the member has saved nothing yet.
+                  showEmptyLine={
+                    !owner ||
+                    (filter === 'all' && feed.settled && !feed.error && !feed.hasAny)
+                  }
+                />
               )}
               {segment === 'plan' && (
                 <div data-testid="looks-first-content">

@@ -12,6 +12,8 @@
 // The per-tab checks (E2E-001..006) live in app-shell-tabs-light and app-shell-tabs-dark, the
 // palettes (E2E-008) in app-shell-premium-palettes and the de-DE strings (E2E-009) in
 // app-shell-de-de-strings: one file was too heavy for one burn-in shard (CI 46f09ae8).
+// Story CC-7.12 (Step 69): capsules live at /looks/capsules (back to Saved > Capsules) and the
+// saved look detail /looks/saved/ID joins the sub-screens.
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -24,6 +26,7 @@ import {
   tokenTriples,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
+import { SHELL_SAVED_LOOK_ID } from '../support/helpers/shell-fixtures'
 
 test.use({
   authSessionEnabled: false,
@@ -34,11 +37,19 @@ test.use({
 
 /** Routed sub-screens of a member (spec D7); `parent` is where back lands on a direct entry. */
 const SUB_SCREENS = [
-  // Story CC-7.11 D10: capsules is a Looks row now, so a direct entry backs out to Looks.
+  // Story CC-7.12 D6: the manager moved under Looks; a direct entry backs out to Saved with the
+  // Capsules filter.
   {
     name: 'capsules',
-    path: '/wardrobe/capsules',
-    parent: '/looks',
+    path: '/looks/capsules',
+    parent: '/looks?segment=saved&filter=capsules',
+    mode: 'populated',
+  },
+  // Story CC-7.12 D5: a saved look's own screen; a direct entry backs out to Saved.
+  {
+    name: 'saved look detail',
+    path: `/looks/saved/${SHELL_SAVED_LOOK_ID}`,
+    parent: '/looks?segment=saved',
     mode: 'populated',
   },
   // Closet setup shows only while setup is unfinished: a finished closet redirects to /wardrobe.

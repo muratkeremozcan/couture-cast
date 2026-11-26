@@ -52,6 +52,7 @@ import {
   createCapsuleFromMobile,
   deleteCapsuleFromMobile,
   favoriteCapsuleFromMobile,
+  getCapsuleFromMobile,
   listCapsulesFromMobile,
   listGarmentsFromMobile,
   resolveOwnerUserId,
@@ -108,6 +109,12 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
 
   // D6: the capsule a Looks tile asked for, focused once its card has laid out.
   const focusTargetRef = useRef(typeof capsuleParam === 'string' ? capsuleParam : null)
+  // Codex #4: that capsule, read on its own and listed first while it is outside the first
+  // page; cleared by a search or filter of the member's own, a 404 or a failed read.
+  const pinnedIdRef = useRef(focusTargetRef.current)
+  const unpin = () => {
+    pinnedIdRef.current = null
+  }
   const listRef = useRef<ScrollView | null>(null)
   const cardRefs = useRef(new Map<string, View>())
   const titleRefs = useRef(new Map<string, Text>())
@@ -184,6 +191,27 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
     return () => clearTimeout(timer)
   }, [searchInput])
 
+  /**
+   * Codex #4: the page with the asked-for capsule first when the page lacks it. A failed read
+   * (gone, another member's or unreachable) unpins it, so nothing is focused.
+   */
+  const withPinnedCapsule = useCallback(
+    async (token: string, items: OutfitCapsuleContract[], signal: AbortSignal) => {
+      const pinnedId = pinnedIdRef.current
+      if (pinnedId === null || items.some((item) => item.id === pinnedId)) return items
+      try {
+        const pinned = await getCapsuleFromMobile(token, ownerUserId, pinnedId, signal)
+        return [pinned, ...items.filter((item) => item.id !== pinned.id)]
+      } catch {
+        if (signal.aborted) return items
+        pinnedIdRef.current = null
+        if (focusTargetRef.current === pinnedId) focusTargetRef.current = null
+        return items
+      }
+    },
+    [ownerUserId]
+  )
+
   const loadCapsules = useCallback(async () => {
     const signal = mountRef.current?.signal
     if (!ownerUserId || !signal || !current(signal)) {
@@ -217,7 +245,9 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
         listGarmentsFromMobile(token, controller.signal),
       ])
       if (!reading()) return
-      setCapsules(page.items)
+      const items = await withPinnedCapsule(token, page.items, controller.signal)
+      if (!reading()) return
+      setCapsules(items)
       setTotal(page.total)
       setGarments(garmentList)
     } catch (error: unknown) {
@@ -230,7 +260,16 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
         setIsLoading(false)
       }
     }
-  }, [current, memberToken, ownerUserId, searchQuery, occasionFilter, favoriteOnly, t])
+  }, [
+    current,
+    memberToken,
+    ownerUserId,
+    searchQuery,
+    occasionFilter,
+    favoriteOnly,
+    t,
+    withPinnedCapsule,
+  ])
 
   useEffect(() => {
     void loadCapsules()
@@ -363,7 +402,10 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
       <View style={styles.toolbar}>
         <TextInput
           value={searchInput}
-          onChangeText={setSearchInput}
+          onChangeText={(value) => {
+            unpin()
+            setSearchInput(value)
+          }}
           placeholder={t('wardrobe.capsules.searchPlaceholder')}
           accessibilityLabel={t('wardrobe.capsules.searchLabel')}
           placeholderTextColor={colors.inkMuted}
@@ -414,7 +456,10 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
           return (
             <Pressable
               key={occasion}
-              onPress={() => setOccasionFilter(occasion)}
+              onPress={() => {
+                unpin()
+                setOccasionFilter(occasion)
+              }}
               accessibilityRole="radio"
               aria-checked={selected}
               accessibilityLabel={
@@ -444,7 +489,10 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
           )
         })}
         <Pressable
-          onPress={() => setFavoriteOnly((value) => !value)}
+          onPress={() => {
+            unpin()
+            setFavoriteOnly((value) => !value)
+          }}
           accessibilityRole="checkbox"
           aria-checked={favoriteOnly}
           accessibilityLabel={t('wardrobe.capsules.filterFavorites')}

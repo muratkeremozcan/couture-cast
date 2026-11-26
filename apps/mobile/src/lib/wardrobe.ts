@@ -329,6 +329,29 @@ export async function listCapsulesFromMobile(
 }
 
 /**
+ * Story CC-7.12 D6: one capsule, for a Looks tile whose capsule is outside the manager's first
+ * page. A 404 (removed or another member's) throws with `status` 404.
+ */
+export async function getCapsuleFromMobile(
+  accessToken: string,
+  ownerUserId: string,
+  capsuleId: string,
+  signal?: AbortSignal
+): Promise<OutfitCapsuleContract> {
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      createMobileApiClient({ accessToken }).apiV1WardrobeOwnerUserIdCapsulesCapsuleIdGet(
+        { ownerUserId, capsuleId },
+        { signal: requestSignal }
+      )
+    )
+    return outfitCapsuleResponseSchema.parse(response).data
+  } catch (error) {
+    throw await actionableWardrobeError(error, 'Unable to load capsule detail.')
+  }
+}
+
+/**
  * `idempotencyKey` is required rather than generated internally so a retry after
  * a timeout replays the original request instead of creating a second capsule.
  */

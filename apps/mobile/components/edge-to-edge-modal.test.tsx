@@ -704,12 +704,15 @@ describe('[7.11-NAT-034] every EdgeToEdgeModal caller', () => {
       './community/community-spotlight-detail.tsx',
       './community/community-post-sheet.tsx',
       './wardrobe/garment-capture-modal.tsx',
-      '../src/features/wardrobe/saved-looks-row.tsx',
+      '../src/features/wardrobe/style-piece-panel.tsx',
       '../src/features/wardrobe/closet-top-bar.tsx',
       '../src/features/preview/guest-preview-parts.tsx',
     ])
       expect(files, known).toContain(known)
-    expect(usages.length).toBeGreaterThanOrEqual(13)
+    // Story CC-7.12 D5, D8: the saved look detail left the Closet row's layer for its own stack
+    // screen (`saved-look/[savedLookId]`), so the row's usage is gone and twelve layers remain.
+    expect(files).not.toContain('../src/features/wardrobe/saved-looks-row.tsx')
+    expect(usages.length).toBeGreaterThanOrEqual(12)
   })
 
   it('passes onRequestClose and returnFocusRef at every usage, and says who refocuses where the ref is null', () => {

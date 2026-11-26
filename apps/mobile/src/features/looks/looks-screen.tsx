@@ -58,21 +58,31 @@ export function LooksScreen() {
 }
 
 function MemberLooks({ epoch }: { epoch: number }) {
-  const { space } = useTokens()
+  const { colors, space } = useTokens()
   const owner = mobileApplicationUserId()
   const params = useLocalSearchParams<{ segment?: string; filter?: string }>()
   const addressSegment = parseLooksSegment(params.segment)
   const filter = parseLooksFilter(params.filter)
   const feed = useLooksFeed({ owner, epoch, filter })
 
-  // P1: decided once per entry; removing the last look while on Saved keeps Saved.
+  // P1: decided once per entry; removing the last look while on Saved keeps Saved. A Today or
+  // Capsules filter in the address belongs to Saved, so it opens Saved; an empty filtered feed
+  // never says the member has nothing (Codex #11).
   const [defaultSegment, setDefaultSegment] = useState<LooksSegment | null>(() =>
-    owner ? null : 'ideas'
+    owner ? (filter === 'all' ? null : 'saved') : 'ideas'
   )
   useEffect(() => {
-    if (defaultSegment || addressSegment || !feed.settled) return
+    if (defaultSegment || addressSegment || filter !== 'all' || !feed.settled) return
     setDefaultSegment(feed.failed || feed.hasItems ? 'saved' : 'ideas')
-  }, [addressSegment, defaultSegment, feed.failed, feed.hasItems, feed.settled])
+  }, [addressSegment, defaultSegment, filter, feed.failed, feed.hasItems, feed.settled])
+
+  // Codex #11: whether Saved holds nothing at all, known from the All feed (or any item seen).
+  const [allEmpty, setAllEmpty] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!feed.settled || feed.failed) return
+    if (feed.hasItems) setAllEmpty(false)
+    else if (filter === 'all') setAllEmpty(true)
+  }, [feed.failed, feed.hasItems, feed.settled, filter])
 
   const segment = addressSegment ?? defaultSegment
   const ready = segment !== null && (segment !== 'saved' || feed.settled)
@@ -108,15 +118,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
 
   return (
     <View style={styles.screen} testID="looks-screen">
-      <ScreenGate
-        screen="looks"
-        ready={ready}
-        style={styles.gate}
-        // The gate's deadline opened it before the reads answered: Saved shows their progress.
-        onOpenChange={(open) => {
-          if (open && !addressSegment && !defaultSegment) setDefaultSegment('saved')
-        }}
-      >
+      <ScreenGate screen="looks" ready={ready} style={styles.gate}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[
@@ -141,7 +143,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
                 />
               ) : null}
               {segment === 'ideas' ? (
-                <IdeasPanel showEmptyLine={!owner || (feed.settled && !feed.hasItems)} />
+                <IdeasPanel showEmptyLine={!owner || allEmpty === true} />
               ) : null}
               {segment === 'plan' ? (
                 <View testID="looks-first-content" style={{ gap: space[3] }}>
@@ -149,7 +151,13 @@ function MemberLooks({ epoch }: { epoch: number }) {
                 </View>
               ) : null}
             </>
-          ) : null}
+          ) : (
+            // Codex #6: the gate's deadline opened it before the first reads answered; the
+            // default segment waits for them, so the member sees their progress meanwhile.
+            <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
+              <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
+            </View>
+          )}
         </ScrollView>
       </ScreenGate>
     </View>

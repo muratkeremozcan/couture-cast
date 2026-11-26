@@ -3,6 +3,8 @@
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // Story 4.3 Task 8: repair, recommendation, favorite, and delete journey.
+// Story CC-7.12 (Step 69): the capsule manager moved to /looks/capsules (/wardrobe/capsules now
+// redirects to Looks > Saved > Capsules), so the spec opens the new address.
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import { PrismaClient } from '@prisma/client'
@@ -62,7 +64,7 @@ async function openCapsules(
   await log.step('Intercept the capsule library fetch before navigating to it')
   const listCall = interceptNetworkCall({ method: 'GET', url: CAPSULE_LIST_URL })
 
-  await page.goto('/wardrobe/capsules')
+  await page.goto('/looks/capsules')
 
   const { responseJson, status } = await listCall
   expect(status).toBe(200)

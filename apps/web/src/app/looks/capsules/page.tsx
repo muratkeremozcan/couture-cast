@@ -14,6 +14,7 @@ import {
 } from '../../../lib/use-web-session'
 import {
   listCapsulesFromWeb,
+  getCapsuleFromWeb,
   createCapsuleFromWeb,
   updateCapsuleFromWeb,
   favoriteCapsuleFromWeb,
@@ -53,6 +54,24 @@ const CAPSULE_OCCASIONS: readonly CapsuleOccasion[] = [
 /** The strong entity tag the API issues and requires back on every mutation. */
 function capsuleETag(capsule: OutfitCapsuleContract): string {
   return `"capsule:${capsule.id}:${capsule.revision}"`
+}
+
+/**
+ * Codex #4: the capsule a Looks tile opened, read on its own when the loaded page lacks it. A
+ * failed or missing read pins nothing.
+ */
+async function readPinnedCapsule(
+  ownerUserId: string,
+  capsuleId: string | null,
+  loaded: readonly OutfitCapsuleContract[],
+  signal: AbortSignal
+): Promise<OutfitCapsuleContract | null> {
+  if (!capsuleId || loaded.some((capsule) => capsule.id === capsuleId)) return null
+  try {
+    return await getCapsuleFromWeb(ownerUserId, capsuleId, signal)
+  } catch {
+    return null
+  }
 }
 
 function CapsuleErrorBanner({
@@ -119,6 +138,15 @@ function CapsulesView({ session }: { session: MemberSession }) {
     [owner]
   )
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
+  // Story CC-7.12 D6: the capsule a Looks tile opened, read once from the address.
+  const [focusCapsuleId] = useState<string | null>(() =>
+    typeof window === 'undefined'
+      ? null
+      : new URL(window.location.href).searchParams.get('capsule')
+  )
+  // Codex #4: a capsule outside the first page is read on its own and shown first, so the tile
+  // always lands on its card. It shows only while no search or filter narrows the list.
+  const [pinnedCapsule, setPinnedCapsule] = useState<OutfitCapsuleContract | null>(null)
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
@@ -207,6 +235,15 @@ function CapsulesView({ session }: { session: MemberSession }) {
       }
       setCapsules(page.items)
       setTotal(page.total)
+      // Every read refreshes the pinned capsule too, so an edit, favorite or delete shows.
+      const unfilteredRead = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
+      const pinned = await readPinnedCapsule(
+        ownerUserId,
+        unfilteredRead ? focusCapsuleId : null,
+        page.items,
+        controller.signal
+      )
+      if (reading()) setPinnedCapsule(pinned)
       setGarments(garmentList)
     } catch (err: unknown) {
       if (!reading()) {
@@ -218,7 +255,16 @@ function CapsulesView({ session }: { session: MemberSession }) {
         setIsLoading(false)
       }
     }
-  }, [current, mountSignal, ownerUserId, searchQuery, selectedOccasion, favoriteOnly, t])
+  }, [
+    current,
+    mountSignal,
+    ownerUserId,
+    searchQuery,
+    selectedOccasion,
+    favoriteOnly,
+    focusCapsuleId,
+    t,
+  ])
 
   useEffect(() => {
     void fetchCapsules()
@@ -228,22 +274,23 @@ function CapsulesView({ session }: { session: MemberSession }) {
 
   // Story CC-7.12 D6: a Looks capsule tile opens the manager on its card. The id is matched by
   // equality against the loaded capsules (TEA P7), and only the first load moves focus.
-  const [focusCapsuleId] = useState<string | null>(() =>
-    typeof window === 'undefined'
-      ? null
-      : new URL(window.location.href).searchParams.get('capsule')
-  )
   const focusedCapsuleRef = useRef(false)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
+  const unfiltered = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
+  const shownCapsules = useMemo(() => {
+    if (!pinnedCapsule || !unfiltered) return capsules
+    const fresh = capsules.find((capsule) => capsule.id === pinnedCapsule.id)
+    return fresh ? capsules : [pinnedCapsule, ...capsules]
+  }, [capsules, pinnedCapsule, unfiltered])
   useEffect(() => {
     if (!focusCapsuleId || focusedCapsuleRef.current || isLoading) return
-    const match = capsules.find((capsule) => capsule.id === focusCapsuleId)
+    const match = shownCapsules.find((capsule) => capsule.id === focusCapsuleId)
     if (!match) return
     focusedCapsuleRef.current = true
     const card = cardRefs.current.get(match.id)
     card?.scrollIntoView({ block: 'center' })
     card?.focus({ preventScroll: true })
-  }, [focusCapsuleId, capsules, isLoading])
+  }, [focusCapsuleId, shownCapsules, isLoading])
 
   /**
    * Another client's committed changes appear on refocus, which is the
@@ -417,7 +464,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
         >
           {t('wardrobe.capsules.loading')}
         </div>
-      ) : !owner ? null : capsules.length === 0 ? (
+      ) : !owner ? null : shownCapsules.length === 0 ? (
         <div
           className="mt-12 text-center text-sm text-ink-muted"
           data-testid="capsule-empty-state"
@@ -431,7 +478,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
             className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
             data-testid="capsule-grid"
           >
-            {capsules.map((capsule) => (
+            {shownCapsules.map((capsule) => (
               <div
                 key={capsule.id}
                 ref={(element) => {

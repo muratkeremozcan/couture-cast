@@ -29,6 +29,8 @@ vi.mock('expo-router', () => ({
   router: { replace: vi.fn(), push: vi.fn() },
   useRouter: () => ({ back: vi.fn() }),
   Stack: { Screen: () => null },
+  // Story CC-7.12 D6: the capsule manager reads its `capsule` focus param; none here.
+  useLocalSearchParams: () => ({}),
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', async () =>

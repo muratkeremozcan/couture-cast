@@ -13,6 +13,14 @@
 // Style, palette, notifications, locations and the dashboards). 7.11-NAT-003: the active tab
 // button reports itself selected.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-020 (D5, T4), a cold link to a saved look or one opened
+// by View goes back, and system back lands, on Looks with `segment=saved`, while one opened from
+// a Saved tile pops back to that Looks page;
+// 7.12-NAT-033 (D11), the real `app/planner.tsx` opens Looks with `segment=plan`, as a cold link
+// and as a push, leaving no planner screen in front.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 import React, { useEffect } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,7 +48,15 @@ vi.mock('expo-localization', () => ({
 }))
 
 import { APP_TABS } from '@couture/utils'
-import { ExpoRoot, Stack, Tabs, router, usePathname } from 'expo-router'
+import {
+  ExpoRoot,
+  Stack,
+  Tabs,
+  router,
+  useGlobalSearchParams,
+  usePathname,
+} from 'expo-router'
+import PlannerRoute from '@/app/planner'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
   forgetSeenTabAnchorsForTesting,
@@ -62,7 +78,13 @@ function inMemoryContext(modules: Record<string, Record<string, unknown>>) {
 }
 
 function Pathname() {
-  return <Text testID="pathname">{usePathname()}</Text>
+  const { segment } = useGlobalSearchParams<{ segment?: string }>()
+  return (
+    <>
+      <Text testID="pathname">{usePathname()}</Text>
+      <Text testID="segment">{typeof segment === 'string' ? segment : ''}</Text>
+    </>
+  )
 }
 
 /** Mounts of the tab group, to tell a pop onto the anchor from a replace with a new one. */
@@ -76,7 +98,9 @@ const CLOSET_SCREENS = [
   'wardrobe-silhouette',
   'wardrobe-garment',
 ] as const
-const LOOKS_SCREENS = ['wardrobe-capsules', 'planner'] as const
+// Story CC-7.12 D5, D11: a saved look's screen joined Looks; Plan is a Looks segment, and the
+// `planner` route is the real redirect module (below), no longer a stack screen with a top bar.
+const LOOKS_SCREENS = ['wardrobe-capsules', 'saved-look/[savedLookId]'] as const
 const PROFILE_SCREENS = [
   'settings-style',
   'palette-advisor',
@@ -87,15 +111,22 @@ const PROFILE_SCREENS = [
 ] as const
 const SUB_SCREENS = [...CLOSET_SCREENS, ...LOOKS_SCREENS, ...PROFILE_SCREENS]
 
-const COLD_LINKS: readonly (readonly [string, string, string])[] = [
-  ...CLOSET_SCREENS.map((name) => [name, '/wardrobe', 'closet body'] as const),
-  ...LOOKS_SCREENS.map((name) => [name, '/looks', 'looks body'] as const),
-  ...PROFILE_SCREENS.map((name) => [name, '/settings', 'profile body'] as const),
+/** Each sub-screen, its parent tab, that tab's body, and the Looks segment back lands on. */
+const COLD_LINKS: readonly (readonly [string, string, string, string])[] = [
+  ...CLOSET_SCREENS.map((name) => [name, '/wardrobe', 'closet body', ''] as const),
+  ['wardrobe-capsules', '/looks', 'looks body', ''],
+  // 7.12-NAT-020: PARENT_TAB sends a saved look's direct entry to Looks on Saved.
+  ['saved-look/[savedLookId]', '/looks', 'looks body', 'saved'],
+  ...PROFILE_SCREENS.map((name) => [name, '/settings', 'profile body', ''] as const),
 ]
 
-/** A cold link to `name`: the garment detail takes its id. */
+/** A cold link to `name`: the garment detail and a saved look take their id. */
 const linkTo = (name: string) =>
-  name === 'wardrobe-garment' ? `/${name}?id=g1` : `/${name}`
+  name === 'wardrobe-garment'
+    ? `/${name}?id=g1`
+    : name === 'saved-look/[savedLookId]'
+      ? '/saved-look/sl-1'
+      : `/${name}`
 
 /**
  * The routing config of app/_layout.tsx and app/(tabs)/_layout.tsx: the `(tabs)` initial route,
@@ -147,9 +178,12 @@ const appContext = inMemoryContext({
   '(tabs)/community': body('community body'),
   '(tabs)/settings': body('profile body'),
   ...Object.fromEntries(SUB_SCREENS.map((name) => [name, body(`${name} body`)])),
+  // 7.12-NAT-033: the shipped redirect, not a stand-in.
+  planner: { default: PlannerRoute },
 })
 
 const pathname = () => screen.getByTestId('pathname')
+const segment = () => screen.getByTestId('segment')
 
 async function openApp(location: string) {
   render(<ExpoRoot context={appContext as never} location={location} />)
@@ -205,16 +239,31 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
   })
 
   it.each(COLD_LINKS)(
-    '[7.11-NAT-020] a cold link to %s goes back to %s',
-    async (name, parent, parentBody) => {
+    '[7.11-NAT-020] [7.12-NAT-020] a cold link to %s goes back to %s',
+    async (name, parent, parentBody, parentSegment) => {
       await openApp(linkTo(name))
       // Expo Router reports caller history: the `(tabs)` anchor it inserted below the link.
       expect(router.canGoBack()).toBe(true)
 
       await pressBack(parent)
       await waitFor(() => expect(screen.getByText(parentBody)).toBeVisible())
+      await waitFor(() => expect(segment().textContent).toBe(parentSegment))
     }
   )
+
+  it('[P0] [7.12-NAT-033] a cold link to the old planner address opens Looks on Plan', async () => {
+    render(<ExpoRoot context={appContext as never} location="/planner" />)
+
+    await waitFor(() => {
+      expect(pathname().textContent).toBe('/looks')
+      expect(segment().textContent).toBe('plan')
+    })
+    expect(screen.getByText('looks body')).toBeVisible()
+    // A redirect, not a screen: no planner top bar with a back control sits in front.
+    expect(
+      screen.queryAllByTestId('app-top-bar-back').filter((node) => node.checkVisibility())
+    ).toEqual([])
+  })
 
   it('[7.11-NAT-003] the five tab buttons sit in order and only the open tab reports selected', async () => {
     await openApp('/')
@@ -234,7 +283,8 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
   it('a screen pushed from Home goes back to Home, its real caller', async () => {
     await openApp('/')
     tabGroupMounts.count = 0
-    await navigate(() => router.push('/planner'), '/planner')
+    // Story CC-7.12 D11: `/planner` is a redirect now, so Capsules is the screen pushed here.
+    await navigate(() => router.push('/wardrobe-capsules'), '/wardrobe-capsules')
 
     await pressBack('/')
     await waitFor(() => expect(screen.getByText('home body')).toBeVisible())
@@ -253,15 +303,61 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     expect(tabGroupMounts.count).toBe(0)
   })
 
-  it('[7.11-NAT-022] Plan pushed from Looks pops back to that Looks', async () => {
+  // Replaces 7.11-NAT-022 "Plan pushed from Looks pops back to that Looks": Plan is a Looks
+  // segment (CC-7.12 D10), so the screen Looks pushes now is a saved look (D5), and a push of the
+  // old planner address lands on Looks on Plan (D11).
+  it('[7.11-NAT-022] [7.12-NAT-020] a saved look pushed from Looks pops back to that Looks', async () => {
     await openApp('/')
-    await navigate(() => router.navigate('/looks'), '/looks')
+    await navigate(
+      () => router.navigate({ pathname: '/looks', params: { segment: 'saved' } }),
+      '/looks'
+    )
     tabGroupMounts.count = 0
-    await navigate(() => router.push('/planner'), '/planner')
+    await navigate(
+      () =>
+        router.push({
+          pathname: '/saved-look/[savedLookId]',
+          params: { savedLookId: 'sl-1', from: 'all' },
+        }),
+      '/saved-look/sl-1'
+    )
 
     await pressBack('/looks')
     await waitFor(() => expect(screen.getByText('looks body')).toBeVisible())
+    await waitFor(() => expect(segment().textContent).toBe('saved'))
     expect(tabGroupMounts.count).toBe(0)
+  })
+
+  it('[P1] [7.12-NAT-033] a push of the old planner address from Home lands on Looks on Plan', async () => {
+    await openApp('/')
+    await act(async () => {
+      router.push('/planner')
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(pathname().textContent).toBe('/looks')
+      expect(segment().textContent).toBe('plan')
+    })
+    expect(screen.getByText('looks body')).toBeVisible()
+  })
+
+  // TEA T4: View on a save confirmation opens the look with no `from`; back goes to Looks on
+  // Saved, where the look now sits, never back to the screen that saved it.
+  it('[P0] [7.12-NAT-020] a saved look opened by View from Home goes back to Looks on Saved', async () => {
+    await openApp('/')
+    await navigate(
+      () =>
+        router.push({
+          pathname: '/saved-look/[savedLookId]',
+          params: { savedLookId: 'sl-1' },
+        }),
+      '/saved-look/sl-1'
+    )
+
+    await pressBack('/looks')
+    await waitFor(() => expect(screen.getByText('looks body')).toBeVisible())
+    await waitFor(() => expect(segment().textContent).toBe('saved'))
   })
 
   it('after a cold link, a pushed screen returns to the linked one, then to Closet', async () => {
@@ -275,12 +371,13 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
   // Android hardware back, the iOS swipe and any other pop that bypasses the top bar reach the
   // stack as `goBack()`, which `router.back()` dispatches here.
   it.each(COLD_LINKS)(
-    '[7.11-NAT-022] a system back from a cold link to %s lands on %s',
-    async (name, parent, parentBody) => {
+    '[7.11-NAT-022] [7.12-NAT-020] a system back from a cold link to %s lands on %s',
+    async (name, parent, parentBody, parentSegment) => {
       await openApp(linkTo(name))
 
       await navigate(() => router.back(), parent)
       await waitFor(() => expect(screen.getByText(parentBody)).toBeVisible())
+      await waitFor(() => expect(segment().textContent).toBe(parentSegment))
     }
   )
 

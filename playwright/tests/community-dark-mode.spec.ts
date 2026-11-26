@@ -1,5 +1,7 @@
 // Learning path Step 58: Production status and nightly health, production follow-ups.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
+// Story CC-7.12 (Step 69): the locked planner's Get Premium became the Plan segment's free
+// preview with one Upgrade, so 3.6-E2E-016 measures that Upgrade and the preview's text.
 //
 // Production feedback 2026-11-19: the lookbook on /community stayed white under a dark system
 // setting while Wardrobe and Moderation follow it, the "Community inspirations" label repeated
@@ -568,10 +570,10 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
   for (const scheme of ['dark', 'light'] as const) {
     for (const palette of [null, ...PREMIUM_PALETTES]) {
       const name = palette ?? 'Default'
-      // The monitor is off: a reader without Premium gets 403 from the planner read, the locked
-      // state under test.
+      // The monitor is off: a reader without Premium gets 403 from the planner read, the free
+      // preview state under test.
       test(
-        `3.6-E2E-016: the locked planner's Get Premium is readable (${name}, ${scheme} system)`,
+        `3.6-E2E-016: the free Plan preview's Upgrade is readable (${name}, ${scheme} system)`,
         { annotation: [{ type: 'skipNetworkMonitoring' }] },
         async ({ page, communitySession }) => {
           expect(communitySession.userId).toBeTruthy()
@@ -580,14 +582,18 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
           await page.goto('/')
           await setPalette(page, palette)
 
-          // Story CC-7.11 D9: Plan week is a link to the Plan route, where the locked rail shows.
+          // Story CC-7.12 D10, D11: Plan week opens the Looks Plan segment, where a reader
+          // without Premium sees the sample week with one Upgrade in place of the lock.
           await page
             .getByRole('link', { name: enUS.commerce.premium.planner.openControl })
             .click()
-          await expect(page).toHaveURL('/looks/plan')
-          const cta = page.getByTestId('planner-rail-get-premium')
+          await expect(page).toHaveURL('/looks?segment=plan')
+          const preview = page.getByTestId('plan-free-preview')
+          const cta = preview.getByTestId('plan-upgrade')
           await expect(cta).toBeVisible()
+          await expect(cta).toHaveText(enUS.looks.freePlan.upgrade)
           expect(await textContrastFailures(cta)).toEqual([])
+          expect(await textContrastFailures(preview), 'free preview text').toEqual([])
         }
       )
 

@@ -4,6 +4,7 @@
 // risk R3). Split from app-shell-visual-system.spec.ts so the burn-in shards spread the
 // full-page contrast scans. Test design:
 // _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
+// Story CC-7.12 (Step 69): Plan week opens the Looks Plan segment (/looks?segment=plan).
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -157,15 +158,15 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
           expect(await textContrastFailures(card), `${name} text`).toEqual([])
         }
 
-        // The planner, reached from Home in the same document. Story CC-7.11 D9: Plan week links
-        // to the Plan route, which keeps the palette through the client navigation.
+        // The planner, reached from Home in the same document. Story CC-7.12 D11: Plan week links
+        // to the Looks Plan segment, which keeps the palette through the client navigation.
         setScreen('home')
         await page.getByTestId(SHELL_TABS.home.nav).click()
         await expect(page).toHaveURL(/\/$/)
         await waitForShellSettled(page, router)
         await expect(html).toHaveAttribute('data-theme', palette)
         await page.getByTestId('planner-open-control').click()
-        await expect(page).toHaveURL('/looks/plan')
+        await expect(page).toHaveURL('/looks?segment=plan')
         await expect(html).toHaveAttribute('data-theme', palette)
         expect((await plannerRead).status).toBe(200)
         const rail = page.getByRole('complementary', {

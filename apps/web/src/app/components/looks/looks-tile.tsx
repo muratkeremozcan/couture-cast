@@ -113,19 +113,21 @@ export function useSavedLookName(): (look: SavedLookContract) => string {
 
 function Cell({ cell }: { cell: LooksTileCell }) {
   // A failed photo swaps to the placeholder inside the same square, so nothing moves (P8).
-  const [failed, setFailed] = useState(false)
+  // Codex #7: a failure belongs to one signed URL, so a refreshed URL gets a fresh try.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const box = 'relative aspect-square overflow-hidden bg-card-muted'
-  if (cell.kind === 'photo' && !failed) {
+  if (cell.kind === 'photo' && cell.url !== failedUrl) {
+    const url = cell.url
     return (
       <div className={box}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={cell.url}
+          src={url}
           alt=""
           referrerPolicy="no-referrer"
           loading="lazy"
           className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
+          onError={() => setFailedUrl(url)}
         />
       </div>
     )

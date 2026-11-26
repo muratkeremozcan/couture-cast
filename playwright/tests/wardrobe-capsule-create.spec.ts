@@ -1,6 +1,8 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Story 4.3 Task 8: capsule creation journey, ordering durability, and cross-client refresh.
+// Story CC-7.12 (Step 69): the capsule manager moved to /looks/capsules (/wardrobe/capsules now
+// redirects to Looks > Saved > Capsules), so the spec opens the new address.
 import type { Page } from '@playwright/test'
 import {
   interceptNetworkCall as interceptOnPage,
@@ -50,11 +52,17 @@ async function openCapsules(
   await log.step('Intercept the capsule library fetch before navigating to it')
   const listCall = interceptNetworkCall({ method: 'GET', url: CAPSULE_LIST_URL })
 
-  await page.goto('/wardrobe/capsules')
+  await page.goto('/looks/capsules')
 
   const { responseJson, status } = await listCall
   expect(status).toBe(200)
   await waitForAccessibilityReady(page)
+  // Story CC-7.12 D6: the manager sits under Looks; its back returns to Saved > Capsules.
+  await expect(page.getByTestId('app-top-bar-title')).toHaveText(/^Outfit capsules$/)
+  await expect(page.getByTestId('app-top-bar-back')).toHaveAttribute(
+    'href',
+    '/looks?segment=saved&filter=capsules'
+  )
 
   return responseJson as CapsuleListResponse | null
 }
@@ -192,7 +200,7 @@ test.describe('Wardrobe capsule creation', () => {
       method: 'GET',
       url: CAPSULE_LIST_URL,
     })
-    await observer.goto('/wardrobe/capsules')
+    await observer.goto('/looks/capsules')
     await observerListCall
     await waitForAccessibilityReady(observer)
 

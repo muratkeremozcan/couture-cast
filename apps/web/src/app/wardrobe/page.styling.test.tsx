@@ -1,3 +1,8 @@
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-IMPORT-001 (D8: the device-saved looks import moved
+// with the saved looks read from the Closet to Looks) and 7.12-UNIT-VIEW-001 (D7, Codex 7.12 #1).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): router stub for the history-aware top bar back (D11)
@@ -36,6 +41,7 @@ import {
   type SavedLooksMswStore,
 } from '../../test-utils/saved-looks-msw'
 import { HomeRitual } from '../components/home-ritual'
+import LooksPage from '../looks/page'
 import WardrobePage from './page'
 
 const photoErrors = vi.hoisted(() => new Map<string, () => void>())
@@ -207,8 +213,11 @@ beforeEach(() => {
   )
 })
 
+const startUrl = window.location.href
+
 afterEach(() => {
   cleanup()
+  window.history.replaceState(null, '', startUrl)
   photoErrors.clear()
   vi.useRealTimers()
   vi.restoreAllMocks()
@@ -320,6 +329,38 @@ describe('Wardrobe styling', () => {
     )
     expect(readRecipes()).toEqual([])
     expect(selectedWeather).toHaveFocus()
+  })
+
+  // Story CC-7.12 D7 and Codex 7.12 #1: View on the save confirmation opens the saved look's
+  // detail, both for a new save and for a save that confirmed the look already saved.
+  it('7.12-UNIT-VIEW-001 View opens the saved look, and after a duplicate save opens the existing look', async () => {
+    router.push.mockClear()
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const save = within(dialog).getAllByTestId('style-piece-save')[0]!
+    await waitFor(() => expect(save).toBeEnabled())
+    await user.click(save)
+    await waitFor(() => expect(savedLooksStore.items).toHaveLength(1))
+    const savedId = savedLooksStore.items[0]!.id
+
+    await user.click(await within(dialog).findByTestId('status-bar-action-view'))
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${savedId}`)
+
+    // Reopen the panel: the first look is the same composition, so Save confirms the existing
+    // look instead of creating a second one, and View opens that look.
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', dialogName)).toBeNull())
+    const { dialog: reopened } = await startStyling()
+    await within(reopened).findByRole('button', { name: /open saved look/i })
+    const again = within(reopened).getAllByTestId('style-piece-save')[0]!
+    await waitFor(() => expect(again).toBeEnabled())
+    router.push.mockClear()
+    await user.click(again)
+    await user.click(await within(reopened).findByTestId('status-bar-action-view'))
+
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${savedId}`)
+    expect(savedLooksStore.items.map((item) => item.id)).toEqual([savedId])
   })
 
   it('reuses the same Idempotency-Key on retry and saves even when localStorage is blocked', async () => {
@@ -940,8 +981,10 @@ describe('Wardrobe styling', () => {
     expect(savedLooksStore.items).toHaveLength(1)
   })
 
-  it('imports pre-CC-7.2 device-saved looks for the active member on Closet load, marks unresolved looks Needs review, and preserves other members and guest storage', async () => {
-    const user = userEvent.setup()
+  // Story CC-7.12 D8: the Closet no longer reads saved looks, so the one-time import of
+  // pre-CC-7.2 device-saved looks runs when the member opens Looks (the saved looks read starts
+  // it), and its looks land as Saved tiles. Was "on Closet load" with the Closet saved looks row.
+  it('7.12-UNIT-IMPORT-001 imports pre-CC-7.2 device-saved looks for the active member on Looks load, marks unresolved looks Needs review, and preserves other members and guest storage', async () => {
     const changedGarment = createReadyGarmentFixture({
       id: 'style-jacket-changed',
       category: 'outerwear',
@@ -994,16 +1037,22 @@ describe('Wardrobe styling', () => {
       ])
     )
 
-    publishOwner(owner)
-    render(<WardrobePage />)
-
-    const row = await screen.findByTestId('closet-saved-looks-row')
-    await waitFor(() => expect(row).toHaveTextContent('2 saved'))
-    await user.click(row)
-
-    expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
-      'Needs review'
+    useMswHandlers(
+      http.get(`${api}/wardrobe/:ownerUserId/capsules`, () =>
+        HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
+      )
     )
+    window.history.replaceState(null, '', '/looks?segment=saved')
+    publishOwner(owner)
+    render(<LooksPage />)
+
+    // Both of the member's own device looks land as Saved tiles, one of them Needs review.
+    const grid = await screen.findByTestId('looks-saved-grid')
+    await waitFor(() =>
+      expect(within(grid).getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+    )
+    expect(within(grid).getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+    expect(savedLooksStore.items).toHaveLength(2)
     await waitFor(() => {
       expect(localStorage.getItem(ownValidKey)).toBeNull()
       expect(localStorage.getItem(ownUnresolvedKey)).toBeNull()

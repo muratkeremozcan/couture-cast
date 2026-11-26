@@ -62,17 +62,14 @@ function premiumTree(catalog: Catalog): Record<string, unknown> {
   const commerce = (catalog.commerce ?? {}) as Record<string, unknown>
   const premium = (commerce.premium ?? {}) as Record<string, unknown>
   // Story 5.4 adds `palette` the same way and audits it in
-  // `palette-advisor-locales.spec.ts`. Story 5.5 adds `planner` and
-  // `plannerLocked` the same way again and audits them in
-  // `planner-locales.spec.ts`. The rule Decision 15 states: a new feature area
-  // gets its own spec AND the parent gets an exclusion.
+  // `palette-advisor-locales.spec.ts`. Story 5.5 adds `planner` the same way again and
+  // audits it in `planner-locales.spec.ts`. The rule Decision 15 states: a new feature area
+  // gets its own spec AND the parent gets an exclusion. Story CC-7.12 D10 removed
+  // `plannerLocked`, so its exclusion is gone too: a lock string that came back would grow
+  // the pinned key count below (7.12-UNIT-071).
   return Object.fromEntries(
     Object.entries(premium).filter(
-      ([key]) =>
-        key !== 'theme' &&
-        key !== 'palette' &&
-        key !== 'planner' &&
-        key !== 'plannerLocked'
+      ([key]) => key !== 'theme' && key !== 'palette' && key !== 'planner'
     )
   )
 }
@@ -107,10 +104,12 @@ describe('5.2 mobile premium locale parity', () => {
     // refusal key, because purchases go through the store SDK there.
     // 21 shared keys, the mobile-only `unavailableInBuild`, and `signedOutHint`: the
     // settings tab is reachable signed out, so it says what signing in unlocks
-    // instead of a load failure. `plannerLocked.*` now ships on mobile too (Story 5.5),
-    // but it is excluded here the same way `theme`/`palette`/`planner` are,
-    // and audited in its own `planner-locales.spec.ts`.
+    // instead of a load failure. Story CC-7.12 D10 removed `plannerLocked.*` with the lock
+    // panel; it is no longer excluded, so the count and the check below catch its return.
     expect(reference.size).toBe(25)
+    expect(
+      [...reference.keys()].filter((key) => key.startsWith('plannerLocked'))
+    ).toEqual([])
     expect(reference.has('status.complimentary')).toBe(true)
     expect(reference.has('complimentaryNote')).toBe(true)
     expect(reference.has('unavailableInBuild')).toBe(true)

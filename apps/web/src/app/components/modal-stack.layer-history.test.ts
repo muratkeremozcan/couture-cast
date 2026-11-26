@@ -208,31 +208,31 @@ describe('CC-7.11 D13 layer history', () => {
     const layer = stack.openLayerHistory(() => undefined)
 
     layer.handOff()
-    window.history.replaceState(routerState('/looks/plan'), '', '/looks/plan')
+    window.history.replaceState(routerState('/looks/saved/sl-1'), '', '/looks/saved/sl-1')
     layer.release()
     await settle()
 
     expect(go).not.toHaveBeenCalled()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(window.location.pathname).toBe('/looks/saved/sl-1')
   })
 
   it('a layer released after a replace to another URL does not step back', async () => {
     const { stack, go } = await setup()
     const layer = stack.openLayerHistory(() => undefined)
 
-    window.history.replaceState(routerState('/looks/plan'), '', '/looks/plan')
+    window.history.replaceState(routerState('/looks/saved/sl-1'), '', '/looks/saved/sl-1')
     layer.release()
     await settle()
 
     expect(go).not.toHaveBeenCalled()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(window.location.pathname).toBe('/looks/saved/sl-1')
   })
 
   it('a layer released after a navigation pushed above it does not step back', async () => {
     const { stack, go, entry } = await setup()
     const layer = stack.openLayerHistory(() => undefined)
 
-    window.history.pushState(routerState('/looks/plan'), '', '/looks/plan')
+    window.history.pushState(routerState('/looks/saved/sl-1'), '', '/looks/saved/sl-1')
     layer.release()
     await settle()
 

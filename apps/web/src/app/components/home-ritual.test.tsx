@@ -1,5 +1,10 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): D7, View on the Home sample save confirmation opens the saved
+// look's detail, for a new save and for a save that confirmed an existing look (Codex 7.12 #1).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { createMemberSampleOutfit, rotateMemberSampleOutfit } from '@couture/utils'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -14,6 +19,21 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { createSavedLooksMswHandlers } from '../../test-utils/saved-looks-msw'
 import { settle } from '../../test-utils/request-barrier'
 import { HomeRitual } from './home-ritual'
+
+// Story CC-7.12 D7: View pushes the saved look's address through the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 const session = vi.hoisted(() => ({
   owner: null as string | null,
@@ -128,6 +148,7 @@ function renderHome() {
 }
 
 beforeEach(async () => {
+  router.push.mockReset()
   session.owner = null
   session.stored = false
   session.verify.mockReset()
@@ -451,11 +472,15 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
     )
     store.items = []
 
-    // Save look again -> View saved -> Reopen saved look -> Re-save hits verified 200 non-destructive refresh.
+    // Save look again -> View -> Reopen saved look -> Re-save hits verified 200 non-destructive refresh.
+    // CC-7.12 D7: View opens the new look's detail. (The CC-7.2 step queried a
+    // `status-bar-action-view-saved` id that never existed and skipped itself; the action is
+    // `status-bar-action-view`.)
     await user.click(screen.getByTestId('sample-save-look'))
     await waitFor(() => expect(store.items).toHaveLength(1))
-    const viewSavedBtn = screen.queryByTestId('status-bar-action-view-saved')
-    if (viewSavedBtn) await user.click(viewSavedBtn)
+    const createdId = store.items[0]!.id
+    await user.click(await screen.findByTestId('status-bar-action-view'))
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${createdId}`)
 
     // Shuffle away and reopen the saved look so saveResetKey resets while matching existingMatch.
     await user.click(screen.getByRole('button', { name: 'Try another look' }))
@@ -468,6 +493,11 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
       expect(screen.getByTestId('sample-save-look')).toHaveTextContent('Saved')
     )
     expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
+    // Codex 7.12 #1: the save confirmed the existing look, so View opens that look.
+    router.push.mockClear()
+    await user.click(await screen.findByTestId('status-bar-action-view'))
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${createdId}`)
+    expect(store.items.map((item) => item.id)).toEqual([createdId])
 
     // Offline Remove shows offline notice without calling DELETE.
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })

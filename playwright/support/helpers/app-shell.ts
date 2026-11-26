@@ -7,7 +7,7 @@
 // the snapshot spec (app-shell-visual-snapshots.spec.ts). The probes read what the browser
 // painted, never class names: a migrated class that emits no CSS shows up here as the colour it
 // fell back to.
-import { outfitCapsuleListResponseSchema } from '@couture/api-client/contracts/http'
+// Story CC-7.12 (Step 69): the capsules list fallback route moved into the shell router.
 import { colorRoles, hexToChannels } from '@couture/utils'
 import { expect, type Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -66,20 +66,9 @@ export async function openFixtureShell(
     screen: () => active,
     requireBearer: true,
   })
+  // Story CC-7.12 (Step 69): the capsules list is a shell read now (Looks merges it into Saved,
+  // and /looks/capsules reads it), so the router serves it and its own fallback route is gone.
   void interceptNetworkCall({ url: '**/api/v1/**', handler: router.handler })
-  // The capsules list is no shell read, so the router lets it through to the local API, which
-  // answers 404 for a fixture member. A member with no capsules gets an empty page instead
-  // (registered later, so it answers first).
-  await page.route('**/api/v1/wardrobe/*/capsules**', async (route) => {
-    if (route.request().method() !== 'GET') return route.fallback()
-    const body = outfitCapsuleListResponseSchema.parse({
-      data: [],
-      total: 0,
-      limit: 20,
-      offset: 0,
-    })
-    return route.fulfill({ json: body })
-  })
   await closeCommunitySocket(page)
   if (options.storedSession) await seedStoredSession(page, memberId)
   // CC-7.10 D1: the guardian-pending member signs in with a teen bearer, as the API reads it.

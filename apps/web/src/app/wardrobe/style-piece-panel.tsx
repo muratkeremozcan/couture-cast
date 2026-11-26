@@ -375,6 +375,8 @@ function StylePieceIdeas({
   const swapRevisionRef = useRef(0)
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
+  /** Story CC-7.12 D7: the look the last accepted save confirmed, created or existing. */
+  const viewLookIdRef = useRef<string | null>(null)
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const statusBarRef = useRef(statusBar)
@@ -615,6 +617,7 @@ function StylePieceIdeas({
               const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
                 delete lastCreatedRef.current[attemptKey]
+                viewLookIdRef.current = existingMatch.id
                 setSavedState('ready')
                 if (swapRevisionRef.current === startSwapRevision) {
                   swapUndoStackRef.current = []
@@ -647,6 +650,7 @@ function StylePieceIdeas({
               deletedIdsRef.current.delete(created.id)
               mutationVersionRef.current += 1
               lastCreatedRef.current[attemptKey] = created
+              viewLookIdRef.current = created.id
               setSaved((current) => [
                 created,
                 ...current.filter((item) => item.id !== created.id),
@@ -688,8 +692,9 @@ function StylePieceIdeas({
             }}
             onViewSaved={() => {
               // Story CC-7.12 D7: View opens the saved look in Looks.
-              const created = lastCreatedRef.current[`${recipeKey}:${compositionKey}`]
-              if (created) router.push(savedLookHref(created.id))
+              // Codex #1: a save that confirmed an existing look views that look.
+              const id = viewLookIdRef.current
+              if (id) router.push(savedLookHref(id))
             }}
             onSwap={(category, id) => {
               draftRevision.current += 1

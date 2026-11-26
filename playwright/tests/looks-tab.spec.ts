@@ -16,7 +16,8 @@ import {
   type LookSeed,
 } from '../support/helpers/looks-fixtures'
 
-test.use({ viewport: FOLD_VIEWPORT })
+// Fixture bearers seed their own session; the signed-out test needs none at all.
+test.use({ viewport: FOLD_VIEWPORT, authSessionEnabled: false })
 
 const segment = (page: Page, id: 'saved' | 'ideas' | 'plan') =>
   page.getByTestId(`looks-segment-${id}`)
@@ -101,20 +102,24 @@ test.describe('CC-7.12 Looks segments and default @local-lane', () => {
     })
   }
 
-  test('[P0] [7.12-E2E-003] a failed saved looks read opens Saved with its retry, not Ideas (P1)', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
-    const { router } = await openLooksFixture(page, interceptNetworkCall, {
-      looks: LOOKS,
-      failLooksRead: true,
-    })
-    await page.goto('/looks')
-    await waitForShellSettled(page, router)
+  test(
+    '[P0] [7.12-E2E-003] a failed saved looks read opens Saved with its retry, not Ideas (P1)',
+    {
+      // The 503 is the scenario; every other read still answers from the fixture.
+      annotation: [{ type: 'skipNetworkMonitoring' }],
+    },
+    async ({ page, interceptNetworkCall }) => {
+      const { router } = await openLooksFixture(page, interceptNetworkCall, {
+        looks: LOOKS,
+        failLooksRead: true,
+      })
+      await page.goto('/looks')
+      await waitForShellSettled(page, router)
 
-    await expect(segment(page, 'saved')).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByTestId('saved-looks-retry')).toBeVisible()
-  })
+      await expect(segment(page, 'saved')).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByTestId('saved-looks-retry')).toBeVisible()
+    }
+  )
 
   test('[P0] [7.12-E2E-004] no flash: a member with looks never sees Ideas selected while the reads are out (P1)', async ({
     page,
@@ -160,42 +165,46 @@ test.describe('CC-7.12 Looks segments and default @local-lane', () => {
 test.describe('CC-7.12 each segment opens within the fold @local-lane', () => {
   for (const mode of ['populated', 'empty'] as const) {
     for (const id of ['saved', 'ideas', 'plan'] as const) {
-      test(`[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`, async ({
-        page,
-        interceptNetworkCall,
-      }) => {
-        const { router } = await openLooksFixture(page, interceptNetworkCall, {
-          looks: mode === 'populated' ? LOOKS : [],
-          capsules: mode === 'populated' ? CAPSULES : [],
-          planner: 'free',
-        })
-        await page.goto(`/looks?segment=${id}`)
-        await waitForShellSettled(page, router)
+      test(
+        `[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`,
+        {
+          // A free member: the planner read answers the Premium-required 403 by design.
+          annotation: [{ type: 'skipNetworkMonitoring' }],
+        },
+        async ({ page, interceptNetworkCall }) => {
+          const { router } = await openLooksFixture(page, interceptNetworkCall, {
+            looks: mode === 'populated' ? LOOKS : [],
+            capsules: mode === 'populated' ? CAPSULES : [],
+            planner: 'free',
+          })
+          await page.goto(`/looks?segment=${id}`)
+          await waitForShellSettled(page, router)
 
-        const band = await foldBand(page)
-        const first = page.getByTestId('looks-first-content')
-        await expect(first).toBeVisible()
-        const { box } = await visibleInBand(first, band)
-        expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
-          band.top - 1
-        )
+          const band = await foldBand(page)
+          const first = page.getByTestId('looks-first-content')
+          await expect(first).toBeVisible()
+          const { box } = await visibleInBand(first, band)
+          expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
+            band.top - 1
+          )
 
-        // The first thing a member reads in each segment sits wholly inside the band.
-        const probe =
-          id === 'saved'
-            ? mode === 'populated'
-              ? page.getByTestId('saved-look-card-look-c')
-              : page.getByTestId('looks-filter-empty')
-            : id === 'ideas'
-              ? page.locator('[data-testid^="looks-idea-card-"]').first()
-              : page.getByTestId('plan-upgrade')
-        const probeBox = (await probe.boundingBox())!
-        expect(probeBox, `${id} first item`).not.toBeNull()
-        expect(
-          probeBox.y + probeBox.height,
-          `${id} first item bottom`
-        ).toBeLessThanOrEqual(band.bottom + 1)
-      })
+          // The first thing a member reads in each segment sits wholly inside the band.
+          const probe =
+            id === 'saved'
+              ? mode === 'populated'
+                ? page.getByTestId('saved-look-card-look-c')
+                : page.getByTestId('looks-filter-empty')
+              : id === 'ideas'
+                ? page.locator('[data-testid^="looks-idea-card-"]').first()
+                : page.getByTestId('plan-upgrade')
+          const probeBox = (await probe.boundingBox())!
+          expect(probeBox, `${id} first item`).not.toBeNull()
+          expect(
+            probeBox.y + probeBox.height,
+            `${id} first item bottom`
+          ).toBeLessThanOrEqual(band.bottom + 1)
+        }
+      )
     }
   }
 })
@@ -485,8 +494,9 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
       capsules: CAPSULES,
     })
     await page.goto('/looks/capsules')
-    await waitForShellSettled(page, router)
+    // The manager renders no screen gate; its top bar and the fixture reads settle it.
     await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
+    await expect.poll(() => router.inflight()).toBe(0)
     await expect(page.getByTestId('bottom-nav-looks')).toHaveAttribute(
       'aria-current',
       'page'
@@ -507,8 +517,8 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
     })
     for (const id of ['missing-capsule', '"]\';alert(1)//', 'a b']) {
       await page.goto(`/looks/capsules?capsule=${encodeURIComponent(id)}`)
-      await waitForShellSettled(page, router)
       await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
+      await expect.poll(() => router.inflight()).toBe(0)
       expect(await page.evaluate(() => window.scrollY)).toBe(0)
     }
     expect(errors).toEqual([])

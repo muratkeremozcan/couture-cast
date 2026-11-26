@@ -1,6 +1,8 @@
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.8 Task 5 step 2 owner: E2E Playwright test skip-link activation, main landmark focus, and reduced-motion emulation in `playwright/tests/accessibility-hardening.spec.ts`
+// Story CC-7.12 (Step 69): the scan covers the Looks Plan and Ideas segments and /looks/capsules
+// in place of /looks/plan; Plan week opens /looks?segment=plan, a tab with no back arrow.
 import type { Locator, Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
@@ -25,7 +27,12 @@ const primaryRoutes = [
   '/palette',
 ] as const
 const secondaryRoutes = [
-  '/looks/plan',
+  // Story CC-7.12 D1, D6, D11: Plan is a Looks segment (the old /looks/plan redirects there),
+  // Ideas is the other segment a signed-in member can open, and the capsule manager moved
+  // under Looks.
+  '/looks?segment=plan',
+  '/looks?segment=ideas',
+  '/looks/capsules',
   '/wardrobe/silhouette',
   '/settings/style',
   '/signup',
@@ -403,14 +410,18 @@ test.describe('Story 3.8 interaction states', () => {
     await page.setViewportSize(viewports[0])
     await openStablePage(page, '/', interceptNetworkCall)
 
-    // Story CC-7.11 D9: the "Plan week" control links to the Plan route, where the planner
-    // renders as the inline rail. The chips checked below live on Today, so return there.
+    // Story CC-7.12 D11: the "Plan week" control links to the Looks Plan segment, where the
+    // planner renders as the inline rail. Plan is a tab with no back arrow, so browser back
+    // returns to Today, where the chips checked below live.
     await page.getByTestId('planner-open-control').click()
-    await expect(page).toHaveURL('/looks/plan')
+    await expect(page).toHaveURL('/looks?segment=plan')
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
     await expect(planner).toHaveCSS('animation-name', 'none')
-    await page.getByTestId('app-header').getByTestId('app-top-bar-back').click()
+    await expect(
+      page.getByTestId('app-header').getByTestId('app-top-bar-back')
+    ).toHaveCount(0)
+    await page.goBack()
     await expect(page).toHaveURL('/')
     const chip = page.getByTestId('chip-personal')
     const transitionDuration = await chip.evaluate(
@@ -480,9 +491,9 @@ test.describe('Story 3.8 interaction states', () => {
       // name, and this assertion is about the alert's own surface (`dangerSurface`, D2).
       const severeAlert = page.getByTestId('severe-weather-alert-focused')
       await expect(severeAlert).toBeVisible()
-      // Story CC-7.11 D9: the alert's Plan week is a link to the Plan route.
+      // Story CC-7.12 D11: the alert's Plan week is a link to the Looks Plan segment.
       const alertPlan = severeAlert.getByRole('link', { name: 'Plan week' })
-      await expect(alertPlan).toHaveAttribute('href', '/looks/plan')
+      await expect(alertPlan).toHaveAttribute('href', '/looks?segment=plan')
       const alertBackdrop = await expectVisibleFocusRing(
         alertPlan,
         `${colorScheme} alert action`

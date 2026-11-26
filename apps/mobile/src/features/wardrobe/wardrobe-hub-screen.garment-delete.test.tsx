@@ -35,6 +35,8 @@ vi.mock('expo-router', async () => ({
   router: routerMock,
   // Capsules renders its stack header; the header is native chrome.
   Stack: { Screen: () => null },
+  // Story CC-7.12 D6: the capsule manager reads its `capsule` focus param; none here.
+  useLocalSearchParams: () => ({}),
   // Imported, not importActual'd, so the hub and `screenFocus` share one module instance.
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
   // Story CC-7.11 D4: the hub sets its top bar Add and More through setOptions.

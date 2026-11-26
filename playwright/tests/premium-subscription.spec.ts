@@ -12,9 +12,13 @@
 // live on `checkout.stripe.test`, an RFC-2606 host that never resolves in DNS. The
 // spec stubs that host with `page.route` BEFORE clicking subscribe, so the browser
 // proves the app initiated the navigation without touching an unresolvable origin.
+//
+// Story CC-7.12 (Step 69): Plan week opens the Looks Plan segment, and the planner lock panel is
+// gone: free, expired and signed-out members see the sample week with one Upgrade instead.
 import type { Locator, Page } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
+import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { isNonLocalEnvironment, resolveApiBaseUrl } from '../support/helpers/api-test'
 import {
@@ -82,8 +86,8 @@ async function openSettings(
 }
 
 /**
- * The Plan route reached from the Today "Plan week" link at 1440px (Story CC-7.11 D9: the
- * planner left Today for `/looks/plan`, where the rail renders inline). The realtime poll is stubbed so the page settles without a
+ * The Looks Plan segment reached from the Today "Plan week" link at 1440px (Story CC-7.12 D11:
+ * the planner left Today for `/looks?segment=plan`, where the rail renders inline). The realtime poll is stubbed so the page settles without a
  * live events dependency. Register any network watch (e.g. on `PLANNER_URL`) before
  * calling this, since the open click happens inside it.
  */
@@ -98,8 +102,29 @@ async function openLookbookUltrawide(
   await page.setViewportSize(ULTRAWIDE_VIEWPORT)
   await page.goto('/')
   await page.getByTestId('planner-open-control').click()
-  // Story CC-7.11 D9: Plan week links to the Plan route, where the rail renders inline.
-  await expect(page).toHaveURL('/looks/plan')
+  // Story CC-7.12 D11: Plan week links to the Looks Plan segment, where the rail renders inline.
+  await expect(page).toHaveURL('/looks?segment=plan')
+}
+
+/**
+ * Story CC-7.12 D10: what replaced the CC-7.11 lock panel. A member without Premium sees the
+ * sample week (seven day rows), the one line on what Premium adds and exactly one Upgrade, whose
+ * target is Profile's Premium section for a member and sign-in for a visitor. No lock id or lock
+ * string remains.
+ */
+async function expectFreePlanPreview(page: Page, upgradeHref: string) {
+  const preview = plannerRail(page).getByTestId('plan-free-preview')
+  await expect(preview).toBeVisible()
+  await expect(preview).toContainText(enUS.looks.freePlan.line)
+  for (let day = 0; day < 7; day += 1)
+    await expect(preview.getByTestId(`plan-free-day-${day}`)).toBeVisible()
+  await expect(page.getByTestId('plan-upgrade')).toHaveCount(1)
+  await expect(page.getByTestId('plan-upgrade')).toHaveText(enUS.looks.freePlan.upgrade)
+  await expect(page.getByTestId('plan-upgrade')).toHaveAttribute('href', upgradeHref)
+  await expect(
+    page.locator('[data-testid^="planner"][data-testid*="locked"]')
+  ).toHaveCount(0)
+  await expect(page.getByText('The 7-Day Planner is a Premium feature')).toHaveCount(0)
 }
 
 function subscribeButton(page: Page, plan: 'monthly' | 'annual'): Locator {
@@ -170,10 +195,11 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded active subscriber', (
       const loaded = await load
       expect(loaded.status).toBe(200)
 
-      await log.step('Assert the rail shows the live week, not the upsell')
+      await log.step('Assert the rail shows the live week, not the free preview')
       await expect(plannerRail(page)).toBeVisible()
-      await expect(page.getByTestId('planner-rail-locked')).toHaveCount(0)
-      await expect(page.getByTestId('planner-rail-get-premium')).toHaveCount(0)
+      // Story CC-7.12 D10: the upsell is the free preview now; an entitled member sees neither.
+      await expect(page.getByTestId('plan-free-preview')).toHaveCount(0)
+      await expect(page.getByTestId('plan-upgrade')).toHaveCount(0)
       // Story 5.5: the live seven-day week is the "unlocked" proof, replacing the
       // Story 3.5 static shell text. `planner.spec.ts` owns the deep per-day
       // content assertions.
@@ -208,7 +234,7 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded expired subscriber', 
   )
 
   premiumSeededTest(
-    '[P1] 5.2-E2E-011 keeps the planner rail locked for the expired user',
+    '[P1] 5.2-E2E-011 [7.12-E2E-030] shows the expired user the free week with one Upgrade',
     // The 403 below is the subject of the test, so the network monitor is off.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
@@ -222,11 +248,7 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded expired subscriber', 
       expect(loaded.status).toBe(403)
 
       await expect(plannerRail(page)).toBeVisible()
-      await expect(page.getByTestId('planner-rail-locked')).toBeVisible()
-      await expect(page.getByTestId('planner-rail-get-premium')).toHaveAttribute(
-        'href',
-        '/settings'
-      )
+      await expectFreePlanPreview(page, '/settings#premium')
     }
   )
 })
@@ -342,7 +364,7 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
   )
 
   premiumFreshTest(
-    '[P1] 5.2-E2E-011 keeps the planner rail locked for a never-subscribed user',
+    '[P1] 5.2-E2E-011 [7.12-E2E-030] shows a never-subscribed user the free week with one Upgrade',
     // Same 403-is-the-subject reason as the expired test above.
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ premiumFreshSession: _premiumFreshSession, page, interceptNetworkCall }) => {
@@ -355,15 +377,9 @@ premiumFreshTest.describe('Story 5.2 web settings, never-subscribed user', () =>
       expect(loaded.status).toBe(403)
 
       await expect(plannerRail(page)).toBeVisible()
-      const locked = page.getByTestId('planner-rail-locked')
-      await expect(locked).toBeVisible()
-      // Decision 2's no-dark-patterns guardrail: the locked state says plainly
-      // what it is and links to settings, nothing more.
-      await expect(locked).toContainText('The 7-Day Planner is a Premium feature')
-      await expect(page.getByTestId('planner-rail-get-premium')).toHaveAttribute(
-        'href',
-        '/settings'
-      )
+      // Decision 2's no-dark-patterns guardrail, as Story CC-7.12 D10 words it: one plain line
+      // on what Premium adds and one Upgrade to Profile's Premium section, nothing more.
+      await expectFreePlanPreview(page, '/settings#premium')
     }
   )
 })
@@ -399,7 +415,7 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
   )
 
   anonymousTest(
-    '[P0] 5.2-E2E-011 shows the locked upsell signed out without an entitlement read',
+    '[P0] 5.2-E2E-011 [7.12-E2E-033] shows the free week signed out without an entitlement read',
     async ({ page, interceptNetworkCall }) => {
       let plannerRequests = 0
       await page.route(PLANNER_URL, async (route) => {
@@ -410,11 +426,8 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
       await openLookbookUltrawide(page, interceptNetworkCall)
 
       await expect(plannerRail(page)).toBeVisible()
-      await expect(page.getByTestId('planner-rail-locked')).toBeVisible()
-      await expect(page.getByTestId('planner-rail-get-premium')).toHaveAttribute(
-        'href',
-        '/settings'
-      )
+      // Story CC-7.12 P5: a visitor's Upgrade opens sign-in.
+      await expectFreePlanPreview(page, '/signin')
       // Signed out means no session to spend on a read the gate cannot use: an
       // entitlement the client cannot verify is one it does not have, so the rail is
       // locked by construction. `PlannerRail` checks `hasWebSession()` before

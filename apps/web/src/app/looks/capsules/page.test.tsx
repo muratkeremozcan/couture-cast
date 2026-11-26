@@ -1,3 +1,10 @@
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-041 (D6, P7: `?capsule=` focuses a loaded card matched
+// by equality; an unknown or hostile id does nothing) and 7.12-UNIT-061 (the manager's parent is
+// Looks Saved with the Capsules filter). Moved from app/wardrobe/capsules/page.test.tsx with every
+// case kept; the route is now /looks/capsules.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): 7.11-CMP-CAPSULES-001 (D10: Capsules is a Looks sub-screen, so a
@@ -10,7 +17,7 @@ import { act, render, screen, waitFor, fireEvent, within } from '@testing-librar
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
 import type { OutfitCapsuleContract } from '@couture/api-client/contracts/http'
-import WardrobeCapsulesPage from './page'
+import LooksCapsulesPage from './page'
 import * as wardrobeApi from '../../../lib/wardrobe'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
 import type * as WebSession from '../../../lib/web-session'
@@ -29,11 +36,12 @@ const router = vi.hoisted(() => ({
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
-  usePathname: () => '/wardrobe/capsules',
+  usePathname: () => '/looks/capsules',
 }))
 
 vi.mock('../../../lib/wardrobe', () => ({
   listCapsulesFromWeb: vi.fn(),
+  getCapsuleFromWeb: vi.fn(),
   listGarmentsFromWeb: vi.fn(),
   createCapsuleFromWeb: vi.fn(),
   updateCapsuleFromWeb: vi.fn(),
@@ -104,7 +112,7 @@ function mockPage(items: OutfitCapsuleContract[], total = items.length) {
   return { items, total, limit: 50, offset: 0 }
 }
 
-describe('WardrobeCapsulesPage account switch', () => {
+describe('LooksCapsulesPage account switch', () => {
   const memberA = buildCapsule({ name: 'Member A weekend capsule' })
   const memberB = buildCapsule({
     id: 'cap-b',
@@ -128,7 +136,7 @@ describe('WardrobeCapsulesPage account switch', () => {
     const oldRefresh = Promise.withResolvers<ReturnType<typeof mockPage>>()
     const list = vi.mocked(wardrobeApi.listCapsulesFromWeb)
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     expect(await screen.findByRole('heading', { name: memberA.name })).toBeVisible()
     list.mockReturnValueOnce(oldRefresh.promise)
     act(() => {
@@ -152,7 +160,7 @@ describe('WardrobeCapsulesPage account switch', () => {
     const user = userEvent.setup()
     vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockResolvedValue(undefined)
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     expect(await screen.findByRole('heading', { name: memberA.name })).toBeVisible()
     await user.click(screen.getByRole('button', { name: /^Delete$/ }))
     const dialog = screen.getByRole('dialog', { name: 'Delete this capsule?' })
@@ -171,7 +179,154 @@ describe('WardrobeCapsulesPage account switch', () => {
   })
 })
 
-describe('WardrobeCapsulesPage', () => {
+// Story CC-7.12 D6, TEA P7: a Looks capsule tile opens the manager with `?capsule={id}`. The id
+// is matched by equality against the loaded capsules, never put into a selector.
+describe('7.12 LooksCapsulesPage capsule focus (D6, P7)', () => {
+  const startUrl = window.location.href
+  const scrollIntoView = vi.fn()
+  const original = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView')
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    // jsdom has no scrollIntoView; the spy records which card the manager scrolls to.
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      writable: true,
+      value: scrollIntoView,
+    })
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
+    vi.mocked(wardrobeApi.listCapsulesFromWeb).mockResolvedValue(
+      mockPage([
+        buildCapsule(),
+        buildCapsule({ id: 'cap-2', name: 'Winter Layers' }),
+        buildCapsule({ id: 'cap-3', name: 'Office Week' }),
+      ])
+    )
+    vi.mocked(wardrobeApi.listGarmentsFromWeb).mockResolvedValue([])
+    // An id outside the first page is read on its own (Codex 7.12 #4); unknown ids are a 404.
+    vi.mocked(wardrobeApi.getCapsuleFromWeb).mockRejectedValue(
+      new Error('Outfit capsule not found')
+    )
+  })
+
+  afterEach(() => {
+    if (original) Object.defineProperty(Element.prototype, 'scrollIntoView', original)
+    else delete (Element.prototype as Partial<Element>).scrollIntoView
+    window.history.replaceState(null, '', startUrl)
+  })
+
+  it('7.12-UNIT-041a a known id scrolls to that card and focuses it on the first load', async () => {
+    window.history.replaceState(null, '', '/looks/capsules?capsule=cap-2')
+    render(<LooksCapsulesPage />)
+
+    const card = await screen.findByTestId('capsule-card-cap-2')
+    await waitFor(() => expect(card).toHaveFocus())
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toBe(card)
+    expect(card).toHaveAttribute('tabindex', '-1')
+    // Only the matched card takes programmatic focus.
+    expect(screen.getByTestId('capsule-card-cap-1')).not.toHaveAttribute('tabindex')
+    expect(screen.getByTestId('capsule-card-cap-3')).not.toHaveAttribute('tabindex')
+
+    // A refetch (window focus) does not move focus or scroll again.
+    screen.getByTestId('create-capsule-button').focus()
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(2))
+    await screen.findByTestId('capsule-card-cap-2')
+    expect(screen.getByTestId('create-capsule-button')).toHaveFocus()
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  // Codex 7.12 #4: Looks pages by creation time and the manager by its own order, so a tile's
+  // capsule can sit outside the manager's first page; it is read by id and still focused.
+  it('7.12-UNIT-041c a capsule outside the first page is read on its own, shown and focused', async () => {
+    const deep = buildCapsule({ id: 'cap-99', name: 'Deep capsule' })
+    vi.mocked(wardrobeApi.getCapsuleFromWeb).mockResolvedValue(deep)
+    window.history.replaceState(null, '', '/looks/capsules?capsule=cap-99')
+    render(<LooksCapsulesPage />)
+
+    const card = await screen.findByTestId('capsule-card-cap-99')
+    await waitFor(() => expect(card).toHaveFocus())
+    expect(wardrobeApi.getCapsuleFromWeb).toHaveBeenCalledWith(
+      SIGNED_IN_USER,
+      'cap-99',
+      expect.any(AbortSignal)
+    )
+    expect(within(card).getByRole('heading', { name: 'Deep capsule' })).toBeVisible()
+    expect(scrollIntoView.mock.contexts).toEqual([card])
+    // The first page stays as it was, and the read capsule shows once.
+    expect(screen.getAllByTestId('capsule-card-cap-99')).toHaveLength(1)
+    expect(screen.getByTestId('capsule-card-cap-1')).toBeVisible()
+  })
+
+  it('7.12-UNIT-041e a filtered list skips the extra read and does not show the pinned capsule', async () => {
+    vi.mocked(wardrobeApi.getCapsuleFromWeb).mockResolvedValue(
+      buildCapsule({ id: 'cap-99', name: 'Deep capsule' })
+    )
+    window.history.replaceState(null, '', '/looks/capsules?capsule=cap-99')
+    render(<LooksCapsulesPage />)
+    await screen.findByTestId('capsule-card-cap-99')
+    expect(wardrobeApi.getCapsuleFromWeb).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(screen.getByTestId('capsule-occasion-filter'), {
+      target: { value: 'work' },
+    })
+
+    await waitFor(() =>
+      expect(vi.mocked(wardrobeApi.listCapsulesFromWeb).mock.calls.at(-1)?.[1]).toEqual(
+        expect.objectContaining({ occasion: 'work' })
+      )
+    )
+    await waitFor(() => expect(screen.queryByTestId('capsule-card-cap-99')).toBeNull())
+    expect(screen.getByTestId('capsule-card-cap-1')).toBeVisible()
+    expect(wardrobeApi.getCapsuleFromWeb).toHaveBeenCalledTimes(1)
+  })
+
+  it('7.12-UNIT-041d a capsule on the first page is not read again', async () => {
+    window.history.replaceState(null, '', '/looks/capsules?capsule=cap-3')
+    render(<LooksCapsulesPage />)
+
+    await waitFor(() => expect(screen.getByTestId('capsule-card-cap-3')).toHaveFocus())
+    expect(wardrobeApi.getCapsuleFromWeb).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['an unknown id', 'cap-unknown'],
+    ['another member id', 'cap-of-member-b'],
+    ['a selector-breaking value', '"]\'><img src=x onerror=alert(1)>'],
+    ['a selector list', 'cap-1, [data-testid]'],
+  ])(
+    '7.12-UNIT-041b %s scrolls nowhere, focuses nothing and shows no error',
+    async (_label, value) => {
+      const querySelector = vi.spyOn(Document.prototype, 'querySelector')
+      window.history.replaceState(
+        null,
+        '',
+        `/looks/capsules?capsule=${encodeURIComponent(value)}`
+      )
+      const imagesBefore = document.querySelectorAll('img').length
+      render(<LooksCapsulesPage />)
+
+      expect(await screen.findByTestId('capsule-card-cap-1')).toBeVisible()
+      expect(screen.getByTestId('capsule-card-cap-3')).toBeVisible()
+      expect(scrollIntoView).not.toHaveBeenCalled()
+      expect(document.activeElement).toBe(document.body)
+      for (const id of ['cap-1', 'cap-2', 'cap-3'])
+        expect(screen.getByTestId(`capsule-card-${id}`)).not.toHaveAttribute('tabindex')
+      expect(screen.queryByTestId('capsule-error-banner')).toBeNull()
+      expect(screen.queryByRole('alert')).toBeNull()
+      // The raw value never reaches a selector or the DOM.
+      for (const [selector] of querySelector.mock.calls)
+        expect(String(selector)).not.toContain(value)
+      expect(document.querySelectorAll('img')).toHaveLength(imagesBefore)
+      querySelector.mockRestore()
+    }
+  )
+})
+
+describe('LooksCapsulesPage', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
@@ -182,7 +337,7 @@ describe('WardrobeCapsulesPage', () => {
   })
 
   it('4.3-WEB-PAGE-01 renders the header and the fetched capsule grid', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(screen.getByRole('heading', { name: 'Outfit capsules' })).toBeInTheDocument()
 
@@ -193,17 +348,17 @@ describe('WardrobeCapsulesPage', () => {
   })
 
   it('7.9-WEB-CAPSULES-01 sits on the shared shell: one page surface, top bar with back, one card level', async () => {
-    const { container } = render(<WardrobeCapsulesPage />)
+    const { container } = render(<LooksCapsulesPage />)
 
     const header = screen.getByTestId('app-header')
     expect(within(header).getByRole('heading', { level: 1 })).toHaveTextContent(
       'Outfit capsules'
     )
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
-    // CC-7.11 D10: Capsules moved under Looks, so its back parent is the Looks tab.
+    // CC-7.12 D6: the manager's back parent is Looks Saved with the Capsules filter.
     expect(within(header).getByTestId('app-top-bar-back')).toHaveAttribute(
       'href',
-      '/looks'
+      '/looks?segment=saved&filter=capsules'
     )
     expect(container.querySelectorAll('[data-surface="page"]')).toHaveLength(1)
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
@@ -218,9 +373,9 @@ describe('WardrobeCapsulesPage', () => {
     )
   })
 
-  it('7.11-CMP-CAPSULES-001 a direct entry marks the Looks tab and its back replaces to /looks', async () => {
+  it('7.11-CMP-CAPSULES-001 7.12-UNIT-061 a direct entry marks the Looks tab and its back replaces to Looks Capsules', async () => {
     clearAppHistory()
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     const tabs = within(screen.getByTestId('primary-nav'))
     expect(tabs.getByTestId('nav-looks')).toHaveAttribute('aria-current', 'page')
@@ -228,14 +383,16 @@ describe('WardrobeCapsulesPage', () => {
 
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
 
-    expect(router.replace).toHaveBeenCalledExactlyOnceWith('/looks')
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith(
+      '/looks?segment=saved&filter=capsules'
+    )
     expect(router.back).not.toHaveBeenCalled()
     await screen.findByTestId('capsule-card-cap-1')
   })
 
   it('7.9-WEB-CAPSULES-02 renders the capsules screen from the de-DE catalog', async () => {
     await getI18n().changeLanguage('de-DE')
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(
       within(screen.getByTestId('app-header')).getByRole('heading', { level: 1 })
@@ -255,7 +412,7 @@ describe('WardrobeCapsulesPage', () => {
    * as the owner path segment, so every request 404ed for every real user.
    */
   it('4.3-WEB-PAGE-02 uses the signed-in user as the owner, not a placeholder', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     await waitFor(() => {
       expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalled()
@@ -270,7 +427,7 @@ describe('WardrobeCapsulesPage', () => {
       new Error('Your session expired.')
     )
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     await waitFor(() => {
       expect(screen.getByTestId('capsule-error-banner')).toHaveTextContent(
@@ -288,7 +445,7 @@ describe('WardrobeCapsulesPage', () => {
   it('4.3-WEB-PAGE-04 sends the strong entity tag when deleting', async () => {
     vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockResolvedValue(undefined)
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await waitFor(() => {
       expect(screen.getByText('Summer Basics')).toBeInTheDocument()
     })
@@ -313,7 +470,7 @@ describe('WardrobeCapsulesPage', () => {
       buildCapsule({ isFavorite: false })
     )
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await waitFor(() => {
       expect(screen.getByText('Summer Basics')).toBeInTheDocument()
     })
@@ -333,7 +490,7 @@ describe('WardrobeCapsulesPage', () => {
 
   /** The destructive confirmation must be a real dialog, not a bare div. */
   it('4.3-WEB-PAGE-06 renders the delete confirmation as an accessible dialog', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await waitFor(() => {
       expect(screen.getByText('Summer Basics')).toBeInTheDocument()
     })
@@ -349,7 +506,7 @@ describe('WardrobeCapsulesPage', () => {
       mockPage([buildCapsule()], 87)
     )
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     await waitFor(() => {
       expect(screen.getByTestId('capsule-truncation-notice')).toHaveTextContent(
@@ -365,7 +522,7 @@ describe('WardrobeCapsulesPage', () => {
       ])
     )
 
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     await waitFor(() => {
       expect(screen.getByTestId('capsule-unavailable-count-cap-1')).toHaveTextContent(
@@ -400,7 +557,7 @@ function fillBuilderForm(name: string) {
   fireEvent.click(screen.getByTestId('garment-select-checkbox-g-2'))
 }
 
-describe('WardrobeCapsulesPage builder integration', () => {
+describe('LooksCapsulesPage builder integration', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
@@ -410,7 +567,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
 
   it('creates a capsule, announces it politely, and refetches the grid', async () => {
     vi.mocked(wardrobeApi.createCapsuleFromWeb).mockResolvedValue(buildCapsule())
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByTestId('capsule-empty-state')
 
     fireEvent.click(screen.getByTestId('create-capsule-button'))
@@ -439,7 +596,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
       mockPage([buildCapsule()])
     )
     vi.mocked(wardrobeApi.updateCapsuleFromWeb).mockResolvedValue(buildCapsule())
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('edit-capsule-button-cap-1'))
@@ -467,7 +624,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
   })
 
   it('closes the builder without writing anything when cancelled', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByTestId('capsule-empty-state')
 
     fireEvent.click(screen.getByTestId('create-capsule-button'))
@@ -488,7 +645,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
     vi.mocked(wardrobeApi.updateCapsuleFromWeb).mockRejectedValue(
       new Error('CAPSULE_REVISION_MISMATCH')
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('edit-capsule-button-cap-1'))
@@ -506,7 +663,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
     const user = userEvent.setup()
     const identity = Promise.withResolvers<string>()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockReturnValue(identity.promise)
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     const create = screen.getByTestId('create-capsule-button')
     expect(create).toBeDisabled()
@@ -525,7 +682,7 @@ describe('WardrobeCapsulesPage builder integration', () => {
   })
 })
 
-describe('WardrobeCapsulesPage filtering', () => {
+describe('LooksCapsulesPage filtering', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
@@ -536,7 +693,7 @@ describe('WardrobeCapsulesPage filtering', () => {
   })
 
   it('debounces typing into a single search query', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     const search = screen.getByTestId('capsule-search-input')
@@ -554,7 +711,7 @@ describe('WardrobeCapsulesPage filtering', () => {
   })
 
   it('sends the selected occasion as a server-side filter', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.change(screen.getByTestId('capsule-occasion-filter'), {
@@ -569,7 +726,7 @@ describe('WardrobeCapsulesPage filtering', () => {
   })
 
   it('sends the favorites-only filter as a server-side filter', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('capsule-favorite-filter'))
@@ -582,7 +739,7 @@ describe('WardrobeCapsulesPage filtering', () => {
   })
 
   it('refetches when the window regains focus so another client’s writes appear', async () => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.focus(window)
@@ -594,7 +751,7 @@ describe('WardrobeCapsulesPage filtering', () => {
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockResolvedValue(
       mockPage([buildCapsule({ isFavorite: false })])
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     const favorite = await screen.findByTestId('favorite-button-cap-1')
     expect(favorite).toHaveAttribute('aria-pressed', 'false')
@@ -607,7 +764,7 @@ describe('WardrobeCapsulesPage filtering', () => {
         buildCapsule({ availabilityStatus: 'needs_repair', unavailableGarmentCount: 1 }),
       ])
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(
       await screen.findByTestId('capsule-unavailable-count-cap-1')
@@ -615,7 +772,7 @@ describe('WardrobeCapsulesPage filtering', () => {
   })
 })
 
-describe('WardrobeCapsulesPage failure handling', () => {
+describe('LooksCapsulesPage failure handling', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
@@ -629,7 +786,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockRejectedValue(
       new Error('capsule service down')
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(await screen.findByTestId('capsule-error-banner')).toHaveTextContent(
       'capsule service down'
@@ -640,7 +797,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
 
   it('falls back to translated copy when the load rejection is not an Error', async () => {
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockRejectedValue('ECONNRESET')
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(await screen.findByTestId('capsule-error-banner')).toHaveTextContent(
       'Unable to load capsules.'
@@ -649,7 +806,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
 
   it('falls back to generic copy when the session cannot be resolved at all', async () => {
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockRejectedValue('no session cookie')
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     expect(await screen.findByTestId('capsule-error-banner')).toHaveTextContent(
       'Sign in to manage capsules.'
@@ -660,7 +817,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
     vi.mocked(wardrobeApi.favoriteCapsuleFromWeb).mockRejectedValue(
       new Error('precondition failed')
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('favorite-button-cap-1'))
@@ -672,7 +829,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
 
   it('falls back to translated copy when a favorite toggle rejects with a non-Error', async () => {
     vi.mocked(wardrobeApi.favoriteCapsuleFromWeb).mockRejectedValue('socket hang up')
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('favorite-button-cap-1'))
@@ -686,7 +843,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
     vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockRejectedValue(
       new Error('delete rejected')
     )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('delete-capsule-button-cap-1'))
@@ -700,7 +857,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
 
   it('falls back to translated copy when a delete rejects with a non-Error', async () => {
     vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockRejectedValue('socket hang up')
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('delete-capsule-button-cap-1'))
@@ -713,7 +870,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
 
   it('announces a successful delete and refetches', async () => {
     vi.mocked(wardrobeApi.deleteCapsuleFromWeb).mockResolvedValue(undefined)
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('delete-capsule-button-cap-1'))
@@ -731,7 +888,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
     ['the cancel button', 'cancel-delete-capsule-button'],
     ['the dialog close control', 'close'],
   ])('dismisses the delete confirmation from %s', async (_label, target) => {
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await screen.findByText('Summer Basics')
 
     fireEvent.click(screen.getByTestId('delete-capsule-button-cap-1'))
@@ -748,7 +905,7 @@ describe('WardrobeCapsulesPage failure handling', () => {
   })
 })
 
-describe('WardrobeCapsulesPage superseded requests', () => {
+describe('LooksCapsulesPage superseded requests', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
@@ -766,7 +923,7 @@ describe('WardrobeCapsulesPage superseded requests', () => {
       .mockResolvedValue(
         mockPage([buildCapsule({ id: 'cap-new', name: 'Newer Result' })])
       )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(1))
 
     fireEvent.click(screen.getByTestId('capsule-favorite-filter'))
@@ -791,7 +948,7 @@ describe('WardrobeCapsulesPage superseded requests', () => {
       .mockResolvedValue(
         mockPage([buildCapsule({ id: 'cap-new', name: 'Newer Result' })])
       )
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
     await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(1))
 
     fireEvent.click(screen.getByTestId('capsule-favorite-filter'))
@@ -811,7 +968,7 @@ describe('WardrobeCapsulesPage superseded requests', () => {
       })
     )
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockResolvedValue(mockPage([]))
-    const { unmount } = render(<WardrobeCapsulesPage />)
+    const { unmount } = render(<LooksCapsulesPage />)
     unmount()
 
     settleUser(SIGNED_IN_USER)
@@ -830,14 +987,14 @@ describe('WardrobeCapsulesPage superseded requests', () => {
       })
     )
     vi.mocked(wardrobeApi.listCapsulesFromWeb).mockResolvedValue(mockPage([]))
-    const { unmount } = render(<WardrobeCapsulesPage />)
+    const { unmount } = render(<LooksCapsulesPage />)
     unmount()
 
     failUser(new Error('late session failure'))
     await waitFor(() => expect(wardrobeApi.resolveCurrentUserId).toHaveBeenCalledTimes(1))
 
     vi.mocked(wardrobeApi.resolveCurrentUserId).mockResolvedValue(SIGNED_IN_USER)
-    render(<WardrobeCapsulesPage />)
+    render(<LooksCapsulesPage />)
 
     // A fresh mount must not inherit the discarded failure.
     await screen.findByTestId('capsule-empty-state')

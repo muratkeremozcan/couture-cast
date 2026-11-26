@@ -74,7 +74,8 @@ function SlotRow({
 }) {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const samples = getGuestPreviewStrings(i18n.language)
-  const [failed, setFailed] = useState(false)
+  // Codex #7: a failure belongs to one signed URL, so a refreshed URL gets a fresh try.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
   const category = samples.values.category[slot.category]
   const box =
     'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md'
@@ -98,15 +99,20 @@ function SlotRow({
         ?
       </span>
     )
-  } else if (slot.imageAccess?.url && !failed) {
+  } else if (
+    slot.imageAccess?.url &&
+    slot.imageAccess.url !== failedUrl &&
+    Date.parse(slot.imageAccess.expiresAt) > Date.now()
+  ) {
+    const url = slot.imageAccess.url
     visual = (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={slot.imageAccess.url}
+        src={url}
         alt=""
         referrerPolicy="no-referrer"
         className="h-12 w-12 shrink-0 rounded-md object-cover"
-        onError={() => setFailed(true)}
+        onError={() => setFailedUrl(url)}
       />
     )
   } else {
@@ -246,8 +252,32 @@ function DetailBody({
     )
   }
 
+  // Codex #8: Undo keeps a recovery action offline too (Undo once back online, Retry after a
+  // failed restore), and one restore runs at a time.
+  let undoInFlight = false
+  const undoFailed = (error: unknown, token: string | undefined) => {
+    const offline = isOfflineError(error) || !online()
+    notice(
+      `undo-${offline ? 'offline' : 'failed'}`,
+      offline ? t('feedback.offlineAction') : t('feedback.saveFailed'),
+      offline ? 'offline' : 'error',
+      [
+        {
+          id: offline ? 'undo' : 'retry',
+          kind: offline ? 'undo' : 'retry',
+          label: offline ? t('feedback.undo') : t('feedback.retry'),
+          onPress: () => void runUndo(token),
+        },
+      ]
+    )
+  }
   const runUndo = async (token: string | undefined) => {
-    if (!stillOwner()) return
+    if (undoInFlight || !stillOwner()) return
+    if (!online()) {
+      undoFailed(new TypeError('Failed to fetch'), token)
+      return
+    }
+    undoInFlight = true
     try {
       await restoreSavedLookFromWeb(look.id, { accessToken: token })
       if (!stillOwner()) return
@@ -255,7 +285,9 @@ function DetailBody({
       notice('undo', t('feedback.undone'), 'neutral')
     } catch (error) {
       if (!stillOwner()) return
-      failure('undo', error, () => void runUndo(token))
+      undoFailed(error, token)
+    } finally {
+      undoInFlight = false
     }
   }
 
@@ -435,6 +467,7 @@ function useSavedLook(
 function SavedLookDetail({ savedLookId }: { savedLookId: string }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const owner = useWebSessionOwner()
+  const router = useRouter()
   const { state, reload } = useSavedLook(owner, savedLookId)
   const name = useSavedLookName()
   const [from] = useState(readFrom)
@@ -442,7 +475,12 @@ function SavedLookDetail({ savedLookId }: { savedLookId: string }) {
     owner && state.kind === 'ready' ? name(state.look) : t('looks.segments.saved')
   return (
     <AppPage>
-      <AppTopBar title={title} parentHref={savedLooksHref(from ?? 'all')} />
+      {from === null ? (
+        // TEA T4: a look opened by View (or a link) returns to Saved, not to the saving screen.
+        <AppTopBar title={title} onBack={() => router.replace(savedLooksHref('all'))} />
+      ) : (
+        <AppTopBar title={title} parentHref={savedLooksHref(from)} />
+      )}
       <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
         <DetailBody
           key={owner ?? 'signed-out'}
@@ -459,9 +497,12 @@ function SavedLookDetail({ savedLookId }: { savedLookId: string }) {
 }
 
 export function SavedLookDetailScreen({ savedLookId }: { savedLookId: string }) {
+  // Codex #3: the detail's state is keyed by the signed-in member, so an account switch never
+  // shows the previous member's look while the new read is in flight.
+  const owner = useWebSessionOwner()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <SavedLookDetail savedLookId={savedLookId} />
+      <SavedLookDetail key={owner ?? 'signed-out'} savedLookId={savedLookId} />
     </I18nextProvider>
   )
 }

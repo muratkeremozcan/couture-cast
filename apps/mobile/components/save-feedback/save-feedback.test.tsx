@@ -2,12 +2,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-59-shared-save-undo-and-status-feedback
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-023 (D7) for Style this piece, whose save
+// confirmation's View closes the panel and opens the saved look's own screen.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import { useRef } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessibilityInfo, AppState, Platform, Text, View } from 'react-native'
+import { router } from 'expo-router'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { SAVE_FEEDBACK_TIMINGS } from '@couture/utils'
 import { mobileIdentityEpoch, setMobileApplicationUserId } from '@/src/lib/mobile-auth'
@@ -775,6 +781,93 @@ describe('mobile save-feedback components', () => {
       } else {
         process.env.EXPO_PUBLIC_API_BASE_URL = prevBaseUrl
       }
+    }
+  })
+
+  it('[P1] [7.12-NAT-023] Style this piece View closes the panel, then opens the saved look screen', async () => {
+    setMobileApplicationUserId('mobile-style-view-owner')
+    const garment = createReadyGarmentFixture({
+      id: 'mobile-style-view-garment',
+      imageAccess: {
+        url: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>',
+        expiresAt: '2090-01-01T00:00:00.000Z',
+      },
+    })
+    mocks.listSavedLooksFromMobile.mockResolvedValue([])
+    mocks.createSavedLookFromMobile.mockResolvedValue({
+      id: 'sl-mob-view-1',
+      ownerUserId: 'mobile-style-view-owner',
+      source: 'style_piece',
+      lookId: 'sample:l:soft-pleats',
+      weather: 'mild-dry',
+      title: null,
+      anchorGarmentId: garment.id,
+      anchorSnapshot: { garmentId: garment.id, category: 'top', comfortRange: 'mild' },
+      composition: [
+        {
+          slotIndex: 0,
+          category: 'top',
+          kind: 'garment',
+          itemId: garment.id,
+          label: null,
+          missing: false,
+          imageAccess: null,
+        },
+      ],
+      swaps: {},
+      collection: null,
+      comfort: null,
+      availabilityStatus: 'ready',
+      missingGarmentIds: [],
+      needsReviewReasons: [],
+      revision: 0,
+      createdAt: '2026-11-22T00:00:00.000Z',
+      updatedAt: '2026-11-22T00:00:00.000Z',
+    })
+    const onClose = vi.fn()
+    try {
+      await render(
+        <SaveFeedbackProvider>
+          <StylePiecePanel
+            selection={{
+              id: garment.id,
+              category: garment.category ?? 'top',
+              comfortRange: garment.comfortRange ?? 'mild',
+            }}
+            inWardrobe
+            loadInventory={() => Promise.resolve([garment])}
+            visible
+            owner="mobile-style-view-owner"
+            epoch={mobileIdentityEpoch()}
+            locale="en-US"
+            onClose={onClose}
+            onDismiss={vi.fn()}
+          />
+        </SaveFeedbackProvider>
+      )
+      const panel = await screen.findByTestId('style-piece-panel')
+      const save = (await within(panel).findAllByTestId('style-piece-save'))[0]!
+      await waitFor(() => expect(save).not.toBeDisabled())
+      await userEvent.click(save)
+      const view = await within(panel).findByTestId('status-bar-action-view')
+      expect(view).toHaveTextContent('View')
+      expect(vi.mocked(router.push)).not.toHaveBeenCalled()
+
+      fireEvent.click(view)
+      // D7: the panel closes first, so the saved look's screen never sits under its layer.
+      expect(onClose).toHaveBeenCalledTimes(1)
+      await waitFor(() =>
+        expect(vi.mocked(router.push).mock.calls).toEqual([
+          [
+            {
+              pathname: '/saved-look/[savedLookId]',
+              params: { savedLookId: 'sl-mob-view-1' },
+            },
+          ],
+        ])
+      )
+    } finally {
+      setMobileApplicationUserId(null)
     }
   })
 
