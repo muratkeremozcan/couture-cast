@@ -228,6 +228,9 @@ async function clipFor(
     throw error
   }
   const cover = await target.evaluate((el) => {
+    // Centred first: scrolled only into view, text at the bottom edge lands under a fixed tab
+    // bar (CC-7.9 shell spec, CI c9614d98) and would be refused as covered.
+    el.scrollIntoView({ block: 'center', inline: 'nearest' })
     const r = el.getBoundingClientRect()
     for (const fx of [0.5, 0.15, 0.85]) {
       const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)

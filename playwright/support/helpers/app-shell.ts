@@ -323,10 +323,12 @@ export const roleRgb = (scheme: Scheme, role: keyof (typeof colorRoles)['light']
   rgbOf(hexToChannels(colorRoles[scheme][role]))
 
 /**
- * Lets the painted-contrast probe measure text under a stretched-link overlay: a transparent,
- * textless link or button laid over a whole tile (garment-open, spotlight-lookbook-open) so the
- * tile is one tap target. Only such overlays stop taking hit tests during the scan; a sticky bar
- * or anything that paints still covers and still fails the probe.
+ * Lets the painted-contrast probe measure text under a stretched-link overlay: a link or button
+ * with no fill of its own, laid over a whole tile (garment-open, spotlight-lookbook-open) so the
+ * tile is one tap target. Its own label (a "View look" pill) may sit inside it. During the scan
+ * the overlay stops taking hit tests and its children keep theirs, so the badges under it and
+ * the pill inside it are each measured where they paint. A sticky bar or anything with a fill
+ * still covers and still fails the probe.
  */
 export async function measureThroughOverlays(page: Page) {
   await page.evaluate(() => {
@@ -338,9 +340,10 @@ export async function measureThroughOverlays(page: Page) {
       const host = parent.getBoundingClientRect()
       const covers = own.width * own.height >= host.width * host.height * 0.9
       const transparent = /rgba\(0, 0, 0, 0\)|transparent/.test(style.backgroundColor)
-      const textless = !(control.textContent ?? '').trim()
-      if (covers && transparent && textless)
-        (control as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
+      if (!covers || !transparent) continue
+      ;(control as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
+      for (const child of Array.from(control.children))
+        (child as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
     }
   })
 }

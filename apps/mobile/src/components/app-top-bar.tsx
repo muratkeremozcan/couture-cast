@@ -67,12 +67,10 @@ export function AppTopBar({ title, onBack, titleNode, trailing }: AppTopBarProps
           </Text>
         </Pressable>
       ) : null}
-      {/* One `app-top-bar-title` either way: Android reports the title as a sibling of the bar,
-          so UI tests find it by its own id. */}
-      <View
-        testID={titleNode ? 'app-top-bar-title' : undefined}
-        style={[styles.title, { paddingHorizontal: space[2] }]}
-      >
+      {/* One `app-top-bar-title` either way, on the title Text itself (the tab heading carries it
+          too): Android reports the title as a sibling of the bar, so UI tests match id and text
+          on that one node. */}
+      <View style={[styles.title, { paddingHorizontal: space[2] }]}>
         {titleNode ?? (
           <Text
             testID="app-top-bar-title"

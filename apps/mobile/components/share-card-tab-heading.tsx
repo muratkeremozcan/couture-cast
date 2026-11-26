@@ -32,6 +32,7 @@ export function ShareCardTabHeading({
   return (
     <Text
       ref={title}
+      testID="app-top-bar-title"
       accessibilityRole="header"
       numberOfLines={1}
       style={{

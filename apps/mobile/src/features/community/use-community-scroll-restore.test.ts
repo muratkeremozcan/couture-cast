@@ -95,4 +95,44 @@ describe('useCommunityScrollRestore (Story 6.5 R43)', () => {
     rerender({ available: true, data: SHOWN })
     expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 600, animated: false })
   })
+
+  it('CC-7.9-MOB-SCROLL-004 keeps restoring a Spotlight offset after a resume until the list can hold it, when the native list ran the jump before the Spotlight was mounted', async () => {
+    const scope = { current: 1 }
+    // The native list: until the Spotlight rows are mounted it holds no offset, so a jump
+    // clamps to the top; it reports every position it reaches, as onScroll does.
+    const native = { mounted: true, offset: 0 }
+    const view = renderHook(
+      ({ available, data }: Props) =>
+        useCommunityScrollRestore({ available, data, scope }),
+      { initialProps: { available: true, data: [] as Row[] } }
+    )
+    const scrollToOffset = vi.fn(({ offset }: { offset: number }) => {
+      native.offset = native.mounted ? offset : 0
+      view.result.current.onScroll(scrolledTo(native.offset))
+    })
+    Object.assign(view.result.current.listRef, { current: { scrollToOffset } })
+    // The member reads the Spotlight card above an empty feed.
+    act(() => view.result.current.onScroll(scrolledTo(700)))
+    native.offset = 700
+
+    // Android resume after the in-app browser: the foreground hide unmounts the Spotlight
+    // and the emptied list clamps to the top.
+    native.mounted = false
+    view.rerender({ available: false, data: [] })
+    native.offset = 0
+    // The catch-up verifies access. Fabric delivers the content size before it mounts the
+    // Spotlight rows, so both the commit's jump and the size change's jump land on the top.
+    view.rerender({ available: true, data: [] })
+    act(() => view.result.current.onContentSizeChange())
+    expect(native.offset).toBe(0)
+
+    // The rows mount with no further size event (CI c9614d98 step 105: back at the top).
+    native.mounted = true
+    await vi.waitFor(() => expect(native.offset).toBe(700))
+    // Reaching the offset ends the restore: a later member scroll is theirs.
+    const calls = scrollToOffset.mock.calls.length
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+    expect(scrollToOffset).toHaveBeenCalledTimes(calls)
+  })
 })

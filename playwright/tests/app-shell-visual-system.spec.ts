@@ -336,6 +336,42 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
   })
 })
 
+test.describe('CC-7.9 Profile account handoff @local-lane', () => {
+  // Codex replaced-assertions check 2: the unit cases check classes; this proves the visible
+  // handoff in the browser. The Profile gate opens without the account read (CC-7.7 D3), so the
+  // account line holds a reserve until the read lands; landing must not move what follows.
+  test('[P0] [7.9-E2E-013] the account read landing after the reveal swaps the reserve for the email without moving the next section', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'populated',
+      screen: 'profile',
+    })
+    const release = router.hold('profile')
+    await page.goto('/settings')
+    await expect(
+      page.locator('[data-testid="screen-gate"][data-ready="true"]')
+    ).toBeVisible()
+
+    const reserve = page.getByTestId('profile-account-reserved')
+    await expect(reserve).toBeVisible()
+    await expect(page.getByTestId('profile-account')).toHaveCount(0)
+    const next = page.getByRole('heading', { name: 'Locations', level: 2 })
+    await expect(next).toBeVisible()
+    const before = await next.boundingBox()
+
+    release()
+    const account = page.getByTestId('profile-account')
+    await expect(account).toBeVisible()
+    await expect(account).toContainText('shell-member@example.test')
+    await expect(reserve).toHaveCount(0)
+    expect(await next.boundingBox(), 'the section below the account line moved').toEqual(
+      before
+    )
+  })
+})
+
 /** Hard-coded English on Wardrobe and capsules at the 812cadce baseline (spec D9). */
 const BASELINE_ENGLISH = [
   'Your Digital Closet',

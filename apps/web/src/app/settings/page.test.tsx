@@ -981,7 +981,11 @@ describe('7.7 Profile without flashes', () => {
     )
     // CI snapshot on 3d7af2a2: the held name line left 28 px of blank page under the email.
     expect(account).not.toHaveClass('min-h-12')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      /^jade@example\.test$/
+    )
     expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
   })
 
   it('7.9-CMP-SNAP-002 an email-only account that lands after the reveal keeps the two lines it held', async () => {
@@ -1017,6 +1021,11 @@ describe('7.7 Profile without flashes', () => {
     })
     // The sections below were already on screen, so the header never shrinks under them.
     expect(await screen.findByTestId('profile-account')).toHaveClass('min-h-12')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      /^jade@example\.test$/
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
   })
 
   it('7.7-CMP-046 a preference read sent while a save is out never replaces the saved value, and a read sent after the save does (CodeRabbit r2 #4)', async () => {
