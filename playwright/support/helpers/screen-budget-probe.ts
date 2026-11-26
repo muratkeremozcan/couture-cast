@@ -197,18 +197,28 @@ export async function probeTarget(
     )
   )
   const effects: string[] = []
+  // The first effect ends the window early: only a control with none waits the full second
+  // (CI a0f4d24b: full windows on every Today control ran a shard past 20 minutes).
+  let signal = () => undefined as void
+  const nodeEffect = new Promise<void>((resolve) => {
+    signal = resolve
+  })
+  const record = (effect: string) => {
+    effects.push(effect)
+    signal()
+  }
   const onRequest = (request: Request) => {
     if (isAnalyticsRequest(request.url(), before.href)) return
     const url = new URL(request.url(), before)
     if (request.method() === 'GET' && seenPaths.has(url.pathname)) return
-    effects.push(`request ${request.method()} ${url.pathname}`)
+    record(`request ${request.method()} ${url.pathname}`)
   }
   const onDialog = (dialog: Dialog) => {
-    effects.push(`dialog ${dialog.type()}`)
+    record(`dialog ${dialog.type()}`)
     void dialog.dismiss()
   }
-  const onPopup = () => effects.push('popup')
-  const onDownload = () => effects.push('download')
+  const onPopup = () => record('popup')
+  const onDownload = () => record('download')
   const onFileChooser = (chooser: FileChooser) => {
     void chooser.setFiles({ name: 'probe.png', mimeType: 'image/png', buffer: PNG })
   }
@@ -220,22 +230,25 @@ export async function probeTarget(
   try {
     const handle = await control.elementHandle()
     await control.click()
-    let seen: string[] = []
-    try {
-      seen = await page.evaluate(
-        async ({ el, observeMs, scroll }) => {
-          await new Promise((resolve) => setTimeout(resolve, observeMs))
-          const state = (
-            window as unknown as {
-              __budgetProbe?: { churn: WeakSet<Node>; after: Node[] }
-            }
-          ).__budgetProbe
+    const observation = page.evaluate(
+      async ({ el, observeMs, scroll, start }) => {
+        const deadline = performance.now() + observeMs
+        const state = (
+          window as unknown as {
+            __budgetProbe?: { churn: WeakSet<Node>; after: Node[] }
+          }
+        ).__budgetProbe
+        // A label hands focus to its own control: that is the click landing, not an effect.
+        const own = el instanceof HTMLLabelElement ? el.control : null
+        const check = () => {
           const found: string[] = []
+          // A new document (a reload) has no probe state: that is an effect too.
+          if (!state) return ['document replaced']
+          const now = `${location.pathname}${location.search}`
+          if (now !== start) found.push(`navigation ${now}`)
           if (window.scrollX !== scroll[0] || window.scrollY !== scroll[1])
             found.push('scroll')
           const active = document.activeElement
-          // A label hands focus to its own control: that is the click landing, not an effect.
-          const own = el instanceof HTMLLabelElement ? el.control : null
           if (
             active &&
             active !== document.body &&
@@ -243,8 +256,6 @@ export async function probeTarget(
             active !== own
           )
             found.push(`focus ${active.tagName.toLowerCase()}`)
-          // A new document (a reload) has no probe state: that is an effect too.
-          if (!state) return [...found, 'document replaced']
           const outside = state.after.filter(
             (node) =>
               !state.churn.has(node) && !el.contains(node) && node.isConnected !== false
@@ -252,17 +263,38 @@ export async function probeTarget(
           if (outside.length)
             found.push(`dom ${outside.length} change(s) outside the control`)
           return found
-        },
-        { el: handle, observeMs: OBSERVE_MS, scroll: scrollBefore }
-      )
+        }
+        for (;;) {
+          const found = check()
+          if (found.length || performance.now() >= deadline) return found
+          await new Promise((resolve) => setTimeout(resolve, 50))
+        }
+      },
+      {
+        el: handle,
+        observeMs: OBSERVE_MS,
+        scroll: scrollBefore,
+        start: `${before.pathname}${before.search}`,
+      }
+    )
+    // A window the node side ended early keeps running in the page until the next load.
+    observation.catch(() => undefined)
+    let seen: string[] = []
+    try {
+      const first = await Promise.race([observation, nodeEffect.then(() => null)])
+      seen = first ?? []
     } catch (error) {
       // A full navigation destroys the page the observer lived in: that is an effect.
       if (!/context was destroyed|navigat|Target closed/i.test(String(error))) throw error
       seen = ['document replaced']
     }
     const after = new URL(page.url())
-    if (after.pathname !== before.pathname || after.search !== before.search)
-      effects.push(`navigation ${after.pathname}${after.search}`)
+    const navigation = `navigation ${after.pathname}${after.search}`
+    if (
+      (after.pathname !== before.pathname || after.search !== before.search) &&
+      !seen.includes(navigation)
+    )
+      effects.push(navigation)
     effects.push(...seen)
   } catch (error) {
     return {

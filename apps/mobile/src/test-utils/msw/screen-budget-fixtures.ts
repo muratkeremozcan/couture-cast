@@ -36,6 +36,9 @@ const iso = '2026-11-20T12:00:00.000Z'
 const pixel =
   'data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%201%201%22%3E%3Cpath%20d=%22M0%200h1v1H0z%22%20fill=%22blue%22/%3E%3C/svg%3E'
 
+const PNG_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
 /** What the API answers a member with no saved city (the web fixture's NO_CITY). */
 const NO_CITY = {
   statusCode: 400,
@@ -59,7 +62,12 @@ function feedItem(id: string, title: string) {
     author: { isSelf: false, displayName: 'Fixture neighbor' },
     publishedAt: iso,
     createdAt: iso,
-    imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
+    // A PNG that expires an hour from the read, as storage signs it: the Community card refuses
+    // an image reference outside the signing window (CI 2c27e80e: no card rendered).
+    imageAccess: {
+      url: PNG_PIXEL,
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    },
     // The app asks for reaction summaries (x-couture-reactions: 1) and the API sends one on every
     // item; without it the client drops the reaction rows CC-7.15 keeps on each card.
     reactions: {

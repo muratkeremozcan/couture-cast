@@ -3,6 +3,13 @@
 Updated: 2026-11-26. Initial plan from spec-7-10 (in-progress, baseline 6d8b1db3) with TEA
 pushback P1-P10 accepted by the builder (spec Plan Change Log, amends D3-D7).
 
+Updated: 2026-11-26. First CI runs (a0f4d24b, 2c27e80e): pw-e2e on four shards (one of three ran
+past 20 minutes with the new specs, which have no duration history on a PR); the probe ends a
+control's window at its first effect; the native probe reads requests at fetch (the browser MSW
+shim has no lifecycle events) and holds real anchors as navigation; native `tileSelectors` gain
+`garment-tile-*` (Today outfit tiles); the native Community fixture signs images for an hour (a
+2099 expiry overflows the card's refresh timer and loops).
+
 Status: active
 
 ## Scope

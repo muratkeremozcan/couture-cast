@@ -25,7 +25,6 @@ import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { expect } from 'vitest'
 import { AppTopBar } from '@/src/components/app-top-bar'
-import { server } from './msw/server'
 import { press } from './press'
 import { setViewport } from './viewport'
 
@@ -232,11 +231,17 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
   unmountFirst()
   const results: NativeProbeResult[] = []
   for (const target of targets) {
+    // The browser MSW shim has no lifecycle events, so the probe reads requests at fetch itself
+    // (the app's only transport), then hands each call on unchanged.
     const requested = new Set<string>()
-    const onRequest = ({ request }: { request: Request }) => {
-      requested.add(`${request.method} ${new URL(request.url).pathname}`)
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init)
+      requested.add(
+        `${request.method} ${new URL(request.url, window.location.href).pathname}`
+      )
+      return realFetch(input, init)
     }
-    server.events.on('request:start', onRequest)
     const unmount = await options.mount()
     try {
       const control = find(target)
@@ -294,7 +299,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       results.push({ target, effects })
     } finally {
       unmount()
-      server.events.removeListener('request:start', onRequest)
+      globalThis.fetch = realFetch
     }
   }
   return { targets, results }

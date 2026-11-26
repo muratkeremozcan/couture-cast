@@ -35,6 +35,7 @@
     ],
     "native": [
       "[data-testid^=\"garment-card-\"]",
+      "[data-testid^=\"garment-tile-\"]",
       "[data-testid^=\"saved-look-card-\"]",
       "[data-testid^=\"community-post-card-\"]",
       "[data-testid^=\"highlighted-community-card-\"]"
