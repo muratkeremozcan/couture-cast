@@ -55,7 +55,7 @@ test.describe('The wardrobe hub on production, signed in on a phone', () => {
         expect((await closet).status(), `closet read on ${label}`).toBe(200)
 
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe Hub' }),
+          page.getByRole('heading', { level: 1, name: 'Wardrobe' }),
           label
         ).toBeVisible()
         // The account loaded: Silhouette needs the user id the hub resolves from the session.

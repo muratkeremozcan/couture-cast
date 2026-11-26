@@ -5,10 +5,19 @@
 // render state, and the no-provider fallback that keeps a stray consumer on Default
 // instead of throwing. Both are AC 6 surface area: the section renders them, but this
 // is where the decision is made.
+import type * as ReactNativeModule from 'react-native'
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { premiumPalettes } from '@couture/utils'
+
+// Story CC-7.9 D5: the palette follows the OS scheme, so each test pins the scheme it reads.
+const scheme = vi.hoisted(() => ({ current: 'light' as 'dark' | 'light' }))
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  return { ...actual, useColorScheme: () => scheme.current }
+})
 
 import { server } from '../test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '../lib/mobile-auth'
@@ -60,6 +69,7 @@ describe('AppThemeProvider', () => {
   afterEach(() => {
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
+    scheme.current = 'light'
   })
 
   it('applies the palette the server resolved, on mount, with no caller action', async () => {
@@ -79,6 +89,26 @@ describe('AppThemeProvider', () => {
     expect(probe.dataset.themeKey).toBe('jewel_radiance')
     expect(probe.dataset.cardBg).toBe(PREMIUM_THEME_PALETTES.jewel_radiance.cardBg)
     expect(probe.dataset.entitled).toBe('true')
+  })
+
+  it('CC-7.9 D5: serves the chosen palette in its dark variant when the OS is dark', async () => {
+    scheme.current = 'dark'
+    server.use(
+      http.get(THEME_ROUTE, () =>
+        HttpResponse.json({
+          data: { theme: 'jewel_radiance', isEntitled: true, themesEnabled: true },
+        })
+      )
+    )
+
+    const probe = await renderProbe()
+
+    await waitFor(() => {
+      expect(probe.dataset.status).toBe('ready')
+    })
+    expect(probe.dataset.themeKey).toBe('jewel_radiance')
+    expect(probe.dataset.cardBg).toBe(premiumPalettes.jewel_radiance.dark.cardBg)
+    expect(probe.dataset.cardBg).not.toBe(PREMIUM_THEME_PALETTES.jewel_radiance.cardBg)
   })
 
   /**
@@ -157,6 +187,15 @@ describe('AppThemeProvider', () => {
     expect(probe.dataset.status).toBe('loading')
     expect(probe.dataset.cardBg).toBe(DEFAULT_THEME_PALETTE.cardBg)
     expect(probe.dataset.entitled).toBe('false')
+  })
+
+  it('CC-7.9 D5: serves Default in its dark variant with no provider when the OS is dark', async () => {
+    scheme.current = 'dark'
+    await render(<ThemeProbe />)
+    const probe = screen.getByTestId('probe')
+
+    expect(probe.dataset.status).toBe('loading')
+    expect(probe.dataset.cardBg).toBe(premiumPalettes.default.dark.cardBg)
   })
 
   it('exposes no-op mutators and a resolving refresh outside a provider', async () => {

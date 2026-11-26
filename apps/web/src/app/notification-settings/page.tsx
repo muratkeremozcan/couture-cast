@@ -11,6 +11,8 @@ import { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
+import { AppPage, APP_MAIN_BASE_CLASS } from '../components/app-page'
+import { AppTopBar } from '../components/app-top-bar'
 import { communitySyncFromWeb } from '../../lib/community'
 import {
   hasStoredWebSession,
@@ -176,103 +178,111 @@ export default function NotificationSettingsPage() {
   const form = ready ? draft : loading ? LOADING_SETTINGS : null
   const edit = (change: Partial<CommunityNotificationSettings>) =>
     setDraft((previous) => (previous ? { ...previous, ...change } : previous))
+  // Story CC-7.9 D6, D7: the shared top bar (the page's only `h1`, with back to Community,
+  // where the notifications bell opens this page) and the page surface.
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex max-w-lg flex-col gap-5 p-6"
-      aria-busy={loading || undefined}
-    >
-      <h1 className="text-3xl font-semibold">{t('community.notifications.title')}</h1>
-      {form && (
-        <form
-          className={`flex flex-col gap-4${ready ? '' : ' invisible'}`}
-          inert={!ready}
-          aria-hidden={ready ? undefined : true}
-          data-testid={ready ? undefined : 'notification-settings-loading'}
-          onSubmit={(event) => {
-            event.preventDefault()
-            void save()
-          }}
-        >
-          <label className="flex min-h-12 items-center gap-3">
-            <input
-              type="checkbox"
-              checked={form.enabled}
-              onChange={(event) => edit({ enabled: event.target.checked })}
-            />
-            {t('community.notifications.enabled')}
-          </label>
-          <label className="flex min-h-12 items-center gap-3">
-            <input
-              type="checkbox"
-              checked={form.quietHoursEnabled}
-              onChange={(event) => edit({ quietHoursEnabled: event.target.checked })}
-            />
-            {t('community.notifications.quiet')}
-          </label>
-          <label className="flex flex-col gap-2">
-            {t('community.notifications.start')}
-            <input
-              type="time"
-              required
-              value={form.quietHoursStart}
-              onChange={(event) => edit({ quietHoursStart: event.target.value })}
-              className="min-h-12 rounded border p-3"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            {t('community.notifications.end')}
-            <input
-              type="time"
-              required
-              value={form.quietHoursEnd}
-              onChange={(event) => edit({ quietHoursEnd: event.target.value })}
-              className="min-h-12 rounded border p-3"
-            />
-          </label>
-          <label className="flex flex-col gap-2">
-            {t('community.notifications.timezone')}
-            <input
-              required
-              value={form.timezone}
-              onChange={(event) => {
-                suggestedTimezone.current = undefined
-                edit({ timezone: event.target.value })
-              }}
-              className="min-h-12 rounded border p-3"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="min-h-12 rounded bg-[#C9A14A] px-4 py-3 text-black"
+    <AppPage>
+      <AppTopBar title={t('community.notifications.title')} backHref="/community" />
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={`${APP_MAIN_BASE_CLASS} max-w-lg gap-5`}
+        aria-busy={loading || undefined}
+      >
+        {form && (
+          <form
+            className={`flex flex-col gap-4${ready ? '' : ' invisible'}`}
+            inert={!ready}
+            aria-hidden={ready ? undefined : true}
+            data-testid={ready ? undefined : 'notification-settings-loading'}
+            onSubmit={(event) => {
+              event.preventDefault()
+              void save()
+            }}
           >
-            {t('community.notifications.save')}
+            <label className="flex min-h-12 items-center gap-3">
+              <input
+                type="checkbox"
+                className="accent-ink"
+                checked={form.enabled}
+                onChange={(event) => edit({ enabled: event.target.checked })}
+              />
+              {t('community.notifications.enabled')}
+            </label>
+            <label className="flex min-h-12 items-center gap-3">
+              <input
+                type="checkbox"
+                className="accent-ink"
+                checked={form.quietHoursEnabled}
+                onChange={(event) => edit({ quietHoursEnabled: event.target.checked })}
+              />
+              {t('community.notifications.quiet')}
+            </label>
+            <label className="flex flex-col gap-2">
+              {t('community.notifications.start')}
+              <input
+                type="time"
+                required
+                value={form.quietHoursStart}
+                onChange={(event) => edit({ quietHoursStart: event.target.value })}
+                className="min-h-12 rounded-md border border-line-strong bg-page p-3 text-ink"
+              />
+            </label>
+            <label className="flex flex-col gap-2">
+              {t('community.notifications.end')}
+              <input
+                type="time"
+                required
+                value={form.quietHoursEnd}
+                onChange={(event) => edit({ quietHoursEnd: event.target.value })}
+                className="min-h-12 rounded-md border border-line-strong bg-page p-3 text-ink"
+              />
+            </label>
+            <label className="flex flex-col gap-2">
+              {t('community.notifications.timezone')}
+              <input
+                required
+                value={form.timezone}
+                onChange={(event) => {
+                  suggestedTimezone.current = undefined
+                  edit({ timezone: event.target.value })
+                }}
+                className="min-h-12 rounded-md border border-line-strong bg-page p-3 text-ink"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              data-gold="primary"
+              className="min-h-12 rounded-md bg-primary px-4 py-3 text-on-primary"
+            >
+              {t('community.notifications.save')}
+            </button>
+          </form>
+        )}
+        <p role="status" aria-live="polite">
+          {message ? t(message) : ''}
+        </p>
+        {signedIn === false ? (
+          <Link href="/signin" className="min-h-12 self-start py-3 underline">
+            {t('community.notifications.signin')}
+          </Link>
+        ) : null}
+        {signedIn ? (
+          <button
+            type="button"
+            onClick={() => {
+              void signOutWebSession().then(() => window.location.assign('/'))
+            }}
+            className="min-h-12 self-start py-3 underline"
+          >
+            {t('community.notifications.signout')}
           </button>
-        </form>
-      )}
-      <p role="status" aria-live="polite">
-        {message ? t(message) : ''}
-      </p>
-      {signedIn === false ? (
-        <Link href="/signin" className="min-h-12 self-start py-3 underline">
-          {t('community.notifications.signin')}
+        ) : null}
+        <Link href="/" className="min-h-12 self-start py-3 underline">
+          {t('community.notifications.back')}
         </Link>
-      ) : null}
-      {signedIn ? (
-        <button
-          type="button"
-          onClick={() => {
-            void signOutWebSession().then(() => window.location.assign('/'))
-          }}
-          className="min-h-12 self-start py-3 underline"
-        >
-          {t('community.notifications.signout')}
-        </button>
-      ) : null}
-      <Link href="/" className="min-h-12 self-start py-3 underline">
-        {t('community.notifications.back')}
-      </Link>
-    </main>
+      </main>
+    </AppPage>
   )
 }

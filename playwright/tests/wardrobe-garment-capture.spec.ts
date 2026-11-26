@@ -20,9 +20,7 @@ test.describe('Wardrobe Garment Capture Flow', () => {
 
     const mainLandmark = page.locator('#main-content')
     await expect(mainLandmark).toBeVisible()
-    await expect(
-      page.getByRole('heading', { level: 1, name: 'Wardrobe Hub' })
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'Wardrobe' })).toBeVisible()
 
     const addGarmentButton = page.getByRole('button', {
       name: /\+ Add Garment|Add Garment/i,

@@ -3,9 +3,9 @@
 //
 // Story 6.15 F-00i: at Android 2.0 the bottom tab label "Community" was wider than its tab and
 // ellipsized ("Commun..."), and every label grew below the bar's fixed height into the active
-// tab's underline. This label draws exactly what React Navigation's own label draws (centred,
-// 10 pt below the icon or 13 pt beside it, the theme's medium face), and adds two things: a label
-// wider than its tab shrinks to fit (nextTabLabelFit) instead of being cut, and each label reports
+// tab's underline. This label draws what React Navigation's own label draws (centred, the
+// theme's medium face) at the D4 type scale (Story CC-7.9: 12 pt below the icon, 14 pt beside
+// it), and adds two things: a label wider than its tab shrinks to fit (nextTabLabelFit) instead of being cut, and each label reports
 // its height so the bar can grow by what the text grew (tabBarGrowth). On iOS the label keeps React Navigation's behaviour: it does
 // not scale, and the tab's Large Content Viewer shows the label at the user's size instead.
 import React, { useCallback, useRef, useState } from 'react'
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   lineBox: { justifyContent: 'flex-end' },
   // Beside the icon the line box shrinks in the tab's row and centres its label on the icon.
   lineBoxBeside: { justifyContent: 'center', flexShrink: 1 },
-  below: { fontSize: 10 },
+  below: { fontSize: 12 },
   // flexShrink lets a beside-icon label wrap inside its row instead of widening it.
-  beside: { fontSize: 13, marginStart: 5, marginEnd: 12, lineHeight: 24, flexShrink: 1 },
+  beside: { fontSize: 14, marginStart: 4, marginEnd: 12, lineHeight: 24, flexShrink: 1 },
 })

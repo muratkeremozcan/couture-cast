@@ -2,7 +2,6 @@
 // Story 6.16 owner: the web guest preview at /preview. It resolves any stored session
 // first (D1), gates on self-reported age (D2), then runs the sample policy over local
 // guest state (D5, D7). Members are sent back to the app; nothing here calls a member API.
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -30,6 +29,8 @@ import {
   type SampleOutfitResult,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
+import { AppPage, APP_MAIN_CLASS } from '../app-page'
+import { AppTopBar } from '../app-top-bar'
 import {
   guestPreviewAnalytics,
   resolveWebPreviewSession,
@@ -404,7 +405,7 @@ function previewStatusScreen({
         <p
           role="status"
           data-testid="guest-preview-checking"
-          className="text-sm text-[#36363D]"
+          className="text-sm text-ink-soft"
         >
           {strings.chrome.checkingSession}
         </p>
@@ -416,13 +417,13 @@ function previewStatusScreen({
     return (
       <PreviewFrame strings={strings} showNav={false}>
         <div className="space-y-3" data-testid="guest-preview-session-unavailable">
-          <p role="alert" className="text-sm text-[#111111]">
+          <p role="alert" className="text-sm text-ink">
             {strings.chrome.sessionUnavailable}
           </p>
           <button
             type="button"
             onClick={retrySession}
-            className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+            className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
           >
             {strings.chrome.retry}
           </button>
@@ -472,42 +473,40 @@ function PreviewFrame({
     { view: 'wardrobe', label: strings.chrome.navWardrobe },
     { view: 'preferences', label: strings.chrome.navPreferences },
   ]
+  const outlineButton =
+    'min-h-11 rounded-lg border border-line-strong bg-page px-3 text-sm font-medium text-ink'
+  // Story CC-7.9 D6, D7: the shared top bar (back to Home) on the page surface. The preview's
+  // own header row (reset, exit, the sample label and the section nav) is the body's first row,
+  // since it does not fit the one-row top bar.
   return (
-    <div className="lookbook-body min-h-screen bg-[#FAFAFB] text-[#111111]">
-      <header className="border-b border-[#E6E6ED] bg-[#FFFFFF]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/"
-              className="lookbook-metrics inline-flex min-h-11 items-center text-xs uppercase tracking-[0.3em] text-[#5C5C66]"
-            >
-              CoutureCast
-            </Link>
-            {showNav ? (
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={onReset}
-                  data-testid="guest-preview-reset"
-                  className="min-h-11 rounded-lg border border-[#C9C9D1] px-3 text-sm font-medium"
-                >
-                  {strings.chrome.resetPreview}
-                </button>
-                <button
-                  type="button"
-                  onClick={onExit}
-                  data-testid="guest-preview-exit"
-                  className="min-h-11 rounded-lg border border-[#C9C9D1] px-3 text-sm font-medium"
-                >
-                  {strings.chrome.exitPreview}
-                </button>
-              </div>
-            ) : null}
-          </div>
+    <AppPage>
+      <AppTopBar title={strings.chrome.entry} backHref="/" />
+      <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-6`}>
+        <div className="flex flex-col gap-3">
+          {showNav ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onReset}
+                data-testid="guest-preview-reset"
+                className={outlineButton}
+              >
+                {strings.chrome.resetPreview}
+              </button>
+              <button
+                type="button"
+                onClick={onExit}
+                data-testid="guest-preview-exit"
+                className={outlineButton}
+              >
+                {strings.chrome.exitPreview}
+              </button>
+            </div>
+          ) : null}
           <p
             role="note"
             data-testid="guest-preview-label"
-            className="rounded-lg bg-[#FFF8E6] px-3 py-2 text-sm font-medium text-[#5A4310]"
+            className="rounded-lg border border-notice-line bg-notice-surface px-3 py-2 text-sm font-medium text-notice-ink"
           >
             {strings.chrome.sampleLabel}
           </p>
@@ -515,7 +514,7 @@ function PreviewFrame({
             <p
               role="status"
               data-testid="guest-preview-storage"
-              className="text-sm text-[#5A4310]"
+              className="text-sm text-notice-ink"
             >
               {strings.chrome.storageUnavailable}
             </p>
@@ -537,8 +536,8 @@ function PreviewFrame({
                       }}
                       className={`inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold ${
                         item.view === view
-                          ? 'bg-[#111111] text-[#FFFFFF]'
-                          : 'border border-[#C9C9D1] bg-[#FFFFFF] text-[#111111]'
+                          ? 'bg-inverse text-on-inverse'
+                          : 'border border-line-strong bg-page text-ink'
                       }`}
                     >
                       {item.label}
@@ -549,14 +548,8 @@ function PreviewFrame({
             </nav>
           ) : null}
         </div>
-      </header>
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="mx-auto max-w-6xl space-y-6 px-4 py-6 outline-none sm:px-6"
-      >
         {children}
       </main>
-    </div>
+    </AppPage>
   )
 }

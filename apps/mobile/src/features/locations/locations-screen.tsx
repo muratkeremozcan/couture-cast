@@ -540,9 +540,9 @@ function MemberLocationsScreen({
     }
   }
 
-  const textStyle = { color: palette.text }
-  const mutedStyle = { color: palette.mutedText }
-  const inputStyle = [styles.input, { color: palette.text, borderColor: palette.divider }]
+  const textStyle = { color: palette.ink }
+  const mutedStyle = { color: palette.inkMuted }
+  const inputStyle = [styles.input, { color: palette.ink, borderColor: palette.line }]
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
   const canRetry =
     formError?.reason === 'provider_unavailable' ||
@@ -550,7 +550,7 @@ function MemberLocationsScreen({
 
   return (
     <ScrollView
-      style={{ backgroundColor: palette.background }}
+      style={{ backgroundColor: palette.page }}
       contentContainerStyle={styles.screen}
       keyboardShouldPersistTaps="handled"
       testID="locations-screen"
@@ -558,7 +558,7 @@ function MemberLocationsScreen({
       <GuidedLocationCancel
         guided={guided}
         label={t('locations.cancel')}
-        color={palette.text}
+        color={palette.ink}
       />
       {/* The native header carries the title; this screen renders no second one. */}
       <Text ref={headingRef} style={[styles.body, mutedStyle]}>
@@ -579,7 +579,7 @@ function MemberLocationsScreen({
       {screenState === 'load_failed' && (
         <Text
           accessibilityRole="alert"
-          style={[styles.body, { color: palette.danger }]}
+          style={[styles.body, { color: palette.dangerInk }]}
           testID="locations-load-error"
         >
           {t('locations.loadError')}
@@ -599,7 +599,7 @@ function MemberLocationsScreen({
           {locations.map((location, index) => (
             <View
               key={location.id}
-              style={[styles.card, { borderColor: palette.divider }]}
+              style={[styles.card, { borderColor: palette.line }]}
               testID={`location-item-${index}`}
             >
               <View style={styles.cardHeader}>
@@ -610,7 +610,13 @@ function MemberLocationsScreen({
                   {location.label}
                 </Text>
                 {location.isPrimary && (
-                  <Text style={styles.badge} testID={`location-primary-badge-${index}`}>
+                  <Text
+                    style={[
+                      styles.badge,
+                      { backgroundColor: palette.inverse, color: palette.onInverse },
+                    ]}
+                    testID={`location-primary-badge-${index}`}
+                  >
                     {t('locations.primary')}
                   </Text>
                 )}
@@ -647,17 +653,19 @@ function MemberLocationsScreen({
                         }
                       )
                     }}
-                    style={styles.primaryButton}
+                    style={[styles.primaryButton, { backgroundColor: palette.inverse }]}
                     testID={`location-rename-save-${index}`}
                   >
-                    <Text style={styles.primaryButtonText}>
+                    <Text
+                      style={[styles.primaryButtonText, { color: palette.onInverse }]}
+                    >
                       {t('locations.renameSave')}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => setRenamingId(null)}
-                    style={[styles.secondaryButton, { borderColor: palette.divider }]}
+                    style={[styles.secondaryButton, { borderColor: palette.line }]}
                   >
                     <Text style={textStyle}>{t('locations.cancel')}</Text>
                   </Pressable>
@@ -685,17 +693,17 @@ function MemberLocationsScreen({
                         if (current?.()) focus(headingRef.current)
                       })
                     }}
-                    style={[styles.secondaryButton, { borderColor: palette.danger }]}
+                    style={[styles.secondaryButton, { borderColor: palette.dangerInk }]}
                     testID="location-delete-confirm"
                   >
-                    <Text style={{ color: palette.danger }}>
+                    <Text style={{ color: palette.dangerInk }}>
                       {t('locations.deleteConfirmAction')}
                     </Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => setConfirmingId(null)}
-                    style={[styles.secondaryButton, { borderColor: palette.divider }]}
+                    style={[styles.secondaryButton, { borderColor: palette.line }]}
                   >
                     <Text style={textStyle}>{t('locations.cancel')}</Text>
                   </Pressable>
@@ -716,7 +724,10 @@ function MemberLocationsScreen({
                           () => t('locations.primaryChanged', { label: location.label })
                         )
                       }}
-                      style={[styles.secondaryButton, { borderColor: '#C9A14A' }]}
+                      style={[
+                        styles.secondaryButton,
+                        { borderColor: palette.lineStrong },
+                      ]}
                       testID={`location-make-primary-${index}`}
                     >
                       <Text style={textStyle}>{t('locations.makePrimary')}</Text>
@@ -730,7 +741,7 @@ function MemberLocationsScreen({
                       setRenameValue(location.label)
                       setRenamingId(location.id)
                     }}
-                    style={[styles.secondaryButton, { borderColor: palette.divider }]}
+                    style={[styles.secondaryButton, { borderColor: palette.line }]}
                     testID={`location-rename-${index}`}
                   >
                     <Text style={textStyle}>{t('locations.rename')}</Text>
@@ -742,7 +753,7 @@ function MemberLocationsScreen({
                       setRenamingId(null)
                       setConfirmingId(location.id)
                     }}
-                    style={[styles.secondaryButton, { borderColor: palette.divider }]}
+                    style={[styles.secondaryButton, { borderColor: palette.line }]}
                     testID={`location-delete-${index}`}
                   >
                     <Text style={textStyle}>{t('locations.delete')}</Text>
@@ -754,7 +765,7 @@ function MemberLocationsScreen({
           {/* Announced once through the announcer in runListAction; an alert
               role here would read it a second time. */}
           {listError && (
-            <Text style={{ color: palette.danger }} testID="locations-list-error">
+            <Text style={{ color: palette.dangerInk }} testID="locations-list-error">
               {t(errorKey(listError))}
             </Text>
           )}
@@ -790,7 +801,7 @@ function MemberLocationsScreen({
                   setSelected(null)
                 }}
                 placeholder={t('locations.searchHint')}
-                placeholderTextColor={palette.mutedText}
+                placeholderTextColor={palette.inkMuted}
                 style={inputStyle}
                 testID="locations-search-input"
               />
@@ -805,7 +816,7 @@ function MemberLocationsScreen({
                   accessibilityRole="button"
                   accessibilityLabel={candidate.displayLabel}
                   onPress={() => choose(candidate)}
-                  style={[styles.option, { borderColor: palette.divider }]}
+                  style={[styles.option, { borderColor: palette.line }]}
                   testID={`location-search-option-${index}`}
                 >
                   <Text style={textStyle}>{candidate.displayLabel}</Text>
@@ -837,18 +848,24 @@ function MemberLocationsScreen({
                     onPress={() => {
                       void save()
                     }}
-                    style={styles.primaryButton}
+                    style={[styles.primaryButton, { backgroundColor: palette.primary }]}
                     testID="location-save-button"
                   >
                     {isSaving ? (
                       <View style={styles.row}>
-                        <ActivityIndicator color="#111111" />
-                        <Text style={styles.primaryButtonText}>
+                        <ActivityIndicator color={palette.onPrimary} />
+                        <Text
+                          style={[styles.primaryButtonText, { color: palette.onPrimary }]}
+                        >
                           {t('locations.saving')}
                         </Text>
                       </View>
                     ) : (
-                      <Text style={styles.primaryButtonText}>{t('locations.save')}</Text>
+                      <Text
+                        style={[styles.primaryButtonText, { color: palette.onPrimary }]}
+                      >
+                        {t('locations.save')}
+                      </Text>
                     )}
                   </Pressable>
                 </View>
@@ -858,7 +875,7 @@ function MemberLocationsScreen({
                 <View style={styles.form}>
                   {/* Announced once through the announcer by search and save;
                       an alert role here would read it a second time. */}
-                  <Text style={{ color: palette.danger }} testID="location-error">
+                  <Text style={{ color: palette.dangerInk }} testID="location-error">
                     {t(errorKey(formError.reason, formError.step))}
                   </Text>
                   {canRetry && (
@@ -876,7 +893,7 @@ function MemberLocationsScreen({
                         setFormError(null)
                         setSearchAttempt((attempt) => attempt + 1)
                       }}
-                      style={[styles.secondaryButton, { borderColor: palette.divider }]}
+                      style={[styles.secondaryButton, { borderColor: palette.line }]}
                       testID="location-retry-button"
                     >
                       <Text style={textStyle}>{t('locations.retry')}</Text>
@@ -902,7 +919,7 @@ function UseMyLocationButton({
 }) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
-  const textStyle = { color: palette.text }
+  const textStyle = { color: palette.ink }
   return (
     <Pressable
       accessibilityRole="button"
@@ -911,12 +928,16 @@ function UseMyLocationButton({
       accessibilityState={{ busy: isLocating }}
       aria-busy={isLocating}
       onPress={onPress}
-      style={[styles.secondaryButton, styles.locateButton, { borderColor: '#C9A14A' }]}
+      style={[
+        styles.secondaryButton,
+        styles.locateButton,
+        { borderColor: palette.lineStrong },
+      ]}
       testID="locations-use-my-location"
     >
       {isLocating ? (
         <View style={styles.row}>
-          <ActivityIndicator color={palette.text} />
+          <ActivityIndicator color={palette.ink} />
           <Text style={textStyle}>{t('locations.locating')}</Text>
         </View>
       ) : (
@@ -928,16 +949,14 @@ function UseMyLocationButton({
 
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12, paddingBottom: 48 },
-  body: { fontSize: 15, lineHeight: 21 },
-  label: { fontSize: 15, fontWeight: '600' },
-  card: { borderWidth: 1, borderRadius: 12, padding: 14, gap: 8 },
+  body: { fontSize: 16, lineHeight: 24 },
+  label: { fontSize: 16, fontWeight: '600' },
+  card: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 8 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  cardTitle: { fontSize: 17, fontWeight: '700' },
+  cardTitle: { fontSize: 18, fontWeight: '700' },
   badge: {
     overflow: 'hidden',
-    borderRadius: 999,
-    backgroundColor: '#C9A14A',
-    color: '#111111',
+    borderRadius: 9999,
     fontSize: 12,
     fontWeight: '700',
     paddingHorizontal: 8,
@@ -945,11 +964,11 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   flex: { flexGrow: 1, flexShrink: 1 },
-  form: { gap: 10 },
+  form: { gap: 12 },
   input: {
     minHeight: 44,
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 16,
   },
@@ -964,18 +983,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    // Gold with near-black text holds contrast on both the light and dark hero palettes.
-    backgroundColor: '#C9A14A',
-    paddingHorizontal: 18,
+    // Story CC-7.9 D3: the fill is set inline. Save is the screen's main action (`primary`);
+    // the rename row's Save is `inverse`.
+    paddingHorizontal: 16,
   },
-  primaryButtonText: { color: '#111111', fontWeight: '700' },
+  primaryButtonText: { fontWeight: '700' },
   locateButton: { alignSelf: 'flex-start' },
   secondaryButton: {
     minHeight: 44,
     minWidth: 44,
     justifyContent: 'center',
     borderWidth: 1,
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 12,
   },
 })

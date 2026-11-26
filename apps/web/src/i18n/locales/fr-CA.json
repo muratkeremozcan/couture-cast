@@ -114,7 +114,8 @@
           "opened": "Planificateur de tenues ouvert.",
           "ready": "Votre plan de 7 jours est prêt.",
           "dayFailed": "La tenue du {{day}} n'a pas pu être générée."
-        }
+        },
+        "railLabel": "Panneau du planificateur"
       },
       "theme": {
         "sectionTitle": "Palettes d'interface",
@@ -352,7 +353,53 @@
         "evening": "Soirée",
         "outdoor": "Extérieur",
         "home": "Maison"
-      }
+      },
+      "signIn": "Connectez-vous pour gérer vos capsules.",
+      "subtitle": "Compose et gère tes propres combinaisons de tenues.",
+      "filterOccasionLabel": "Filtrer par occasion",
+      "loading": "Chargement des capsules de tenues…",
+      "favoriteCapsule": "Mettre la capsule {{name}} en favori",
+      "garmentCount_one": "{{count}} vêtement",
+      "garmentCount_other": "{{count}} vêtements",
+      "status": {
+        "ready": "Prête",
+        "needsRepair": "À réparer"
+      },
+      "editAction": "Modifier",
+      "deleteAction": "Supprimer",
+      "truncation": "{{shown}} sur {{total}} affichées. Affinez votre recherche pour voir le reste.",
+      "cancelDeletion": "Annuler la suppression",
+      "cancel": "Annuler",
+      "builderDescription": "Compose une capsule de tenues cohérente à partir de ta garde-robe.",
+      "repairRemoved_one": "{{count}} vêtement n’est plus disponible et a été retiré. Choisissez un remplacement avant d’enregistrer.",
+      "repairRemoved_other": "{{count}} vêtements ne sont plus disponibles et ont été retirés. Choisissez des remplacements avant d’enregistrer.",
+      "reloadLatest": "Recharger la dernière version",
+      "garmentFallback": "Vêtement {{position}}",
+      "garmentNoun": "vêtement",
+      "untagged": "Vêtement",
+      "garmentLabel": "{{category}} (rang {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (rang {{position}})",
+      "category": {
+        "top": "haut",
+        "bottom": "bas",
+        "outerwear": "vêtement d'extérieur",
+        "dress": "robe",
+        "shoes": "chaussures",
+        "accessory": "accessoire"
+      },
+      "comfort": {
+        "cold": "froid",
+        "cool": "frais",
+        "mild": "doux",
+        "warm": "chaud",
+        "hot": "très chaud"
+      },
+      "garmentAtPosition": "{{garment}} (en position {{position}})",
+      "garmentNumber": "Vêtement {{position}}",
+      "closeBuilder": "Fermer le créateur de capsules",
+      "favoriteMarked": "Capsule favorite",
+      "markFavorite": "Marquer comme favorite",
+      "saving": "Enregistrement..."
     },
     "onboarding": {
       "title": "Configurez votre garde-robe",
@@ -492,6 +539,102 @@
       "deleteUndone": "Suppression annulée",
       "deleteFailed": "Impossible de supprimer cette pièce.",
       "deleteUsageFailed": "Impossible de vérifier où cette pièce est utilisée. Réessaie."
+    },
+    "hub": {
+      "loading": "Chargement de ta garde-robe...",
+      "emptyTitle": "Aucun vêtement pour l'instant",
+      "emptyBody": "Prends en photo ton manteau, ton haut ou ta robe préférée pour commencer.",
+      "emptyAction": "Photographier ou importer un vêtement",
+      "accountFailed": "Impossible de charger ton compte, alors les réglages de silhouette ne sont pas disponibles pour l'instant. Recharge la page pour réessayer.",
+      "accountFailedShort": "Impossible de charger ton compte. Recharge la page pour réessayer.",
+      "setupFailed": "Impossible de vérifier la progression de la configuration de ta garde-robe.",
+      "addGarment": "+ Ajouter un vêtement",
+      "closetTitle": "Ta garde-robe numérique",
+      "closetBody": "Photographie ou téléverse tes vêtements pour des conseils météo personnalisés.",
+      "needsTags": "Étiquettes requises",
+      "taggingSlow": "L'étiquetage intelligent prend plus de temps que prévu. Le vêtement reste visible pendant que le traitement se poursuit.",
+      "statusRefreshFailed": "Impossible d'actualiser l'état du vêtement.",
+      "refreshFailed": "Impossible d'actualiser ta garde-robe.",
+      "silhouetteSaving": "Enregistrement des modifications. Patiente un instant.",
+      "status": {
+        "pending_upload": "Téléversement",
+        "bytes_uploaded": "Téléversé",
+        "processing": "Traitement en cours",
+        "awaiting_tags": "En attente d'étiquettes",
+        "ready": "Prêt",
+        "failed": "Échec"
+      },
+      "detailTitle": "Détails de la pièce"
+    },
+    "tagEditor": {
+      "title": "Organiser les étiquettes du vêtement",
+      "suggestedDescription": "Vérifie ou ajuste les suggestions de l'IA pour personnaliser tes recommandations de tenues quotidiennes.",
+      "savingAnnouncement": "Enregistrement des étiquettes du vêtement",
+      "retrySuggestions": "Réessayer les suggestions intelligentes",
+      "categoryLegend": "Catégorie du vêtement",
+      "materialLegend": "Matière du tissu",
+      "optional": "(Facultatif)",
+      "comfortLegend": "Plage de confort",
+      "suggestedConfident": "(Suggestion de l'IA : {{value}})",
+      "suggestedReview": "(À vérifier, suggestion : {{value}})",
+      "materialClear": "Je ne sais pas / Effacer",
+      "cancel": "Annuler",
+      "save": "Confirmer et enregistrer les étiquettes",
+      "saving": "Enregistrement...",
+      "errors": {
+        "suggestionUnavailable": "Suggestion indisponible",
+        "analysisPending": "L'analyse du vêtement est encore en cours. Réessaie dans un instant.",
+        "inferenceUnavailable": "Les suggestions intelligentes sont indisponibles. Choisis les étiquettes toi-même.",
+        "suggestionsFailed": "Impossible de charger les suggestions intelligentes.",
+        "selectionRequired": "Choisis une catégorie et une plage de confort avant d'enregistrer.",
+        "saveFailed": "Impossible d'enregistrer les étiquettes. Réessaie."
+      },
+      "category": {
+        "top": "Haut",
+        "bottom": "Bas",
+        "outerwear": "Vêtement d'extérieur",
+        "dress": "Robe",
+        "shoes": "Chaussures",
+        "accessory": "Accessoire"
+      },
+      "material": {
+        "cotton": "Coton",
+        "wool": "Laine",
+        "linen": "Lin",
+        "leather": "Cuir",
+        "denim": "Toile de jean",
+        "fleece": "Molleton polaire",
+        "synthetic": "Synthétique",
+        "down": "Duvet",
+        "silk": "Soie"
+      },
+      "comfort": {
+        "cold": {
+          "label": "Froid (< 10 °C / 50 °F)",
+          "desc": "Grande chaleur et superpositions",
+          "name": "Froid"
+        },
+        "cool": {
+          "label": "Frais (10–16 °C / 50–60 °F)",
+          "desc": "Veste ou pull léger",
+          "name": "Frais"
+        },
+        "mild": {
+          "label": "Doux (16–22 °C / 60–72 °F)",
+          "desc": "Couche légère et confortable",
+          "name": "Doux"
+        },
+        "warm": {
+          "label": "Chaud (22–28 °C / 72–82 °F)",
+          "desc": "Haut ou bas d'été classique",
+          "name": "Chaud"
+        },
+        "hot": {
+          "label": "Très chaud (> 28 °C / 82 °F)",
+          "desc": "Respirant, par temps chaud",
+          "name": "Très chaud"
+        }
+      }
     }
   },
   "community": {
@@ -885,6 +1028,83 @@
       "linkLabel_one": "Look vedette à {{label}} par {{author}}, {{count}} réaction. Ouvre les Vedettes de la ville.",
       "linkLabel_other": "Look vedette à {{label}} par {{author}}, {{count}} réactions. Ouvre les Vedettes de la ville.",
       "cta": "Voir dans les Vedettes de la ville"
+    },
+    "tagline": "Des plans de garde-robe adaptés à la météo pour chaque trajet",
+    "hero": {
+      "eyebrow": "Rituel quotidien",
+      "headline": "Planifiez des tenues assurées en moins de 90 secondes.",
+      "body": "CoutureCast combine la météo hyperlocale, les archives de votre garde-robe et les idées de la communauté pour recommander des looks adaptés au trajet, à la réunion et à l'ambiance."
+    },
+    "lookbook": {
+      "eyebrow": "Lookbook Prism",
+      "title": "Garde-robe et communauté selon la météo",
+      "heroLabel": "Zone du rituel quotidien",
+      "communityLabel": "Section communauté",
+      "alert": {
+        "label": "Détails de l’alerte météo grave",
+        "severity": "Alerte météo : {{severity}}",
+        "advisory": "Avis : {{type}}",
+        "adjustOutfit": "Ajuster la tenue"
+      },
+      "demo": {
+        "heading": "Rituel quotidien",
+        "timeCity": "08 h 30 • NYC",
+        "temperature": "18 °C",
+        "humidity": "Humidité modérée • 65 %",
+        "change": "+3 °C par rapport au trajet d’hier",
+        "primaryLook": "Look principal recommandé",
+        "matchScore": "Correspondance : {{score}}",
+        "garments": {
+          "blazer": "Blazer onyx",
+          "scarf": "Foulard en soie merlot",
+          "loafers": "Mocassins en cuir"
+        },
+        "lookA": {
+          "label": "LOOK A (principal)",
+          "title": "Blazer et maille de soie",
+          "body": "Niveau de chaleur adapté au vent frais du matin."
+        },
+        "lookB": {
+          "label": "LOOK B (alternative)",
+          "title": "Trench et cardigan en mérinos",
+          "body": "Meilleure protection contre le vent avec une coque déperlante."
+        }
+      },
+      "recommendations": {
+        "personal": {
+          "eyebrow": "Prêt pour le trajet",
+          "title": "Blazer croisé et maille de soie",
+          "description": "Pensé pour un trajet en train à 18 °C le matin, puis un bureau climatisé."
+        },
+        "community": {
+          "eyebrow": "Tendance dans la communauté",
+          "title": "Mélange parisien soie et cachemire",
+          "description": "Les favoris de la communauté associent un cachemire léger à une jupe midi plissée pour les prévisions venteuses."
+        },
+        "brands": {
+          "eyebrow": "Sélection de marques",
+          "title": "Ensemble d’archives Couture House",
+          "description": "Associations axées sur les marques, en laine recyclée avec des détails dorés signature."
+        }
+      }
+    },
+    "chips": {
+      "navLabel": "Filtrer les recommandations par catégorie",
+      "groupLabel": "Filtres de catégorie",
+      "personal": "Personnel",
+      "community": "Communauté",
+      "sponsored": "Commandité",
+      "showing": "Recommandations affichées : {{category}}"
+    },
+    "layoutControls": {
+      "label": "Commandes de mise en page",
+      "comparison": "Mode comparaison",
+      "mobilePreview": "Aperçu mobile"
+    },
+    "actions": {
+      "previewOutfits": "Voir les tenues",
+      "seePlanner": "Voir le planificateur",
+      "startUpload": "Commencer l’ajout de vêtements"
     }
   },
   "shareCard": {
@@ -1141,7 +1361,8 @@
       "firstDecision": "Première décision : {{when}}",
       "escalated": "Ce cas attend un administrateur. Seul un administrateur peut le clore.",
       "reporterScreening": "Filtrage automatique",
-      "reasonRemoved": "Motif retiré par l'effacement"
+      "reasonRemoved": "Motif retiré par l'effacement",
+      "screenTitle": "Examen du cas"
     },
     "action": {
       "flagged": "Signalé par le filtrage",
@@ -1318,6 +1539,7 @@
   },
   "nav": {
     "label": "Navigation du bas",
+    "primaryLabel": "Navigation principale",
     "home": "Accueil",
     "wardrobe": "Garde-robe",
     "community": "Communauté",
@@ -1368,5 +1590,66 @@
     "close": "Fermer",
     "showList": "Afficher les tenues enregistrées",
     "hideList": "Masquer les tenues enregistrées"
+  },
+  "shell": {
+    "back": "Retour",
+    "goHome": "Retour à l'accueil",
+    "notFound": {
+      "title": "Page introuvable",
+      "body": "La page que vous cherchez n'existe pas. Revenez à l'écran d'accueil pour continuer."
+    },
+    "error": {
+      "title": "Un problème est survenu",
+      "retry": "Réessayer"
+    },
+    "dismissBanner": "Fermer la bannière",
+    "skipToContent": "Aller au contenu principal"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Consentement du tuteur",
+      "heading": "Accepter l'accès à la garde-robe ado",
+      "intro": "Confirmez cette invitation pour associer le compte du tuteur et débloquer la garde-robe ado.",
+      "tokenMissing": "Le code d'invitation manque dans ce lien.",
+      "success": "Consentement enregistré pour {{teenEmail}}. Le compte tuteur {{guardianEmail}} est maintenant associé.",
+      "failed": "Impossible d'accepter l'invitation du tuteur",
+      "accepting": "Acceptation…",
+      "accept": "Accepter l'invitation"
+    },
+    "dashboard": {
+      "title": "Tableau de bord du tuteur",
+      "intro": "Consultez les comptes ados associés et retirez le consentement quand l'accès doit s'arrêter.",
+      "loading": "Chargement des ados associés...",
+      "loadFailed": "Impossible de charger le tableau de bord",
+      "revokeFailed": "Impossible de retirer le consentement",
+      "revoked": "Consentement retiré pour {{teenId}}. Session ado fermée : {{invalidated}}.",
+      "yes": "oui",
+      "no": "non",
+      "linkedTeens": "Ados associés",
+      "revokeLabel": "Retirer le consentement pour {{teenId}}",
+      "revoking": "Retrait en cours...",
+      "revoke": "Retirer",
+      "empty": "Aucun compte ado associé pour l'instant."
+    },
+    "consent": {
+      "awaiting": "Consentement en attente",
+      "status": {
+        "granted": "accordé",
+        "pending": "en attente",
+        "revoked": "retiré"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Tableau de bord ado",
+      "loading": "Chargement du statut du consentement...",
+      "loadFailed": "Impossible de charger le tableau de bord",
+      "granted": "Consentement du tuteur accordé",
+      "revoked": "Consentement du tuteur retiré",
+      "pending": "Consentement du tuteur en attente",
+      "linkedGuardians": "Tuteurs associés",
+      "empty": "Aucun tuteur n'a encore donné son consentement."
+    }
   }
 }

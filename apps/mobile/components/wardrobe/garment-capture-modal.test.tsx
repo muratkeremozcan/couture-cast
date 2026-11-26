@@ -888,7 +888,7 @@ describe('MobileGarmentCaptureModal', () => {
     await pickLibraryPhotoAndConfirm()
 
     await waitFor(() => {
-      expect(screen.getByText('AUTHENTICATION_REQUIRED')).toBeInTheDocument()
+      expect(screen.getByText('wardrobe.error.sign_in_required')).toBeInTheDocument()
     })
   })
 

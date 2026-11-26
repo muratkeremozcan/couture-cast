@@ -1,0 +1,47 @@
+# Learning path Step 66: One app shell and visual system.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
+# Story CC-7.9 test owner (TEA): 7.9-NVIS-001..008, AC2 and AC6, spec D11.
+# Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
+#
+# Each tab in light, then the system flips to dark with the app still open and each tab again,
+# so the dark half also proves the app follows a live change of the system setting. Runs only
+# in the visual shard of pr-mobile-e2e.yml, on the Android small_phone (360 x 640 dp), the
+# smallest supported phone; baselines live in maestro/snapshots/shell-visual/. The status bar
+# is in SystemUI demo mode (fixed 12:00 clock, full battery, no notification icons).
+appId: ${MAESTRO_APP_ID}
+name: 'CC-7.9 shell snapshots in light and dark on the smallest phone'
+tags:
+  - e2e
+  - visual
+onFlowComplete:
+  # Leave the device as the next flow expects it, whatever happened above.
+  - runScript:
+      file: subflows/set-system-appearance.js
+      env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
+  - runScript:
+      file: subflows/set-system-appearance.js
+      env: { APPEARANCE_ROUTE: 'status-bar', APPEARANCE_VALUE: 'false' }
+---
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'status-bar', APPEARANCE_VALUE: 'true' }
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+- runFlow: subflows/open-app.yaml
+
+- runFlow:
+    file: subflows/shell-visual-tabs.yaml
+    env: { SCHEME: 'light' }
+
+# The member flips Dark theme with the app open: no relaunch, no reload.
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'yes' }
+- runFlow:
+    file: subflows/shell-visual-tabs.yaml
+    env: { SCHEME: 'dark' }

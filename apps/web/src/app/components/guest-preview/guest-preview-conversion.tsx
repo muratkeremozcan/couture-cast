@@ -20,24 +20,25 @@ export function GuestPreviewConversion({
     <section
       aria-labelledby="guest-preview-conversion-heading"
       data-testid="guest-preview-conversion"
-      className="space-y-4 rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] p-5"
+      data-surface="card"
+      className="space-y-4 rounded-xl border border-line bg-card p-5"
     >
       <h2 id="guest-preview-conversion-heading" className="text-lg font-semibold">
         {detail.garmentHeading}
       </h2>
-      <p className="text-sm text-[#111111]">{strings.chrome.conversion}</p>
+      <p className="text-sm text-ink">{strings.chrome.conversion}</p>
       <dl className="grid gap-3 text-sm sm:grid-cols-3">
         <div>
-          <dt className="font-semibold text-[#111111]">{detail.canSave}</dt>
-          <dd className="text-[#36363D]">{detail.canSaveBody}</dd>
+          <dt className="font-semibold text-ink">{detail.canSave}</dt>
+          <dd className="text-ink-soft">{detail.canSaveBody}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-[#111111]">{detail.previewOnly}</dt>
-          <dd className="text-[#36363D]">{detail.previewOnlyBody}</dd>
+          <dt className="font-semibold text-ink">{detail.previewOnly}</dt>
+          <dd className="text-ink-soft">{detail.previewOnlyBody}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-[#111111]">{detail.stillRequired}</dt>
-          <dd className="text-[#36363D]">{detail.stillRequiredBody}</dd>
+          <dt className="font-semibold text-ink">{detail.stillRequired}</dt>
+          <dd className="text-ink-soft">{detail.stillRequiredBody}</dd>
         </div>
       </dl>
       <div className="flex flex-wrap gap-3">
@@ -45,7 +46,7 @@ export function GuestPreviewConversion({
           href="/signup?from=preview"
           onClick={onCreateAccount}
           data-testid="guest-preview-create-account"
-          className="inline-flex min-h-11 items-center rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+          className="inline-flex min-h-11 items-center rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
         >
           {strings.chrome.createAccount}
         </Link>
@@ -53,7 +54,7 @@ export function GuestPreviewConversion({
           href="/signin?from=preview"
           onClick={onSignIn}
           data-testid="guest-preview-sign-in"
-          className="inline-flex min-h-11 items-center rounded-lg border border-[#111111] px-4 text-sm font-semibold text-[#111111]"
+          className="inline-flex min-h-11 items-center rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
         >
           {strings.chrome.signIn}
         </Link>
@@ -62,7 +63,7 @@ export function GuestPreviewConversion({
         <p
           role="status"
           data-testid="guest-preview-offline"
-          className="text-sm text-[#9F1D1D]"
+          className="text-sm text-danger-ink"
         >
           {strings.chrome.connectionNeeded}
         </p>

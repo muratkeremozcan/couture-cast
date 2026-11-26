@@ -1,0 +1,26 @@
+# Story CC-7.9 (TEA): one tab's snapshot for maestro/shell-visual-snapshots.yaml.
+# env: TAB_ID (tab-home ...), TITLE (top bar title), NAME (home ...), SCHEME (light or dark).
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: ${TAB_ID}
+- extendedWaitUntil:
+    visible:
+      text: ${TITLE}
+      childOf:
+        id: 'app-top-bar'
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: 'screen-placeholder'
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
+# Every run keeps its screen in the artifacts, so a new or changed baseline is reviewed and
+# committed from CI (npm run visual:pull-baselines).
+- takeScreenshot:
+    path: maestro/artifacts/shell-visual/${SCHEME}-${NAME}
+- assertScreenshot:
+    path: ../snapshots/shell-visual/${SCHEME}-${NAME}.png
+    thresholdPercentage: 99
+    label: '${NAME} matches its ${SCHEME} baseline on the 360 x 640 dp phone'

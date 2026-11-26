@@ -39,7 +39,9 @@ export function SampleGarmentArt({
             key={index}
             d={path.d}
             fill={path.tone === 'primary' ? art.primary : art.secondary}
-            stroke="#111111"
+            // Story CC-7.9 D2: the outline follows `ink`, so a near-white garment keeps its edge
+            // in light and a near-black one in dark.
+            className="stroke-ink"
             strokeOpacity={0.18}
             strokeWidth={1}
             strokeLinejoin="round"

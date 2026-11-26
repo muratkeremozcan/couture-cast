@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { AppPage, APP_MAIN_CLASS } from '../../../components/app-page'
+import { AppTopBar } from '../../../components/app-top-bar'
 import { ModerationCaseDetailView } from '../../../components/moderation-case-detail'
 
 export const metadata: Metadata = { title: 'CoutureCast moderation case' }
@@ -17,12 +19,12 @@ type ModerationCasePageProps = { params: Promise<{ caseId: string }> }
 export default async function ModerationCasePage({ params }: ModerationCasePageProps) {
   const { caseId } = await params
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      className="min-h-screen bg-white px-4 py-8 text-neutral-900 outline-none sm:px-6 sm:py-12 dark:bg-neutral-950 dark:text-neutral-100"
-    >
-      <ModerationCaseDetailView caseId={readCaseId(caseId)} />
-    </main>
+    // Story CC-7.9 D6, D7: the shared top bar and page surface; staff wording stays as it is (D9).
+    <AppPage>
+      <AppTopBar titleKey="moderation.detail.screenTitle" backHref="/moderation" />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <ModerationCaseDetailView caseId={readCaseId(caseId)} />
+      </main>
+    </AppPage>
   )
 }

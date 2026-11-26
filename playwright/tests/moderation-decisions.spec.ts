@@ -911,7 +911,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       }
       await link.click()
       await expect(
-        page.getByRole('heading', { level: 1, name: 'Post case' })
+        page.getByRole('heading', { level: 2, name: 'Post case' })
       ).toBeVisible()
 
       // A published target with open reports offers exactly these, and the panel starts idle.
@@ -1473,7 +1473,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     await browserView.goto(COMMUNITY_URL)
     await expect(browserView.getByTestId('home-spotlight-teaser-link')).toBeVisible()
     await expect(browserView.getByTestId('home-spotlight-teaser-link')).not.toContainText(
-      plan.posts[0]!.caption!
+      plan.posts[0]!.caption
     )
     await expect(
       browserView.getByTestId(`community-spotlight-item-${plan.expectedOrder[1]!}`)

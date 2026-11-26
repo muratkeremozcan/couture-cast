@@ -21,29 +21,25 @@ import { FailureNotice, moderationControl } from './moderation-failure-notice'
 /** The monitor's stale flag is computed on read, so an open page must read again to see it. */
 const REFRESH_INTERVAL_MS = 60_000
 
+// Story CC-7.9 D2: severity reads through the notice, danger and success roles in both schemes.
 const DELIVERY_CLASS = {
-  pending:
-    'bg-amber-100 text-amber-950 ring-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-400',
-  delivered:
-    'bg-emerald-100 text-emerald-950 ring-emerald-700 dark:bg-emerald-950 dark:text-emerald-100 dark:ring-emerald-400',
-  console_only:
-    'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
-  superseded:
-    'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
+  pending: 'bg-notice-surface text-notice-ink ring-notice-line',
+  delivered: 'bg-card text-success-ink ring-success-ink',
+  console_only: 'bg-card-muted text-ink ring-line-strong',
+  superseded: 'bg-card-muted text-ink ring-line-strong',
 } as const
 
 const KIND_CLASS = {
-  at_risk:
-    'bg-amber-100 text-amber-950 ring-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-400',
-  breached:
-    'bg-red-100 text-red-950 ring-red-800 dark:bg-red-950 dark:text-red-100 dark:ring-red-400',
-  escalated:
-    'bg-violet-100 text-violet-950 ring-violet-800 dark:bg-violet-950 dark:text-violet-100 dark:ring-violet-400',
+  at_risk: 'bg-notice-surface text-notice-ink ring-notice-line',
+  breached: 'bg-danger-surface text-danger-ink ring-danger-line',
+  // An admin hand-off: the strongest neutral, so it stays apart from the two SLA warnings.
+  escalated: 'bg-inverse text-on-inverse ring-inverse',
 } as const
 
 const badge =
-  'inline-flex min-h-[28px] items-center rounded px-2 text-sm font-semibold ring-1 ring-inset'
-const card = 'rounded-lg border border-neutral-400 p-4 dark:border-neutral-600'
+  'inline-flex min-h-[28px] items-center rounded-md px-2 text-sm font-semibold ring-1 ring-inset'
+/** Story CC-7.9 D7: a console card; its container carries `data-surface="card"`. */
+const card = 'rounded-xl border border-line bg-card p-4 text-ink'
 
 type ManualRefresh = 'idle' | 'refreshing' | 'refreshed'
 
@@ -123,7 +119,7 @@ export function ModerationSlaDashboard() {
   const status = key ? t(key) : ''
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <SlaHeader
         canRefresh={summary !== null}
         busy={busy}
@@ -150,7 +146,7 @@ export function ModerationSlaDashboard() {
             />
           ) : null}
           {summary && failure ? (
-            <p role="alert" className="rounded border border-neutral-500 p-4">
+            <p role="alert" className="rounded-md border border-line-strong p-4">
               {t('moderation.state.stale')}
             </p>
           ) : null}
@@ -183,13 +179,9 @@ function SlaHeader({
 }) {
   const { t } = useModerationTranslation()
   return (
+    // Story CC-7.9 D6: the top bar holds the title and the way back to the queue.
     <header className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold">{t('moderation.sla.title')}</h1>
-        <p className="text-sm text-neutral-700 dark:text-neutral-300">
-          {t('moderation.sla.subtitle')}
-        </p>
-      </div>
+      <p className="text-sm text-ink-soft">{t('moderation.sla.subtitle')}</p>
       <div className="flex flex-wrap gap-2">
         {canRefresh ? (
           <button
@@ -204,12 +196,6 @@ function SlaHeader({
             {t(busy ? 'moderation.queue.refreshing' : 'moderation.queue.refresh')}
           </button>
         ) : null}
-        <Link
-          href="/moderation"
-          className={`${moderationControl} inline-flex items-center`}
-        >
-          {t('moderation.backToQueue')}
-        </Link>
       </div>
     </header>
   )
@@ -248,8 +234,8 @@ function MonitorPanel({ summary }: { summary: ModerationSlaSummary }) {
         data-monitor-stale={stale}
         className={
           stale
-            ? 'rounded border border-red-800 bg-red-100 p-4 font-semibold text-red-950 ring-1 ring-inset ring-red-800 dark:border-red-400 dark:bg-red-950 dark:text-red-100 dark:ring-red-400'
-            : 'rounded border border-neutral-400 p-4 dark:border-neutral-600'
+            ? 'rounded-md border border-danger-line bg-danger-surface p-4 font-semibold text-danger-ink ring-1 ring-inset ring-danger-line'
+            : 'rounded-md border border-line p-4'
         }
       >
         {healthText}
@@ -257,7 +243,7 @@ function MonitorPanel({ summary }: { summary: ModerationSlaSummary }) {
       {channel === 'console' ? (
         <p
           data-channel={channel}
-          className="rounded border border-amber-700 bg-amber-100 p-4 text-amber-950 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-100"
+          className="rounded-md border border-notice-line bg-notice-surface p-4 text-notice-ink"
         >
           {t('moderation.sla.channelConsole')}
         </p>
@@ -287,10 +273,10 @@ function Metric({
 }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-sm text-neutral-700 dark:text-neutral-300">{label}</dt>
+      <dt className="text-sm text-ink-soft">{label}</dt>
       <dd
         className={`text-2xl font-semibold tabular-nums ${
-          emphasis && value > 0 ? 'text-red-800 dark:text-red-300' : ''
+          emphasis && value > 0 ? 'text-danger-ink' : ''
         }`}
       >
         {value}
@@ -306,7 +292,7 @@ function QueuePanel({ summary }: { summary: ModerationSlaSummary }) {
   const formatTime = useFormatTime()
   const { queue } = summary
   return (
-    <section aria-labelledby="sla-queue" className={card}>
+    <section aria-labelledby="sla-queue" data-surface="card" className={card}>
       <h2 id="sla-queue" className="text-lg font-semibold">
         {t('moderation.sla.queueTitle')}
       </h2>
@@ -333,7 +319,7 @@ function ResolutionPanel({ summary }: { summary: ModerationSlaSummary }) {
   const { t } = useModerationTranslation()
   const { resolution } = summary
   return (
-    <section aria-labelledby="sla-resolution" className={card}>
+    <section aria-labelledby="sla-resolution" data-surface="card" className={card}>
       <h2 id="sla-resolution" className="text-lg font-semibold">
         {t('moderation.sla.resolutionTitle', { days: resolution.windowDays })}
       </h2>
@@ -350,7 +336,7 @@ function DeliveryPanel({ summary }: { summary: ModerationSlaSummary }) {
   const { t } = useModerationTranslation()
   const { alerts } = summary
   return (
-    <section aria-labelledby="sla-delivery" className={card}>
+    <section aria-labelledby="sla-delivery" data-surface="card" className={card}>
       <h2 id="sla-delivery" className="text-lg font-semibold">
         {t('moderation.sla.deliveryTitle')}
       </h2>
@@ -371,7 +357,7 @@ function ScreeningPanel({ summary }: { summary: ModerationSlaSummary }) {
   const formatTime = useFormatTime()
   const { oldestPendingReviewAt } = summary.screening
   return (
-    <section aria-labelledby="sla-screening" className={card}>
+    <section aria-labelledby="sla-screening" data-surface="card" className={card}>
       <h2 id="sla-screening" className="text-lg font-semibold">
         {t('moderation.sla.screeningTitle')}
       </h2>
@@ -394,7 +380,7 @@ function RecentAlerts({ alerts }: { alerts: ModerationSlaRecentAlert[] }) {
         {t('moderation.sla.recentTitle')}
       </h2>
       {alerts.length === 0 ? (
-        <p className="rounded border border-dashed border-neutral-500 p-6">
+        <p className="rounded-md border border-dashed border-line-strong p-6">
           {t('moderation.sla.recentEmpty')}
         </p>
       ) : (
@@ -415,7 +401,7 @@ function AlertRow({ alert }: { alert: ModerationSlaRecentAlert }) {
   const formatTime = useFormatTime()
   const labelId = `sla-alert-${alert.id}`
   return (
-    <article aria-labelledby={labelId} className={card}>
+    <article aria-labelledby={labelId} data-surface="card" className={card}>
       <div className="flex flex-wrap items-center gap-2">
         <span id={labelId} className={`${badge} ${KIND_CLASS[alert.kind]}`}>
           {t(`moderation.sla.alertKind.${alert.kind}`)}

@@ -41,6 +41,8 @@ import {
   premiumThemeFailureReason,
   type PremiumThemeFailureReason,
 } from '@/src/lib/premium-theme'
+import { useColorScheme } from 'react-native'
+import { resolveScheme } from './tokens'
 import {
   DEFAULT_THEME_PALETTE,
   resolveThemePalette,
@@ -116,6 +118,12 @@ const FALLBACK_VALUE: AppThemeValue = Object.freeze({
   refresh: () => Promise.resolve(),
   applyResolvedTheme: () => undefined,
   applyFailure: () => 'unknown' as const,
+})
+
+/** The same fallback in the dark scheme, with Default's dark variant (Story CC-7.9 D5). */
+const FALLBACK_DARK_VALUE: AppThemeValue = Object.freeze({
+  ...FALLBACK_VALUE,
+  palette: resolveThemePalette(null, 'dark'),
 })
 
 const AppThemeContext = createContext<AppThemeValue | null>(null)
@@ -201,10 +209,13 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     return () => controllerRef.current?.abort()
   }, [refresh])
 
+  const scheme = resolveScheme(useColorScheme())
+
   const value = useMemo<AppThemeValue>(
     () => ({
       themeKey,
-      palette: resolveThemePalette(themeKey),
+      // Story CC-7.9 D5: the palette follows the system setting through its dark variant.
+      palette: resolveThemePalette(themeKey, scheme),
       isEntitled,
       themesEnabled,
       status,
@@ -215,6 +226,7 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
     }),
     [
       themeKey,
+      scheme,
       isEntitled,
       themesEnabled,
       status,
@@ -235,7 +247,9 @@ export function AppThemeProvider({ children }: PropsWithChildren) {
  * Navigation's own `useTheme`, which answers the OS light/dark question instead.
  */
 export function useAppTheme(): AppThemeValue {
-  return useContext(AppThemeContext) ?? FALLBACK_VALUE
+  const value = useContext(AppThemeContext)
+  const scheme = resolveScheme(useColorScheme())
+  return value ?? (scheme === 'dark' ? FALLBACK_DARK_VALUE : FALLBACK_VALUE)
 }
 
 /**

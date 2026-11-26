@@ -46,7 +46,13 @@
         "heat": "Sıcak hava uyarısı",
         "ice": "Buzlanma uyarısı"
       },
-      "body_generic": "Bölgeniz için bir hava durumu uyarısı yürürlükte."
+      "body_generic": "Bölgeniz için bir hava durumu uyarısı yürürlükte.",
+      "focused_badge": "Hava durumu uyarısı: {{severity}}",
+      "severity": {
+        "info": "Bilgi",
+        "warning": "Uyarı",
+        "critical": "Kritik"
+      }
     },
     "no_location": "Günlük kombinler almak için konumunuzu ekleyin"
   },
@@ -141,7 +147,8 @@
       "storage_forbidden": "Depolama erişimi reddedildi.",
       "consent_required": "Giysi yüklemek için vasi onayı gerekiyor.",
       "upload_expired": "Yükleme oturumunun süresi doldu.",
-      "upload_session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin."
+      "upload_session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin.",
+      "sign_in_required": "Gardırobunu yönetmek için giriş yap."
     },
     "crop": {
       "title": "Kırp ve konumlandır",
@@ -283,7 +290,53 @@
       },
       "garmentsSelected": "Parçalar ({{max}} parçadan {{count}} tanesi seçildi)",
       "garmentsRange": "{{min}} ile {{max}} arasında parça seçin.",
-      "garmentOrder": "Parça sırası"
+      "garmentOrder": "Parça sırası",
+      "signIn": "Kapsülleri yönetmek için giriş yap.",
+      "status": {
+        "ready": "Hazır",
+        "needsRepair": "Onarılmalı"
+      },
+      "garmentCount_one": "{{count}} parça",
+      "garmentCount_other": "{{count}} parça",
+      "truncation": "{{total}} kapsülden {{shown}} tanesi gösteriliyor. Kalanları görmek için aramanı daralt.",
+      "garmentAtPosition": "{{garment}} ({{position}}. sıra)",
+      "garmentNumber": "Parça {{position}}",
+      "closeBuilder": "Kapsül oluşturucuyu kapat",
+      "repairRemoved_one": "{{count}} parça artık kullanılamıyor ve kaldırıldı. Kaydetmeden önce yerine bir parça seç.",
+      "repairRemoved_other": "{{count}} parça artık kullanılamıyor ve kaldırıldı. Kaydetmeden önce yerlerine parça seç.",
+      "favoriteMarked": "Favori kapsül",
+      "markFavorite": "Favori olarak işaretle",
+      "saving": "Kaydediliyor...",
+      "subtitle": "Kendi kıyafet kombinlerini oluştur ve yönet.",
+      "filterOccasionLabel": "Duruma göre filtrele",
+      "loading": "Kıyafet kapsülleri yükleniyor…",
+      "favoriteCapsule": "{{name}} kapsülünü favorilere ekle",
+      "editAction": "Düzenle",
+      "deleteAction": "Sil",
+      "cancelDeletion": "Silmeyi iptal et",
+      "cancel": "İptal",
+      "builderDescription": "Gardırobundan uyumlu bir kıyafet kapsülü oluştur.",
+      "reloadLatest": "En son sürümü yükle",
+      "garmentFallback": "Kıyafet {{position}}",
+      "garmentNoun": "kıyafet",
+      "untagged": "Kıyafet",
+      "garmentLabel": "{{category}} ({{position}}. sıra)",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} ({{position}}. sıra)",
+      "category": {
+        "top": "üst",
+        "bottom": "alt",
+        "outerwear": "dış giyim",
+        "dress": "elbise",
+        "shoes": "ayakkabı",
+        "accessory": "aksesuar"
+      },
+      "comfort": {
+        "cold": "soğuk",
+        "cool": "serin",
+        "mild": "ılık",
+        "warm": "sıcak",
+        "hot": "çok sıcak"
+      }
     },
     "onboarding": {
       "title": "Gardırobunu oluştur",
@@ -324,7 +377,8 @@
         "storage_error": "Bu fotoğraf kaydedilemedi. Tekrar deneyin.",
         "confirm_required": "Yüklemeden önce temel giysi yönergesini onaylayın.",
         "session_changed": "Bu yükleme sırasında oturumu kapattınız veya hesap değiştirdiniz. Fotoğrafı yeniden seçin."
-      }
+      },
+      "sign_in_required": "Silüetini düzenlemek için giriş yap."
     },
     "detail": {
       "back": "Dolaba dön",
@@ -351,6 +405,19 @@
       "deleteUndone": "Silme geri alındı",
       "deleteFailed": "Bu parça silinemedi.",
       "deleteUsageFailed": "Bu parçanın nerede kullanıldığı kontrol edilemedi. Tekrar dene."
+    },
+    "hub": {
+      "loading": "Gardırop yükleniyor",
+      "saved_looks_failed": "Kaydedilen kombinlerin yüklenemedi.",
+      "status": {
+        "pending_upload": "Yükleniyor",
+        "bytes_uploaded": "Yükleniyor",
+        "processing": "İşleniyor",
+        "awaiting_tags": "Etiket bekliyor",
+        "ready": "Hazır",
+        "failed": "Yükleme başarısız",
+        "unknown": "Devam ediyor"
+      }
     }
   },
   "commerce": {
@@ -1112,5 +1179,61 @@
     "close": "Kapat",
     "showList": "Kaydedilen kombinleri göster",
     "hideList": "Kaydedilen kombinleri gizle"
+  },
+  "shell": {
+    "back": "Geri",
+    "notFound": {
+      "title": "Ekran bulunamadı",
+      "body": "Aradığın ekran yok. Devam etmek için ana ekrana dön."
+    },
+    "goHome": "Ana sayfaya dön"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Veli onayı",
+      "heading": "Genç gardırop erişimini kabul et",
+      "intro": "Veli hesabını bağlamak ve genç gardırobunu açmak için bu daveti onayla.",
+      "tokenMissing": "Bu bağlantıda davet kodu eksik.",
+      "success": "{{teenEmail}} için onay kaydedildi. {{guardianEmail}} veli hesabı artık bağlı.",
+      "failed": "Veli daveti kabul edilemedi",
+      "accepting": "Kabul ediliyor…",
+      "accept": "Daveti kabul et",
+      "acceptingLabel": "Davet kabul ediliyor"
+    },
+    "dashboard": {
+      "title": "Veli paneli",
+      "intro": "Bağlı genç hesaplarını incele ve erişim bitmesi gerektiğinde onayı geri çek.",
+      "loading": "Bağlı gençler yükleniyor...",
+      "loadFailed": "Panel yüklenemedi",
+      "revokeFailed": "Onay geri çekilemedi",
+      "revoked": "{{teenId}} için onay geri çekildi. Genç oturumu kapatıldı: {{invalidated}}.",
+      "yes": "evet",
+      "no": "hayır",
+      "linkedTeens": "Bağlı gençler",
+      "revokeLabel": "{{teenId}} için onayı geri çek",
+      "revoking": "Geri çekiliyor...",
+      "revoke": "Geri çek",
+      "empty": "Henüz bağlı genç hesabı yok."
+    },
+    "consent": {
+      "awaiting": "Onay bekleniyor",
+      "status": {
+        "granted": "verildi",
+        "pending": "bekliyor",
+        "revoked": "geri çekildi"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Genç paneli",
+      "loading": "Veli onayı durumu yükleniyor...",
+      "loadFailed": "Panel yüklenemedi",
+      "granted": "Veli onayı verildi",
+      "revoked": "Veli onayı geri çekildi",
+      "pending": "Veli onayı bekleniyor",
+      "linkedGuardians": "Bağlı veliler",
+      "empty": "Henüz hiçbir veli onay vermedi."
+    }
   }
 }

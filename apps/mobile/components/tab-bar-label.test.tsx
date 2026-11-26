@@ -44,7 +44,7 @@ describe('6.15 tab bar label', () => {
     expect(tabBarGrowth([21], 1.5)).toBe(7)
   })
 
-  it('6.15-MOB-TAB-03 draws a centred 10 pt label that is never cut and reports its height', async () => {
+  it('6.15-MOB-TAB-03 draws a centred 12 pt label that is never cut and reports its height', async () => {
     captured.props.length = 0
     const onHeight = vi.fn()
     render(
@@ -53,7 +53,7 @@ describe('6.15 tab bar label', () => {
       </TabBarLabel>
     )
     const label = screen.getByText('Community')
-    expect(getComputedStyle(label).fontSize).toBe('10px')
+    expect(getComputedStyle(label).fontSize).toBe('12px')
     expect(getComputedStyle(label).textAlign).toBe('center')
     expect(getComputedStyle(label).color).toBe('rgb(1, 2, 3)')
     const props = captured.props.find((entry) => entry.children === 'Community')!
@@ -135,7 +135,7 @@ describe('6.15 tab bar label fit and position', () => {
     )
     expect(
       Number.parseFloat(getComputedStyle(screen.getByText('Community')).fontSize)
-    ).toBeCloseTo(10 * (100 / 120) * 0.98, 1)
+    ).toBeCloseTo(12 * (100 / 120) * 0.98, 1)
   })
 
   it('6.15-MOB-TAB-08 draws a label beside its icon the way React Navigation does', () => {
@@ -145,9 +145,9 @@ describe('6.15 tab bar label fit and position', () => {
       </TabBarLabel>
     )
     const label = getComputedStyle(screen.getByText('Settings'))
-    expect(label.fontSize).toBe('13px')
+    expect(label.fontSize).toBe('14px')
     expect(label.lineHeight).toBe('24px')
-    expect(label.marginInlineStart).toBe('5px')
+    expect(label.marginInlineStart).toBe('4px')
     expect(label.marginInlineEnd).toBe('12px')
   })
 })
@@ -168,7 +168,7 @@ describe('6.15 tab bar sizing (r46)', () => {
     )
     const label = getComputedStyle(screen.getByText('Community'))
     const fit = (100 / 120) * 0.98
-    expect(Number.parseFloat(label.fontSize)).toBeCloseTo(13 * fit, 1)
+    expect(Number.parseFloat(label.fontSize)).toBeCloseTo(14 * fit, 1)
     expect(Number.parseFloat(label.lineHeight)).toBeCloseTo(24 * fit, 1)
     const props = captured.props.findLast((entry) => entry.children === 'Community')!
     expect(StyleSheet.flatten(props.style).flexShrink).toBe(1)

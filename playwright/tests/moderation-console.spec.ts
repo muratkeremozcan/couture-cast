@@ -316,7 +316,7 @@ test.describe('Moderator console, live (Story 6.10)', () => {
     if ((await link.count()) > 0) {
       await link.click()
       await expect(
-        page.getByRole('heading', { level: 1, name: /^(Post|Comment) case$/ })
+        page.getByRole('heading', { level: 2, name: /^(Post|Comment) case$/ })
       ).toBeVisible()
       await page.getByRole('link', { name: 'Back to queue' }).click()
       await expect(page).toHaveURL(/\/moderation$/)
@@ -386,7 +386,7 @@ test.describe('Moderator console, live (Story 6.10)', () => {
     await reach(link)
     await page.keyboard.press('Enter')
     await expect(
-      page.getByRole('heading', { level: 1, name: /^(Post|Comment) case$/ })
+      page.getByRole('heading', { level: 2, name: /^(Post|Comment) case$/ })
     ).toBeVisible()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Back to queue' })).toBeFocused()
@@ -619,7 +619,7 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     await expect(page).toHaveURL(
       new RegExp(`/moderation/cases/post\\.${queue.posts.B.id}$`)
     )
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
     const reporters = page.getByRole('region', { name: 'Reporters' })
     await expect(reporters.getByRole('listitem')).toHaveCount(3)
     for (const n of [1, 2, 3])
@@ -710,7 +710,7 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     expect(await count()).toBe(0)
 
     await page.goto(caseUrl(queue.expectations.A!.caseId))
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
     // A focus change or a minute tick must not refetch.
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
@@ -775,7 +775,7 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     })
     await signInAs(page, queue.moderator.id)
     await page.goto(caseUrl(`post.${post.id}`))
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Reporters' })).toContainText(
       '<img src=x onerror="window.__cc610xss=1">'
     )
@@ -836,7 +836,7 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
   }) => {
     await signInAs(page, queue.moderator.id)
     await page.goto(caseUrl(queue.expectations.C!.caseId))
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Machine findings' })).toContainText(
       '1.2.0'
     )

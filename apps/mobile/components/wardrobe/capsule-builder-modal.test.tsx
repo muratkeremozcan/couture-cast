@@ -211,12 +211,13 @@ describe('MobileCapsuleBuilderModal', () => {
   })
 
   it('4.3-MOB-MODAL-06 labels reorder controls so two garments of a category are distinguishable', () => {
+    // Story CC-7.9 D9: the label is the localized category and comfort range, never the raw tag.
     renderModal()
     selectGarments(['g-1', 'g-2'])
 
     expect(screen.getByTestId('move-down-button-g-1')).toHaveAttribute(
       'aria-label',
-      'Move top, mild (position 1) down'
+      'Move Top, Mild (position 1) down'
     )
   })
 
@@ -425,18 +426,18 @@ describe('MobileCapsuleBuilderModal', () => {
 
     // Into the middle: the moved row is at neither boundary.
     fireEvent.click(screen.getByTestId('move-down-button-g-1'))
-    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('2. top')
+    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('2. Top')
     expect(AccessibilityInfo.announceForAccessibility).toHaveBeenCalledWith(
-      'Moved top, mild (position 2) to position 2 of 3'
+      'Moved Top, Mild (position 2) to position 2 of 3'
     )
 
     // Onto the first row, where the "move up" control it came from goes disabled.
     fireEvent.click(screen.getByTestId('move-up-button-g-1'))
-    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('1. top')
+    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('1. Top')
 
     // Onto the last row, where the "move down" control goes disabled instead.
     fireEvent.click(screen.getByTestId('move-down-button-g-2'))
-    expect(screen.getByTestId('reorder-row-g-2')).toHaveTextContent('3. bottom')
+    expect(screen.getByTestId('reorder-row-g-2')).toHaveTextContent('3. Bottom')
   })
 
   it('4.3-MOB-MODAL-16B leaves the order untouched at a disabled boundary control', () => {
@@ -445,8 +446,8 @@ describe('MobileCapsuleBuilderModal', () => {
 
     fireEvent.click(screen.getByTestId('move-up-button-g-1'))
 
-    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('1. top')
-    expect(screen.getByTestId('reorder-row-g-2')).toHaveTextContent('2. bottom')
+    expect(screen.getByTestId('reorder-row-g-1')).toHaveTextContent('1. Top')
+    expect(screen.getByTestId('reorder-row-g-2')).toHaveTextContent('2. Bottom')
   })
 
   /** Server-side repair can strip every occasion; the form must say so on save. */
@@ -533,12 +534,12 @@ describe('MobileCapsuleBuilderModal', () => {
 
     expect(screen.getByTestId('garment-checkbox-g-untagged')).toHaveAttribute(
       'aria-label',
-      'Garment mild'
+      'Untagged garment'
     )
-    expect(screen.getByTestId('reorder-row-g-removed')).toHaveTextContent('2. Garment')
+    expect(screen.getByTestId('reorder-row-g-removed')).toHaveTextContent('2. Garment 2')
     expect(screen.getByTestId('move-down-button-g-untagged')).toHaveAttribute(
       'aria-label',
-      'Move garment (position 1) down'
+      'Move Untagged garment (position 1) down'
     )
     expect(screen.getByTestId('move-up-button-g-removed')).toHaveAttribute(
       'aria-label',

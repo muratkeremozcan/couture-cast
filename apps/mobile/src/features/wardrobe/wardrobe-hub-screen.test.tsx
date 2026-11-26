@@ -389,6 +389,21 @@ describe('WardrobeHubScreen', () => {
     vi.clearAllMocks()
   })
 
+  it('[P1] [7.9 D6, D9] leaves the title to the tab header and names a garment status in words', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garmentFixture()] })
+      )
+    )
+    renderScreen()
+
+    const status = await screen.findByTestId('garment-status-awaiting_tags')
+    expect(status).toHaveTextContent('Waiting for tags')
+    expect(screen.getByTestId('garment-capture-open')).toBeVisible()
+    // The tab's AppTopBar shows the Wardrobe title; the body has no second one.
+    expect(screen.queryByText(i18n.t('wardrobe.title'))).toBeNull()
+  })
+
   it('7.7-NAT-003 the Closet gate waits for the inventory and onboarding reads, then a refresh keeps the closet in place', async () => {
     let releaseOnboarding!: () => void
     const onboardingHeld = new Promise<void>((resolve) => {
@@ -1399,7 +1414,10 @@ describe('WardrobeHubScreen', () => {
     })
   })
 
-  it('4.4-MOB-HUB-09 shows a recovery action when the wardrobe session is missing', async () => {
+  it("4.4-MOB-HUB-09 shows a recovery action when a member's wardrobe session is missing", async () => {
+    // Story CC-7.9 add-on B: this is a member (the screen holds their id) whose token is gone. A
+    // visitor who never signed in has no failure to recover from; 7.9-NAT-VISITOR covers them.
+    setMobileApplicationUserId('member-session-lapsed')
     restoreAccessTokenResolver()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
 
@@ -1408,6 +1426,26 @@ describe('WardrobeHubScreen', () => {
     expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
     expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
     expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR offers sign-in, and no failure, to a visitor who never signed in', async () => {
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+
+    renderScreen()
+
+    const signIn = await screen.findByTestId('wardrobe-sign-in')
+    expect(signIn).toHaveTextContent(i18n.t('community.notifications.signin'))
+    expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-error-banner')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    fireEvent.click(signIn)
+    expect(routerMock.push).toHaveBeenLastCalledWith('/signin')
+    fireEvent.click(screen.getByTestId('garment-capture-open'))
+    expect(routerMock.push).toHaveBeenLastCalledWith('/signin')
+    expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
   })
 
   it('4.4-MOB-HUB-10 opens tagging from the Needs tags action on an already-untagged garment', async () => {
@@ -1443,7 +1481,7 @@ describe('WardrobeHubScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('wardrobe-error-banner')).toHaveTextContent(
-        'AUTHENTICATION_REQUIRED'
+        'Sign in to manage your wardrobe.'
       )
     })
     expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()

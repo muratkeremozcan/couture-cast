@@ -153,7 +153,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
         await page.getByRole('button', { name: 'Continue' }).click()
         await expect(page).toHaveURL(/\/wardrobe$/)
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe Hub' })
+          page.getByRole('heading', { level: 1, name: 'Wardrobe' })
         ).toBeVisible()
       })
 

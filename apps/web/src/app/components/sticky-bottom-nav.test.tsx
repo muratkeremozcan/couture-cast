@@ -12,7 +12,7 @@ import type * as NextLinkModule from 'next/link'
 import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { getI18n } from '../../i18n'
-import { ProfileNavLink } from './profile-nav-link'
+import { AppTopBar } from './app-top-bar'
 import { resolveActiveNavTab, StickyBottomNav } from './sticky-bottom-nav'
 
 const posthogMocks = vi.hoisted(() => ({
@@ -232,8 +232,9 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
       })
     })
 
-    it('PROFILE-NAV-WEB-03 the home header Profile link reads the reader language and records English', async () => {
-      render(<ProfileNavLink />)
+    // Story CC-7.9 D6: the top bar's desktop tab links replaced the home header ProfileNavLink.
+    it('PROFILE-NAV-WEB-03 the top bar Profile link reads the reader language and records English', async () => {
+      render(<AppTopBar titleKey="nav.home" />)
       const link = screen.getByTestId('nav-profile')
       expect(link).toHaveAccessibleName('Profile')
       expect(link).toHaveAttribute('href', '/settings')

@@ -6,6 +6,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
+import { roleRgb } from '../support/helpers/app-shell'
 import {
   communityTest as test,
   completedCommunityFeed,
@@ -229,10 +230,15 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     await expect(communityChip).toHaveAttribute('aria-pressed', 'true')
     await expect(communityChip).toHaveAttribute('tabindex', '0')
     await expect(personalChip).toHaveAttribute('tabindex', '-1')
-    await expect(communityChip).toHaveCSS('outline-color', 'rgb(17, 17, 17)')
+    // CC-7.9 D3: the essential outline inside the gold focus halo, both read from the tokens
+    // (the light halo darkened from #C9A14A to #9A7A2A to meet 3:1 on white).
+    await expect(communityChip).toHaveCSS(
+      'outline-color',
+      roleRgb('light', 'focusEssential')
+    )
     await expect(communityChip).toHaveCSS(
       'box-shadow',
-      'rgb(201, 161, 74) 0px 0px 0px 4px'
+      `${roleRgb('light', 'focus')} 0px 0px 0px 4px`
     )
 
     // The roving-tabindex contract: one Tab exits the whole chip group. Asserting
@@ -271,7 +277,10 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     )
 
     const communityPage = page.getByTestId('community-page')
-    await expect(communityPage.getByRole('heading', { level: 1 })).toHaveText('Community')
+    // CC-7.9 D6: the title is the top bar's h1, above the page's main column.
+    await expect(
+      page.getByTestId('app-header').getByRole('heading', { level: 1 })
+    ).toHaveText('Community')
 
     const filters = communityPage.getByRole('navigation', { name: 'Community filters' })
     await expect(filters.getByRole('heading', { level: 2 })).toHaveText('Latest looks')
@@ -321,7 +330,8 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
 
     await page.setViewportSize({ width: 1280, height: 800 })
     await expect(page.getByTestId('sticky-bottom-nav')).toBeHidden()
-    const home = page.getByTestId('community-page-home-link')
+    // CC-7.9 D6: the desktop tab links live in the top bar's trailing slot.
+    const home = page.getByTestId('primary-nav').getByTestId('nav-ritual')
     await expect(home).toBeVisible()
     await home.click()
     await expect(page).toHaveURL('/')

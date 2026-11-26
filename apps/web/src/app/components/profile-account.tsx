@@ -85,17 +85,11 @@ export function ProfileAccount() {
       className={ACCOUNT_FOOTPRINT}
     >
       {account.displayName && (
-        <p
-          className="text-lg font-semibold text-white"
-          data-testid="profile-account-name"
-        >
+        <p className="text-lg font-semibold text-ink" data-testid="profile-account-name">
           {account.displayName}
         </p>
       )}
-      <p
-        className="break-all text-sm text-neutral-300"
-        data-testid="profile-account-email"
-      >
+      <p className="break-all text-sm text-ink-soft" data-testid="profile-account-email">
         {account.email}
       </p>
     </section>

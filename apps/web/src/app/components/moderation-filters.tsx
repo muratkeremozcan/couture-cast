@@ -15,7 +15,7 @@ import {
 import { SUPPORTED_LOCALES } from '../../i18n'
 
 const field =
-  'min-h-[44px] w-full rounded border border-neutral-500 bg-white px-3 py-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100'
+  'min-h-[44px] w-full rounded-md border border-line-strong bg-page px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
 
 type Key = 'source' | 'locale' | 'risk' | 'sla'
 

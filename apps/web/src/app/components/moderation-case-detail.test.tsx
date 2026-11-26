@@ -16,6 +16,12 @@ import {
 } from '../../test-utils/moderation-console'
 import { ModerationCaseDetailView } from './moderation-case-detail'
 
+/**
+ * Story CC-7.9 D6: the route's top bar owns the h1, so a loaded case is the article its title
+ * (now the first h2) names. The wait holds in every locale.
+ */
+const loadedCase = () => screen.findByRole('article')
+
 const RLO = String.fromCodePoint(0x202e)
 const PDF = String.fromCodePoint(0x202c)
 const ZWSP = String.fromCodePoint(0x200b)
@@ -32,7 +38,7 @@ async function openCase(
   const reads: string[] = []
   mockApi(detailHandler(() => json({ data: detail(overrides) }), reads))
   const view = render(<ModerationCaseDetailView caseId={caseId} />)
-  await screen.findByRole('heading', { level: 1 })
+  await loadedCase()
   return { reads, ...view }
 }
 
@@ -40,7 +46,7 @@ describe('C-WEB-Q-DETAIL', () => {
   it('labels what the reporter saw and the current state apart, with the reporter context', async () => {
     await openCase()
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Post case' })
+      screen.getByRole('heading', { level: 2, name: 'Post case' })
     ).toBeInTheDocument()
     const content = screen.getByRole('region', { name: 'Reported content' })
     expect(within(content).getByText('Author')).toBeInTheDocument()
@@ -60,10 +66,8 @@ describe('C-WEB-Q-DETAIL', () => {
     expect(screen.getByText('Risk: High')).toBeInTheDocument()
     expect(screen.getByText('Open')).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/\b(at_risk|on_track|harassment)\b/)
-    expect(screen.getByRole('link', { name: 'Back to queue' })).toHaveAttribute(
-      'href',
-      '/moderation'
-    )
+    // Story CC-7.9 D6: the way back is the route's top bar (moderation-shell.test.tsx), not the view.
+    expect(screen.queryByRole('link', { name: 'Back to queue' })).toBeNull()
   })
 
   it('shows the time remaining on the server clock and the SLA state', async () => {
@@ -281,7 +285,7 @@ describe('C-WEB-Q-DETAIL', () => {
       'comment.c1'
     )
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Comment case' })
+      screen.getByRole('heading', { level: 2, name: 'Comment case' })
     ).toBeInTheDocument()
     expect(screen.getByText('Reported comment body')).toBeInTheDocument()
     expect(screen.getByText('The parent comment')).toBeInTheDocument()
@@ -330,7 +334,7 @@ describe('C-WEB-Q-DETAIL-ONE-READ: every read writes one audit row', () => {
         <ModerationCaseDetailView caseId="post.p1" />
       </StrictMode>
     )
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     expect(reads).toEqual(['post.p1'])
   })
 
@@ -354,7 +358,7 @@ describe('C-WEB-Q-DETAIL-ONE-READ: every read writes one audit row', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
     await waitFor(() => expect(reads).toHaveLength(2))
     expect(
-      screen.getByRole('heading', { level: 1, name: 'Post case' })
+      screen.getByRole('heading', { level: 2, name: 'Post case' })
     ).toBeInTheDocument()
   })
 
@@ -362,7 +366,7 @@ describe('C-WEB-Q-DETAIL-ONE-READ: every read writes one audit row', () => {
     const reads: string[] = []
     mockApi(detailHandler((caseId) => json({ data: detail({ caseId }) }), reads))
     const { rerender } = render(<ModerationCaseDetailView caseId="post.a" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     rerender(<ModerationCaseDetailView caseId="post.b" />)
     await waitFor(() => expect(reads).toEqual(['post.a', 'post.b']))
   })
@@ -382,9 +386,10 @@ describe('C-WEB-Q-STATES', () => {
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
     expect(await screen.findByText('Loading')).toHaveAttribute('aria-busy', 'true')
-    expect(screen.getByRole('link', { name: 'Back to queue' })).toBeInTheDocument()
+    // Story CC-7.9 D6: the way back is the route's top bar (moderation-shell.test.tsx), not the view.
+    expect(screen.queryByRole('link', { name: 'Back to queue' })).toBeNull()
     release()
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
   })
 
   it.each([
@@ -417,10 +422,8 @@ describe('C-WEB-Q-STATES', () => {
       const alert = await screen.findByRole('alert')
       expect(alert).toHaveTextContent(message)
       expect(within(alert).queryAllByRole('button')).toHaveLength(retry ? 1 : 0)
-      expect(screen.getByRole('link', { name: 'Back to queue' })).toHaveAttribute(
-        'href',
-        '/moderation'
-      )
+      // Story CC-7.9 D6: the way back is the route's top bar (moderation-shell.test.tsx), not the view.
+      expect(screen.queryByRole('link', { name: 'Back to queue' })).toBeNull()
       expect(document.body.textContent).not.toMatch(
         /What the reporter saw|Reporters|quiet-fox/
       )
@@ -443,7 +446,7 @@ describe('C-WEB-Q-STATES', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).not.toHaveTextContent('turned off')
     await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
-    await screen.findByRole('heading', { level: 1, name: 'Post case' })
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
     expect(reads).toHaveLength(2)
   })
 
@@ -454,7 +457,7 @@ describe('C-WEB-Q-STATES', () => {
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not refresh. Showing the last result.'
@@ -565,7 +568,7 @@ describe('review findings: a failed reload never keeps data the viewer may no lo
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     expect(document.querySelector('img')).not.toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Reload case' }))
     return screen.findByRole('alert')
@@ -576,7 +579,6 @@ describe('review findings: a failed reload never keeps data the viewer may no lo
     expect(screen.queryByText('Reporter typed this')).not.toBeInTheDocument()
     expect(document.querySelector('img')).toBeNull()
     expect(screen.queryByRole('region')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to queue' })).toBeInTheDocument()
   }
 
   it.each([
@@ -634,7 +636,7 @@ describe('review findings: a failed reload never keeps data the viewer may no lo
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Too many requests. Wait a moment, then try again.')
     await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }))
-    await screen.findByRole('heading', { level: 1, name: 'Post case' })
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
   })
 
   it('a 400 on a case read is a server fault, never "That filter is not valid."', async () => {
@@ -658,7 +660,7 @@ describe('review findings: reload feedback and a changing case', () => {
       }, reads)
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     const reload = screen.getByRole('button', { name: 'Reload case' })
     reload.focus()
     await userEvent.click(reload)
@@ -726,7 +728,7 @@ describe('review findings: findings that a newer server may send', () => {
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     expect(screen.getByText('Other finding, Language')).toBeInTheDocument()
     expect(document.body.textContent).not.toContain('moderation.category')
   })
@@ -761,7 +763,7 @@ describe('round 2: the Reload control keeps focus through the stale banner', () 
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     const button = screen.getByRole('button', { name: 'Reload case' })
     button.focus()
     await userEvent.click(button)

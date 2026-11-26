@@ -144,26 +144,22 @@ export function useStatusBar() {
   }
 }
 
+/**
+ * Story CC-7.9 D2, D3: the bar is an inverse surface (dark on a light page, light on a dark
+ * one); errors use the danger fill and offline the notice roles. No tone paints gold.
+ */
 const TONE_CLASSES: Record<StatusBarNotice['tone'], string> = {
-  neutral:
-    'border-zinc-700 bg-zinc-900 text-white dark:border-zinc-300 dark:bg-zinc-100 dark:text-zinc-950',
-  success:
-    'border-emerald-700 bg-zinc-900 text-white dark:border-emerald-700 dark:bg-zinc-100 dark:text-zinc-950',
-  error:
-    'border-red-700 bg-red-900 text-white dark:border-red-400 dark:bg-red-950 dark:text-red-50',
-  offline:
-    'border-amber-700 bg-amber-950 text-amber-50 dark:border-amber-400 dark:bg-amber-100 dark:text-amber-950',
+  neutral: 'border-inverse bg-inverse text-on-inverse',
+  success: 'border-success-ink bg-inverse text-on-inverse',
+  error: 'border-danger bg-danger text-on-danger',
+  offline: 'border-notice-line bg-notice-surface text-notice-ink',
 }
 
 const ACTION_CLASSES: Record<StatusBarNotice['tone'], string> = {
-  neutral:
-    'text-amber-300 hover:bg-white/10 focus-visible:outline-amber-300 dark:text-amber-900 dark:hover:bg-black/10 dark:focus-visible:outline-amber-900',
-  success:
-    'text-amber-300 hover:bg-white/10 focus-visible:outline-amber-300 dark:text-amber-900 dark:hover:bg-black/10 dark:focus-visible:outline-amber-900',
-  error:
-    'text-white underline hover:bg-white/15 focus-visible:outline-white dark:text-red-50 dark:hover:bg-white/10',
-  offline:
-    'text-amber-200 underline hover:bg-white/10 focus-visible:outline-amber-200 dark:text-amber-950 dark:hover:bg-black/10',
+  neutral: 'text-on-inverse underline hover:bg-on-inverse/10',
+  success: 'text-on-inverse underline hover:bg-on-inverse/10',
+  error: 'text-on-danger underline hover:bg-on-danger/15',
+  offline: 'text-notice-ink underline hover:bg-notice-ink/10',
 }
 
 export function OfflineStatusLine({
@@ -220,7 +216,7 @@ export function OfflineStatusLine({
       data-testid="offline-status-line"
       data-offline="true"
       style={!inline && headerOffset !== null ? { top: `${headerOffset}px` } : undefined}
-      className={`${positionClass} w-full border-amber-300 bg-amber-50 px-4 py-1.5 text-center text-xs font-semibold text-amber-950 transition-opacity duration-150 motion-reduce:transition-none dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100 ${className}`.trim()}
+      className={`${positionClass} w-full border-notice-line bg-notice-surface px-4 py-2 text-center text-xs font-semibold text-notice-ink transition-opacity duration-150 motion-reduce:transition-none ${className}`.trim()}
     >
       {t('feedback.offlineBanner')}
     </div>
@@ -314,7 +310,7 @@ export function StatusFeedbackBar({
           ? { bottom: `${bottomPx}px` }
           : undefined
       }
-      className={`${placementClasses} flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2 shadow-lg transition-opacity duration-150 motion-reduce:transition-none ${TONE_CLASSES[notice.tone]}`}
+      className={`${placementClasses} flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2 shadow-overlay transition-opacity duration-150 motion-reduce:transition-none ${TONE_CLASSES[notice.tone]}`}
     >
       <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{notice.message}</p>
       {actions.length > 0 && (
@@ -324,7 +320,7 @@ export function StatusFeedbackBar({
               key={action.id}
               type="button"
               data-testid={`status-bar-action-${action.kind ?? action.id}`}
-              className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg px-2.5 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${ACTION_CLASSES[notice.tone]}`}
+              className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none ${ACTION_CLASSES[notice.tone]}`}
               onClick={() => {
                 const activeId = notice.id
                 const result = action.onPress()

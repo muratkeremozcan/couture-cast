@@ -4,157 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --focus-essential: #111111;
-  --focus-halo: #c9a14a;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    --focus-essential: #ffffff;
-  }
-}
-
-[data-focus-surface='light'] {
-  --focus-essential: #111111;
-}
-
-[data-focus-surface='dark'] {
-  --focus-essential: #ffffff;
-}
-
 /*
- * Story 5.3 Task 5 owner: the premium palette layer.
- *
- * These extend the `[data-focus-surface]` precedent directly above: an attribute
- * selector that redefines custom properties for its subtree. `data-theme` is set on
- * `<html>` by `lib/premium-theme.ts` when a palette is applied, and independently on
- * each gallery card in `premium-theme-section.tsx` so a card can show its own palette
- * while a different one is active. Both uses fall out of the same four rules; there is
- * no separate "card" variant to keep in sync.
- *
- * The values are `refs/ux/ux-color-themes.html`'s, the file the UX spec designates as
- * the precise-values reference for engineering (Decision 2). This file is the single
- * web source for them: `premium-theme-section.test.tsx` parses these blocks and proves
- * every text/background pairing against `meetsWcagAA` from `@couture/utils` rather
- * than re-declaring the hexes in TypeScript where the two copies could drift.
- *
- * Every carrier is a single solid color, `--theme-card-bg` included. Winter Metallic's
- * reference gradient `linear-gradient(135deg,#f7fbff,#e9edf6)` is flattened to its Ice
- * end, which is the darker stop and so the worst case for contrast against Gunmetal
- * text (Decision 2). Keeping one color per property is what lets web and mobile share
- * one palette table; do not turn this one property into a gradient string on web only.
- *
- * `:root` carries the Default monochrome-and-gold system, and `[data-theme='default']`
- * restates it so the gallery's Default card renders Default even while a palette is
- * active on `<html>` and would otherwise inherit down into it.
+ * Story CC-7.9 D1: every color is a `--cc-*` channel triple that the Tailwind plugin in
+ * `tailwind.config.ts` emits from `@couture/utils` design tokens (`:root`, the dark media query
+ * and each premium `[data-theme]` in both schemes). Nothing in this file writes a color value;
+ * `scripts/check-design-tokens.mjs` fails on one.
  */
-:root,
-[data-theme='default'] {
-  --theme-primary: #111111;
-  --theme-secondary: #c9a14a;
-  --theme-card-bg: #f5f5f7;
-  --theme-card-text: #111111;
-  --theme-card-border: rgba(17, 17, 25, 0.2);
-}
-
-[data-theme='jewel_radiance'] {
-  --theme-primary: #0d6f62;
-  --theme-secondary: #6c3aa8;
-  --theme-card-bg: #f4f6fb;
-  --theme-card-text: #1f4e79;
-  --theme-card-border: rgba(31, 78, 121, 0.25);
-}
-
-[data-theme='autumn_umber'] {
-  --theme-primary: #b1683a;
-  --theme-secondary: #d9b38c;
-  --theme-card-bg: #f3ede6;
-  --theme-card-text: #3e2a23;
-  --theme-card-border: rgba(62, 42, 35, 0.2);
-}
-
-[data-theme='winter_metallic'] {
-  --theme-primary: #7e889a;
-  --theme-secondary: #c9cdd8;
-  --theme-card-bg: #e9edf6;
-  --theme-card-text: #2f333d;
-  --theme-card-border: rgba(47, 51, 61, 0.15);
-}
-
-/*
- * Production feedback 2026-11-19: the lookbook (Home and /community) stayed white under a dark
- * system setting while Wardrobe and Moderation follow it. The lookbook surface reads these tokens,
- * and the Default system gets dark values below. A premium palette is a light design the member
- * chose, so the lookbook keeps it, light surface included, whatever the system setting says.
- * Every ink sits at 4.5:1 or more on both surfaces of its mode.
- */
-:root {
-  --lookbook-surface: #ffffff;
-  --lookbook-surface-muted: #f5f5f7;
-  --lookbook-ink: #111111;
-  --lookbook-ink-soft: #36363d;
-  --lookbook-ink-muted: #5c5c66;
-  --lookbook-line: #e6e6ed;
-  --lookbook-gold-ink: #8a691f;
-  --lookbook-danger: #b91c1c;
-  /* Merlot as a foreground (an error, a flag, Withdraw); a Merlot fill under white text keeps
-     #7a1f2d in both modes. */
-  --lookbook-merlot-ink: #7a1f2d;
-  /* The ritual card's warm paper (Create my outfit card) and the share-card control's ink. */
-  --lookbook-cream: #f7f3e8;
-  --lookbook-cream-line: #d7c8a7;
-  --lookbook-cream-ink: #292724;
-}
-
-/*
- * The `~=` match keeps these selectors out of the palette table that
- * premium-theme-section.test.tsx parses from every `[data-theme=` rule. A new palette adds its
- * own block above and its name here.
- */
-@media (prefers-color-scheme: dark) {
-  html:not([data-theme~='jewel_radiance']):not([data-theme~='autumn_umber']):not(
-      [data-theme~='winter_metallic']
-    ) {
-    --theme-primary: #f5f5f7;
-    --theme-card-bg: #1c1c21;
-    --theme-card-text: #f5f5f7;
-    --theme-card-border: rgba(245, 245, 247, 0.2);
-    --lookbook-surface: #121214;
-    --lookbook-surface-muted: #1c1c21;
-    --lookbook-ink: #f5f5f7;
-    --lookbook-ink-soft: #d4d4d8;
-    --lookbook-ink-muted: #a1a1aa;
-    --lookbook-line: #2e2e36;
-    --lookbook-gold-ink: #d9b75e;
-    --lookbook-danger: #f87171;
-    --lookbook-merlot-ink: #f0a3ae;
-    --lookbook-cream: #24211b;
-    --lookbook-cream-line: #4a4232;
-    --lookbook-cream-ink: #f5f0e3;
-  }
-
-  /*
-   * A light focus surface sits on a theme card, and the Default card is dark here. Native
-   * controls on it (a checkbox, the file picker, a scrollbar) follow the dark surface too.
-   */
-  html:not([data-theme~='jewel_radiance']):not([data-theme~='autumn_umber']):not(
-      [data-theme~='winter_metallic']
-    )
-    :is([data-focus-surface='light'], .lookbook-body) {
-    --focus-essential: #ffffff;
-    color-scheme: dark;
-  }
-}
-
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--cc-ink));
+  background: rgb(var(--cc-page));
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
 :where(button, a[href], input, select, textarea) {
@@ -162,10 +21,11 @@ body {
   min-width: 44px;
 }
 
+/* D3: the focus ring is the essential outline (ink or white) inside the gold `focus` halo. */
 *:focus-visible {
-  outline: 2px solid var(--focus-essential) !important;
+  outline: 2px solid rgb(var(--cc-focus-essential)) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 0 0 4px var(--focus-halo) !important;
+  box-shadow: 0 0 0 4px rgb(var(--cc-focus)) !important;
 }
 
 @media (forced-colors: active) {
@@ -173,18 +33,6 @@ body {
     outline-color: CanvasText !important;
     box-shadow: none !important;
   }
-}
-
-.lookbook-body {
-  font-family: Inter, 'SF Pro Display', system-ui, sans-serif;
-}
-
-.lookbook-display {
-  font-family: Canela, 'Playfair Display', Georgia, serif;
-}
-
-.lookbook-metrics {
-  font-family: 'Space Grotesk', SFMono-Regular, Consolas, monospace;
 }
 
 @keyframes planner-rail-in {
@@ -263,9 +111,6 @@ html[data-session='pending'] [data-landing='refused-inline'] {
  * place of the body until the gate's reads settle and it sets `data-ready`; a signed-out page
  * never shows the placeholder. These rules apply before first paint, ahead of React.
  */
-:root {
-  --screen-placeholder-surface: rgb(127 127 127 / 0.08);
-}
 [data-screen-gate],
 [data-screen-body]:not([hidden]) {
   display: contents;

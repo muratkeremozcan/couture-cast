@@ -86,7 +86,11 @@ export function ModerationAccountStanding({
     : null
 
   return (
-    <section aria-labelledby="standing-heading" className={moderationCard}>
+    <section
+      aria-labelledby="standing-heading"
+      data-surface="card"
+      className={moderationCard}
+    >
       <h2 id="standing-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.standing.title')}
       </h2>
@@ -122,7 +126,7 @@ export function ModerationAccountStanding({
           <label className="flex flex-col gap-1 text-sm font-medium">
             {t('moderation.standing.appealReason')}
             <textarea
-              className="min-h-[72px] rounded border border-neutral-500 bg-white p-2 text-sm font-normal text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100"
+              className="min-h-[72px] rounded-md border border-line-strong bg-page p-2 text-sm font-normal text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-required="true"
               aria-invalid={trimmed.length > MODERATION_REASON_MAX_LENGTH}
               value={reason}

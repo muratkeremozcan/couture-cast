@@ -125,7 +125,7 @@ export function StylePieceEntry({
       disabled={needsRefresh && loading}
       style={[
         styles.entry,
-        { backgroundColor: colors.noticeSurface, borderColor: colors.noticeBorder },
+        { backgroundColor: colors.noticeSurface, borderColor: colors.noticeLine },
       ]}
       onPress={() => {
         if (mobileIdentityEpoch() !== epoch || mobileApplicationUserId() !== owner) return
@@ -138,7 +138,7 @@ export function StylePieceEntry({
           })
       }}
     >
-      <Text style={[styles.entryText, { color: colors.noticeText }]}>
+      <Text style={[styles.entryText, { color: colors.noticeInk }]}>
         {needsRefresh ? labels.refreshPhoto : labels.start}
       </Text>
     </Pressable>
@@ -264,17 +264,14 @@ export function StylePiecePanel({
         style={[
           styles.modal,
           {
-            backgroundColor: palette.background,
+            backgroundColor: palette.page,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
           },
         ]}
       >
         <View style={styles.header}>
-          <Text
-            accessibilityRole="header"
-            style={[styles.title, { color: palette.text }]}
-          >
+          <Text accessibilityRole="header" style={[styles.title, { color: palette.ink }]}>
             {labels.start}
           </Text>
           <PreviewButton
@@ -336,7 +333,7 @@ function StylePieceUnavailable({
       <Text
         accessibilityRole="alert"
         testID="style-piece-unavailable"
-        style={{ color: palette.text }}
+        style={{ color: palette.ink }}
       >
         {labels.photo}
       </Text>
@@ -529,7 +526,7 @@ function StylePieceIdeas({
     })
   }
 
-  const text = { color: palette.text }
+  const text = { color: palette.ink }
   if (anchor === undefined)
     return (
       <Text accessibilityRole="progressbar" style={[styles.content, text]}>
@@ -816,10 +813,7 @@ function StylePieceIdeas({
               ...companionNames,
             ].join(' · ')
             return (
-              <View
-                key={entry.id}
-                style={[styles.card, { borderColor: palette.divider }]}
-              >
+              <View key={entry.id} style={[styles.card, { borderColor: palette.line }]}>
                 <Text style={text}>{description}</Text>
                 {entry.availabilityStatus === 'needs_review' ? (
                   <Text testID="saved-look-needs-review" style={[styles.label, text]}>
@@ -1067,14 +1061,11 @@ function StylePieceCard({
 }) {
   const [editing, setEditing] = useState<SampleGarmentCategory | null>(null)
   const swapInvoker = useRef<ComponentRef<typeof Pressable> | null>(null)
-  const text = { color: palette.text }
+  const text = { color: palette.ink }
   const recipeKey = stylePieceRecipeKey(look.recipe)
 
   return (
-    <View
-      testID="style-piece-look"
-      style={[styles.card, { borderColor: palette.divider }]}
-    >
+    <View testID="style-piece-look" style={[styles.card, { borderColor: palette.line }]}>
       <Text accessibilityRole="header" style={[styles.label, text]}>
         {formatPreviewString(labels.idea, { number: index + 1 })}
       </Text>
@@ -1166,10 +1157,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
-  title: { flex: 1, fontSize: 22, fontWeight: '700' },
+  title: { flex: 1, fontSize: 24, fontWeight: '700' },
   content: { paddingHorizontal: 20, paddingVertical: 12, gap: 16 },
   group: { gap: 8 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   label: { fontWeight: '700' },
   card: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 12 },
   anchor: { width: 94, alignSelf: 'flex-start', gap: 4 },

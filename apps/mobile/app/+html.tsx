@@ -1,3 +1,4 @@
+import { colorRoles } from '@couture/utils'
 import { ScrollViewStyleReset } from 'expo-router/html'
 
 // This file is web-only and used to configure the root HTML for every
@@ -30,12 +31,13 @@ export default function Root({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Story CC-7.9 D1: the page role of each scheme, read from the shared tokens.
 const responsiveBackground = `
 body {
-  background-color: #fff;
+  background-color: ${colorRoles.light.page};
 }
 @media (prefers-color-scheme: dark) {
   body {
-    background-color: #000;
+    background-color: ${colorRoles.dark.page};
   }
 }`

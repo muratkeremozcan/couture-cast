@@ -5,15 +5,8 @@ import { CLIMATE_BANDS } from '@couture/utils'
 import type { ClimateBand, CommunityFeedMode } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
-/**
- * `hero-theme.ts` carries background/surface/text/mutedText/divider/subtleSurface/
- * skeleton/danger and no premium accent, and this task may not extend it, so the
- * gold selection colour and the ink that sits on it are derived here. Reported as
- * a palette gap: the community surface needs `accent` and `onAccent` tokens.
- * `#111111` on `#C9A14A` computes to 8.7:1, well over the 4.5:1 floor.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
+// Story CC-7.9 D3: a selected chip is `inverse` with `onInverse` ink, the same on web and
+// native, so gold stays with the five gold roles.
 
 /**
  * The filter strip is the feed's `mode` query parameter, nothing else. It is
@@ -48,14 +41,14 @@ export function CommunityFilterChips({
       accessibilityLabel={t('community.filters.label')}
       style={[
         styles.stickyHeader,
-        { backgroundColor: palette.background, borderBottomColor: palette.divider },
+        { backgroundColor: palette.page, borderBottomColor: palette.line },
       ]}
     >
       {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
           climate band and nothing said what a band is, so one line above them does. */}
       <Text
         testID="community-filters-explainer"
-        style={[styles.explainer, { color: palette.mutedText }]}
+        style={[styles.explainer, { color: palette.inkMuted }]}
       >
         {t('community.filters.explainer')}
       </Text>
@@ -100,10 +93,10 @@ export function CommunityFilterChips({
               style={[
                 styles.chip,
                 {
-                  backgroundColor: isActive ? ACCENT_GOLD : palette.surface,
+                  backgroundColor: isActive ? palette.inverse : palette.page,
                   // Selection never rides on colour alone: the active chip also
                   // doubles its border weight and bolds its label.
-                  borderColor: isActive ? ON_ACCENT : palette.mutedText,
+                  borderColor: isActive ? palette.inverse : palette.inkMuted,
                   borderWidth: isActive ? 2 : 1,
                 },
               ]}
@@ -112,7 +105,7 @@ export function CommunityFilterChips({
                 style={[
                   styles.chipText,
                   {
-                    color: isActive ? ON_ACCENT : palette.text,
+                    color: isActive ? palette.onInverse : palette.ink,
                     fontWeight: isActive ? '700' : '500',
                   },
                 ]}
@@ -130,12 +123,12 @@ export function CommunityFilterChips({
 const styles = StyleSheet.create({
   stickyHeader: {
     borderBottomWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
     zIndex: 10,
   },
   explainer: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
@@ -146,13 +139,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 9999,
     minHeight: 44,
     justifyContent: 'center',
   },
   chipText: {
-    fontSize: 13,
+    fontSize: 14,
   },
 })

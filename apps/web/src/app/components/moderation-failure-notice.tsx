@@ -17,7 +17,14 @@ const RETRYABLE: readonly ModerationFailureReason[] = [
 ]
 
 export const moderationControl =
-  'min-h-[44px] min-w-[44px] rounded border border-neutral-500 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] aria-disabled:opacity-60'
+  'min-h-[44px] min-w-[44px] rounded-md border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 aria-disabled:opacity-60'
+
+/**
+ * Story CC-7.9 D3: the one main action of a console screen (Apply decision, Export period). Gold
+ * fill through the `primary` role; the element also carries `data-gold="primary"`.
+ */
+export const moderationPrimaryControl =
+  'min-h-[44px] min-w-[44px] rounded-md border border-primary bg-primary px-4 py-2 text-sm font-medium text-on-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 aria-disabled:opacity-60'
 
 export function FailureNotice({
   reason,
@@ -41,7 +48,7 @@ export function FailureNotice({
   return (
     <div
       role="alert"
-      className="flex flex-col items-start gap-3 rounded border border-neutral-500 p-4"
+      className="flex flex-col items-start gap-3 rounded-md border border-line-strong p-4"
     >
       <p>{t(message)}</p>
       {reason === 'signed_out' ? (

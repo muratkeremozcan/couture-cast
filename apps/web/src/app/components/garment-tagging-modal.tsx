@@ -40,46 +40,40 @@ export interface GarmentTaggingModalProps {
   ) => Promise<GarmentItemContract>
 }
 
-const CATEGORY_OPTIONS: { value: GarmentCategory; label: string; emoji: string }[] = [
-  { value: 'top', label: 'Top', emoji: '👕' },
-  { value: 'bottom', label: 'Bottom', emoji: '👖' },
-  { value: 'outerwear', label: 'Outerwear', emoji: '🧥' },
-  { value: 'dress', label: 'Dress', emoji: '👗' },
-  { value: 'shoes', label: 'Shoes', emoji: '👟' },
-  { value: 'accessory', label: 'Accessory', emoji: '🧢' },
+// Labels come from `wardrobe.tagEditor.category|material|comfort` in the locale catalogs.
+const CATEGORY_OPTIONS: { value: GarmentCategory; emoji: string }[] = [
+  { value: 'top', emoji: '👕' },
+  { value: 'bottom', emoji: '👖' },
+  { value: 'outerwear', emoji: '🧥' },
+  { value: 'dress', emoji: '👗' },
+  { value: 'shoes', emoji: '👟' },
+  { value: 'accessory', emoji: '🧢' },
 ]
 
-const MATERIAL_OPTIONS: { value: GarmentMaterial; label: string }[] = [
-  { value: 'cotton', label: 'Cotton' },
-  { value: 'wool', label: 'Wool' },
-  { value: 'linen', label: 'Linen' },
-  { value: 'leather', label: 'Leather' },
-  { value: 'denim', label: 'Denim' },
-  { value: 'fleece', label: 'Fleece' },
-  { value: 'synthetic', label: 'Synthetic' },
-  { value: 'down', label: 'Down' },
-  { value: 'silk', label: 'Silk' },
+const MATERIAL_OPTIONS: { value: GarmentMaterial }[] = [
+  { value: 'cotton' },
+  { value: 'wool' },
+  { value: 'linen' },
+  { value: 'leather' },
+  { value: 'denim' },
+  { value: 'fleece' },
+  { value: 'synthetic' },
+  { value: 'down' },
+  { value: 'silk' },
 ]
 
-const COMFORT_OPTIONS: { value: GarmentComfortRange; label: string; desc: string }[] = [
-  { value: 'cold', label: 'Cold (< 10°C / 50°F)', desc: 'Heavy warmth & layering' },
-  {
-    value: 'cool',
-    label: 'Cool (10-16°C / 50-60°F)',
-    desc: 'Outerwear or light sweater',
-  },
-  { value: 'mild', label: 'Mild (16-22°C / 60-72°F)', desc: 'Comfortable light layer' },
-  {
-    value: 'warm',
-    label: 'Warm (22-28°C / 72-82°F)',
-    desc: 'Standard summer top/bottom',
-  },
-  { value: 'hot', label: 'Hot (> 28°C / 82°F)', desc: 'Breathable, hot weather' },
+const COMFORT_OPTIONS: { value: GarmentComfortRange }[] = [
+  { value: 'cold' },
+  { value: 'cool' },
+  { value: 'mild' },
+  { value: 'warm' },
+  { value: 'hot' },
 ]
 
 interface SuggestionStatusProps {
   isLoading: boolean
   loadingLabel: string
+  retryLabel: string
   errorMessage: string | null
   onRetry: () => void
 }
@@ -87,12 +81,13 @@ interface SuggestionStatusProps {
 function SuggestionStatus({
   isLoading,
   loadingLabel,
+  retryLabel,
   errorMessage,
   onRetry,
 }: SuggestionStatusProps) {
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 text-sm text-zinc-500">
+      <div className="flex items-center gap-2 text-sm text-ink-muted">
         <span className="animate-spin text-lg">⏳</span> {loadingLabel}
       </div>
     )
@@ -102,15 +97,15 @@ function SuggestionStatus({
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+      <p role="alert" className="text-sm text-danger-ink">
         {errorMessage}
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className="min-h-[44px] self-start rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        className="min-h-11 self-start rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink hover:bg-card"
       >
-        Retry smart suggestions
+        {retryLabel}
       </button>
     </div>
   )
@@ -128,7 +123,7 @@ export function GarmentTaggingModal({
 }: GarmentTaggingModalProps) {
   // The modal mounts under the wardrobe page's provider and under onboarding; the shared instance
   // keeps it on the same language without requiring either.
-  const { t } = useTranslation(undefined, { i18n: getI18n() })
+  const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
   const [selectedComfort, setSelectedComfort] = useState<GarmentComfortRange | null>(null)
@@ -205,17 +200,20 @@ export function GarmentTaggingModal({
       .catch((err: unknown) => {
         if (!isMounted) return
         // 503 or 409 means manual mode or pending; open with manual choices available
-        const message = err instanceof Error ? err.message : 'Suggestion unavailable'
+        const message =
+          err instanceof Error
+            ? err.message
+            : i18n.t('wardrobe.tagEditor.errors.suggestionUnavailable')
         const code = err instanceof WardrobeRequestError ? err.code : undefined
         if (code === 'GARMENT_ANALYSIS_PENDING') {
           setIsAnalysisPending(true)
-          setSuggestionError('Garment analysis is still pending. Please retry shortly.')
+          setSuggestionError(i18n.t('wardrobe.tagEditor.errors.analysisPending'))
         } else if (code === 'TAGGING_INFERENCE_UNAVAILABLE') {
-          setSuggestionError(
-            'Smart suggestion inference is unavailable. Please select tags manually.'
-          )
+          setSuggestionError(i18n.t('wardrobe.tagEditor.errors.inferenceUnavailable'))
         } else {
-          setSuggestionError(message || 'Unable to load smart suggestions.')
+          setSuggestionError(
+            message || i18n.t('wardrobe.tagEditor.errors.suggestionsFailed')
+          )
         }
       })
       .finally(() => {
@@ -228,7 +226,7 @@ export function GarmentTaggingModal({
       isMounted = false
       controller.abort()
     }
-  }, [isOpen, garmentId, loadAttempt, suggestTagsFn])
+  }, [isOpen, garmentId, loadAttempt, suggestTagsFn, i18n])
 
   useEffect(() => {
     if (isOpen) return
@@ -283,7 +281,7 @@ export function GarmentTaggingModal({
 
   const handleSave = async () => {
     if (!garmentId || !selectedCategory || !selectedComfort) {
-      setSaveError('Please select a category and comfort range before saving.')
+      setSaveError(t('wardrobe.tagEditor.errors.selectionRequired'))
       if (!selectedCategory && categoryGroupRef.current) {
         categoryGroupRef.current.focus()
       }
@@ -313,7 +311,7 @@ export function GarmentTaggingModal({
     } catch (err: unknown) {
       if (!controller.signal.aborted && saveRequestIdRef.current === requestId) {
         setSaveError(
-          err instanceof Error ? err.message : 'Failed to save tags. Please try again.'
+          err instanceof Error ? err.message : t('wardrobe.tagEditor.errors.saveFailed')
         )
       }
     } finally {
@@ -330,13 +328,13 @@ export function GarmentTaggingModal({
       isOpen={isOpen}
       onClose={onClose}
       titleId="garment-tagging-title"
-      title="Organize Garment Tags"
+      title={t('wardrobe.tagEditor.title')}
       descriptionId="garment-tagging-desc"
       description={
         // Suggestion wording only once suggestions are in hand. Manual mode says the member
         // chooses; until the answer names the mode (and when it failed) the copy is neutral.
         suggestions
-          ? 'Review or customize AI suggestions to personalize your daily outfit recommendations.'
+          ? t('wardrobe.tagEditor.suggestedDescription')
           : isManualMode
             ? t('wardrobe.tagging.manual_desc')
             : t('wardrobe.tagging.pending_desc')
@@ -347,7 +345,7 @@ export function GarmentTaggingModal({
         isLoadingSuggestions
           ? t('wardrobe.tagging.loading')
           : isSaving
-            ? 'Saving garment tags'
+            ? t('wardrobe.tagEditor.savingAnnouncement')
             : null
       }
       errorMessage={saveError}
@@ -356,6 +354,7 @@ export function GarmentTaggingModal({
         <SuggestionStatus
           isLoading={isLoadingSuggestions}
           loadingLabel={t('wardrobe.tagging.loading')}
+          retryLabel={t('wardrobe.tagEditor.retrySuggestions')}
           errorMessage={suggestionError}
           onRetry={() => setLoadAttempt((current) => current + 1)}
         />
@@ -370,15 +369,22 @@ export function GarmentTaggingModal({
             >
               <legend
                 id="garment-category-legend"
-                className="text-sm font-semibold text-zinc-800 dark:text-zinc-200"
+                className="text-sm font-semibold text-ink"
               >
-                Garment Category <span className="text-red-500">*</span>
+                {t('wardrobe.tagEditor.categoryLegend')}{' '}
+                <span className="text-danger-ink">*</span>
                 {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-400">
-                    (
-                    {suggestions.suggestions.category.isConfident ? 'AI' : 'Needs review'}
-                    {' suggested: '}
-                    {suggestions.suggestions.category.value})
+                  <span className="ml-2 text-xs font-normal text-success-ink">
+                    {t(
+                      suggestions.suggestions.category.isConfident
+                        ? 'wardrobe.tagEditor.suggestedConfident'
+                        : 'wardrobe.tagEditor.suggestedReview',
+                      {
+                        value: t(
+                          `wardrobe.tagEditor.category.${suggestions.suggestions.category.value}`
+                        ),
+                      }
+                    )}
                   </span>
                 )}
               </legend>
@@ -414,12 +420,12 @@ export function GarmentTaggingModal({
                       }
                       className={`flex min-h-[44px] min-w-[44px] items-center justify-center gap-2 rounded-lg border p-2 text-sm font-medium transition ${
                         isSelected
-                          ? 'border-gold-500 bg-gold-500/10 text-zinc-900 ring-2 ring-gold-500 dark:text-zinc-50'
-                          : 'border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200'
+                          ? 'border-inverse bg-inverse text-on-inverse'
+                          : 'border-line-strong bg-page text-ink-soft hover:bg-card'
                       }`}
                     >
                       <span aria-hidden="true">{opt.emoji}</span>
-                      <span>{opt.label}</span>
+                      <span>{t(`wardrobe.tagEditor.category.${opt.value}`)}</span>
                     </button>
                   )
                 })}
@@ -430,16 +436,26 @@ export function GarmentTaggingModal({
             <fieldset className="flex flex-col gap-2 border-0 p-0 m-0">
               <legend
                 id="garment-material-legend"
-                className="text-sm font-semibold text-zinc-800 dark:text-zinc-200"
+                className="text-sm font-semibold text-ink"
               >
-                Fabric Material{' '}
-                <span className="text-xs font-normal text-zinc-500">(Optional)</span>
+                {t('wardrobe.tagEditor.materialLegend')}{' '}
+                <span className="text-xs font-normal text-ink-muted">
+                  {t('wardrobe.tagEditor.optional')}
+                </span>
                 {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-400">
-                    (
-                    {suggestions.suggestions.material.isConfident ? 'AI' : 'Needs review'}
-                    {' suggested: '}
-                    {suggestions.suggestions.material.value})
+                  <span className="ml-2 text-xs font-normal text-success-ink">
+                    {t(
+                      suggestions.suggestions.material.isConfident
+                        ? 'wardrobe.tagEditor.suggestedConfident'
+                        : 'wardrobe.tagEditor.suggestedReview',
+                      {
+                        value: suggestions.suggestions.material.value
+                          ? t(
+                              `wardrobe.tagEditor.material.${suggestions.suggestions.material.value}`
+                            )
+                          : t('wardrobe.tagEditor.materialClear'),
+                      }
+                    )}
                   </span>
                 )}
               </legend>
@@ -474,13 +490,13 @@ export function GarmentTaggingModal({
                         )
                     )
                   }}
-                  className={`min-h-[44px] min-w-[44px] rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                  className={`min-h-11 min-w-11 rounded-lg border px-3 py-2 text-xs font-medium transition ${
                     selectedMaterial === null
-                      ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                      : 'border-zinc-300 text-zinc-600 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-400'
+                      ? 'border-inverse bg-inverse text-on-inverse'
+                      : 'border-line-strong bg-page text-ink-soft hover:bg-card'
                   }`}
                 >
-                  Not sure / Clear
+                  {t('wardrobe.tagEditor.materialClear')}
                 </button>
                 {MATERIAL_OPTIONS.map((opt) => {
                   const isSelected = selectedMaterial === opt.value
@@ -512,13 +528,13 @@ export function GarmentTaggingModal({
                             )
                         )
                       }}
-                      className={`min-h-[44px] min-w-[44px] rounded-lg border px-3 py-2 text-xs font-medium transition ${
+                      className={`min-h-11 min-w-11 rounded-lg border px-3 py-2 text-xs font-medium transition ${
                         isSelected
-                          ? 'border-gold-500 bg-gold-500/10 text-zinc-900 ring-2 ring-gold-500 dark:text-zinc-50'
-                          : 'border-zinc-300 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300'
+                          ? 'border-inverse bg-inverse text-on-inverse'
+                          : 'border-line-strong bg-page text-ink-soft hover:bg-card'
                       }`}
                     >
-                      {opt.label}
+                      {t(`wardrobe.tagEditor.material.${opt.value}`)}
                     </button>
                   )
                 })}
@@ -529,17 +545,22 @@ export function GarmentTaggingModal({
             <fieldset className="flex flex-col gap-2 border-0 p-0 m-0">
               <legend
                 id="garment-comfort-legend"
-                className="text-sm font-semibold text-zinc-800 dark:text-zinc-200"
+                className="text-sm font-semibold text-ink"
               >
-                Target Comfort Range <span className="text-red-500">*</span>
+                {t('wardrobe.tagEditor.comfortLegend')}{' '}
+                <span className="text-danger-ink">*</span>
                 {suggestions && (
-                  <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-400">
-                    (
-                    {suggestions.suggestions.comfortRange.isConfident
-                      ? 'AI'
-                      : 'Needs review'}
-                    {' suggested: '}
-                    {suggestions.suggestions.comfortRange.value})
+                  <span className="ml-2 text-xs font-normal text-success-ink">
+                    {t(
+                      suggestions.suggestions.comfortRange.isConfident
+                        ? 'wardrobe.tagEditor.suggestedConfident'
+                        : 'wardrobe.tagEditor.suggestedReview',
+                      {
+                        value: t(
+                          `wardrobe.tagEditor.comfort.${suggestions.suggestions.comfortRange.value}.name`
+                        ),
+                      }
+                    )}
                   </span>
                 )}
               </legend>
@@ -573,17 +594,19 @@ export function GarmentTaggingModal({
                           selectComfort
                         )
                       }
-                      className={`flex min-h-[44px] w-full flex-col items-start justify-center rounded-lg border p-3 text-left transition ${
+                      className={`flex min-h-11 w-full flex-col items-start justify-center rounded-lg border p-3 text-left transition ${
                         isSelected
-                          ? 'border-gold-500 bg-gold-500/10 ring-2 ring-gold-500'
-                          : 'border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800/50'
+                          ? 'border-inverse bg-inverse text-on-inverse'
+                          : 'border-line-strong bg-page text-ink hover:bg-card'
                       }`}
                     >
-                      <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {opt.label}
+                      <span className="text-sm font-semibold">
+                        {t(`wardrobe.tagEditor.comfort.${opt.value}.label`)}
                       </span>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {opt.desc}
+                      <span
+                        className={`text-xs ${isSelected ? 'text-on-inverse' : 'text-ink-muted'}`}
+                      >
+                        {t(`wardrobe.tagEditor.comfort.${opt.value}.desc`)}
                       </span>
                     </button>
                   )
@@ -596,9 +619,9 @@ export function GarmentTaggingModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="min-h-[44px] min-w-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+                className="min-h-11 min-w-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink hover:bg-card"
               >
-                Cancel
+                {t('wardrobe.tagEditor.cancel')}
               </button>
               <button
                 type="button"
@@ -606,13 +629,13 @@ export function GarmentTaggingModal({
                 onClick={() => {
                   void handleSave()
                 }}
-                className={`min-h-[44px] min-w-[44px] rounded-lg px-6 py-2 text-sm font-semibold text-white transition ${
+                className={`min-h-11 min-w-11 rounded-lg px-6 py-2 text-sm font-semibold transition ${
                   isSaveDisabled
-                    ? 'cursor-not-allowed bg-zinc-300 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-600'
-                    : 'bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900'
+                    ? 'cursor-not-allowed bg-card-muted text-ink-muted'
+                    : 'bg-inverse text-on-inverse hover:bg-inverse/90'
                 }`}
               >
-                {isSaving ? 'Saving...' : 'Confirm & Save Tags'}
+                {isSaving ? t('wardrobe.tagEditor.saving') : t('wardrobe.tagEditor.save')}
               </button>
             </div>
           </>

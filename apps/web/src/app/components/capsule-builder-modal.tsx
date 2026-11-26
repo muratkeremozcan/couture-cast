@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { AccessibleModal } from './accessible-modal'
 import type {
   CapsuleOccasion,
@@ -49,15 +50,23 @@ const MAX_GARMENTS = 10
  * a screen-reader user hears "Move top up" twice with no way to tell them apart.
  */
 function describeGarment(
+  t: TFunction,
   garment: GarmentItemContract | undefined,
   position: number
 ): string {
   if (!garment) {
-    return `Garment ${position}`
+    return t('wardrobe.capsules.garmentFallback', { position })
   }
-  const category = garment.category ?? 'garment'
-  const comfort = garment.comfortRange ? `, ${garment.comfortRange}` : ''
-  return `${category}${comfort} (position ${position})`
+  const category = garment.category
+    ? t(`wardrobe.capsules.category.${garment.category}`)
+    : t('wardrobe.capsules.garmentNoun')
+  return garment.comfortRange
+    ? t('wardrobe.capsules.garmentLabelWithComfort', {
+        category,
+        comfort: t(`wardrobe.capsules.comfort.${garment.comfortRange}`),
+        position,
+      })
+    : t('wardrobe.capsules.garmentLabel', { category, position })
 }
 
 export function CapsuleBuilderModal({
@@ -156,6 +165,12 @@ export function CapsuleBuilderModal({
     [availableGarments]
   )
 
+  /** The visible row label: the category, or the untagged label when the garment has none. */
+  const orderedCategoryLabel = (garment: GarmentItemContract | undefined) =>
+    garment?.category
+      ? t(`wardrobe.capsules.category.${garment.category}`)
+      : t('wardrobe.capsules.untagged')
+
   const toggleGarment = (id: string) => {
     setErrorMessage(null)
     if (selectedGarmentIds.includes(id)) {
@@ -194,7 +209,7 @@ export function CapsuleBuilderModal({
     updated[targetIndex] = movedId
     setSelectedGarmentIds(updated)
 
-    const label = describeGarment(garmentsById.get(movedId), targetIndex + 1)
+    const label = describeGarment(t, garmentsById.get(movedId), targetIndex + 1)
     setLiveAnnouncement(
       t('wardrobe.capsules.garmentMoved', {
         garment: label,
@@ -274,7 +289,7 @@ export function CapsuleBuilderModal({
       titleId="capsule-modal-title"
       title={initialCapsule ? t('wardrobe.capsules.edit') : t('wardrobe.capsules.create')}
       descriptionId="capsule-modal-description"
-      description="Build a cohesive outfit capsule from your wardrobe."
+      description={t('wardrobe.capsules.builderDescription')}
       invokingElementRef={invokingElementRef}
       initialFocusRef={nameInputRef}
       ariaLiveMessage={liveAnnouncement}
@@ -289,15 +304,13 @@ export function CapsuleBuilderModal({
       >
         {unavailableCount > 0 && (
           <div
-            className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            className="rounded-lg border border-notice-line bg-notice-surface p-3 text-xs text-notice-ink"
             data-testid="capsule-repair-banner"
           >
             <strong className="block font-semibold">
               {t('wardrobe.capsules.repairTitle')}
             </strong>
-            {unavailableCount === 1
-              ? '1 garment is no longer available and has been removed. Choose a replacement before saving.'
-              : `${unavailableCount} garments are no longer available and have been removed. Choose replacements before saving.`}
+            {t('wardrobe.capsules.repairRemoved', { count: unavailableCount })}
           </div>
         )}
 
@@ -305,17 +318,17 @@ export function CapsuleBuilderModal({
           <button
             type="button"
             onClick={() => onStaleCapsule?.()}
-            className="w-full rounded-lg border border-amber-300 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200"
+            className="w-full rounded-lg border border-notice-line bg-page px-3 py-2 text-xs font-medium text-notice-ink hover:bg-notice-surface"
             data-testid="capsule-reload-button"
           >
-            Reload the latest version
+            {t('wardrobe.capsules.reloadLatest')}
           </button>
         )}
 
         <div>
           <label
             htmlFor="capsule-name-input"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-soft"
           >
             {t('wardrobe.capsules.nameLabel')}
           </label>
@@ -327,7 +340,7 @@ export function CapsuleBuilderModal({
             onChange={(event) => setName(event.target.value)}
             maxLength={60}
             required
-            className="mt-1 block w-full rounded-md border border-zinc-300 p-2 text-sm text-zinc-900 focus:border-black focus:ring-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            className="mt-1 block w-full rounded-md border border-line-strong bg-page p-2 text-sm text-ink placeholder:text-ink-muted"
             placeholder={t('wardrobe.capsules.namePlaceholder')}
             data-testid="capsule-name-input"
           />
@@ -336,7 +349,7 @@ export function CapsuleBuilderModal({
         <div>
           <label
             htmlFor="capsule-desc-input"
-            className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="block text-sm font-medium text-ink-soft"
           >
             {t('wardrobe.capsules.descriptionLabel')}
           </label>
@@ -346,29 +359,30 @@ export function CapsuleBuilderModal({
             onChange={(event) => setDescription(event.target.value)}
             maxLength={280}
             rows={2}
-            className="mt-1 block w-full rounded-md border border-zinc-300 p-2 text-sm text-zinc-900 focus:border-black focus:ring-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            className="mt-1 block w-full rounded-md border border-line-strong bg-page p-2 text-sm text-ink placeholder:text-ink-muted"
             placeholder={t('wardrobe.capsules.descriptionPlaceholder')}
             data-testid="capsule-desc-input"
           />
         </div>
 
         <fieldset>
-          <legend className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <legend className="text-sm font-medium text-ink-soft">
             {t('wardrobe.capsules.occasionsLabel')}
           </legend>
           <div className="mt-2 flex flex-wrap gap-2">
             {ALL_OCCASIONS.map((occasion) => (
               <label
                 key={occasion}
+                data-gold="focus"
                 /**
                  * The real checkbox stays visually hidden but focusable, and
-                 * `focus-within` renders the ring on the styled chip so keyboard
+                 * `focus-within` renders the focus halo on the styled chip so keyboard
                  * focus is visible. Target size meets the 44px minimum.
                  */
-                className={`flex min-h-[44px] cursor-pointer items-center space-x-2 rounded-lg border px-3 py-2 text-xs font-medium focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-black dark:focus-within:ring-zinc-100 ${
+                className={`flex min-h-11 cursor-pointer items-center space-x-2 rounded-lg border px-3 py-2 text-xs font-medium focus-within:ring-2 focus-within:ring-focus focus-within:ring-offset-2 ${
                   selectedOccasions.includes(occasion)
-                    ? 'border-black bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                    : 'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-300'
+                    ? 'border-inverse bg-inverse text-on-inverse'
+                    : 'border-line bg-card text-ink-soft'
                 }`}
               >
                 <input
@@ -385,11 +399,11 @@ export function CapsuleBuilderModal({
         </fieldset>
 
         <fieldset>
-          <legend className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <legend className="text-sm font-medium text-ink-soft">
             {t('wardrobe.capsules.garmentsLabel')}
           </legend>
           <p
-            className="mt-1 text-xs text-zinc-500 dark:text-zinc-400"
+            className="mt-1 text-xs text-ink-muted"
             data-testid="capsule-selection-count"
           >
             {selectionCountLabel}{' '}
@@ -398,22 +412,23 @@ export function CapsuleBuilderModal({
               max: MAX_GARMENTS,
             })}
           </p>
-          <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+          <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-line p-2">
             {availableGarments.map((garment) => (
               <label
                 key={garment.id}
-                className="flex min-h-[44px] items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                className="flex min-h-11 items-center justify-between p-2 hover:bg-card"
               >
                 <div className="flex items-center space-x-3">
                   <input
                     type="checkbox"
                     checked={selectedGarmentIds.includes(garment.id)}
                     onChange={() => toggleGarment(garment.id)}
-                    className="h-5 w-5 rounded border-zinc-300 text-black focus:ring-2 focus:ring-black focus:ring-offset-2"
+                    className="h-5 w-5 rounded-md border-line-strong accent-ink"
                     data-testid={`garment-select-checkbox-${garment.id}`}
                   />
-                  <span className="text-sm capitalize text-zinc-900 dark:text-zinc-100">
-                    {garment.category ?? 'Garment'} ({garment.comfortRange ?? 'mild'})
+                  <span className="text-sm capitalize text-ink">
+                    {orderedCategoryLabel(garment)} (
+                    {t(`wardrobe.capsules.comfort.${garment.comfortRange ?? 'mild'}`)})
                   </span>
                 </div>
               </label>
@@ -423,20 +438,20 @@ export function CapsuleBuilderModal({
 
         {selectedGarmentIds.length > 0 && (
           <div>
-            <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            <h3 className="text-sm font-medium text-ink-soft">
               {t('wardrobe.capsules.garmentOrder')}
             </h3>
             <ul className="mt-2 space-y-2" data-testid="capsule-garment-ordering-list">
               {selectedGarmentIds.map((garmentId, index) => {
-                const label = describeGarment(garmentsById.get(garmentId), index + 1)
+                const label = describeGarment(t, garmentsById.get(garmentId), index + 1)
                 return (
                   <li
                     key={garmentId}
-                    className="flex items-center justify-between rounded-lg border border-zinc-200 p-2 text-sm dark:border-zinc-800"
+                    className="flex items-center justify-between rounded-lg border border-line p-2 text-sm"
                     data-testid={`ordered-garment-item-${garmentId}`}
                   >
                     <span className="font-medium capitalize">
-                      {index + 1}. {garmentsById.get(garmentId)?.category ?? 'Garment'}
+                      {index + 1}. {orderedCategoryLabel(garmentsById.get(garmentId))}
                     </span>
                     <div className="flex items-center space-x-1">
                       <button
@@ -446,7 +461,7 @@ export function CapsuleBuilderModal({
                         aria-label={t('wardrobe.capsules.moveGarmentUp', {
                           garment: label,
                         })}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-zinc-300 px-2 py-1 text-xs focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:opacity-30 dark:border-zinc-700"
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-line-strong bg-page px-2 py-1 text-xs text-ink disabled:opacity-30"
                         data-testid={`move-up-button-${garmentId}`}
                       >
                         ▲
@@ -458,7 +473,7 @@ export function CapsuleBuilderModal({
                         aria-label={t('wardrobe.capsules.moveGarmentDown', {
                           garment: label,
                         })}
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-zinc-300 px-2 py-1 text-xs focus:ring-2 focus:ring-black focus:ring-offset-1 disabled:opacity-30 dark:border-zinc-700"
+                        className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-line-strong bg-page px-2 py-1 text-xs text-ink disabled:opacity-30"
                         data-testid={`move-down-button-${garmentId}`}
                       >
                         ▼
@@ -471,35 +486,32 @@ export function CapsuleBuilderModal({
           </div>
         )}
 
-        <div className="flex min-h-[44px] items-center space-x-2">
+        <div className="flex min-h-11 items-center space-x-2">
           <input
             id="capsule-favorite-checkbox"
             type="checkbox"
             checked={isFavorite}
             onChange={(event) => setIsFavorite(event.target.checked)}
-            className="h-5 w-5 rounded border-zinc-300 text-black focus:ring-2 focus:ring-black focus:ring-offset-2"
+            className="h-5 w-5 rounded-md border-line-strong accent-ink"
             data-testid="capsule-favorite-checkbox"
           />
-          <label
-            htmlFor="capsule-favorite-checkbox"
-            className="text-sm text-zinc-700 dark:text-zinc-300"
-          >
+          <label htmlFor="capsule-favorite-checkbox" className="text-sm text-ink-soft">
             {t('wardrobe.capsules.favoriteLabel')}
           </label>
         </div>
 
-        <div className="flex items-center justify-end space-x-3 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <div className="flex items-center justify-end space-x-3 border-t border-line pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink hover:bg-card"
           >
-            {t('common.cancel', 'Cancel')}
+            {t('wardrobe.capsules.cancel')}
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-inverse px-4 py-2 text-sm font-medium text-on-inverse hover:bg-inverse/90 disabled:opacity-50"
             data-testid="save-capsule-button"
           >
             {isSubmitting

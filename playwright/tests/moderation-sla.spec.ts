@@ -350,7 +350,7 @@ test.describe('P-SLA: the page', () => {
     const link = page.locator(`a[href="/moderation/cases/${seeded.caseId}"]`).first()
     await expect(link).toBeVisible()
     await link.click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
   })
 
   test('[P0] P-SLA-AXE passes axe on the live page, in light and dark', async ({

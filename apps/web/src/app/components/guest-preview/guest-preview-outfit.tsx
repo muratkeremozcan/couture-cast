@@ -27,6 +27,7 @@ export function GuestPreviewOutfit({
   onResetChoices,
   heading,
   continuation,
+  nested = false,
 }: {
   result: SampleOutfitResult
   strings: GuestPreviewStrings
@@ -40,7 +41,14 @@ export function GuestPreviewOutfit({
   onResetChoices: () => void
   heading?: string
   continuation?: React.ReactNode
+  /**
+   * Story CC-7.9 D7: true where a parent card already holds the outfit (Home's hero), so it
+   * renders as a plain section; on /preview it is its own card.
+   */
+  nested?: boolean
 }) {
+  const cardSurface = nested ? undefined : 'card'
+  const cardClass = nested ? '' : 'rounded-xl border border-line bg-card'
   const look = result.look
   const hasSwaps = hasAppliedSampleSwaps(result)
   const explanation = result.explanation.map((item) =>
@@ -52,12 +60,10 @@ export function GuestPreviewOutfit({
       <section
         data-testid="guest-preview-empty"
         aria-labelledby="guest-preview-empty-heading"
-        className="space-y-4 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-6"
+        data-surface={cardSurface}
+        className={`space-y-4 ${nested ? '' : 'p-6'} ${cardClass}`}
       >
-        <h2
-          id="guest-preview-empty-heading"
-          className="lookbook-display text-xl font-semibold"
-        >
+        <h2 id="guest-preview-empty-heading" className="text-xl font-semibold">
           {result.reason === 'all-disliked'
             ? strings.outfit.allDisliked
             : strings.outfit.noEligible}
@@ -67,7 +73,7 @@ export function GuestPreviewOutfit({
             type="button"
             onClick={onReviewChoices}
             data-testid="guest-preview-review-choices"
-            className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold"
+            className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
           >
             {strings.outfit.reviewChoices}
           </button>
@@ -75,7 +81,7 @@ export function GuestPreviewOutfit({
             type="button"
             onClick={onResetChoices}
             data-testid="guest-preview-reset-choices"
-            className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+            className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
           >
             {strings.outfit.resetChoices}
           </button>
@@ -90,12 +96,13 @@ export function GuestPreviewOutfit({
       aria-labelledby="guest-preview-outfit-heading"
       data-testid="guest-preview-outfit"
       data-look-id={look.id}
-      className="space-y-5 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-5 sm:p-6"
+      data-surface={cardSurface}
+      className={`space-y-5 ${nested ? '' : 'p-5 sm:p-6'} ${cardClass}`}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           {(heading || !hasSwaps) && (
-            <p className="lookbook-metrics text-xs uppercase tracking-[0.12em] text-[#8A691F]">
+            <p className="text-xs uppercase tracking-[0.12em] text-ink-muted">
               {heading ?? strings.outfit.heading}
             </p>
           )}
@@ -103,15 +110,15 @@ export function GuestPreviewOutfit({
             id="guest-preview-outfit-heading"
             tabIndex={-1}
             data-testid="guest-preview-look-name"
-            className="lookbook-display text-2xl font-semibold text-[#111111]"
+            className="text-2xl font-semibold text-ink"
           >
             {hasSwaps ? strings.outfit.heading : lookText.name}
           </h2>
-          {!hasSwaps && <p className="text-sm text-[#36363D]">{lookText.description}</p>}
+          {!hasSwaps && <p className="text-sm text-ink-soft">{lookText.description}</p>}
         </div>
         <span
           data-testid="guest-preview-weather-chip"
-          className="lookbook-metrics rounded-full border border-[#E6E6ED] bg-[#F5F5F7] px-3 py-1 text-xs text-[#111111]"
+          className="rounded-full border border-line bg-page px-3 py-1 text-xs text-ink"
         >
           {strings.values.weather[result.context.weather]}
         </span>
@@ -124,7 +131,7 @@ export function GuestPreviewOutfit({
           onClick={onTryAnother}
           data-testid="guest-preview-try-another"
           data-primary-action="true"
-          className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+          className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
         >
           {strings.outfit.tryAnother}
         </button>
@@ -132,14 +139,14 @@ export function GuestPreviewOutfit({
           <p
             role="status"
             data-testid="guest-preview-no-alternative"
-            className="text-sm text-[#36363D]"
+            className="text-sm text-ink-soft"
           >
             {strings.outfit.noAlternative}
           </p>
         ) : null}
       </div>
 
-      <p className="text-xs text-[#5C5C66]">{strings.styleIdeas.illustrations}</p>
+      <p className="text-xs text-ink-muted">{strings.styleIdeas.illustrations}</p>
       <ul
         data-testid="guest-preview-garments"
         className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-3 sm:grid-cols-3"
@@ -152,20 +159,20 @@ export function GuestPreviewOutfit({
               key={garment.category}
               data-testid="guest-preview-garment"
               data-garment-id={garment.id}
-              className="flex flex-col items-center gap-2 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-3 text-center"
+              className="flex flex-col items-center gap-2 rounded-lg border border-line bg-page p-3 text-center"
             >
               <SampleGarmentArt
                 garment={garment}
                 label={text.description}
                 className="h-auto w-20 max-w-full"
               />
-              <span className="text-sm font-medium text-[#111111]">{text.name}</span>
+              <span className="text-sm font-medium text-ink">{text.name}</span>
               <button
                 type="button"
                 onClick={(event) => onSwap(garment.category, event.currentTarget)}
                 data-testid={`guest-preview-swap-${garment.category}`}
                 aria-label={`${formatPreviewString(strings.outfit.swap, { category })}: ${text.name}`}
-                className="min-h-11 rounded-lg border border-[#C9C9D1] bg-[#FFFFFF] px-3 text-xs font-semibold text-[#111111] hover:border-[#C9A14A]"
+                className="min-h-11 rounded-lg border border-line-strong bg-page px-3 text-xs font-semibold text-ink hover:border-ink"
               >
                 {formatPreviewString(strings.outfit.swap, { category })}
               </button>
@@ -175,13 +182,11 @@ export function GuestPreviewOutfit({
       </ul>
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold text-[#111111]">
-          {strings.outfit.whyThisWorks}
-        </h3>
+        <h3 className="text-sm font-semibold text-ink">{strings.outfit.whyThisWorks}</h3>
         <ul
           data-testid="guest-preview-explanation"
           aria-live="polite"
-          className="list-disc space-y-1 pl-5 text-sm text-[#36363D]"
+          className="list-disc space-y-1 pl-5 text-sm text-ink-soft"
         >
           {explanation.map((line, index) => (
             <li key={`${result.explanation[index]?.key}-${index}`}>{line}</li>
@@ -195,7 +200,7 @@ export function GuestPreviewOutfit({
             type="button"
             onClick={onUndoSwaps}
             data-testid="guest-preview-undo-swaps"
-            className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold"
+            className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
           >
             {strings.outfit.undoSwaps}
           </button>
@@ -205,7 +210,7 @@ export function GuestPreviewOutfit({
             type="button"
             onClick={onBrowseWardrobe}
             data-testid="guest-preview-browse-wardrobe"
-            className="min-h-11 rounded-lg px-2 text-sm font-semibold text-[#8A691F] underline underline-offset-4"
+            className="min-h-11 rounded-lg px-2 text-sm font-semibold text-ink underline underline-offset-4"
           >
             {strings.outfit.browseWardrobe}
           </button>

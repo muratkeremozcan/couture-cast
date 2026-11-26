@@ -132,11 +132,14 @@ describe('shard resolver auth modes', () => {
 
 describe('pr-mobile-e2e.yml signed-out lane', () => {
   const rows = matrixRows(job.strategy.matrix)
-  const member = rows.filter((row) => row.auth === 'member')
+  // Story CC-7.9: the visual row is a member row outside the packed suite (lane: visual);
+  // scripts/ci/maestro-visual-lane.test.mjs holds it.
+  const member = rows.filter((row) => row.auth === 'member' && !row.lane)
   const signedOut = rows.filter((row) => row.auth === 'signed-out')
+  const visual = rows.filter((row) => row.lane === 'visual')
 
   test('nine member shards, one signed-out shard, each row a distinct shard number', () => {
-    assert.equal(rows.length, member.length + signedOut.length)
+    assert.equal(rows.length, member.length + signedOut.length + visual.length)
     assert.equal(member.length, Number(job.env.MAESTRO_MEMBER_SHARDS))
     assert.equal(signedOut.length, 1)
     const shards = rows.map((row) => row.shard)

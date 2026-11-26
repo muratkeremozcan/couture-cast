@@ -56,10 +56,10 @@ export function GuestPreviewSwapDialog({
             return (
               <label
                 key={garment.id}
-                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-2 p-2 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#C9A14A] ${
-                  current
-                    ? 'border-[#C9A14A]'
-                    : 'border-zinc-300 hover:border-[#C9A14A] dark:border-zinc-600'
+                // Story CC-7.9 D3: the current garment is marked with `inverse`; the radio itself
+                // takes the global focus ring.
+                className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border-2 p-2 ${
+                  current ? 'border-inverse' : 'border-line-strong hover:border-ink'
                 }`}
               >
                 <input
@@ -69,16 +69,16 @@ export function GuestPreviewSwapDialog({
                   checked={current}
                   onChange={() => onChoose(garment.id)}
                   data-testid={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
-                  className="h-5 w-5 accent-[#C9A14A]"
+                  className="h-5 w-5 accent-ink"
                 />
-                {/* A light tile keeps dark garments visible in the dark theme. */}
-                <span className="rounded-md bg-[#F5F5F7] p-1">
+                {/* A muted tile sets the art off the dialog; its outline follows `ink`. */}
+                <span className="rounded-md bg-card-muted p-1">
                   <SampleGarmentArt garment={garment} className="h-11 w-11" />
                 </span>
                 <span className="flex-1 text-sm">
                   {text.name}
                   {current ? (
-                    <span className="ml-2 text-xs text-zinc-600 dark:text-zinc-300">
+                    <span className="ml-2 text-xs text-ink-muted">
                       ({strings.outfit.current})
                     </span>
                   ) : null}

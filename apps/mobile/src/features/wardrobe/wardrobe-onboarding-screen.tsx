@@ -22,7 +22,7 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 
-import { Text, View } from '@/components/themed'
+import { Text, View, createSchemeStyles, useSchemeColors } from '@/components/themed'
 import { MobileGarmentCaptureModal } from '@/components/wardrobe/garment-capture-modal'
 import { MobileGarmentTaggingModal } from '@/components/wardrobe/garment-tagging-modal'
 import { SilhouetteEditor } from '@/components/wardrobe/silhouette-editor'
@@ -52,6 +52,8 @@ function uiPhaseFor(step: string): UiPhase {
 // eslint-disable-next-line complexity
 export function WardrobeOnboardingScreen() {
   const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const themed = useThemedStyles()
   const { announce } = useAccessibilityAnnouncer()
 
   const [isLoading, setIsLoading] = useState(true)
@@ -71,7 +73,9 @@ export function WardrobeOnboardingScreen() {
   const userIdRef = useRef('')
   const revisionRef = useRef(0)
   const pollAbortRef = useRef<AbortController | null>(null)
-  const headingRef = useRef<ElementRef<typeof RNText> | null>(null)
+  // Story CC-7.9 D6: the stack's AppTopBar names the screen, so each step's first line takes the
+  // accessibility focus on a step change (the capture step has no intro line: its first control).
+  const stepFocusRef = useRef<ElementRef<typeof RNText> | null>(null)
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
 
   const load = useCallback(async () => {
@@ -79,7 +83,7 @@ export function WardrobeOnboardingScreen() {
     setLoadError(null)
     try {
       const token = await resolveMobileAccessToken()
-      if (!token) throw new Error('AUTHENTICATION_REQUIRED')
+      if (!token) throw new Error(t('wardrobe.error.sign_in_required'))
       setAccessToken(token)
       userIdRef.current = await resolveOwnerUserId(token)
 
@@ -120,7 +124,9 @@ export function WardrobeOnboardingScreen() {
 
   useEffect(() => {
     if (isLoading || Platform.OS === 'web') return
-    const node = safeFindNodeHandle(headingRef.current)
+    const node = safeFindNodeHandle(
+      phase === 'capture' ? addGarmentButtonRef.current : stepFocusRef.current
+    )
     if (node) AccessibilityInfo.setAccessibilityFocus(node)
   }, [phase, isLoading])
 
@@ -253,16 +259,16 @@ export function WardrobeOnboardingScreen() {
   if (loadError) {
     return (
       <View style={styles.screen} testID="wardrobe-onboarding-screen-error">
-        <View accessibilityRole="alert" style={styles.errorBox}>
+        <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
           <Text>{loadError}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
           testID="onboarding-load-retry"
-          style={styles.primaryButton}
+          style={[styles.primaryButton, themed.primaryButton]}
           onPress={() => void load()}
         >
-          <Text style={styles.primaryButtonText}>
+          <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
             {t('common.retry', { defaultValue: 'Retry' })}
           </Text>
         </Pressable>
@@ -272,19 +278,15 @@ export function WardrobeOnboardingScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.screen} testID="wardrobe-onboarding-screen">
-      <RNText ref={headingRef} accessibilityRole="header" style={styles.title}>
-        {t('wardrobe.onboarding.title')}
-      </RNText>
-
       {advanceError ? (
-        <View accessibilityRole="alert" style={styles.errorBox}>
+        <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
           <Text>{advanceError}</Text>
           <Pressable
             accessibilityRole="button"
             testID="onboarding-advance-retry"
             onPress={() => void retryAdvance()}
           >
-            <Text style={styles.link}>
+            <Text style={[styles.link, themed.link]}>
               {t('common.retry', { defaultValue: 'Retry' })}
             </Text>
           </Pressable>
@@ -293,20 +295,22 @@ export function WardrobeOnboardingScreen() {
 
       {phase === 'permission' ? (
         <View testID="onboarding-permission-step">
-          <Text style={styles.body}>{t('wardrobe.onboarding.permission_body')}</Text>
+          <RNText ref={stepFocusRef} style={[styles.body, { color: colors.ink }]}>
+            {t('wardrobe.onboarding.permission_body')}
+          </RNText>
           {permissionDenied ? (
-            <View accessibilityRole="alert" style={styles.errorBox}>
+            <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>
               <Text>{t('wardrobe.onboarding.permission_denied')}</Text>
             </View>
           ) : null}
           <Pressable
             accessibilityRole="button"
             testID="onboarding-request-permission"
-            style={styles.primaryButton}
+            style={[styles.primaryButton, themed.primaryButton]}
             disabled={isAdvancing}
             onPress={() => void requestPermissionsAndContinue()}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
               {t('wardrobe.onboarding.permission_title')}
             </Text>
           </Pressable>
@@ -343,7 +347,9 @@ export function WardrobeOnboardingScreen() {
                       testID={`onboarding-tag-${garment.id}`}
                       onPress={() => setTaggingGarmentId(garment.id)}
                     >
-                      <Text style={styles.link}>{t('wardrobe.tagging.needs_tags')}</Text>
+                      <Text style={[styles.link, themed.link]}>
+                        {t('wardrobe.tagging.needs_tags')}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -355,10 +361,10 @@ export function WardrobeOnboardingScreen() {
             ref={addGarmentButtonRef}
             accessibilityRole="button"
             testID="onboarding-add-garment"
-            style={styles.primaryButton}
+            style={[styles.primaryButton, themed.primaryButton]}
             onPress={() => setIsCaptureOpen(true)}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
               {garments.length === 0
                 ? t('wardrobe.add_garment')
                 : t('wardrobe.onboarding.add_another')}
@@ -372,7 +378,7 @@ export function WardrobeOnboardingScreen() {
               disabled={isAdvancing}
               onPress={useStarterWardrobe}
             >
-              <Text style={styles.link}>
+              <Text style={[styles.link, themed.link]}>
                 {t('wardrobe.onboarding.use_starter_wardrobe')}
               </Text>
             </Pressable>
@@ -386,11 +392,12 @@ export function WardrobeOnboardingScreen() {
               testID="onboarding-continue"
               style={[
                 styles.primaryButton,
+                themed.primaryButton,
                 (!canContinueFromCapture || isAdvancing) && styles.disabledButton,
               ]}
               onPress={() => void advanceTo('silhouette')}
             >
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
                 {t('wardrobe.onboarding.continue')}
               </Text>
             </Pressable>
@@ -405,10 +412,10 @@ export function WardrobeOnboardingScreen() {
             accessibilityRole="button"
             testID="onboarding-finish"
             disabled={isAdvancing}
-            style={styles.primaryButton}
+            style={[styles.primaryButton, themed.primaryButton]}
             onPress={() => void advanceTo('complete')}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
               {t('wardrobe.onboarding.continue')}
             </Text>
           </Pressable>
@@ -417,14 +424,16 @@ export function WardrobeOnboardingScreen() {
 
       {phase === 'complete' ? (
         <View testID="onboarding-complete-step">
-          <Text style={styles.body}>{t('wardrobe.onboarding.complete')}</Text>
+          <RNText ref={stepFocusRef} style={[styles.body, { color: colors.ink }]}>
+            {t('wardrobe.onboarding.complete')}
+          </RNText>
           <Pressable
             accessibilityRole="button"
             testID="onboarding-done"
-            style={styles.primaryButton}
+            style={[styles.primaryButton, themed.primaryButton]}
             onPress={() => router.replace('/wardrobe')}
           >
-            <Text style={styles.primaryButtonText}>
+            <Text style={[styles.primaryButtonText, themed.primaryButtonText]}>
               {t('common.done', { defaultValue: 'Done' })}
             </Text>
           </Pressable>
@@ -456,10 +465,9 @@ export function WardrobeOnboardingScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, padding: 20, gap: 16 },
-  title: { fontSize: 28, fontWeight: '700' },
   body: { marginBottom: 12 },
-  errorBox: { borderRadius: 12, backgroundColor: '#FEE2E2', padding: 12, gap: 8 },
-  link: { color: '#8A5A00', fontWeight: '700', paddingVertical: 8 },
+  errorBox: { borderRadius: 12, padding: 12, gap: 8 },
+  link: { fontWeight: '700', paddingVertical: 8 },
   checklistRow: {
     minHeight: 44,
     flexDirection: 'row',
@@ -472,10 +480,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#111111',
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   disabledButton: { opacity: 0.4 },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '700' },
+  primaryButtonText: { fontWeight: '700' },
 })
+
+/**
+ * Story CC-7.9 D2: the OS light/dark roles for the layout above. The buttons were always black
+ * on white and the error box always light; now both follow the scheme.
+ */
+const useThemedStyles = createSchemeStyles((colors) => ({
+  errorBox: { backgroundColor: colors.dangerSurface },
+  link: { color: colors.ink },
+  primaryButton: { backgroundColor: colors.inverse },
+  primaryButtonText: { color: colors.onInverse },
+}))

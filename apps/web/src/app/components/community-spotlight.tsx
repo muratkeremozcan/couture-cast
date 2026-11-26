@@ -29,10 +29,6 @@ import {
   getCommunitySpotlightFromWeb,
 } from '../../lib/community'
 
-const MERLOT = '#7A1F2D'
-/** Merlot as text or a border: globals.css gives it a dark-mode value that reads on the dark surface. */
-const MERLOT_INK = 'var(--lookbook-merlot-ink)'
-
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
 export type CommunitySpotlightStatus = 'idle' | 'loading' | 'ready' | 'disabled' | 'error'
@@ -522,7 +518,7 @@ function SpotlightStates({
     return (
       <p
         data-testid="community-spotlight-disabled"
-        className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-xs text-[color:var(--theme-card-text)]"
+        className="rounded-md border border-line bg-card p-4 text-xs text-ink"
       >
         {t('community.spotlight.disabled')}
       </p>
@@ -532,16 +528,14 @@ function SpotlightStates({
     return (
       <div
         data-testid="community-spotlight-error"
-        style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
-        className="flex items-center justify-between gap-3 rounded-[8px] border bg-[var(--theme-card-bg)] p-4 text-xs"
+        className="flex items-center justify-between gap-3 rounded-md border border-merlot-ink bg-card p-4 text-xs text-merlot-ink"
       >
         <span>{t('community.spotlight.error')}</span>
         <button
           type="button"
           data-testid="community-spotlight-retry-button"
           onClick={onRetry}
-          style={{ backgroundColor: MERLOT }}
-          className="min-h-[44px] rounded-md px-3 py-1 text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)]"
+          className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3 py-1 text-xs font-semibold"
         >
           {t('community.spotlight.retry')}
         </button>
@@ -551,14 +545,13 @@ function SpotlightStates({
   return (
     <div
       data-testid="community-spotlight-empty"
-      className="flex flex-col items-center justify-center rounded-[8px] border border-dashed border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-8 text-center"
+      data-surface="card"
+      className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-8 text-center"
     >
-      <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
+      <p className="text-sm font-semibold text-theme-card-text">
         {t('community.spotlight.emptyTitle')}
       </p>
-      <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
-        {t('community.spotlight.emptyBody')}
-      </p>
+      <p className="mt-1 text-xs text-ink-muted">{t('community.spotlight.emptyBody')}</p>
     </div>
   )
 }
@@ -583,7 +576,7 @@ function SpotlightViewMore({
         data-testid="community-spotlight-view-more"
         disabled={state.loadingMore || state.status === 'loading'}
         onClick={onLoadMore}
-        className="min-h-[44px] whitespace-nowrap rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
+        className="min-h-11 whitespace-nowrap rounded-full border border-line-strong bg-page text-ink px-6 py-2 text-xs font-semibold uppercase tracking-wider disabled:opacity-50"
       >
         {state.loadingMore
           ? t('community.spotlight.loadingMore')
@@ -633,7 +626,7 @@ function SpotlightRow({
                 </span>
                 <span
                   aria-hidden="true"
-                  className="lookbook-metrics pointer-events-none absolute right-3 top-3 z-10 rounded-md bg-[#111111] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm"
+                  className="pointer-events-none absolute right-3 top-3 z-10 rounded-md bg-inverse px-3 py-1 text-xs font-semibold text-on-inverse shadow-card"
                 >
                   #{item.rank}
                 </span>
@@ -648,8 +641,7 @@ function SpotlightRow({
       {state.moreFailed && (
         <p
           data-testid="community-spotlight-more-error"
-          style={{ color: MERLOT_INK }}
-          className="text-center text-xs"
+          className="text-center text-xs text-merlot-ink"
         >
           {t('community.spotlight.error')}
         </p>
@@ -691,24 +683,22 @@ export function CommunitySpotlightSection({
       aria-busy={state.status === 'loading' || state.loadingMore}
       data-testid="community-spotlight"
       data-level={ready ? state.level : undefined}
-      className="flex min-w-0 flex-col gap-4 border-b border-[color:var(--theme-card-border)] pb-6"
+      className="flex min-w-0 flex-col gap-4 border-b border-line pb-6"
     >
       <div className="flex flex-col gap-1">
-        <span className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--theme-card-text)]">
+        <span className="text-xs uppercase tracking-widest text-ink-muted">
           {t('community.spotlight.eyebrow')}
         </span>
         <h2
           id="community-spotlight-heading"
           data-testid="community-spotlight-heading"
-          className="lookbook-display text-xl font-semibold text-[color:var(--theme-primary)]"
+          className="text-xl font-semibold text-ink"
         >
           {hasArea
             ? t('community.spotlight.heading', { area: state.label })
             : t('community.spotlight.headingFallback')}
         </h2>
-        <p className="text-xs text-[color:var(--theme-card-text)]">
-          {t('community.spotlight.intro')}
-        </p>
+        <p className="text-xs text-ink-soft">{t('community.spotlight.intro')}</p>
       </div>
 
       {ready && !showEmpty ? (

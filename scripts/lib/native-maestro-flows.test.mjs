@@ -8,6 +8,7 @@ import {
   NATIVE_MAESTRO_FLOWS,
   assertGenericMaestroFlows,
   discoverRunnableMaestroFlows,
+  VISUAL_MAESTRO_FLOWS,
 } from './native-maestro-flows.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -19,16 +20,19 @@ describe('native-only Maestro flows', () => {
     assert.equal(fs.existsSync(path.join(root, 'maestro', native)), true)
   })
 
-  test('generic run-maestro discovery keeps every other root flow and drops the native one', () => {
+  // Story CC-7.9: the visual snapshot flow is left out too; it runs only when named, in the
+  // small_phone shard (scripts/ci/maestro-visual-lane.test.mjs).
+  test('generic run-maestro discovery keeps every other root flow and drops the native and visual ones', () => {
     const flows = discoverRunnableMaestroFlows(root)
     const roots = fs
       .readdirSync(path.join(root, 'maestro'))
       .filter((name) => /\.ya?ml$/.test(name))
     assert.equal(flows.includes(`maestro/${native}`), false)
+    assert.equal(flows.includes('maestro/shell-visual-snapshots.yaml'), false)
     assert.deepEqual(
       flows,
       roots
-        .filter((name) => name !== native)
+        .filter((name) => name !== native && !VISUAL_MAESTRO_FLOWS.has(name))
         .map((name) => `maestro/${name}`)
         .sort()
     )

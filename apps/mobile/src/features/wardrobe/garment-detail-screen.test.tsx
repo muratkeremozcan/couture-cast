@@ -27,15 +27,11 @@ const routerMock = vi.hoisted(() => ({
 }))
 vi.mock('expo-router', () => ({
   router: routerMock,
-  // The stack header is native chrome; render its title and back control inline.
+  // The stack header is native chrome (Story CC-7.9 D6: the shared AppTopBar, whose back control
+  // is covered in app-top-bar.test.tsx); render the title the screen hands it inline.
   Stack: {
-    Screen: ({
-      options,
-    }: {
-      options: { title?: string; headerLeft?: () => React.ReactNode }
-    }) => (
+    Screen: ({ options }: { options: { title?: string } }) => (
       <div data-testid="stack-header">
-        {options.headerLeft?.()}
         <span data-testid="stack-header-title">{options.title}</span>
       </div>
     ),
@@ -309,7 +305,7 @@ describe('GarmentDetailScreen', () => {
     vi.clearAllMocks()
   })
 
-  it('[P0] [7.5-NAT-003] shows back, the labeled photo, the tags, Edit tags and Style this piece', async () => {
+  it('[P0] [7.5-NAT-003] [7.9 D6] titles the header, shows the labeled photo, the tags, Edit tags and Style this piece', async () => {
     renderDetail()
 
     const detail = await screen.findByTestId('garment-detail')
@@ -322,19 +318,8 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-comfort').textContent).toBe('Mild')
     expect(await editTagsButton()).toHaveAttribute('data-testid', 'garment-edit-tags')
     expect(tag('style-piece-open')).toBeVisible()
-
-    await browserUser.click(tag('garment-detail-back'))
-    expect(routerMock.back).toHaveBeenCalledTimes(1)
-  })
-
-  it('[P1] [7.5-NAT-003] back with no history returns to the closet tab', async () => {
-    routerMock.canGoBack.mockReturnValueOnce(false)
-    renderDetail()
-
-    await browserUser.click(await screen.findByTestId('garment-detail-back'))
-
-    expect(routerMock.dismissTo).toHaveBeenCalledWith('/wardrobe')
-    expect(routerMock.back).not.toHaveBeenCalled()
+    // The header owns the title; the body repeats it in no heading of its own.
+    expect(within(detail).queryByRole('heading', { name: 'Blue top' })).toBeNull()
   })
 
   it.each([
@@ -353,7 +338,8 @@ describe('GarmentDetailScreen', () => {
       expect(await screen.findByTestId('garment-detail-missing')).toHaveTextContent(
         'This piece is no longer in your closet.'
       )
-      expect(tag('garment-detail-back')).toBeVisible()
+      // The stack header (title and back) stays registered on the missing state.
+      expect(tag('stack-header')).toBeInTheDocument()
     }
   )
 

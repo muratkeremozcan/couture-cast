@@ -43,15 +43,19 @@ vi.mock('posthog-js', () => ({
 import { AnalyticsEventActions } from './analytics-event-actions'
 
 describe('AnalyticsEventActions styles', () => {
-  it('applies expected utility classes to the primary CTA', () => {
+  // Story CC-7.9 D3: Home's one gold action is the sample entry (guest) or Open wardrobe
+  // (member), so this CTA is a neutral outline on the token roles and never paints gold.
+  it('styles the preview CTA as a neutral outline on the token roles', () => {
     render(<AnalyticsEventActions />)
 
     const primaryCta = screen.getByTestId('cta-primary')
     expect(primaryCta).toHaveClass(
-      'bg-amber-300',
-      'text-black',
+      'border-line-strong',
+      'text-ink',
       'rounded-full',
       'font-semibold'
     )
+    expect(primaryCta).not.toHaveClass('bg-primary')
+    expect(primaryCta).not.toHaveAttribute('data-gold')
   })
 })

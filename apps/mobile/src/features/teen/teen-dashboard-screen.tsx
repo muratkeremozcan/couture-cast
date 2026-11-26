@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { StyleSheet } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type { UserProfileResponse } from '@couture/api-client/contracts/http'
-import { Text, View } from '@/components/themed'
+import { createSchemeStyles, Text, View } from '@/components/themed'
 import { getUserProfileFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
@@ -9,18 +10,18 @@ type TeenDashboardScreenProps = {
   loadProfile?: () => Promise<UserProfileResponse>
 }
 
-function formatConsentDate(value: string | null) {
+function formatConsentDate(value: string | null, t: TFunction, locale: string) {
   if (!value) {
-    return 'Awaiting consent'
+    return t('guardian.consent.awaiting')
   }
 
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeZone: 'UTC',
   }).format(new Date(value))
 }
 
-function getConsentStatus(profile: UserProfileResponse) {
+function getConsentStatus(profile: UserProfileResponse, t: TFunction) {
   const hasGrantedGuardian = profile.linkedGuardians.some(
     (guardian) => guardian.status === 'granted'
   )
@@ -29,19 +30,21 @@ function getConsentStatus(profile: UserProfileResponse) {
   )
 
   if (hasGrantedGuardian) {
-    return 'Guardian consent granted'
+    return t('teen.dashboard.granted')
   }
 
   if (hasRevokedGuardian) {
-    return 'Guardian consent revoked'
+    return t('teen.dashboard.revoked')
   }
 
-  return 'Guardian consent pending'
+  return t('teen.dashboard.pending')
 }
 
 export function TeenDashboardScreen({
   loadProfile = getUserProfileFromMobile,
 }: TeenDashboardScreenProps) {
+  const { t, i18n } = useTranslation()
+  const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -65,7 +68,7 @@ export function TeenDashboardScreen({
       .catch((error) => {
         if (isMounted) {
           setErrorMessage(
-            error instanceof Error ? error.message : 'Unable to load dashboard'
+            error instanceof Error ? error.message : t('teen.dashboard.loadFailed')
           )
         }
       })
@@ -73,13 +76,13 @@ export function TeenDashboardScreen({
     return () => {
       isMounted = false
     }
-  }, [loadProfile])
+  }, [loadProfile, t])
 
   if (errorMessage) {
     return (
       <View style={styles.container}>
         <Text style={styles.title} accessibilityRole="header">
-          Teen dashboard
+          {t('teen.dashboard.title')}
         </Text>
         <Text
           testID="teen-dashboard-error"
@@ -96,42 +99,45 @@ export function TeenDashboardScreen({
   if (!profile) {
     return (
       <View style={styles.container}>
-        <Text style={styles.description}>Loading guardian consent status...</Text>
+        <Text style={styles.description}>{t('teen.dashboard.loading')}</Text>
       </View>
     )
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>Teen dashboard</Text>
+      <Text style={styles.eyebrow}>{t('teen.dashboard.title')}</Text>
       <Text style={styles.title} accessibilityRole="header">
         {profile.user.displayName ?? profile.user.email}
       </Text>
       <Text testID="teen-consent-status" style={styles.status}>
-        {getConsentStatus(profile)}
+        {getConsentStatus(profile, t)}
       </Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Linked guardians</Text>
+        <Text style={styles.sectionTitle}>{t('teen.dashboard.linkedGuardians')}</Text>
         {profile.linkedGuardians.length > 0 ? (
           profile.linkedGuardians.map((guardian) => (
             <View key={guardian.guardianId} style={styles.row}>
               <Text style={styles.rowTitle}>{guardian.guardianId}</Text>
-              <Text style={styles.rowMeta}>{guardian.status}</Text>
               <Text style={styles.rowMeta}>
-                {formatConsentDate(guardian.consentGrantedAt)}
+                {t(`guardian.consent.status.${guardian.status}`)}
+              </Text>
+              <Text style={styles.rowMeta}>
+                {formatConsentDate(guardian.consentGrantedAt, t, i18n.language)}
               </Text>
             </View>
           ))
         ) : (
-          <Text style={styles.description}>No guardian has accepted consent yet.</Text>
+          <Text style={styles.description}>{t('teen.dashboard.empty')}</Text>
         )}
       </View>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
+// Story CC-7.9 D2, D7: colors follow the OS scheme; each linked guardian is one card on the page.
+const useStyles = createSchemeStyles((colors) => ({
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -142,43 +148,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
-    color: '#fcd34d',
+    color: colors.inkMuted,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    lineHeight: 34,
+    lineHeight: 32,
   },
   status: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#bbf7d0',
+    color: colors.successInk,
   },
   description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#a3a3a3',
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.inkMuted,
   },
   errorMessage: {
-    fontSize: 13,
-    color: '#fecaca',
+    fontSize: 14,
+    color: colors.dangerInk,
   },
   section: {
     marginTop: 12,
-    gap: 10,
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: '#d4d4d4',
+    color: colors.inkSoft,
   },
   row: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    padding: 14,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
     gap: 4,
   },
   rowTitle: {
@@ -186,7 +193,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rowMeta: {
-    fontSize: 13,
-    color: '#a3a3a3',
+    fontSize: 14,
+    color: colors.inkMuted,
   },
-})
+}))

@@ -9,7 +9,7 @@ it('puts the top-level destinations in keyboard order and offers a sample on Hom
   const user = userEvent.setup()
   render(<Home />)
 
-  const primary = within(screen.getByRole('navigation', { name: 'Primary' }))
+  const primary = within(screen.getByRole('navigation', { name: 'Main navigation' }))
   for (const [name, href] of [
     ['Home', '/'],
     ['Wardrobe', '/wardrobe'],

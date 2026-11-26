@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 
 import Colors, { type SchemeColors } from '@/constants/colors'
+import { resolveScheme } from '@/src/theme/tokens'
 
 type ThemeProps = {
   lightColor?: string
@@ -22,9 +23,9 @@ export type ViewProps = ThemeProps & DefaultView['props']
 
 export function useThemeColor(
   props: { light?: string; dark?: string },
-  colorName: keyof (typeof Colors)['light']
+  colorName: keyof SchemeColors
 ) {
-  const theme = useColorScheme() === 'dark' ? 'dark' : 'light'
+  const theme = resolveScheme(useColorScheme())
   const colorFromProps = props[theme]
 
   if (colorFromProps) {
@@ -34,9 +35,9 @@ export function useThemeColor(
   }
 }
 
-/** The OS scheme's chrome tokens (`constants/colors.ts`), for styles a themed View or Text cannot carry. */
-export function useSchemeColors() {
-  return Colors[useColorScheme() === 'dark' ? 'dark' : 'light']
+/** The OS scheme's color roles (Story CC-7.9 D2), for styles a themed View or Text cannot carry. */
+export function useSchemeColors(): SchemeColors {
+  return Colors[resolveScheme(useColorScheme())]
 }
 
 /**
@@ -49,23 +50,20 @@ export function createSchemeStyles<T extends StyleSheet.NamedStyles<T>>(
   const light = StyleSheet.create(factory(Colors.light))
   const dark = StyleSheet.create(factory(Colors.dark))
   return function useSchemeStyles() {
-    return useColorScheme() === 'dark' ? dark : light
+    return resolveScheme(useColorScheme()) === 'dark' ? dark : light
   }
 }
 
 export function Text(props: TextProps) {
   const { style, lightColor, darkColor, ...otherProps } = props
-  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text')
+  const color = useThemeColor({ light: lightColor, dark: darkColor }, 'ink')
 
   return <DefaultText style={[{ color }, style]} {...otherProps} />
 }
 
 export function View(props: ViewProps) {
   const { style, lightColor, darkColor, ...otherProps } = props
-  const backgroundColor = useThemeColor(
-    { light: lightColor, dark: darkColor },
-    'background'
-  )
+  const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, 'page')
 
   return <DefaultView style={[{ backgroundColor }, style]} {...otherProps} />
 }

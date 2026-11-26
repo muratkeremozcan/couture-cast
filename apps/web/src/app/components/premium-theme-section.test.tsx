@@ -6,15 +6,22 @@
 // the bearer header, the PUT body and the contract parsing are exercised by the same
 // tests that cover the UI states. Nothing is mocked: `data-theme` on `<html>` is a real
 // DOM write, which is exactly what AC 4 is about.
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import axe from 'axe-core'
 import { I18nextProvider } from 'react-i18next'
 import { http, HttpResponse } from 'msw'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { contrastRatio, meetsWcagAA } from '@couture/utils'
+import {
+  buildDesignTokenCssRules,
+  colorRoles,
+  contrastRatio,
+  kebabTokenName,
+  meetsWcagAA,
+  PREMIUM_PALETTE_FIELDS,
+  PREMIUM_PALETTE_KEYS,
+  premiumPalettes,
+  type ColorScheme,
+} from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -85,53 +92,41 @@ async function drainSettledResponses(): Promise<void> {
 }
 
 /*
- * Resolved through `fileURLToPath` on the string form rather than `new URL(...)`.
- * The jsdom environment replaces the global `URL`, and `node:fs` refuses an instance
- * of a class that is not its own, so the object form fails at runtime here.
+ * Story CC-7.9 D5: the palette variables are no longer hand-written in `globals.css`. The
+ * Tailwind token plugin emits them from `@couture/utils` (`buildDesignTokenCssRules`), as
+ * `--cc-theme-*` channel triples for `:root`, each `[data-theme]` and the dark media query.
+ * These tests install the light rules exactly as the plugin emits them, so the selector text
+ * and values are the plugin's own rather than a second copy here. The dark rules sit behind a
+ * media query jsdom does not evaluate; their contrast is pinned in `design-tokens.spec.ts`.
  */
-const CSS = readFileSync(
-  join(dirname(fileURLToPath(import.meta.url)), '..', 'globals.css'),
-  'utf8'
+const TOKEN_RULES = buildDesignTokenCssRules()
+
+/** The plugin's light rules (every selector outside the dark media query), as CSS text. */
+const PALETTE_RULES = Object.entries(TOKEN_RULES)
+  .filter(([selector]) => !selector.startsWith('@'))
+  .map(([selector, declarations]) => ({
+    selector,
+    body: Object.entries(declarations as Record<string, string>)
+      .map(([property, value]) => `${property}: ${value};`)
+      .join(' '),
+  }))
+
+const PALETTE_PROPERTIES = PREMIUM_PALETTE_FIELDS.map(
+  (field) => `--cc-theme-${kebabTokenName(field)}`
 )
 
-/**
- * The palette rules exactly as `globals.css` writes them, selector text included.
- *
- * The leading `:root,` on the Default block is load-bearing: `<html>` carries an empty
- * `data-theme` for Default, so `:root` is the rule that has to supply those values.
- * Comments are stripped first: the block comment above these rules contains no braces,
- * so it would otherwise be swept into the first selector.
- */
-const PALETTE_RULES = [
-  ...CSS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g),
-]
-  .map(([, selector = '', body = '']) => ({ selector: selector.trim(), body }))
-  .filter((rule) => rule.selector.includes('[data-theme='))
-
+/** Each palette's five carriers as the plugin emits them for the light scheme. */
 function paletteBlocks(): Map<string, Record<string, string>> {
   const blocks = new Map<string, Record<string, string>>()
-  for (const { selector, body } of PALETTE_RULES) {
-    const name = /\[data-theme='([a-z_]+)'\]/.exec(selector)?.[1] ?? ''
-    const declarations: Record<string, string> = {}
-    for (const line of body.split(';')) {
-      const [property, ...rest] = line.split(':')
-      if (!property?.trim().startsWith('--')) continue
-      declarations[property.trim()] = rest.join(':').trim()
-    }
-    blocks.set(name, declarations)
+  for (const [selector, declarations] of Object.entries(TOKEN_RULES)) {
+    const name = /^\[data-theme='([a-z_]+)'\]$/.exec(selector)?.[1]
+    if (!name) continue
+    blocks.set(name, { ...(declarations as Record<string, string>) })
   }
   return blocks
 }
 
 const BLOCKS = paletteBlocks()
-
-const PALETTE_PROPERTIES = [
-  '--theme-primary',
-  '--theme-secondary',
-  '--theme-card-bg',
-  '--theme-card-text',
-  '--theme-card-border',
-] as const
 
 /**
  * Puts the real palette rules in the test document.
@@ -153,10 +148,10 @@ function installPaletteStyles(): HTMLStyleElement {
  * The palette an element actually resolves, following custom-property inheritance.
  *
  * jsdom runs the cascade but does not inherit custom properties, so `getComputedStyle`
- * answers empty for `--theme-*` on any element that does not itself match one of the
+ * answers empty for `--cc-theme-*` on any element that does not itself match one of the
  * installed `[data-theme]` rules. Walking up to the first ancestor that does resolve one
  * reproduces what a browser inherits, and it does so through jsdom's own selector
- * matching against the real `globals.css` rather than a second cascade written here. A
+ * matching against the plugin's real rules rather than a second cascade written here. A
  * browser inherits, so it answers on the first iteration and the helper stays correct
  * wherever this file is run.
  */
@@ -684,7 +679,7 @@ describe('PremiumThemeSection', () => {
     expect(activeTheme()).toBe('jewel_radiance')
     // Paired with `5.3-WEB-126`, which proves this exact opacity keeps a dimmed card
     // above the 4.5:1 floor. Changing one without the other breaks that pair.
-    expect(card('jewel_radiance').className).toContain('disabled:opacity-70')
+    expect(card('jewel_radiance').className).toContain('disabled:opacity-80')
   })
 
   it('5.3-WEB-109 refuses a second write while the first is in flight', async () => {
@@ -835,173 +830,123 @@ describe('PremiumThemeSection', () => {
  * AC 2, the web half: every pairing the gallery renders, proven against the WCAG 2.2 AA
  * maths in `@couture/utils` rather than eyeballed.
  *
- * `globals.css` is parsed rather than mirrored in a TypeScript table on purpose. A
- * second copy of the hex values inside this repository would be the thing that drifts;
- * the story already accepts one duplicate across web and mobile and no more.
+ * Story CC-7.9 D5 moved the values into `premiumPalettes` (the token module), which
+ * `design-tokens.spec.ts` (7.9-UNIT-002) pins to the Story 5.3 reference values and to 4.5:1
+ * card text in both schemes. The cases below keep what that spec does not: the gallery's
+ * palette set, the swatch boundary, the primary fills that may not carry text, the five
+ * carriers per palette and a dimmed card's readability, each in both schemes.
  */
-describe('5.3 premium palette tokens (globals.css)', () => {
-  /**
-   * Pinned to `refs/ux/ux-color-themes.html`, the file the UX spec designates as the
-   * precise-values reference. Winter Metallic's card background is the flattened solid
-   * Ice end of its two-stop gradient (Decision 2). The UX spec's prose separately names
-   * Wine Red `#722F37` and Chestnut `#8C5331`; Decision 2 rules the HTML wins, so
-   * neither appears here and neither should be "restored".
-   */
-  const EXPECTED = {
-    default: {
-      '--theme-primary': '#111111',
-      '--theme-secondary': '#c9a14a',
-      '--theme-card-bg': '#f5f5f7',
-      '--theme-card-text': '#111111',
-      '--theme-card-border': 'rgba(17, 17, 25, 0.2)',
-    },
-    jewel_radiance: {
-      '--theme-primary': '#0d6f62',
-      '--theme-secondary': '#6c3aa8',
-      '--theme-card-bg': '#f4f6fb',
-      '--theme-card-text': '#1f4e79',
-      '--theme-card-border': 'rgba(31, 78, 121, 0.25)',
-    },
-    autumn_umber: {
-      '--theme-primary': '#b1683a',
-      '--theme-secondary': '#d9b38c',
-      '--theme-card-bg': '#f3ede6',
-      '--theme-card-text': '#3e2a23',
-      '--theme-card-border': 'rgba(62, 42, 35, 0.2)',
-    },
-    winter_metallic: {
-      '--theme-primary': '#7e889a',
-      '--theme-secondary': '#c9cdd8',
-      '--theme-card-bg': '#e9edf6',
-      '--theme-card-text': '#2f333d',
-      '--theme-card-border': 'rgba(47, 51, 61, 0.15)',
-    },
-  } as const
+const SCHEMES: readonly ColorScheme[] = ['light', 'dark']
+const PALETTES = ['default', ...PREMIUM_PALETTE_KEYS] as const
 
-  it('5.3-WEB-120 declares exactly the four palettes the gallery renders', () => {
-    expect([...BLOCKS.keys()].sort()).toEqual([
-      'autumn_umber',
-      'default',
-      'jewel_radiance',
-      'winter_metallic',
+describe('5.3 premium palette tokens (@couture/utils premiumPalettes)', () => {
+  it('5.3-WEB-120 emits exactly the four palettes the gallery renders', () => {
+    const themed = Object.keys(TOKEN_RULES).filter((selector) =>
+      selector.startsWith('[data-theme=')
+    )
+    expect(themed.sort()).toEqual([
+      "[data-theme='autumn_umber']",
+      "[data-theme='default']",
+      "[data-theme='jewel_radiance']",
+      "[data-theme='winter_metallic']",
     ])
-    expect(CSS).not.toContain('spring_bloom')
-    expect(CSS).not.toContain('#722f37')
-    expect(CSS).not.toContain('#8c5331')
+    expect(Object.keys(premiumPalettes).sort()).toEqual([...PALETTES].sort())
+    const emitted = JSON.stringify(TOKEN_RULES)
+    expect(emitted).not.toContain('spring_bloom')
   })
 
-  it.each(Object.entries(EXPECTED))(
-    '5.3-WEB-121 pins %s to the UX reference values',
-    (name, expected) => {
-      expect(BLOCKS.get(name)).toEqual(expected)
+  /**
+   * The swatch dots are non-text UI, so SC 1.4.11's 3:1 floor applies. `primary` clears it
+   * against its own card background unaided (3.05:1 and up), but `secondary` does not:
+   * Autumn Umber's Wheat and Winter Metallic's Platinum sit close to their cards. That is why
+   * both dots are ringed in `cardText`, and why this test checks the ring and the primary.
+   */
+  it.each(PALETTES.flatMap((name) => SCHEMES.map((scheme) => ({ name, scheme }))))(
+    '5.3-WEB-123 keeps the $name $scheme swatch boundary discernible at 3:1',
+    ({ name, scheme }) => {
+      const { cardText, cardBg, primary } = premiumPalettes[name][scheme]
+
+      expect(meetsWcagAA(cardText, cardBg, { largeText: true })).toBe(true)
+      expect(meetsWcagAA(primary, cardBg, { largeText: true })).toBe(true)
     }
   )
 
   /**
-   * The card-preview pairing is the only one that carries text in the gallery, and it
-   * clears the small-text floor in all four palettes (8.01-17.34:1). This is what makes
-   * it safe to render every string in a card in `--theme-card-text`.
+   * The reason `primary` never carries text here. Most fills miss the small-text floor
+   * against white (Decision 2), so a future change that starts writing on a primary fill
+   * has to confront this list rather than discover it.
    */
-  it.each(Object.keys(EXPECTED))(
-    '5.3-WEB-122 clears the 4.5:1 small-text floor for %s body copy',
-    (name) => {
-      const block = BLOCKS.get(name)!
-      const text = block['--theme-card-text']!
-      const background = block['--theme-card-bg']!
-
-      expect(meetsWcagAA(text, background)).toBe(true)
-      expect(contrastRatio(text, background)).toBeGreaterThanOrEqual(4.5)
-    }
-  )
-
-  /**
-   * The swatch dots are non-text UI, so SC 1.4.11's 3:1 floor applies. `--theme-primary`
-   * clears it against its own card background unaided (3.05-17.34:1), but
-   * `--theme-secondary` does not: Autumn Umber's Wheat measures 1.68:1 and Winter
-   * Metallic's Platinum 1.36:1. That is why both dots are ringed in `--theme-card-text`,
-   * and why this test checks the ring rather than the fill.
-   */
-  it.each(Object.keys(EXPECTED))(
-    '5.3-WEB-123 keeps the %s swatch boundary discernible at 3:1',
-    (name) => {
-      const block = BLOCKS.get(name)!
-      const ring = block['--theme-card-text']!
-      const background = block['--theme-card-bg']!
-      const primary = block['--theme-primary']!
-
-      expect(meetsWcagAA(ring, background, { largeText: true })).toBe(true)
-      expect(meetsWcagAA(primary, background, { largeText: true })).toBe(true)
-    }
-  )
-
-  /**
-   * The reason `--theme-primary` never carries text here. Two of the three fills miss
-   * the small-text floor against white (Decision 2), so a future change that starts
-   * writing on a primary fill has to confront this list rather than discover it.
-   */
-  it('5.3-WEB-124 records which primary fills may not carry small white text', () => {
-    const failing = Object.keys(EXPECTED).filter(
-      (name) => !meetsWcagAA('#ffffff', BLOCKS.get(name)!['--theme-primary']!)
+  it('5.3-WEB-124 records which light primary fills may not carry small white text', () => {
+    const failing = PREMIUM_PALETTE_KEYS.filter(
+      (name) => !meetsWcagAA('#FFFFFF', premiumPalettes[name].light.primary)
     )
 
     expect(failing).toEqual(['autumn_umber', 'winter_metallic'])
   })
 
   /**
-   * Borders are the one carrier that is not a plain hex, so they are excluded from the
-   * ratio maths above (the helper rejects `rgba()` rather than guessing a backdrop).
-   * They are decoration here: the selected state is text plus `aria-pressed`, never
-   * a border color. Every palette still has to declare all five properties, or a
-   * card would inherit a stray value from whatever palette is active on `<html>`.
+   * Every palette has to declare all five carriers in both schemes, or a card would inherit
+   * a stray value from whatever palette is active on `<html>`. Borders are solid colors now
+   * (the old alpha borders were flattened onto each card), so every carrier is a channel
+   * triple the `rgb(var(--cc-theme-*) / <alpha>)` Tailwind colors read.
    */
-  it('5.3-WEB-125 declares all five carriers as single color values', () => {
-    for (const [name, block] of BLOCKS) {
-      expect(Object.keys(block).sort(), name).toEqual([
-        '--theme-card-bg',
-        '--theme-card-border',
-        '--theme-card-text',
-        '--theme-primary',
-        '--theme-secondary',
-      ])
-      for (const [property, value] of Object.entries(block)) {
-        expect(value, `${name} ${property}`).not.toContain('gradient')
+  it('5.3-WEB-125 declares all five carriers as channel triples in both schemes', () => {
+    const dark = TOKEN_RULES['@media (prefers-color-scheme: dark)'] as Record<
+      string,
+      Record<string, string>
+    >
+    for (const name of PALETTES) {
+      const selector = `[data-theme='${name}']`
+      for (const [scheme, block] of [
+        ['light', TOKEN_RULES[selector] as Record<string, string>],
+        ['dark', dark[selector]!],
+      ] as const) {
+        expect(Object.keys(block).sort(), `${name} ${scheme}`).toEqual(
+          [...PALETTE_PROPERTIES].sort()
+        )
+        for (const [property, value] of Object.entries(block)) {
+          expect(value, `${name} ${scheme} ${property}`).toMatch(
+            /^\d{1,3} \d{1,3} \d{1,3}$/
+          )
+        }
       }
     }
   })
 
   /**
-   * The kill-switch state dims every card with `disabled:opacity-70`, and CSS `opacity`
-   * composites the whole card, text included, against the page behind it, which on
-   * `/settings` is Tailwind's `bg-neutral-950` (#0a0a0a). That lowers the pairing this
-   * block just proved: Jewel Radiance drops from 8.01:1 to 5.40:1.
+   * The kill-switch state dims every card with `disabled:opacity-80`, and CSS `opacity`
+   * composites the whole card, text included, against the page behind it: the `page` role,
+   * white in light and near-black in dark (Story CC-7.9 D2). On the white page the old
+   * `opacity-70` dropped Jewel Radiance to 3.77:1, so the class moved to 80, the lowest step
+   * that keeps every palette above 4.5:1 in both schemes.
    *
    * SC 1.4.3 exempts inactive controls, so nothing here is strictly required. It is
    * asserted anyway because a reader whose gallery has been switched off is exactly the
-   * reader who needs to be able to read it, and because the number is one careless
-   * `opacity-40` away from failing. Paired with `5.3-WEB-108`, which pins the class.
+   * reader who needs to be able to read it. Paired with `5.3-WEB-108`, which pins the class.
    */
-  it('5.3-WEB-126 keeps a dimmed card readable at the disabled opacity', () => {
-    const PAGE_BACKGROUND = [0x0a, 0x0a, 0x0a]
-    const DISABLED_OPACITY = 0.7
+  it.each(SCHEMES)(
+    '5.3-WEB-126 keeps a dimmed card readable on the %s page',
+    (scheme) => {
+      const DISABLED_OPACITY = 0.8
+      const channels = (hex: string) =>
+        [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16))
+      const page = channels(colorRoles[scheme].page)
+      const composite = (hex: string) =>
+        `#${channels(hex)
+          .map((channel, index) =>
+            Math.round(DISABLED_OPACITY * channel + (1 - DISABLED_OPACITY) * page[index]!)
+          )
+          .map((value) => value.toString(16).padStart(2, '0'))
+          .join('')}`
 
-    const composite = (hex: string) => {
-      const channels = [1, 3, 5].map((index) =>
-        Number.parseInt(hex.slice(index, index + 2), 16)
-      )
-      const blended = channels.map((channel, index) =>
-        Math.round(
-          DISABLED_OPACITY * channel + (1 - DISABLED_OPACITY) * PAGE_BACKGROUND[index]!
-        )
-      )
-      return `#${blended.map((value) => value.toString(16).padStart(2, '0')).join('')}`
+      for (const name of PALETTES) {
+        const { cardText, cardBg } = premiumPalettes[name][scheme]
+
+        expect(
+          contrastRatio(composite(cardText), composite(cardBg)),
+          `${name} ${scheme} dimmed`
+        ).toBeGreaterThanOrEqual(4.5)
+      }
     }
-
-    for (const name of Object.keys(EXPECTED)) {
-      const block = BLOCKS.get(name)!
-      const text = composite(block['--theme-card-text']!)
-      const background = composite(block['--theme-card-bg']!)
-
-      expect(meetsWcagAA(text, background), `${name} dimmed`).toBe(true)
-    }
-  })
+  )
 })

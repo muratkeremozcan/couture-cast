@@ -3,7 +3,6 @@
 // Story 6.10 web owner: the case view at `/moderation/cases/[caseId]`.
 // The detail loads once per navigation. Focus, visibility, online, timer and strict-mode effects never refetch it,
 // because every read writes one audit row. Reload is a user action.
-import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   communityModerationReasonCategorySchema,
@@ -19,21 +18,21 @@ import {
 } from '../../lib/moderation'
 import { ModerationAccountStanding } from './moderation-account-standing'
 import { CaseMedia } from './moderation-case-media'
-import { ModerationDecisionPanel } from './moderation-decision-panel'
+import { ModerationDecisionPanel, moderationCard } from './moderation-decision-panel'
 import { ModerationEvidenceExport } from './moderation-evidence-export'
 import { FailureNotice, moderationControl } from './moderation-failure-notice'
 import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
 
 const control = moderationControl
-const card =
-  'rounded-lg border border-neutral-400 bg-white p-4 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100'
+const card = moderationCard
 const RISK_CLASS = {
-  high: 'bg-red-100 text-red-950 ring-red-800 dark:bg-red-950 dark:text-red-100 dark:ring-red-400',
-  medium:
-    'bg-amber-100 text-amber-950 ring-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-500',
-  low: 'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
+  high: 'bg-danger-surface text-danger-ink ring-danger-line',
+  medium: 'bg-notice-surface text-notice-ink ring-notice-line',
+  low: 'bg-card-muted text-ink ring-line-strong',
 } as const
+const note =
+  'rounded-md border border-notice-line bg-notice-surface p-3 text-sm text-notice-ink'
 
 function useDateFormat() {
   const { i18n } = useModerationTranslation()
@@ -121,19 +120,10 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
     void read().then(() => outcomeRef.current?.focus())
   }
 
-  const back = (
-    <Link
-      href="/moderation"
-      className="inline-flex min-h-[44px] items-center rounded underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
-    >
-      {t('moderation.backToQueue')}
-    </Link>
-  )
-
   if (!detail) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-4">
-        {back}
+      // Story CC-7.9 D6: the top bar's back control returns to the queue, so the view has none.
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
         {loading ? (
           <p aria-busy="true">{t('moderation.state.loading')}</p>
         ) : (
@@ -150,10 +140,9 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
 
   return (
     <article
-      className="mx-auto flex max-w-5xl flex-col gap-6"
+      className="mx-auto flex w-full max-w-5xl flex-col gap-6"
       aria-labelledby="case-heading"
     >
-      {back}
       <DetailHeader
         detail={detail}
         stale={stale}
@@ -168,7 +157,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
         data-testid="moderation-decision-outcome"
         className={
           outcome
-            ? 'rounded border border-green-800 p-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:border-green-500'
+            ? 'rounded-md border border-line bg-card p-3 text-sm text-success-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
             : 'sr-only'
         }
       >
@@ -179,7 +168,7 @@ export function ModerationCaseDetailView({ caseId }: { caseId: string }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           <ContentSection detail={detail} />
-          <section aria-labelledby="media-heading" className={card}>
+          <section aria-labelledby="media-heading" data-surface="card" className={card}>
             <h2 id="media-heading" className="mb-3 text-lg font-semibold">
               {t('moderation.detail.media')}
             </h2>
@@ -223,14 +212,15 @@ function DetailHeader({
   const format = useDateFormat()
   return (
     <header className="flex flex-col gap-3">
-      <h1 id="case-heading" tabIndex={-1} className="text-3xl font-semibold">
+      {/* Story CC-7.9 D6: the top bar owns the page's one h1, so the case title is the first h2. */}
+      <h2 id="case-heading" tabIndex={-1} className="text-2xl font-semibold">
         {t('moderation.detail.title', {
           source: t(`moderation.source.${detail.source}`),
         })}
-      </h1>
+      </h2>
       <div className="flex flex-wrap items-center gap-3">
         <span
-          className={`inline-flex min-h-[28px] items-center rounded px-2 text-sm font-semibold ring-1 ring-inset ${RISK_CLASS[detail.risk]}`}
+          className={`inline-flex min-h-[28px] items-center rounded-md px-2 text-sm font-semibold ring-1 ring-inset ${RISK_CLASS[detail.risk]}`}
         >
           {t('moderation.riskLabel', { risk: t(`moderation.risk.${detail.risk}`) })}
         </span>
@@ -250,7 +240,7 @@ function DetailHeader({
           />
         ) : null}
       </div>
-      <p className="text-sm text-neutral-700 dark:text-neutral-300">
+      <p className="text-sm text-ink-soft">
         {t('moderation.detail.accepted', { when: format(detail.acceptedAt) })}
         {' · '}
         {t('moderation.queue.reports', { count: detail.reportCount })}
@@ -260,12 +250,12 @@ function DetailHeader({
           : ''}
       </p>
       {detail.escalated ? (
-        <p role="note" className="rounded border border-amber-700 p-3 text-sm">
+        <p role="note" className={note}>
           {t('moderation.detail.escalated')}
         </p>
       ) : null}
       {detail.viewerConflict ? (
-        <p role="note" className="rounded border border-amber-700 p-3 text-sm">
+        <p role="note" className={note}>
           {t('moderation.detail.conflict')}
         </p>
       ) : null}
@@ -280,7 +270,7 @@ function DetailHeader({
           {t(stale ? 'moderation.state.retry' : 'moderation.detail.reload')}
         </button>
         {stale ? (
-          <p role="alert" className="rounded border border-amber-700 p-3 text-sm">
+          <p role="alert" className={note}>
             {t('moderation.state.stale')}
           </p>
         ) : null}
@@ -303,7 +293,7 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
   const format = useDateFormat()
   const { snapshot, target } = detail
   return (
-    <section aria-labelledby="content-heading" className={card}>
+    <section aria-labelledby="content-heading" data-surface="card" className={card}>
       <h2 id="content-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.detail.content')}
       </h2>
@@ -343,7 +333,7 @@ function ContentSection({ detail }: { detail: ModerationCaseDetail }) {
                   <span>{t('moderation.detail.snapshotEmpty')}</span>
                 ) : null}
                 {snapshot.capturedAt ? (
-                  <span className="text-neutral-700 dark:text-neutral-300">
+                  <span className="text-ink-soft">
                     {t('moderation.detail.capturedAt', {
                       when: format(snapshot.capturedAt),
                     })}
@@ -407,7 +397,7 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
   const note = findings?.operatorNote ?? null
   return (
     <>
-      <section aria-labelledby="findings-heading" className={card}>
+      <section aria-labelledby="findings-heading" data-surface="card" className={card}>
         <h2 id="findings-heading" className="mb-3 text-lg font-semibold">
           {t('moderation.detail.findings')}
         </h2>
@@ -448,7 +438,11 @@ function FindingsSection({ detail }: { detail: ModerationCaseDetail }) {
       </section>
       {/* An operator's words are no machine verdict, so they sit under their own heading. */}
       {note ? (
-        <section aria-labelledby="operator-note-heading" className={card}>
+        <section
+          aria-labelledby="operator-note-heading"
+          data-surface="card"
+          className={card}
+        >
           <h2 id="operator-note-heading" className="mb-3 text-lg font-semibold">
             {t('moderation.detail.operatorNote')}
           </h2>
@@ -465,7 +459,7 @@ function ReportersSection({ detail }: { detail: ModerationCaseDetail }) {
   const { t } = useModerationTranslation()
   const format = useDateFormat()
   return (
-    <section aria-labelledby="reporters-heading" className={card}>
+    <section aria-labelledby="reporters-heading" data-surface="card" className={card}>
       <h2 id="reporters-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.detail.reporters')}
       </h2>
@@ -481,12 +475,12 @@ function ReportersSection({ detail }: { detail: ModerationCaseDetail }) {
               {' · '}
               {t(`moderation.reason.${reporter.reason}`)}
             </p>
-            <p className="text-neutral-700 dark:text-neutral-300">
+            <p className="text-ink-soft">
               {format(reporter.reportedAt)}
               {reporter.resolved ? ` · ${t('moderation.status.resolved')}` : ''}
             </p>
             {reporter.details ? (
-              <blockquote className="mt-1 border-l-4 border-neutral-400 pl-3">
+              <blockquote className="mt-1 border-l-4 border-line-strong pl-3">
                 <PlainText value={reporter.details} />
               </blockquote>
             ) : null}
@@ -501,7 +495,7 @@ function PriorActionsSection({ detail }: { detail: ModerationCaseDetail }) {
   const { t } = useModerationTranslation()
   const format = useDateFormat()
   return (
-    <section aria-labelledby="actions-heading" className={card}>
+    <section aria-labelledby="actions-heading" data-surface="card" className={card}>
       <h2 id="actions-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.detail.priorActions')}
       </h2>
@@ -518,11 +512,9 @@ function PriorActionsSection({ detail }: { detail: ModerationCaseDetail }) {
                   defaultValue: t('moderation.action.unknown'),
                 })}
               </p>
-              <p className="text-neutral-700 dark:text-neutral-300">
-                {format(action.occurredAt)}
-              </p>
+              <p className="text-ink-soft">{format(action.occurredAt)}</p>
               {action.reasonRemoved ? (
-                <p className="text-neutral-700 italic dark:text-neutral-300">
+                <p className="text-ink-soft italic">
                   {t('moderation.detail.reasonRemoved')}
                 </p>
               ) : action.reason ? (

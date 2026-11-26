@@ -22,7 +22,10 @@ test.use({
 
 async function expectLookbookVocabulary(page: Page) {
   const community = page.getByTestId('community-page')
-  await expect(community.getByRole('heading', { level: 1 })).toHaveText('Community')
+  // CC-7.9 D6: the title is the top bar's h1, above the page's main column.
+  await expect(
+    page.getByTestId('app-header').getByRole('heading', { level: 1 })
+  ).toHaveText('Community')
 
   const filters = community.getByRole('navigation', { name: 'Community filters' })
   // Jade asked for the title to change from "Living Community Look book".

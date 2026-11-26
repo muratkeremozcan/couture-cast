@@ -2,6 +2,8 @@
 'use client'
 
 import posthog from 'posthog-js'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 
 export interface LayoutControlsProps {
   isComparisonMode: boolean
@@ -16,6 +18,7 @@ export function LayoutControls({
   isMobilePreview,
   onToggleMobilePreview,
 }: LayoutControlsProps) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   const handleComparisonClick = () => {
     onToggleComparison()
     try {
@@ -46,33 +49,34 @@ export function LayoutControls({
 
   return (
     <div
-      aria-label="Layout Controls"
-      className="flex flex-wrap items-center gap-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] p-3"
+      aria-label={t('home.layoutControls.label')}
+      data-surface="card"
+      className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card p-3"
     >
       <button
         type="button"
         onClick={handleComparisonClick}
         aria-pressed={isComparisonMode}
-        className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+        className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none ${
           isComparisonMode
-            ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111]'
-            : 'border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)]'
+            ? 'border-inverse bg-inverse text-on-inverse'
+            : 'border-line-strong bg-page text-ink'
         }`}
       >
-        Comparison Mode
+        {t('home.layoutControls.comparison')}
       </button>
 
       <button
         type="button"
         onClick={handleMobilePreviewClick}
         aria-pressed={isMobilePreview}
-        className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+        className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none ${
           isMobilePreview
-            ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111]'
-            : 'border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)]'
+            ? 'border-inverse bg-inverse text-on-inverse'
+            : 'border-line-strong bg-page text-ink'
         }`}
       >
-        Mobile Preview
+        {t('home.layoutControls.mobilePreview')}
       </button>
     </div>
   )

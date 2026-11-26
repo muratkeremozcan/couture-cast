@@ -35,18 +35,17 @@ export function GuestPreviewGate({
     <section
       aria-labelledby={`${inputId}-heading`}
       data-testid="guest-preview-gate"
-      className="mx-auto w-full max-w-md space-y-5 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-6 shadow-sm"
+      data-surface="card"
+      className="mx-auto w-full max-w-md space-y-5 rounded-xl border border-line bg-card p-6 shadow-card"
     >
-      <h1
-        id={`${inputId}-heading`}
-        className="lookbook-display text-2xl font-semibold text-[#111111]"
-      >
+      {/* Story CC-7.9 D6: the top bar owns the page's only h1. */}
+      <h2 id={`${inputId}-heading`} className="text-2xl font-semibold text-ink">
         {strings.gate.heading}
-      </h1>
-      <p className="text-sm text-[#36363D]">{strings.gate.body}</p>
+      </h2>
+      <p className="text-sm text-ink-soft">{strings.gate.body}</p>
       <form className="space-y-4" onSubmit={submit} noValidate>
         <div className="space-y-2">
-          <label htmlFor={inputId} className="block text-sm font-medium text-[#111111]">
+          <label htmlFor={inputId} className="block text-sm font-medium text-ink">
             {strings.gate.field}
           </label>
           <input
@@ -61,7 +60,7 @@ export function GuestPreviewGate({
             aria-describedby={error ? errorId : undefined}
             onChange={(event) => setBirthdate(event.target.value)}
             data-testid="guest-preview-birthdate"
-            className="min-h-11 w-full rounded-lg border border-[#C9C9D1] bg-[#FFFFFF] px-3 text-[#111111]"
+            className="min-h-11 w-full rounded-lg border border-line-strong bg-page px-3 text-ink"
           />
         </div>
         {error ? (
@@ -69,7 +68,7 @@ export function GuestPreviewGate({
             id={errorId}
             role="alert"
             data-testid="guest-preview-gate-error"
-            className="text-sm font-medium text-[#9F1D1D]"
+            className="text-sm font-medium text-danger-ink"
           >
             {error === 'underage' ? strings.gate.underage : strings.gate.invalid}
           </p>
@@ -77,16 +76,16 @@ export function GuestPreviewGate({
         <button
           type="submit"
           data-testid="guest-preview-gate-submit"
-          className="min-h-11 w-full rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+          className="min-h-11 w-full rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
         >
           {strings.gate.submit}
         </button>
       </form>
-      <p className="text-xs text-[#5C5C66]">{strings.gate.selfReported}</p>
+      <p className="text-xs text-ink-muted">{strings.gate.selfReported}</p>
       <Link
         href="/"
         data-testid="guest-preview-gate-exit"
-        className="inline-flex min-h-11 items-center text-sm font-medium text-[#8A691F] underline underline-offset-4"
+        className="inline-flex min-h-11 items-center text-sm font-medium text-ink underline underline-offset-4"
       >
         {strings.gate.exit}
       </Link>

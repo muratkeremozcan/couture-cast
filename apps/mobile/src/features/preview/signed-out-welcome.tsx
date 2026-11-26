@@ -3,7 +3,11 @@
 import { router } from 'expo-router'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { createMemberSampleOutfit, getGuestPreviewStrings } from '@couture/utils'
+import {
+  colorRoles,
+  createMemberSampleOutfit,
+  getGuestPreviewStrings,
+} from '@couture/utils'
 import { SampleGarmentArt } from './guest-preview-parts'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
@@ -28,15 +32,12 @@ export function SignedOutWelcome() {
   return (
     <View
       testID="home-signed-out-welcome"
-      style={[
-        styles.card,
-        { backgroundColor: palette.surface, borderColor: palette.divider },
-      ]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
-      <Text accessibilityRole="header" style={[styles.heading, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
         {strings.chrome.welcomeHeading}
       </Text>
-      <Text style={[styles.body, { color: palette.mutedText }]}>
+      <Text style={[styles.body, { color: palette.inkMuted }]}>
         {strings.chrome.sampleLabel}
       </Text>
       <View
@@ -60,15 +61,16 @@ export function SignedOutWelcome() {
             onPress={() => router.push(action.href)}
             style={[
               styles.button,
+              // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
               primary
-                ? { backgroundColor: palette.text }
-                : { borderColor: palette.text, borderWidth: 1 },
+                ? { backgroundColor: palette.inverse }
+                : { borderColor: palette.lineStrong, borderWidth: 1 },
             ]}
           >
             <Text
               style={[
                 styles.buttonText,
-                { color: primary ? palette.background : palette.text },
+                { color: primary ? palette.onInverse : palette.ink },
               ]}
             >
               {action.label}
@@ -82,25 +84,26 @@ export function SignedOutWelcome() {
 
 const styles = StyleSheet.create({
   art: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tile: { backgroundColor: '#F5F5F7', padding: 5, borderRadius: 8 },
+  // The sample art is drawn for a light ground, so its tile is the light card in both schemes.
+  tile: { backgroundColor: colorRoles.light.card, padding: 4, borderRadius: 8 },
   card: {
     marginHorizontal: 20,
-    marginTop: 28,
+    marginTop: 24,
     paddingHorizontal: 24,
-    paddingVertical: 28,
+    paddingVertical: 24,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 16,
     gap: 12,
   },
   heading: { fontSize: 24, fontWeight: '700', lineHeight: 30 },
-  body: { fontSize: 15, lineHeight: 22, marginBottom: 8 },
+  body: { fontSize: 16, lineHeight: 24, marginBottom: 8 },
   button: {
     minHeight: 48,
-    borderRadius: 999,
+    borderRadius: 9999,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  buttonText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
 })

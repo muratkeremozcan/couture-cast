@@ -38,9 +38,10 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
 }
 
 /**
- * Story 3.5 design copy. Every field here is hardcoded demonstration content —
- * the garment chips below the card are too — and it is what the hero renders
- * until a real recommendation feed reaches this surface.
+ * Story 3.5 design copy. Every entry names hardcoded demonstration content (its
+ * copy lives under `home.lookbook.recommendations.<key>` in the web catalogs since
+ * Story CC-7.9 D9; the garment chips below the card are demonstration too), and
+ * it is what the hero renders until a real recommendation feed reaches this surface.
  *
  * THE `Sponsored` ENTRY MUST NOT CLAIM A COMMERCIAL RELATIONSHIP. It used to
  * read `'Sponsored Selection'` over `'A clearly labeled brand selection...'`,
@@ -56,7 +57,7 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
  * Placeholder copy borrowing that language is the inverse failure: a disclosure
  * with nothing to disclose, which is a claim rather than a caveat.
  *
- * So this entry describes the view a reader selected, brand-oriented looks, and
+ * So the `brands` entry describes the view a reader selected, brand-oriented looks, and
  * says nothing about who paid for it. `lookbook-prism-layout.test.tsx` asserts
  * that, so restoring the old wording turns a test red rather than shipping
  * quietly.
@@ -68,32 +69,14 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
  * hero copy and `data-chip-category`, which is why the disclosure rule above
  * still governs it.
  */
-const HERO_RECOMMENDATIONS: Record<
-  ChipCategory,
-  { eyebrow: string; score: string; title: string; description: string }
-> = {
-  Personal: {
-    eyebrow: 'Commute Ready',
-    score: '96%',
-    title: 'Double-Breasted Blazer & Silk Knit',
-    description:
-      'Optimized for 18°C morning train commute transitioning into air-conditioned office.',
-  },
-  Community: {
-    eyebrow: 'Community Trending',
-    score: '93%',
-    title: 'Parisian Silk & Cashmere Blend',
-    description:
-      'Community favorites pair light cashmere with a pleated midi skirt for the breezy forecast.',
-  },
-  Sponsored: {
-    eyebrow: 'Brand Picks',
-    score: '90%',
-    title: 'Couture House Archive Ensemble',
-    description:
-      'Brand-forward pairings built around recycled wool and signature gold details.',
-  },
+const HERO_RECOMMENDATIONS: Record<ChipCategory, { key: string; score: string }> = {
+  Personal: { key: 'personal', score: '96%' },
+  Community: { key: 'community', score: '93%' },
+  Sponsored: { key: 'brands', score: '90%' },
 }
+
+/** The demonstration garment chips under the hero look (catalog keys under `home.lookbook.demo.garments`). */
+const DEMO_GARMENT_KEYS = ['blazer', 'scarf', 'loafers'] as const
 
 interface PlannerSlotProps {
   isMobilePreview: boolean
@@ -376,27 +359,25 @@ export function LookbookPrismLayout() {
   }, [])
 
   return (
+    // Story CC-7.9 D7: the lookbook sits straight on the page surface (the light inset card and
+    // its frame are gone); the hero canvas below is the one card level. The phone preview keeps
+    // its device frame.
     <div
       ref={containerRef}
-      data-focus-surface="light"
       data-testid="lookbook-prism-container"
-      className={`lookbook-body relative w-full bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
+      className={`relative w-full text-ink motion-safe:transition-[max-width,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
         isMobilePreview
-          ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[var(--lookbook-surface)] p-4 shadow-2xl'
-          : 'mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-8'
+          ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-xl border-4 border-ink bg-page p-4 shadow-overlay'
+          : 'mx-auto max-w-[1440px]'
       }`}
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4 sm:mb-8">
         <div data-landing="guest">
-          <span className="lookbook-metrics text-xs uppercase tracking-[0.3em] text-[color:var(--lookbook-gold-ink)]">
-            Lookbook Prism
+          <span className="text-xs uppercase tracking-[0.3em] text-ink-muted">
+            {i18n.t('home.lookbook.eyebrow')}
           </span>
-          <h2
-            className={`lookbook-display font-semibold tracking-tight text-[color:var(--lookbook-ink)] ${
-              isMobilePreview ? 'text-3xl' : 'text-3xl sm:text-4xl'
-            }`}
-          >
-            Weather-Aware Wardrobe & Community
+          <h2 className="text-3xl font-semibold tracking-tight text-ink">
+            {i18n.t('home.lookbook.title')}
           </h2>
         </div>
         {/*
@@ -411,7 +392,7 @@ export function LookbookPrismLayout() {
             plannerOpenerRef.current = event.currentTarget
             setIsPlannerRailOpen(true)
           }}
-          className="min-h-[44px] rounded-lg border border-[#C9A14A] bg-[var(--lookbook-surface)] px-4 py-2 text-sm font-semibold text-[color:var(--lookbook-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink"
         >
           {i18n.t('commerce.premium.planner.openControl')}
         </button>
@@ -430,35 +411,38 @@ export function LookbookPrismLayout() {
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
-          data-focus-surface="dark"
-          aria-label="Severe Weather Alert Details"
+          aria-label={i18n.t('home.lookbook.alert.label')}
           data-testid="severe-weather-alert-focused"
           tabIndex={-1}
-          className="my-4 rounded-xl border border-[#B91C1C] bg-[#361F1F] p-5 text-[#FFFFFF] ring-2 ring-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#FFFFFF]"
+          className="my-4 rounded-xl border border-danger-line bg-danger-surface p-5 text-ink"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#F87171]">
-              ⚠️ {focusedWeatherAlert.event.data.severity} weather alert
+            <span className="text-xs font-bold uppercase tracking-wider text-danger-ink">
+              ⚠️{' '}
+              {i18n.t('home.lookbook.alert.severity', {
+                severity: focusedWeatherAlert.event.data.severity,
+              })}
               {` (#${focusedWeatherAlert.id})`}
             </span>
-            <span className="text-xs text-[#E6E6ED]">
+            <span className="text-xs text-ink-soft">
               {focusedWeatherAlert.event.data.location}
             </span>
           </div>
           <h3 className="mt-2 text-lg font-semibold">
-            {focusedWeatherAlert.event.data.alertType.replace('_', ' ')} advisory
+            {i18n.t('home.lookbook.alert.advisory', {
+              type: focusedWeatherAlert.event.data.alertType.replace('_', ' '),
+            })}
           </h3>
-          <p className="mt-1 text-sm text-[#E6E6ED]">
+          <p className="mt-1 text-sm text-ink-soft">
             {focusedWeatherAlert.event.data.message}
           </p>
           <div className="mt-4 flex gap-3">
             <button
               type="button"
-              data-focus-surface="light"
               onClick={() => handleChipCategoryChange('Personal')}
-              className="rounded-lg bg-[#C9A14A] px-4 py-2 text-xs font-semibold text-[#111111] hover:bg-[#b58e3c]"
+              className="rounded-lg border border-line-strong bg-page px-4 py-2 text-xs font-semibold text-ink"
             >
-              Adjust outfit
+              {i18n.t('home.lookbook.alert.adjustOutfit')}
             </button>
             <button
               type="button"
@@ -466,7 +450,7 @@ export function LookbookPrismLayout() {
                 plannerOpenerRef.current = event.currentTarget
                 setIsPlannerRailOpen(true)
               }}
-              className="rounded-lg border border-[#E6E6ED] bg-transparent px-4 py-2 text-xs font-semibold text-white hover:bg-white/10"
+              className="rounded-lg border border-line-strong bg-transparent px-4 py-2 text-xs font-semibold text-ink hover:bg-ink/5"
             >
               {i18n.t('commerce.premium.planner.openControl')}
             </button>
@@ -501,10 +485,12 @@ export function LookbookPrismLayout() {
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
         <section
           ref={heroCanvasRef}
-          aria-label="Hero Ritual Canvas"
+          aria-label={i18n.t('home.lookbook.heroLabel')}
           // Focusable from code, so focus has somewhere to land when the teaser leaves.
           tabIndex={-1}
-          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] p-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+          // Story CC-7.9 D7: the hero canvas is the one card; the looks inside it are sections.
+          data-surface="card"
+          className={`flex min-w-0 self-start flex-col gap-6 rounded-xl border border-line bg-card p-6 shadow-card ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >
@@ -515,38 +501,38 @@ export function LookbookPrismLayout() {
                   <h2
                     tabIndex={-1}
                     data-share-card-focus-fallback="hero"
-                    className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--lookbook-gold-ink)]"
+                    className="text-xs uppercase tracking-widest text-ink-muted"
                   >
-                    Daily Hero Ritual
+                    {i18n.t('home.lookbook.demo.heading')}
                   </h2>
-                  <span className="lookbook-metrics rounded-full border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 py-1 text-xs text-[color:var(--lookbook-ink)]">
-                    08:30 AM • NYC
+                  <span className="rounded-full border border-line bg-page px-3 py-1 text-xs text-ink">
+                    {i18n.t('home.lookbook.demo.timeCity')}
                   </span>
                 </div>
 
                 {/* Weather Numerical Banner */}
                 <div className="flex items-baseline gap-4">
-                  <span className="lookbook-metrics text-5xl font-bold text-[color:var(--lookbook-ink)]">
-                    18°C
+                  <span className="text-3xl font-bold text-ink">
+                    {i18n.t('home.lookbook.demo.temperature')}
                   </span>
                   <div className="space-y-1">
-                    <p className="text-sm font-semibold text-[color:var(--lookbook-ink)]">
-                      Mild Humidity • 65%
+                    <p className="text-sm font-semibold text-ink">
+                      {i18n.t('home.lookbook.demo.humidity')}
                     </p>
-                    <p className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
-                      +3°C from yesterday commute
+                    <p className="text-xs text-ink-muted">
+                      {i18n.t('home.lookbook.demo.change')}
                     </p>
                   </div>
                 </div>
 
                 {/* Outfit Tiles */}
                 <div className="space-y-4">
-                  <h3 className="lookbook-display text-xl font-semibold text-[color:var(--lookbook-ink)]">
-                    Primary Recommended Look
+                  <h3 className="text-xl font-semibold text-ink">
+                    {i18n.t('home.lookbook.demo.primaryLook')}
                     {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
                     <span
                       data-testid="hero-example-label"
-                      className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[color:var(--lookbook-gold-ink)]"
+                      className="ml-3 rounded-full border border-line-strong px-2 py-0.5 align-middle text-xs uppercase text-ink-muted"
                     >
                       {getGuestPreviewStrings(i18n.language).chrome.exampleLabel}
                     </span>
@@ -561,39 +547,46 @@ export function LookbookPrismLayout() {
                     }
                   >
                     {!isComparisonMode ? (
-                      // Single Primary Card
-                      <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-200 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
+                      // Single Primary Look: a section inside the hero card (D7), not a card.
+                      <div className="border-t border-line pt-4">
                         <div className="mb-4 flex items-center justify-between">
-                          <span className="lookbook-metrics text-xs uppercase text-[color:var(--lookbook-gold-ink)]">
-                            {heroRecommendation.eyebrow}
+                          <span className="text-xs uppercase text-ink-muted">
+                            {i18n.t(
+                              `home.lookbook.recommendations.${heroRecommendation.key}.eyebrow`
+                            )}
                           </span>
-                          <span className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
-                            Match Score: {heroRecommendation.score}
+                          <span className="text-xs text-ink-muted">
+                            {i18n.t('home.lookbook.demo.matchScore', {
+                              score: heroRecommendation.score,
+                            })}
                           </span>
                         </div>
                         <h4
                           data-testid="hero-recommendation-title"
-                          className="lookbook-display mb-2 text-lg font-semibold text-[color:var(--lookbook-ink)]"
+                          className="mb-2 text-lg font-semibold text-ink"
                         >
-                          {heroRecommendation.title}
+                          {i18n.t(
+                            `home.lookbook.recommendations.${heroRecommendation.key}.title`
+                          )}
                         </h4>
-                        <p className="mb-4 text-xs leading-relaxed text-[color:var(--lookbook-ink-soft)]">
-                          {heroRecommendation.description}
+                        <p className="mb-4 text-xs leading-relaxed text-ink-soft">
+                          {i18n.t(
+                            `home.lookbook.recommendations.${heroRecommendation.key}.description`
+                          )}
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                            Onyx Blazer
-                          </span>
-                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                            Merlot Silk Scarf
-                          </span>
-                          <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
-                            Leather Loafers
-                          </span>
+                          {DEMO_GARMENT_KEYS.map((garment) => (
+                            <span
+                              key={garment}
+                              className="rounded-md border border-line bg-page px-2 py-1 text-xs text-ink-soft"
+                            >
+                              {i18n.t(`home.lookbook.demo.garments.${garment}`)}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     ) : (
-                      // Dual Outfit Cards (Comparison Mode)
+                      // Dual Outfit Looks (Comparison Mode): sections inside the hero card.
                       <div
                         data-testid="comparison-container"
                         className={`grid gap-4 ${
@@ -603,30 +596,30 @@ export function LookbookPrismLayout() {
                         }`}
                       >
                         {/* Look A */}
-                        <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[var(--lookbook-surface)] p-5">
-                          <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-gold-ink)]">
-                            <span>LOOK A (Primary)</span>
+                        <div className="space-y-3 border-t border-line pt-4">
+                          <div className="flex items-center justify-between text-xs font-semibold text-ink">
+                            <span>{i18n.t('home.lookbook.demo.lookA.label')}</span>
                             <span>96%</span>
                           </div>
-                          <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
-                            Blazer & Silk Knit
+                          <h4 className="text-base font-semibold text-ink">
+                            {i18n.t('home.lookbook.demo.lookA.title')}
                           </h4>
-                          <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
-                            Warmth level tuned for brisk morning wind.
+                          <p className="text-xs text-ink-soft">
+                            {i18n.t('home.lookbook.demo.lookA.body')}
                           </p>
                         </div>
 
                         {/* Look B */}
-                        <div className="space-y-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-5">
-                          <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-ink-muted)]">
-                            <span>LOOK B (Alternative)</span>
+                        <div className="space-y-3 border-t border-line pt-4">
+                          <div className="flex items-center justify-between text-xs text-ink-muted">
+                            <span>{i18n.t('home.lookbook.demo.lookB.label')}</span>
                             <span>91%</span>
                           </div>
-                          <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
-                            Trench & Merino Cardigan
+                          <h4 className="text-base font-semibold text-ink">
+                            {i18n.t('home.lookbook.demo.lookB.title')}
                           </h4>
-                          <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
-                            Higher wind protection with water-resistant shell.
+                          <p className="text-xs text-ink-soft">
+                            {i18n.t('home.lookbook.demo.lookB.body')}
                           </p>
                         </div>
                       </div>
@@ -651,7 +644,10 @@ export function LookbookPrismLayout() {
         </section>
 
         {/* Right Column / Slot 2: Community Lookbook Grid */}
-        <section aria-label="Community Section" className="w-full min-w-0">
+        <section
+          aria-label={i18n.t('home.lookbook.communityLabel')}
+          className="w-full min-w-0"
+        >
           <CommunityLookbookGrid
             activeTab={activeTab}
             isMobilePreview={isMobilePreview}

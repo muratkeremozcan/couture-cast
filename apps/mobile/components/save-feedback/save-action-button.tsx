@@ -805,29 +805,29 @@ export function SaveActionButton({
     switch (controller.state) {
       case 'saved':
         return {
-          backgroundColor: colors.subtleSurface,
-          borderColor: colors.successText,
-          textColor: colors.successText,
+          backgroundColor: colors.card,
+          borderColor: colors.successInk,
+          textColor: colors.successInk,
         }
       case 'failed':
         return {
           backgroundColor: colors.dangerSurface,
-          borderColor: colors.dangerBorder,
-          textColor: colors.dangerText,
+          borderColor: colors.dangerLine,
+          textColor: colors.dangerInk,
         }
       case 'saving':
       case 'still-saving':
         return {
-          backgroundColor: colors.subtleSurface,
-          borderColor: colors.strongBorder,
-          textColor: palette.text,
+          backgroundColor: colors.card,
+          borderColor: colors.lineStrong,
+          textColor: palette.ink,
         }
       case 'offline':
       case 'idle':
         return {
-          backgroundColor: palette.surface,
-          borderColor: palette.divider,
-          textColor: palette.text,
+          backgroundColor: palette.page,
+          borderColor: palette.line,
+          textColor: palette.ink,
         }
     }
   })()
@@ -927,14 +927,14 @@ const styles = StyleSheet.create({
   button: {
     minHeight: 44,
     minWidth: 44,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
   buttonText: {
     fontSize: 14,

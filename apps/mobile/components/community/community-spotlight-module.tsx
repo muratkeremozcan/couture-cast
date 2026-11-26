@@ -23,9 +23,7 @@ import type {
   SpotlightStatus,
 } from '@/src/features/community/use-community-spotlight'
 
-/** Same derived gold the community screen and challenge banner use. */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
+// Story CC-7.9 D3: the rank badge is a marker, so it is `inverse` with `onInverse`.
 
 /** The heading's native id, so the carousel's list can name itself after it. */
 const HEADING_ID = 'community-spotlight-heading'
@@ -168,13 +166,13 @@ export function CommunitySpotlightModule({
       testID="community-spotlight"
       // Unboxed, so the reused cards keep the same insets as the feed below and
       // the divider alone separates the two sections.
-      style={[styles.section, { borderColor: palette.divider }]}
+      style={[styles.section, { borderColor: palette.line }]}
     >
       <Text
         testID="community-spotlight-heading"
         nativeID={HEADING_ID}
         accessibilityRole="header"
-        style={[styles.heading, { color: palette.text }]}
+        style={[styles.heading, { color: palette.ink }]}
       >
         {heading}
       </Text>
@@ -186,8 +184,8 @@ export function CommunitySpotlightModule({
     if (status === 'loading') {
       return (
         <View testID="community-spotlight-loading" style={styles.stateRow}>
-          <ActivityIndicator size="small" color={palette.text} />
-          <Text style={[styles.body, { color: palette.mutedText }]}>
+          <ActivityIndicator size="small" color={palette.ink} />
+          <Text style={[styles.body, { color: palette.inkMuted }]}>
             {t('community.spotlight.loading')}
           </Text>
         </View>
@@ -197,7 +195,7 @@ export function CommunitySpotlightModule({
       return (
         <Text
           testID="community-spotlight-disabled"
-          style={[styles.body, { color: palette.mutedText }]}
+          style={[styles.body, { color: palette.inkMuted }]}
         >
           {t('community.spotlight.disabled')}
         </Text>
@@ -206,17 +204,17 @@ export function CommunitySpotlightModule({
     if (status === 'error') {
       return (
         <View testID="community-spotlight-error" style={styles.stateColumn}>
-          <Text style={[styles.body, { color: palette.text }]}>
+          <Text style={[styles.body, { color: palette.ink }]}>
             {t('community.spotlight.error')}
           </Text>
           <TouchableOpacity
             testID="community-spotlight-retry"
-            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
             onPress={onRetry}
             accessibilityRole="button"
             accessibilityLabel={t('community.spotlight.retry')}
           >
-            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
               {t('community.spotlight.retry')}
             </Text>
           </TouchableOpacity>
@@ -228,10 +226,10 @@ export function CommunitySpotlightModule({
     if (level === 'none' || (items.length === 0 && !hasMore)) {
       return (
         <View testID="community-spotlight-empty" style={styles.stateColumn}>
-          <Text style={[styles.emptyTitle, { color: palette.text }]}>
+          <Text style={[styles.emptyTitle, { color: palette.ink }]}>
             {t('community.spotlight.emptyTitle')}
           </Text>
-          <Text style={[styles.body, { color: palette.mutedText }]}>
+          <Text style={[styles.body, { color: palette.inkMuted }]}>
             {t('community.spotlight.emptyBody')}
           </Text>
         </View>
@@ -239,7 +237,7 @@ export function CommunitySpotlightModule({
     }
     return (
       <>
-        <Text style={[styles.body, { color: palette.mutedText }]}>
+        <Text style={[styles.body, { color: palette.inkMuted }]}>
           {t('community.spotlight.intro')}
         </Text>
         {/*
@@ -280,9 +278,9 @@ export function CommunitySpotlightModule({
                     testID={`community-spotlight-rank-${item.id}`}
                     accessible
                     accessibilityLabel={rankLabel(item.rank, index + 1, items.length)}
-                    style={[styles.rankBadge, { backgroundColor: ACCENT_GOLD }]}
+                    style={[styles.rankBadge, { backgroundColor: palette.inverse }]}
                   >
-                    <Text style={[styles.rankText, { color: ON_ACCENT }]}>
+                    <Text style={[styles.rankText, { color: palette.onInverse }]}>
                       #{item.rank}
                     </Text>
                   </View>
@@ -316,8 +314,8 @@ export function CommunitySpotlightModule({
     if (isLoadingMore) {
       return (
         <View testID="community-spotlight-loading-more" style={styles.trailing}>
-          <ActivityIndicator size="small" color={palette.text} />
-          <Text style={[styles.trailingText, { color: palette.mutedText }]}>
+          <ActivityIndicator size="small" color={palette.ink} />
+          <Text style={[styles.trailingText, { color: palette.inkMuted }]}>
             {t('community.spotlight.loadingMore')}
           </Text>
         </View>
@@ -330,17 +328,17 @@ export function CommunitySpotlightModule({
           accessibilityRole="alert"
           style={styles.trailing}
         >
-          <Text style={[styles.trailingText, { color: palette.text }]}>
+          <Text style={[styles.trailingText, { color: palette.ink }]}>
             {t('community.spotlight.error')}
           </Text>
           <TouchableOpacity
             testID="community-spotlight-more-retry"
-            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
             onPress={onViewMore}
             accessibilityRole="button"
             accessibilityLabel={t('community.spotlight.retry')}
           >
-            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
               {t('community.spotlight.retry')}
             </Text>
           </TouchableOpacity>
@@ -352,14 +350,14 @@ export function CommunitySpotlightModule({
       <View style={styles.trailing}>
         <TouchableOpacity
           testID="community-spotlight-view-more"
-          style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+          style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
           onPress={onViewMore}
           disabled={isReplacing}
           accessibilityRole="button"
           accessibilityLabel={t('community.spotlight.viewMore')}
           accessibilityState={{ disabled: isReplacing }}
         >
-          <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+          <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
             {t('community.spotlight.viewMore')}
           </Text>
         </TouchableOpacity>
@@ -382,13 +380,13 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   body: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     paddingHorizontal: 16,
     flexShrink: 1,
   },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
     paddingHorizontal: 16,
     flexShrink: 1,
@@ -412,7 +410,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   item: {
-    gap: 6,
+    gap: 8,
     marginHorizontal: -CARD_INSET / 2,
   },
   trailing: {
@@ -423,8 +421,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   trailingText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   rankBadge: {
@@ -432,13 +430,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     minWidth: 44,
     minHeight: 28,
-    paddingHorizontal: 10,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
   },
   rankText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   outlineButton: {
@@ -453,7 +451,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outlineButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
   },

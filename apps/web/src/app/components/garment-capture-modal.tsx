@@ -116,15 +116,13 @@ function SourceStep({
 
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {t('wardrobe.capture.intro')}
-      </p>
+      <p className="text-sm text-ink-soft">{t('wardrobe.capture.intro')}</p>
       <div className="grid grid-cols-2 gap-4">
         <button
           onClick={() => {
             onStartCamera()
           }}
-          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-6 font-semibold text-zinc-800 transition hover:border-gold-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-line-strong p-6 font-semibold text-ink transition hover:border-ink hover:bg-card"
         >
           <span aria-hidden="true" className="text-2xl">
             📷
@@ -134,7 +132,7 @@ function SourceStep({
 
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-6 font-semibold text-zinc-800 transition hover:border-gold-500 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-line-strong p-6 font-semibold text-ink transition hover:border-ink hover:bg-card"
         >
           <span aria-hidden="true" className="text-2xl">
             📁
@@ -182,13 +180,13 @@ function CameraStep({
       <div className="flex gap-4">
         <button
           onClick={onCancel}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+          className="rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink hover:bg-card"
         >
           {t('wardrobe.capture.cancel')}
         </button>
         <button
           onClick={onCapture}
-          className="rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-lg bg-inverse px-6 py-2 text-sm font-semibold text-on-inverse hover:bg-inverse/90"
         >
           {t('wardrobe.capture.snapPhoto')}
         </button>
@@ -230,26 +228,26 @@ function CropStep({
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <span className="text-sm font-medium text-ink-soft">
           {t('wardrobe.capture.aspectRatio')}
         </span>
         <div className="flex gap-2">
           <button
             onClick={() => setAspectRatio('1:1')}
-            className={`rounded px-3 py-1 text-xs font-bold ${
+            className={`rounded-md px-3 py-1 text-xs font-bold ${
               aspectRatio === '1:1'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                ? 'bg-inverse text-on-inverse'
+                : 'bg-card-muted text-ink-soft'
             }`}
           >
             {t('wardrobe.capture.aspectSquare')}
           </button>
           <button
             onClick={() => setAspectRatio('4:3')}
-            className={`rounded px-3 py-1 text-xs font-bold ${
+            className={`rounded-md px-3 py-1 text-xs font-bold ${
               aspectRatio === '4:3'
-                ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
-                : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                ? 'bg-inverse text-on-inverse'
+                : 'bg-card-muted text-ink-soft'
             }`}
           >
             {t('wardrobe.capture.aspectPortrait')}
@@ -258,7 +256,7 @@ function CropStep({
       </div>
 
       <div
-        className={`relative mx-auto overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-800 ${
+        className={`relative mx-auto overflow-hidden rounded-lg bg-card-muted ${
           aspectRatio === '1:1' ? 'aspect-square w-64' : 'aspect-[3/4] w-64'
         }`}
       >
@@ -276,17 +274,17 @@ function CropStep({
         ) : null}
       </div>
       {keptOriginal && (
-        <p role="status" className="text-sm text-zinc-700 dark:text-zinc-300">
+        <p role="status" className="text-sm text-ink-soft">
           {cleanupFallback}
         </p>
       )}
 
-      <div className="flex items-center justify-between rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/50">
+      <div className="flex items-center justify-between rounded-lg bg-card p-3">
         <div>
-          <span className="block text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+          <span className="block text-sm font-semibold text-ink">
             {t('wardrobe.capture.cleanupLabel')}
           </span>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="text-xs text-ink-muted">
             {t('wardrobe.capture.cleanupHint')}
           </span>
         </div>
@@ -303,11 +301,11 @@ function CropStep({
           <span
             aria-hidden="true"
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-              useBgCleanup ? 'bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-600'
+              useBgCleanup ? 'bg-inverse' : 'bg-line-strong'
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+              className={`inline-block h-4 w-4 transform rounded-full bg-page transition ${
                 useBgCleanup ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
@@ -321,7 +319,7 @@ function CropStep({
         <button
           ref={retakeRef}
           onClick={onReset}
-          className="whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+          className="whitespace-nowrap rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink hover:bg-card"
         >
           {t('wardrobe.capture.retake')}
         </button>
@@ -331,7 +329,7 @@ function CropStep({
           onClick={() => {
             onConfirm()
           }}
-          className="whitespace-nowrap rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+          className="whitespace-nowrap rounded-lg bg-inverse px-5 py-2 text-sm font-semibold text-on-inverse hover:bg-inverse/90 disabled:opacity-60"
         >
           {t('wardrobe.capture.useImage')}
         </button>
@@ -351,13 +349,13 @@ function UploadingStep({
   const statusKey = UPLOAD_STATUS_KEYS[uploadState]
   return (
     <div className="mt-8 flex flex-col items-center gap-4 py-6">
-      <div className="h-3 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+      <div className="h-3 w-full overflow-hidden rounded-full bg-card-muted">
         <div
-          className="h-full bg-emerald-600 transition-all duration-200"
+          className="h-full bg-inverse transition-all duration-200"
           style={{ width: `${uploadProgress}%` }}
         />
       </div>
-      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+      <p className="text-sm font-semibold text-ink">
         {statusKey ? t(statusKey, { progress: uploadProgress }) : null}
       </p>
     </div>
@@ -368,18 +366,16 @@ function CompleteStep({ onDone }: { onDone: () => void }) {
   const { t } = useTranslation()
   return (
     <div className="mt-6 flex flex-col items-center gap-4 text-center py-4">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-card text-2xl text-success-ink">
         ✓
       </div>
-      <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+      <h3 className="text-lg font-bold text-ink">
         {t('wardrobe.capture.completeTitle')}
       </h3>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {t('wardrobe.capture.completeBody')}
-      </p>
+      <p className="text-sm text-ink-soft">{t('wardrobe.capture.completeBody')}</p>
       <button
         onClick={onDone}
-        className="mt-2 min-h-[44px] rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+        className="mt-2 min-h-11 rounded-lg bg-inverse px-6 py-2 text-sm font-semibold text-on-inverse hover:bg-inverse/90"
       >
         {t('wardrobe.capture.done')}
       </button>
@@ -683,14 +679,14 @@ export function GarmentCaptureModal({
             <button
               ref={keepEditing}
               type="button"
-              className="min-h-11 rounded border px-3"
+              className="min-h-11 rounded-md border border-line-strong bg-page px-3 text-ink"
               onClick={dismissDiscard}
             >
               {strings.keepEditing}
             </button>
             <button
               type="button"
-              className="min-h-11 rounded border px-3"
+              className="min-h-11 rounded-md border border-line-strong bg-page px-3 text-ink"
               onClick={handleClose}
             >
               {strings.discard}

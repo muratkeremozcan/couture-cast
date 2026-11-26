@@ -244,7 +244,10 @@ describe('Web settings page', () => {
     const landmarks = document.querySelectorAll('main#main-content')
     expect(landmarks).toHaveLength(1)
     expect(landmarks[0]).toHaveAttribute('tabindex', '-1')
-    expect(landmarks[0]).toHaveAttribute('data-focus-surface', 'dark')
+    // Story CC-7.9 D3, D7: the page surface replaced the always-dark page and its
+    // `data-focus-surface="dark"` switch; the focus ring tokens follow the scheme instead.
+    expect(landmarks[0]?.closest('[data-surface="page"]')).not.toBeNull()
+    expect(document.querySelector('[data-focus-surface]')).toBeNull()
     expect(screen.getByTestId('sticky-bottom-nav')).toBeInTheDocument()
   })
 

@@ -634,18 +634,17 @@ export function useSaveAction({
   }
 }
 
+/**
+ * Story CC-7.9 D3: a save control is a neutral outline button in every state (it is never the
+ * screen's gold main action); saved and failed tint it with the success and danger roles.
+ */
 const STATE_BUTTON_STYLES: Record<SaveFeedbackState, string> = {
-  idle: 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
-  offline:
-    'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800',
-  saving:
-    'border-zinc-400 bg-zinc-100 text-zinc-900 dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-100',
-  'still-saving':
-    'border-zinc-400 bg-zinc-100 text-zinc-900 dark:border-zinc-500 dark:bg-zinc-800 dark:text-zinc-100',
-  saved:
-    'border-emerald-700 bg-emerald-50 text-emerald-900 dark:border-emerald-400 dark:bg-emerald-950 dark:text-emerald-100',
-  failed:
-    'border-red-700 bg-red-50 text-red-900 dark:border-red-400 dark:bg-red-950 dark:text-red-100',
+  idle: 'border-line-strong bg-page text-ink hover:bg-card',
+  offline: 'border-line-strong bg-page text-ink hover:bg-card',
+  saving: 'border-line-strong bg-card-muted text-ink',
+  'still-saving': 'border-line-strong bg-card-muted text-ink',
+  saved: 'border-success-ink bg-card text-success-ink',
+  failed: 'border-danger-line bg-danger-surface text-danger-ink',
 }
 
 export interface SaveActionButtonProps
@@ -714,7 +713,7 @@ export function SaveActionButton({
         aria-busy={busy || undefined}
         aria-disabled={disabled || busy || undefined}
         data-save-state={controller.state}
-        className={`inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600 disabled:opacity-60 ${STATE_BUTTON_STYLES[controller.state]} ${className}`.trim()}
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none disabled:opacity-60 ${STATE_BUTTON_STYLES[controller.state]} ${className}`.trim()}
         onClick={() => {
           if (disabled) return
           void controller.triggerSave()

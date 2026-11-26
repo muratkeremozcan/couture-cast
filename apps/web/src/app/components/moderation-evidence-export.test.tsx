@@ -465,6 +465,8 @@ describe('W-A11Y', () => {
     )
     expect(screen.getByLabelText(copy.to).className).toMatch(/min-h-\[44px\]/)
     expect(await violations(container)).toEqual([])
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(copy.title)
+    // Story CC-7.9 D6: the route's top bar shows the title (moderation-shell.test.tsx).
+    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    expect(screen.getByText(copy.subtitle)).toBeInTheDocument()
   })
 })

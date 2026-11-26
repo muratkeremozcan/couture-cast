@@ -306,7 +306,7 @@ export function MobileGarmentCaptureModal({
         resolveMobileAccessToken
       )
       if (!accessToken) {
-        throw new Error('AUTHENTICATION_REQUIRED')
+        throw new Error(t('wardrobe.error.sign_in_required'))
       }
 
       const sha256 = await sha256Hex(bytes)
@@ -539,7 +539,7 @@ export function MobileGarmentCaptureModal({
 
         {step === 'uploading' ? (
           <View style={styles.uploadState} testID="garment-upload-progress">
-            <ActivityIndicator color={colors.text} />
+            <ActivityIndicator color={colors.ink} />
             <Text>{uploadStatus}</Text>
             <Pressable
               testID="garment-upload-cancel"
@@ -557,7 +557,7 @@ export function MobileGarmentCaptureModal({
 
         {step === 'complete' ? (
           <View style={styles.completeState} testID="garment-capture-complete">
-            <Text style={styles.completeIcon}>✓</Text>
+            <Text style={[styles.completeIcon, themed.success]}>✓</Text>
             <Text style={styles.sectionTitle}>{t('wardrobe.upload.processing')}</Text>
             <Pressable
               testID="garment-capture-done"
@@ -598,41 +598,42 @@ const styles = StyleSheet.create({
   },
   sourceButtonText: { fontSize: 18, fontWeight: '700' },
   fixtureButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  cropContent: { gap: 18, alignItems: 'stretch' },
+  cropContent: { gap: 20, alignItems: 'stretch' },
   sectionTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
   squarePreview: { width: '100%', aspectRatio: 1, borderRadius: 16 },
   portraitPreview: { width: '100%', aspectRatio: 0.75, borderRadius: 16 },
-  row: { flexDirection: 'row', gap: 10 },
+  row: { flexDirection: 'row', gap: 12 },
   optionButton: {
     flex: 1,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
   },
   primaryButton: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   primaryButtonText: { fontWeight: '700' },
   uploadState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 },
   completeState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
-  completeIcon: { fontSize: 56, color: '#059669' },
+  completeIcon: { fontSize: 30 },
 })
 
 /** The OS light/dark colors for the layout above. */
 const useThemedStyles = createSchemeStyles((colors) => ({
-  modal: { backgroundColor: colors.background },
-  text: { color: colors.text },
+  modal: { backgroundColor: colors.page },
+  text: { color: colors.ink },
   errorBox: { backgroundColor: colors.dangerSurface },
-  errorText: { color: colors.dangerText },
-  link: { color: colors.noticeText },
-  outline: { borderColor: colors.strongBorder },
-  option: { backgroundColor: colors.border },
-  inverse: { backgroundColor: colors.inverseSurface },
+  errorText: { color: colors.dangerInk },
+  link: { color: colors.noticeInk },
+  outline: { borderColor: colors.lineStrong },
+  option: { backgroundColor: colors.card },
+  success: { color: colors.successInk },
+  inverse: { backgroundColor: colors.inverse },
   onInverse: { color: colors.onInverse },
 }))

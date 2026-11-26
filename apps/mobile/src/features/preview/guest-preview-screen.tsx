@@ -133,13 +133,16 @@ export function GuestPreviewScreen() {
   const frame = (children: React.ReactNode, testID = 'guest-preview-screen') => (
     <ScrollView
       testID={testID}
-      style={[previewStyles.screen, { backgroundColor: palette.background }]}
+      style={[previewStyles.screen, { backgroundColor: palette.page }]}
       contentContainerStyle={previewStyles.content}
     >
       <Text
         testID="guest-preview-label"
         accessibilityRole="text"
-        style={[previewStyles.label, { backgroundColor: '#FFF8E6', color: '#5A4310' }]}
+        style={[
+          previewStyles.label,
+          { backgroundColor: palette.noticeSurface, color: palette.noticeInk },
+        ]}
       >
         {strings.chrome.sampleLabel}
       </Text>
@@ -150,7 +153,7 @@ export function GuestPreviewScreen() {
   if (session === 'unavailable') {
     return frame(
       <View testID="guest-preview-session-unavailable" style={{ gap: 12 }}>
-        <Text accessibilityRole="alert" style={{ color: palette.text }}>
+        <Text accessibilityRole="alert" style={{ color: palette.ink }}>
           {strings.chrome.sessionUnavailable}
         </Text>
         <PreviewButton
@@ -168,7 +171,7 @@ export function GuestPreviewScreen() {
       <Text
         testID="guest-preview-checking"
         accessibilityLiveRegion="polite"
-        style={{ color: palette.mutedText }}
+        style={{ color: palette.inkMuted }}
       >
         {strings.chrome.checkingSession}
       </Text>
@@ -245,7 +248,7 @@ export function GuestPreviewScreen() {
         <Text
           testID="guest-preview-storage"
           accessibilityLiveRegion="polite"
-          style={{ color: '#5A4310' }}
+          style={{ color: palette.noticeInk }}
         >
           {strings.chrome.storageUnavailable}
         </Text>
@@ -274,13 +277,13 @@ export function GuestPreviewScreen() {
               style={[
                 previewStyles.tab,
                 selected
-                  ? { backgroundColor: palette.text, borderColor: palette.text }
-                  : { borderColor: palette.divider },
+                  ? { backgroundColor: palette.inverse, borderColor: palette.inverse }
+                  : { borderColor: palette.lineStrong },
               ]}
             >
               <Text
                 style={{
-                  color: selected ? palette.background : palette.text,
+                  color: selected ? palette.onInverse : palette.ink,
                   fontWeight: '600',
                 }}
               >

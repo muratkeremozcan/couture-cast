@@ -63,6 +63,7 @@ import {
   sentinelPlace,
 } from './lib/weather-provider-double-data.mjs'
 import { startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
+import { startDeviceAppearanceEndpoint } from './lib/device-appearance-endpoint.mjs'
 import {
   ANDROID_LOG_BUFFER,
   androidFailureCaptures,
@@ -2004,6 +2005,15 @@ let androidFlowTree
  * @param {readonly string[]} devices
  * @returns {Promise<{ sourceDir: string, targetDir: string }>}
  */
+/**
+ * Story CC-7.9: the Android appearance endpoint (scripts/lib/device-appearance-endpoint.mjs).
+ * iOS gets an empty URL, so a flow that needs it fails by name there.
+ */
+const startAppearanceEndpoint = async (platform, devices) =>
+  platform === 'android'
+    ? startDeviceAppearanceEndpoint({ adbBinary: resolveAdbBinary(), devices })
+    : { url: '', close: async () => undefined }
+
 const prepareAndroidFlows = async (appId, devices) => {
   /** @type {string[] | undefined} */
   let permissions
@@ -4066,6 +4076,9 @@ const buildMaestroFlowEnvArgs = () => [
   // Empty on iOS: `subflows/open-link.yaml` then keeps a plain `openLink`.
   '-e',
   `MAESTRO_EXPO_GO_OPEN_URL=${process.env.MAESTRO_EXPO_GO_OPEN_URL ?? ''}`,
+  // Story CC-7.9: Android only; empty on iOS (scripts/lib/device-appearance-endpoint.mjs).
+  '-e',
+  `MAESTRO_APPEARANCE_URL=${process.env.MAESTRO_APPEARANCE_URL ?? ''}`,
   // Story 6.16: the synthetic address the guest conversion signs up; empty otherwise.
   '-e',
   `GUEST_PREVIEW_EMAIL=${process.env.GUEST_PREVIEW_EMAIL ?? ''}`,
@@ -5296,6 +5309,14 @@ const run = async () => {
           })
         : undefined
     process.env.MAESTRO_EXPO_GO_OPEN_URL = expoGoLinks?.url ?? ''
+    // Story CC-7.9: the shell snapshot flow flips Android dark mode and freezes the status bar
+    // through this endpoint while the app stays open. See
+    // scripts/lib/device-appearance-endpoint.mjs.
+    const deviceAppearance = await startAppearanceEndpoint(
+      target.platform,
+      androidDevices
+    )
+    process.env.MAESTRO_APPEARANCE_URL = deviceAppearance.url
 
     const { maestroEnv, xcrunShimDir } = createMaestroEnv(target.platform)
 
@@ -5349,6 +5370,7 @@ const run = async () => {
       await runFlowsSerially(target, maestroEnv, mobileIdentity, flowFailures)
     } finally {
       await expoGoLinks?.close()
+      await deviceAppearance.close()
       if (xcrunShimDir) {
         fs.rmSync(xcrunShimDir, { recursive: true, force: true })
       }

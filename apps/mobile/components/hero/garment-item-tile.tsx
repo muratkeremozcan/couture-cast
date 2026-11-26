@@ -1,7 +1,8 @@
 import React, { type ComponentRef } from 'react'
-import { StyleSheet, Pressable, Platform } from 'react-native'
+import { StyleSheet, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
+import { elevationStyle } from '@/src/theme/tokens'
 import { useGlyphBox } from '@/components/glyph-box'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -170,10 +171,7 @@ export function GarmentItemTile({
   return (
     <Pressable
       ref={(element) => onRef?.(garmentId, element)}
-      style={[
-        styles.card,
-        { backgroundColor: palette.surface, borderColor: palette.divider },
-      ]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
       onPress={(event) =>
         onSwap(
           garmentId,
@@ -191,20 +189,20 @@ export function GarmentItemTile({
               garment has no name, so its category is the title on its own
               rather than repeated as a group above itself. */}
           {parts.name && (
-            <Text style={[styles.categoryText, { color: palette.mutedText }]}>
+            <Text style={[styles.categoryText, { color: palette.inkMuted }]}>
               {localizedCategory}
             </Text>
           )}
-          <Text style={[styles.nameText, { color: palette.text }]}>{title}</Text>
+          <Text style={[styles.nameText, { color: palette.ink }]}>{title}</Text>
         </View>
         <View
           style={[
             styles.swapButton,
             swapBox,
-            { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+            { backgroundColor: palette.page, borderColor: palette.line },
           ]}
         >
-          <Text style={[styles.swapIcon, { color: palette.accentText }]}>⇄</Text>
+          <Text style={[styles.swapIcon, { color: palette.inkMuted }]}>⇄</Text>
         </View>
       </View>
     </Pressable>
@@ -212,27 +210,13 @@ export function GarmentItemTile({
 }
 
 const styles = StyleSheet.create({
+  // Colors come from the scheme roles at render time; the static sheet keeps layout only.
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E6E6ED',
-    padding: 14,
+    padding: 12,
     marginVertical: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 4,
-      },
-      android: {
-        elevation: 2,
-      },
-      web: {
-        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
-      },
-    }),
+    ...elevationStyle('card'),
   },
   content: {
     flexDirection: 'row',
@@ -245,39 +229,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#a3a3a3',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
     marginBottom: 4,
   },
   nameText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#111111',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
   },
   swapButton: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
-    borderRadius: 15,
+    borderRadius: 9999,
     width: 30,
     height: 30,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E6E6ED',
   },
   swapIcon: {
     fontSize: 14,

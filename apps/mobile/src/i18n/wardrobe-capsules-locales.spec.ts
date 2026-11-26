@@ -54,6 +54,8 @@ const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
   'occasions.casual': ['it-IT', 'es-419', 'pt-PT', 'pt-BR'],
   'occasions.formal': ['es-419', 'pt-PT', 'pt-BR'],
   'occasions.sport': ['fr-FR', 'fr-CA', 'it-IT', 'de-DE'],
+  // Story CC-7.9: German says "warm" too (the web catalog approves the same cognate).
+  'comfort.warm': ['de-DE'],
 }
 
 function capsuleTree(catalog: Catalog): Record<string, unknown> {
@@ -98,8 +100,15 @@ describe('4.3 mobile wardrobe capsule locale parity', () => {
   // 4.3-MOB-MODAL-04 and -15, which then matched two elements. The key stays in
   // the mobile catalogs because 4.3-I18N-MOB-06 requires one key tree across
   // both surfaces.
-  it('4.3-I18N-MOB-01 ships 52 capsule keys in the reference catalog', () => {
-    expect(reference.size).toBe(52)
+  //
+  // 92, not 52. Story CC-7.9 D9 moved the last hard-coded capsule copy into the catalogs: on
+  // mobile the sign-in error, the card status and garment count, the truncation notice and, in
+  // the builder, the garment fallbacks, the close label, the repair banner, the favorite toggle
+  // and the saving label (14 keys); on web the page subtitle, filter, card actions, delete
+  // confirmation and builder garment labels (26 keys). Both surfaces carry all 40 for
+  // 4.3-I18N-MOB-06.
+  it('4.3-I18N-MOB-01 ships 92 capsule keys in the reference catalog', () => {
+    expect(reference.size).toBe(92)
   })
 
   it('4.3-I18N-MOB-02 uses an identical key tree in every locale', () => {

@@ -4,13 +4,8 @@ import { useTranslation } from 'react-i18next'
 import type { EmbeddedCommunityChallenge } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
-/**
- * `hero-theme.ts` has no premium accent token and this task may not extend it, so
- * the gold badge/CTA colour and the ink on it are derived here. Reported as a
- * palette gap. `#111111` on `#C9A14A` computes to 8.7:1.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
+// Story CC-7.9 D3: the eyebrow badge is a marker (`inverse`) and Participate is a secondary
+// action on the Community screen, so it is a neutral outline button; gold stays with the roles.
 
 export interface CommunityChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
@@ -34,29 +29,29 @@ export function CommunityChallengeBanner({
       testID="community-challenge-banner"
       style={[
         styles.banner,
-        { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+        { backgroundColor: palette.card, borderColor: palette.line },
       ]}
     >
       <View style={styles.headerRow}>
-        <View style={[styles.badgeContainer, { backgroundColor: ACCENT_GOLD }]}>
-          <Text style={[styles.badgeText, { color: ON_ACCENT }]}>
+        <View style={[styles.badgeContainer, { backgroundColor: palette.inverse }]}>
+          <Text style={[styles.badgeText, { color: palette.onInverse }]}>
             {t('community.challenge.eyebrow')}
           </Text>
         </View>
-        <View style={[styles.climateTag, { borderColor: palette.mutedText }]}>
-          <Text style={[styles.climateTagText, { color: palette.text }]}>
+        <View style={[styles.climateTag, { borderColor: palette.inkMuted }]}>
+          <Text style={[styles.climateTagText, { color: palette.ink }]}>
             {climateLabel}
           </Text>
         </View>
       </View>
       <Text
-        style={[styles.title, { color: palette.text }]}
+        style={[styles.title, { color: palette.ink }]}
         testID="community-challenge-title"
       >
         {challenge.title}
       </Text>
       <Text
-        style={[styles.body, { color: palette.mutedText }]}
+        style={[styles.body, { color: palette.inkMuted }]}
         testID="community-challenge-body"
       >
         {challenge.body}
@@ -67,10 +62,13 @@ export function CommunityChallengeBanner({
         accessibilityLabel={t('community.challenge.participateLabel', {
           title: challenge.title,
         })}
-        style={[styles.ctaButton, { backgroundColor: ACCENT_GOLD }]}
+        style={[
+          styles.ctaButton,
+          { backgroundColor: palette.page, borderColor: palette.lineStrong },
+        ]}
         onPress={onParticipate}
       >
-        <Text style={[styles.ctaButtonText, { color: ON_ACCENT }]}>
+        <Text style={[styles.ctaButtonText, { color: palette.ink }]}>
           {t('community.challenge.participate')}
         </Text>
       </TouchableOpacity>
@@ -98,40 +96,41 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.8,
   },
   climateTag: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 9999,
     borderWidth: 1,
   },
   climateTagText: {
-    fontSize: 11,
+    fontSize: 12,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   body: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 12,
   },
   ctaButton: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
+    borderWidth: 1,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'flex-start',
   },
   ctaButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 })

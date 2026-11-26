@@ -135,3 +135,42 @@ export * from './sample-wardrobe'
 export * from './federated-signin'
 export * from './save-feedback'
 export * from './wardrobe/deferred-garment-deletion'
+
+export {
+  boxShadowFor,
+  buildDesignTokenCssRules,
+  COLOR_ROLE_NAMES,
+  colorRoles,
+  elevation,
+  FILL_TEXT_PAIRS,
+  fontWeight,
+  GOLD_COLOR_ROLES,
+  hexToChannels,
+  kebabTokenName,
+  MEANING_LINE_COLOR_ROLES,
+  PREMIUM_PALETTE_FIELDS,
+  PREMIUM_PALETTE_KEYS,
+  premiumPalettes,
+  radius,
+  SCRIM_OPACITY,
+  SHADOW_COLOR,
+  shell,
+  space,
+  SPACE_SCALE_PX,
+  TEXT_COLOR_ROLES,
+  typeScale,
+  withAlpha,
+} from './design-tokens'
+export type {
+  ColorRole,
+  ColorRoles,
+  ColorScheme,
+  DesignTokenCssRules,
+  ElevationKey,
+  ElevationLevel,
+  PremiumPaletteColors,
+  PremiumPaletteKey,
+  RadiusKey,
+  SpaceKey,
+  TypeScaleKey,
+} from './design-tokens'

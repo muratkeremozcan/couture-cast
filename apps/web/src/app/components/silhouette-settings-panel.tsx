@@ -109,7 +109,7 @@ function MannequinPreview({
       <svg
         viewBox="0 0 120 220"
         aria-hidden="true"
-        className="h-48 w-24 text-zinc-900 dark:text-zinc-100"
+        className="h-48 w-24 text-ink"
         data-testid="silhouette-mannequin"
       >
         <g style={{ transform: `scaleY(${heightScale})`, transformOrigin: '60px 210px' }}>
@@ -188,28 +188,26 @@ function MyFormPanel({
   const isReady = isMyFormActive && myForm?.status === 'ready'
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+    <div className="flex flex-col gap-3 rounded-lg border border-line p-4">
+      <p className="text-sm font-semibold text-ink">
         {t('wardrobe.silhouette.myFormUpload')}
       </p>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        {t('wardrobe.silhouette.myFormGuidance')}
-      </p>
+      <p className="text-xs text-ink-muted">{t('wardrobe.silhouette.myFormGuidance')}</p>
 
-      <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-ink-soft">
         <input
           ref={confirmCheckboxRef}
           type="checkbox"
           checked={confirmChecked}
           onChange={(event) => onConfirmChange(event.target.checked)}
           aria-label={t('wardrobe.silhouette.myFormConfirm')}
-          className="h-5 w-5 rounded border-zinc-300 focus:ring-2 focus:ring-black focus:ring-offset-2"
+          className="h-5 w-5 rounded-sm border-line-strong accent-ink"
         />
         {t('wardrobe.silhouette.myFormConfirm')}
       </label>
 
       {confirmError && (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+        <p role="alert" className="text-sm text-danger-ink">
           {confirmError}
         </p>
       )}
@@ -225,21 +223,21 @@ function MyFormPanel({
       />
 
       {(isUploading || isPolling) && (
-        <p role="status" className="text-sm text-zinc-600 dark:text-zinc-300">
+        <p role="status" className="text-sm text-ink-muted">
           {t('wardrobe.silhouette.processing')}
         </p>
       )}
 
       {displayError && (
         <div className="flex flex-col items-start gap-2">
-          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+          <p role="alert" className="text-sm text-danger-ink">
             {displayError}
           </p>
           {canRetry && (
             <button
               type="button"
               onClick={onRetryUpload}
-              className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="min-h-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink hover:bg-card"
             >
               {t('wardrobe.silhouette.myFormRetry')}
             </button>
@@ -257,7 +255,7 @@ function MyFormPanel({
         <button
           type="button"
           onClick={onUploadButtonClick}
-          className="min-h-[44px] rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          className="min-h-11 rounded-lg bg-inverse px-4 py-2 text-sm font-semibold text-on-inverse hover:opacity-90"
         >
           {t('wardrobe.silhouette.myFormUpload')}
         </button>
@@ -265,10 +263,7 @@ function MyFormPanel({
 
       {isReady && (
         <div className="flex flex-col items-start gap-3">
-          <p
-            role="status"
-            className="text-sm font-semibold text-emerald-700 dark:text-emerald-300"
-          >
+          <p role="status" className="text-sm font-semibold text-success-ink">
             {t('wardrobe.silhouette.ready')}
           </p>
           {myForm?.imageAccess && (
@@ -283,7 +278,7 @@ function MyFormPanel({
             type="button"
             disabled={isRemoving}
             onClick={onRemoveMyForm}
-            className="min-h-[44px] rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+            className="min-h-11 rounded-lg border border-danger-line px-4 py-2 text-sm font-semibold text-danger-ink hover:bg-danger-surface"
           >
             {t('wardrobe.silhouette.myFormRemove')}
           </button>
@@ -784,7 +779,11 @@ export function SilhouetteSettingsPanel({
 
   if (isLoading) {
     return (
-      <p role="status" className="text-sm text-zinc-500" data-testid="silhouette-loading">
+      <p
+        role="status"
+        className="text-sm text-ink-muted"
+        data-testid="silhouette-loading"
+      >
         {t('wardrobe.silhouette.loading')}
       </p>
     )
@@ -792,7 +791,10 @@ export function SilhouetteSettingsPanel({
 
   if (loadError) {
     return (
-      <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+      <p
+        role="alert"
+        className="rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
+      >
         {loadError}
       </p>
     )
@@ -831,10 +833,10 @@ export function SilhouetteSettingsPanel({
   return (
     <div className="flex flex-col gap-6" data-testid="silhouette-settings-panel">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+        <h2 className="text-lg font-semibold text-ink">
           {t('wardrobe.silhouette.title')}
         </h2>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 text-xs text-ink-muted">
           {isMyFormActive
             ? t('wardrobe.silhouette.modeMyForm')
             : t('wardrobe.silhouette.modeDefault')}
@@ -842,7 +844,10 @@ export function SilhouetteSettingsPanel({
       </div>
 
       {sliderError && (
-        <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
+        >
           {sliderError}
         </p>
       )}
@@ -851,7 +856,7 @@ export function SilhouetteSettingsPanel({
         <button
           type="button"
           onClick={reloadProfile}
-          className="w-full rounded-lg border border-amber-300 px-3 py-2 text-xs font-medium text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-200"
+          className="w-full rounded-lg border border-notice-line px-3 py-2 text-xs font-medium text-notice-ink hover:bg-notice-surface"
         >
           Reload the latest version
         </button>
@@ -860,7 +865,7 @@ export function SilhouetteSettingsPanel({
       <MannequinPreview heightSlider={heightSlider} buildSlider={buildSlider} />
 
       <div className="flex flex-col gap-4">
-        <label className="flex flex-col gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
           {t('wardrobe.silhouette.heightSliderLabel')}
           <input
             type="range"
@@ -873,7 +878,7 @@ export function SilhouetteSettingsPanel({
             data-testid="silhouette-height-slider"
           />
         </label>
-        <label className="flex flex-col gap-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+        <label className="flex flex-col gap-2 text-sm font-medium text-ink-soft">
           {t('wardrobe.silhouette.buildSliderLabel')}
           <input
             type="range"

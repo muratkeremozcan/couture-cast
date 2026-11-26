@@ -3,6 +3,7 @@ import React, { forwardRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useGlyphBox } from '@/components/glyph-box'
+import { elevationStyle, useTokens } from '@/src/theme/tokens'
 
 export interface InfoBannerProps {
   message: string
@@ -25,6 +26,7 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
 ) {
   const { t } = useTranslation()
   const iconBox = useGlyphBox(22, true)
+  const { colors } = useTokens()
   const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
 
   if (dismissedMessage === message) {
@@ -43,7 +45,10 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
       accessibilityLiveRegion={liveRegion ? 'polite' : 'none'}
       accessibilityLabel={message}
       testID="deep-link-info-banner"
-      style={styles.container}
+      style={[
+        styles.container,
+        { backgroundColor: colors.card, borderColor: colors.line },
+      ]}
     >
       <View
         ref={ref}
@@ -54,10 +59,12 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
         {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
         style={styles.content}
       >
-        <View style={[styles.iconContainer, iconBox]}>
-          <Text style={styles.iconText}>i</Text>
+        <View
+          style={[styles.iconContainer, iconBox, { backgroundColor: colors.inverse }]}
+        >
+          <Text style={[styles.iconText, { color: colors.onInverse }]}>i</Text>
         </View>
-        <Text style={styles.messageText}>{message}</Text>
+        <Text style={[styles.messageText, { color: colors.ink }]}>{message}</Text>
       </View>
       <Pressable
         onPress={handleDismiss}
@@ -66,7 +73,7 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         style={styles.closeButton}
       >
-        <Text style={styles.closeText}>✕</Text>
+        <Text style={[styles.closeText, { color: colors.ink }]}>✕</Text>
       </Pressable>
     </View>
   )
@@ -76,24 +83,14 @@ const styles = StyleSheet.create({
   container: {
     marginHorizontal: 16,
     marginVertical: 8,
-    padding: 14,
-    backgroundColor: '#111111',
+    padding: 12,
+    // Colors follow the OS scheme at render time (Story CC-7.9 D2); the sheet keeps layout.
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(201, 161, 74, 0.4)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-      },
-      android: { elevation: 5 },
-      web: { boxShadow: '0 2px 4px rgba(0, 0, 0, 0.25)' },
-    }),
+    ...elevationStyle('card'),
   },
   content: {
     flexDirection: 'row',
@@ -104,19 +101,16 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 22,
     height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(201, 161, 74, 0.2)',
+    borderRadius: 9999,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 8,
   },
   iconText: {
-    color: '#C9A14A',
     fontWeight: 'bold',
     fontSize: 12,
   },
   messageText: {
-    color: '#F5F5F7',
     fontSize: 14,
     fontWeight: '500',
     flex: 1,
@@ -125,7 +119,6 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   closeText: {
-    color: '#F5F5F7',
     fontSize: 16,
   },
 })

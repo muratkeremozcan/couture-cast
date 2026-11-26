@@ -46,7 +46,13 @@
         "heat": "Allerta caldo",
         "ice": "Allerta ghiaccio"
       },
-      "body_generic": "È in vigore un'allerta meteo per la tua zona."
+      "body_generic": "È in vigore un'allerta meteo per la tua zona.",
+      "focused_badge": "Allerta meteo: {{severity}}",
+      "severity": {
+        "info": "Informazione",
+        "warning": "Avviso",
+        "critical": "Critica"
+      }
     },
     "no_location": "Aggiungi la tua posizione per ricevere gli outfit del giorno"
   },
@@ -141,7 +147,8 @@
       "storage_forbidden": "Accesso allo spazio di archiviazione negato.",
       "consent_required": "Per caricare capi serve il consenso di un tutore.",
       "upload_expired": "La sessione di caricamento è scaduta.",
-      "upload_session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto."
+      "upload_session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto.",
+      "sign_in_required": "Accedi per gestire il tuo guardaroba."
     },
     "crop": {
       "title": "Ritaglia e posiziona",
@@ -283,7 +290,53 @@
       },
       "garmentsSelected": "Capi ({{count}} di {{max}} selezionati)",
       "garmentsRange": "Seleziona da {{min}} a {{max}} capi.",
-      "garmentOrder": "Ordine dei capi"
+      "garmentOrder": "Ordine dei capi",
+      "signIn": "Accedi per gestire le tue capsule.",
+      "status": {
+        "ready": "Pronta",
+        "needsRepair": "Da riparare"
+      },
+      "garmentCount_one": "{{count}} capo",
+      "garmentCount_other": "{{count}} capi",
+      "truncation": "Vengono mostrate {{shown}} di {{total}}. Affina la ricerca per vedere le altre.",
+      "garmentAtPosition": "{{garment}} (posizione {{position}})",
+      "garmentNumber": "Capo {{position}}",
+      "closeBuilder": "Chiudi il creatore di capsule",
+      "repairRemoved_one": "{{count}} capo non è più disponibile ed è stato rimosso. Scegli un sostituto prima di salvare.",
+      "repairRemoved_other": "{{count}} capi non sono più disponibili e sono stati rimossi. Scegli dei sostituti prima di salvare.",
+      "favoriteMarked": "Capsula preferita",
+      "markFavorite": "Segna come preferita",
+      "saving": "Salvataggio...",
+      "subtitle": "Crea e gestisci le tue combinazioni di outfit.",
+      "filterOccasionLabel": "Filtra per occasione",
+      "loading": "Caricamento delle capsule di outfit…",
+      "favoriteCapsule": "Aggiungi la capsula {{name}} ai preferiti",
+      "editAction": "Modifica",
+      "deleteAction": "Elimina",
+      "cancelDeletion": "Annulla eliminazione",
+      "cancel": "Annulla",
+      "builderDescription": "Crea una capsula di outfit coerente dal tuo guardaroba.",
+      "reloadLatest": "Ricarica l'ultima versione",
+      "garmentFallback": "Capo {{position}}",
+      "garmentNoun": "capo",
+      "untagged": "Capo",
+      "garmentLabel": "{{category}} (posizione {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (posizione {{position}})",
+      "category": {
+        "top": "capo superiore",
+        "bottom": "capo inferiore",
+        "outerwear": "capospalla",
+        "dress": "abito",
+        "shoes": "scarpe",
+        "accessory": "accessorio"
+      },
+      "comfort": {
+        "cold": "freddo",
+        "cool": "fresco",
+        "mild": "mite",
+        "warm": "caldo",
+        "hot": "molto caldo"
+      }
     },
     "onboarding": {
       "title": "Configura il tuo guardaroba",
@@ -324,7 +377,8 @@
         "storage_error": "Non siamo riusciti a salvare questa foto. Riprova.",
         "confirm_required": "Conferma le indicazioni sull'abbigliamento di base prima di caricare.",
         "session_changed": "Hai effettuato la disconnessione o cambiato account durante questo caricamento. Scegli di nuovo la foto."
-      }
+      },
+      "sign_in_required": "Accedi per modificare la tua silhouette."
     },
     "detail": {
       "back": "Torna all'armadio",
@@ -351,6 +405,19 @@
       "deleteUndone": "Eliminazione annullata",
       "deleteFailed": "Impossibile eliminare questo capo.",
       "deleteUsageFailed": "Impossibile verificare dove è usato questo capo. Riprova."
+    },
+    "hub": {
+      "loading": "Caricamento del guardaroba",
+      "saved_looks_failed": "Impossibile caricare i tuoi look salvati.",
+      "status": {
+        "pending_upload": "Caricamento in corso",
+        "bytes_uploaded": "Caricamento in corso",
+        "processing": "Elaborazione in corso",
+        "awaiting_tags": "In attesa dei tag",
+        "ready": "Pronto",
+        "failed": "Caricamento non riuscito",
+        "unknown": "In corso"
+      }
     }
   },
   "commerce": {
@@ -1112,5 +1179,61 @@
     "close": "Chiudi",
     "showList": "Mostra look salvati",
     "hideList": "Nascondi look salvati"
+  },
+  "shell": {
+    "back": "Indietro",
+    "notFound": {
+      "title": "Schermata non trovata",
+      "body": "La schermata che cercavi non esiste. Torna alla schermata iniziale per continuare."
+    },
+    "goHome": "Vai alla home"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Consenso del genitore",
+      "heading": "Accetta l'accesso al guardaroba teen",
+      "intro": "Conferma questo invito per collegare l'account del genitore e sbloccare il guardaroba teen.",
+      "tokenMissing": "In questo link manca il codice di invito.",
+      "success": "Consenso registrato per {{teenEmail}}. L'account genitore {{guardianEmail}} ora è collegato.",
+      "failed": "Impossibile accettare l'invito del genitore",
+      "accepting": "Accettazione…",
+      "accept": "Accetta invito",
+      "acceptingLabel": "Accettazione dell'invito"
+    },
+    "dashboard": {
+      "title": "Pannello del genitore",
+      "intro": "Controlla gli account teen collegati e revoca il consenso quando l'accesso deve finire.",
+      "loading": "Caricamento dei teen collegati...",
+      "loadFailed": "Impossibile caricare il pannello",
+      "revokeFailed": "Impossibile revocare il consenso",
+      "revoked": "Consenso revocato per {{teenId}}. Sessione teen chiusa: {{invalidated}}.",
+      "yes": "sì",
+      "no": "no",
+      "linkedTeens": "Teen collegati",
+      "revokeLabel": "Revoca il consenso per {{teenId}}",
+      "revoking": "Revoca in corso...",
+      "revoke": "Revoca",
+      "empty": "Ancora nessun account teen collegato."
+    },
+    "consent": {
+      "awaiting": "Consenso in attesa",
+      "status": {
+        "granted": "concesso",
+        "pending": "in attesa",
+        "revoked": "revocato"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Pannello teen",
+      "loading": "Caricamento dello stato del consenso...",
+      "loadFailed": "Impossibile caricare il pannello",
+      "granted": "Consenso del genitore concesso",
+      "revoked": "Consenso del genitore revocato",
+      "pending": "Consenso del genitore in attesa",
+      "linkedGuardians": "Genitori collegati",
+      "empty": "Nessun genitore ha ancora dato il consenso."
+    }
   }
 }

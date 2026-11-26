@@ -7,5 +7,5 @@ appId: com.apple.Preferences
 - extendedWaitUntil:
     visible:
       id: breadcrumb
-      text: ".*CoutureCast Story68"
+      text: '.*CoutureCast Story68'
     timeout: 15000

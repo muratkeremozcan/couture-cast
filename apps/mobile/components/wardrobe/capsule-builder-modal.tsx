@@ -1,6 +1,8 @@
 // Story 4.3 Task 6 step 1 owner: implement native mobile CapsuleBuilderModal component in apps/mobile/components/wardrobe/capsule-builder-modal.tsx
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
+import { formatGarmentAlt, formatGarmentTagLabels } from '@couture/utils'
 
 import { randomUuidV4 } from '@/src/lib/uuid'
 import { createSchemeStyles } from '@/components/themed'
@@ -22,6 +24,7 @@ import type {
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { useTokens } from '@/src/theme/tokens'
 
 export interface MobileCapsuleSaveOptions {
   /** Present only when editing; the current strong entity tag. */
@@ -46,17 +49,35 @@ export interface MobileCapsuleBuilderModalProps {
 const MIN_GARMENTS = 2
 const MAX_GARMENTS = 10
 
+/** The localized category, or "Untagged garment" when the piece has none. */
+function garmentName(locale: string, garment: GarmentItemContract): string {
+  return (
+    formatGarmentTagLabels(locale, garment).category ??
+    formatGarmentAlt(locale, { category: null })
+  )
+}
+
+/** The localized category with its comfort range, for a checklist row ("Top, Mild"). */
+function garmentChoiceLabel(locale: string, garment: GarmentItemContract): string {
+  const name = garmentName(locale, garment)
+  const comfort = formatGarmentTagLabels(locale, garment).comfort
+  return comfort ? `${name}, ${comfort}` : name
+}
+
 /** Distinguishes two garments of the same category for screen-reader users. */
 function describeGarment(
+  t: TFunction,
+  locale: string,
   garment: GarmentItemContract | undefined,
   position: number
 ): string {
   if (!garment) {
-    return `Garment ${position}`
+    return t('wardrobe.capsules.garmentNumber', { position })
   }
-  const category = garment.category ?? 'garment'
-  const comfort = garment.comfortRange ? `, ${garment.comfortRange}` : ''
-  return `${category}${comfort} (position ${position})`
+  return t('wardrobe.capsules.garmentAtPosition', {
+    garment: garmentChoiceLabel(locale, garment),
+    position,
+  })
 }
 
 const ALL_OCCASIONS: CapsuleOccasion[] = [
@@ -79,8 +100,10 @@ export function MobileCapsuleBuilderModal({
   invokingNodeHandle,
 }: MobileCapsuleBuilderModalProps) {
   const modalAnimation = useModalAnimation('slide')
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language
   const styles = useStyles()
+  const { scrim } = useTokens()
   const insets = useModalInsets()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -189,7 +212,7 @@ export function MobileCapsuleBuilderModal({
     setSelectedGarmentIds(updated)
 
     const garment = availableGarments.find((g) => g.id === temp)
-    const label = describeGarment(garment, targetIndex + 1)
+    const label = describeGarment(t, locale, garment, targetIndex + 1)
     AccessibilityInfo.announceForAccessibility(
       t('wardrobe.capsules.garmentMoved', {
         garment: label,
@@ -266,7 +289,7 @@ export function MobileCapsuleBuilderModal({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
-      scrim="rgba(0,0,0,0.5)"
+      scrim={scrim}
     >
       <View style={styles.overlay}>
         {/* The sheet is the accessibility modal view: react-native's Modal drops the prop, so
@@ -291,7 +314,7 @@ export function MobileCapsuleBuilderModal({
               onPress={onClose}
               style={styles.closeButton}
               accessibilityRole="button"
-              accessibilityLabel="Close capsule builder modal"
+              accessibilityLabel={t('wardrobe.capsules.closeBuilder')}
               testID="close-modal-button"
             >
               <Text style={styles.closeText}>✕</Text>
@@ -313,9 +336,9 @@ export function MobileCapsuleBuilderModal({
             {(initialCapsule?.unavailableGarmentCount ?? 0) > 0 && (
               <View style={styles.repairBox} testID="capsule-repair-banner">
                 <Text style={styles.repairText}>
-                  {initialCapsule?.unavailableGarmentCount === 1
-                    ? '1 garment is no longer available and has been removed. Choose a replacement before saving.'
-                    : `${initialCapsule?.unavailableGarmentCount} garments are no longer available and have been removed. Choose replacements before saving.`}
+                  {t('wardrobe.capsules.repairRemoved', {
+                    count: initialCapsule?.unavailableGarmentCount ?? 0,
+                  })}
                 </Text>
               </View>
             )}
@@ -388,13 +411,13 @@ export function MobileCapsuleBuilderModal({
                     onPress={() => toggleGarment(g.id)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: isSelected }}
-                    accessibilityLabel={`${g.category ?? 'Garment'} ${g.comfortRange ?? 'mild'}`}
+                    accessibilityLabel={garmentChoiceLabel(locale, g)}
                     style={styles.garmentRow}
                     testID={`garment-checkbox-${g.id}`}
                   >
                     <Text style={styles.garmentText}>
                       {isSelected ? '[✓] ' : '[  ] '}
-                      {g.category ?? 'Garment'} ({g.comfortRange ?? 'mild'})
+                      {garmentChoiceLabel(locale, g)}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -411,7 +434,7 @@ export function MobileCapsuleBuilderModal({
                 <Text style={styles.label}>{t('wardrobe.capsules.garmentOrder')}</Text>
                 {selectedGarmentIds.map((gId, idx) => {
                   const g = availableGarments.find((garment) => garment.id === gId)
-                  const label = describeGarment(g, idx + 1)
+                  const label = describeGarment(t, locale, g, idx + 1)
                   const isFirst = idx === 0
                   const isLast = idx === selectedGarmentIds.length - 1
                   return (
@@ -421,7 +444,10 @@ export function MobileCapsuleBuilderModal({
                       testID={`reorder-row-${gId}`}
                     >
                       <Text style={styles.reorderText}>
-                        {idx + 1}. {g?.category ?? 'Garment'}
+                        {idx + 1}.{' '}
+                        {g
+                          ? garmentName(locale, g)
+                          : t('wardrobe.capsules.garmentNumber', { position: idx + 1 })}
                       </Text>
                       <View style={styles.reorderButtons}>
                         <TouchableOpacity
@@ -475,7 +501,9 @@ export function MobileCapsuleBuilderModal({
               testID="favorite-toggle"
             >
               <Text style={styles.favoriteText}>
-                {isFavorite ? '★ Favorite Capsule' : '☆ Mark as Favorite'}
+                {isFavorite
+                  ? `★ ${t('wardrobe.capsules.favoriteMarked')}`
+                  : `☆ ${t('wardrobe.capsules.markFavorite')}`}
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -485,9 +513,9 @@ export function MobileCapsuleBuilderModal({
               onPress={onClose}
               style={styles.cancelButton}
               accessibilityRole="button"
-              accessibilityLabel="Cancel"
+              accessibilityLabel={t('common.cancel')}
             >
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
@@ -500,7 +528,9 @@ export function MobileCapsuleBuilderModal({
               testID="save-capsule-button"
             >
               <Text style={styles.saveText}>
-                {isSubmitting ? 'Saving...' : 'Save Capsule'}
+                {isSubmitting
+                  ? t('wardrobe.capsules.saving')
+                  : t('wardrobe.capsules.save')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -517,7 +547,7 @@ const useStyles = createSchemeStyles((colors) => ({
     justifyContent: 'flex-end',
   },
   modalContainer: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.page,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '90%',
@@ -529,12 +559,12 @@ const useStyles = createSchemeStyles((colors) => ({
     justifyContent: 'space-between',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.line,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.ink,
   },
   closeButton: {
     minWidth: 44,
@@ -544,7 +574,7 @@ const useStyles = createSchemeStyles((colors) => ({
   },
   closeText: {
     fontSize: 18,
-    color: colors.mutedText,
+    color: colors.inkMuted,
   },
   repairBox: {
     backgroundColor: colors.noticeSurface,
@@ -553,17 +583,17 @@ const useStyles = createSchemeStyles((colors) => ({
     padding: 12,
   },
   repairText: {
-    color: colors.noticeText,
+    color: colors.noticeInk,
     fontSize: 12,
   },
   errorBox: {
     backgroundColor: colors.dangerSurface,
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
     marginTop: 8,
   },
   errorText: {
-    color: colors.dangerText,
+    color: colors.dangerInk,
     fontSize: 12,
     fontWeight: '500',
   },
@@ -576,17 +606,17 @@ const useStyles = createSchemeStyles((colors) => ({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.ink,
     marginTop: 12,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.strongBorder,
+    borderColor: colors.lineStrong,
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     fontSize: 14,
-    color: colors.text,
+    color: colors.ink,
   },
   multilineInput: {
     height: 60,
@@ -602,20 +632,20 @@ const useStyles = createSchemeStyles((colors) => ({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
-    backgroundColor: colors.subtleSurface,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.card,
     minWidth: 44,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
   },
   chipSelected: {
-    backgroundColor: colors.inverseSurface,
-    borderColor: colors.inverseSurface,
+    backgroundColor: colors.inverse,
+    borderColor: colors.inverse,
   },
   chipText: {
     fontSize: 12,
-    color: colors.text,
+    color: colors.ink,
     textTransform: 'capitalize',
   },
   chipTextSelected: {
@@ -624,20 +654,20 @@ const useStyles = createSchemeStyles((colors) => ({
   },
   garmentListContainer: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.line,
     borderRadius: 8,
     maxHeight: 180,
   },
   garmentRow: {
     padding: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.line,
     minHeight: 44,
     justifyContent: 'center',
   },
   garmentText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.ink,
   },
   reorderSection: {
     marginTop: 12,
@@ -646,31 +676,31 @@ const useStyles = createSchemeStyles((colors) => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.line,
   },
   reorderText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.text,
+    color: colors.ink,
   },
   reorderButtons: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   reorderBtn: {
     minWidth: 44,
     minHeight: 44,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
-    borderRadius: 6,
+    borderColor: colors.lineStrong,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   reorderBtnText: {
     fontSize: 12,
-    color: colors.text,
+    color: colors.ink,
   },
   favoriteRow: {
     marginTop: 16,
@@ -679,7 +709,7 @@ const useStyles = createSchemeStyles((colors) => ({
   favoriteText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.ink,
   },
   footer: {
     flexDirection: 'row',
@@ -687,7 +717,7 @@ const useStyles = createSchemeStyles((colors) => ({
     gap: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.line,
   },
   cancelButton: {
     minWidth: 44,
@@ -697,11 +727,11 @@ const useStyles = createSchemeStyles((colors) => ({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
+    borderColor: colors.lineStrong,
   },
   cancelText: {
     fontSize: 14,
-    color: colors.mutedText,
+    color: colors.inkMuted,
   },
   saveButton: {
     minWidth: 44,
@@ -710,7 +740,7 @@ const useStyles = createSchemeStyles((colors) => ({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: colors.inverseSurface,
+    backgroundColor: colors.inverse,
   },
   saveText: {
     fontSize: 14,

@@ -1,4 +1,5 @@
 // Story CC-7.2: Temporary "Saved looks" row at the top of the Closet screen until CC-7.12 ships.
+// Story CC-7.9 D7: the row is one card; the saved looks inside it are plain sections.
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -101,11 +102,11 @@ function SavedLookStatusBadges({
 }) {
   if (status === 'ready') return null
   return (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-wrap gap-2">
       {status === 'missing_garment' && (
         <span
           data-testid="saved-look-missing-garment"
-          className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+          className="rounded-sm border border-notice-line bg-notice-surface px-2 py-0.5 text-xs font-semibold text-notice-ink"
         >
           {missingLabel}
         </span>
@@ -113,7 +114,7 @@ function SavedLookStatusBadges({
       {status === 'needs_review' && (
         <span
           data-testid="saved-look-needs-review"
-          className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-200"
+          className="rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink"
         >
           {needsReviewLabel}
         </span>
@@ -136,7 +137,7 @@ function SavedLookDetailNotices({
       <p
         role="status"
         data-testid="saved-look-detail-missing"
-        className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/50 dark:text-amber-200"
+        className="rounded-lg border border-notice-line bg-notice-surface p-3 text-sm text-notice-ink"
       >
         {missingDetail}
       </p>
@@ -147,7 +148,7 @@ function SavedLookDetailNotices({
       <p
         role="status"
         data-testid="saved-look-detail-needs-review"
-        className="rounded-lg bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+        className="rounded-lg border border-line bg-card-muted p-3 text-sm text-ink"
       >
         {needsReviewDetail}
       </p>
@@ -464,10 +465,10 @@ function ClosetSavedLooksRowInner({
           key={`${slot.slotIndex}-${slot.itemId}`}
           data-testid={`saved-look-slot-${slot.slotIndex}`}
           data-slot-item-id={slot.itemId}
-          className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700"
+          className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 text-xs text-ink"
         >
           {catalogItem ? (
-            <span className="shrink-0 rounded bg-[#F5F5F7] p-0.5">
+            <span className="shrink-0 rounded-md bg-card-muted p-0.5">
               <SampleGarmentArt garment={catalogItem} className="h-7 w-7" />
             </span>
           ) : null}
@@ -482,7 +483,7 @@ function ClosetSavedLooksRowInner({
           key={`${slot.slotIndex}-${slot.itemId}`}
           data-testid={`saved-look-slot-${slot.slotIndex}`}
           data-slot-item-id={slot.itemId}
-          className="flex items-center gap-2 rounded-lg border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-200"
+          className="flex items-center gap-2 rounded-lg border border-dashed border-notice-line bg-notice-surface px-2 py-1 text-xs font-medium text-notice-ink"
         >
           <span aria-hidden="true">?</span>
           <span>
@@ -502,7 +503,7 @@ function ClosetSavedLooksRowInner({
         key={`${slot.slotIndex}-${slot.itemId}`}
         data-testid={`saved-look-slot-${slot.slotIndex}`}
         data-slot-item-id={slot.itemId}
-        className="flex items-center gap-2 rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700"
+        className="flex items-center gap-2 rounded-lg border border-line px-2 py-1 text-xs text-ink"
       >
         {photoUsable && slot.imageAccess ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -510,7 +511,7 @@ function ClosetSavedLooksRowInner({
             src={slot.imageAccess.url}
             alt={samples.values.category[slot.category]}
             referrerPolicy="no-referrer"
-            className="h-7 w-7 rounded object-cover"
+            className="h-7 w-7 rounded-md object-cover"
             onError={() => {
               if (!photoKey) return
               setFailedImageKeys((prev) => {
@@ -524,7 +525,7 @@ function ClosetSavedLooksRowInner({
         ) : (
           <span
             data-testid="saved-look-photo-placeholder"
-            className="flex h-7 w-7 items-center justify-center rounded bg-zinc-100 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            className="flex h-7 w-7 items-center justify-center rounded-md bg-card-muted text-xs font-semibold text-ink-soft"
           >
             {samples.values.category[slot.category].slice(0, 2).toUpperCase()}
           </span>
@@ -542,26 +543,25 @@ function ClosetSavedLooksRowInner({
   return (
     <section
       aria-label={t('savedLooks.title')}
-      className="mb-6 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+      data-surface="card"
+      className="mb-6 rounded-xl border border-line bg-card p-4 text-ink shadow-card"
     >
       <button
         type="button"
         data-testid="closet-saved-looks-row"
         aria-expanded={expanded}
         onClick={() => setExpanded((current) => !current)}
-        className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left"
       >
         <div>
-          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            {t('savedLooks.title')}
-          </h2>
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          <h2 className="text-base font-semibold text-ink">{t('savedLooks.title')}</h2>
+          <p className="text-xs text-ink-muted">
             {isLoading && savedLooks.length === 0
               ? '…'
               : t('savedLooks.count', { count: displayedCount })}
           </p>
         </div>
-        <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+        <span className="text-sm font-semibold text-ink-soft">
           {expanded ? t('savedLooks.hideList') : t('savedLooks.showList')}
         </span>
       </button>
@@ -569,7 +569,7 @@ function ClosetSavedLooksRowInner({
       {loadError && (
         <div
           role="alert"
-          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800"
+          className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
         >
           <span>{t('savedLooks.loadFailed')}</span>
           <button
@@ -586,9 +586,7 @@ function ClosetSavedLooksRowInner({
       {expanded && (
         <div className="mt-4 space-y-3" data-testid="closet-saved-looks-list">
           {savedLooks.length === 0 ? (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('savedLooks.empty')}
-            </p>
+            <p className="text-sm text-ink-muted">{t('savedLooks.empty')}</p>
           ) : (
             savedLooks.map((look) => {
               const title =
@@ -599,14 +597,12 @@ function ClosetSavedLooksRowInner({
                 <article
                   key={look.id}
                   data-testid={`saved-look-card-${look.id}`}
-                  className="space-y-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
+                  className="space-y-2 border-t border-line pt-3"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {title}
-                      </h3>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+                      <p className="text-xs text-ink-muted">
                         {weatherLabel(look.weather)} ·{' '}
                         {look.source === 'style_piece'
                           ? t('savedLooks.sourceStylePiece')
@@ -629,7 +625,7 @@ function ClosetSavedLooksRowInner({
                       type="button"
                       data-testid="saved-look-reopen"
                       onClick={(event) => handleReopen(look, event.currentTarget)}
-                      className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm font-semibold dark:border-zinc-600"
+                      className="min-h-11 rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink"
                     >
                       {t('savedLooks.reopen')}
                     </button>
@@ -638,7 +634,7 @@ function ClosetSavedLooksRowInner({
                       data-testid="saved-look-remove"
                       disabled={removingId === look.id}
                       onClick={() => void handleRemove(look)}
-                      className="min-h-11 rounded-lg px-3 text-sm font-semibold underline disabled:opacity-60"
+                      className="min-h-11 rounded-lg px-3 text-sm font-semibold text-ink underline disabled:opacity-60"
                     >
                       {t('savedLooks.remove')}
                     </button>
@@ -653,7 +649,7 @@ function ClosetSavedLooksRowInner({
               data-testid="saved-looks-load-more"
               disabled={isLoadingMore}
               onClick={onLoadMore}
-              className="min-h-11 w-full rounded-lg border border-zinc-300 px-3 text-sm font-semibold disabled:opacity-60 dark:border-zinc-600"
+              className="min-h-11 w-full rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink disabled:opacity-60"
             >
               {isLoadingMore ? '…' : t('savedLooks.showList')}
             </button>
@@ -671,7 +667,7 @@ function ClosetSavedLooksRowInner({
           invokingElementRef={detailInvokerRef}
         >
           <div data-testid="saved-look-detail-modal" className="mt-3 space-y-4">
-            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            <p className="text-sm text-ink-soft">
               {weatherLabel(detailLook.weather)} ·{' '}
               {detailLook.source === 'style_piece'
                 ? t('savedLooks.sourceStylePiece')
@@ -698,7 +694,7 @@ function ClosetSavedLooksRowInner({
                 data-testid="saved-look-detail-remove"
                 disabled={removingId === detailLook.id}
                 onClick={() => void handleRemove(detailLook)}
-                className="min-h-11 rounded-lg border border-zinc-300 px-3 text-sm font-semibold disabled:opacity-60 dark:border-zinc-600"
+                className="min-h-11 rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink disabled:opacity-60"
               >
                 {t('savedLooks.remove')}
               </button>

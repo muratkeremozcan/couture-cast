@@ -11,23 +11,31 @@
 // every other build renders nothing here.
 import { Stack } from 'expo-router'
 import { StyleSheet, Text, View } from 'react-native'
+import { useTokens } from '@/src/theme/tokens'
 
 const TEXT_CLIP_LABEL = 'Show watermark on the card\nCard preview below'
 const LINE_HEIGHT = 22
 
 export default function TextClipFixtureRoute() {
   if (process.env.EXPO_PUBLIC_TEXT_LAYOUT_PROBE !== '1') return null
+  return <TextClipFixture />
+}
+
+/** The fixture on the page surface of the OS scheme (Story CC-7.9 D7). */
+function TextClipFixture() {
+  const { colors } = useTokens()
+  const label = [styles.label, { color: colors.ink }]
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.screen}>
+      <View style={[styles.screen, { backgroundColor: colors.page }]}>
         <View collapsable={false} style={styles.healthy}>
-          <Text testID="text-clip-healthy" style={styles.label}>
+          <Text testID="text-clip-healthy" style={label}>
             {TEXT_CLIP_LABEL}
           </Text>
         </View>
         <View collapsable={false} style={styles.mutant}>
-          <Text testID="text-clip-mutant" style={styles.label}>
+          <Text testID="text-clip-mutant" style={label}>
             {TEXT_CLIP_LABEL}
           </Text>
         </View>
@@ -37,8 +45,8 @@ export default function TextClipFixtureRoute() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: 120, paddingHorizontal: 24, backgroundColor: '#ffffff' },
-  label: { fontSize: 16, lineHeight: LINE_HEIGHT, color: '#111111' },
+  screen: { flex: 1, paddingTop: 64, paddingHorizontal: 24 },
+  label: { fontSize: 16, lineHeight: LINE_HEIGHT },
   healthy: { marginBottom: 48 },
   // One line at the base scale: the second line is cut at every scale.
   mutant: { height: LINE_HEIGHT, overflow: 'hidden' },

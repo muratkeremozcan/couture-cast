@@ -18,9 +18,9 @@ type Translator = (key: string) => string
 type OutcomeFeedbackKey = 'editSaved' | 'editNoChanges'
 
 const inputClass =
-  'min-h-11 w-full rounded border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2 text-[color:var(--theme-card-text)]'
+  'min-h-11 w-full rounded-md border border-theme-card-border bg-page p-2 text-theme-card-text'
 const buttonClass =
-  'min-h-11 rounded border border-[color:var(--theme-card-border)] px-3 text-sm font-semibold disabled:opacity-50'
+  'min-h-11 rounded-md border border-theme-card-border px-3 text-sm font-semibold disabled:opacity-50'
 
 function editErrorKey(failure: unknown): string {
   if (!(failure instanceof CommunityRequestError)) return 'editFailed'
@@ -165,7 +165,7 @@ export function CommunityPostTextEditor({
     return null
   if (!draft)
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <button
           ref={opener}
           type="button"
@@ -184,10 +184,7 @@ export function CommunityPostTextEditor({
           {t('community.compose.editText')}
         </button>
         {feedback && (
-          <p
-            data-testid="community-edit-status"
-            className="text-xs text-[color:var(--lookbook-ink-muted)]"
-          >
+          <p data-testid="community-edit-status" className="text-xs text-ink-muted">
             {t(`community.compose.${feedback}`)}
           </p>
         )}

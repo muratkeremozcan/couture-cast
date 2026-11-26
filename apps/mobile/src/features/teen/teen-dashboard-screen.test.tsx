@@ -1,5 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import i18n, { initI18n } from '@/src/lib/i18n'
+import deDE from '@/assets/locales/de-DE.json'
 import type { UserProfileResponse } from '@couture/api-client/contracts/http'
 import { TeenDashboardScreen } from './teen-dashboard-screen'
 
@@ -19,6 +21,16 @@ function profileFixture(overrides: Partial<UserProfileResponse> = {}) {
 }
 
 describe('TeenDashboardScreen', () => {
+  // Story CC-7.9 D9: the screen's copy comes from the locale catalog.
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en-US')
+  })
+
   it('shows guardian consent status and linked guardians for a teen account', async () => {
     const profile: UserProfileResponse = {
       user: {
@@ -47,6 +59,27 @@ describe('TeenDashboardScreen', () => {
     })
     expect(screen.getByText('guardian-7')).toBeTruthy()
     expect(screen.getByText('granted')).toBeTruthy()
+  })
+
+  it('CC-7.9 D9: renders the status, list heading and row status from the de-DE catalog', async () => {
+    await i18n.changeLanguage('de-DE')
+    const profile = profileFixture({
+      linkedGuardians: [
+        { guardianId: 'guardian-9', status: 'revoked', consentGrantedAt: null },
+      ],
+    })
+
+    render(<TeenDashboardScreen loadProfile={() => Promise.resolve(profile)} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('teen-consent-status').textContent).toBe(
+        deDE.teen.dashboard.revoked
+      )
+    })
+    expect(screen.getByText(deDE.teen.dashboard.linkedGuardians)).toBeInTheDocument()
+    expect(screen.getByText(deDE.guardian.consent.status.revoked)).toBeInTheDocument()
+    expect(screen.getByText(deDE.guardian.consent.awaiting)).toBeInTheDocument()
+    expect(screen.queryByText('Guardian consent revoked')).not.toBeInTheDocument()
   })
 
   it('reports revoked consent and an unconfirmed grant date', async () => {

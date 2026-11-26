@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import {
+  colorRoles,
   evaluateGuestPreviewGate,
   formatPreviewString,
   formatSampleExplanation,
@@ -39,13 +40,19 @@ import {
 } from '@couture/utils'
 import { EdgeToEdgeModal } from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
+import { useTokens, withAlpha } from '@/src/theme/tokens'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
 export type PreviewPalette = ReturnType<typeof useHeroPalette>
 export type PreviewControl = 'weather' | 'thermal' | 'wind' | 'rain'
 
-const LIGHT_TILE = '#F5F5F7'
+/**
+ * The sample art palette is drawn for a light ground, so its tile stays the light card in both
+ * schemes: a light tile keeps dark garments visible in the dark theme.
+ */
+const ART_TILE = colorRoles.light.card
+const ART_OUTLINE = withAlpha(colorRoles.light.ink, 0.18)
 
 export function SampleGarmentArt({
   garment,
@@ -81,7 +88,7 @@ export function SampleGarmentArt({
               key={index}
               d={path.d}
               fill={path.tone === 'primary' ? art.primary : art.secondary}
-              stroke="rgba(17,17,17,0.18)"
+              stroke={ART_OUTLINE}
               strokeWidth={1}
             />
           )
@@ -125,17 +132,15 @@ export function PreviewButton({
       onPress={onPress}
       style={[
         styles.button,
+        // Story CC-7.9 D3: a filled button is ink; any other is the neutral outline.
         primary
-          ? { backgroundColor: palette.text }
-          : { borderColor: palette.text, borderWidth: 1 },
+          ? { backgroundColor: palette.inverse }
+          : { borderColor: palette.lineStrong, borderWidth: 1 },
         disabled ? styles.disabled : null,
       ]}
     >
       <Text
-        style={[
-          styles.buttonText,
-          { color: primary ? palette.background : palette.text },
-        ]}
+        style={[styles.buttonText, { color: primary ? palette.onInverse : palette.ink }]}
       >
         {label}
       </Text>
@@ -165,7 +170,7 @@ export function ChoiceGroup<T extends string>({
       accessibilityLabel={legend}
       style={styles.group}
     >
-      <Text style={[styles.legend, { color: palette.mutedText }]}>{legend}</Text>
+      <Text style={[styles.legend, { color: palette.inkMuted }]}>{legend}</Text>
       <View style={styles.wrap}>
         {options.map((option) => {
           const checked = option.value === value
@@ -179,11 +184,11 @@ export function ChoiceGroup<T extends string>({
               style={[
                 styles.chip,
                 checked
-                  ? { backgroundColor: palette.text, borderColor: palette.text }
-                  : { borderColor: palette.divider },
+                  ? { backgroundColor: palette.inverse, borderColor: palette.inverse }
+                  : { borderColor: palette.lineStrong },
               ]}
             >
-              <Text style={{ color: checked ? palette.background : palette.text }}>
+              <Text style={{ color: checked ? palette.onInverse : palette.ink }}>
                 {option.label}
               </Text>
             </Pressable>
@@ -220,13 +225,13 @@ export function PreviewGate({
   return (
     <View
       testID="guest-preview-gate"
-      style={[styles.card, { borderColor: palette.divider }]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
-      <Text accessibilityRole="header" style={[styles.heading, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
         {strings.gate.heading}
       </Text>
-      <Text style={{ color: palette.mutedText }}>{strings.gate.body}</Text>
-      <Text style={{ color: palette.text }}>{strings.gate.field}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.gate.body}</Text>
+      <Text style={{ color: palette.ink }}>{strings.gate.field}</Text>
       <TextInput
         testID="guest-preview-birthdate"
         accessibilityLabel={strings.gate.field}
@@ -236,14 +241,14 @@ export function PreviewGate({
         value={birthdate}
         onChangeText={setBirthdate}
         onSubmitEditing={submit}
-        style={[styles.input, { borderColor: palette.divider, color: palette.text }]}
+        style={[styles.input, { borderColor: palette.lineStrong, color: palette.ink }]}
       />
       {error ? (
         <Text
           testID="guest-preview-gate-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
-          style={{ color: palette.danger }}
+          style={{ color: palette.dangerInk }}
         >
           {error === 'underage' ? strings.gate.underage : strings.gate.invalid}
         </Text>
@@ -255,7 +260,7 @@ export function PreviewGate({
         palette={palette}
         primary
       />
-      <Text style={[styles.small, { color: palette.mutedText }]}>
+      <Text style={[styles.small, { color: palette.inkMuted }]}>
         {strings.gate.selfReported}
       </Text>
       <PreviewButton
@@ -326,12 +331,12 @@ export function PreviewOutfit({
     return (
       <View
         testID="guest-preview-empty"
-        style={[styles.card, { borderColor: palette.divider }]}
+        style={[
+          styles.card,
+          { backgroundColor: palette.card, borderColor: palette.line },
+        ]}
       >
-        <Text
-          accessibilityRole="header"
-          style={[styles.heading, { color: palette.text }]}
-        >
+        <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
           {result.reason === 'all-disliked'
             ? strings.outfit.allDisliked
             : strings.outfit.noEligible}
@@ -356,26 +361,26 @@ export function PreviewOutfit({
   return (
     <View
       testID="guest-preview-outfit"
-      style={[styles.card, { borderColor: palette.divider }]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
       {(heading || !hasSwaps) && (
-        <Text style={[styles.eyebrow, { color: palette.accentText }]}>
+        <Text style={[styles.eyebrow, { color: palette.inkMuted }]}>
           {heading ?? strings.outfit.heading}
         </Text>
       )}
       <Text
         testID="guest-preview-look-name"
         accessibilityRole="header"
-        style={[styles.heading, { color: palette.text }]}
+        style={[styles.heading, { color: palette.ink }]}
       >
         {hasSwaps ? strings.outfit.heading : lookText.name}
       </Text>
       {!hasSwaps && (
-        <Text style={{ color: palette.mutedText }}>{lookText.description}</Text>
+        <Text style={{ color: palette.inkMuted }}>{lookText.description}</Text>
       )}
       <Text
         testID="guest-preview-weather-chip"
-        style={[styles.chipLabel, { color: palette.text }]}
+        style={[styles.chipLabel, { color: palette.ink }]}
       >
         {strings.values.weather[result.context.weather]}
       </Text>
@@ -387,7 +392,7 @@ export function PreviewOutfit({
         palette={palette}
         primary
       />
-      <Text style={{ color: palette.mutedText }}>{strings.styleIdeas.illustrations}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.styleIdeas.illustrations}</Text>
       <View testID="guest-preview-garments" style={styles.wrap}>
         {result.garments.map((garment) => {
           const text = sampleGarmentText(garment, strings)
@@ -397,10 +402,11 @@ export function PreviewOutfit({
             <View
               key={garment.category}
               testID={`guest-preview-garment-${garment.id.slice('sample:g:'.length)}`}
-              style={[styles.garment, { borderColor: palette.divider }]}
+              // Inside the outfit card, so a plain section (Story CC-7.9 D7: one card level).
+              style={styles.garment}
             >
               <SampleGarmentArt garment={garment} label={text.description} />
-              <Text style={[styles.garmentName, { color: palette.text }]}>
+              <Text style={[styles.garmentName, { color: palette.ink }]}>
                 {text.name}
               </Text>
               <PreviewButton
@@ -418,12 +424,12 @@ export function PreviewOutfit({
           )
         })}
       </View>
-      <Text style={[styles.subheading, { color: palette.text }]}>
+      <Text style={[styles.subheading, { color: palette.ink }]}>
         {strings.outfit.whyThisWorks}
       </Text>
       <View testID="guest-preview-explanation" accessibilityLiveRegion="polite">
         {result.explanation.map((item, index) => (
-          <Text key={`${item.key}-${index}`} style={{ color: palette.mutedText }}>
+          <Text key={`${item.key}-${index}`} style={{ color: palette.inkMuted }}>
             {`• ${formatSampleExplanation(item, { strings, locale, catalog: SAMPLE_CATALOG })}`}
           </Text>
         ))}
@@ -432,7 +438,7 @@ export function PreviewOutfit({
         <Text
           testID="guest-preview-no-alternative"
           accessibilityLiveRegion="polite"
-          style={{ color: palette.text }}
+          style={{ color: palette.ink }}
         >
           {strings.outfit.noAlternative}
         </Text>
@@ -480,12 +486,12 @@ export function PreviewControls({
   return (
     <View
       testID="guest-preview-controls"
-      style={[styles.card, { borderColor: palette.divider }]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
-      <Text accessibilityRole="header" style={[styles.heading, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
         {strings.preferences.heading}
       </Text>
-      <Text style={{ color: palette.mutedText }}>{strings.chrome.supporting}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.chrome.supporting}</Text>
       <ChoiceGroup
         legend={strings.preferences.weather}
         testID="guest-preview-weather"
@@ -497,7 +503,7 @@ export function PreviewControls({
         onChange={onWeather}
         palette={palette}
       />
-      <Text style={[styles.small, { color: palette.mutedText }]}>
+      <Text style={[styles.small, { color: palette.inkMuted }]}>
         {formatPreviewString(strings.preferences.weatherDetail, {
           temperature: formatSampleTemperature(weather.feelsLike, locale),
           windSpeed: weather.windSpeed,
@@ -565,16 +571,16 @@ export function PreviewFeedback({
   return (
     <View
       testID="guest-preview-feedback"
-      style={[styles.card, { borderColor: palette.divider }]}
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
     >
-      <Text accessibilityRole="header" style={[styles.heading, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
         {strings.feedback.heading}
       </Text>
-      <Text style={{ color: palette.mutedText }}>{strings.feedback.body}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.feedback.body}</Text>
       <Text
         testID="guest-preview-feedback-progress"
         accessibilityLiveRegion="polite"
-        style={{ color: palette.text }}
+        style={{ color: palette.ink }}
       >
         {formatPreviewString(strings.feedback.progress, {
           reviewed: progress.reviewed,
@@ -588,7 +594,8 @@ export function PreviewFeedback({
           <View
             key={card.id}
             testID={`guest-preview-card-${card.id.slice('sample:l:'.length)}`}
-            style={[styles.feedbackCard, { borderColor: palette.divider }]}
+            // Inside the feedback card, so a plain section under a rule (Story CC-7.9 D7).
+            style={[styles.feedbackCard, { borderTopColor: palette.line }]}
           >
             <View
               style={styles.wrap}
@@ -602,8 +609,8 @@ export function PreviewFeedback({
                 ) : null
               })}
             </View>
-            <Text style={[styles.subheading, { color: palette.text }]}>{text.name}</Text>
-            <Text style={{ color: palette.mutedText }}>{text.description}</Text>
+            <Text style={[styles.subheading, { color: palette.ink }]}>{text.name}</Text>
+            <Text style={{ color: palette.inkMuted }}>{text.description}</Text>
             <View style={styles.row}>
               {(['like', 'dislike'] as const).map((choice) => {
                 const selected = vote === choice
@@ -618,11 +625,14 @@ export function PreviewFeedback({
                     style={[
                       styles.voteButton,
                       selected
-                        ? { backgroundColor: palette.text, borderColor: palette.text }
-                        : { borderColor: palette.divider },
+                        ? {
+                            backgroundColor: palette.inverse,
+                            borderColor: palette.inverse,
+                          }
+                        : { borderColor: palette.lineStrong },
                     ]}
                   >
-                    <Text style={{ color: selected ? palette.background : palette.text }}>
+                    <Text style={{ color: selected ? palette.onInverse : palette.ink }}>
                       {choice === 'like'
                         ? strings.feedback.like
                         : strings.feedback.dislike}
@@ -678,7 +688,7 @@ export function PreviewWardrobe({
   const openText = open ? sampleGarmentText(open, strings) : null
   return (
     <View testID="guest-preview-wardrobe" style={styles.section}>
-      <Text accessibilityRole="header" style={[styles.heading, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.heading, { color: palette.ink }]}>
         {strings.wardrobe.heading}
       </Text>
       <PreviewButton
@@ -718,7 +728,7 @@ export function PreviewWardrobe({
       <Text
         testID="guest-preview-item-count"
         accessibilityLiveRegion="polite"
-        style={{ color: palette.mutedText }}
+        style={{ color: palette.inkMuted }}
       >
         {items.length === 0
           ? strings.wardrobe.empty
@@ -737,13 +747,17 @@ export function PreviewWardrobe({
                 setOpen(garment)
                 onInspect()
               }}
-              style={[styles.garment, { borderColor: palette.divider }]}
+              style={[
+                styles.garment,
+                styles.garmentCard,
+                { backgroundColor: palette.card, borderColor: palette.line },
+              ]}
             >
               <SampleGarmentArt garment={garment} />
-              <Text style={[styles.garmentName, { color: palette.text }]}>
+              <Text style={[styles.garmentName, { color: palette.ink }]}>
                 {text.name}
               </Text>
-              <Text style={[styles.small, { color: palette.mutedText }]}>
+              <Text style={[styles.small, { color: palette.inkMuted }]}>
                 {values.categoryTitle[garment.category]}
               </Text>
             </Pressable>
@@ -761,7 +775,7 @@ export function PreviewWardrobe({
         {open && openText ? (
           <>
             <SampleGarmentArt garment={open} label={openText.description} size={96} />
-            <Text style={{ color: palette.text }}>{openText.description}</Text>
+            <Text style={{ color: palette.ink }}>{openText.description}</Text>
             <DetailRow
               label={strings.wardrobe.category}
               value={values.categoryTitle[open.category]}
@@ -821,8 +835,8 @@ function DetailRow({
 }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={[styles.detailLabel, { color: palette.mutedText }]}>{label}</Text>
-      <Text style={{ color: palette.text }}>{value}</Text>
+      <Text style={[styles.detailLabel, { color: palette.inkMuted }]}>{label}</Text>
+      <Text style={{ color: palette.ink }}>{value}</Text>
     </View>
   )
 }
@@ -846,23 +860,24 @@ export function PreviewSheet({
   children: React.ReactNode
 }) {
   const modalAnimation = useModalAnimation('slide')
+  const { scrim } = useTokens()
   return (
     <EdgeToEdgeModal
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
-      scrim="rgba(0,0,0,0.45)"
+      scrim={scrim}
     >
       <View style={styles.sheetSpacer} />
       <View
         testID={testID}
         accessibilityViewIsModal
-        style={[styles.sheet, { backgroundColor: palette.surface }]}
+        style={[styles.sheet, { backgroundColor: palette.page }]}
       >
         <View style={styles.sheetHeader}>
           <Text
             accessibilityRole="header"
-            style={[styles.heading, styles.sheetTitle, { color: palette.text }]}
+            style={[styles.heading, styles.sheetTitle, { color: palette.ink }]}
           >
             {title}
           </Text>
@@ -873,10 +888,10 @@ export function PreviewSheet({
             onPress={onClose}
             style={styles.close}
           >
-            <Text style={{ color: palette.text, fontSize: 20 }}>{'×'}</Text>
+            <Text style={{ color: palette.ink, fontSize: 20 }}>{'×'}</Text>
           </Pressable>
         </View>
-        <Text style={[styles.small, { color: palette.mutedText }]}>
+        <Text style={[styles.small, { color: palette.inkMuted }]}>
           {strings.chrome.sampleLabel}
         </Text>
         {children}
@@ -914,7 +929,7 @@ export function PreviewSwapSheet({
       testID="guest-preview-swap-sheet"
     >
       {alternatives.length === 0 ? (
-        <Text testID="guest-preview-no-suitable" style={{ color: palette.text }}>
+        <Text testID="guest-preview-no-suitable" style={{ color: palette.ink }}>
           {strings.outfit.noSuitableAlternative}
         </Text>
       ) : (
@@ -934,11 +949,11 @@ export function PreviewSwapSheet({
                 onPress={() => onChoose(garment.id)}
                 style={[
                   styles.option,
-                  { borderColor: checked ? '#C9A14A' : palette.divider },
+                  { borderColor: checked ? palette.ink : palette.line },
                 ]}
               >
                 <SampleGarmentArt garment={garment} size={40} />
-                <Text style={[styles.optionText, { color: palette.text }]}>
+                <Text style={[styles.optionText, { color: palette.ink }]}>
                   {checked ? `${text.name} (${strings.outfit.current})` : text.name}
                 </Text>
               </Pressable>
@@ -965,15 +980,18 @@ export function PreviewConversion({
   return (
     <View
       testID="guest-preview-conversion"
-      style={[styles.card, { borderColor: '#C9A14A' }]}
+      style={[
+        styles.card,
+        { backgroundColor: palette.card, borderColor: palette.lineStrong },
+      ]}
     >
       <Text
         accessibilityRole="header"
-        style={[styles.subheading, { color: palette.text }]}
+        style={[styles.subheading, { color: palette.ink }]}
       >
         {detail.garmentHeading}
       </Text>
-      <Text style={{ color: palette.text }}>{strings.chrome.conversion}</Text>
+      <Text style={{ color: palette.ink }}>{strings.chrome.conversion}</Text>
       {(
         [
           [detail.canSave, detail.canSaveBody],
@@ -982,8 +1000,8 @@ export function PreviewConversion({
         ] as const
       ).map(([title, body]) => (
         <View key={title}>
-          <Text style={[styles.subheading, { color: palette.text }]}>{title}</Text>
-          <Text style={{ color: palette.mutedText }}>{body}</Text>
+          <Text style={[styles.subheading, { color: palette.ink }]}>{title}</Text>
+          <Text style={{ color: palette.inkMuted }}>{body}</Text>
         </View>
       ))}
       <PreviewButton
@@ -999,7 +1017,7 @@ export function PreviewConversion({
         testID="guest-preview-sign-in"
         palette={palette}
       />
-      <Text style={[styles.small, { color: palette.mutedText }]}>
+      <Text style={[styles.small, { color: palette.inkMuted }]}>
         {strings.chrome.connectionNeeded}
       </Text>
     </View>
@@ -1013,7 +1031,7 @@ export const previewStyles = StyleSheet.create({
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tab: {
     minHeight: 44,
-    borderRadius: 999,
+    borderRadius: 9999,
     borderWidth: 1,
     paddingHorizontal: 16,
     justifyContent: 'center',
@@ -1022,20 +1040,20 @@ export const previewStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   artTile: {
-    backgroundColor: LIGHT_TILE,
-    borderRadius: 10,
+    backgroundColor: ART_TILE,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   button: {
     minHeight: 44,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
+    borderRadius: 9999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { fontSize: 15, fontWeight: '700', textAlign: 'center' },
+  buttonText: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
   disabled: { opacity: 0.6 },
   group: { gap: 8 },
   legend: {
@@ -1048,38 +1066,38 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8 },
   chip: {
     minHeight: 44,
-    borderRadius: 999,
+    borderRadius: 9999,
     borderWidth: 1,
     paddingHorizontal: 16,
     justifyContent: 'center',
   },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, gap: 12 },
   section: { gap: 12 },
-  heading: { fontSize: 22, fontWeight: '700' },
-  subheading: { fontSize: 15, fontWeight: '700' },
+  heading: { fontSize: 20, fontWeight: '700' },
+  subheading: { fontSize: 16, fontWeight: '700' },
   eyebrow: {
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  chipLabel: { fontSize: 13, fontWeight: '600' },
-  small: { fontSize: 13 },
-  input: { minHeight: 44, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
+  chipLabel: { fontSize: 14, fontWeight: '600' },
+  small: { fontSize: 14 },
+  input: { minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
   garment: {
     width: 148,
-    borderWidth: 1,
     borderRadius: 12,
-    padding: 10,
+    padding: 8,
     gap: 8,
     alignItems: 'center',
   },
+  garmentCard: { borderWidth: 1 },
   garmentName: { fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  feedbackCard: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 8 },
+  feedbackCard: { borderTopWidth: 1, paddingTop: 12, gap: 8 },
   voteButton: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1088,8 +1106,8 @@ const styles = StyleSheet.create({
   detailLabel: { fontWeight: '600' },
   sheetSpacer: { flex: 1 },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     padding: 20,
     gap: 12,
     maxHeight: '85%',
@@ -1107,5 +1125,5 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 8,
   },
-  optionText: { flex: 1, fontSize: 15 },
+  optionText: { flex: 1, fontSize: 16 },
 })

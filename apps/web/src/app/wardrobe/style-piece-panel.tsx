@@ -66,9 +66,10 @@ type InventoryRefresh = ReturnType<typeof createStylePieceRefresh>
 type Labels = ReturnType<typeof getStylePieceStrings>
 type SampleLabels = ReturnType<typeof getGuestPreviewStrings>
 
+// Story CC-7.9 D3: neutral outline buttons; the global focus rule draws the gold ring.
 const button =
-  'min-h-11 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-600 disabled:opacity-60 dark:border-zinc-600'
-const action = 'min-h-11 rounded-lg px-2 text-sm font-semibold underline'
+  'min-h-11 rounded-lg border border-line-strong bg-page px-3 py-2 text-sm font-semibold text-ink disabled:opacity-60'
+const action = 'min-h-11 rounded-lg px-2 text-sm font-semibold text-ink underline'
 
 export function StylePieceEntry({
   garment,
@@ -93,7 +94,7 @@ export function StylePieceEntry({
     <button
       type="button"
       data-testid={needsRefresh ? 'style-piece-refresh' : 'style-piece-open'}
-      className="min-h-11 rounded-lg border border-zinc-300 px-2 py-1 text-xs font-semibold aria-disabled:opacity-60 dark:border-zinc-700"
+      className="min-h-11 rounded-lg border border-line-strong bg-page px-2 py-1 text-xs font-semibold text-ink aria-disabled:opacity-60"
       // aria-disabled keeps focus on the button while the photo refreshes; a disabled button
       // drops keyboard focus to the page body and Chromium does not restore it.
       aria-disabled={needsRefresh && loading}
@@ -539,14 +540,14 @@ function StylePieceIdeas({
               type="button"
               data-testid={`style-piece-weather-${value}`}
               aria-pressed={weather === value}
-              className={`${button} aria-pressed:border-gold-600 aria-pressed:bg-gold-500/15`}
+              className={`${button} aria-pressed:border-inverse aria-pressed:bg-inverse aria-pressed:text-on-inverse`}
               onClick={() => changeWeather(value)}
             >
               {weatherName(value)}
             </button>
           ))}
         </div>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="mt-2 text-sm text-ink-soft">
           {formatSampleTemperature(SAMPLE_WEATHER[weather].feelsLike, locale)}
         </p>
       </fieldset>
@@ -771,14 +772,15 @@ function StylePieceIdeas({
             return (
               <div
                 key={entry.id}
-                className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-700"
+                data-surface="card"
+                className="rounded-lg border border-line bg-card p-3"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm">{description}</p>
                   {entry.availabilityStatus === 'needs_review' && (
                     <span
                       data-testid="saved-look-needs-review"
-                      className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900 dark:bg-blue-950 dark:text-blue-200"
+                      className="rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink"
                     >
                       {t('savedLooks.needsReview')}
                     </span>
@@ -1028,7 +1030,8 @@ function StylePieceCard({
     <article
       data-testid="style-piece-look"
       data-style-look={stylePieceRecipeKey(look.recipe)}
-      className="space-y-3 rounded-xl border border-zinc-200 p-3 dark:border-zinc-700"
+      data-surface="card"
+      className="space-y-3 rounded-xl border border-line bg-card p-3"
     >
       <h3
         ref={headingRef}
@@ -1054,7 +1057,7 @@ function StylePieceCard({
               return (
                 <li key={item.category}>
                   <div className="flex items-center gap-2">
-                    <span className="shrink-0 rounded-md bg-[#F5F5F7]">
+                    <span className="shrink-0 rounded-md bg-card-muted">
                       <SampleGarmentArt garment={item} className="h-11 w-11" />
                     </span>
                     <div className="min-w-0">
@@ -1089,7 +1092,7 @@ function StylePieceCard({
                               requestAnimationFrame(() => swapInvoker.current?.focus())
                             }}
                           >
-                            <span className="shrink-0 rounded-md bg-[#F5F5F7]">
+                            <span className="shrink-0 rounded-md bg-card-muted">
                               <SampleGarmentArt garment={option} className="h-9 w-9" />
                             </span>
                             {sampleGarmentText(option, samples).name}

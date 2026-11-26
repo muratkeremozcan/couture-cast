@@ -15,6 +15,7 @@ import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { useTokens } from '@/src/theme/tokens'
 
 export interface CommunitySpotlightDetailProps {
   item: CommunityReactionSpotlightItem | null
@@ -39,6 +40,7 @@ export function CommunitySpotlightDetail({
   const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
   const insets = useModalInsets()
   const titleRef = useRef<Text>(null)
   // The sheet stays mounted while it animates away, showing the look it opened.
@@ -54,7 +56,7 @@ export function CommunitySpotlightDetail({
       animationType={modalAnimation}
       onRequestClose={onClose}
       onDismiss={onDismissed}
-      scrim="rgba(0,0,0,0.5)"
+      scrim={scrim}
       onShow={() => {
         // The feed's own focused-look announcement, so both surfaces say the same.
         AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
@@ -67,7 +69,7 @@ export function CommunitySpotlightDetail({
           testID="community-spotlight-detail"
           style={[
             styles.sheet,
-            { backgroundColor: palette.surface, paddingBottom: 32 + insets.bottom },
+            { backgroundColor: palette.page, paddingBottom: 32 + insets.bottom },
           ]}
           accessibilityViewIsModal
           accessible={false}
@@ -78,13 +80,13 @@ export function CommunitySpotlightDetail({
                 ref={titleRef}
                 testID="community-spotlight-detail-title"
                 accessibilityRole="header"
-                style={[styles.title, { color: palette.text }]}
+                style={[styles.title, { color: palette.ink }]}
               >
                 {t('community.spotlight.eyebrow')}
               </Text>
               <Text
                 testID="community-spotlight-detail-rank"
-                style={[styles.rank, { color: palette.mutedText }]}
+                style={[styles.rank, { color: palette.inkMuted }]}
               >
                 {t('community.spotlight.rank', { rank: shown.rank })}
               </Text>
@@ -94,9 +96,9 @@ export function CommunitySpotlightDetail({
               onPress={onClose}
               accessibilityRole="button"
               accessibilityLabel={t('common.back')}
-              style={[styles.closeButton, { borderColor: palette.mutedText }]}
+              style={[styles.closeButton, { borderColor: palette.inkMuted }]}
             >
-              <Text style={[styles.closeText, { color: palette.text }]}>
+              <Text style={[styles.closeText, { color: palette.ink }]}>
                 {t('common.back')}
               </Text>
             </TouchableOpacity>
@@ -115,8 +117,8 @@ const styles = StyleSheet.create({
   sheet: {
     maxHeight: '90%',
     paddingTop: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   row: {
     flexDirection: 'row',
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rank: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   closeButton: {
@@ -146,7 +148,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   closeText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   content: { paddingBottom: 12 },

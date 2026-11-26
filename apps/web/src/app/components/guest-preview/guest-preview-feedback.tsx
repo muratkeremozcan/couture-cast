@@ -36,16 +36,16 @@ export function GuestPreviewFeedback({
         <div className="space-y-1">
           <h2
             id="guest-preview-feedback-heading"
-            className="lookbook-display text-lg font-semibold text-[#111111]"
+            className="text-lg font-semibold text-ink"
           >
             {strings.feedback.heading}
           </h2>
-          <p className="text-sm text-[#36363D]">{strings.feedback.body}</p>
+          <p className="text-sm text-ink-soft">{strings.feedback.body}</p>
         </div>
         <p
           role="status"
           data-testid="guest-preview-feedback-progress"
-          className="lookbook-metrics text-xs text-[#5C5C66]"
+          className="text-xs text-ink-muted"
         >
           {formatPreviewString(strings.feedback.progress, {
             reviewed: progress.reviewed,
@@ -62,7 +62,8 @@ export function GuestPreviewFeedback({
               key={card.id}
               data-testid="guest-preview-card"
               data-look-id={card.id}
-              className="space-y-3 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-4"
+              data-surface="card"
+              className="space-y-3 rounded-xl border border-line bg-card p-4"
             >
               <div className="flex gap-1" aria-hidden="true">
                 {card.core.map((id) => {
@@ -73,8 +74,8 @@ export function GuestPreviewFeedback({
                 })}
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-[#111111]">{text.name}</h3>
-                <p className="text-xs text-[#36363D]">
+                <h3 className="text-sm font-semibold text-ink">{text.name}</h3>
+                <p className="text-xs text-ink-soft">
                   {card.core
                     .map((id) => garments.get(id))
                     .map((garment) =>
@@ -93,8 +94,8 @@ export function GuestPreviewFeedback({
                     data-testid={`guest-preview-vote-${choice}`}
                     className={`min-h-11 flex-1 rounded-lg border px-3 text-sm font-semibold ${
                       vote === choice
-                        ? 'border-[#111111] bg-[#111111] text-[#FFFFFF]'
-                        : 'border-[#C9C9D1] bg-[#FFFFFF] text-[#111111]'
+                        ? 'border-inverse bg-inverse text-on-inverse'
+                        : 'border-line-strong bg-page text-ink'
                     }`}
                   >
                     {choice === 'like' ? strings.feedback.like : strings.feedback.dislike}
@@ -109,7 +110,7 @@ export function GuestPreviewFeedback({
         type="button"
         onClick={onReset}
         data-testid="guest-preview-feedback-reset"
-        className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold"
+        className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
       >
         {strings.outfit.resetChoices}
       </button>

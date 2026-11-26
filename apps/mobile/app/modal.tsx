@@ -32,7 +32,7 @@ export default function ModalScreen() {
         accessibilityRole="button"
         accessibilityLabel={t('common.cancel')}
         onPress={() => router.back()}
-        style={[styles.closeButton, { backgroundColor: colors.inverseSurface }]}
+        style={[styles.closeButton, { backgroundColor: colors.inverse }]}
         testID="information-modal-close"
       >
         <Text style={[styles.closeButtonText, { color: colors.onInverse }]}>
@@ -65,7 +65,7 @@ const styles = StyleSheet.create({
   closeButton: {
     minWidth: 120,
     minHeight: 44,
-    borderRadius: 999,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,

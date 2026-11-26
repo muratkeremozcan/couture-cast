@@ -52,17 +52,16 @@ export const IMAGE_URL = 'https://storage.local/community/post-1.jpg'
 
 export const REFRESHED_IMAGE_URL = 'https://storage.local/community/post-1-refreshed.jpg'
 
-/** The premium accent system's error/destructive fill, under white labels. */
-export const MERLOT = '#7A1F2D'
-
 /**
- * Merlot as text or border. It is mode-aware (globals.css `--lookbook-merlot-ink`: #7a1f2d light,
- * #f0a3ae dark), so the grid sets the token; the Playwright dark-mode spec measures its contrast.
+ * Merlot as text and as a border: the `merlotInk` design token role (Story CC-7.9 D2), which has
+ * a light and a dark value of its own. The grid paints it through these classes, and the
+ * Playwright dark-mode spec measures its contrast.
  */
-export const MERLOT_INK = 'var(--lookbook-merlot-ink)'
+export const MERLOT_INK_CLASS = 'text-merlot-ink'
+export const MERLOT_LINE_CLASS = 'border-merlot-ink'
 
-/** Success gold. Flagged content must never wear it. */
-export const GOLD = '#C9A14A'
+/** The classes that paint gold (D3). Flagged content must never wear one. */
+export const GOLD_CLASSES = ['bg-primary', 'bg-premium', 'text-premium-ink'] as const
 
 export const SUGGESTED_ALT_TEXT = 'A layered outfit photographed against a plain wall.'
 

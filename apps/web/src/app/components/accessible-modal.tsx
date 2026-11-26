@@ -32,33 +32,30 @@ export interface AccessibleModalProps {
 }
 
 /**
- * The header and error colors per surface. A theme surface follows the lookbook theme (a premium
- * palette stays light under a dark system setting), so the system `dark:` variants would put
- * light text on its light panel.
+ * The header and error colors per surface. A theme surface follows the lookbook theme (the
+ * premium palette's light or dark variant, Story CC-7.9 D5); the default surface uses the page
+ * roles. Both follow the system scheme through the `--cc-*` tokens.
  */
 const SURFACE_PARTS = {
   default: {
-    rule: 'border-zinc-200 dark:border-zinc-800',
-    description: 'text-zinc-500 dark:text-zinc-400',
-    error: 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200',
+    rule: 'border-line',
+    description: 'text-ink-muted',
+    error: 'border border-danger-line bg-danger-surface text-danger-ink',
+    close: 'text-ink-muted hover:bg-card',
   },
   theme: {
-    rule: 'border-[color:var(--theme-card-border)]',
-    description: 'text-[color:var(--theme-card-text)]',
-    error:
-      'border border-[color:var(--lookbook-merlot-ink)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-merlot-ink)]',
+    rule: 'border-theme-card-border',
+    description: 'text-theme-card-text',
+    error: 'border border-merlot-ink bg-page text-merlot-ink',
+    close: 'text-theme-card-text hover:bg-ink/5',
   },
 } as const
 
 function surfaceClassName(surface: 'default' | 'theme', columnLayout: boolean) {
   const layout = columnLayout ? ' flex flex-col' : ''
   const colors =
-    surface === 'theme'
-      ? 'bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]'
-      : // The dark surface also darkens native controls (a checkbox, the file picker), which
-        // otherwise keep their light rendering on it.
-        'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark]'
-  return `max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl${layout} ${colors}`
+    surface === 'theme' ? 'bg-theme-card-bg text-theme-card-text' : 'bg-page text-ink'
+  return `max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-overlay${layout} ${colors}`
 }
 
 /** Whether the element or an ancestor is inert or hidden from assistive technology. */
@@ -244,11 +241,10 @@ export function AccessibleModal({
       onKeyDown={handleKeyDown}
       // Only the top dialog dims the page; a covered one keeps its place without
       // stacking a second scrim over the first.
-      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 ${covered ? 'bg-transparent' : 'bg-black/60'}`}
+      className={`fixed inset-0 z-[60] flex items-center justify-center p-4 ${covered ? 'bg-transparent' : 'bg-scrim/60'}`}
     >
       <div
         ref={dialogRef}
-        data-focus-surface={surface === 'theme' ? 'light' : undefined}
         tabIndex={-1}
         className={surfaceClassName(surface, columnLayout)}
       >
@@ -271,7 +267,7 @@ export function AccessibleModal({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className={`flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-lg ${surface === 'theme' ? 'text-[color:var(--theme-card-text)] hover:bg-black/5' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
+            className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg ${SURFACE_PARTS[surface].close}`}
             aria-label={closeLabel}
           >
             ✕

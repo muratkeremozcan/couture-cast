@@ -61,15 +61,15 @@ function ComfortColumn({
       testID={testID}
       style={{
         borderWidth: 1,
-        borderColor: palette.divider,
+        borderColor: palette.line,
         borderRadius: 12,
         padding: 12,
         gap: 4,
       }}
     >
-      <Text style={{ color: palette.text, fontWeight: '700' }}>{heading}</Text>
+      <Text style={{ color: palette.ink, fontWeight: '700' }}>{heading}</Text>
       {rows.map(([label, value]) => (
-        <Text key={label} style={{ color: palette.text }}>{`${label}: ${value}`}</Text>
+        <Text key={label} style={{ color: palette.ink }}>{`${label}: ${value}`}</Text>
       ))}
     </View>
   )
@@ -207,23 +207,23 @@ export function GuestPreviewReviewScreen() {
   return (
     <ScrollView
       testID="guest-preview-review"
-      style={[previewStyles.screen, { backgroundColor: palette.background }]}
+      style={[previewStyles.screen, { backgroundColor: palette.page }]}
       contentContainerStyle={previewStyles.content}
     >
       <Text
         accessibilityRole="header"
-        style={{ color: palette.text, fontSize: 24, fontWeight: '700' }}
+        style={{ color: palette.ink, fontSize: 24, fontWeight: '700' }}
       >
         {strings.review.heading}
       </Text>
       {status.kind === 'loading' ? (
-        <Text accessibilityLiveRegion="polite" style={{ color: palette.mutedText }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.inkMuted }}>
           {strings.chrome.checkingSession}
         </Text>
       ) : null}
       {status.kind === 'load-failed' ? (
         <>
-          <Text accessibilityRole="alert" style={{ color: palette.text }}>
+          <Text accessibilityRole="alert" style={{ color: palette.ink }}>
             {strings.review.loadFailed}
           </Text>
           <PreviewButton
@@ -258,7 +258,7 @@ export function GuestPreviewReviewScreen() {
             <Text
               testID="guest-preview-review-failed"
               accessibilityRole="alert"
-              style={{ color: palette.danger }}
+              style={{ color: palette.dangerInk }}
             >
               {strings.review.failed}
             </Text>
@@ -288,7 +288,7 @@ export function GuestPreviewReviewScreen() {
           <Text
             testID="guest-preview-review-result"
             accessibilityLiveRegion="polite"
-            style={{ color: palette.text }}
+            style={{ color: palette.ink }}
           >
             {status.kind === 'saved'
               ? strings.review.saved

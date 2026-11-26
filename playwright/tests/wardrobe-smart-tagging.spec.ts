@@ -104,7 +104,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await page.goto('/wardrobe')
         await waitForAccessibilityReady(page)
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe Hub' })
+          page.getByRole('heading', { level: 1, name: 'Wardrobe' })
         ).toBeVisible()
 
         await page.getByRole('button', { name: '+ Add Garment' }).click()

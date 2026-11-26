@@ -118,7 +118,6 @@ tags:
       platform: Android
     commands:
       - back
-
 # The "Saved capsule" badge is deliberately NOT asserted here.
 #
 # It was, as `assertVisible: text: 'Saved capsule'` with `optional: true`, which

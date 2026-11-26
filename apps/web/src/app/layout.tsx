@@ -33,7 +33,12 @@ export default function RootLayout({
   return (
     // The head script sets data-session before React hydrates, so <html> differs from the server
     // render by that one attribute on purpose.
-    <html lang="en" suppressHydrationWarning>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      // Story CC-7.9 D4: Geist Sans on every page, from the root.
+      className={`${geistSans.variable} ${geistMono.variable}`}
+    >
       <head>
         {/* First: a browser that refuses storage gets an in-memory store before any SDK loads. */}
         <script dangerouslySetInnerHTML={{ __html: blockedStorageFallbackScript() }} />
@@ -47,7 +52,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className="bg-page font-sans text-ink antialiased">
         <SkipToContent />
         <SaveFeedbackProvider>{children}</SaveFeedbackProvider>
         {/* Last, so its effect switches to the browser language after every component in the page

@@ -20,26 +20,23 @@ export function CommunityExampleInspiration({
   return (
     <View
       testID="community-example-inspiration"
-      style={[
-        styles.group,
-        { borderColor: palette.divider, backgroundColor: palette.surface },
-      ]}
+      style={[styles.group, { borderColor: palette.line, backgroundColor: palette.card }]}
     >
-      <Text accessibilityRole="header" style={[styles.title, { color: palette.text }]}>
+      <Text accessibilityRole="header" style={[styles.title, { color: palette.ink }]}>
         {strings.styleIdeas.inspiration}
       </Text>
-      <Text style={{ color: palette.mutedText }}>{strings.styleIdeas.illustrations}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.styleIdeas.illustrations}</Text>
       {communitySampleOutfits(band).map((result) => {
         if (!result.look) return null
         const look = sampleLookText(result.look, strings)
         return (
           <View
             key={result.look.id}
-            style={[styles.card, { borderColor: palette.divider }]}
+            style={[styles.section, { borderTopColor: palette.line }]}
           >
             <Text
               accessibilityRole="header"
-              style={[styles.look, { color: palette.text }]}
+              style={[styles.look, { color: palette.ink }]}
             >
               {look.name}
             </Text>
@@ -48,8 +45,8 @@ export function CommunityExampleInspiration({
                 <SampleGarmentArt key={garment.id} garment={garment} size={42} />
               ))}
             </View>
-            <Text style={{ color: palette.text }}>{look.description}</Text>
-            <Text style={{ color: palette.mutedText }}>
+            <Text style={{ color: palette.ink }}>{look.description}</Text>
+            <Text style={{ color: palette.inkMuted }}>
               {strings.preferences.weather} ·{' '}
               {strings.values.weather[result.context.weather]}
             </Text>
@@ -70,7 +67,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: { fontSize: 18, fontWeight: '700' },
-  card: { padding: 12, borderWidth: 1, borderRadius: 8, gap: 6 },
+  // Story CC-7.9 D7: one card level, so each look is a plain section inside the group card.
+  section: { paddingTop: 12, borderTopWidth: 1, gap: 8 },
   look: { fontWeight: '600' },
   art: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
 })

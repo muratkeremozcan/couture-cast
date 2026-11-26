@@ -2,6 +2,8 @@
 // place of the grid for `/wardrobe?garment=<id>`, so the grid stays mounted and keeps its scroll.
 // Done saves through the CC-7.1 status bar: "Saved" with Undo, "No changes", and a distinct
 // message for a concurrent update, a guardian block and a lost connection.
+// Story CC-7.9 D7: the detail sits on the page surface as a sub-screen. The Closet page's top bar
+// carries its back control and the garment title, so the detail has no back or title row.
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -57,7 +59,6 @@ export type GarmentDetailProps = {
   hasLoaded: boolean
   loadFailed: boolean
   loading: boolean
-  onBack: () => void
   /**
    * Called when a tag save is sent; whatever it returns comes back with that save's
    * `onTagsSaved`, so the page can tell whether a newer closet read landed meanwhile.
@@ -92,7 +93,6 @@ function GarmentDetailUnavailable({
   hasLoaded,
   loadFailed,
   loading,
-  onBack,
   onRefresh,
 }: GarmentDetailProps) {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
@@ -101,31 +101,18 @@ function GarmentDetailUnavailable({
   const failed = loadFailed && !loading
   const missing = hasLoaded && !failed
   return (
-    <section
-      data-testid={missing ? 'garment-detail-missing' : 'garment-detail-loading'}
-      className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-    >
-      <button
-        type="button"
-        data-testid="garment-detail-back"
-        className={BACK_BUTTON_CLASS}
-        onClick={onBack}
-      >
-        <span aria-hidden="true">←</span> {t('wardrobe.detail.back')}
-      </button>
+    <section data-testid={missing ? 'garment-detail-missing' : 'garment-detail-loading'}>
       {missing ? (
-        <p className="mt-4 text-base font-semibold text-zinc-800 dark:text-zinc-100">
-          {t('wardrobe.detail.missing')}
-        </p>
+        <p className="text-base font-semibold text-ink">{t('wardrobe.detail.missing')}</p>
       ) : (
-        <p role="status" className="mt-4 text-sm text-zinc-600 dark:text-zinc-300">
+        <p role="status" className="text-sm text-ink-soft">
           {failed ? t('wardrobe.detail.loadFailed') : t('wardrobe.detail.loading')}
         </p>
       )}
       {failed && (
         <button
           type="button"
-          className="mt-2 min-h-11 px-2 text-sm font-semibold underline"
+          className="mt-2 min-h-11 px-2 text-sm font-semibold text-ink underline"
           onClick={onRefresh}
         >
           {retry}
@@ -134,9 +121,6 @@ function GarmentDetailUnavailable({
     </section>
   )
 }
-
-const BACK_BUTTON_CLASS =
-  'inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white'
 
 /**
  * Notice and announcement ids come from one counter for the whole page, so they stay unique
@@ -642,7 +626,7 @@ function GarmentDeleteButton({ deletion }: { deletion: GarmentDeleteState }) {
         deletion.phase.kind === 'confirm' ? 'garment-delete-confirm' : undefined
       }
       onClick={deletion.startDelete}
-      className="min-h-11 rounded-lg border border-red-300 px-4 text-sm font-semibold text-red-700 aria-disabled:opacity-60 dark:border-red-800 dark:text-red-300"
+      className="min-h-11 rounded-lg border border-danger-line bg-page px-4 text-sm font-semibold text-danger-ink aria-disabled:opacity-60"
     >
       {t('wardrobe.detail.delete')}
     </button>
@@ -657,16 +641,16 @@ function GarmentDeleteUsageFailed({ deletion }: { deletion: GarmentDeleteState }
     <div
       role="alert"
       data-testid="garment-delete-usage-failed"
-      className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/60"
+      className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger-line bg-danger-surface p-4"
     >
-      <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+      <p className="text-sm font-semibold text-danger-ink">
         {t('wardrobe.detail.deleteUsageFailed')}
       </p>
       <button
         type="button"
         data-testid="garment-delete-usage-retry"
         onClick={deletion.startDelete}
-        className="min-h-11 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-800 dark:border-red-800 dark:bg-zinc-900 dark:text-red-200"
+        className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
       >
         {t('feedback.retry')}
       </button>
@@ -691,13 +675,13 @@ function GarmentDeleteConfirm({ deletion }: { deletion: GarmentDeleteState }) {
           deletion.cancel()
         }
       }}
-      className="mt-4 rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/60"
+      className="mt-4 rounded-lg border border-danger-line bg-danger-surface p-4"
     >
       <p
         id="garment-delete-confirm-title"
         data-testid="garment-delete-confirm-count"
         data-count={phase.count}
-        className="text-sm font-semibold text-red-900 dark:text-red-100"
+        className="text-sm font-semibold text-danger-ink"
       >
         {t('wardrobe.detail.deleteConfirmTitle', {
           count: phase.count,
@@ -708,7 +692,7 @@ function GarmentDeleteConfirm({ deletion }: { deletion: GarmentDeleteState }) {
           type="button"
           data-testid="garment-delete-confirm-accept"
           onClick={deletion.accept}
-          className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white hover:bg-red-800 dark:bg-red-300 dark:text-red-950"
+          className="min-h-11 rounded-lg bg-danger px-4 text-sm font-semibold text-on-danger"
         >
           {t('wardrobe.detail.deleteConfirmAccept')}
         </button>
@@ -717,7 +701,7 @@ function GarmentDeleteConfirm({ deletion }: { deletion: GarmentDeleteState }) {
           type="button"
           data-testid="garment-delete-cancel"
           onClick={deletion.cancel}
-          className="min-h-11 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
         >
           {t('wardrobe.detail.deleteCancel')}
         </button>
@@ -767,7 +751,7 @@ function GarmentDetailPhoto({
         data-testid="garment-detail-photo"
         role="img"
         aria-label={alt}
-        className="flex aspect-[3/4] w-full max-w-xs items-center justify-center rounded-lg bg-zinc-100 text-4xl dark:bg-zinc-800"
+        className="flex aspect-[3/4] w-full max-w-xs items-center justify-center rounded-lg bg-card-muted text-3xl"
       >
         <span aria-hidden="true">👗</span>
       </div>
@@ -798,7 +782,6 @@ function GarmentDetailInner({
   owner,
   loadFailed,
   loading,
-  onBack,
   onTagSaveStart,
   onTagsSaved,
   onRefresh,
@@ -809,7 +792,7 @@ function GarmentDetailInner({
   const locale = i18n.language
   const styleLabels = getStylePieceStrings(locale)
   const samples = getGuestPreviewStrings(locale)
-  const headingRef = useRef<HTMLHeadingElement | null>(null)
+  const detailRef = useRef<HTMLElement | null>(null)
   const editor = useGarmentTagEditor({
     garment,
     owner,
@@ -823,9 +806,9 @@ function GarmentDetailInner({
   const rereadFailed = awaitingRead && loadFailed && !loading
   const garmentId = garment.id
 
-  // A newly opened garment starts with its heading focused.
+  // A newly opened garment starts with the detail focused; its name, the top bar title, labels it.
   useEffect(() => {
-    headingRef.current?.focus()
+    detailRef.current?.focus()
   }, [garmentId])
 
   const alt = garmentPhotoAlt(locale, garment)
@@ -839,9 +822,7 @@ function GarmentDetailInner({
     onSelect: (value: V) => void
   ) => (
     <fieldset className="mt-4">
-      <legend className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-        {legend}
-      </legend>
+      <legend className="text-sm font-semibold text-ink">{legend}</legend>
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((option) => {
           const pressed = option.value === selected
@@ -855,8 +836,8 @@ function GarmentDetailInner({
               onClick={() => onSelect(option.value)}
               className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition-colors duration-150 motion-reduce:transition-none disabled:opacity-60 ${
                 pressed
-                  ? 'border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900'
-                  : 'border-zinc-300 text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800'
+                  ? 'border-inverse bg-inverse text-on-inverse'
+                  : 'border-line-strong bg-page text-ink'
               }`}
             >
               {option.label}
@@ -869,12 +850,9 @@ function GarmentDetailInner({
 
   const { values } = samples
   const tagRow = (testId: string, label: string, value: string) => (
-    <div className="flex items-baseline justify-between gap-4 border-b border-zinc-100 py-2 last:border-b-0 dark:border-zinc-800">
-      <dt className="text-sm text-zinc-600 dark:text-zinc-400">{label}</dt>
-      <dd
-        data-testid={testId}
-        className="text-sm font-semibold text-zinc-900 dark:text-zinc-50"
-      >
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-2 last:border-b-0">
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd data-testid={testId} className="text-sm font-semibold text-ink">
         {value}
       </dd>
     </div>
@@ -882,33 +860,17 @@ function GarmentDetailInner({
 
   return (
     <section
+      ref={detailRef}
+      tabIndex={-1}
       data-testid="garment-detail"
-      aria-labelledby="garment-detail-title"
-      className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900"
+      aria-label={alt}
+      className="outline-none"
     >
-      <button
-        type="button"
-        data-testid="garment-detail-back"
-        className={BACK_BUTTON_CLASS}
-        onClick={onBack}
-      >
-        <span aria-hidden="true">←</span> {t('wardrobe.detail.back')}
-      </button>
-
-      <div className="mt-3 grid gap-4 sm:grid-cols-[minmax(0,16rem)_1fr]">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,16rem)_1fr]">
         <GarmentDetailPhoto garment={garment} alt={alt} onRefresh={onRefresh} />
 
         <div>
-          <h2
-            id="garment-detail-title"
-            ref={headingRef}
-            tabIndex={-1}
-            className="text-xl font-bold text-zinc-900 outline-none dark:text-zinc-50"
-          >
-            {alt}
-          </h2>
-
-          <dl className="mt-3">
+          <dl>
             {tagRow(
               'garment-detail-category',
               t('wardrobe.detail.category'),
@@ -969,7 +931,7 @@ function GarmentDetailInner({
                 <p
                   data-testid="garment-tag-error"
                   data-failure={failure}
-                  className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/60 dark:text-red-200"
+                  className="mt-4 rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
                 >
                   {editor.failureMessage(failure)}
                 </p>
@@ -979,7 +941,7 @@ function GarmentDetailInner({
                   type="button"
                   data-testid="garment-tag-reread"
                   onClick={onRefresh}
-                  className="mt-2 min-h-11 px-2 text-sm font-semibold underline"
+                  className="mt-2 min-h-11 px-2 text-sm font-semibold text-ink underline"
                 >
                   {t('feedback.retry')}
                 </button>
@@ -990,13 +952,14 @@ function GarmentDetailInner({
                   type="button"
                   data-testid="garment-tag-done"
                   data-primary-action="true"
+                  data-gold="primary"
                   aria-busy={busy}
                   data-save-state={saveState}
                   // aria-disabled keeps keyboard focus on Done while it saves or while the
                   // re-read after a conflict is pending; handleDone ignores those presses.
                   aria-disabled={busy || awaitingRead}
                   onClick={() => void editor.handleDone()}
-                  className="min-h-11 min-w-[5.5rem] rounded-lg bg-zinc-900 px-4 text-sm font-semibold text-white transition-colors duration-150 hover:bg-zinc-800 motion-reduce:transition-none aria-disabled:opacity-70 dark:bg-zinc-100 dark:text-zinc-900"
+                  className="min-h-11 min-w-[5.5rem] rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary aria-disabled:opacity-70"
                 >
                   {saveState === 'still-saving'
                     ? t('feedback.stillSaving')
@@ -1009,7 +972,7 @@ function GarmentDetailInner({
                   data-testid="garment-tag-cancel"
                   disabled={busy}
                   onClick={editor.closeEditor}
-                  className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-800 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100"
+                  className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
                 >
                   {t('wardrobe.detail.cancel')}
                 </button>
@@ -1030,7 +993,7 @@ function GarmentDetailInner({
                     deletion.phase.kind === 'confirm'
                   }
                   onClick={editor.openEditor}
-                  className="min-h-11 rounded-lg border border-zinc-300 px-4 text-sm font-semibold text-zinc-800 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-100"
+                  className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
                 >
                   {t('wardrobe.detail.editTags')}
                 </button>

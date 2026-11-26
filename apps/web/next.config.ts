@@ -2,6 +2,10 @@ import type { NextConfig } from 'next'
 import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { resolveGitMetadata } from './git-metadata'
+import {
+  PREVIEW_API_PROXY_ROUTE,
+  previewApiProxyConfig,
+} from './src/lib/preview-api-proxy'
 
 const rootDir = path.resolve(__dirname, '../..')
 const rootEnvFiles = [
@@ -101,7 +105,14 @@ const nextConfig: NextConfig = {
     const routes: NonNullable<Awaited<ReturnType<NonNullable<NextConfig['rewrites']>>>> =
       []
 
-    if (apiProxyBaseUrl) {
+    // A protected preview API needs the bypass header a rewrite cannot add, so a configured
+    // preview deployment goes through its own proxy route (src/lib/preview-api-proxy.ts).
+    if (previewApiProxyConfig()) {
+      routes.push({
+        source: '/api/v1/:path*',
+        destination: `${PREVIEW_API_PROXY_ROUTE}/:path*`,
+      })
+    } else if (apiProxyBaseUrl) {
       routes.push({
         source: '/api/v1/:path*',
         destination: `${apiProxyBaseUrl}/api/v1/:path*`,

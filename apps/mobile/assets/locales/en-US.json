@@ -46,7 +46,13 @@
         "heat": "Heat warning",
         "ice": "Ice warning"
       },
-      "body_generic": "A weather warning is in effect for your area."
+      "body_generic": "A weather warning is in effect for your area.",
+      "focused_badge": "Weather alert: {{severity}}",
+      "severity": {
+        "info": "Info",
+        "warning": "Warning",
+        "critical": "Critical"
+      }
     },
     "no_location": "Add your location to get daily outfits"
   },
@@ -141,7 +147,8 @@
       "storage_forbidden": "Storage access forbidden.",
       "consent_required": "Guardian consent required for wardrobe uploads.",
       "upload_expired": "Upload session expired.",
-      "upload_session_changed": "You signed out or switched accounts during this upload. Choose the photo again."
+      "upload_session_changed": "You signed out or switched accounts during this upload. Choose the photo again.",
+      "sign_in_required": "Sign in to manage your wardrobe."
     },
     "crop": {
       "title": "Crop & Position",
@@ -283,7 +290,53 @@
       },
       "garmentsSelected": "Garments ({{count}} of {{max}} selected)",
       "garmentsRange": "Select {{min}} to {{max}} garments.",
-      "garmentOrder": "Garment order"
+      "garmentOrder": "Garment order",
+      "signIn": "Sign in to manage capsules.",
+      "status": {
+        "ready": "Ready",
+        "needsRepair": "Needs repair"
+      },
+      "garmentCount_one": "{{count}} garment",
+      "garmentCount_other": "{{count}} garments",
+      "truncation": "Showing {{shown}} of {{total}}. Refine your search to see the rest.",
+      "garmentAtPosition": "{{garment}} (position {{position}})",
+      "garmentNumber": "Garment {{position}}",
+      "closeBuilder": "Close capsule builder",
+      "repairRemoved_one": "{{count}} garment is no longer available and has been removed. Choose a replacement before saving.",
+      "repairRemoved_other": "{{count}} garments are no longer available and have been removed. Choose replacements before saving.",
+      "favoriteMarked": "Favorite Capsule",
+      "markFavorite": "Mark as Favorite",
+      "saving": "Saving...",
+      "subtitle": "Curate and manage your custom outfit combinations.",
+      "filterOccasionLabel": "Filter by occasion",
+      "loading": "Loading outfit capsules…",
+      "favoriteCapsule": "Favorite capsule {{name}}",
+      "editAction": "Edit",
+      "deleteAction": "Delete",
+      "cancelDeletion": "Cancel deletion",
+      "cancel": "Cancel",
+      "builderDescription": "Build a cohesive outfit capsule from your wardrobe.",
+      "reloadLatest": "Reload the latest version",
+      "garmentFallback": "Garment {{position}}",
+      "garmentNoun": "garment",
+      "untagged": "Garment",
+      "garmentLabel": "{{category}} (position {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (position {{position}})",
+      "category": {
+        "top": "top",
+        "bottom": "bottom",
+        "outerwear": "outerwear",
+        "dress": "dress",
+        "shoes": "shoes",
+        "accessory": "accessory"
+      },
+      "comfort": {
+        "cold": "cold",
+        "cool": "cool",
+        "mild": "mild",
+        "warm": "warm",
+        "hot": "hot"
+      }
     },
     "onboarding": {
       "title": "Set up your closet",
@@ -324,7 +377,8 @@
         "storage_error": "We couldn't save this photo. Try again.",
         "confirm_required": "Confirm the basewear guidance before uploading.",
         "session_changed": "You signed out or switched accounts during this upload. Choose the photo again."
-      }
+      },
+      "sign_in_required": "Sign in to edit your silhouette."
     },
     "detail": {
       "back": "Back to closet",
@@ -351,6 +405,19 @@
       "deleteUndone": "Undone",
       "deleteFailed": "Could not delete this piece.",
       "deleteUsageFailed": "Could not check where this piece is used. Try again."
+    },
+    "hub": {
+      "loading": "Loading wardrobe",
+      "saved_looks_failed": "Unable to load your saved looks.",
+      "status": {
+        "pending_upload": "Uploading",
+        "bytes_uploaded": "Uploading",
+        "processing": "Processing",
+        "awaiting_tags": "Waiting for tags",
+        "ready": "Ready",
+        "failed": "Upload failed",
+        "unknown": "In progress"
+      }
     }
   },
   "commerce": {
@@ -1112,5 +1179,61 @@
     "close": "Close",
     "showList": "Show saved looks",
     "hideList": "Hide saved looks"
+  },
+  "shell": {
+    "back": "Back",
+    "notFound": {
+      "title": "Screen not found",
+      "body": "The screen you were looking for doesn't exist. Head back to the home screen to continue."
+    },
+    "goHome": "Go home"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Guardian consent",
+      "heading": "Accept teen wardrobe access",
+      "intro": "Confirm this invitation to link the guardian account and unlock the teen wardrobe journey.",
+      "tokenMissing": "Invitation token is missing from this link.",
+      "success": "Consent recorded for {{teenEmail}}. Guardian account {{guardianEmail}} is now linked.",
+      "failed": "Unable to accept guardian invitation",
+      "accepting": "Accepting…",
+      "accept": "Accept invitation",
+      "acceptingLabel": "Accepting invitation"
+    },
+    "dashboard": {
+      "title": "Guardian dashboard",
+      "intro": "Review linked teen accounts and revoke consent when access should stop.",
+      "loading": "Loading linked teens...",
+      "loadFailed": "Unable to load dashboard",
+      "revokeFailed": "Unable to revoke consent",
+      "revoked": "Consent revoked for {{teenId}}. Teen session invalidated: {{invalidated}}.",
+      "yes": "yes",
+      "no": "no",
+      "linkedTeens": "Linked teens",
+      "revokeLabel": "Revoke consent for {{teenId}}",
+      "revoking": "Revoking...",
+      "revoke": "Revoke",
+      "empty": "No linked teen accounts yet."
+    },
+    "consent": {
+      "awaiting": "Awaiting consent",
+      "status": {
+        "granted": "granted",
+        "pending": "pending",
+        "revoked": "revoked"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Teen dashboard",
+      "loading": "Loading guardian consent status...",
+      "loadFailed": "Unable to load dashboard",
+      "granted": "Guardian consent granted",
+      "revoked": "Guardian consent revoked",
+      "pending": "Guardian consent pending",
+      "linkedGuardians": "Linked guardians",
+      "empty": "No guardian has accepted consent yet."
+    }
   }
 }

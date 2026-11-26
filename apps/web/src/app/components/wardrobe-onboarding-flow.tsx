@@ -8,10 +8,10 @@
 // optional `garmentPollIntervalsMs` test-only prop that fails that check once `.next/types` has
 // actually been generated (`next dev`/`next build`) — confirmed against a real `tsc --noEmit`
 // run against generated route types, not assumed. `page.tsx` stays a thin default-only wrapper.
+// Story CC-7.9 D6, D7: every state sits on the page surface under the shared top bar, whose title
+// and back control (to /wardrobe) replace the in-body heading and back link.
 'use client'
 
-import Link from 'next/link'
-import { getGuestPreviewStrings } from '@couture/utils'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { I18nextProvider, useTranslation } from 'react-i18next'
@@ -21,7 +21,8 @@ import type {
   WardrobeOnboardingStep,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
-import { SkipToContent } from './skip-to-content'
+import { AppPage, APP_MAIN_BASE_CLASS } from './app-page'
+import { AppTopBar } from './app-top-bar'
 import { GarmentCaptureModal } from './garment-capture-modal'
 import { GarmentTaggingModal } from './garment-tagging-modal'
 import { SilhouetteSettingsPanel } from './silhouette-settings-panel'
@@ -101,7 +102,7 @@ function OnboardingFlow({
 }: {
   garmentPollIntervalsMs?: readonly number[]
 }) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const router = useRouter()
 
   const [userId, setUserId] = useState<string | null>(null)
@@ -433,26 +434,29 @@ function OnboardingFlow({
 
   if (isLoading) {
     return (
-      <main className="mx-auto max-w-2xl p-6">
-        <p role="status" className="text-sm text-zinc-500">
+      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+        <p role="status" className="text-sm text-ink-muted">
           {t('wardrobe.onboarding.loading')}
         </p>
-      </main>
+      </OnboardingFrame>
     )
   }
 
   if (loadError) {
     return (
-      <main className="mx-auto max-w-2xl p-6">
-        <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">
+      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
+        >
           {loadError}
         </p>
-      </main>
+      </OnboardingFrame>
     )
   }
 
   if (!onboardingState || !userId) {
-    return null
+    return <OnboardingFrame title={t('wardrobe.onboarding.title')} />
   }
 
   const currentStep = onboardingState.currentStep
@@ -464,77 +468,53 @@ function OnboardingFlow({
 
   return (
     <>
-      <div
-        data-app-shell
-        className="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
-      >
-        <SkipToContent />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className="mx-auto max-w-2xl px-6 py-10 outline-none"
-        >
+      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+        <p aria-live="polite" className="sr-only" data-testid="onboarding-status-region">
+          {liveAnnouncement ?? ''}
+        </p>
+
+        {advanceError && (
           <p
-            aria-live="polite"
-            className="sr-only"
-            data-testid="onboarding-status-region"
+            role="alert"
+            className="rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
           >
-            {liveAnnouncement ?? ''}
+            {advanceError}
           </p>
+        )}
 
-          <Link
-            href="/wardrobe"
-            className="inline-flex min-h-11 items-center text-sm font-semibold underline"
-          >
-            {getGuestPreviewStrings(i18n.language).firstUse.backToWardrobe}
-          </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {t('wardrobe.onboarding.title')}
-          </h1>
-
-          {advanceError && (
-            <p
-              role="alert"
-              className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800"
-            >
-              {advanceError}
-            </p>
-          )}
-
-          <OnboardingStepContent
-            t={t}
-            currentStep={currentStep}
-            permissionDenied={permissionDenied}
-            isRequestingPermission={isRequestingPermission}
-            onAllowPermission={() => {
-              void handleAllowPermission()
-            }}
-            garments={garments}
-            garmentPositions={garmentPositionsRef.current}
-            timedOutGarmentIds={timedOutGarmentIds}
-            allTagged={allTagged}
-            isAdvancing={isAdvancing}
-            isSilhouetteBusy={isSilhouetteBusy}
-            addAnotherButtonRef={addAnotherButtonRef}
-            taggingButtonRefs={taggingButtonRefs}
-            onAddAnother={openCapture}
-            onOpenTagging={openTagging}
-            onUseStarterWardrobe={() => {
-              void handleUseStarterWardrobe()
-            }}
-            onContinueFromCapture={() => {
-              void handleContinueFromCapture()
-            }}
-            onContinueFromTagging={() => {
-              void handleContinueFromTagging()
-            }}
-            onFinishOnboarding={handleFinishOnboarding}
-            onSilhouetteBusyChange={setIsSilhouetteBusy}
-            onGoToWardrobe={() => router.push('/wardrobe')}
-            userId={userId}
-          />
-        </main>
-      </div>
+        <OnboardingStepContent
+          t={t}
+          currentStep={currentStep}
+          permissionDenied={permissionDenied}
+          isRequestingPermission={isRequestingPermission}
+          onAllowPermission={() => {
+            void handleAllowPermission()
+          }}
+          garments={garments}
+          garmentPositions={garmentPositionsRef.current}
+          timedOutGarmentIds={timedOutGarmentIds}
+          allTagged={allTagged}
+          isAdvancing={isAdvancing}
+          isSilhouetteBusy={isSilhouetteBusy}
+          addAnotherButtonRef={addAnotherButtonRef}
+          taggingButtonRefs={taggingButtonRefs}
+          onAddAnother={openCapture}
+          onOpenTagging={openTagging}
+          onUseStarterWardrobe={() => {
+            void handleUseStarterWardrobe()
+          }}
+          onContinueFromCapture={() => {
+            void handleContinueFromCapture()
+          }}
+          onContinueFromTagging={() => {
+            void handleContinueFromTagging()
+          }}
+          onFinishOnboarding={handleFinishOnboarding}
+          onSilhouetteBusyChange={setIsSilhouetteBusy}
+          onGoToWardrobe={() => router.push('/wardrobe')}
+          userId={userId}
+        />
+      </OnboardingFrame>
 
       <GarmentCaptureModal
         isOpen={isCaptureModalOpen}
@@ -551,6 +531,28 @@ function OnboardingFlow({
         invokingElementRef={taggingInvokerRef}
       />
     </>
+  )
+}
+
+/** D6, D7: the page surface, the top bar (title and back to the closet) and the main column. */
+function OnboardingFrame({
+  title,
+  children,
+}: {
+  title: string
+  children?: React.ReactNode
+}) {
+  return (
+    <AppPage>
+      <AppTopBar title={title} backHref="/wardrobe" />
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className={`${APP_MAIN_BASE_CLASS} max-w-2xl`}
+      >
+        {children}
+      </main>
+    </AppPage>
   )
 }
 
@@ -643,7 +645,7 @@ function OnboardingStepContent({
         ever be seen; it clears once the user moves past capture.
        */}
       {showPermissionDeniedBanner && (
-        <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-300">
+        <p role="alert" className="mt-4 text-sm text-danger-ink">
           {t('wardrobe.onboarding.permissionDenied')}
         </p>
       )}
@@ -686,7 +688,8 @@ function OnboardingStepContent({
             type="button"
             disabled={isAdvancing || isSilhouetteBusy}
             onClick={onFinishOnboarding}
-            className="min-h-[44px] self-start rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+            data-gold="primary"
+            className="min-h-11 self-start rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-on-primary"
           >
             {t('wardrobe.onboarding.continue')}
           </button>
@@ -695,16 +698,14 @@ function OnboardingStepContent({
 
       {currentStep === 'complete' && (
         <div className="mt-6 flex flex-col items-start gap-4">
-          <p
-            role="status"
-            className="text-lg font-semibold text-emerald-700 dark:text-emerald-300"
-          >
+          <p role="status" className="text-lg font-semibold text-success-ink">
             {t('wardrobe.onboarding.complete')}
           </p>
           <button
             type="button"
             onClick={onGoToWardrobe}
-            className="min-h-[44px] rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+            data-gold="primary"
+            className="min-h-11 rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-on-primary"
           >
             {t('wardrobe.onboarding.continue')}
           </button>
@@ -723,17 +724,16 @@ interface PermissionStepProps {
 function PermissionStep({ t, isRequesting, onAllow }: PermissionStepProps) {
   return (
     <div className="mt-6 flex flex-col gap-4">
-      <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+      <h2 className="text-lg font-semibold text-ink">
         {t('wardrobe.onboarding.permissionTitle')}
       </h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-        {t('wardrobe.onboarding.permissionBody')}
-      </p>
+      <p className="text-sm text-ink-muted">{t('wardrobe.onboarding.permissionBody')}</p>
       <button
         type="button"
         disabled={isRequesting}
         onClick={onAllow}
-        className="min-h-[44px] self-start rounded-lg bg-zinc-900 px-6 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+        data-gold="primary"
+        className="min-h-11 self-start rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-on-primary"
       >
         {t('wardrobe.onboarding.permissionAction')}
       </button>
@@ -799,16 +799,16 @@ function CaptureAndTaggingStep({
             return (
               <li
                 key={garment.id}
-                className="flex items-center rounded-lg border border-zinc-200 p-1 text-sm dark:border-zinc-800"
+                className="flex items-center rounded-lg border border-line p-1 text-sm"
               >
                 {tagged ? (
-                  <span className="px-2 py-2 text-emerald-700 dark:text-emerald-300">
+                  <span className="px-2 py-2 text-success-ink">
                     {t('wardrobe.onboarding.checklistTagged', { garment: label })}
                   </span>
                 ) : isFailed ? (
                   <span
                     data-testid={`garment-status-${garment.id}`}
-                    className="px-2 py-2 text-red-700 dark:text-red-300"
+                    className="px-2 py-2 text-danger-ink"
                   >
                     {t('wardrobe.onboarding.checklistFailed', { garment: label })}
                   </span>
@@ -820,14 +820,14 @@ function CaptureAndTaggingStep({
                       else taggingButtonRefs.current.delete(garment.id)
                     }}
                     onClick={() => onOpenTagging(garment.id)}
-                    className="min-h-[44px] w-full rounded px-2 py-1 text-left font-semibold text-gold-700 hover:bg-gold-500/10 dark:text-gold-300"
+                    className="min-h-11 w-full rounded-md px-2 py-1 text-left font-semibold text-ink underline"
                   >
                     {t('wardrobe.onboarding.checklistPending', { garment: label })}
                   </button>
                 ) : (
                   <span
                     data-testid={`garment-status-${garment.id}`}
-                    className="px-2 py-2 text-zinc-500 dark:text-zinc-400"
+                    className="px-2 py-2 text-ink-muted"
                   >
                     {t('wardrobe.onboarding.checklistProcessing', { garment: label })}
                   </span>
@@ -843,7 +843,8 @@ function CaptureAndTaggingStep({
           ref={addAnotherButtonRef}
           type="button"
           onClick={onAddAnother}
-          className="min-h-[44px] rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          data-gold="primary"
+          className="min-h-11 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary"
         >
           {t('wardrobe.onboarding.addAnother')}
         </button>
@@ -858,7 +859,7 @@ function CaptureAndTaggingStep({
             type="button"
             onClick={onUseStarterWardrobe}
             disabled={isAdvancing}
-            className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+            className="min-h-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink"
           >
             {t('wardrobe.onboarding.useStarterWardrobe')}
           </button>
@@ -867,7 +868,7 @@ function CaptureAndTaggingStep({
           type="button"
           disabled={continueDisabled}
           onClick={onContinue}
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-40 dark:border-zinc-700 dark:text-zinc-300"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink disabled:opacity-40"
         >
           {t('wardrobe.onboarding.continue')}
         </button>

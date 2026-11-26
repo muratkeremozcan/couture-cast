@@ -51,7 +51,7 @@ export function MobileChipNavigation({
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.background, borderBottomColor: colors.border },
+        { backgroundColor: colors.page, borderBottomColor: colors.line },
       ]}
       testID="mobile-chip-navigation"
     >
@@ -81,9 +81,10 @@ export function MobileChipNavigation({
               onPress={() => handleSelect(category)}
               style={({ pressed }) => [
                 styles.chip,
+                // Story CC-7.9 D3: the selected chip is inverse, never gold.
                 isActive
-                  ? styles.chipActive
-                  : { backgroundColor: colors.subtleSurface, borderColor: colors.border },
+                  ? { backgroundColor: colors.inverse, borderColor: colors.inverse }
+                  : { backgroundColor: colors.card, borderColor: colors.line },
                 pressed && styles.chipPressed,
               ]}
             >
@@ -91,7 +92,7 @@ export function MobileChipNavigation({
                 numberOfLines={1}
                 style={[
                   styles.chipText,
-                  isActive ? styles.chipTextActive : { color: colors.mutedText },
+                  { color: isActive ? colors.onInverse : colors.inkMuted },
                 ]}
               >
                 {localizedCategory}
@@ -128,16 +129,12 @@ const styles = StyleSheet.create({
     minWidth: 96,
     flexShrink: 0,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: 9999,
     borderWidth: 1,
     minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  chipActive: {
-    backgroundColor: '#C9A14A',
-    borderColor: '#C9A14A',
   },
   chipPressed: {
     opacity: 0.8,
@@ -147,9 +144,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  chipTextActive: {
-    color: '#111111',
   },
   bottomEdge: {
     position: 'absolute',

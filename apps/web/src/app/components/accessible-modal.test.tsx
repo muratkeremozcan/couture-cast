@@ -88,12 +88,18 @@ describe('AccessibleModal', () => {
     )
   })
 
-  it('pairs a theme surface with the existing light-surface keyboard focus token', () => {
-    renderModal({ surface: 'theme' })
-    expect(screen.getByRole('dialog').firstElementChild).toHaveAttribute(
-      'data-focus-surface',
-      'light'
-    )
+  // Story CC-7.9 D3, D5: the focus ring follows the scheme on its own, so the panel carries no
+  // focus-surface marker; a theme panel wears the premium palette and the default one the page.
+  it('paints a theme surface with the premium palette and the default one with the page roles', () => {
+    const { unmount } = renderModal({ surface: 'theme' })
+    const themePanel = screen.getByRole('dialog').firstElementChild
+    expect(themePanel).toHaveClass('bg-theme-card-bg', 'text-theme-card-text')
+    expect(themePanel).not.toHaveAttribute('data-focus-surface')
+    unmount()
+    renderModal()
+    const defaultPanel = screen.getByRole('dialog').firstElementChild
+    expect(defaultPanel).toHaveClass('bg-page', 'text-ink')
+    expect(defaultPanel).not.toHaveClass('bg-theme-card-bg')
   })
 
   it('hides actual page content without an app-shell marker and restores prior state', () => {
