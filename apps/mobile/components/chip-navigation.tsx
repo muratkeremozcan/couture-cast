@@ -73,8 +73,10 @@ export function MobileChipNavigation({
               key={category}
               testID={`chip-${category.toLowerCase()}`}
               accessibilityRole="button"
+              // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+              // so the web side uses aria-pressed.
               accessibilityState={{ selected: isActive }}
-              aria-selected={isActive}
+              aria-pressed={isActive}
               accessibilityLabel={t('accessibility.chip_filter_label', {
                 chip: localizedCategory,
               })}

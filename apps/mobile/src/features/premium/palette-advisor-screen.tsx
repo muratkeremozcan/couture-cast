@@ -224,7 +224,7 @@ function RecommendationCardView({
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: isBusy }}
+              aria-disabled={isBusy}
               disabled={isBusy}
               style={styles.secondaryButton}
               testID={`palette-advisor-unsave-${card.itemKey}`}
@@ -238,7 +238,7 @@ function RecommendationCardView({
         ) : (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: isBusy }}
+            aria-disabled={isBusy}
             disabled={isBusy}
             style={styles.secondaryButton}
             testID={`palette-advisor-save-${card.itemKey}`}
@@ -251,7 +251,7 @@ function RecommendationCardView({
         )}
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
+          aria-disabled={isBusy}
           disabled={isBusy}
           style={styles.secondaryButton}
           testID={`palette-advisor-dismiss-${card.itemKey}`}
@@ -324,7 +324,7 @@ function ConsentBlock({
               <View style={styles.actionRow}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityState={{ disabled: isBusy }}
+                  aria-disabled={isBusy}
                   disabled={isBusy}
                   style={styles.dangerButton}
                   testID="palette-advisor-erase-confirm-yes"
@@ -349,7 +349,7 @@ function ConsentBlock({
           ) : (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: isBusy }}
+              aria-disabled={isBusy}
               disabled={isBusy}
               style={styles.secondaryButton}
               testID="palette-advisor-consent-revoke"
@@ -367,9 +367,7 @@ function ConsentBlock({
           accessibilityHint={
             showUnavailable ? t('commerce.premium.palette.unavailable') : undefined
           }
-          accessibilityState={{
-            disabled: isBusy || !isAnalysisEnabled,
-          }}
+          aria-disabled={isBusy || !isAnalysisEnabled}
           disabled={isBusy || !isAnalysisEnabled}
           style={styles.primaryButton}
           testID="palette-advisor-consent-grant"
@@ -405,9 +403,7 @@ function SourceChoice({
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{
-          disabled: isBusy || !isAnalysisEnabled,
-        }}
+        aria-disabled={isBusy || !isAnalysisEnabled}
         disabled={isBusy || !isAnalysisEnabled}
         style={styles.secondaryButton}
         testID="palette-advisor-source-wardrobe"
@@ -423,9 +419,7 @@ function SourceChoice({
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{
-          disabled: isBusy || !isAnalysisEnabled,
-        }}
+        aria-disabled={isBusy || !isAnalysisEnabled}
         disabled={isBusy || !isAnalysisEnabled}
         style={styles.secondaryButton}
         testID="palette-advisor-source-selfie"
@@ -529,7 +523,7 @@ function PaletteResult({
           </Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: isBusy }}
+            aria-disabled={isBusy}
             disabled={isBusy}
             style={styles.secondaryButton}
             testID="palette-advisor-undo-dismiss"

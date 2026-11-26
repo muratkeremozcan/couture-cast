@@ -79,13 +79,14 @@ describe('MobileChipNavigation Component (Story 3.6 - 3.6-UNIT-009)', () => {
     expect(personalChip).toBeDefined()
     expect(communityChip).toBeDefined()
     expect(sponsoredChip).toBeDefined()
-    expect(personalChip.getAttribute('aria-selected')).toBe('true')
-    expect(communityChip.getAttribute('aria-selected')).toBe('false')
+    // Story CC-7.10: a button takes aria-pressed, not aria-selected (ARIA), so the DOM says so.
+    expect(personalChip.getAttribute('aria-pressed')).toBe('true')
+    expect(communityChip.getAttribute('aria-pressed')).toBe('false')
 
     fireEvent.click(communityChip)
 
-    expect(personalChip.getAttribute('aria-selected')).toBe('false')
-    expect(communityChip.getAttribute('aria-selected')).toBe('true')
+    expect(personalChip.getAttribute('aria-pressed')).toBe('false')
+    expect(communityChip.getAttribute('aria-pressed')).toBe('true')
     expect(analyticsMocks.announce).toHaveBeenCalledWith('chip_change', 'Community')
     expect(analyticsMocks.capture).toHaveBeenCalledWith('chip_changed', {
       chipCategory: 'Community',

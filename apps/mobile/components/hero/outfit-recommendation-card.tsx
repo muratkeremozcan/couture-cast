@@ -179,7 +179,10 @@ export function OutfitRecommendationCard({
                   ]}
                   testID={`reasoning-badge-${badge.key}`}
                   accessibilityRole="button"
+                  // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+                  // so the web side uses aria-pressed.
                   accessibilityState={{ selected: isSelected }}
+                  aria-pressed={isSelected}
                 >
                   <Text
                     style={[
@@ -277,11 +280,7 @@ export function OutfitRecommendationCard({
             // then the handoff warning. The visible label leads so the
             // accessible name always contains what a speech-input user reads.
             accessibilityLabel={[ctaLabel, partnerLabel, opensInBrowserLabel].join('. ')}
-            // Busy rather than disabled: the control is working, not
-            // unavailable. `aria-busy` rides alongside because react-native-web
-            // does not project `accessibilityState` onto the DOM, the same pair
-            // `components/chip-navigation.tsx` ships.
-            accessibilityState={{ busy: isActivatingCta }}
+            // Busy rather than disabled: the control is working, not unavailable.
             aria-busy={isActivatingCta}
           >
             <Text style={[styles.shopThisLookCtaLabel, { color: palette.onInverse }]}>

@@ -139,7 +139,6 @@ export const CommunitySponsoredShop = forwardRef<View, CommunitySponsoredShopPro
           onBlur={onBlur}
           // Busy state keeps the control enabled: a disabled control can drop
           // accessibility focus.
-          accessibilityState={{ busy: isPending }}
           aria-busy={isPending}
           onPress={() => {
             void handlePress()

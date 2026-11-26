@@ -506,10 +506,14 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     expect(touchableSpy.props.get('community-publish-button')?.accessibilityHint).toBe(
       enUS.community.validation.altConfirmRequired
     )
+    // Story CC-7.10: the checkbox state is the aria prop now, so it is read from the DOM.
     expect(touchableSpy.props.get('community-confirm-alt-text')).toMatchObject({
       accessibilityRole: 'checkbox',
-      accessibilityState: { checked: false },
     })
+    expect(screen.getByTestId('community-confirm-alt-text')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
 
     press(screen.getByTestId('community-confirm-alt-text'))
 
@@ -518,9 +522,10 @@ describe('CommunityPostSheet (Story 6.1)', () => {
         screen.getByTestId('community-publish-button').getAttribute('aria-disabled')
       ).not.toBe('true')
     )
-    expect(touchableSpy.props.get('community-confirm-alt-text')).toMatchObject({
-      accessibilityState: { checked: true },
-    })
+    expect(screen.getByTestId('community-confirm-alt-text')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
     expect(touchableSpy.props.get('community-publish-button')?.accessibilityHint).toBe(
       undefined
     )

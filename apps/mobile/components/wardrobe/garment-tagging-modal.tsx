@@ -417,7 +417,8 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-category-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
+                      aria-checked={isSelected}
+                      aria-disabled={isSaving}
                       accessibilityLabel={label}
                       disabled={isSaving}
                       onPress={() => {
@@ -462,10 +463,8 @@ export function MobileGarmentTaggingModal({
               >
                 <TouchableOpacity
                   accessibilityRole="radio"
-                  accessibilityState={{
-                    selected: selectedMaterial === null,
-                    disabled: isSaving,
-                  }}
+                  aria-checked={selectedMaterial === null}
+                  aria-disabled={isSaving}
                   accessibilityLabel={t('wardrobe.tagging.not_sure')}
                   disabled={isSaving}
                   onPress={() => {
@@ -491,7 +490,8 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-material-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
+                      aria-checked={isSelected}
+                      aria-disabled={isSaving}
                       accessibilityLabel={label}
                       disabled={isSaving}
                       onPress={() => {
@@ -542,7 +542,8 @@ export function MobileGarmentTaggingModal({
                       key={opt}
                       testID={`garment-tag-comfort-${opt}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected, disabled: isSaving }}
+                      aria-checked={isSelected}
+                      aria-disabled={isSaving}
                       accessibilityLabel={label}
                       disabled={isSaving}
                       onPress={() => {
@@ -584,7 +585,7 @@ export function MobileGarmentTaggingModal({
                 disabled={isSaveDisabled}
                 style={[styles.saveBtn, isSaveDisabled && styles.saveBtnDisabled]}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: isSaveDisabled }}
+                aria-disabled={isSaveDisabled}
                 testID="garment-tagging-save"
               >
                 <Text style={styles.saveText}>

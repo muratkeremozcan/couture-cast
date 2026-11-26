@@ -243,8 +243,8 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     expect(saveButton.getAttribute('aria-busy')).toBe('false')
     try {
       await userEvent.click(saveButton)
-      // `aria-busy` is what react-native-web 0.21 renders; it dropped the
-      // `accessibilityState.busy` mapping.
+      // `aria-busy` is the prop the button sets (Story CC-7.10: the aria props replaced the
+      // native-only `accessibilityState`), and react-native-web renders it as is.
       await waitFor(() => expect(saveButton.getAttribute('aria-busy')).toBe('true'))
       expect(saveButton.textContent).toBe('Saving...')
       expect(within(saveButton).getByRole('progressbar')).toBeTruthy()

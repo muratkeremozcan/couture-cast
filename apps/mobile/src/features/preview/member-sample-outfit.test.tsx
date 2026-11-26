@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpResponse } from 'msw'
 import {
@@ -325,7 +326,10 @@ describe('MemberSampleOutfit (mobile)', () => {
     await waitFor(() => expect(saveBtn).toHaveTextContent('Failed'))
 
     // Next Save succeeds cleanly.
-    fireEvent.click(saveBtn)
+    // A real click: react-native-web reconfigures Pressable's responder in a passive effect, so a
+    // synchronous click in the commit's own task still meets the busy (disabled) responder. A
+    // member's tap cannot land that fast.
+    await userEvent.click(saveBtn)
     await waitFor(() => expect(store.items).toHaveLength(2))
     await view.unmount()
 

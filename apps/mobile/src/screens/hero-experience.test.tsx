@@ -243,9 +243,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     fireEvent.click(screen.getByTestId('chip-sponsored'))
 
     expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
-    expect(screen.getByTestId('chip-sponsored').getAttribute('aria-selected')).toBe(
-      'true'
-    )
+    // Story CC-7.10: the chip is a toggle button, so its selection is aria-pressed.
+    expect(screen.getByTestId('chip-sponsored').getAttribute('aria-pressed')).toBe('true')
     expect(mockCapture).toHaveBeenCalledWith('chip_changed', {
       chipCategory: 'Sponsored',
       previousCategory: 'Personal',

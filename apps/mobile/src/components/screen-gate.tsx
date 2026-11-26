@@ -184,7 +184,6 @@ function GateFrame({
           // One element to VoiceOver and TalkBack; on web it stays out of the tab order.
           accessible={Platform.OS !== 'web'}
           accessibilityLabel={t('common.loading')}
-          accessibilityState={{ busy: true }}
           aria-busy
           style={[styles.placeholder, { backgroundColor: colors.cardMuted }]}
         />

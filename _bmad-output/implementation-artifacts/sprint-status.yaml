@@ -131,9 +131,10 @@ development_status:
   7-5-garment-detail-tag-edit: done
   7-6-garment-delete: done
   7-7-signed-in-shell-without-flashes: done
-  7-8-teen-adult-usability-studies: backlog
+  # 7-8: owner decision 2026-11-26, formal usability studies dropped; the product owner reviews with her own account after Epic 7 ships.
+  7-8-teen-adult-usability-studies: done
   7-9-one-app-shell-visual-system: done
-  7-10-screen-budget-guard: backlog
+  7-10-screen-budget-guard: done
   7-11-five-tab-navigation-back-pattern: backlog
   7-12-looks-tab-saved-looks-ideas-plans: backlog
   7-13-calm-today-one-primary-job: backlog

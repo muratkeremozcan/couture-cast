@@ -28,8 +28,19 @@ import {
  *   SYNC_DELAY_MS in both slow modes: past its own ~2 s deadline the feed hides as an outage,
  *   which is not what these modes measure.
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
+ *   guardian-pending  Story CC-7.10 D1: a 14 year old teen whose one linked guardian is still
+ *              `pending`. Under the production consent policy `off` the API lets a teen waiting on
+ *              a guardian through on every read (`teenAccessBlocked(prefs, 'off')` is false), so
+ *              the member's own reads answer as `empty` (no city, no closet, onboarding not
+ *              started) while the shared Community feed and Spotlight answer as `populated`.
  */
-export type ShellMode = 'empty' | 'populated' | 'delayed' | 'late' | 'ritual-503'
+export type ShellMode =
+  | 'empty'
+  | 'populated'
+  | 'delayed'
+  | 'late'
+  | 'ritual-503'
+  | 'guardian-pending'
 export type ShellScreen = 'home' | 'closet' | 'community' | 'profile'
 
 export const DELAY_MS = 3000
@@ -126,8 +137,11 @@ function feedItem(id: string, title: string) {
   }
 }
 
-function bodies(memberId: string, populated: boolean) {
-  const feedItems = populated
+function bodies(memberId: string, populated: boolean, teenPending = false) {
+  // Community content is other members' posts, so a pending teen with nothing of their own still
+  // sees it (CC-7.10 D1).
+  const community = populated || teenPending
+  const feedItems = community
     ? [feedItem('shell-look-1', 'Blue layers'), feedItem('shell-look-2', 'Rain shell')]
     : []
   const feedPage = {
@@ -135,12 +149,16 @@ function bodies(memberId: string, populated: boolean) {
     authorStates: [],
     nextCursor: null,
     mode: 'auto',
-    viewerBand: 'temperate_dry',
-    bandResolved: true,
-    bandUnresolvedReason: null,
+    // A member with no saved city gets the all-regions feed with the reason, as the API answers
+    // (community.service.ts resolveViewerBand: no locations is `no_location`; CC-7.10 Codex #9).
+    viewerBand: populated ? 'temperate_dry' : null,
+    bandResolved: populated,
+    bandUnresolvedReason: populated ? null : 'no_location',
     experimentVariant: 'auto',
     activeChallenge: null,
   }
+  // The Spotlight needs a saved city (community-spotlight.service.ts resolveViewer): a member
+  // without one gets level none, whatever the feed holds.
   const spotlight = populated
     ? {
         level: 'city',
@@ -252,17 +270,36 @@ function bodies(memberId: string, populated: boolean) {
     imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
   })
 
-  const profile = {
-    user: {
-      id: memberId,
-      email: 'shell-member@example.test',
-      displayName: null,
-      birthdate: null,
-      role: 'guardian',
-    },
-    linkedGuardians: [],
-    linkedTeens: [],
-  }
+  const profile = teenPending
+    ? {
+        user: {
+          id: memberId,
+          email: 'shell-member@example.test',
+          displayName: null,
+          // 14 at the fixed clock (2026-11-20), inside the 13 to 15 consent band.
+          birthdate: '2012-06-01T00:00:00.000Z',
+          role: 'teen',
+        },
+        linkedGuardians: [
+          {
+            guardianId: 'shell-guardian-pending',
+            status: 'pending',
+            consentGrantedAt: null,
+          },
+        ],
+        linkedTeens: [],
+      }
+    : {
+        user: {
+          id: memberId,
+          email: 'shell-member@example.test',
+          displayName: null,
+          birthdate: null,
+          role: 'guardian',
+        },
+        linkedGuardians: [],
+        linkedTeens: [],
+      }
   const onboarding = populated
     ? {
         status: 'completed',
@@ -412,14 +449,16 @@ export function createShellRouter(options: {
   hold?: Partial<Record<string, number>>
 }) {
   const { mode } = options
-  const populated = mode !== 'empty'
+  const teenPending = mode === 'guardian-pending'
+  const populated = mode !== 'empty' && !teenPending
   // Bodies follow the bearer each request carries, so a member switch inside one document
   // (7.7-E2E-009) gets the new member's content and the old member's text tells a leak apart.
   const bodiesByOwner = new Map<string, ReturnType<typeof bodies>>()
   const bodiesFor = (request: Request) => {
     // Only reached with a fixture bearer (the handler refuses the rest), so no fallback owner.
     const owner = fixtureOwner(request.headers()['authorization'])!
-    if (!bodiesByOwner.has(owner)) bodiesByOwner.set(owner, bodies(owner, populated))
+    if (!bodiesByOwner.has(owner))
+      bodiesByOwner.set(owner, bodies(owner, populated, teenPending))
     return bodiesByOwner.get(owner)!
   }
   let open = 0
@@ -473,7 +512,7 @@ export function createShellRouter(options: {
       const { json, resolve } = bodiesFor(request)
       if (key === 'community-resolve') {
         await route.fulfill({ json: resolve(request) })
-      } else if (key === 'ritual' && mode === 'empty') {
+      } else if (key === 'ritual' && !populated) {
         await route.fulfill({ status: 400, json: NO_CITY })
       } else if (key === 'ritual' && mode === 'ritual-503') {
         await route.fulfill({

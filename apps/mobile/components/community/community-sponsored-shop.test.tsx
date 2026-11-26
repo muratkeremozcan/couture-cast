@@ -299,9 +299,8 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       // Busy, the name is the loading state alone; the browser suffix returns
       // with the idle label.
       expect(button.getAttribute('aria-label')).toBe('Opening partner site')
-      expect(
-        pressableProps.get('community-card-shop-post-a')?.accessibilityState
-      ).toEqual({ busy: true })
+      // Story CC-7.10: busy is the aria prop now, so the DOM carries it.
+      expect(button).toHaveAttribute('aria-busy', 'true')
       expect(
         vi
           .mocked(AccessibilityInfo.announceForAccessibility)

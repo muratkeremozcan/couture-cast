@@ -525,10 +525,11 @@ export default function SettingsScreen() {
                       }}
                       testID={`locale-btn-${locale.code}`}
                       accessibilityRole="button"
-                      accessibilityState={{
-                        disabled: isChangingLocale || isSelected,
-                        selected: isSelected,
-                      }}
+                      aria-disabled={isChangingLocale || isSelected}
+                      // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+                      // so the web side uses aria-pressed.
+                      accessibilityState={{ selected: isSelected }}
+                      aria-pressed={isSelected}
                     >
                       <Text
                         style={[
@@ -595,13 +596,6 @@ export default function SettingsScreen() {
                     }}
                     testID="commerce-opt-out-toggle"
                     accessibilityRole="switch"
-                    accessibilityState={{
-                      checked: affiliateCtasEnabled ?? false,
-                      disabled: affiliateCtasEnabled === null,
-                    }}
-                    // react-native-web does not project `accessibilityState` onto the
-                    // DOM, so the aria pair rides alongside it exactly as
-                    // `components/chip-navigation.tsx` does.
                     aria-checked={affiliateCtasEnabled ?? false}
                     aria-disabled={affiliateCtasEnabled === null}
                     accessibilityLabel={t('commerce.settings.optOutLabel')}
@@ -1191,9 +1185,7 @@ function PremiumSettingsSection({
 
 /**
  * The three store CTAs. Purchases show a busy state instead of optimistic UI:
- * `accessibilityState={{ busy }}` plus the aria mirror, since react-native-web
- * does not project `accessibilityState` onto the DOM (the commerce toggle's
- * aria-checked precedent).
+ * `aria-busy`, which react-native-web projects onto the DOM.
  */
 function PremiumSubscribeControls({
   purchasesEnabled,
@@ -1240,7 +1232,6 @@ function PremiumSubscribeControls({
           }}
           testID={`premium-subscribe-${plan === 'premium_monthly' ? 'monthly' : 'annual'}`}
           accessibilityRole="button"
-          accessibilityState={{ disabled: busy, busy: premiumFlow === 'purchasing' }}
           aria-disabled={busy}
           aria-busy={premiumFlow === 'purchasing'}
         >
@@ -1253,7 +1244,6 @@ function PremiumSubscribeControls({
         onPress={onRestore}
         testID="premium-restore"
         accessibilityRole="button"
-        accessibilityState={{ disabled: busy, busy: premiumFlow === 'restoring' }}
         aria-disabled={busy}
         aria-busy={premiumFlow === 'restoring'}
       >
@@ -1410,7 +1400,7 @@ function usePaletteNameList(): string {
  *   Every string in a card renders in `cardText` on `cardBg`, the pairing
  *   measured at 8.01-11.58:1.
  * - **Selection is never signalled by color alone.** The active card states
- *   "Selected" in text and carries `accessibilityState.selected`, so the palette
+ *   "Selected" in text and carries `aria-pressed`, so the palette
  *   is decoration on top of a state that is already readable and announced.
  *
  * The section owns no fetch of its own: `AppThemeProvider` holds the one read and
@@ -1626,10 +1616,8 @@ function PremiumThemeSection({ returns = 0 }: { returns?: number }) {
 /**
  * One gallery card, painted in the palette it offers rather than the applied one.
  *
- * `accessibilityState` carries the real state and the `aria-*` pair rides
- * alongside it, because react-native-web does not project `accessibilityState`
- * onto the DOM — the same precedent the commerce toggle and the subscribe
- * controls above already follow.
+ * Selection is `accessibilityState.selected` for native and `aria-pressed` for the
+ * DOM: ARIA allows aria-selected only on option/tab/row/gridcell/treeitem.
  */
 function PaletteCard({
   option,
@@ -1662,14 +1650,10 @@ function PaletteCard({
       testID={`premium-theme-option-${option.id}`}
       accessibilityRole="button"
       accessibilityLabel={name}
-      accessibilityState={{
-        selected: isSelected,
-        disabled: !isSelectable,
-        busy: isSaving,
-      }}
       accessibilityHint={
         isSelectable ? undefined : t('commerce.premium.theme.unavailable')
       }
+      accessibilityState={{ selected: isSelected }}
       aria-pressed={isSelected}
       aria-disabled={!isSelectable}
       aria-busy={isSaving}

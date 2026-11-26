@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-25.
-Added Steps 40 to 66:
+Updated: 2026-11-26.
+Added Steps 40 to 67:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -30,7 +30,8 @@ Added Steps 40 to 66:
 - Step 63: Story 7.5, garment detail and tag edit, `246577af` (PR #290), merged on 2026-11-25.
 - Step 64: Story 7.6, garment delete, `11c26918` (PR #291), merged on 2026-11-25.
 - Step 65: Story 7.7, signed-in shell without flashes, `812cadce` (PR #292), merged on 2026-11-25.
-- Step 66: Story 7.9, one app shell and visual system, in review on `feat/epic7-story-7-9-one-app-shell-visual-system`.
+- Step 66: Story 7.9, one app shell and visual system, `6d8b1db3` (PR #293), merged on 2026-11-26.
+- Step 67: Story 7.10, screen budget guard, in review on `feat/epic7-story-7-10-screen-budget-guard`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -38,6 +39,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 67 for Story CC-7.10 (screen budget guard) while its PR is in review, and moved Step 66 to merged (`6d8b1db3`, PR #293).
 Added Step 66 for Story CC-7.9 (one app shell and visual system) while its PR is in review, and moved Step 65 to merged (`812cadce`, PR #292).
 Added Step 65 for Story CC-7.7 (signed-in shell without flashes) while its PR is in review, and moved Step 64 to merged (`11c26918`, PR #291).
 Added Step 64 for Story CC-7.6 (garment delete) while its PR is in review, and moved Step 63 to merged (`246577af`, PR #290).
@@ -158,11 +160,11 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 66, Story CC-7.9, one app shell and visual system, status `in-progress` on `feat/epic7-story-7-9-one-app-shell-visual-system`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-9-one-app-shell-visual-system.md`.
-  Step 66 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
-  `epic-7` is `in-progress` in `sprint-status.yaml`.
-- Previous completed steps: Steps 59 to 65, Stories CC-7.1 to CC-7.7, merged on `main` (the last, Step 65, as `812cadce`, PR #292).
+- Latest step: Step 67, Story CC-7.10, screen budget guard, status `in-progress` on `feat/epic7-story-7-10-screen-budget-guard`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-10-screen-budget-guard.md`.
+  Step 67 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+  `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
+- Previous completed steps: Steps 59 to 66, Stories CC-7.1 to CC-7.7 and CC-7.9, merged on `main` (the last, Step 66, as `6d8b1db3`, PR #293).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -21917,3 +21919,117 @@ Evidence boundaries:
   apps/mobile, and ESLint on touched files.
 - Unit, component, native, Playwright and snapshot suites run in CI on the PR; snapshot
   baselines are generated on Linux CI.
+
+## Step 67: Screen budget guard
+
+User/business impact:
+
+- Later stories cannot make a screen busy again without a recorded owner decision. Each tab
+  (Today, Closet, Community, Profile) is measured at 390 x 844 on web and native, signed in as an
+  empty, a populated and a guardian-pending member, against the epic's clutter bars: one primary
+  button, seven targets above the fold (tab bar and tiles excluded), one chip row, no card inside
+  a card, no paragraph over two lines, Today at most 1,688 px tall and the Closet grid at most
+  160 px from the top.
+- A probe taps every Home control and fails on one whose only effect is an analytics event, such
+  as today's "Preview outfits", "See the planner" and "Start wardrobe upload".
+- What the app already breaks is recorded as a ratchet: each violation names the Epic 7 story
+  that removes it (7.11, 7.13, 7.15, 7.16, 7.17). The guard fails on a new or larger violation,
+  and on a recorded one that no longer reproduces, so the story that fixes it deletes its entry.
+
+Technical architecture:
+
+- `packages/utils/src/screen-budget-measure.ts`: `measureScreenBudget(config)`, one
+  self-contained async browser function that Playwright serializes into the page and the native
+  Vitest browser suite calls on the react-native-web DOM. It reads layout and computed styles
+  only: the primary, card and card-muted colors and the card shadow resolve through a probe
+  element, so web follows the live `--cc-*` variables; lines come from `Range.getClientRects`
+  after `document.fonts.ready`.
+- `packages/utils/src/screen-budget.json`: the limits (the AC values), the measure viewport,
+  tab bar and tile selectors, the Today and Closet anchors per platform, the analytics request
+  allow list and the `known` ratchet.
+- `packages/utils/src/screen-budget.ts`: `screenBudgetMeasureConfig(platform, screen)`,
+  `evaluateScreenBudget(audit, limits, known)` and `isAnalyticsRequest`. Count and height rules
+  match their known value exactly; card-in-card, paragraph and analytics-only entries list
+  element keys (testid, else tag and the first 40 characters of text), and a paragraph entry
+  records each paragraph's line count, so a known paragraph that grows still fails.
+- `scripts/check-screen-budget-decisions.mjs` (PR checks lint job): every increase against the
+  merge base (a raised limit, an added `known` entry, a raised value, a new element key, a
+  paragraph with more lines) must cite a decision the base did not already use, and every cited
+  decision must be recorded under `## Screen budget decisions` in its `decidedIn` story's spec
+  as term lines (`rule=... scope=<platform>/<screen>/<fixture> max=...`, or `scope=limit`) that
+  bind the rule, scope and ceiling the JSON may use. Lowering or deleting needs none.
+- New anchors: web `closet-garment-grid` and `closet-empty-state`, native
+  `wardrobe-garment-list` and the Add control (`garment-capture-open`) while
+  `wardrobe-empty-state` renders.
+
+Hard-won lessons from the implementation of this story:
+
+- A measure that sees nothing passes forever, so a token that does not resolve, a missing
+  anchor or a missing tab bar is an error, and each rule is proved with a passing and a failing
+  control on synthetic DOM.
+- react-native-web wraps a card's content in a View with the same box and color; counting that
+  as a card inside a card is a false positive, so an inner card needs its own box and its own
+  background, shadow or border.
+- Link chip rows mark only the active chip with `aria-current`, so a chip row is two or more
+  pills in one row container with at least one selection state, not two selectable pills.
+- A ratchet keyed only on counts lets one paragraph be fixed and another added at the same count;
+  per-element rules list their keys.
+
+Story/Task mapping:
+
+- Story CC-7.10: Screen budget guard (Epic 7 Lane B clarity).
+- Follows CC-7.9 (one app shell and visual system): the primary and card rules read its tokens.
+- Records the owner decision that drops CC-7.8's formal usability studies.
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.10: Screen budget guard**`)
+- `_bmad-output/implementation-artifacts/spec-7-10-screen-budget-guard.md`
+- `_bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md`
+
+Cross-links:
+
+- Step 66 (`#step-66-one-app-shell-and-visual-system`): the tokens the primary and card rules
+  resolve.
+- Step 65 (`#step-65-signed-in-shell-without-flashes`): the screen gate the audits wait on and the
+  shell fixtures they reuse.
+
+Sequence to follow:
+
+1. Add `screen-budget-measure.ts`, `screen-budget.ts` and `screen-budget.json` to
+   `packages/utils` and export them; exclude the browser-only measure from the node coverage.
+2. Add `scripts/check-screen-budget-decisions.mjs` with its `node --test` spec and the PR checks
+   step.
+3. Add the Closet anchors on web and native.
+4. Add the `guardian-pending` fixtures, the web audits and Home probe, and the native suite.
+5. Fill `known` from a CI run, each entry with its owning story and `D-KNOWN-7.10`.
+
+Task owner map:
+
+- Step 67 step 1 owner: `packages/utils/src/screen-budget-measure.ts` and
+  `packages/utils/src/screen-budget.ts`.
+- Step 67 step 2 owner: `scripts/check-screen-budget-decisions.mjs`.
+- Step 67 step 3 owner: `apps/web/src/app/wardrobe/page.tsx` and
+  `apps/mobile/src/features/wardrobe/wardrobe-hub-screen.tsx`.
+- Step 67 step 5 owner: `packages/utils/src/screen-budget.json`.
+
+Tests that cover this step:
+
+- [`scripts/check-screen-budget-decisions.test.mjs`](../../scripts/check-screen-budget-decisions.test.mjs):
+  7.10-DEC-001 to 7.10-DEC-012.
+- The unit (`packages/utils/src/screen-budget.test.ts`), rule
+  (`playwright/tests/screen-budget-rules.spec.ts`), web audit and Home probe
+  (`playwright/tests/screen-budget.spec.ts`, `screen-budget-home-actions.spec.ts`) and native
+  (`apps/mobile/src/screens/screen-budget-home.test.tsx`,
+  `apps/mobile/src/screens/screen-budget-profile.test.tsx`,
+  `apps/mobile/src/screens/screen-budget-community.test.tsx`,
+  `apps/mobile/src/features/wardrobe/screen-budget-closet.test.tsx`) suites are listed in
+  `_bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md`.
+
+Evidence boundaries:
+
+- Locally: the decisions check and its `node --test` spec, `tsc --noEmit` in packages/utils,
+  apps/web and apps/mobile, ESLint `--max-warnings=0` on touched files, and one throwaway
+  Chromium run of the measure on synthetic DOM.
+- Unit, rule, Playwright and native suites run in CI on the PR, and the `known` baseline comes
+  from a CI dispatch run of this branch.

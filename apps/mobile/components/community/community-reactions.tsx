@@ -37,13 +37,10 @@ export function CommunityReactions({
             accessibilityRole="button"
             aria-pressed={summary.viewerReaction === id}
             accessibilityLabel={`${t(`community.reactions.${id}`)}, ${summary.counts[id]}`}
-            accessibilityState={{
-              selected: summary.viewerReaction === id,
-              disabled: pending || canRetry,
-              busy: pending,
-            }}
-            // react-native-web 0.21 drops `accessibilityState.busy`; the aria
-            // mirror is what reaches the DOM.
+            // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+            // so the web side uses aria-pressed.
+            accessibilityState={{ selected: summary.viewerReaction === id }}
+            aria-disabled={pending || canRetry}
             aria-busy={pending}
             disabled={pending || canRetry}
             onPress={() => {

@@ -120,7 +120,7 @@ export function StylePieceEntry({
     <Pressable
       ref={buttonRef}
       accessibilityRole="button"
-      accessibilityState={{ disabled: needsRefresh && loading }}
+      aria-disabled={needsRefresh && loading}
       testID={needsRefresh ? 'style-piece-refresh' : 'style-piece-open'}
       disabled={needsRefresh && loading}
       style={[

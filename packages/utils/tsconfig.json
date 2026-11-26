@@ -8,5 +8,5 @@
     "rootDir": "src",
     "composite": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.json"]
 }

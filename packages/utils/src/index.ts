@@ -174,3 +174,42 @@ export type {
   SpaceKey,
   TypeScaleKey,
 } from './design-tokens'
+
+export { measureScreenBudget } from './screen-budget-measure'
+export type {
+  ScreenBudgetElement,
+  ScreenBudgetMeasureConfig,
+  ScreenBudgetMeasurement,
+  ScreenBudgetParagraph,
+} from './screen-budget-measure'
+
+export {
+  evaluateScreenBudget,
+  formatScreenBudgetFailures,
+  isAnalyticsRequest,
+  SCREEN_BUDGET_OWNING_STORIES,
+  SCREEN_BUDGET_PER_ELEMENT_RULES,
+  SCREEN_BUDGET_RULES,
+  screenBudget,
+  screenBudgetKnownKeys,
+  screenBudgetMeasureConfig,
+} from './screen-budget'
+export type {
+  ScreenBudgetAnalyticsRequest,
+  ScreenBudgetAudit,
+  ScreenBudgetAuditMeasurement,
+  ScreenBudgetEvaluation,
+  ScreenBudgetFailure,
+  ScreenBudgetFailureKind,
+  ScreenBudgetFile,
+  ScreenBudgetFixture,
+  ScreenBudgetKnownParagraph,
+  ScreenBudgetKnownViolation,
+  ScreenBudgetLimitDecision,
+  ScreenBudgetLimits,
+  ScreenBudgetMeasure,
+  ScreenBudgetPlatform,
+  ScreenBudgetPlatformSelectors,
+  ScreenBudgetRule,
+  ScreenBudgetScreen,
+} from './screen-budget'

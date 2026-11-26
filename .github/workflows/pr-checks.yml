@@ -138,6 +138,13 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node scripts/check-design-tokens.mjs
 
+      # Story CC-7.10 D6: a screen budget limit above its AC value, or a known violation added or
+      # raised, needs a decision recorded in the named story's spec. Compares against the merge
+      # base with the PR base branch (this job checks out with fetch-depth 0).
+      - name: Check screen budget decisions
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node scripts/check-screen-budget-decisions.mjs
+
   lighthouse:
     name: Lighthouse accessibility gate
     needs: lanes

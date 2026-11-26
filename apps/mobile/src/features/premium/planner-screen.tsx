@@ -252,7 +252,7 @@ function ReadyDayCard({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ disabled: isBusy }}
+        aria-disabled={isBusy}
         disabled={isBusy}
         style={[styles.secondaryButton, { borderColor: palette.cardBorder }]}
         testID={`planner-reshuffle-${day.planDate}`}

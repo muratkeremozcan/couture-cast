@@ -7,6 +7,9 @@ import { useEffect, useState } from 'react'
 import type { ModerationMedia } from '@couture/api-client/contracts/http'
 import { useModerationTranslation } from '../../lib/moderation'
 
+/** setTimeout's largest delay (2^31 - 1 ms, about 24.8 days); a longer one fires at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647
+
 const control =
   'min-h-[44px] min-w-[44px] rounded-md border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
 
@@ -39,7 +42,21 @@ export function CaseMedia({
       return
     }
     setExpired(false)
-    const timer = window.setTimeout(() => setExpired(true), wait)
+    // A delay above the 32-bit timer limit fires at once and would show a live link as
+    // expired, so a long wait runs in steps of at most the limit, each re-reading the clock,
+    // until the link expires.
+    let timer: number | undefined
+    const arm = (remaining: number) => {
+      timer = window.setTimeout(
+        () => {
+          const left = expiresAt - (Date.now() + clockOffsetMs)
+          if (left <= 0) setExpired(true)
+          else arm(left)
+        },
+        Math.min(remaining, MAX_TIMER_DELAY_MS)
+      )
+    }
+    arm(wait)
     return () => window.clearTimeout(timer)
   }, [expiresAt, clockOffsetMs])
 

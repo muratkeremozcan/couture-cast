@@ -332,7 +332,8 @@ export function FinishSignupScreen({
       <Pressable
         testID="finish-signup-create"
         accessibilityRole="button"
-        accessibilityState={{ disabled: busy !== null, busy: busy === 'create' }}
+        aria-disabled={busy !== null}
+        aria-busy={busy === 'create'}
         disabled={busy !== null}
         onPress={() => {
           void submit()
@@ -346,7 +347,8 @@ export function FinishSignupScreen({
       <Pressable
         testID="finish-signup-cancel"
         accessibilityRole="button"
-        accessibilityState={{ disabled: busy !== null, busy: busy === 'cancel' }}
+        aria-disabled={busy !== null}
+        aria-busy={busy === 'cancel'}
         disabled={busy !== null}
         onPress={cancelFinish}
         style={[styles.secondary, busy !== null ? styles.disabled : null]}
@@ -469,7 +471,7 @@ function GuardianInvitePanel({
             accessibilityLabel={
               level === 'read_only' ? strings.readOnlyConsent : strings.fullAccessConsent
             }
-            accessibilityState={{ selected: consentLevel === level }}
+            aria-checked={consentLevel === level}
             onPress={() => setConsentLevel(level)}
             style={[styles.segment, consentLevel === level ? styles.segmentActive : null]}
           >

@@ -5,6 +5,7 @@
 import { useRef } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessibilityInfo, AppState, Platform, Text, View } from 'react-native'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -345,6 +346,41 @@ describe('mobile save-feedback components', () => {
       'Still saving',
       'Saved to your looks.',
     ])
+  })
+
+  // Story CC-7.10 test owner (TEA): a pending save must read disabled to assistive tech and take
+  // no taps. React Native Web's Pressable writes aria-disabled from its own disabled prop over the
+  // one the button passes, so before busy reached that prop a pending save showed no
+  // aria-disabled at all. The second press pins that a tap on the pending button starts no
+  // second save, and the settled check pins that busy alone drives the disabled state.
+  it('[P1] [7.10-NAT-024] reports a pending save as disabled and ignores a press until it settles', async () => {
+    const pending = deferred<boolean>()
+    const onSave = vi.fn(() => pending.promise)
+
+    await render(
+      <SaveFeedbackProvider>
+        <SaveActionButton testID="save-btn" onSave={onSave} />
+      </SaveFeedbackProvider>
+    )
+
+    const button = screen.getByTestId('save-btn')
+    expect(button).not.toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(button)
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(button).toHaveTextContent('Saving')
+    expect(button).toHaveAttribute('aria-busy', 'true')
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.click(button)
+    expect(onSave).toHaveBeenCalledTimes(1)
+    expect(button).toHaveTextContent('Saving')
+
+    await act(async () => {
+      pending.resolve(true)
+      await pending.promise
+    })
+    expect(button).toHaveTextContent('Saved')
+    expect(button).not.toHaveAttribute('aria-disabled', 'true')
   })
 
   it('failed save & retry: keeps content intact, shows Failed + Retry bar, and retries cleanly', async () => {
@@ -721,7 +757,10 @@ describe('mobile save-feedback components', () => {
       expect(getNetworkOnline()).toBe(false)
 
       // Tapping Save again runs default EXPO_PUBLIC_API_BASE_URL probe -> recovers online -> saves!
-      fireEvent.click(firstSave)
+      // A real click: react-native-web reconfigures Pressable's responder in a passive effect, so a
+      // synchronous click in the commit's own task still meets the busy (disabled) responder. A
+      // member's tap cannot land that fast.
+      await userEvent.click(firstSave)
       await waitFor(() => expect(firstSave).toHaveTextContent('Saved'))
       expect(fetchSpy).toHaveBeenCalledWith(
         'https://api.couturecast.test/api/health',
@@ -1383,7 +1422,10 @@ describe('mobile save-feedback components', () => {
     )
     expect(getNetworkOnline()).toBe(false)
     // Browser still reports navigator.onLine === true, so explicit retry runs and recovers online!
-    fireEvent.click(screen.getByTestId('expo-web-save'))
+    // A real click: react-native-web reconfigures Pressable's responder in a passive effect, so a
+    // synchronous click in the commit's own task still meets the busy (disabled) responder. A
+    // member's tap cannot land that fast.
+    await userEvent.click(screen.getByTestId('expo-web-save'))
     await waitFor(() =>
       expect(screen.getByTestId('expo-web-save')).toHaveTextContent('Saved')
     )
@@ -1493,8 +1535,9 @@ describe('mobile save-feedback components', () => {
       expect(calls[0]?.[1]?.idempotencyKey).toBeTruthy()
       expect(calls[0]?.[1]?.idempotencyKey).toBe(calls[1]?.[1]?.idempotencyKey)
 
-      // Saving the same unchanged look again is a no-op without destructive Undo
-      fireEvent.click(saveBtn)
+      // Saving the same unchanged look again is a no-op without destructive Undo. A real click, as
+      // above: the Retry save ended busy in a promise, so the responder re-enables a task later.
+      await userEvent.click(saveBtn)
       await waitFor(() =>
         expect(
           within(panel).queryByTestId('status-bar-action-undo')

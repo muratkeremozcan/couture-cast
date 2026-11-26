@@ -49,7 +49,8 @@ export function GoogleSignInButton({
       testID="google-sign-in"
       accessibilityRole="button"
       accessibilityLabel={strings.continueWithGoogle}
-      accessibilityState={{ busy: opening, disabled: opening }}
+      aria-busy={opening}
+      aria-disabled={opening}
       disabled={opening}
       onPress={() => {
         setOpening(true)

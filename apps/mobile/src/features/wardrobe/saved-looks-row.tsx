@@ -573,7 +573,7 @@ function ClosetSavedLooksRowInner({
     <View style={[styles.container, { borderColor: colors.lineStrong }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded }}
+        aria-expanded={expanded}
         testID="closet-saved-looks-row"
         style={styles.headerButton}
         onPress={() => setExpanded((current) => !current)}

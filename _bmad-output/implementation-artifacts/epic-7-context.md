@@ -5,6 +5,9 @@
 Updated: 2026-11-21: created from tester and owner feedback, a phone-width production walk, the
 Codex review and the UX review.
 
+Updated: 2026-11-26: CC-7.8 formal usability studies dropped (owner decision, CC-7.10 D8); the
+product owner reviews with her own account after Epic 7 ships.
+
 ## Goal
 
 Make CoutureCast simple enough that a teen can use it without help, make every save stick, and
@@ -93,7 +96,7 @@ Lane A: reliability
 
 Lane B: clarity
 
-- 7.8 Teen and adult usability studies (baseline, midpoint, exit)
+- 7.8 Teen and adult usability studies (dropped 2026-11-26: owner review after the epic instead)
 - 7.9 One app shell and visual system
 - 7.10 Screen budget guard
 - 7.11 Five-tab navigation and back pattern
@@ -129,15 +132,15 @@ Lane D: keep members coming back
 
 ## Sequencing
 
-1. Run the CC-7.8 baseline on the current build before Lane B changes the tested tasks. It can
-   run in parallel with Lane A.
+1. CC-7.8 is dropped (owner decision 2026-11-26): no baseline, midpoint or exit study gates any
+   story. The product owner uses her own account and comments after Epic 7 ships.
 2. Lane A in order: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7.
-3. Lane B in order: 7.9, 7.10, 7.11, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17, then the CC-7.8 midpoint.
+3. Lane B in order: 7.9, 7.10, 7.11, 7.12, 7.13, 7.14, 7.15, 7.16, 7.17.
 4. Lane C: 7.18 and 7.20 may overlap Lane B; 7.19 follows 7.5 and 7.18; 7.21 and 7.22 follow
    7.12. 7.23 gates 7.24, which gates every photo AI story. 7.26 may start any time with an
    on-device or server model.
 5. Lane D: 7.30 after 7.5; 7.31 after 7.14; 7.33 after 7.22.
-6. The CC-7.8 exit study runs after the last member-facing story.
+6. The owner's review of her own account runs after the last member-facing story.
 
 ## Guardrails
 

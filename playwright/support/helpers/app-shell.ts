@@ -80,7 +80,15 @@ export async function openFixtureShell(
   })
   await closeCommunitySocket(page)
   if (options.storedSession) await seedStoredSession(page, memberId)
-  else await seedWebSession(page, localE2EAccessToken(memberId))
+  // CC-7.10 D1: the guardian-pending member signs in with a teen bearer, as the API reads it.
+  else
+    await seedWebSession(
+      page,
+      localE2EAccessToken(
+        memberId,
+        options.mode === 'guardian-pending' ? 'teen' : 'guardian'
+      )
+    )
   return {
     router,
     setScreen: (screen: ShellScreen) => {
