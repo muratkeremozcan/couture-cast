@@ -164,6 +164,8 @@ at least one primary on the screens whose CC-7.9 one gold action is present (Hom
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
 | 7.10-NAT-001..012 | Home, Wardrobe hub, Community, Profile under the three MSW fixtures at 390 x 844 (`setViewport`), same measure, same floors as the web audits except the tab bar (these suites render the screen without the tab layout) | 1, 2   |
 | 7.10-NAT-013..015 | Home probe per fixture: presses with the router mock and MSW; effect = router call, non-analytics request, DOM change outside the control                                                                                | 3, D4  |
+| 7.10-NAT-016      | Product fix found by the fixture: a Community image signed past setTimeout's 32-bit limit stays on screen and arms no refresh (community-card.test.tsx)                                                                  | D1     |
+| 7.10-UNIT-013     | Same class on web: moderation case media whose link expires past the timer limit stays on screen (moderation-case-media.test.tsx)                                                                                        | D1     |
 
 ### Decisions check (builder, TEA reviews)
 

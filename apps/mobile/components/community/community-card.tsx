@@ -41,6 +41,8 @@ import { CommunitySponsoredShop, withDisclosure } from './community-sponsored-sh
  */
 const MAX_IMAGE_REFRESH_ATTEMPTS = 2
 const IMAGE_REFRESH_BACKOFF_MS = [0, 4000]
+/** setTimeout's largest delay (2^31 - 1 ms, about 24.8 days); a longer one fires at once. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647
 export const IMAGE_LOAD_TIMEOUT_MS = 15_000
 
 interface CommunityCardMediaProps {
@@ -457,6 +459,9 @@ export function CommunityCard({
     if (msUntilExpiry > 0) {
       // An unexpired URL is not proof the image loads (the host can be unreachable or
       // the object broken), so only a completed load restores the budget (onLoad).
+      // A delay above the 32-bit timer limit fires at once and loops the refresh, so a URL
+      // that outlives the limit schedules nothing; the next feed read re-signs it anyway.
+      if (msUntilExpiry > MAX_TIMER_DELAY_MS) return
       const timer = setTimeout(requestImageRefresh, msUntilExpiry)
       return () => clearTimeout(timer)
     }

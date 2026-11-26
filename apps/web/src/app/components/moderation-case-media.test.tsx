@@ -111,6 +111,26 @@ describe('C-WEB-Q-MEDIA: expiry on the server clock', () => {
     expect(screen.getByText('The image link expired.')).toBeInTheDocument()
   })
 
+  // Story CC-7.10 test owner (TEA): a wait past setTimeout's 32-bit limit (about 24.8 days)
+  // fires at once, which showed a live link as expired. Fake timers clamp an overflowing delay
+  // to 1 ms as browsers do, so this fails without the guard (same class as 7.10-NAT-016).
+  // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+  it('[P1] [7.10-UNIT-013] keeps a link that expires past the timer limit on screen', async () => {
+    pinBrowserClock()
+    render(
+      <CaseMedia
+        media={available(30 * 24 * 60 * 60 * 1000)}
+        clockOffsetMs={0}
+        onReload={() => undefined}
+      />
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000)
+    })
+    expect(screen.getByRole('img')).toBeInTheDocument()
+    expect(screen.queryByText('The image link expired.')).not.toBeInTheDocument()
+  })
+
   it('shows the expired state at once when the link had expired before it rendered', () => {
     pinBrowserClock()
     render(

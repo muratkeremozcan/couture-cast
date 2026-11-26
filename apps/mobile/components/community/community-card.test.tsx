@@ -757,6 +757,34 @@ describe('CommunityCard (Story 6.1)', () => {
     expect(onImageExpiry).toHaveBeenCalledTimes(1)
   })
 
+  // Story CC-7.10 test owner (TEA): a URL signed past setTimeout's 32-bit limit (about 24.8
+  // days) used to arm a timer that fires at once, so the card asked for a new URL on every
+  // render and the feed never settled (found by the screen budget fixture, CI 2c27e80e). Fake
+  // timers clamp an overflowing delay to 1 ms as browsers do, so this fails without the guard.
+  // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+  it('[P1] [7.10-NAT-016] keeps a URL signed past the timer limit on screen with no refresh loop', () => {
+    vi.useFakeTimers()
+    const onImageExpiry = vi.fn()
+    render(
+      <CommunityCard
+        item={item({
+          imageAccess: { url: PIXEL, expiresAt: '2099-12-31T00:00:00.000Z' },
+        })}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+
+    // Well inside the 15 s load timeout, so only the expiry timer could fire here.
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+    expect(onImageExpiry).not.toHaveBeenCalled()
+    expect(screen.getByTestId('community-card-image-post-a')).toBeInTheDocument()
+    expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+  })
+
   it('6.1-MOB-041 has no axe violations', async () => {
     const { container } = renderCard({
       item: item({
