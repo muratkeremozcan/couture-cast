@@ -255,7 +255,7 @@ function GarmentCardPhoto({
       <div
         role="img"
         aria-label={garmentPhotoAlt(locale, garment)}
-        className="flex aspect-square w-full items-center justify-center text-3xl"
+        className="flex aspect-[4/3] w-full items-center justify-center text-3xl"
       >
         <span aria-hidden="true">👗</span>
       </div>
@@ -266,7 +266,7 @@ function GarmentCardPhoto({
     <img
       src={garment.imageAccess.url}
       alt={garmentPhotoAlt(locale, garment)}
-      className="aspect-square w-full object-cover"
+      className="aspect-[4/3] w-full object-cover"
     />
   )
 }
