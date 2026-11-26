@@ -115,9 +115,19 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
   )
 
   const masks = readMasks(path.join(root, 'maestro/snapshots/shell-visual'))
-  assert.deepEqual(Object.keys(masks).sort(), ['community', 'profile'])
+  assert.deepEqual(Object.keys(masks).sort(), [
+    'community',
+    'home',
+    'profile',
+    'wardrobe',
+  ])
   assert.deepEqual(masksFor('dark-profile', masks), masksFor('light-profile', masks))
-  assert.deepEqual(masksFor('light-home', masks), [])
+  // Every tab hides only the scroll indicator strip in the right gutter; generated text adds more.
+  const strip = [704, 160, 16, 960]
+  assert.deepEqual(masksFor('light-home', masks), [strip])
+  assert.deepEqual(masksFor('dark-wardrobe', masks), [strip])
+  assert.equal(masksFor('light-profile', masks).length, 2)
+  assert.equal(masksFor('light-community', masks).length, 2)
   for (const entries of Object.values(masks))
     for (const { rect, reason } of entries) {
       assert.equal(rect.length, 4)

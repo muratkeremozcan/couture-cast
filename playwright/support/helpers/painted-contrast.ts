@@ -65,6 +65,30 @@ const nextFrames = (page: Page) =>
       })
   )
 
+/**
+ * Puts the page at rest before a pair of shots: the pointer parked at the top-left corner, then
+ * every finite animation and transition finished (at most a second; spinners never finish and are
+ * left alone). Centring the target scrolls the page, and the element that lands under a resting
+ * pointer turns hover a moment later; its colour transition running between the bare and inked
+ * shots made a near-invisible group of changed pixels decide the ratio (CC-7.9 reactions ring,
+ * 1.0069 on CI 7c284e60 and 40ee2f90, first case only, the one that scrolled).
+ */
+async function settle(page: Page) {
+  await page.mouse.move(0, 0)
+  await nextFrames(page)
+  await page.evaluate(async () => {
+    const finite = document.getAnimations().filter((animation) => {
+      const end = animation.effect?.getComputedTiming().endTime
+      return animation.playState === 'running' && Number.isFinite(Number(end))
+    })
+    await Promise.race([
+      Promise.all(finite.map((animation) => animation.finished.catch(() => undefined))),
+      new Promise((resolve) => setTimeout(resolve, 1000)),
+    ])
+  })
+  await nextFrames(page)
+}
+
 type Clip = { x: number; y: number; width: number; height: number }
 
 async function shot(page: Page, clip: Clip) {
@@ -232,14 +256,27 @@ async function clipFor(
     // bar (CC-7.9 shell spec, CI c9614d98) and would be refused as covered.
     el.scrollIntoView({ block: 'center', inline: 'nearest' })
     const r = el.getBoundingClientRect()
-    for (const fx of [0.5, 0.15, 0.85]) {
-      const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
-      if (hit && !el.contains(hit) && !hit.contains(el)) {
-        const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
-        return `${hit.tagName.toLowerCase()} in ${id}`
+    // The measured element takes hit tests for the check, whatever its own or an ancestor's
+    // pointer-events say: a decorative label (the spotlight rank pill, a badge row) is
+    // pointer-events none, so the hit fell through it to the photo it paints over and read as
+    // covered (CI 40ee2f90). Anything really painted above it still wins the hit.
+    const own = el as HTMLElement
+    const previous = own.style.getPropertyValue('pointer-events')
+    const priority = own.style.getPropertyPriority('pointer-events')
+    own.style.setProperty('pointer-events', 'auto', 'important')
+    try {
+      for (const fx of [0.5, 0.15, 0.85]) {
+        const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
+        if (hit && !el.contains(hit) && !hit.contains(el)) {
+          const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
+          return `${hit.tagName.toLowerCase()} in ${id}`
+        }
       }
+      return null
+    } finally {
+      if (previous) own.style.setProperty('pointer-events', previous, priority)
+      else own.style.removeProperty('pointer-events')
     }
-    return null
   })
   if (cover)
     throw new Error(`painted-contrast: the measured element is covered by ${cover}`)
@@ -294,6 +331,7 @@ async function measure(
     const handle = await target.elementHandle()
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
+      await settle(page)
       const ink = await takeShots(page, clip, states)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),

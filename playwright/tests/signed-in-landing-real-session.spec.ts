@@ -290,6 +290,41 @@ test('L-4: after Sign out, going back to the landing shows the signed-out action
   await expectGuestLanding(page)
 })
 
+// CC-7.9 TEA (burn-in, webkit, CI 40ee2f90): a Sign out before this page's session start settles
+// left the landing on neither set. The sign-out event came while the stored session was still
+// there and the start unsettled, so the landing read pending, and nothing read it again once the
+// SDK cleared the stored session. Holding the profile check keeps the start unsettled; the
+// landing must turn signed out well before that check's own 5 s timeout would settle it.
+test('L-4b: Sign out while the session check is still out shows the signed-out actions', async ({
+  page,
+  apiRequest,
+}) => {
+  const account = await member(apiRequest)
+  await signInWithCode(page, account)
+  await page.goto('/wardrobe')
+  let releaseProfile: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    releaseProfile = resolve
+  })
+  let profileHeld = false
+  await page.route('**/api/v1/user/profile', async (route) => {
+    profileHeld = true
+    await held
+    await route.continue().catch(() => undefined)
+  })
+  await page.goto('/')
+  await expectMemberLanding(page)
+  await expect.poll(() => profileHeld).toBe(true)
+
+  await page.getByTestId('landing-sign-out').click()
+  await expect(page.locator('html')).toHaveAttribute('data-session', 'none', {
+    timeout: 2_000,
+  })
+  await expectGuestLanding(page)
+  releaseProfile()
+  await page.unroute('**/api/v1/user/profile')
+})
+
 // The first tab's community feed may still send one request with the token the other tab just
 // signed out; the API answers 401, as it should.
 test(

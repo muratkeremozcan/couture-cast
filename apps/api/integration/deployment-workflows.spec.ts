@@ -434,9 +434,9 @@ describe('deployment workflows', () => {
     // pr-share-card-native.yml starts it in seven jobs: the API32 original-resource job, the
     // browser lane and the five Android 36 partitions (four of them reuse the first one's
     // anchored steps). The iOS shards start Supabase from scripts/ci/native-supabase.mjs.
-    // pr-pw-e2e-local.yml adds Story 6.14's complimentary access lane, and android-native.yml
-    // Story 6.17's Google sign-in lane (learning path Step 57).
-    expect(startingJobs).toBe(15)
+    // pr-pw-e2e-local.yml adds Story 6.14's complimentary access lane and CC-7.9's real-session
+    // burn-in job, and android-native.yml Story 6.17's Google sign-in lane (learning path Step 57).
+    expect(startingJobs).toBe(16)
   })
 
   it('the burn-in fans out across planned shards that each fit the 20-minute PR job limit', () => {

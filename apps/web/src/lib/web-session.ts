@@ -424,13 +424,21 @@ export async function signOutWebSession() {
   // still under way when no account was verified (the E2E fixture token).
   forgetAllUploadAttempts()
   clearFederatedFinishMarker()
+  // The stored session goes before the announcement too: a listener reading it while a session
+  // start's profile check is still out would see a valid stored session and stay pending, and
+  // no later event would correct it (CC-7.9 L-4b). The SDK's local sign-out needs no storage.
+  removeStoredAuthSession()
   window.dispatchEvent(new Event('couture:session'))
   try {
     await webSupabase().auth.signOut({ scope: 'local' })
   } finally {
-    window.localStorage.removeItem(authStorageKey)
-    window.localStorage.removeItem(`${authStorageKey}-code-verifier`)
+    removeStoredAuthSession()
   }
+}
+
+function removeStoredAuthSession() {
+  window.localStorage.removeItem(authStorageKey)
+  window.localStorage.removeItem(`${authStorageKey}-code-verifier`)
 }
 
 /** Story 6.17: what a finished Google round trip means for the person. */

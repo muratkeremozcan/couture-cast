@@ -214,6 +214,20 @@ describe('verified web session failure boundaries', () => {
     expect(sessionStorage.getItem(key)).toBeNull()
     expect(await auth.resolveWebSessionToken()).toBeUndefined()
   })
+  it('7.9-UNIT-L4B announces the sign-out only after the stored session is gone', async () => {
+    localStorage.setItem('couturecast.auth-session', 'session')
+    const storedAtEachEvent: (string | null)[] = []
+    const listener = () =>
+      storedAtEachEvent.push(localStorage.getItem('couturecast.auth-session'))
+    window.addEventListener('couture:session', listener)
+    try {
+      const auth = await import('./web-session')
+      await auth.signOutWebSession()
+    } finally {
+      window.removeEventListener('couture:session', listener)
+    }
+    expect(storedAtEachEvent).toEqual([null])
+  })
   it('clears verified state when the SDK reports no session and propagates SDK uncertainty', async () => {
     useMswHandlers(http.get('*/api/v1/user/profile', () => HttpResponse.json(profile())))
     const auth = await import('./web-session')

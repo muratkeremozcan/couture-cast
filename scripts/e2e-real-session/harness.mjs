@@ -343,7 +343,7 @@ export const REAL_SESSION_SPEC_PATTERN =
   /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session|settings-locations-real-session|wardrobe-upload-account-switch-real-session|settings-sections-real-session)\.spec\.ts$/
 
 /** A full policy-off run counts both Chromium and iPhone WebKit landing cases. */
-export const EXPECTED_REAL_SESSION_TESTS = 61
+export const EXPECTED_REAL_SESSION_TESTS = 63
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
 export const EXPECTED_CONSENT_REQUIRED_TESTS = 5
