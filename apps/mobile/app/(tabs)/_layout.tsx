@@ -1,3 +1,7 @@
+// Story CC-7.11 D1 to D3 owner: the five tabs (Today, Closet, Looks, Community, Profile) from the
+// one `@couture/utils` tab definition, with the shared outline icons.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 import React, { useEffect } from 'react'
 import { useAndroidNavigationIntent } from '@/components/android-share-card-presentation'
 import {
@@ -6,6 +10,7 @@ import {
 } from '@/components/save-feedback'
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
+import { APP_TABS, type AppTab, type AppTabId } from '@couture/utils'
 import { Link, Tabs } from 'expo-router'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -15,29 +20,42 @@ import { renderTabTopBar } from '@/src/components/app-top-bar'
 import { useTokens } from '@/src/theme/tokens'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
 import { TabBarLabel, useTabBarSizing } from '@/components/tab-bar-label'
+import { TabIcon } from '@/components/tab-bar-icon'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+/** A tab screen's options object (Tabs.Screen also takes a function form). */
+type TabScreenOptions = Exclude<
+  NonNullable<React.ComponentProps<typeof Tabs.Screen>['options']>,
+  (...args: never[]) => unknown
+>
+/** What a tab adds to the shared options: its own heading or top bar actions. */
+type TabExtraOptions = Pick<TabScreenOptions, 'headerTitle' | 'headerRight'>
+
+/**
+ * Story CC-7.11 D2, D3: the shared outline icon in the label color, and the underline that marks
+ * the active tab with the gold and the semibold label, so the state never relies on color alone.
+ */
 function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name']
   color: string
   focused: boolean
-  tabId: string
+  tabId: AppTabId
   /** How far the underline drops below the icon as the bar grows (useTabBarSizing). */
   growth: number
 }) {
-  const { focused, tabId, growth, ...iconProps } = props
+  const { focused, tabId, growth, color } = props
 
   return (
     <View style={styles.iconContainer}>
-      <FontAwesome size={28} style={styles.icon} {...iconProps} />
+      <View style={styles.icon}>
+        <TabIcon tabId={tabId} color={color} />
+      </View>
       {focused && (
         <View
           // The bar grows upward with its labels and the icon with it, so the underline drops
           // by the same amount to stay on the bar's bottom edge, below the label.
           style={[
             styles.activeIndicator,
-            { backgroundColor: props.color, bottom: INDICATOR_BOTTOM - growth },
+            { backgroundColor: color, bottom: INDICATOR_BOTTOM - growth },
           ]}
           testID={`tab-${tabId}-active-indicator`}
         />
@@ -60,13 +78,8 @@ export default function TabLayout() {
       setMobileTabBarHeight(DEFAULT_MOBILE_TAB_BAR_HEIGHT)
     }
   }, [growth])
-  const tabLabels = {
-    home: t('tabs.home', { defaultValue: 'Home' }),
-    wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
-    community: t('tabs.community', { defaultValue: 'Community' }),
-    // The settings route reads Profile: the member's account and everything they set.
-    settings: t('tabs.profile', { defaultValue: 'Profile' }),
-  }
+  // Story CC-7.11 D1: the five tabs and their order come from the one shared tab definition.
+  const tabLabel = (tab: AppTab) => t(`tabs.${tab.labelKey}`, { defaultValue: tab.label })
 
   const trackTabPress = (tabId: string, label: string, targetPath: string) => {
     navigationIntent(targetPath)
@@ -79,6 +92,37 @@ export default function TabLayout() {
     } catch {
       // Analytics must never block navigation.
     }
+  }
+
+  /** The options a tab adds to the shared ones: its own heading or top bar actions. */
+  const tabOptions: Partial<Record<AppTabId, TabExtraOptions>> = {
+    home: {
+      headerTitle: (props) => <ShareCardTabHeading {...props} scope="outfit" />,
+      headerRight: () => (
+        <Link href="/modal" asChild>
+          <Pressable
+            testID="header-info-modal"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.about_couturecast')}
+            style={styles.headerButton}
+          >
+            {({ pressed }) => (
+              <FontAwesome
+                name="info-circle"
+                size={25}
+                color={colors.ink}
+                style={{ marginRight: 16, opacity: pressed ? 0.5 : 1 }}
+              />
+            )}
+          </Pressable>
+        </Link>
+      ),
+    },
+    // The Closet's Add and More live in its top bar; the hub sets them (D4), since Add opens
+    // the hub's own capture flow.
+    community: {
+      headerTitle: (props) => <ShareCardTabHeading {...props} scope="community" />,
+    },
   }
 
   return (
@@ -97,14 +141,17 @@ export default function TabLayout() {
         tabBarLabel: ({
           color,
           children,
+          focused,
           position,
         }: {
           color: string
           children: string
+          focused: boolean
           position: 'below-icon' | 'beside-icon'
         }) => (
           <TabBarLabel
             color={color}
+            focused={focused}
             onHeight={onLabelHeight}
             position={position}
             lineBoxHeight={tallestLabel}
@@ -120,107 +167,34 @@ export default function TabLayout() {
         headerShown: useClientOnlyValue(false, true),
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: tabLabels.home,
-          headerTitle: (props) => <ShareCardTabHeading {...props} scope="outfit" />,
-          tabBarButtonTestID: 'tab-home',
-          tabBarAccessibilityLabel: tabLabels.home,
-          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon
-              growth={indicatorDrop}
-              name="home"
-              color={color}
-              focused={focused}
-              tabId="home"
-            />
-          ),
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable
-                testID="header-info-modal"
-                accessibilityRole="button"
-                accessibilityLabel={t('common.about_couturecast')}
-                style={styles.headerButton}
-              >
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={colors.ink}
-                    style={{ marginRight: 16, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
-        }}
-        listeners={{
-          tabPress: () => trackTabPress('home', tabLabels.home, '/'),
-        }}
-      />
-      <Tabs.Screen
-        name="wardrobe"
-        options={{
-          title: tabLabels.wardrobe,
-          tabBarButtonTestID: 'tab-wardrobe',
-          tabBarAccessibilityLabel: tabLabels.wardrobe,
-          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon
-              growth={indicatorDrop}
-              name="shopping-bag"
-              color={color}
-              focused={focused}
-              tabId="wardrobe"
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => trackTabPress('wardrobe', tabLabels.wardrobe, '/wardrobe'),
-        }}
-      />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: tabLabels.community,
-          headerTitle: (props) => <ShareCardTabHeading {...props} scope="community" />,
-          tabBarButtonTestID: 'tab-community',
-          tabBarAccessibilityLabel: tabLabels.community,
-          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon
-              growth={indicatorDrop}
-              name="users"
-              color={color}
-              focused={focused}
-              tabId="community"
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => trackTabPress('community', tabLabels.community, '/community'),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: tabLabels.settings,
-          tabBarButtonTestID: 'tab-settings',
-          tabBarAccessibilityLabel: tabLabels.settings,
-          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon
-              growth={indicatorDrop}
-              name="user-circle"
-              color={color}
-              focused={focused}
-              tabId="settings"
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => trackTabPress('settings', tabLabels.settings, '/settings'),
-        }}
-      />
+      {APP_TABS.map((tab) => {
+        const label = tabLabel(tab)
+        return (
+          <Tabs.Screen
+            key={tab.id}
+            name={tab.nativeRoute}
+            options={{
+              title: label,
+              tabBarButtonTestID: `tab-${tab.id}`,
+              tabBarAccessibilityLabel: label,
+              tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
+                <TabBarIcon
+                  growth={indicatorDrop}
+                  color={color}
+                  focused={focused}
+                  tabId={tab.id}
+                />
+              ),
+              ...tabOptions[tab.id],
+            }}
+            listeners={{
+              // Analytics records the English tab name whatever the reader's language.
+              tabPress: () => trackTabPress(tab.id, tab.label, tab.nativeHref),
+            }}
+          />
+        )
+      })}
+      {/* Kept routable: Android navigation restoration still lists /two. */}
       <Tabs.Screen
         name="two"
         options={{

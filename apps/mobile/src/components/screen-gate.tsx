@@ -13,7 +13,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 
-export type GatedScreen = 'home' | 'closet' | 'community' | 'profile'
+export type GatedScreen = 'home' | 'closet' | 'looks' | 'community' | 'profile'
 
 /**
  * Story CC-7.7 (review triage P2-2, as on web): a gate whose reads have not all settled opens

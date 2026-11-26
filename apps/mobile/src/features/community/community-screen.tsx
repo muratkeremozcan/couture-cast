@@ -2307,31 +2307,35 @@ export function CommunityScreen() {
             onContentSizeChange={feedScroll.onContentSizeChange}
             scrollEventThrottle={16}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <CommunityCard
-                onExport={openShareCard}
-                onComments={(post) => {
-                  notificationIntentRef.current++
-                  commentsInvokerRef.current =
-                    commentsButtonRefs.current.get(post.id) ?? null
-                  setCommentsPostId(post.id)
-                }}
-                commentsButtonRef={(node) => {
-                  commentsButtonRefs.current.set(item.id, node)
-                }}
-                reactionControls={reactionState.controls(item.id)}
-                item={item}
-                onTextSaved={updateSavedText}
-                textEditingEnabled={communityAvailable && screenFocused}
-                isReported={reportedPostIds.has(item.id)}
-                containerRef={(node) => {
-                  cardRefs.current.set(item.id, node)
-                }}
-                onReport={handleReportPost}
-                onWithdraw={handleWithdrawPost}
-                onImageExpiry={handleImageExpiry}
-                onOpen={handleOpenCard}
-              />
+            renderItem={({ item, index }) => (
+              // Story CC-7.11 P5: the first feed card is Community's first own content. Every
+              // card sits in the same wrapper, so a new first card never remounts the others.
+              <View testID={index === 0 ? 'community-first-content' : undefined}>
+                <CommunityCard
+                  onExport={openShareCard}
+                  onComments={(post) => {
+                    notificationIntentRef.current++
+                    commentsInvokerRef.current =
+                      commentsButtonRefs.current.get(post.id) ?? null
+                    setCommentsPostId(post.id)
+                  }}
+                  commentsButtonRef={(node) => {
+                    commentsButtonRefs.current.set(item.id, node)
+                  }}
+                  reactionControls={reactionState.controls(item.id)}
+                  item={item}
+                  onTextSaved={updateSavedText}
+                  textEditingEnabled={communityAvailable && screenFocused}
+                  isReported={reportedPostIds.has(item.id)}
+                  containerRef={(node) => {
+                    cardRefs.current.set(item.id, node)
+                  }}
+                  onReport={handleReportPost}
+                  onWithdraw={handleWithdrawPost}
+                  onImageExpiry={handleImageExpiry}
+                  onOpen={handleOpenCard}
+                />
+              </View>
             )}
             refreshControl={
               <RefreshControl
@@ -2345,7 +2349,10 @@ export function CommunityScreen() {
             ListHeaderComponent={renderHeaderComponent()}
             // Elements keep the empty state and the load-more control mounted across
             // renders; a fresh function per render would remount them and drop focus.
-            ListEmptyComponent={renderEmptyComponent()}
+            // Story CC-7.11 P5: with no cards, the empty state is the first own content.
+            ListEmptyComponent={
+              <View testID="community-first-content">{renderEmptyComponent()}</View>
+            }
             ListFooterComponent={
               <>
                 {renderExampleInspiration()}

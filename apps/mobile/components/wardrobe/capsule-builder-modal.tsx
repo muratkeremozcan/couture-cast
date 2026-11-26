@@ -289,6 +289,8 @@ export function MobileCapsuleBuilderModal({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
+      // Story CC-7.11 D13: focus returns to invokingNodeHandle.
+      returnFocusRef={null}
       scrim={scrim}
     >
       <View style={styles.overlay}>

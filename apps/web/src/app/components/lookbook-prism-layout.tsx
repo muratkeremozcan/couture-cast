@@ -1,19 +1,19 @@
 // Story 3.5 Task 1 step 1 owner: orchestrate responsive grid breakpoints and hero/community panels in apps/web/src/app/components/lookbook-prism-layout.tsx
-// Story 5.5 Task 7 step 3 owner: own the Plan week control, the closed default and the 1440px variant decision in `apps/web/src/app/components/lookbook-prism-layout.tsx`
+// Story 5.5 Task 7 step 3 owner: own the Plan week control in `apps/web/src/app/components/lookbook-prism-layout.tsx` (Story CC-7.11 D9: it links to `/looks/plan`)
 'use client'
 
 import { HomeRitual } from './home-ritual'
 
+import Link from 'next/link'
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import posthog from 'posthog-js'
-import { I18nextProvider, useTranslation } from 'react-i18next'
+import { useTranslation } from 'react-i18next'
 import { getGuestPreviewStrings } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
 import { CommunityLookbookGrid, type FilterCategory } from './community-lookbook-grid'
-import { PlannerRail } from './planner-rail'
 import { ChipNavigation, type ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
 import { InfoBanner } from './info-banner'
@@ -78,73 +78,6 @@ const HERO_RECOMMENDATIONS: Record<ChipCategory, { key: string; score: string }>
 /** The demonstration garment chips under the hero look (catalog keys under `landing.lookbook.demo.garments`). */
 const DEMO_GARMENT_KEYS = ['blazer', 'scarf', 'loafers'] as const
 
-interface PlannerSlotProps {
-  isMobilePreview: boolean
-  isNarrowViewport: boolean
-  isPlannerRailOpen: boolean
-  onClose: () => void
-  plannerOpenerRef: React.RefObject<HTMLElement | null>
-}
-
-/**
- * The >=1440px third-column rail slot. Split out of `LookbookPrismLayout`
- * (alongside {@link PlannerOverlaySlot}) purely to keep that function's
- * cyclomatic complexity under this repo's ceiling of 15 -- the four
- * `isMobilePreview`/`isNarrowViewport`/`isPlannerRailOpen` conditions live
- * here instead, following `palette-advisor-panel.tsx`'s same rationale for
- * its own extracted blocks.
- *
- * Each slot carries its own `I18nextProvider` rather than one wrapping all of
- * `LookbookPrismLayout`: the `/` route mounts none (unlike `/settings`,
- * `/palette`, etc.), and scoping it to just the two places that render
- * `PlannerRail` -- the only consumer of `useTranslation()` on this page --
- * keeps the rest of this static-English file's indentation untouched.
- */
-function DesktopPlannerRailSlot({
-  isMobilePreview,
-  isNarrowViewport,
-  isPlannerRailOpen,
-  onClose,
-  plannerOpenerRef,
-}: PlannerSlotProps) {
-  if (isMobilePreview || isNarrowViewport) return null
-  return (
-    <div className="hidden min-[1440px]:block">
-      {isPlannerRailOpen && (
-        <I18nextProvider i18n={getI18n()}>
-          <PlannerRail
-            isOpen
-            onClose={onClose}
-            variant="rail"
-            invokingElementRef={plannerOpenerRef}
-          />
-        </I18nextProvider>
-      )}
-    </div>
-  )
-}
-
-/** The below-1440px focus-trapped overlay drawer, rendered outside the grid entirely. */
-function PlannerOverlaySlot({
-  isMobilePreview,
-  isNarrowViewport,
-  isPlannerRailOpen,
-  onClose,
-  plannerOpenerRef,
-}: PlannerSlotProps) {
-  if (isMobilePreview || !isNarrowViewport || !isPlannerRailOpen) return null
-  return (
-    <I18nextProvider i18n={getI18n()}>
-      <PlannerRail
-        isOpen
-        onClose={onClose}
-        variant="overlay"
-        invokingElementRef={plannerOpenerRef}
-      />
-    </I18nextProvider>
-  )
-}
-
 /**
  * Story CC-7.7 D4: the teaser's place is known once the viewport is measured; it shows only when
  * the layout stacks, and then the gate waits for its read.
@@ -163,42 +96,15 @@ export function LookbookPrismLayout() {
   const alertRef = useRef<HTMLDivElement>(null)
   const [isComparisonMode, setIsComparisonMode] = useState(false)
   const [isMobilePreview, setIsMobilePreview] = useState(false)
-  // Story 5.5 Decision 7: closed by default, opened only by the "Plan week"
-  // control. `PlannerRail` is self-contained below this -- it owns its own
-  // `checking | entitled | locked | error` state and fetches nothing until
-  // this turns true, so there is no separate entitlement effect in this
-  // component any more (Story 5.2's used to live here).
-  const [isPlannerRailOpen, setIsPlannerRailOpen] = useState(false)
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    if (url.searchParams.get('planner') !== '1') return
-    setIsPlannerRailOpen(true)
-    url.searchParams.delete('planner')
-    window.history.replaceState(window.history.state, '', url)
-  }, [])
-  // >=1440px renders the rail inline as the third grid column (no focus trap,
-  // ordinary page content); narrower renders it as a focus-trapped overlay
-  // drawer. `window.innerWidth` matches this file's own existing posthog
-  // layout-mode check below rather than introducing `matchMedia`, which has
-  // no other user in this codebase.
+  // Story CC-7.11 D9: Plan is the `/looks/plan` route, so Home no longer holds the planner
+  // drawer; its "Plan week" controls link there and `/?planner=1` redirects (next.config.ts).
   //
-  // The initial value must be a literal, not a `window`-dependent lazy
-  // initializer: SSR has no `window` (`isNarrowViewport` would resolve to
-  // `false`), but React reuses that SAME initializer for the client's first
-  // hydration render too, where `window` DOES exist -- so a real narrow
-  // viewport made the client's first render disagree with the server's,
-  // which is exactly React error #418 ("Minified React error #418",
-  // hydration mismatch). `false` matches the server unconditionally; the
-  // effect below corrects it immediately on mount, one render after
-  // hydration completes, which is the standard fix for viewport-dependent
-  // state in an SSR'd component.
-  //
-  // Story CC-7.7 D5: only hydration needs that literal. A client-side mount (a return to Home)
-  // measures at once, so its first frame already holds the stacked teaser it will keep.
+  // The viewport flags below start from a literal while hydrating: SSR has no `window`, and
+  // React reuses the same initializer for the client's first hydration render, so a measured
+  // value there would mismatch the server (React error #418). The effect below corrects it one
+  // render after hydration. Story CC-7.7 D5: a client-side mount (a return to Home) measures at
+  // once, so its first frame already holds the stacked teaser it will keep.
   const hydrating = useHydrating()
-  const [isNarrowViewport, setIsNarrowViewport] = useState(
-    () => !hydrating && window.innerWidth < 1440
-  )
   // Story 6.7: below 1280px the hero sits above the community section. Same
   // SSR-safe `false` default as above, measured after mount.
   const [isBelowSplit, setIsBelowSplit] = useState(
@@ -213,7 +119,6 @@ export function LookbookPrismLayout() {
   // Story CC-7.7 D4: the teaser sits inside the hero, above the community section, so Home's
   // screen gate waits for it wherever it shows (stacked layouts).
   useScreenGateRead('teaser', teaserGateSettled(isMeasured, isStacked, teaser.settled))
-  const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
   const [communityBanned, setCommunityBanned] = useState(false)
@@ -304,7 +209,6 @@ export function LookbookPrismLayout() {
 
   useEffect(() => {
     function handleResize() {
-      setIsNarrowViewport(window.innerWidth < 1440)
       setIsBelowSplit(window.innerWidth < 1280)
       setIsMeasured(true)
     }
@@ -382,20 +286,15 @@ export function LookbookPrismLayout() {
         </div>
         {/*
           Story 5.5 Decision 7: the "ordinary Plan week control near the hero
-          actions" that opens the planner. Present at every viewport --
-          `PlannerRail` itself decides rail vs overlay chrome below.
+          actions". Story CC-7.11 D9: it links to the Plan route under Looks.
         */}
-        <button
-          type="button"
+        <Link
+          href="/looks/plan"
           data-testid="planner-open-control"
-          onClick={(event) => {
-            plannerOpenerRef.current = event.currentTarget
-            setIsPlannerRailOpen(true)
-          }}
-          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink"
+          className="flex min-h-11 items-center rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink"
         >
           {i18n.t('commerce.premium.planner.openControl')}
-        </button>
+        </Link>
       </div>
 
       {isInvalidDeepLink && (
@@ -444,16 +343,12 @@ export function LookbookPrismLayout() {
             >
               {i18n.t('landing.lookbook.alert.adjustOutfit')}
             </button>
-            <button
-              type="button"
-              onClick={(event) => {
-                plannerOpenerRef.current = event.currentTarget
-                setIsPlannerRailOpen(true)
-              }}
+            <Link
+              href="/looks/plan"
               className="rounded-lg border border-line-strong bg-transparent px-4 py-2 text-xs font-semibold text-ink hover:bg-ink/5"
             >
               {i18n.t('commerce.premium.planner.openControl')}
-            </button>
+            </Link>
           </div>
         </div>
       )}
@@ -479,7 +374,7 @@ export function LookbookPrismLayout() {
             : // `minmax(0,1fr)`, because a bare `1fr` track floors at its content's
               // min-content: the hero's non-wrapping filter chips then claimed the
               // whole row and crushed the community column off the right edge.
-              'grid-cols-1 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]'
+              'grid-cols-1 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]'
         }`}
       >
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
@@ -490,6 +385,8 @@ export function LookbookPrismLayout() {
           tabIndex={-1}
           // Story CC-7.9 D7: the hero canvas is the one card; the looks inside it are sections.
           data-surface="card"
+          // Story CC-7.11 P5: Today's first own content, the outfit card.
+          data-testid="today-first-content"
           className={`flex min-w-0 self-start flex-col gap-6 rounded-xl border border-line bg-card p-6 shadow-card ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
@@ -664,30 +561,7 @@ export function LookbookPrismLayout() {
             spotlightFocusIntent={teaser.focusIntent}
           />
         </section>
-
-        {/*
-        Ultrawide Column / Slot 3: Planner Rail Container.
-        Story 5.5 Decision 7: >=1440px reserves the third grid column and
-        renders the rail inline there when open; below that, the overlay
-        variant renders itself as a fixed drawer outside the grid entirely
-        (see `PlannerOverlaySlot` below), so this slot stays empty.
-      */}
-        <DesktopPlannerRailSlot
-          isMobilePreview={isMobilePreview}
-          isNarrowViewport={isNarrowViewport}
-          isPlannerRailOpen={isPlannerRailOpen}
-          onClose={() => setIsPlannerRailOpen(false)}
-          plannerOpenerRef={plannerOpenerRef}
-        />
       </div>
-
-      <PlannerOverlaySlot
-        isMobilePreview={isMobilePreview}
-        isNarrowViewport={isNarrowViewport}
-        isPlannerRailOpen={isPlannerRailOpen}
-        onClose={() => setIsPlannerRailOpen(false)}
-        plannerOpenerRef={plannerOpenerRef}
-      />
 
       <div data-landing="guest" className="mt-8 flex justify-end">
         <LayoutControls

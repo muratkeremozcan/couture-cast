@@ -20,6 +20,7 @@ import {
   fetchWebFederatedSignupStatus,
   submitWebFederatedSignup,
 } from './signup'
+import { APP_SIGNED_OUT_EVENT } from './app-history'
 import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from './browser-persistence'
 import { forgetAllUploadAttempts, setUploadAttemptAccount } from './upload-attempts'
 let client: SupabaseClient | undefined
@@ -429,6 +430,8 @@ export async function signOutWebSession() {
   // no later event would correct it (CC-7.9 L-4b). The SDK's local sign-out needs no storage.
   removeStoredAuthSession()
   window.dispatchEvent(new Event('couture:session'))
+  // Story CC-7.11 P8: the in-app back stack and any open layer belong to the member who left.
+  window.dispatchEvent(new Event(APP_SIGNED_OUT_EVENT))
   try {
     await webSupabase().auth.signOut({ scope: 'local' })
   } finally {

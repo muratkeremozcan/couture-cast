@@ -36,7 +36,11 @@ import {
   type CommunityPhotoAsset,
   type CommunityPublishState,
 } from '@/src/lib/community'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens } from '@/src/theme/tokens'
 import { useGlyphBox } from '@/components/glyph-box'
@@ -624,6 +628,8 @@ export function CommunityPostSheet({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={handleClose}
+      // Story CC-7.11 D13: the Community screen's closePostSheet focuses New post.
+      returnFocusRef={null}
       scrim={scrim}
     >
       <View style={styles.overlay}>
@@ -641,7 +647,9 @@ export function CommunityPostSheet({
             },
           ]}
         >
-          <View style={[styles.header, { borderBottomColor: palette.line }]}>
+          {/* Story CC-7.11 D13: the compose sheet is an overlay, so it keeps its X; its header
+              is the swipe-down handle. */}
+          <LayerSwipeHandle style={[styles.header, { borderBottomColor: palette.line }]}>
             <Text style={[styles.headerTitle, { color: palette.ink }]}>
               {t('community.compose.title')}
             </Text>
@@ -654,7 +662,7 @@ export function CommunityPostSheet({
             >
               <Text style={[styles.closeButtonText, { color: palette.ink }]}>✕</Text>
             </TouchableOpacity>
-          </View>
+          </LayerSwipeHandle>
 
           <ScrollView
             {...reveal.scrollProps}

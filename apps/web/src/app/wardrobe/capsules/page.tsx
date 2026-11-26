@@ -95,7 +95,7 @@ export default function WardrobeCapsulesPage() {
       {/* Story CC-7.9 D6, D7, D8: the shared top bar and page surface render outside the
           member scope, so the bar sits in its final place while the session is read. */}
       <AppPage>
-        <AppTopBar titleKey="wardrobe.capsules.title" backHref="/wardrobe" />
+        <AppTopBar titleKey="wardrobe.capsules.title" parentHref="/looks" />
         <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
       </AppPage>
     </I18nextProvider>

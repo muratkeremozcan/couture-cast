@@ -63,7 +63,7 @@ export function FinishSignupTopBar() {
   return (
     <AppTopBar
       title={getFederatedSignInStrings(i18n.language).finishTitle}
-      backHref="/"
+      parentHref="/"
     />
   )
 }

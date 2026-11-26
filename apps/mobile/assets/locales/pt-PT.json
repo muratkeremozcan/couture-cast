@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Separador Um",
     "tab_two": "Definições",
-    "home": "Início",
-    "wardrobe": "Guarda-roupa",
+    "today": "Hoje",
+    "closet": "Roupeiro",
+    "looks": "Looks",
     "community": "Comunidade",
     "profile": "Perfil"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "Estado do serviço da API: {{status}}",
     "api_health_unavailable": "Serviço da API indisponível",
     "diagnostic_alert_btn": "Registar analítica de alerta meteorológico",
-    "diagnostic_info": "O rastreio de alert_received está ligado a recetores de notificações push reais."
+    "diagnostic_info": "O rastreio de alert_received está ligado a recetores de notificações push reais.",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silhueta",
+      "closetSetup": "Configurar roupeiro",
+      "palette": "Paleta de cores"
+    }
   },
   "common": {
     "loading": "A carregar",
@@ -419,6 +427,15 @@
         "unknown": "Em curso"
       },
       "detailTitle": "Detalhes da peça"
+    },
+    "menu": {
+      "add": "Adicionar",
+      "more": "Mais",
+      "label": "Opções do roupeiro",
+      "setup": "Configurar roupeiro",
+      "setupDone": "Configurar roupeiro: concluído",
+      "silhouette": "Silhueta",
+      "close": "Fechar"
     }
   },
   "commerce": {
@@ -1237,5 +1254,10 @@
       "linkedGuardians": "Encarregados associados",
       "empty": "Nenhum encarregado deu ainda o consentimento."
     }
+  },
+  "looks": {
+    "empty": "Guarda um look para o veres aqui",
+    "capsules": "Cápsulas",
+    "plan": "Plano"
   }
 }

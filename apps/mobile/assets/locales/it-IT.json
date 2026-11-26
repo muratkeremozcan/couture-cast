@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Scheda Uno",
     "tab_two": "Impostazioni",
-    "home": "Home",
-    "wardrobe": "Guardaroba",
+    "today": "Oggi",
+    "closet": "Armadio",
+    "looks": "Look",
     "community": "Community",
     "profile": "Profilo"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "Stato dell'API: {{status}}",
     "api_health_unavailable": "Stato dell'API non disponibile",
     "diagnostic_alert_btn": "Registra analisi allerta meteo",
-    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
+    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali.",
+    "style": {
+      "row": "Stile",
+      "title": "Stile",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configura armadio",
+      "palette": "Palette colori"
+    }
   },
   "common": {
     "loading": "Caricamento",
@@ -419,6 +427,15 @@
         "unknown": "In corso"
       },
       "detailTitle": "Dettagli del capo"
+    },
+    "menu": {
+      "add": "Aggiungi",
+      "more": "Altro",
+      "label": "Opzioni dell'armadio",
+      "setup": "Configura armadio",
+      "setupDone": "Configura armadio: fatto",
+      "silhouette": "Silhouette",
+      "close": "Chiudi"
     }
   },
   "commerce": {
@@ -1237,5 +1254,10 @@
       "linkedGuardians": "Genitori collegati",
       "empty": "Nessun genitore ha ancora dato il consenso."
     }
+  },
+  "looks": {
+    "empty": "Salva un look per vederlo qui",
+    "capsules": "Capsule",
+    "plan": "Piano"
   }
 }

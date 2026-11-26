@@ -480,7 +480,7 @@ function PreviewFrame({
   // since it does not fit the one-row top bar.
   return (
     <AppPage>
-      <AppTopBar title={strings.chrome.entry} backHref="/" />
+      <AppTopBar title={strings.chrome.entry} parentHref="/" />
       <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-6`}>
         <div className="flex flex-col gap-3">
           {showNav ? (

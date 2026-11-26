@@ -434,7 +434,7 @@ function OnboardingFlow({
 
   if (isLoading) {
     return (
-      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+      <OnboardingFrame title={t('wardrobe.menu.setup')}>
         <p role="status" className="text-sm text-ink-muted">
           {t('wardrobe.onboarding.loading')}
         </p>
@@ -444,7 +444,7 @@ function OnboardingFlow({
 
   if (loadError) {
     return (
-      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+      <OnboardingFrame title={t('wardrobe.menu.setup')}>
         <p
           role="alert"
           className="rounded-lg border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
@@ -456,7 +456,7 @@ function OnboardingFlow({
   }
 
   if (!onboardingState || !userId) {
-    return <OnboardingFrame title={t('wardrobe.onboarding.title')} />
+    return <OnboardingFrame title={t('wardrobe.menu.setup')} />
   }
 
   const currentStep = onboardingState.currentStep
@@ -468,7 +468,7 @@ function OnboardingFlow({
 
   return (
     <>
-      <OnboardingFrame title={t('wardrobe.onboarding.title')}>
+      <OnboardingFrame title={t('wardrobe.menu.setup')}>
         <p aria-live="polite" className="sr-only" data-testid="onboarding-status-region">
           {liveAnnouncement ?? ''}
         </p>
@@ -534,7 +534,10 @@ function OnboardingFlow({
   )
 }
 
-/** D6, D7: the page surface, the top bar (title and back to the closet) and the main column. */
+/**
+ * D6, D7: the page surface, the top bar and the main column. Story CC-7.11 D10: titled Closet
+ * setup, the name the More menu and Profile > Style use; back follows in-app history, else Closet.
+ */
 function OnboardingFrame({
   title,
   children,
@@ -544,7 +547,7 @@ function OnboardingFrame({
 }) {
   return (
     <AppPage>
-      <AppTopBar title={title} backHref="/wardrobe" />
+      <AppTopBar title={title} parentHref="/wardrobe" />
       <main
         id="main-content"
         tabIndex={-1}

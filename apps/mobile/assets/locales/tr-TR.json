@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Ana Sayfa",
     "tab_two": "Ayarlar",
-    "home": "Ana Sayfa",
-    "wardrobe": "Gardırop",
+    "today": "Bugün",
+    "closet": "Dolap",
+    "looks": "Kombinler",
     "community": "Topluluk",
     "profile": "Profil"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "API durumu: {{status}}",
     "api_health_unavailable": "API kullanılabilir değil",
     "diagnostic_alert_btn": "Hava uyarısı analitiğini kaydet",
-    "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır."
+    "diagnostic_info": "alert_received takibi, gerçek anlık bildirim alıcılarına bağlıdır.",
+    "style": {
+      "row": "Stil",
+      "title": "Stil",
+      "silhouette": "Silüet",
+      "closetSetup": "Dolap kurulumu",
+      "palette": "Renk paleti"
+    }
   },
   "common": {
     "loading": "Yükleniyor",
@@ -419,6 +427,15 @@
         "unknown": "Devam ediyor"
       },
       "detailTitle": "Parça ayrıntıları"
+    },
+    "menu": {
+      "add": "Ekle",
+      "more": "Daha fazla",
+      "label": "Dolap seçenekleri",
+      "setup": "Dolap kurulumu",
+      "setupDone": "Dolap kurulumu: tamam",
+      "silhouette": "Silüet",
+      "close": "Kapat"
     }
   },
   "commerce": {
@@ -1237,5 +1254,10 @@
       "linkedGuardians": "Bağlı veliler",
       "empty": "Henüz hiçbir veli onay vermedi."
     }
+  },
+  "looks": {
+    "empty": "Burada görmek için bir kombin kaydet",
+    "capsules": "Kapsüller",
+    "plan": "Plan"
   }
 }

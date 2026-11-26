@@ -636,6 +636,15 @@
           "name": "Çok sıcak"
         }
       }
+    },
+    "menu": {
+      "add": "Ekle",
+      "more": "Daha fazla",
+      "label": "Dolap seçenekleri",
+      "setup": "Dolap kurulumu",
+      "setupDone": "Dolap kurulumu: tamam",
+      "silhouette": "Silüet",
+      "close": "Kapat"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Profil",
-    "account": "Hesabınız"
+    "account": "Hesabınız",
+    "style": {
+      "row": "Stil",
+      "title": "Stil",
+      "silhouette": "Silüet",
+      "closetSetup": "Dolap kurulumu",
+      "palette": "Renk paleti"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Alt gezinme",
     "primaryLabel": "Ana gezinme",
     "home": "Ana Sayfa",
-    "wardrobe": "Gardırop",
+    "today": "Bugün",
+    "closet": "Dolap",
+    "looks": "Kombinler",
     "community": "Topluluk",
     "profile": "Profil",
     "navigatedTo": "{{label}} sekmesine geçildi"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Bağlı veliler",
       "empty": "Henüz hiçbir veli onay vermedi."
     }
+  },
+  "looks": {
+    "empty": "Burada görmek için bir kombin kaydet",
+    "capsules": "Kapsüller",
+    "plan": "Plan"
   }
 }

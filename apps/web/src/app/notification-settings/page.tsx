@@ -182,7 +182,7 @@ export default function NotificationSettingsPage() {
   // where the notifications bell opens this page) and the page surface.
   return (
     <AppPage>
-      <AppTopBar title={t('community.notifications.title')} backHref="/community" />
+      <AppTopBar title={t('community.notifications.title')} parentHref="/settings" />
       <main
         id="main-content"
         tabIndex={-1}

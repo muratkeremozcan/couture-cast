@@ -6,8 +6,9 @@ import {
 import { createWebApiClient } from './api-client'
 
 export const SET_CITY_FROM_HOME = '/settings?addLocation=1&returnTo=%2F#locations'
+// Story CC-7.11 D9: the planner is the Plan route under Looks.
 export const SET_CITY_FROM_PLANNER =
-  '/settings?addLocation=1&returnTo=%2F%3Fplanner%3D1#locations'
+  '/settings?addLocation=1&returnTo=%2Flooks%2Fplan#locations'
 
 export async function getRitualFromWeb(
   token: string,

@@ -49,7 +49,11 @@ import {
   throwUploadStepError,
   useUploadSessionChange,
 } from '@/src/lib/upload-attempts'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
@@ -421,6 +425,8 @@ export function MobileGarmentCaptureModal({
       animationType={modalAnimation}
       visible={visible}
       onRequestClose={handleClose}
+      // Story CC-7.11 D13: focus returns to invokingNodeHandle.
+      returnFocusRef={null}
     >
       <View
         style={[
@@ -432,7 +438,8 @@ export function MobileGarmentCaptureModal({
         accessibilityViewIsModal={true}
         onAccessibilityEscape={handleClose}
       >
-        <View style={styles.modalHeader}>
+        {/* Story CC-7.11 D13: the header is the layer's swipe-down handle; the X stays. */}
+        <LayerSwipeHandle style={styles.modalHeader}>
           {/* A native Text: the themed one forwards no ref, and focus lands on this title. */}
           <NativeText
             ref={titleRef}
@@ -450,7 +457,7 @@ export function MobileGarmentCaptureModal({
           >
             <Text style={[styles.closeButton, themed.text]}>✕</Text>
           </Pressable>
-        </View>
+        </LayerSwipeHandle>
 
         {errorMessage ? (
           <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>

@@ -7,7 +7,7 @@ export default function WardrobeOnboardingRoute() {
   const { t } = useTranslation()
   return (
     <>
-      <Stack.Screen options={{ title: t('wardrobe.onboarding.title') }} />
+      <Stack.Screen options={{ title: t('wardrobe.menu.setup') }} />
       <WardrobeOnboardingScreen />
     </>
   )

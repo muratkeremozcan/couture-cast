@@ -98,6 +98,17 @@ const nextConfig: NextConfig = {
       },
     ])
   },
+  // Story CC-7.11 D9: Plan is a route under Looks. The old Home drawer deep link opens it.
+  redirects() {
+    return Promise.resolve([
+      {
+        source: '/',
+        has: [{ type: 'query' as const, key: 'planner', value: '1' }],
+        destination: '/looks/plan',
+        permanent: false,
+      },
+    ])
+  },
   // /ingest is served by src/app/ingest/[...path]/route.ts, which forwards only the
   // headers PostHog needs. A rewrite would forward every browser header, Referer and
   // cookies included.

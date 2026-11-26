@@ -406,6 +406,8 @@ export function CommunityCommentsSheet({
       animationType={modalAnimation}
       scrim={scrim}
       scrimTestID="comments-scrim"
+      // Story CC-7.11 D13: the Community screen's onClose focuses the comments button.
+      returnFocusRef={null}
       onRequestClose={() => {
         // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
         // Android 16 the modal otherwise takes that Back as a close request.

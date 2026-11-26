@@ -31,7 +31,8 @@ Added Steps 40 to 67:
 - Step 64: Story 7.6, garment delete, `11c26918` (PR #291), merged on 2026-11-25.
 - Step 65: Story 7.7, signed-in shell without flashes, `812cadce` (PR #292), merged on 2026-11-25.
 - Step 66: Story 7.9, one app shell and visual system, `6d8b1db3` (PR #293), merged on 2026-11-26.
-- Step 67: Story 7.10, screen budget guard, in review on `feat/epic7-story-7-10-screen-budget-guard`.
+- Step 67: Story 7.10, screen budget guard, `4e5702c3` (PR #294), merged on 2026-11-26.
+- Step 68: Story 7.11, five-tab navigation and back pattern, in review on `feat/epic7-story-7-11-five-tab-navigation-back-pattern`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -39,6 +40,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 68 for Story CC-7.11 (five-tab navigation and back pattern) while its PR is in review, and moved Step 67 to merged (`4e5702c3`, PR #294).
 Added Step 67 for Story CC-7.10 (screen budget guard) while its PR is in review, and moved Step 66 to merged (`6d8b1db3`, PR #293).
 Added Step 66 for Story CC-7.9 (one app shell and visual system) while its PR is in review, and moved Step 65 to merged (`812cadce`, PR #292).
 Added Step 65 for Story CC-7.7 (signed-in shell without flashes) while its PR is in review, and moved Step 64 to merged (`11c26918`, PR #291).
@@ -160,11 +162,11 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 67, Story CC-7.10, screen budget guard, status `in-progress` on `feat/epic7-story-7-10-screen-budget-guard`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-10-screen-budget-guard.md`.
-  Step 67 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+- Latest step: Step 68, Story CC-7.11, five-tab navigation and back pattern, status `in-progress` on `feat/epic7-story-7-11-five-tab-navigation-back-pattern`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-11-five-tab-navigation-back-pattern.md`.
+  Step 68 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 66, Stories CC-7.1 to CC-7.7 and CC-7.9, merged on `main` (the last, Step 66, as `6d8b1db3`, PR #293).
+- Previous completed steps: Steps 59 to 67, Stories CC-7.1 to CC-7.7, CC-7.9 and CC-7.10, merged on `main` (the last, Step 67, as `4e5702c3`, PR #294).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -22033,3 +22035,118 @@ Evidence boundaries:
   Chromium run of the measure on synthetic DOM.
 - Unit, rule, Playwright and native suites run in CI on the PR, and the `known` baseline comes
   from a CI dispatch run of this branch.
+
+## Step 68: Five-tab navigation and back pattern
+
+User/business impact:
+
+- Web and native show five tabs in one order, Today, Closet, Looks, Community and Profile, with
+  one outline icon set and 12 px sentence-case labels. The active tab is gold, semibold,
+  underlined and marked as the current page, so it never relies on color alone.
+- Closet opens on its garment grid. Add, the one primary button, and a More menu (Closet setup,
+  Silhouette) sit in the top bar; the action row, setup banner and explainer left the space above
+  the grid, and the saved looks row moved below it.
+- Looks is a new tab: saved looks first, then Capsules and Plan rows. Plan is a route
+  (`/looks/plan`), and the Home planner drawer is gone; `/?planner=1` redirects there.
+- Profile gains a Style row whose sub-screen lists Silhouette, Closet setup and Color palette.
+  Silhouette is a route on web (`/wardrobe/silhouette`) instead of a modal on Closet.
+- Every sub-screen has a top bar with back and a title. Back follows the in-app history and, on
+  a direct entry, replaces to the parent tab. Overlays close with X or the back arrow, Escape, a
+  swipe down and browser or system back, and focus returns to the control that opened them.
+
+Technical architecture:
+
+- `packages/utils/src/app-tabs.ts` (`APP_TABS`) and `tab-icons.ts` (`TAB_ICON_PATHS`): the one tab
+  definition and icon set. Web draws the paths as inline SVG (`components/tab-icon.tsx`); native
+  through react-native-svg (`components/tab-bar-icon.tsx`).
+- `apps/web/src/lib/app-history.ts` with `components/app-history-tracker.tsx` in the root layout:
+  a memory-only URL stack. A new URL pushes, the URL below pops, and a `history.replaceState` to
+  another URL replaces the top. `AppTopBar`'s `parentHref` back calls `router.back()` when an
+  entry sits below, else `router.replace(parentHref)`. Sign-out clears it.
+- `apps/web/src/app/components/modal-stack.ts` `openLayerHistory`: every open `AccessibleModal`
+  owns one same-URL entry (`history.pushState(history.state, '', location.href)`), so its
+  popstate restores the same router tree. Back closes the top layer; closing any other way steps
+  back over the entry, and pushes wait for those back steps to land. A link inside a layer
+  replaces the layer's entry. `AccessibleModal` adds the `screen` presentation (saved look and
+  post detail as full-height layers under a top bar) and a Pointer Events swipe of 80 px.
+- Native keeps `renderStackTopBar` and `tabsAnchorListeners`; `PARENT_TAB` gains
+  `settings-style` and moves `planner` and `wardrobe-capsules` to `/looks`. `EdgeToEdgeModal`
+  requires `onRequestClose` and `returnFocusRef` and adds a PanResponder swipe handle.
+- `TabBarLabel` shrinks a label to fit only down to 12 rendered px (`tabLabelFitFloor`) and
+  wraps to two lines after that.
+- `packages/utils/src/screen-budget.json`: the four `closet-chrome` known entries are deleted, so
+  Closet is held to 160 px, and `looks` joins the audited screens with a `looksAnchors` selector.
+
+Hard-won lessons from the implementation of this story:
+
+- The Next app router owns `history.state`, so in-app history is a URL stack; it learns replaces
+  from `history.replaceState`, which `router.replace` and the app's own URL edits both call.
+- A layer that pushes right after another one stepped back can land below the step, so the
+  second layer would close on the first one's popstate; pushes wait until every back step lands.
+- A history entry tied to a modal's stack registration churns on every suspend; it is tied to the
+  layer being open and shown instead.
+- A long localized "Add garment" label left no room for the Closet title in the top bar, so the
+  bar shows "+ Add" and keeps the full label as the accessible name.
+
+Story/Task mapping:
+
+- Story CC-7.11: Five-tab navigation and back pattern (Epic 7 Lane B clarity).
+- Follows CC-7.9 (the shell and top bar) and CC-7.10 (the screen budget it tightens for Closet).
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.11: Five-tab navigation and back pattern**`)
+- `_bmad-output/implementation-artifacts/spec-7-11-five-tab-navigation-back-pattern.md`
+- `_bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md`
+
+Cross-links:
+
+- Step 67 (`#step-67-screen-budget-guard`): the Closet chrome ratchet this story deletes.
+- Step 66 (`#step-66-one-app-shell-and-visual-system`): the top bar and tokens every new screen
+  uses.
+- Step 65 (`#step-65-signed-in-shell-without-flashes`): the screen gate and per-tab scroll
+  offset that a return from a sub-screen reuses.
+
+Sequence to follow:
+
+1. Add `app-tabs.ts` and `tab-icons.ts` to `packages/utils` and export them.
+2. Read them from the web bottom bar and desktop links, and from the native tab layout.
+3. Add the web history tracker and the history-aware top bar back.
+4. Move Closet's actions to the top bar and the More menu; add the Silhouette and Style screens.
+5. Add the Looks tab and the Plan route; link Home's Plan week controls to it.
+6. Give every overlay its history entry, swipe and focus return; make saved look and post
+   detail full-height layers.
+7. Add the catalog keys in the 10 web and 10 mobile locales and update the screen budget.
+
+Task owner map:
+
+- Step 68 step 1 owner: `packages/utils/src/app-tabs.ts` and `packages/utils/src/tab-icons.ts`.
+- Step 68 step 2 owner: `apps/web/src/app/components/sticky-bottom-nav.tsx` and
+  `apps/mobile/app/(tabs)/_layout.tsx`.
+- Step 68 step 3 owner: `apps/web/src/lib/app-history.ts` and
+  `apps/web/src/app/components/app-top-bar.tsx`.
+- Step 68 step 4 owner: `apps/web/src/app/wardrobe/closet-more-menu.tsx` and
+  `apps/mobile/src/features/wardrobe/closet-top-bar.tsx`.
+- Step 68 step 5 owner: `apps/web/src/app/components/looks-screen.tsx`,
+  `apps/web/src/app/components/plan-screen.tsx` and
+  `apps/mobile/src/features/looks/looks-screen.tsx`.
+- Step 68 step 6 owner: `apps/web/src/app/components/modal-stack.ts`,
+  `apps/web/src/app/components/accessible-modal.tsx` and
+  `apps/mobile/components/edge-to-edge-modal.tsx`.
+
+Tests that cover this step:
+
+- [`apps/web/src/lib/app-history.test.ts`](../../apps/web/src/lib/app-history.test.ts) and
+  [`apps/web/src/app/components/modal-stack.layer-history.test.ts`](../../apps/web/src/app/components/modal-stack.layer-history.test.ts).
+- [`playwright/tests/five-tab-navigation.spec.ts`](../../playwright/tests/five-tab-navigation.spec.ts),
+  [`playwright/tests/sub-screen-back.spec.ts`](../../playwright/tests/sub-screen-back.spec.ts) and
+  [`playwright/tests/overlay-close.spec.ts`](../../playwright/tests/overlay-close.spec.ts).
+- The full list, native and Maestro included, is in
+  `_bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md`.
+
+Evidence boundaries:
+
+- Locally: `tsc --noEmit` in packages/utils, apps/web and apps/mobile (product code clean),
+  ESLint `--max-warnings=0` on touched files, the design token guard and the screen budget
+  decisions check.
+- Unit, Playwright, native and Maestro suites run in CI on the PR.

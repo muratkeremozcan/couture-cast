@@ -140,3 +140,116 @@ export const useModalCovered = (id: string) =>
     () => isCovered(id),
     () => false
   )
+
+/*
+ * Story CC-7.11 D13, P2, P8: every open layer owns one same-URL history entry, so browser or
+ * system back closes the top layer and history does not grow.
+ *
+ * Opening pushes `history.pushState(history.state, '', location.href)`: the copy carries the
+ * app router's own state, so its popstate restores the same tree with no navigation, refetch
+ * or remount. A back step pops the top layer's entry and closes that layer. Closing any other
+ * way (X, Escape, swipe, the back arrow) steps back over the layer's entry, and that popstate
+ * is ignored. History moves are serialized: a push waits until every back step this module
+ * started has landed, so a layer opening right after another closed never lands below it.
+ */
+type Layer = { url: string; consumed: boolean; close: () => void; live: boolean }
+
+const layers: Layer[] = []
+/** Popstates this module caused itself, still to arrive. */
+let ownPops = 0
+/** Back steps requested in this task, flushed as one traversal. */
+let backsToFlush = 0
+let waitingPushes: Layer[] = []
+
+function flushBacks() {
+  const steps = backsToFlush
+  backsToFlush = 0
+  if (steps === 0) return
+  ownPops++
+  window.history.go(-steps)
+}
+
+function requestBack() {
+  if (backsToFlush++ === 0) queueMicrotask(flushBacks)
+}
+
+function pushEntry(layer: Layer) {
+  if (!layer.live) return
+  if (ownPops > 0 || backsToFlush > 0) {
+    waitingPushes.push(layer)
+    return
+  }
+  window.history.pushState(window.history.state, '', window.location.href)
+  layer.url = window.location.href
+  layer.consumed = false
+}
+
+function flushWaitingPushes() {
+  const waiting = waitingPushes
+  waitingPushes = []
+  for (const layer of waiting) pushEntry(layer)
+}
+
+function handleLayerPopState() {
+  if (ownPops > 0) {
+    ownPops--
+    if (ownPops === 0) flushWaitingPushes()
+    return
+  }
+  const top = [...layers].reverse().find((layer) => !layer.consumed)
+  if (!top) return
+  top.consumed = true
+  top.close()
+  // A layer that refused to close (an upload in flight, a discard prompt) keeps its place in
+  // history, so the next back step still reaches it.
+  // A timeout, so the close has rendered and unmounted a layer that did close.
+  window.setTimeout(() => {
+    if (top.live && layers.includes(top)) pushEntry(top)
+  }, 0)
+}
+
+function closeEveryLayer() {
+  for (const layer of [...layers].reverse()) layer.close()
+}
+
+let layerListenersInstalled = false
+function installLayerListeners() {
+  if (layerListenersInstalled || typeof window === 'undefined') return
+  layerListenersInstalled = true
+  window.addEventListener('popstate', handleLayerPopState)
+  // P8: sign-out closes every open layer (lib/app-history.ts APP_SIGNED_OUT_EVENT).
+  window.addEventListener('couture:signed-out', closeEveryLayer)
+}
+
+/** What an open layer holds of its history entry. */
+export interface LayerHistory {
+  /** The layer closed: step back over its entry unless back already consumed it. */
+  release: () => void
+  /**
+   * A link inside the layer is about to replace the layer's entry with another URL (TEA P2), so
+   * closing must not step back over it.
+   */
+  handOff: () => void
+}
+
+/**
+ * Gives an open layer its history entry, for as long as it stays open and is not suspended.
+ */
+export function openLayerHistory(close: () => void): LayerHistory {
+  installLayerListeners()
+  const layer: Layer = { url: '', consumed: true, close, live: true }
+  layers.push(layer)
+  pushEntry(layer)
+  return {
+    release: () => {
+      if (!layer.live) return
+      layer.live = false
+      layers.splice(layers.indexOf(layer), 1)
+      waitingPushes = waitingPushes.filter((waiting) => waiting !== layer)
+      if (!layer.consumed && window.location.href === layer.url) requestBack()
+    },
+    handOff: () => {
+      layer.consumed = true
+    },
+  }
+}

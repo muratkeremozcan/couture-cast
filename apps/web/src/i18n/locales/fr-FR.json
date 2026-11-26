@@ -636,6 +636,15 @@
           "name": "Très chaud"
         }
       }
+    },
+    "menu": {
+      "add": "Ajouter",
+      "more": "Plus",
+      "label": "Options du dressing",
+      "setup": "Configuration du dressing",
+      "setupDone": "Configuration du dressing : terminée",
+      "silhouette": "Silhouette",
+      "close": "Fermer"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Profil",
-    "account": "Votre compte"
+    "account": "Votre compte",
+    "style": {
+      "row": "Style",
+      "title": "Style",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configuration du dressing",
+      "palette": "Palette de couleurs"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Navigation inférieure",
     "primaryLabel": "Navigation principale",
     "home": "Accueil",
-    "wardrobe": "Garde-robe",
+    "today": "Aujourd'hui",
+    "closet": "Dressing",
+    "looks": "Looks",
     "community": "Communauté",
     "profile": "Profil",
     "navigatedTo": "Onglet {{label}} ouvert"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Tuteurs associés",
       "empty": "Aucun tuteur n'a encore donné son consentement."
     }
+  },
+  "looks": {
+    "empty": "Enregistre un look pour le voir ici",
+    "capsules": "Capsules",
+    "plan": "Plan"
   }
 }

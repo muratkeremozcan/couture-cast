@@ -81,9 +81,7 @@ export function TeenDashboardScreen({
   if (errorMessage) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title} accessibilityRole="header">
-          {t('teen.dashboard.title')}
-        </Text>
+        {/* Story CC-7.11 D10: the top bar names the screen, so the body has no second title. */}
         <Text
           testID="teen-dashboard-error"
           style={styles.errorMessage}
@@ -106,7 +104,6 @@ export function TeenDashboardScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>{t('teen.dashboard.title')}</Text>
       <Text style={styles.title} accessibilityRole="header">
         {profile.user.displayName ?? profile.user.email}
       </Text>
@@ -143,12 +140,6 @@ const useStyles = createSchemeStyles((colors) => ({
     paddingHorizontal: 24,
     paddingVertical: 32,
     gap: 12,
-  },
-  eyebrow: {
-    fontSize: 12,
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    color: colors.inkMuted,
   },
   title: {
     fontSize: 24,

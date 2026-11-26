@@ -504,6 +504,8 @@ export default function SettingsScreen() {
               returns={returns}
               onSettledChange={setAccountSettled}
             />
+            {/* Story CC-7.11 D7: directly below the account header. */}
+            <StyleLinkRow />
             <View style={styles.settingsSection}>
               <Text style={styles.sectionTitle} testID="settings-language-title">
                 {t('settings.language', { defaultValue: 'Language' })}
@@ -1833,6 +1835,29 @@ function ProfileAccountHeader({
         {account.email}
       </Text>
     </View>
+  )
+}
+
+/**
+ * Story CC-7.11 D7: Profile > Style, the one row that opens Silhouette, closet setup and the
+ * color palette. A link row like the ones below it; the rest of Profile's layout is CC-7.16's.
+ * Learning path Step 68: Five-tab navigation and back pattern.
+ * See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+ */
+function StyleLinkRow() {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t('settings.style.row')}
+      style={[styles.actionButton, tone.actionButton]}
+      testID="profile-style-row"
+      onPress={() => router.push('/settings-style')}
+    >
+      <Text style={styles.actionText}>{t('settings.style.row')}</Text>
+    </Pressable>
   )
 }
 

@@ -38,7 +38,7 @@ import {
   type SampleVote,
   type GuestSampleWeatherKey,
 } from '@couture/utils'
-import { EdgeToEdgeModal } from '@/components/edge-to-edge-modal'
+import { EdgeToEdgeModal, type LayerFocusTarget } from '@/components/edge-to-edge-modal'
 import { type useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens, withAlpha } from '@/src/theme/tokens'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
@@ -687,6 +687,8 @@ export function PreviewWardrobe({
 }) {
   const [category, setCategory] = useState<CategoryFilter>('all')
   const [open, setOpen] = useState<SampleGarment | null>(null)
+  // Story CC-7.11 D13: the garment that opened the detail takes focus back when it closes.
+  const detailOpener = useRef<unknown>(null)
   const { values } = strings
   const items = SAMPLE_CATALOG.garments.filter(
     (garment) =>
@@ -751,7 +753,8 @@ export function PreviewWardrobe({
               testID={`guest-preview-item-${garment.id.slice('sample:g:'.length)}`}
               accessibilityRole="button"
               accessibilityLabel={`${text.name}, ${values.categoryTitle[garment.category]}`}
-              onPress={() => {
+              onPress={(event) => {
+                detailOpener.current = event.currentTarget
                 setOpen(garment)
                 onInspect()
               }}
@@ -778,6 +781,7 @@ export function PreviewWardrobe({
         strings={strings}
         palette={palette}
         onClose={() => setOpen(null)}
+        returnFocusRef={detailOpener}
         testID="guest-preview-item-detail"
       >
         {open && openText ? (
@@ -856,6 +860,7 @@ export function PreviewSheet({
   strings,
   palette,
   onClose,
+  returnFocusRef = null,
   testID,
   children,
 }: {
@@ -864,6 +869,11 @@ export function PreviewSheet({
   strings: GuestPreviewStrings
   palette: PreviewPalette
   onClose: () => void
+  /**
+   * Story CC-7.11 D13: the opener that takes focus back on close. The swap sheet leaves it out:
+   * useSwapButtonFocus returns focus to the swap button itself.
+   */
+  returnFocusRef?: LayerFocusTarget | null
   testID: string
   children: React.ReactNode
 }) {
@@ -874,6 +884,7 @@ export function PreviewSheet({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
+      returnFocusRef={returnFocusRef}
       scrim={scrim}
     >
       <View style={styles.sheetSpacer} />

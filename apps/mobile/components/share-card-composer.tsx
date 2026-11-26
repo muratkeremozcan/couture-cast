@@ -867,6 +867,8 @@ export function ShareCardComposer({
       visible={open && source !== null && systemBarsReady}
       animationType="slide"
       onRequestClose={close}
+      // Story CC-7.11 D13: restoreFocus on dismiss hands focus back to the opener.
+      returnFocusRef={null}
       onDismiss={restoreFocus}
       scrim="#0009"
       onShow={() => {

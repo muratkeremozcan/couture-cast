@@ -14,10 +14,10 @@
 
 import { currentWebSessionScope } from './use-web-session'
 
-/** The four signed-in tabs; the snapshot never holds more than these. */
-export type ScreenName = 'home' | 'closet' | 'community' | 'profile'
+/** The five signed-in tabs (Story CC-7.11 D1 adds Looks); the snapshot never holds more. */
+export type ScreenName = 'home' | 'closet' | 'looks' | 'community' | 'profile'
 
-export const SCREEN_SNAPSHOT_CAP = 4
+export const SCREEN_SNAPSHOT_CAP = 5
 
 /** The Community grid's part, on Home and on Community. */
 export const COMMUNITY_GRID_SNAPSHOT_PART = 'community-grid'

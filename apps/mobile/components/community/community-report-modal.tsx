@@ -105,6 +105,8 @@ export function CommunityReportModal({
       visible={visible && !suspended}
       animationType={modalAnimation}
       onRequestClose={onClose}
+      // Story CC-7.11 D13: the Community screen's closeReportModal focuses the reported card.
+      returnFocusRef={null}
       testID="community-report-modal"
       scrim={scrim}
       scrimTestID="community-report-modal-scrim"

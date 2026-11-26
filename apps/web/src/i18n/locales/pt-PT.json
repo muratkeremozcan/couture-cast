@@ -636,6 +636,15 @@
           "name": "Muito quente"
         }
       }
+    },
+    "menu": {
+      "add": "Adicionar",
+      "more": "Mais",
+      "label": "Opções do roupeiro",
+      "setup": "Configurar roupeiro",
+      "setupDone": "Configurar roupeiro: concluído",
+      "silhouette": "Silhueta",
+      "close": "Fechar"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Perfil",
-    "account": "A sua conta"
+    "account": "A sua conta",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silhueta",
+      "closetSetup": "Configurar roupeiro",
+      "palette": "Paleta de cores"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Navegação inferior",
     "primaryLabel": "Navegação principal",
     "home": "Início",
-    "wardrobe": "Guarda-roupa",
+    "today": "Hoje",
+    "closet": "Roupeiro",
+    "looks": "Looks",
     "community": "Comunidade",
     "profile": "Perfil",
     "navigatedTo": "Separador {{label}} aberto"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Encarregados associados",
       "empty": "Nenhum encarregado deu ainda o consentimento."
     }
+  },
+  "looks": {
+    "empty": "Guarda um look para o veres aqui",
+    "capsules": "Cápsulas",
+    "plan": "Plano"
   }
 }

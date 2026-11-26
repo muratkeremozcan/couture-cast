@@ -1073,13 +1073,16 @@ export default function TabOneScreen() {
       ) ? (
       <>
         <HomePlannerLink />
-        <MemberSampleOutfit
-          key={applicationUserId}
-          owner={applicationUserId}
-          error={error}
-          busy={isLoading}
-          onRetry={handleRetry}
-        />
+        {/* Story CC-7.11 P5: Today's first own content. */}
+        <NativeView testID="today-first-content">
+          <MemberSampleOutfit
+            key={applicationUserId}
+            owner={applicationUserId}
+            error={error}
+            busy={isLoading}
+            onRetry={handleRetry}
+          />
+        </NativeView>
       </>
     ) : (
       <>
@@ -1110,29 +1113,35 @@ export default function TabOneScreen() {
 
         {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
 
-        {/* Primary Outfit Card */}
-        <OutfitRecommendationCard
-          outfit={activeOutfit}
-          onExport={(recommendationId, opener) => {
-            if (
-              openAndroidShareCard({ kind: 'outfit', recommendationId }, 'outfit', opener)
-            )
-              return
-            shareCardInvoker.current = {
-              node: opener,
-              member: mobileApplicationUserId(),
-            }
-            setShareCardSource({ kind: 'outfit', recommendationId })
-            setShareCardOpen(true)
-            traceShareCardOpener('state-open')
-          }}
-          onSwapGarment={handleSwapGarment}
-          onGarmentRef={(garmentId, element) => {
-            garmentRefs.current.set(garmentId, element)
-          }}
-          isLoading={isLoading}
-          isCacheServed={isCacheServed}
-        />
+        {/* Primary Outfit Card; Story CC-7.11 P5: Today's first own content. */}
+        <NativeView testID="today-first-content">
+          <OutfitRecommendationCard
+            outfit={activeOutfit}
+            onExport={(recommendationId, opener) => {
+              if (
+                openAndroidShareCard(
+                  { kind: 'outfit', recommendationId },
+                  'outfit',
+                  opener
+                )
+              )
+                return
+              shareCardInvoker.current = {
+                node: opener,
+                member: mobileApplicationUserId(),
+              }
+              setShareCardSource({ kind: 'outfit', recommendationId })
+              setShareCardOpen(true)
+              traceShareCardOpener('state-open')
+            }}
+            onSwapGarment={handleSwapGarment}
+            onGarmentRef={(garmentId, element) => {
+              garmentRefs.current.set(garmentId, element)
+            }}
+            isLoading={isLoading}
+            isCacheServed={isCacheServed}
+          />
+        </NativeView>
       </>
     )
 
@@ -1246,6 +1255,8 @@ export default function TabOneScreen() {
         animationType={swapModalAnimation}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
+        // Story CC-7.11 D13: closeSwapModal returns focus to the swap trigger.
+        returnFocusRef={null}
         scrim={scrim}
       >
         <View style={styles.modalOverlay}>

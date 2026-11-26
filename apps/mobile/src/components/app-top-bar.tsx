@@ -2,9 +2,13 @@
 // root stack screen that shows one.
 // Learning path Step 66: One app shell and visual system.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
+// Story CC-7.11 D10 to D12: the parent tab of every sub-screen (PARENT_TAB), and the same bar as
+// the header of the full-height layers (saved look and post detail) with back and their title.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { router, type Href } from 'expo-router'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -17,17 +21,32 @@ export interface AppTopBarProps {
   /** Replaces the plain title text (the share card focus heading registers itself this way). */
   titleNode?: ReactNode
   trailing?: ReactNode
+  /**
+   * Whether the bar sits under the status bar and pads by the top safe-area inset (a header, a
+   * full-height layer). Default true.
+   */
+  safeAreaTop?: boolean
+  /** The plain title text, for a layer that moves accessibility focus to its title on open. */
+  titleRef?: Ref<Text>
 }
 
 /**
  * D6: 56 pt plus the top safe-area inset, one row: optional back, the title (header role) and an
  * optional trailing slot, on the `page` surface with a `line` rule below.
  */
-export function AppTopBar({ title, onBack, titleNode, trailing }: AppTopBarProps) {
+export function AppTopBar({
+  title,
+  onBack,
+  titleNode,
+  trailing,
+  safeAreaTop = true,
+  titleRef,
+}: AppTopBarProps) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const { colors, shell, space, type, fontWeight } = useTokens()
   const backLabel = t('shell.back')
+  const topInset = safeAreaTop ? insets.top : 0
 
   return (
     <View
@@ -35,8 +54,8 @@ export function AppTopBar({ title, onBack, titleNode, trailing }: AppTopBarProps
       style={[
         styles.bar,
         {
-          height: shell.topBarHeight + insets.top,
-          paddingTop: insets.top,
+          height: shell.topBarHeight + topInset,
+          paddingTop: topInset,
           paddingHorizontal: space[2],
           backgroundColor: colors.page,
           borderBottomColor: colors.line,
@@ -73,6 +92,7 @@ export function AppTopBar({ title, onBack, titleNode, trailing }: AppTopBarProps
       <View style={[styles.title, { paddingHorizontal: space[2] }]}>
         {titleNode ?? (
           <Text
+            ref={titleRef}
             testID="app-top-bar-title"
             accessibilityRole="header"
             numberOfLines={1}
@@ -151,12 +171,14 @@ export function renderTabTopBar(props: NavigatorHeaderProps) {
  * The parent tab of each root stack screen, for a direct entry (a deep link or a cold start on the
  * screen) that has no caller below it to go back to.
  */
-const PARENT_TAB: Readonly<Record<string, Href>> = {
-  'wardrobe-capsules': '/wardrobe',
+export const PARENT_TAB: Readonly<Record<string, Href>> = {
+  // Story CC-7.11 D10: Capsules and Plan live under Looks; Style under Profile.
+  'wardrobe-capsules': '/looks',
   locations: '/settings',
   'notification-settings': '/settings',
   'palette-advisor': '/settings',
-  planner: '/settings',
+  planner: '/looks',
+  'settings-style': '/settings',
   'wardrobe-garment': '/wardrobe',
   'wardrobe-onboarding': '/wardrobe',
   'wardrobe-silhouette': '/wardrobe',

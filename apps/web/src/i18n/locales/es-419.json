@@ -636,6 +636,15 @@
           "name": "Caluroso"
         }
       }
+    },
+    "menu": {
+      "add": "Agregar",
+      "more": "Más",
+      "label": "Opciones del clóset",
+      "setup": "Configurar clóset",
+      "setupDone": "Configurar clóset: listo",
+      "silhouette": "Silueta",
+      "close": "Cerrar"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Perfil",
-    "account": "Tu cuenta"
+    "account": "Tu cuenta",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silueta",
+      "closetSetup": "Configurar clóset",
+      "palette": "Paleta de colores"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Navegación inferior",
     "primaryLabel": "Navegación principal",
     "home": "Inicio",
-    "wardrobe": "Guardarropa",
+    "today": "Hoy",
+    "closet": "Clóset",
+    "looks": "Looks",
     "community": "Comunidad",
     "profile": "Perfil",
     "navigatedTo": "Pestaña {{label}} abierta"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Tutores vinculados",
       "empty": "Ningún tutor ha aceptado el consentimiento todavía."
     }
+  },
+  "looks": {
+    "empty": "Guarda un look para verlo aquí",
+    "capsules": "Cápsulas",
+    "plan": "Plan"
   }
 }

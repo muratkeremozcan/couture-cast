@@ -4,15 +4,21 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import type { ReactNode } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import type { MouseEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { APP_TABS } from '@couture/utils'
 import { getI18n } from '../../i18n'
-import { resolveActiveNavTab, type NavTabId } from './sticky-bottom-nav'
+import { hasAppHistoryBelow } from '../../lib/app-history'
+import { resolveActiveNavTab } from './sticky-bottom-nav'
 
 export type AppTopBarProps = AppTopBarTitle & {
-  /** A sub-screen's parent route. The back control renders only when this or `onBack` is set. */
-  backHref?: string
+  /**
+   * A sub-screen's parent tab or screen (Story CC-7.11 D11). Back steps back through the in-app
+   * history when the member came from inside the app, and replaces to this route on a direct
+   * entry. The back control renders only when this or `onBack` is set.
+   */
+  parentHref?: string
   /** For a sub-screen that is not a route (the inline garment detail). */
   onBack?: () => void
   /** Actions that fit the one row. Anything that does not moves to the body's first row. */
@@ -27,36 +33,14 @@ type AppTopBarTitle =
   | { title: string; titleKey?: never }
   | { titleKey: string; title?: never }
 
-const DESKTOP_TABS: readonly {
-  id: NavTabId
-  href: string
-  labelKey: string
-  label: string
-  testId: string
-}[] = [
-  { id: 'home', href: '/', labelKey: 'nav.home', label: 'Home', testId: 'nav-ritual' },
-  {
-    id: 'wardrobe',
-    href: '/wardrobe',
-    labelKey: 'nav.wardrobe',
-    label: 'Wardrobe',
-    testId: 'nav-wardrobe',
-  },
-  {
-    id: 'community',
-    href: '/community',
-    labelKey: 'nav.community',
-    label: 'Community',
-    testId: 'nav-community',
-  },
-  {
-    id: 'settings',
-    href: '/settings',
-    labelKey: 'nav.profile',
-    label: 'Profile',
-    testId: 'nav-profile',
-  },
-]
+/** Story CC-7.11 D1: the desktop links read the one tab definition the bottom bar reads. */
+const DESKTOP_TABS = APP_TABS.map((tab) => ({
+  id: tab.id,
+  href: tab.webHref,
+  labelKey: `nav.${tab.labelKey}`,
+  label: tab.label,
+  testId: tab.desktopTestId,
+}))
 
 /**
  * D6: exactly the shell top bar height, 56 px (`h-top-bar`, border included), one row:
@@ -66,14 +50,26 @@ const DESKTOP_TABS: readonly {
 export function AppTopBar({
   title,
   titleKey,
-  backHref,
+  parentHref,
   onBack,
   trailing,
 }: AppTopBarProps) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const heading = title ?? t(titleKey ?? '')
   const activeTab = resolveActiveNavTab(usePathname())
+  const router = useRouter()
   const backLabel = t('shell.back')
+  // D11: back follows in-app history; a direct entry (a cold load, a reload, a typed URL) has
+  // none below it, so back replaces to the parent tab and never leaves the app.
+  const followBack = (event: MouseEvent<HTMLAnchorElement>, parent: string) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    if (hasAppHistoryBelow()) {
+      router.back()
+      return
+    }
+    router.replace(parent)
+  }
   const backClass =
     'flex min-h-touch min-w-touch shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium text-ink'
 
@@ -82,9 +78,19 @@ export function AppTopBar({
       data-testid="app-header"
       className="h-top-bar w-full shrink-0 border-b border-line bg-page text-ink"
     >
-      <div className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4">
-        {backHref !== undefined ? (
-          <Link href={backHref} data-testid="app-top-bar-back" className={backClass}>
+      {/* CC-7.11 P5: `app-top-bar` and `app-top-bar-title` name the same parts on web and
+          native; `app-header` stays on the landmark. */}
+      <div
+        data-testid="app-top-bar"
+        className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4"
+      >
+        {parentHref !== undefined ? (
+          <Link
+            href={parentHref}
+            data-testid="app-top-bar-back"
+            onClick={(event) => followBack(event, parentHref)}
+            className={backClass}
+          >
             <BackGlyph />
             <span>{backLabel}</span>
           </Link>
@@ -99,7 +105,12 @@ export function AppTopBar({
             <span>{backLabel}</span>
           </button>
         ) : null}
-        <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{heading}</h1>
+        <h1
+          data-testid="app-top-bar-title"
+          className="min-w-0 flex-1 truncate text-lg font-semibold"
+        >
+          {heading}
+        </h1>
         <div className="flex shrink-0 items-center gap-2">
           {trailing}
           <nav
@@ -122,7 +133,7 @@ export function AppTopBar({
                   className={`flex min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm ${
                     active
                       ? 'font-semibold text-ink underline underline-offset-8'
-                      : 'text-ink-muted'
+                      : 'font-medium text-ink-muted'
                   }`}
                 >
                   {t(tab.labelKey)}

@@ -1,5 +1,17 @@
-// Story CC-7.2: Temporary "Saved looks" row at the top of the mobile Closet screen until CC-7.12 ships.
-import { useEffect, useRef, useState } from 'react'
+// Story CC-7.2: Temporary "Saved looks" row on the mobile Closet screen until CC-7.12 ships.
+// Story CC-7.11 D4, D8, D12: the row now sits below the Closet grid, the Looks tab lists the same
+// looks open (`variant="list"`), and a look's detail is a full-height layer under the app top bar
+// with back and the look's title.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentRef,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import type {
@@ -19,7 +31,12 @@ import {
   visibleStylePieceLooks,
   type SampleWeatherKey,
 } from '@couture/utils'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
+import { AppTopBar } from '@/src/components/app-top-bar'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
   checkNetworkOnlineForAction,
@@ -154,6 +171,66 @@ function SavedLookDetailNotices({
   return null
 }
 
+/** The saved looks read failed: the message and Retry. Nothing while the read is fine. */
+function SavedLooksLoadError({
+  error,
+  palette,
+  onRetry,
+}: {
+  error: string | null
+  palette: ReturnType<typeof useHeroPalette>
+  onRetry: () => void
+}) {
+  const { t } = useTranslation()
+  const colors = useSchemeColors()
+  if (!error) return null
+  return (
+    <View
+      accessibilityRole="alert"
+      style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
+    >
+      <Text style={{ color: colors.dangerInk }}>{t('savedLooks.loadFailed')}</Text>
+      <PreviewButton
+        label={t('savedLooks.retry')}
+        testID="saved-looks-retry"
+        palette={palette}
+        onPress={onRetry}
+      />
+    </View>
+  )
+}
+
+/** The Closet row's header: the title and count, and the show or hide toggle. */
+function SavedLooksToggle({
+  expanded,
+  count,
+  onToggle,
+}: {
+  expanded: boolean
+  count: string
+  onToggle: () => void
+}) {
+  const { t } = useTranslation()
+  const colors = useSchemeColors()
+  return (
+    <Pressable
+      accessibilityRole="button"
+      aria-expanded={expanded}
+      testID="closet-saved-looks-row"
+      style={styles.headerButton}
+      onPress={onToggle}
+    >
+      <View>
+        <Text style={[styles.title, { color: colors.ink }]}>{t('savedLooks.title')}</Text>
+        <Text style={[styles.count, { color: colors.ink }]}>{count}</Text>
+      </View>
+      <Text style={[styles.toggle, { color: colors.ink }]}>
+        {expanded ? t('savedLooks.hideList') : t('savedLooks.showList')}
+      </Text>
+    </Pressable>
+  )
+}
+
 async function ensureMobileOnline(readLiveOnline: () => boolean): Promise<boolean> {
   if (readLiveOnline()) return true
   if (hasReliableBrowserOnline()) return false
@@ -173,6 +250,11 @@ export type ClosetSavedLooksRowProps = {
   onRetry: () => void
   onChanged: () => void
   onReopenStylePiece: (look: SavedLookContract) => void
+  /**
+   * `row` (default): the Closet's collapsible card. `list`: the Looks tab's open list, with no
+   * toggle and no card around the looks, so they are the screen's own content.
+   */
+  variant?: 'row' | 'list'
 }
 
 export function ClosetSavedLooksRow(props: ClosetSavedLooksRowProps) {
@@ -201,12 +283,12 @@ function ClosetSavedLooksRowInner({
   onRetry,
   onChanged,
   onReopenStylePiece,
+  variant = 'row',
 }: ClosetSavedLooksRowProps) {
   const { t, i18n } = useTranslation()
   const samples = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
   const palette = useHeroPalette()
-  const insets = useModalInsets()
   const statusBar = useStatusBar()
   const statusBarRef = useRef(statusBar)
   statusBarRef.current = statusBar
@@ -215,7 +297,11 @@ function ClosetSavedLooksRowInner({
   const mountedRef = useRef(true)
   const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
   const detailLookIdRef = useRef<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
+  const [toggledOpen, setExpanded] = useState(false)
+  const expanded = variant === 'list' || toggledOpen
+  // D13: the Reopen button that opened a look's detail takes focus back when it closes.
+  const reopenButtons = useRef(new Map<string, ComponentRef<typeof Pressable>>())
+  const detailOpener = useRef<ComponentRef<typeof Pressable> | null>(null)
   const [detailLook, setDetailLook] = useState<SavedLookContract | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
@@ -292,6 +378,7 @@ function ClosetSavedLooksRowInner({
       onReopenStylePiece(look)
       return
     }
+    detailOpener.current = reopenButtons.current.get(look.id) ?? null
     setDetailLook(look)
     const needsPhotoRefresh = look.composition.some(
       (slot) =>
@@ -568,45 +655,34 @@ function ClosetSavedLooksRowInner({
   }
 
   const displayedCount = totalCount ?? savedLooks.length
+  const sourceLabel = (look: SavedLookContract) =>
+    look.source === 'style_piece'
+      ? t('savedLooks.sourceStylePiece')
+      : t('savedLooks.sourceHomeSample')
+  const titleOf = (look: SavedLookContract) =>
+    look.title || sampleLookText({ id: look.lookId }, samples).name || look.lookId
 
   return (
-    <View style={[styles.container, { borderColor: colors.lineStrong }]}>
-      <Pressable
-        accessibilityRole="button"
-        aria-expanded={expanded}
-        testID="closet-saved-looks-row"
-        style={styles.headerButton}
-        onPress={() => setExpanded((current) => !current)}
-      >
-        <View>
-          <Text style={[styles.title, { color: colors.ink }]}>
-            {t('savedLooks.title')}
-          </Text>
-          <Text style={[styles.count, { color: colors.ink }]}>
-            {isLoading && savedLooks.length === 0
+    <View
+      style={
+        variant === 'list'
+          ? styles.listContainer
+          : [styles.container, { borderColor: colors.lineStrong }]
+      }
+    >
+      {variant === 'row' ? (
+        <SavedLooksToggle
+          expanded={expanded}
+          count={
+            isLoading && savedLooks.length === 0
               ? '…'
-              : t('savedLooks.count', { count: displayedCount })}
-          </Text>
-        </View>
-        <Text style={[styles.toggle, { color: colors.ink }]}>
-          {expanded ? t('savedLooks.hideList') : t('savedLooks.showList')}
-        </Text>
-      </Pressable>
-
-      {loadError ? (
-        <View
-          accessibilityRole="alert"
-          style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
-        >
-          <Text style={{ color: colors.dangerInk }}>{t('savedLooks.loadFailed')}</Text>
-          <PreviewButton
-            label={t('savedLooks.retry')}
-            testID="saved-looks-retry"
-            palette={palette}
-            onPress={onRetry}
-          />
-        </View>
+              : t('savedLooks.count', { count: displayedCount })
+          }
+          onToggle={() => setExpanded((current) => !current)}
+        />
       ) : null}
+
+      <SavedLooksLoadError error={loadError} palette={palette} onRetry={onRetry} />
 
       {expanded ? (
         <View testID="closet-saved-looks-list" style={styles.list}>
@@ -614,10 +690,7 @@ function ClosetSavedLooksRowInner({
             <Text style={{ color: colors.ink }}>{t('savedLooks.empty')}</Text>
           ) : (
             savedLooks.map((look) => {
-              const title =
-                look.title ||
-                sampleLookText({ id: look.lookId }, samples).name ||
-                look.lookId
+              const title = titleOf(look)
               return (
                 <View
                   key={look.id}
@@ -626,11 +699,7 @@ function ClosetSavedLooksRowInner({
                 >
                   <Text style={[styles.cardTitle, { color: colors.ink }]}>{title}</Text>
                   <Text style={[styles.meta, { color: colors.ink }]}>
-                    {`${weatherLabel(look.weather)} · ${
-                      look.source === 'style_piece'
-                        ? t('savedLooks.sourceStylePiece')
-                        : t('savedLooks.sourceHomeSample')
-                    }`}
+                    {`${weatherLabel(look.weather)} · ${sourceLabel(look)}`}
                   </Text>
                   <SavedLookStatusBadges
                     status={look.availabilityStatus}
@@ -646,6 +715,10 @@ function ClosetSavedLooksRowInner({
                       label={t('savedLooks.reopen')}
                       testID="saved-look-reopen"
                       palette={palette}
+                      buttonRef={(button) => {
+                        if (button) reopenButtons.current.set(look.id, button)
+                        else reopenButtons.current.delete(look.id)
+                      }}
                       onPress={() => handleReopen(look)}
                     />
                     <PreviewButton
@@ -673,69 +746,94 @@ function ClosetSavedLooksRowInner({
       ) : null}
 
       {detailLook ? (
-        <EdgeToEdgeModal
-          visible
-          transparent={false}
-          animationType="none"
-          onRequestClose={() => setDetailLook(null)}
-        >
-          <View
-            testID="saved-look-detail-modal"
-            style={[
-              styles.modal,
-              {
-                backgroundColor: palette.page,
-                paddingTop: insets.top,
-                paddingBottom: insets.bottom,
-              },
-            ]}
-          >
-            <View style={styles.modalHeader}>
-              <Text
-                accessibilityRole="header"
-                style={[styles.modalTitle, { color: palette.ink }]}
-              >
-                {t('savedLooks.detailTitle')}
-              </Text>
-              <PreviewButton
-                label={t('savedLooks.close')}
-                testID="saved-look-detail-close"
-                palette={palette}
-                onPress={() => setDetailLook(null)}
-              />
-            </View>
-            <ScrollView contentContainerStyle={styles.modalBody}>
-              <Text style={{ color: palette.ink }}>
-                {`${weatherLabel(detailLook.weather)} · ${
-                  detailLook.source === 'style_piece'
-                    ? t('savedLooks.sourceStylePiece')
-                    : t('savedLooks.sourceHomeSample')
-                }`}
-              </Text>
-              <SavedLookDetailNotices
-                status={detailLook.availabilityStatus}
-                missingDetail={t('savedLooks.missingPieceDetail')}
-                needsReviewDetail={t('savedLooks.needsReviewDetail')}
-                color={colors.noticeInk}
-              />
-              <Text style={[styles.cardTitle, { color: palette.ink }]}>
-                {t('savedLooks.slotOrderLabel')}
-              </Text>
-              <View style={styles.slotsRow}>
-                {sortedSlots(detailLook).map((slot) => renderSlot(detailLook.id, slot))}
-              </View>
-              <PreviewButton
-                label={t('savedLooks.remove')}
-                testID="saved-look-detail-remove"
-                palette={palette}
-                disabled={removingId === detailLook.id}
-                onPress={() => void handleRemove(detailLook)}
-              />
-            </ScrollView>
-          </View>
-        </EdgeToEdgeModal>
+        <SavedLookDetailLayer
+          look={detailLook}
+          title={titleOf(detailLook) || t('savedLooks.detailTitle')}
+          meta={`${weatherLabel(detailLook.weather)} · ${sourceLabel(detailLook)}`}
+          removing={removingId === detailLook.id}
+          opener={detailOpener}
+          onClose={() => setDetailLook(null)}
+          onRemove={() => void handleRemove(detailLook)}
+          renderSlot={renderSlot}
+        />
       ) : null}
     </View>
+  )
+}
+
+/**
+ * D12: a saved look's detail, a full-height layer. Its header is the app top bar with back and
+ * the look's title, which is also the swipe-down handle (D13); focus returns to its Reopen.
+ */
+function SavedLookDetailLayer({
+  look,
+  title,
+  meta,
+  removing,
+  opener,
+  onClose,
+  onRemove,
+  renderSlot,
+}: {
+  look: SavedLookContract
+  title: string
+  meta: string
+  removing: boolean
+  opener: RefObject<unknown>
+  onClose: () => void
+  onRemove: () => void
+  renderSlot: (
+    lookId: string,
+    slot: SavedLookContract['composition'][number]
+  ) => ReactNode
+}) {
+  const { t } = useTranslation()
+  const colors = useSchemeColors()
+  const palette = useHeroPalette()
+  const insets = useModalInsets()
+  return (
+    <EdgeToEdgeModal
+      visible
+      transparent={false}
+      animationType="none"
+      onRequestClose={onClose}
+      returnFocusRef={opener}
+    >
+      <View
+        testID="saved-look-detail-modal"
+        accessibilityViewIsModal
+        style={[
+          styles.modal,
+          { backgroundColor: palette.page, paddingBottom: insets.bottom },
+        ]}
+      >
+        <LayerSwipeHandle>
+          <AppTopBar title={title} onBack={onClose} />
+        </LayerSwipeHandle>
+        <ScrollView testID="layer-body" contentContainerStyle={styles.modalBody}>
+          <Text style={{ color: palette.ink }}>{meta}</Text>
+          <SavedLookDetailNotices
+            status={look.availabilityStatus}
+            missingDetail={t('savedLooks.missingPieceDetail')}
+            needsReviewDetail={t('savedLooks.needsReviewDetail')}
+            color={colors.noticeInk}
+          />
+          <Text style={[styles.cardTitle, { color: palette.ink }]}>
+            {t('savedLooks.slotOrderLabel')}
+          </Text>
+          <View style={styles.slotsRow}>
+            {sortedSlots(look).map((slot) => renderSlot(look.id, slot))}
+          </View>
+          <PreviewButton
+            label={t('savedLooks.remove')}
+            testID="saved-look-detail-remove"
+            palette={palette}
+            disabled={removing}
+            onPress={onRemove}
+          />
+        </ScrollView>
+      </View>
+    </EdgeToEdgeModal>
   )
 }
 
@@ -783,13 +881,8 @@ const styles = StyleSheet.create({
   photoFallbackText: { fontSize: 12, fontWeight: '700' },
   slotText: { fontSize: 12 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  modal: { flex: 1, paddingHorizontal: 16 },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalBody: { gap: 12, paddingBottom: 24 },
+  // The open list on the Looks tab: the looks are the screen's content, with no card around them.
+  listContainer: { gap: 12 },
+  modal: { flex: 1 },
+  modalBody: { gap: 12, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
 })

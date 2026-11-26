@@ -11,7 +11,7 @@ export default function NotFound() {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   return (
     <AppPage>
-      <AppTopBar title={t('shell.notFound.title')} backHref="/" />
+      <AppTopBar title={t('shell.notFound.title')} parentHref="/" />
       <main
         id="main-content"
         tabIndex={-1}

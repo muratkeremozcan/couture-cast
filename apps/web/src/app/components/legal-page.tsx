@@ -25,7 +25,7 @@ export function LegalPage({
   // the always-dark gradient frame is gone and the top bar owns the page's one h1.
   return (
     <AppPage>
-      <AppTopBar title={title} backHref="/" />
+      <AppTopBar title={title} parentHref="/" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <article className="mx-auto w-full max-w-3xl space-y-10">
           <header className="space-y-4">

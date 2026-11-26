@@ -255,6 +255,8 @@ export function StylePiecePanel({
       animationType="none"
       onShow={() => focusStylePieceControl(closeButton.current)}
       onRequestClose={close}
+      // Story CC-7.11 D13: the hub's finishStyleDismissal focuses the Style piece button.
+      returnFocusRef={null}
       onDismiss={onDismiss}
     >
       <View

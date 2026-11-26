@@ -992,6 +992,8 @@ function LookbookCardContent({
 interface LookbookCardProps {
   /** Empty for the feed; `spotlight-` for the City Spotlight's copy of a post. */
   scope?: string
+  /** Story CC-7.11 P5: the feed's first card marks its photo as Community's first content. */
+  firstContent?: boolean
   onComments: (item: CommunityFeedItem) => void
   reactionControls: ReactionControls
   item: CommunityFeedItem
@@ -1052,6 +1054,7 @@ function SponsoredCtaSlot({
 
 function LookbookCard({
   scope = '',
+  firstContent = false,
   onComments,
   reactionControls,
   item,
@@ -1084,15 +1087,29 @@ function LookbookCard({
           : 'border-theme-card-border'
       }`}
     >
-      <LookbookCardImageSurface
-        scope={scope}
-        item={item}
-        isFailedImage={isFailedImage}
-        t={t}
-        onImageError={onImageError}
-        onImageRetry={onImageRetry}
-        onOpen={onOpen}
-      />
+      {firstContent ? (
+        <div data-testid="community-first-content">
+          <LookbookCardImageSurface
+            scope={scope}
+            item={item}
+            isFailedImage={isFailedImage}
+            t={t}
+            onImageError={onImageError}
+            onImageRetry={onImageRetry}
+            onOpen={onOpen}
+          />
+        </div>
+      ) : (
+        <LookbookCardImageSurface
+          scope={scope}
+          item={item}
+          isFailedImage={isFailedImage}
+          t={t}
+          onImageError={onImageError}
+          onImageRetry={onImageRetry}
+          onOpen={onOpen}
+        />
+      )}
       <SponsoredCtaSlot
         scope={scope}
         item={item}
@@ -1190,6 +1207,9 @@ function LookbookDetailDialog({
       onClose={onClose}
       title={item.title || t('community.card.label', { author: authorName })}
       surface="theme"
+      // Story CC-7.11 D12: post detail is a full-height layer under a top bar with back and the
+      // post title; it closes like any overlay (back arrow, Escape, swipe down, browser back).
+      presentation="screen"
       titleId="community-detail-title"
       fallbackFocusSelector={restoreFocus.opener}
       finalFocusSelector={restoreFocus.final}
@@ -2207,7 +2227,10 @@ function CommunityFeedStates({
           data-surface="card"
           className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-10 text-center"
         >
-          <p className="text-sm font-semibold text-theme-card-text">
+          <p
+            data-testid="community-first-content"
+            className="text-sm font-semibold text-theme-card-text"
+          >
             {t('community.feed.emptyTitle')}
           </p>
           <p className="mt-1 text-xs text-ink-muted">{t('community.feed.emptyBody')}</p>
@@ -4824,8 +4847,9 @@ export function CommunityLookbookGrid({
             aria-busy={isLoading || isLoadingMore}
             className={`grid gap-6 ${gridColumns}`}
           >
-            {presentation.items.map((item) => (
+            {presentation.items.map((item, index) => (
               <LookbookCard
+                firstContent={index === 0}
                 reactionControls={reactionState.controls(item.id)}
                 key={item.id}
                 item={item}

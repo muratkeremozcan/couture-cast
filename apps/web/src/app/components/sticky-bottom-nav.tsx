@@ -7,9 +7,11 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
+import { APP_TABS, type AppTabId } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { TabIcon } from './tab-icon'
 
-export type NavTabId = 'home' | 'wardrobe' | 'community' | 'settings'
+export type NavTabId = AppTabId
 
 export interface NavTabItem {
   id: NavTabId
@@ -18,40 +20,30 @@ export interface NavTabItem {
   /** The catalog key the tab shows. */
   labelKey: string
   href: string
-  icon: string
 }
 
 /**
- * The settings tab reads Profile (2026-11-19: Jade looked for a profile and
- * never found it under Settings). Its id and route stay `settings`.
+ * Story CC-7.11 D1, D2: the five tabs, in order, from the one shared definition. Ids and routes
+ * keep their names (the Today tab is `home` at `/`, Closet is `wardrobe`, Profile is `settings`).
  */
-const NAV_TABS: NavTabItem[] = [
-  { id: 'home', label: 'Home', labelKey: 'nav.home', href: '/', icon: '🏠' },
-  {
-    id: 'wardrobe',
-    label: 'Wardrobe',
-    labelKey: 'nav.wardrobe',
-    href: '/wardrobe',
-    icon: '👔',
-  },
-  {
-    id: 'community',
-    label: 'Community',
-    labelKey: 'nav.community',
-    href: '/community',
-    icon: '✨',
-  },
-  {
-    id: 'settings',
-    label: 'Profile',
-    labelKey: 'nav.profile',
-    href: '/settings',
-    icon: '👤',
-  },
-]
+export const NAV_TABS: readonly NavTabItem[] = APP_TABS.map((tab) => ({
+  id: tab.id,
+  label: tab.label,
+  labelKey: `nav.${tab.labelKey}`,
+  href: tab.webHref,
+}))
 
 export interface StickyBottomNavProps {
   isMobilePreview?: boolean
+}
+
+/** D10: sub-screens whose parent tab differs from their path prefix. */
+const SUB_SCREEN_TABS: Readonly<Record<string, NavTabId>> = {
+  '/wardrobe/capsules': 'looks',
+  '/palette': 'settings',
+  '/notification-settings': 'settings',
+  '/guardian/dashboard': 'settings',
+  '/teen/dashboard': 'settings',
 }
 
 /**
@@ -68,14 +60,16 @@ export interface StickyBottomNavProps {
  * The boundary check (`/` or end-of-string after the href) is what stops
  * `/wardrobe-silhouette` from claiming the `/wardrobe` tab.
  *
- * Null is a real answer, not a failure: `/palette` is a destination route that
- * belongs to no tab, and highlighting Home there would be the same lie the
- * exact match told about `/wardrobe/capsules`.
+ * Story CC-7.11 D10: a sub-screen whose parent tab is not its path prefix names that tab in
+ * `SUB_SCREEN_TABS` (capsules moved to Looks; palette, notification settings and the guardian
+ * and teen dashboards are Profile rows). Null is still a real answer for a route under no tab.
  */
 export function resolveActiveNavTab(pathname: string | null): NavTabId | null {
   if (!pathname) {
     return null
   }
+  const parent = SUB_SCREEN_TABS[pathname]
+  if (parent !== undefined) return parent
   const matches = NAV_TABS.filter((tab) =>
     tab.href === '/'
       ? pathname === '/'
@@ -140,26 +134,27 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               data-testid={`bottom-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
-              className="relative flex h-full min-h-touch min-w-16 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-xs font-medium text-ink sm:px-3"
+              // Story CC-7.11 D3, P6: the active tab is gold (`tabActive`), semibold and
+              // underlined; the icon takes the label color. Five tabs share the row equally, so
+              // 320 px still fits them.
+              data-gold={isActive ? 'tab' : undefined}
+              className={`relative flex h-full min-h-touch min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-1 ${
+                isActive ? 'font-semibold text-tab-active' : 'font-medium text-ink-muted'
+              }`}
             >
-              <span aria-hidden="true" className="text-base leading-none">
-                {tab.icon}
-              </span>
-              {/* D4 has no 10 px step, so the label keeps text-xs in sentence case, as the
-                  native tab bar does: uppercase with wide tracking cut the German labels at
-                  320 px (O-1). One line, so a two-word label never stacks. */}
-              <span
-                className={`whitespace-nowrap text-xs ${
-                  isActive ? 'font-semibold text-ink' : 'text-ink-muted'
-                }`}
-              >
+              <TabIcon id={tab.id} />
+              {/* D3: 12 px (text-xs) in sentence case at every size. A label too wide for its
+                  tab wraps to a second line; it is never cut or shrunk below 12 px. */}
+              <span className="max-w-full text-center text-xs leading-tight">
                 {t(tab.labelKey)}
               </span>
               {isActive && (
                 <span
                   data-testid="gold-active-indicator"
                   data-gold="tab"
-                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-tab-active"
+                  // P6: the border keeps the underline visible under forced colors, where the
+                  // system replaces backgrounds but draws borders in CanvasText.
+                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full border-2 border-tab-active bg-tab-active"
                 />
               )}
             </Link>

@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Pestaña Uno",
     "tab_two": "Configuración",
-    "home": "Inicio",
-    "wardrobe": "Guardarropa",
+    "today": "Hoy",
+    "closet": "Clóset",
+    "looks": "Looks",
     "community": "Comunidad",
     "profile": "Perfil"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "Estado de API: {{status}}",
     "api_health_unavailable": "API no disponible",
     "diagnostic_alert_btn": "Registrar análisis de alertas climáticas",
-    "diagnostic_info": "El seguimiento de alert_received está conectado a receptores reales de notificaciones push."
+    "diagnostic_info": "El seguimiento de alert_received está conectado a receptores reales de notificaciones push.",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silueta",
+      "closetSetup": "Configurar clóset",
+      "palette": "Paleta de colores"
+    }
   },
   "common": {
     "loading": "Cargando",
@@ -419,6 +427,15 @@
         "unknown": "En curso"
       },
       "detailTitle": "Detalles de la prenda"
+    },
+    "menu": {
+      "add": "Agregar",
+      "more": "Más",
+      "label": "Opciones del clóset",
+      "setup": "Configurar clóset",
+      "setupDone": "Configurar clóset: listo",
+      "silhouette": "Silueta",
+      "close": "Cerrar"
     }
   },
   "commerce": {
@@ -1237,5 +1254,10 @@
       "linkedGuardians": "Tutores vinculados",
       "empty": "Ningún tutor ha aceptado el consentimiento todavía."
     }
+  },
+  "looks": {
+    "empty": "Guarda un look para verlo aquí",
+    "capsules": "Cápsulas",
+    "plan": "Plan"
   }
 }

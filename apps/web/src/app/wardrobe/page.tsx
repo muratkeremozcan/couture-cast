@@ -26,10 +26,8 @@ import type {
   WardrobeOnboardingStatus,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
-import { AccessibleModal } from '../components/accessible-modal'
 import { GarmentCaptureModal } from '../components/garment-capture-modal'
 import { GarmentTaggingModal } from '../components/garment-tagging-modal'
-import { SilhouetteSettingsPanel } from '../components/silhouette-settings-panel'
 import { AppPage, APP_MAIN_CLASS } from '../components/app-page'
 import { AppTopBar } from '../components/app-top-bar'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
@@ -65,6 +63,7 @@ import {
 } from '../../lib/saved-looks'
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import { ClosetMoreMenu } from './closet-more-menu'
 import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-detail'
 import { useGarmentDeletion, type GarmentDeleteMode } from './garment-deletion'
 import { SaveFeedbackProvider, useStatusBar } from '../components/save-feedback'
@@ -323,16 +322,12 @@ function WardrobeEmptyState({
   )
 }
 
-/** Why Silhouette is disabled, when the account read failed for a member. */
-function silhouetteUnavailableHint(
-  t: (key: string) => string,
-  accountFailed: boolean
-): string | undefined {
-  return accountFailed ? t('wardrobe.hub.accountFailedShort') : undefined
-}
-
+/**
+ * Story CC-7.11 D4: the Closet's one primary, in the top bar's trailing slot. It shows the short
+ * "+ Add" so the title keeps its room in long locales; its accessible name stays the full label.
+ */
 const ADD_GARMENT_CLASS =
-  'col-span-2 flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary'
+  'flex min-h-touch items-center justify-center whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-semibold text-on-primary'
 
 /**
  * The Closet's one primary action. Adding a garment is a member action, so for a visitor who
@@ -354,9 +349,10 @@ function AddGarmentAction({
         href="/signin"
         data-testid="garment-capture-open"
         data-gold="primary"
+        aria-label={t('wardrobe.hub.addGarment')}
         className={ADD_GARMENT_CLASS}
       >
-        {t('wardrobe.hub.addGarment')}
+        {`+ ${t('wardrobe.menu.add')}`}
       </Link>
     )
   return (
@@ -365,9 +361,10 @@ function AddGarmentAction({
       data-testid="garment-capture-open"
       data-gold="primary"
       onClick={(event) => onOpen(event.currentTarget)}
+      aria-label={t('wardrobe.hub.addGarment')}
       className={ADD_GARMENT_CLASS}
     >
-      {t('wardrobe.hub.addGarment')}
+      {`+ ${t('wardrobe.menu.add')}`}
     </button>
   )
 }
@@ -675,8 +672,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     bearer: string | null
   } | null>(null)
   const [userIdError, setUserIdError] = useState(start.userIdError)
-  const [isSilhouetteModalOpen, setIsSilhouetteModalOpen] = useState(false)
-  const [isSilhouetteBusy, setIsSilhouetteBusy] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>(start.savedLooks)
@@ -804,7 +799,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   const isCaptureOpenRef = useRef(false)
   const pollingControllerRef = useRef<AbortController | null>(null)
   const directEntryConsumed = useRef(false)
-  const silhouetteButtonRef = useRef<HTMLButtonElement | null>(null)
   /**
    * The account, setup progress and closet reads below run once at mount. One that ran before
    * this tab held a verified bearer (a new tab, a mount while verification still runs) reads
@@ -1227,43 +1221,25 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
         {detailGarmentId ? (
           <AppTopBar title={detailTitle} onBack={() => closeGarmentDetail()} />
         ) : (
-          <AppTopBar titleKey="nav.wardrobe" />
+          // Story CC-7.11 D4, D5: Closet opens on its grid. Add, the one primary, and the neutral
+          // More menu sit in the top bar, outside the gate, so they never move when the closet
+          // appears; Capsules moved to Looks, Silhouette and setup to More and Profile > Style.
+          <AppTopBar
+            titleKey="nav.closet"
+            trailing={
+              <>
+                <AddGarmentAction
+                  visitor={visitor}
+                  buttonRef={addGarmentButtonRef}
+                  onOpen={openCapture}
+                />
+                <ClosetMoreMenu setupDone={onboardingStatus === 'completed'} />
+              </>
+            }
+          />
         )}
 
         <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
-          {/* D6: the three header actions moved here so the top bar stays one 56 px row. They
-              render outside the gate, where the header held them, so they never move when the
-              closet appears. On phones the two secondary actions share the first row in equal
-              halves and + Add Garment, the screen's main action, takes the full second row
-              (TEA P4). */}
-          <div hidden={Boolean(detailGarmentId)} data-testid="wardrobe-actions">
-            <div className="mb-6 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
-              {/* The capsules route had no entry point anywhere in the app. */}
-              <Link
-                href="/wardrobe/capsules"
-                className="flex min-h-11 items-center justify-center rounded-lg border border-line-strong bg-page px-2 py-2 text-center text-sm font-semibold text-ink sm:px-4"
-                data-testid="wardrobe-capsules-link"
-              >
-                {t('wardrobe.capsules.title')}
-              </Link>
-              <button
-                ref={silhouetteButtonRef}
-                type="button"
-                onClick={() => setIsSilhouetteModalOpen(true)}
-                disabled={!userId}
-                title={silhouetteUnavailableHint(t, userIdError && !visitor)}
-                className="flex min-h-11 items-center justify-center rounded-lg border border-line-strong bg-page px-2 py-2 text-center text-sm font-semibold text-ink disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
-              >
-                {t('wardrobe.silhouette.title')}
-              </button>
-              <AddGarmentAction
-                visitor={visitor}
-                buttonRef={addGarmentButtonRef}
-                onOpen={openCapture}
-              />
-            </div>
-          </div>
-
           <ScreenGate screen="closet" ready={closetReady}>
             {detailGarmentId && (
               <GarmentDetail
@@ -1286,55 +1262,20 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
             <div hidden={Boolean(detailGarmentId)} data-testid="wardrobe-closet-view">
               <ClosetAccountNotices placement="above" {...noticeProps} />
 
-              {onboardingStatus && onboardingStatus !== 'completed' && (
-                <Link
-                  href="/wardrobe/onboarding"
-                  className="mb-6 flex min-h-11 items-center justify-between rounded-xl border border-line-strong bg-page px-6 py-4 text-sm font-semibold text-ink"
-                >
-                  {t('wardrobe.onboarding.title')}
-                  <span aria-hidden="true">→</span>
-                </Link>
-              )}
-
-              <ClosetSavedLooksRow
-                owner={owner}
-                savedLooks={savedLooks}
-                totalCount={savedLooksTotal}
-                hasMore={savedLooks.length < savedLooksTotal}
-                isLoadingMore={savedLooksLoadingMore}
-                onLoadMore={loadMoreSavedLooks}
-                isLoading={savedLooksLoading}
-                loadError={savedLooksError}
-                garments={garments}
-                onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-                onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-                onReopenStylePiece={(look, invoker) => {
-                  const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-                  if (!anchor || !anchor.category || !anchor.comfortRange) return
-                  styleInvoker.current = invoker as HTMLButtonElement
-                  setInitialSavedLook(look)
-                  setStyleSelection({
-                    id: anchor.id,
-                    category: anchor.category,
-                    comfortRange: anchor.comfortRange,
-                  })
-                }}
-              />
-
               {/* D7: the closet is a section on the page; its garment cards are the one card level. */}
               <section aria-labelledby="wardrobe-closet-heading">
+                {/* CC-7.11 D4: the visible heading and explainer left the space above the grid;
+                    the heading stays for screen readers and as the focus target after a
+                    delete. */}
                 <h2
                   id="wardrobe-closet-heading"
                   ref={closetHeadingRef}
                   tabIndex={-1}
                   data-testid="wardrobe-closet-heading"
-                  className="text-lg font-semibold text-ink outline-none"
+                  className="sr-only"
                 >
                   {t('wardrobe.hub.closetTitle')}
                 </h2>
-                <p className="mt-1 text-sm text-ink-muted">
-                  {t('wardrobe.hub.closetBody')}
-                </p>
 
                 <WardrobeLoadError
                   visitor={visitor}
@@ -1370,7 +1311,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   // CC-7.10: the grid top the screen budget measures Closet chrome to.
                   <div
                     data-testid="closet-garment-grid"
-                    className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
+                    className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
                   >
                     {visibleGarments.map((garment) => (
                       <div
@@ -1463,6 +1404,35 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   </div>
                 )}
               </section>
+              {/* D4: the saved looks row moved below the grid; CC-7.12 deletes it. */}
+              <div className="mt-8">
+                <ClosetSavedLooksRow
+                  owner={owner}
+                  savedLooks={savedLooks}
+                  totalCount={savedLooksTotal}
+                  hasMore={savedLooks.length < savedLooksTotal}
+                  isLoadingMore={savedLooksLoadingMore}
+                  onLoadMore={loadMoreSavedLooks}
+                  isLoading={savedLooksLoading}
+                  loadError={savedLooksError}
+                  garments={garments}
+                  onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+                  onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+                  onReopenStylePiece={(look, invoker) => {
+                    const anchor = garments.find(
+                      (item) => item.id === look.anchorGarmentId
+                    )
+                    if (!anchor || !anchor.category || !anchor.comfortRange) return
+                    styleInvoker.current = invoker as HTMLButtonElement
+                    setInitialSavedLook(look)
+                    setStyleSelection({
+                      id: anchor.id,
+                      category: anchor.category,
+                      comfortRange: anchor.comfortRange,
+                    })
+                  }}
+                />
+              </div>
               <ClosetAccountNotices placement="below" {...noticeProps} />
             </div>
           </ScreenGate>
@@ -1502,25 +1472,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
             setInitialSavedLook(null)
           }}
         />
-      )}
-
-      {isSilhouetteModalOpen && userId && (
-        <AccessibleModal
-          isOpen={isSilhouetteModalOpen}
-          onClose={() => {
-            // Escape and the ✕ button both funnel through this handler; ignore
-            // both while a slider save or My Form upload is still in flight so
-            // an in-progress edit is never silently discarded by closing.
-            if (isSilhouetteBusy) return
-            setIsSilhouetteModalOpen(false)
-          }}
-          titleId="silhouette-settings-title"
-          title={t('wardrobe.silhouette.title')}
-          invokingElementRef={silhouetteButtonRef}
-          ariaLiveMessage={isSilhouetteBusy ? t('wardrobe.hub.silhouetteSaving') : null}
-        >
-          <SilhouetteSettingsPanel userId={userId} onBusyChange={setIsSilhouetteBusy} />
-        </AccessibleModal>
       )}
     </>
   )

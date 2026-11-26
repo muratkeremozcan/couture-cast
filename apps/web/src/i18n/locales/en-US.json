@@ -636,6 +636,15 @@
           "name": "Hot"
         }
       }
+    },
+    "menu": {
+      "add": "Add",
+      "more": "More",
+      "label": "Closet options",
+      "setup": "Closet setup",
+      "setupDone": "Closet setup: done",
+      "silhouette": "Silhouette",
+      "close": "Close"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Profile",
-    "account": "Your account"
+    "account": "Your account",
+    "style": {
+      "row": "Style",
+      "title": "Style",
+      "silhouette": "Silhouette",
+      "closetSetup": "Closet setup",
+      "palette": "Color palette"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Bottom navigation",
     "primaryLabel": "Main navigation",
     "home": "Home",
-    "wardrobe": "Wardrobe",
+    "today": "Today",
+    "closet": "Closet",
+    "looks": "Looks",
     "community": "Community",
     "profile": "Profile",
     "navigatedTo": "Navigated to {{label}} tab"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Linked guardians",
       "empty": "No guardian has accepted consent yet."
     }
+  },
+  "looks": {
+    "empty": "Save a look to see it here",
+    "capsules": "Capsules",
+    "plan": "Plan"
   }
 }

@@ -67,7 +67,7 @@ export default function OAuthCallbackPage() {
   return (
     // Story CC-7.9 D6, D7: the shared top bar owns the page's only heading, as on /signin.
     <AppPage>
-      <AppTopBar title={strings.continueWithGoogle} backHref="/" />
+      <AppTopBar title={strings.continueWithGoogle} parentHref="/" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <p
           role="status"

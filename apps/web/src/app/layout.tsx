@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { SkipToContent } from './components/skip-to-content'
+import { AppHistoryTracker } from './components/app-history-tracker'
 import { SaveFeedbackProvider } from './components/save-feedback'
 import { blockedStorageFallbackScript } from '../lib/browser-persistence'
 import { landingSessionScript } from '../lib/landing-session'
@@ -54,6 +55,8 @@ export default function RootLayout({
       </head>
       <body className="bg-page font-sans text-ink antialiased">
         <SkipToContent />
+        {/* Story CC-7.11 D11: the in-app URL stack the top bar back reads. */}
+        <AppHistoryTracker />
         <SaveFeedbackProvider>{children}</SaveFeedbackProvider>
         {/* Last, so its effect switches to the browser language after every component in the page
             has subscribed to the change; placed first, the switch fired before they listened and

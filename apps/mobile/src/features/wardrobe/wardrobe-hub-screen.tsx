@@ -3,16 +3,22 @@
 // app/(tabs)/wardrobe.tsx, so it's covered by the component test runner (see
 // wardrobe-silhouette-screen.tsx for why app/ route files stay thin
 // wrappers); apps/mobile/app/(tabs)/wardrobe.tsx now just re-exports this.
+// Story CC-7.11 D4, D5: the Closet opens on its grid. Add and More sit in the top bar, setup and
+// Silhouette moved into the More sheet, Capsules to the Looks tab, and the saved looks row below
+// the grid until CC-7.12.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
   type ElementRef,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { router, useFocusEffect } from 'expo-router'
+import { router, useFocusEffect, useNavigation } from 'expo-router'
 import {
   ActivityIndicator,
   AppState,
@@ -57,12 +63,10 @@ import {
   listGarmentsFromMobile,
   pollGarmentUntilSettled,
 } from '@/src/lib/wardrobe'
-import {
-  ensureMobileLegacySavedLooksMigration,
-  listSavedLooksPageFromMobile,
-  subscribeMobileSavedLooksChanged,
-} from '@/src/lib/saved-looks'
+import { ensureMobileLegacySavedLooksMigration } from '@/src/lib/saved-looks'
+import { ClosetMoreSheet, ClosetTopBarActions } from './closet-top-bar'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import { useSavedLooks } from './use-saved-looks'
 import { garmentDeletion, type MobileGarmentDeletion } from './garment-deletion'
 import {
   garmentCardLabel,
@@ -163,16 +167,12 @@ function useHubGarmentDeletion({
 }
 
 /**
- * Story CC-7.7 D3, D4: the Closet gate's reads are the inventory, the onboarding state and the
- * first Saved Looks page. The Saved Looks row and its error with Retry sit above the inventory,
- * so a page that landed after the gate opened would push the closet down.
+ * Story CC-7.7 D3, D4: the Closet gate's reads are the inventory and the first Saved Looks page,
+ * so the row below the grid never appears after the closet. Story CC-7.11 D4: the onboarding
+ * state only names the More sheet's setup row now, so the gate no longer waits for it.
  */
-function closetGateReady(
-  inventorySettled: boolean,
-  onboardingSettled: boolean,
-  savedLooksSettled: boolean
-) {
-  return inventorySettled && onboardingSettled && savedLooksSettled
+function closetGateReady(inventorySettled: boolean, savedLooksSettled: boolean) {
+  return inventorySettled && savedLooksSettled
 }
 
 /** Only the first inventory read shows the spinner, and only over an empty grid. */
@@ -208,6 +208,7 @@ function MemberWardrobeHub({
     backgroundColor: colors.noticeSurface,
     borderColor: colors.noticeLine,
   }
+  const navigation = useNavigation()
   const [garments, setGarments] = useState<ClosetGarment[]>([])
   const inventoryRevision = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
@@ -229,25 +230,20 @@ function MemberWardrobeHub({
     null
   )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showOnboardingCard, setShowOnboardingCard] = useState(false)
-  // Story CC-7.7 D3: the Closet gate waits for the first inventory read and the onboarding
-  // state, so the setup card is already in place when the closet appears.
+  // D5: the More sheet's setup row reads "Closet setup: done" once onboarding is completed.
+  const [setupDone, setSetupDone] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  // Story CC-7.7 D3: the Closet gate waits for the first inventory read.
   const [inventorySettled, setInventorySettled] = useState(false)
-  const [onboardingSettled, setOnboardingSettled] = useState(false)
-  const [savedLooksSettled, setSavedLooksSettled] = useState(false)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
   const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
-  const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
-  const [savedLooksTotal, setSavedLooksTotal] = useState(0)
-  const [savedLooksLoading, setSavedLooksLoading] = useState(false)
-  const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
-  const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
-  const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
+  const owner = mobileApplicationUserId()
+  const savedLooksState = useSavedLooks({ owner, epoch })
+  const reloadSavedLooks = savedLooksState.reload
   const [styleClosing, setStyleClosing] = useState(false)
   const styleSelectionRef = useRef<StylePieceSelection | null>(null)
   const taggingOpen = useRef(false)
   const styleLabels = getStylePieceStrings(i18n.language)
-  const owner = mobileApplicationUserId()
   const [, updatePhotoClock] = useState(0)
   const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
   useEffect(
@@ -262,6 +258,7 @@ function MemberWardrobeHub({
   const pendingTagging = useRef<{ id: string; invoker?: number | null } | null>(null)
   const isCaptureOpenRef = useRef(false)
   const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
+  const moreButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
   const directEntryConsumed = useRef(false)
 
   const presentTagging = (id: string, invoker?: number | null) => {
@@ -338,9 +335,9 @@ function MemberWardrobeHub({
         inventoryRevision.current++
         setLoadAttempt((attempt) => attempt + 1)
         // A saved look's Ready or Needs review status follows its anchor's live tags.
-        setSavedLooksAttempt((attempt) => attempt + 1)
+        reloadSavedLooks()
       }),
-    [epoch]
+    [epoch, reloadSavedLooks]
   )
 
   useEffect(() => {
@@ -363,7 +360,7 @@ function MemberWardrobeHub({
       // read again: the server already answers without the deleted piece.
       if (!hasLoadedRef.current) setLoadAttempt((attempt) => attempt + 1)
       // A saved look holding the piece now shows it as missing (CC-7.2).
-      setSavedLooksAttempt((attempt) => attempt + 1)
+      reloadSavedLooks()
       // Other screens (capsules, Today) read the closet again.
       notifyingWardrobeRef.current = true
       try {
@@ -428,60 +425,6 @@ function MemberWardrobeHub({
     [epoch, refreshGarmentList, sessionSeen]
   )
 
-  const savedLooksLoadEpochRef = useRef(0)
-
-  useEffect(() => {
-    const loadEpoch = ++savedLooksLoadEpochRef.current
-    setSavedLooksLoadingMore(false)
-    if (!owner) {
-      setSavedLooks([])
-      setSavedLooksTotal(0)
-      setSavedLooksError(null)
-      setSavedLooksLoading(false)
-      setSavedLooksSettled(true)
-      return
-    }
-    const controller = new AbortController()
-    setSavedLooksLoading(true)
-    void listSavedLooksPageFromMobile({ limit: 50, offset: 0, signal: controller.signal })
-      .then((page) => {
-        if (
-          controller.signal.aborted ||
-          savedLooksLoadEpochRef.current !== loadEpoch ||
-          epoch !== mobileIdentityEpoch()
-        ) {
-          return
-        }
-        setSavedLooks(page.data)
-        setSavedLooksTotal(page.total)
-        setSavedLooksError(null)
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted || savedLooksLoadEpochRef.current !== loadEpoch) {
-          return
-        }
-        setSavedLooksError(
-          error instanceof Error ? error.message : t('wardrobe.hub.saved_looks_failed')
-        )
-      })
-      .finally(() => {
-        if (!controller.signal.aborted && savedLooksLoadEpochRef.current === loadEpoch) {
-          setSavedLooksLoading(false)
-          setSavedLooksSettled(true)
-        }
-      })
-    return () => controller.abort()
-  }, [epoch, owner, savedLooksAttempt, t])
-
-  useEffect(() => {
-    if (!owner) return
-    return subscribeMobileSavedLooksChanged((changedOwner) => {
-      if (changedOwner === owner) {
-        setSavedLooksAttempt((attempt) => attempt + 1)
-      }
-    })
-  }, [owner])
-
   // Story CC-7.7 D5: tabs stay mounted, so returning to the Closet is a focus, never a mount.
   // It reads the inventory and the Saved Looks again in place: the grid, the row and the
   // scroll position stay, and only the first read ever shows the spinner. The first focus is
@@ -491,55 +434,14 @@ function MemberWardrobeHub({
     useCallback(() => {
       if (leftClosetRef.current && epoch === mobileIdentityEpoch()) {
         setLoadAttempt((attempt) => attempt + 1)
-        setSavedLooksAttempt((attempt) => attempt + 1)
+        reloadSavedLooks()
       }
       leftClosetRef.current = false
       return () => {
         leftClosetRef.current = true
       }
-    }, [epoch])
+    }, [epoch, reloadSavedLooks])
   )
-
-  const loadMoreSavedLooks = useCallback(() => {
-    if (
-      !owner ||
-      savedLooksLoading ||
-      savedLooksLoadingMore ||
-      savedLooks.length >= savedLooksTotal
-    )
-      return
-    setSavedLooksLoadingMore(true)
-    const offset = savedLooks.length
-    const startEpoch = epoch
-    const startLoadEpoch = savedLooksLoadEpochRef.current
-    void listSavedLooksPageFromMobile({ limit: 50, offset })
-      .then((page) => {
-        if (
-          savedLooksLoadEpochRef.current !== startLoadEpoch ||
-          startEpoch !== mobileIdentityEpoch()
-        ) {
-          return
-        }
-        setSavedLooks((current) => {
-          const seen = new Set(current.map((item) => item.id))
-          return [...current, ...page.data.filter((item) => !seen.has(item.id))]
-        })
-        setSavedLooksTotal(page.total)
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (savedLooksLoadEpochRef.current === startLoadEpoch) {
-          setSavedLooksLoadingMore(false)
-        }
-      })
-  }, [
-    epoch,
-    owner,
-    savedLooks.length,
-    savedLooksLoading,
-    savedLooksLoadingMore,
-    savedLooksTotal,
-  ])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -560,11 +462,11 @@ function MemberWardrobeHub({
     return () => controller.abort()
   }, [loadAttempt, loadGarments, sessionSeen])
 
+  // The onboarding state only names the More sheet's setup row, so it never blocks the garment
+  // list: a stalled or failing read leaves the row as it was. It is read again with the closet
+  // (a return from setup is a focus), so a finished setup reads "done".
   useEffect(() => {
     const controller = new AbortController()
-    // The onboarding entry-point card fetch is independent of, and must never
-    // block, the garment list: a stalled/erroring onboarding read shouldn't
-    // hide the wardrobe hub's actual contents.
     void resolveMobileAccessToken()
       .then((token) => {
         if (!token || controller.signal.aborted) return null
@@ -572,17 +474,13 @@ function MemberWardrobeHub({
       })
       .then((state) => {
         if (!state || controller.signal.aborted) return
-        setShowOnboardingCard(state.status !== 'completed')
+        setSetupDone(state.status === 'completed')
       })
       .catch(() => undefined)
-      .finally(() => {
-        if (!controller.signal.aborted) setOnboardingSettled(true)
-      })
-    return () => {
-      controller.abort()
-      pollingAbortRef.current?.abort()
-    }
-  }, [])
+    return () => controller.abort()
+  }, [loadAttempt])
+
+  useEffect(() => () => pollingAbortRef.current?.abort(), [])
 
   useEffect(() => {
     if (!addEntry) {
@@ -677,6 +575,24 @@ function MemberWardrobeHub({
     }
   }
 
+  // D4: Add and More fill the tab top bar's trailing slot. The latest press handler is read
+  // through a ref, so the header element stays stable while the hub's state changes.
+  const openAdd = () => (visitor ? router.push('/signin') : setIsCaptureOpen(true))
+  const openAddRef = useRef(openAdd)
+  openAddRef.current = openAdd
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <ClosetTopBarActions
+          addRef={addGarmentButtonRef}
+          moreRef={moreButtonRef}
+          onAdd={() => openAddRef.current()}
+          onMore={() => setMoreOpen(true)}
+        />
+      ),
+    })
+  }, [navigation])
+
   return (
     <>
       <View
@@ -685,103 +601,13 @@ function MemberWardrobeHub({
         {...underModalAccessibility(Boolean(taggingGarmentId || styleSelection))}
       >
         <ScrollView contentContainerStyle={styles.content}>
-          {/* Story CC-7.9 D6: the tab's AppTopBar shows the Wardrobe title, so the body has no
-              second one. The header actions that do not fit the bar open the body. */}
-          <View style={styles.header}>
-            <Text style={{ color: colors.inkMuted }}>{t('wardrobe.empty_desc')}</Text>
-            <View style={styles.headerActions}>
-              {/* The capsule screen had no entry point anywhere in the app. */}
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel={t('wardrobe.capsules.title')}
-                testID="wardrobe-capsules-link"
-                style={secondaryButton}
-                onPress={() => router.push('/wardrobe-capsules')}
-              >
-                <Text style={secondaryButtonText}>{t('wardrobe.capsules.title')}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="link"
-                accessibilityLabel={t('wardrobe.silhouette.title')}
-                testID="wardrobe-silhouette-link"
-                style={secondaryButton}
-                onPress={() => router.push('/wardrobe-silhouette')}
-              >
-                <Text style={secondaryButtonText}>{t('wardrobe.silhouette.title')}</Text>
-              </Pressable>
-              <Pressable
-                ref={addGarmentButtonRef}
-                accessibilityRole="button"
-                testID="garment-capture-open"
-                // CC-7.10 D3: the empty-closet Add block the screen budget measures Closet
-                // chrome to (screen-budget.json native closetAnchors).
-                // D3: the screen's one main action takes the primary role (gold), as on web;
-                // Outfit capsules and Silhouette stay neutral.
-                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
-                onPress={() =>
-                  visitor ? router.push('/signin') : setIsCaptureOpen(true)
-                }
-              >
-                <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
-                  {t('wardrobe.add_garment')}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
           <ScreenGate
             screen="closet"
-            ready={closetGateReady(
-              inventorySettled,
-              onboardingSettled,
-              savedLooksSettled
-            )}
-            // The ScrollView's 24-point gap reaches only its direct children; the gated card,
-            // Saved Looks and inventory keep the same spacing inside the gate body.
+            ready={closetGateReady(inventorySettled, savedLooksState.settled)}
+            // The ScrollView's 24-point gap reaches only its direct children; the notices, the
+            // inventory and Saved Looks keep the same spacing inside the gate body.
             style={styles.gatedBody}
           >
-            {showOnboardingCard ? (
-              <Pressable
-                accessibilityRole="link"
-                testID="wardrobe-onboarding-card"
-                style={[styles.onboardingCard, notice]}
-                onPress={() => router.push('/wardrobe-onboarding')}
-              >
-                <Text style={[styles.onboardingCardTitle, { color: colors.noticeInk }]}>
-                  {t('wardrobe.onboarding.title')}
-                </Text>
-                <Text style={[styles.onboardingCardBody, { color: colors.noticeInk }]}>
-                  {t('wardrobe.onboarding.permission_body')}
-                </Text>
-              </Pressable>
-            ) : null}
-
-            <ClosetSavedLooksRow
-              owner={owner}
-              savedLooks={savedLooks}
-              totalCount={savedLooksTotal}
-              hasMore={savedLooks.length < savedLooksTotal}
-              isLoadingMore={savedLooksLoadingMore}
-              onLoadMore={loadMoreSavedLooks}
-              // Story CC-7.7 D5: only the first page shows the loading count; a refresh keeps
-              // the count on screen until its answer lands.
-              isLoading={savedLooksLoading && !savedLooksSettled}
-              loadError={savedLooksError}
-              garments={garments}
-              onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-              onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-              onReopenStylePiece={(look) => {
-                const anchor = garments.find((item) => item.id === look.anchorGarmentId)
-                if (!anchor || !anchor.category || !anchor.comfortRange) return
-                setInitialSavedLook(look)
-                openStylePanel({
-                  id: anchor.id,
-                  category: anchor.category,
-                  comfortRange: anchor.comfortRange,
-                })
-              }}
-            />
-
             {errorMessage ? (
               <View
                 style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
@@ -838,102 +664,147 @@ function MemberWardrobeHub({
                 // to the Add control (garment-capture-open) while this renders (review #11).
                 <View style={styles.emptyState} testID="wardrobe-empty-state">
                   <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
+                  {/* D4: the top bar Add is the one gold primary, so this one is neutral. */}
+                  <Pressable
+                    accessibilityRole="button"
+                    testID="wardrobe-empty-add"
+                    style={secondaryButton}
+                    onPress={() => openAddRef.current()}
+                  >
+                    <Text style={secondaryButtonText}>{t('wardrobe.add_garment')}</Text>
+                  </Pressable>
                 </View>
               ) : null
             ) : (
-              <View style={styles.grid} testID="wardrobe-garment-list">
-                {visibleGarments.map((garment) => (
-                  <View
-                    key={garment.id}
-                    style={styles.garmentCard}
-                    testID={`garment-card-${garment.id}`}
-                  >
-                    {garment.status === 'ready' ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
-                        testID={`garment-open-${garment.id}`}
-                        onPress={() => {
-                          openingDetailRef.current = true
-                          router.push({
-                            pathname: '/wardrobe-garment',
-                            params: { id: garment.id },
-                          })
-                        }}
-                      >
+              // CC-7.10 screen budget anchor (wardrobe-garment-list) around the P5 grid id.
+              <View testID="wardrobe-garment-list">
+                <View style={styles.grid} testID="closet-garment-grid">
+                  {visibleGarments.map((garment) => (
+                    <View
+                      key={garment.id}
+                      style={styles.garmentCard}
+                      testID={`garment-card-${garment.id}`}
+                    >
+                      {garment.status === 'ready' ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={garmentPhotoLabel(i18n.language, garment)}
+                          testID={`garment-open-${garment.id}`}
+                          onPress={() => {
+                            openingDetailRef.current = true
+                            router.push({
+                              pathname: '/wardrobe-garment',
+                              params: { id: garment.id },
+                            })
+                          }}
+                        >
+                          <GarmentCardFace garment={garment} locale={i18n.language} />
+                        </Pressable>
+                      ) : (
                         <GarmentCardFace garment={garment} locale={i18n.language} />
-                      </Pressable>
-                    ) : (
-                      <GarmentCardFace garment={garment} locale={i18n.language} />
-                    )}
-                    <Text testID={`garment-status-${garment.status}`}>
-                      {/* The status set is open (the contract says so): a new state reads as
+                      )}
+                      <Text testID={`garment-status-${garment.status}`}>
+                        {/* The status set is open (the contract says so): a new state reads as
                         in progress until the catalogs name it. */}
-                      {t(`wardrobe.hub.status.${garment.status}`, {
-                        defaultValue: t('wardrobe.hub.status.unknown'),
-                      })}
-                    </Text>
-                    {garment.status === 'awaiting_tags' && (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={t('wardrobe.tagging.needs_tags', {
-                          defaultValue: 'Needs tags',
+                        {t(`wardrobe.hub.status.${garment.status}`, {
+                          defaultValue: t('wardrobe.hub.status.unknown'),
                         })}
-                        style={[styles.needsTagsBtn, notice]}
-                        onPress={(event) => {
-                          void openTaggingGarment(
-                            garment.id,
-                            safeFindNodeHandle(event.currentTarget)
-                          )
-                        }}
-                      >
-                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
-                          {t('wardrobe.tagging.needs_tags', {
+                      </Text>
+                      {garment.status === 'awaiting_tags' && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={t('wardrobe.tagging.needs_tags', {
                             defaultValue: 'Needs tags',
                           })}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {garment.status === 'failed' && (
-                      <Pressable
-                        accessibilityRole="button"
-                        style={[styles.needsTagsBtn, notice]}
-                        onPress={() => setIsCaptureOpen(true)}
-                      >
-                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
-                          {strings.firstUse.replaceGarment}
-                        </Text>
-                      </Pressable>
-                    )}
-                    {garment.status === 'processing' && (
-                      <Pressable
-                        accessibilityRole="button"
-                        style={[styles.needsTagsBtn, notice]}
-                        onPress={() => pollCommittedGarment(garment.id, accessToken)}
-                      >
-                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
-                          {strings.firstUse.checkGarment}
-                        </Text>
-                      </Pressable>
-                    )}
-                    <StylePieceEntry
-                      garment={garment}
-                      owner={owner}
-                      epoch={epoch}
-                      unavailable={loadFailed}
-                      loading={isLoading}
-                      labels={styleLabels}
-                      buttonRef={(button) => {
-                        if (button) styleButtons.current.set(garment.id, button)
-                        else styleButtons.current.delete(garment.id)
-                      }}
-                      onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
-                      onOpen={openStylePanel}
-                    />
-                  </View>
-                ))}
+                          style={[styles.needsTagsBtn, notice]}
+                          onPress={(event) => {
+                            void openTaggingGarment(
+                              garment.id,
+                              safeFindNodeHandle(event.currentTarget)
+                            )
+                          }}
+                        >
+                          <Text
+                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
+                          >
+                            {t('wardrobe.tagging.needs_tags', {
+                              defaultValue: 'Needs tags',
+                            })}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {garment.status === 'failed' && (
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[styles.needsTagsBtn, notice]}
+                          onPress={() => setIsCaptureOpen(true)}
+                        >
+                          <Text
+                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
+                          >
+                            {strings.firstUse.replaceGarment}
+                          </Text>
+                        </Pressable>
+                      )}
+                      {garment.status === 'processing' && (
+                        <Pressable
+                          accessibilityRole="button"
+                          style={[styles.needsTagsBtn, notice]}
+                          onPress={() => pollCommittedGarment(garment.id, accessToken)}
+                        >
+                          <Text
+                            style={[styles.needsTagsText, { color: colors.noticeInk }]}
+                          >
+                            {strings.firstUse.checkGarment}
+                          </Text>
+                        </Pressable>
+                      )}
+                      <StylePieceEntry
+                        garment={garment}
+                        owner={owner}
+                        epoch={epoch}
+                        unavailable={loadFailed}
+                        loading={isLoading}
+                        labels={styleLabels}
+                        buttonRef={(button) => {
+                          if (button) styleButtons.current.set(garment.id, button)
+                          else styleButtons.current.delete(garment.id)
+                        }}
+                        onRefresh={() => setLoadAttempt((attempt) => attempt + 1)}
+                        onOpen={openStylePanel}
+                      />
+                    </View>
+                  ))}
+                </View>
               </View>
             )}
+
+            {/* D4: below the grid until CC-7.12 deletes it; the Looks tab lists the same looks. */}
+            <ClosetSavedLooksRow
+              owner={owner}
+              savedLooks={savedLooksState.savedLooks}
+              totalCount={savedLooksState.total}
+              hasMore={savedLooksState.hasMore}
+              isLoadingMore={savedLooksState.loadingMore}
+              onLoadMore={savedLooksState.loadMore}
+              // Story CC-7.7 D5: only the first page shows the loading count; a refresh keeps
+              // the count on screen until its answer lands.
+              isLoading={savedLooksState.loading && !savedLooksState.settled}
+              loadError={savedLooksState.error}
+              garments={garments}
+              onRetry={reloadSavedLooks}
+              onChanged={reloadSavedLooks}
+              onReopenStylePiece={(look) => {
+                const anchor = garments.find((item) => item.id === look.anchorGarmentId)
+                if (!anchor || !anchor.category || !anchor.comfortRange) return
+                setInitialSavedLook(look)
+                openStylePanel({
+                  id: anchor.id,
+                  category: anchor.category,
+                  comfortRange: anchor.comfortRange,
+                })
+              }}
+            />
           </ScreenGate>
         </ScrollView>
 
@@ -964,6 +835,13 @@ function MemberWardrobeHub({
         }}
       />
 
+      <ClosetMoreSheet
+        visible={moreOpen}
+        setupDone={setupDone}
+        onClose={() => setMoreOpen(false)}
+        returnFocusRef={moreButtonRef}
+      />
+
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
@@ -974,7 +852,7 @@ function MemberWardrobeHub({
           owner={owner}
           epoch={epoch}
           locale={i18n.language}
-          onSavedLooksChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
+          onSavedLooksChanged={reloadSavedLooks}
           onClose={() => setStyleClosing(true)}
           onDismiss={() => finishStyleDismissal(styleSelection)}
         />
@@ -1028,10 +906,6 @@ const styles = StyleSheet.create({
   },
   content: { paddingHorizontal: TAB_BODY_INSET, paddingVertical: 20, gap: 24 },
   gatedBody: { gap: 24 },
-  header: { gap: 16 },
-  // Story 6.15 F-00i: at iOS XXXL and the accessibility sizes the three actions are wider than
-  // the screen, so they wrap instead of pushing Add garment past the edge.
-  headerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 8,
@@ -1042,24 +916,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   secondaryButtonText: { fontSize: 14, fontWeight: '600' },
-  primaryButton: {
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  primaryButtonText: { fontWeight: '700' },
-  onboardingCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    gap: 8,
-  },
-  onboardingCardTitle: { fontSize: 18, fontWeight: '700' },
-  onboardingCardBody: { opacity: 0.8 },
-  emptyState: { alignItems: 'center', borderRadius: 16, padding: 40 },
+  emptyState: { alignItems: 'center', borderRadius: 16, padding: 40, gap: 16 },
   emptyTitle: { fontSize: 18, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 12 },

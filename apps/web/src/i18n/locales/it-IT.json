@@ -636,6 +636,15 @@
           "name": "Molto caldo"
         }
       }
+    },
+    "menu": {
+      "add": "Aggiungi",
+      "more": "Altro",
+      "label": "Opzioni dell'armadio",
+      "setup": "Configura armadio",
+      "setupDone": "Configura armadio: fatto",
+      "silhouette": "Silhouette",
+      "close": "Chiudi"
     }
   },
   "community": {
@@ -1017,7 +1026,14 @@
   },
   "settings": {
     "title": "Profilo",
-    "account": "Il tuo account"
+    "account": "Il tuo account",
+    "style": {
+      "row": "Stile",
+      "title": "Stile",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configura armadio",
+      "palette": "Palette colori"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1560,9 @@
     "label": "Navigazione inferiore",
     "primaryLabel": "Navigazione principale",
     "home": "Home",
-    "wardrobe": "Guardaroba",
+    "today": "Oggi",
+    "closet": "Armadio",
+    "looks": "Look",
     "community": "Community",
     "profile": "Profilo",
     "navigatedTo": "Scheda {{label}} aperta"
@@ -1660,5 +1678,10 @@
       "linkedGuardians": "Genitori collegati",
       "empty": "Nessun genitore ha ancora dato il consenso."
     }
+  },
+  "looks": {
+    "empty": "Salva un look per vederlo qui",
+    "capsules": "Capsule",
+    "plan": "Piano"
   }
 }
