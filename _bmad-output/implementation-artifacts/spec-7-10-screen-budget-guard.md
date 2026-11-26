@@ -3,7 +3,7 @@ title: 'Story CC-7.10: Screen budget guard'
 type: feature
 ticket: '7-10-screen-budget-guard'
 created: '2026-11-26'
-status: in-progress
+status: built
 baseline_revision: '6d8b1db383d097bdd91c824245344a2a2d948163'
 route: full
 route_source: auto
@@ -297,17 +297,19 @@ not already cite.
   accepted as `known`, each owned by the story the epic assigns its removal to. The ceilings are
   the CI-measured values (per fixture group, the highest):
 - D-KNOWN-7.10: `rule=targets-above-fold scope=native/profile/* max=13`
-- D-KNOWN-7.10: `rule=targets-above-fold scope=native/today/* max=11`
+- D-KNOWN-7.10: `rule=targets-above-fold scope=native/today/* max=12`
 - D-KNOWN-7.10: `rule=targets-above-fold scope=web/today/* max=9`
+- D-KNOWN-7.10: `rule=chip-rows scope=native/profile/* max=6`
+- D-KNOWN-7.10: `rule=chip-rows scope=native/today/* max=2`
 - D-KNOWN-7.10: `rule=chip-rows scope=web/today/* max=3`
-- D-KNOWN-7.10: `rule=closet-chrome scope=native/closet/* max=453`
+- D-KNOWN-7.10: `rule=closet-chrome scope=native/closet/* max=334`
 - D-KNOWN-7.10: `rule=closet-chrome scope=web/closet/* max=476`
 - D-KNOWN-7.10: `rule=paragraph-lines scope=native/community/* max=1 lines=3`
 - D-KNOWN-7.10: `rule=paragraph-lines scope=native/profile/* max=3 lines=7`
 - D-KNOWN-7.10: `rule=paragraph-lines scope=web/profile/* max=4 lines=8`
 - D-KNOWN-7.10: `rule=paragraph-lines scope=web/today/* max=1 lines=4`
-- D-KNOWN-7.10: `rule=today-height scope=web/today/* max=4247`
-- D-KNOWN-7.10: `rule=analytics-only scope=*/today/* max=3` (the three analytics-only Home
+- D-KNOWN-7.10: `rule=today-height scope=web/today/* max=3825`
+- D-KNOWN-7.10: `rule=analytics-only scope=web/today/* max=3` (the three analytics-only Home
   actions the Intent names)
 
 ## Design Notes

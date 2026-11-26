@@ -797,6 +797,20 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
     expect(byKey(results, 'deep-hash').effects).toEqual([])
   })
 
+  test('[P1] [7.10-RULE-073] one late insert while the screen settles does not hide a panel the click adds to the same parent (CI 64c28254)', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<div id="group">
+         <button data-testid="expander" aria-expanded="false"
+                 onclick="this.setAttribute('aria-expanded', 'true'); document.getElementById('group').insertAdjacentHTML('beforeend', '<div>Panel</div>')">Style preferences</button>
+       </div>
+       <script>setTimeout(() => document.getElementById('group').insertAdjacentHTML('beforeend', '<p>Saved looks</p>'), 250)</script>`
+    )
+    expect(byKey(results, 'expander').effects.join(' ')).toMatch(/dom \d+ change/)
+  })
+
   test('[P1] [7.10-RULE-066] a target that is not found in its fresh load is a probe error, never a silent skip', async ({
     page,
   }) => {

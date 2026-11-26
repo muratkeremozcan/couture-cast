@@ -251,7 +251,7 @@ export async function probeTarget(
   await page.evaluate(async (observeMs) => {
     const state = {
       churn: new WeakSet<Node>(),
-      childChurn: new WeakSet<Node>(),
+      childChurn: new WeakMap<Node, number>(),
       after: [] as Node[],
       clicked: false,
     }
@@ -262,11 +262,23 @@ export async function probeTarget(
         // Churn is kept per kind: a parent whose children change on their own (a ticking
         // clock) hides later child changes; a parent whose attributes change on its own does
         // not hide a panel inserted into it (CI ffbd7e54: RULE-064 against RULE-068).
+        // Children count as churn when they changed twice with no click (a clock ticks); one
+        // late insert while the screen settles does not hide a panel the click adds there
+        // (CI 64c28254: the style preferences expander read as analytics-only).
         if (!state.clicked) {
-          ;(list ? state.childChurn : state.churn).add(record.target)
+          if (list)
+            state.childChurn.set(
+              record.target,
+              (state.childChurn.get(record.target) ?? 0) + 1
+            )
+          else state.churn.add(record.target)
           continue
         }
-        if (list ? state.childChurn.has(record.target) : state.churn.has(record.target))
+        if (
+          list
+            ? (state.childChurn.get(record.target) ?? 0) >= 2
+            : state.churn.has(record.target)
+        )
           continue
         state.after.push(
           ...(list && record.addedNodes.length
