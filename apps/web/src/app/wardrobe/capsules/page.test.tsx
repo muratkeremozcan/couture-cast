@@ -1,3 +1,8 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-CAPSULES-001 (D10: Capsules is a Looks sub-screen, so a
+// direct entry's back replaces to /looks and the Looks tab is the active one).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import React from 'react'
@@ -10,9 +15,22 @@ import * as wardrobeApi from '../../../lib/wardrobe'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
 import type * as WebSession from '../../../lib/web-session'
 import { getI18n } from '../../../i18n'
+import { clearAppHistory } from '../../../lib/app-history'
 
 // Story CC-7.9 D6: the shared top bar reads the route to mark the active desktop tab.
-vi.mock('next/navigation', () => ({ usePathname: () => '/wardrobe/capsules' }))
+// Story CC-7.11 D11: its back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/wardrobe/capsules',
+}))
 
 vi.mock('../../../lib/wardrobe', () => ({
   listCapsulesFromWeb: vi.fn(),
@@ -182,9 +200,10 @@ describe('WardrobeCapsulesPage', () => {
       'Outfit capsules'
     )
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    // CC-7.11 D10: Capsules moved under Looks, so its back parent is the Looks tab.
     expect(within(header).getByTestId('app-top-bar-back')).toHaveAttribute(
       'href',
-      '/wardrobe'
+      '/looks'
     )
     expect(container.querySelectorAll('[data-surface="page"]')).toHaveLength(1)
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
@@ -197,6 +216,21 @@ describe('WardrobeCapsulesPage', () => {
       'data-gold',
       'primary'
     )
+  })
+
+  it('7.11-CMP-CAPSULES-001 a direct entry marks the Looks tab and its back replaces to /looks', async () => {
+    clearAppHistory()
+    render(<WardrobeCapsulesPage />)
+
+    const tabs = within(screen.getByTestId('primary-nav'))
+    expect(tabs.getByTestId('nav-looks')).toHaveAttribute('aria-current', 'page')
+    expect(tabs.getByTestId('nav-wardrobe')).not.toHaveAttribute('aria-current')
+
+    fireEvent.click(screen.getByTestId('app-top-bar-back'))
+
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith('/looks')
+    expect(router.back).not.toHaveBeenCalled()
+    await screen.findByTestId('capsule-card-cap-1')
   })
 
   it('7.9-WEB-CAPSULES-02 renders the capsules screen from the de-DE catalog', async () => {

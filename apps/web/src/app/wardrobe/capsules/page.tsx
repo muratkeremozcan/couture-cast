@@ -23,6 +23,7 @@ import {
 import { AccessibleModal } from '../../components/accessible-modal'
 import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
 import { AppTopBar } from '../../components/app-top-bar'
+import { StickyBottomNav } from '../../components/sticky-bottom-nav'
 import {
   CapsuleBuilderModal,
   type CapsuleSaveOptions,
@@ -95,8 +96,10 @@ export default function WardrobeCapsulesPage() {
       {/* Story CC-7.9 D6, D7, D8: the shared top bar and page surface render outside the
           member scope, so the bar sits in its final place while the session is read. */}
       <AppPage>
-        <AppTopBar titleKey="wardrobe.capsules.title" backHref="/wardrobe" />
+        <AppTopBar titleKey="wardrobe.capsules.title" parentHref="/looks" />
         <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+        {/* Story CC-7.11 (TEA e): the tab bar, as on every other sub-screen. */}
+        <StickyBottomNav />
       </AppPage>
     </I18nextProvider>
   )

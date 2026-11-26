@@ -3,6 +3,11 @@
 // Production follow-up after the project close (2026-11-19): the Settings page became the
 // Profile, and the bottom nav labels moved from hardcoded English into the catalogs. Every
 // `nav` and `settings` key ships in all ten web locales.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): D15 parity for the five tab labels (nav.today|closet|looks) and
+// the Profile > Style keys (settings.style.*); nested trees now flatten to dotted keys.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { describe, expect, it } from 'vitest'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
@@ -34,15 +39,24 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
 
 const TREES = ['nav', 'settings'] as const
 
-/** Flat `tree.key` to value for the Profile trees of one catalog. */
+/** Adds every leaf under `node` as `prefix.key`, descending into nested trees. */
+function addLeaves(out: Map<string, string>, prefix: string, node: unknown) {
+  if (typeof node !== 'object' || node === null) {
+    out.set(prefix, String(node))
+    return
+  }
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    addLeaves(out, `${prefix}.${key}`, value)
+  }
+}
+
+/** Flat dotted key to value for the Profile trees of one catalog. */
 function profileStrings(catalog: Catalog): Map<string, string> {
   const out = new Map<string, string>()
   for (const tree of TREES) {
     const node = catalog[tree]
     if (typeof node !== 'object' || node === null) continue
-    for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-      out.set(`${tree}.${key}`, String(value))
-    }
+    addLeaves(out, tree, node)
   }
   return out
 }
@@ -55,9 +69,11 @@ const reference = profileStrings(CATALOGS['en-US'])
 
 /**
  * Names a locale may keep from English because it is the word that locale uses:
- * Community in German and Italian, Home in Italian (the mobile tabs say the same).
+ * Community in German and Italian, Home in Italian (the mobile tabs say the same). Story CC-7.11:
+ * Looks is the fashion loanword German, Spanish, French and Portuguese use; Silhouette is the
+ * German, French and Italian word; Style is the French word.
  */
-const SHARED_WORDS = new Set(['Community', 'Home'])
+const SHARED_WORDS = new Set(['Community', 'Home', 'Looks', 'Silhouette', 'Style'])
 
 describe('Profile and navigation locale parity (web)', () => {
   it('PROFILE-I18N-WEB-01 matches the canonical en-US strings', () => {
@@ -65,14 +81,26 @@ describe('Profile and navigation locale parity (web)', () => {
       'nav.label': 'Bottom navigation',
       // Story CC-7.9 D6: the top bar's desktop tab links name their landmark.
       'nav.primaryLabel': 'Main navigation',
+      // The legal links' Home link; the Today tab reads nav.today.
       'nav.home': 'Home',
-      'nav.wardrobe': 'Wardrobe',
+      // Story CC-7.11 D1: Today, Closet, Looks, Community, Profile.
+      'nav.today': 'Today',
+      'nav.closet': 'Closet',
+      'nav.looks': 'Looks',
       'nav.community': 'Community',
       'nav.profile': 'Profile',
       'nav.navigatedTo': 'Navigated to {{label}} tab',
       'settings.title': 'Profile',
       'settings.account': 'Your account',
+      // Story CC-7.11 D7: Profile > Style and its three rows.
+      'settings.style.row': 'Style',
+      'settings.style.title': 'Style',
+      'settings.style.silhouette': 'Silhouette',
+      'settings.style.closetSetup': 'Closet setup',
+      'settings.style.palette': 'Color palette',
     })
+    // The old Wardrobe tab key left with the rename (D1).
+    expect(reference.has('nav.wardrobe')).toBe(false)
   })
 
   it('PROFILE-I18N-WEB-02 ships the same keys and placeholders in every locale', () => {

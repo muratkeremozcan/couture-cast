@@ -636,6 +636,16 @@
           "name": "Muito quente"
         }
       }
+    },
+    "menu": {
+      "add": "Adicionar",
+      "more": "Mais",
+      "moreLabel": "Mais opções do armário",
+      "label": "Opções do armário",
+      "setup": "Configurar armário",
+      "setupDone": "Configurar armário: concluído",
+      "silhouette": "Silhueta",
+      "close": "Fechar"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Carregar mais looks",
       "loadingMore": "Carregando",
       "yourPostsTitle": "Seus looks em andamento",
-      "yourPostsBody": "Só você vê estes até a triagem terminar."
+      "yourPostsBody": "Só você vê estes até a triagem terminar.",
+      "detailTitle": "Look compartilhado"
     },
     "spotlight": {
       "eyebrow": "Destaques da cidade",
@@ -826,7 +837,11 @@
       "publishing": "Fazendo a triagem e publicando",
       "uploading": "Enviando sua foto",
       "cancel": "Cancelar",
-      "success": "Seu look foi enviado para análise."
+      "success": "Seu look foi enviado para análise.",
+      "discardTitle": "Descartar esta publicação?",
+      "discardMessage": "A foto e o texto desta publicação serão perdidos.",
+      "discardKeep": "Continuar editando",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Escolha uma foto para compartilhar.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Perfil",
-    "account": "Sua conta"
+    "account": "Sua conta",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silhueta",
+      "closetSetup": "Configurar armário",
+      "palette": "Paleta de cores"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Navegação inferior",
     "primaryLabel": "Navegação principal",
     "home": "Início",
-    "wardrobe": "Guarda-roupa",
+    "today": "Hoje",
+    "closet": "Armário",
+    "looks": "Looks",
     "community": "Comunidade",
     "profile": "Perfil",
     "navigatedTo": "Aba {{label}} aberta"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Responsáveis vinculados",
       "empty": "Nenhum responsável aceitou o consentimento ainda."
     }
+  },
+  "looks": {
+    "empty": "Salve um look para vê-lo aqui",
+    "capsules": "Cápsulas",
+    "plan": "Plano"
   }
 }

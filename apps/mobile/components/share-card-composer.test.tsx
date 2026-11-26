@@ -1,6 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeModalModule from './edge-to-edge-modal'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
@@ -44,7 +45,9 @@ vi.mock('@/src/lib/accessibility-focus', async () =>
 vi.mock('../modules/accessibility-focus', async () =>
   (await loadMocks()).accessibilityFocusModule()
 )
-vi.mock('./edge-to-edge-modal', async () => (await loadMocks()).modal())
+vi.mock('./edge-to-edge-modal', async (original) =>
+  (await loadMocks()).modal(await original<typeof EdgeToEdgeModalModule>())
+)
 vi.mock('react-native', async (original) =>
   (await loadMocks()).reactNative(await original<typeof ReactNativeModule>())
 )

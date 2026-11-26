@@ -213,24 +213,43 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     )
 
     await log.step('Tab from the top of the document to the control')
-    // Story CC-7.9 D6: from 768 px the four tab links sit in the top bar
-    // (`primary-nav`), ahead of main, so the desktop path reaches the toggle in eight
-    // presses via Skip, the four tab links and the two city controls. Check each stop
+    // Story CC-7.9 D6: from 768 px the tab links sit in the top bar (`primary-nav`), ahead
+    // of main. Story CC-7.11 D1 made them five, so the desktop path reaches the toggle in
+    // nine presses via Skip, the five tab links and the two city controls. Check each stop
     // to catch extra focus targets.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
     const primaryNav = page.getByTestId('primary-nav')
-    // Each stop is a link with its tab name, Home first, as the old named Home link lookup
-    // required (Codex replaced-assertions check).
-    for (const name of ['Home', 'Wardrobe', 'Community', 'Profile']) {
+    // Each stop is a link with its tab name, Today first (Story CC-7.11 D1: Home reads Today,
+    // Wardrobe reads Closet, Looks is new), as the old named Home link lookup required (Codex
+    // replaced-assertions check).
+    for (const name of ['Today', 'Closet', 'Looks', 'Community', 'Profile']) {
       await page.keyboard.press('Tab')
       await expect(primaryNav.getByRole('link', { name, exact: true })).toBeFocused()
     }
     await expect(
       primaryNav.getByRole('link', { name: 'Profile', exact: true })
     ).toHaveAttribute('aria-current', 'page')
-    await page.keyboard.press('Tab')
-    await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
+    // Story CC-7.11 D7, D10: Profile's Style (and Notifications) rows sit between the tabs and
+    // the city search now. Tab through them; the Style row must be one of the stops.
+    const search = page.getByRole('combobox', { name: 'Search for a city' })
+    const stops: (string | null)[] = []
+    for (let index = 0; index < 6; index += 1) {
+      await page.keyboard.press('Tab')
+      if (await search.evaluate((node) => node === document.activeElement)) break
+      stops.push(
+        await page.evaluate(
+          () =>
+            document.activeElement
+              ?.closest('[data-testid]')
+              ?.getAttribute('data-testid') ?? null
+        )
+      )
+    }
+    expect(stops, 'Tab stops between the tabs and the city search').toContain(
+      'profile-style-row'
+    )
+    await expect(search).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Use my location' })).toBeFocused()
     await page.keyboard.press('Tab')

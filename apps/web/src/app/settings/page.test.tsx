@@ -8,6 +8,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 65: Signed-in shell without flashes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-PROFILE-STYLE-01 and 02 (D7: one Style row below the
+// account header), 7.11-CMP-PROFILE-NOTIF-01 (Codex 7.11 #9: the Notifications row).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 // Story CC-7.7 (Codex review of 8327b4fb): 7.7-CMP-010 pins the prerendered Locations chrome
 // (P2-3) and 7.7-CMP-011 the Profile return from its snapshot (P1-2). CodeRabbit round 1 on PR
@@ -644,6 +649,69 @@ describe('Web settings page', () => {
     await screen.findByTestId('locations-signed-out')
     expect(screen.queryByTestId('profile-account')).toBeNull()
     expect(asked).not.toHaveBeenCalled()
+  })
+
+  it('7.11-CMP-PROFILE-STYLE-01 puts one Style row to /settings/style below the account header and above every section', async () => {
+    signIn()
+    useMswHandlers(...preferenceHandlers({}))
+
+    render(<SettingsPage />)
+
+    const account = await screen.findByTestId('profile-account')
+    const rows = screen.getAllByTestId('profile-style-row')
+    expect(rows).toHaveLength(1)
+    const style = rows[0]!
+    expect(style.tagName).toBe('A')
+    expect(style).toHaveAttribute('href', '/settings/style')
+    expect(style).toHaveAccessibleName('Style')
+    expect(
+      account.compareDocumentPosition(style) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    for (const section of [
+      'locations-section',
+      'commerce-preferences-section',
+      'premium-subscription-section',
+      'premium-theme-section',
+    ]) {
+      expect(
+        style.compareDocumentPosition(screen.getByTestId(section)) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        section
+      ).toBeTruthy()
+    }
+  })
+
+  it('7.11-CMP-PROFILE-STYLE-02 keeps the Style row for a signed-out reader, first in the page body', async () => {
+    render(<SettingsPage />)
+
+    await screen.findByTestId('locations-signed-out')
+    const style = screen.getByTestId('profile-style-row')
+    expect(style).toHaveAttribute('href', '/settings/style')
+    expect(
+      style.compareDocumentPosition(screen.getByTestId('locations-section')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+  // Review #9: Notification settings is a Profile row too (the Community bell stays).
+  it('[Codex 7.11 #9] 7.11-CMP-PROFILE-NOTIF-01 puts one Notifications row to /notification-settings right after the Style row, above every section', async () => {
+    signIn()
+    useMswHandlers(...preferenceHandlers({}))
+
+    render(<SettingsPage />)
+
+    await screen.findByTestId('profile-account')
+    const rows = screen.getAllByTestId('profile-notifications-row')
+    expect(rows).toHaveLength(1)
+    const notifications = rows[0]!
+    expect(notifications.tagName).toBe('A')
+    expect(notifications).toHaveAttribute('href', '/notification-settings')
+    expect(notifications).toHaveAccessibleName('Community notifications')
+    const style = screen.getByTestId('profile-style-row')
+    expect(style.nextElementSibling).toBe(notifications)
+    expect(
+      notifications.compareDocumentPosition(screen.getByTestId('locations-section')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 })
 

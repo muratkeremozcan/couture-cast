@@ -7,6 +7,11 @@
 // asks only for a piece in a look, and returns to the hub.
 // Learning path Step 64: Garment delete.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the Style this piece editor
+// header is the layer's swipe handle, through the same close as its X.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React from 'react'
 import { userEvent as browserUser } from 'vitest/browser'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -151,6 +156,8 @@ import {
 } from './garment-deletion'
 import { renderStackTopBar } from '@/src/components/app-top-bar'
 import { GarmentDetailScreen } from './garment-detail-screen'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 
 stackHeader.render = renderStackTopBar as (props: never) => React.ReactNode
 
@@ -723,6 +730,23 @@ describe('GarmentDetailScreen', () => {
 
     const panel = await screen.findByTestId('style-piece-panel')
     expect(await within(panel).findAllByTestId('style-piece-look')).toHaveLength(3)
+  })
+
+  it('[P1] [Codex 7.11 #3] [7.11-NAT-032] a swipe down on the editor header closes it like its X and Style this piece takes focus back', async () => {
+    renderDetail()
+    const open = await screen.findByTestId('style-piece-open')
+    await browserUser.click(open)
+    const panel = await screen.findByTestId('style-piece-panel')
+    expect(await within(panel).findAllByTestId('style-piece-look')).toHaveLength(3)
+    const handle = within(panel).getByTestId('layer-swipe-handle')
+    expect(handle.contains(within(panel).getByTestId('style-piece-close'))).toBe(true)
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(screen.getByTestId('style-piece-panel')).toBeInTheDocument()
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+    await waitFor(() => expect(screen.getByTestId('style-piece-open')).toHaveFocus())
   })
 
   it('[P2] [7.5-NAT-004] shows Saved inline without a status bar provider', async () => {

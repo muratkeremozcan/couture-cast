@@ -14,8 +14,20 @@ import { focusBackdrop, focusRing } from '../support/helpers/painted-contrast'
 // This scan discovers nothing: it iterates this literal array, so a destination
 // route missing from it is never scanned at either viewport and AC 8's axe evidence
 // for it does not exist.
-const primaryRoutes = ['/', '/community', '/wardrobe', '/settings', '/palette'] as const
+// Story CC-7.11 D1, D6, D7, D9: the Looks tab and the new sub-screens (Plan, Silhouette and
+// Style, which replaced the Home drawer and the Closet Silhouette modal) join the scan.
+const primaryRoutes = [
+  '/',
+  '/wardrobe',
+  '/looks',
+  '/community',
+  '/settings',
+  '/palette',
+] as const
 const secondaryRoutes = [
+  '/looks/plan',
+  '/wardrobe/silhouette',
+  '/settings/style',
   '/signup',
   '/guardian/accept',
   '/guardian/dashboard',
@@ -391,12 +403,15 @@ test.describe('Story 3.8 interaction states', () => {
     await page.setViewportSize(viewports[0])
     await openStablePage(page, '/', interceptNetworkCall)
 
-    // Story 5.5 Decision 7: the planner defaults closed and opens from the "Plan
-    // week" control. `viewports[0]` is desktop width, so this opens the inline rail.
+    // Story CC-7.11 D9: the "Plan week" control links to the Plan route, where the planner
+    // renders as the inline rail. The chips checked below live on Today, so return there.
     await page.getByTestId('planner-open-control').click()
+    await expect(page).toHaveURL('/looks/plan')
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
     await expect(planner).toHaveCSS('animation-name', 'none')
+    await page.getByTestId('app-header').getByTestId('app-top-bar-back').click()
+    await expect(page).toHaveURL('/')
     const chip = page.getByTestId('chip-personal')
     const transitionDuration = await chip.evaluate(
       (node) => getComputedStyle(node).transitionDuration
@@ -465,8 +480,11 @@ test.describe('Story 3.8 interaction states', () => {
       // name, and this assertion is about the alert's own surface (`dangerSurface`, D2).
       const severeAlert = page.getByTestId('severe-weather-alert-focused')
       await expect(severeAlert).toBeVisible()
+      // Story CC-7.11 D9: the alert's Plan week is a link to the Plan route.
+      const alertPlan = severeAlert.getByRole('link', { name: 'Plan week' })
+      await expect(alertPlan).toHaveAttribute('href', '/looks/plan')
       const alertBackdrop = await expectVisibleFocusRing(
-        severeAlert.getByRole('button', { name: 'Plan week' }),
+        alertPlan,
         `${colorScheme} alert action`
       )
       expect(alertBackdrop.color, `${colorScheme} alert action`).toBe(

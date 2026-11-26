@@ -219,7 +219,7 @@ export function GuestPreviewReview() {
     // Story CC-7.9 D6, D7: the shared top bar carries the review question as the screen's only
     // h1; back returns Home, where a declined review leaves the member.
     <AppPage>
-      <AppTopBar title={strings.review.heading} backHref="/" />
+      <AppTopBar title={strings.review.heading} parentHref="/" />
       <main
         id="main-content"
         tabIndex={-1}

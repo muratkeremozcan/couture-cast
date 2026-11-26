@@ -55,7 +55,11 @@ import {
   type StylePieceSelection,
   type StylePieceRecipe,
 } from '@couture/utils'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
   checkNetworkOnlineForAction,
@@ -145,7 +149,15 @@ export function StylePieceEntry({
   )
 }
 
+/**
+ * How many times the panel has moved focus. Story CC-7.11 D13: the dialog's onShow focuses Close
+ * only when nothing inside the panel moved focus since it opened, so a photo check or retry that
+ * finishes before the slide-in ends keeps focus where it put it.
+ */
+let stylePieceFocusMoves = 0
+
 export function focusStylePieceControl(button: ComponentRef<typeof Pressable> | null) {
+  if (button) stylePieceFocusMoves++
   if (Platform.OS === 'web') button?.focus()
   else {
     const node = safeFindNodeHandle(button)
@@ -243,6 +255,13 @@ export function StylePiecePanel({
     return () => cancelAnimationFrame(frame)
   }, [visible])
 
+  // Story CC-7.11 D13: the focus count when the panel opened, read by onShow below. A layout
+  // effect, so it is taken before any content's frame-deferred focus.
+  const focusMovesAtOpen = useRef(0)
+  useLayoutEffect(() => {
+    if (visible) focusMovesAtOpen.current = stylePieceFocusMoves
+  }, [visible])
+
   const close = () => {
     refreshRef.current?.stop()
     onClose()
@@ -253,8 +272,13 @@ export function StylePiecePanel({
       visible={visible}
       transparent={false}
       animationType="none"
-      onShow={() => focusStylePieceControl(closeButton.current)}
+      onShow={() => {
+        if (stylePieceFocusMoves === focusMovesAtOpen.current)
+          focusStylePieceControl(closeButton.current)
+      }}
       onRequestClose={close}
+      // Story CC-7.11 D13: the hub's finishStyleDismissal focuses the Style piece button.
+      returnFocusRef={null}
       onDismiss={onDismiss}
     >
       <View
@@ -270,7 +294,8 @@ export function StylePiecePanel({
           },
         ]}
       >
-        <View style={styles.header}>
+        {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+        <LayerSwipeHandle style={styles.header}>
           <Text accessibilityRole="header" style={[styles.title, { color: palette.ink }]}>
             {labels.start}
           </Text>
@@ -281,7 +306,7 @@ export function StylePiecePanel({
             palette={palette}
             buttonRef={closeButton}
           />
-        </View>
+        </LayerSwipeHandle>
         <SaveFeedbackProvider inline renderOfflineLine>
           <StylePieceIdeas
             key={JSON.stringify([
@@ -1138,11 +1163,12 @@ function StylePieceCard({
 }
 
 const styles = StyleSheet.create({
+  // Story CC-7.11 review #2: a compact gap under the Closet tile's status line.
   entry: {
     minHeight: 44,
     borderWidth: 1,
     borderRadius: 8,
-    marginTop: 8,
+    marginTop: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     alignItems: 'center',

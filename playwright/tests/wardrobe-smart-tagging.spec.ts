@@ -103,8 +103,9 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
 
         await page.goto('/wardrobe')
         await waitForAccessibilityReady(page)
+        // Story CC-7.11 D1: the tab title reads Closet.
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe' })
+          page.getByRole('heading', { level: 1, name: 'Closet' })
         ).toBeVisible()
 
         await page.getByRole('button', { name: '+ Add Garment' }).click()

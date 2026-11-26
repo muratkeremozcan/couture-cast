@@ -54,6 +54,8 @@ vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+  // Story CC-7.11 D16: the screen sets its top bar's New post through setOptions.
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
 vi.mock('expo-haptics', () => ({ selectionAsync: () => Promise.resolve() }))
 vi.mock('expo-localization', () => ({

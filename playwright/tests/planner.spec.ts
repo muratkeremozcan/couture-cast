@@ -20,6 +20,7 @@ import {
   type PlannerReadyDay,
   type PlannerResponse,
 } from '@couture/api-client/contracts/http'
+import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { isNonLocalEnvironment, resolveApiBaseUrl } from '../support/helpers/api-test'
 import {
@@ -49,19 +50,31 @@ function firstDisplayGarmentId(day: PlannerReadyDay): string | null {
 }
 
 /**
- * Clicks the hero "Plan week" control and returns the real GET it triggers. The
- * watch is registered right before the click: Decision 7 fetches nothing until the
- * rail opens, so there is no page-load race to protect against.
+ * Story CC-7.11 D9: Plan is the `/looks/plan` route. `navigate` reaches it (the Today
+ * "Plan week" link, a direct entry or a reload) and this returns the real GET the route
+ * triggers. The watch is registered before `navigate`, so the route's first read is caught.
  */
 async function openPlanner(
   page: Page,
-  interceptNetworkCall: InterceptNetworkCallFn
+  interceptNetworkCall: InterceptNetworkCallFn,
+  navigate: () => Promise<unknown> = () =>
+    page.getByTestId('planner-open-control').click()
 ): Promise<{ status: number; data: PlannerResponse['data'] | undefined }> {
   const load = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
-  await page.getByTestId('planner-open-control').click()
+  await navigate()
+  // Story CC-7.11 D9: the planner lives on its own route under Looks, not a drawer on Today.
+  await expect(page).toHaveURL('/looks/plan')
   const loaded = await load
   const body = loaded.responseJson as { data: PlannerResponse['data'] } | null
   return { status: loaded.status, data: body?.data }
+}
+
+/** Story CC-7.11 D9, D10: Plan's top bar carries the title and back, so the rail has no X. */
+async function expectPlanTopBar(page: Page) {
+  const header = page.getByTestId('app-header')
+  await expect(header.getByRole('heading', { level: 1 })).toHaveText(enUS.looks.plan)
+  await expect(header.getByTestId('app-top-bar-back')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Close planner' })).toHaveCount(0)
 }
 
 /**
@@ -135,32 +148,29 @@ premiumSeededTest.describe(
     })
 
     premiumSeededTest(
-      '[P0] 5.5-E2E-01 opens as a focus-trapped overlay below 1440px and renders the live seven-day week, +axe',
+      '[P0] 5.5-E2E-01 Plan week on Today opens the Plan route below 1440px and renders the live seven-day week, +axe',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         // Matches `lookbook-prism.spec.ts`'s own overlay-boundary width.
         await page.setViewportSize({ width: 1280, height: 900 })
 
-        await log.step('Load / and assert the planner is closed by default')
+        await log.step('Load / and assert Today holds no planner')
         await page.goto('/')
         await waitForAccessibilityReady(page)
         const planner = page.getByRole('complementary', { name: 'Planner Rail' })
         await expect(planner).toBeHidden()
 
-        await log.step('Open the planner and capture the live GET')
+        await log.step('Follow Plan week and capture the live GET')
         const { status, data } = await openPlanner(page, interceptNetworkCall)
         expect(status).toBe(200)
         if (!data) throw new Error('Planner GET returned no data')
         await expect(planner).toBeVisible()
 
-        await log.step(
-          'Assert the overlay renders outside the layout grid and traps focus on open'
-        )
-        await expect(
-          page
-            .getByTestId('lookbook-prism-grid')
-            .getByRole('complementary', { name: 'Planner Rail' })
-        ).toHaveCount(0)
-        await expect(page.getByRole('button', { name: 'Close planner' })).toBeFocused()
+        // Story CC-7.11 D9: the focus-trapped drawer on Today is gone. In its place the route
+        // renders the rail as page content under a top bar with back and the Plan title.
+        await log.step('Assert the Plan route renders the inline rail under its top bar')
+        await expectPlanTopBar(page)
+        await expect(planner).not.toHaveCSS('position', 'fixed')
+        await expect(page.getByTestId('lookbook-prism-grid')).toHaveCount(0)
 
         await log.step('Assert the live seven-day week rendered, not a static fixture')
         await assertLiveWeekRendered(page, data)
@@ -171,33 +181,48 @@ premiumSeededTest.describe(
     )
 
     premiumSeededTest(
-      '[P0] 5.5-E2E-02 opens as an inline rail at 1440px and wider and renders the live seven-day week, +axe',
+      '[P0] 5.5-E2E-02 a direct entry to the Plan route at 1440px renders the inline rail and the live seven-day week, +axe',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         await page.setViewportSize({ width: 1440, height: 900 })
 
-        await log.step('Load / and assert the planner is closed by default')
-        await page.goto('/')
-        await waitForAccessibilityReady(page)
         const planner = page.getByRole('complementary', { name: 'Planner Rail' })
-        await expect(planner).toBeHidden()
 
-        await log.step('Open the planner and capture the live GET')
-        const { status, data } = await openPlanner(page, interceptNetworkCall)
+        await log.step('Enter /looks/plan directly and capture the live GET')
+        const { status, data } = await openPlanner(page, interceptNetworkCall, () =>
+          page.goto('/looks/plan')
+        )
         expect(status).toBe(200)
         if (!data) throw new Error('Planner GET returned no data')
         await expect(planner).toBeVisible()
+        await waitForAccessibilityReady(page)
 
+        // Story CC-7.11 D9: the rail no longer sits in Today's third grid column; on the Plan
+        // route it is ordinary page content, so it still never pulls focus into itself.
         await log.step(
-          'Assert the rail renders inline as the third grid column, not focus-trapped'
+          'Assert the rail renders inline under the top bar, not focus-trapped'
         )
-        await expect(
-          page
-            .getByTestId('lookbook-prism-grid')
-            .getByRole('complementary', { name: 'Planner Rail' })
-        ).toBeVisible()
-        // Decision 7: the rail variant is ordinary page content, so opening it must
-        // never steal focus onto a close control the way the overlay does.
-        await expect(page.getByTestId('planner-open-control')).toBeFocused()
+        await expectPlanTopBar(page)
+        await expect(planner).not.toHaveCSS('position', 'fixed')
+        expect(
+          await planner.evaluate((node) => node.contains(document.activeElement)),
+          'the rail takes no focus on open'
+        ).toBe(false)
+
+        // Codex 7.11 #16: a keyboard member Tabs into the rail and out again; nothing traps
+        // focus inside it any more.
+        await log.step('Tab enters the rail, then leaves it')
+        let entered = false
+        let left = false
+        for (let index = 0; index < 60 && !left; index += 1) {
+          await page.keyboard.press('Tab')
+          const inside = await planner.evaluate((node) =>
+            node.contains(document.activeElement)
+          )
+          if (inside) entered = true
+          else if (entered) left = true
+        }
+        expect(entered, 'Tab reaches a rail control').toBe(true)
+        expect(left, 'Tab moves past the rail').toBe(true)
 
         await log.step('Assert the live seven-day week rendered, not a static fixture')
         await assertLiveWeekRendered(page, data)
@@ -212,10 +237,14 @@ premiumSeededTest.describe(
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         await page.setViewportSize({ width: 1440, height: 900 })
 
-        await log.step('Open the planner and pick the first ready day')
-        await page.goto('/')
+        // Story CC-7.11 D9: the planner is the Plan route; enter it directly.
+        await log.step('Open the Plan route and pick the first ready day')
+        const { status: loadStatus, data } = await openPlanner(
+          page,
+          interceptNetworkCall,
+          () => page.goto('/looks/plan')
+        )
         await waitForAccessibilityReady(page)
-        const { status: loadStatus, data } = await openPlanner(page, interceptNetworkCall)
         expect(loadStatus).toBe(200)
         if (!data) throw new Error('Planner GET returned no data')
         const target = data.days.find(
@@ -267,13 +296,14 @@ premiumSeededTest.describe(
           dayLocator.getByTestId(`planner-reshuffle-${target.planDate}`)
         ).not.toBeDisabled()
 
-        await log.step('Reload, reopen the planner, and assert the reshuffle persisted')
-        await page.reload()
-        await waitForAccessibilityReady(page)
+        // Story CC-7.11 D9: a reload of the Plan route reads the week again on its own.
+        await log.step('Reload the Plan route and assert the reshuffle persisted')
         const { status: reloadStatus, data: reloadedData } = await openPlanner(
           page,
-          interceptNetworkCall
+          interceptNetworkCall,
+          () => page.reload()
         )
+        await waitForAccessibilityReady(page)
         expect(reloadStatus).toBe(200)
         if (!reloadedData) throw new Error('Planner GET returned no data on reload')
         const persisted = reloadedData.days.find(
@@ -368,6 +398,8 @@ premiumSeededTest.describe(
         await page.goto('/')
         await waitForAccessibilityReady(page)
         await page.getByTestId('planner-open-control').click()
+        // Story CC-7.11 D9: Plan week is a link to the Plan route.
+        await expect(page).toHaveURL('/looks/plan')
         await expect(page.getByTestId('planner-days')).toBeVisible()
 
         const errorCard = plannerDayLocator(page, targetDate)
@@ -400,35 +432,34 @@ premiumSeededTest.describe(
     )
 
     premiumSeededTest(
-      '[P1] 5.5-E2E-05 restores focus to the opener when the overlay closes, via Escape and the close control',
+      '[P1] 5.5-E2E-05 back from Plan returns to Today through in-app history and to Looks on a direct entry',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
+        // Story CC-7.11 D9, D11: the overlay with its Escape and X (and focus return to the
+        // opener) is gone; Plan is a route whose top bar back is the exit. These assert
+        // where back lands in both entry modes in place of the overlay close paths.
         await page.setViewportSize({ width: 1280, height: 900 })
         await page.goto('/')
         await waitForAccessibilityReady(page)
-
-        const openControl = page.getByTestId('planner-open-control')
         const planner = page.getByRole('complementary', { name: 'Planner Rail' })
+        const back = page.getByTestId('app-header').getByTestId('app-top-bar-back')
 
-        await log.step('Open the overlay and assert focus moves into it')
-        const firstLoad = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
-        await openControl.click()
-        await firstLoad
+        await log.step('From Today, back steps back through in-app history to Today')
+        const fromToday = await openPlanner(page, interceptNetworkCall)
+        expect(fromToday.status).toBe(200)
         await expect(planner).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Close planner' })).toBeFocused()
+        await back.click()
+        await expect(page).toHaveURL('/')
+        await expect(page.getByTestId('planner-open-control')).toBeVisible()
+        await expect(planner).toHaveCount(0)
 
-        await log.step('Escape closes the overlay and restores focus to the opener')
-        await page.keyboard.press('Escape')
-        await expect(planner).toBeHidden()
-        await expect(openControl).toBeFocused()
-
-        await log.step('The close control also restores focus to the opener')
-        const secondLoad = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
-        await openControl.click()
-        await secondLoad
-        await expect(planner).toBeVisible()
-        await page.getByRole('button', { name: 'Close planner' }).click()
-        await expect(planner).toBeHidden()
-        await expect(openControl).toBeFocused()
+        await log.step('Entered directly, back replaces to the parent tab, Looks')
+        const direct = await openPlanner(page, interceptNetworkCall, () =>
+          page.goto('/looks/plan')
+        )
+        expect(direct.status).toBe(200)
+        await back.click()
+        await expect(page).toHaveURL('/looks')
+        await expect(planner).toHaveCount(0)
       }
     )
   }

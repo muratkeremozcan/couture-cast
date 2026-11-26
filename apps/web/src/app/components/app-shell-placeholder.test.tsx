@@ -5,6 +5,10 @@
 // after it, all on the one page surface, and the placeholder paints `card-muted`. The tab bodies
 // are stubbed: this pins the shell composition, and 7.9-E2E-011 measures the boxes.
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): Today tab rename (D1); the top bar reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { render, screen } from '@testing-library/react'
 import type { ComponentType } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -12,7 +16,10 @@ import Home from '../page'
 import CommunityPage from '../community/page'
 import SettingsPage from '../settings/page'
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
+}))
 vi.mock('./lookbook-prism-layout', () => ({ LookbookPrismLayout: () => <section /> }))
 vi.mock('./guest-preview/guest-preview-entry', () => ({
   GuestPreviewEntry: () => <section />,
@@ -30,7 +37,7 @@ vi.mock('./subscription-section', () => ({ SubscriptionSection: () => <section /
 vi.mock('./premium-theme-section', () => ({ PremiumThemeSection: () => <section /> }))
 
 const TABS: readonly { name: string; Page: ComponentType }[] = [
-  { name: 'Home', Page: Home },
+  { name: 'Today', Page: Home },
   { name: 'Community', Page: CommunityPage },
   { name: 'Profile', Page: SettingsPage },
 ]

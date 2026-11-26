@@ -23,10 +23,14 @@ describe('Localization Client System tests', () => {
   })
 
   it('translates UI keys in the default locale (en-US)', () => {
-    expect(i18n.t('tabs.home')).toBe('Home')
-    expect(i18n.t('tabs.wardrobe')).toBe('Wardrobe')
+    // Story CC-7.11 D1: the five tab labels; the old tabs.home and tabs.wardrobe keys are gone.
+    expect(i18n.t('tabs.today')).toBe('Today')
+    expect(i18n.t('tabs.closet')).toBe('Closet')
+    expect(i18n.t('tabs.looks')).toBe('Looks')
     expect(i18n.t('tabs.community')).toBe('Community')
     expect(i18n.t('tabs.profile')).toBe('Profile')
+    expect(i18n.exists('tabs.home')).toBe(false)
+    expect(i18n.exists('tabs.wardrobe')).toBe(false)
     expect(i18n.t('settings.language')).toBe('Language')
   })
 

@@ -170,6 +170,8 @@ export type ClosetSavedLooksRowProps = {
   onRetry: () => void
   onChanged: () => void
   onReopenStylePiece: (look: SavedLookContract, invoker: HTMLElement) => void
+  /** Story CC-7.11 D8: the Looks tab opens on the list, so it starts expanded there. */
+  initiallyExpanded?: boolean
 }
 
 export function ClosetSavedLooksRow(props: ClosetSavedLooksRowProps) {
@@ -198,6 +200,7 @@ function ClosetSavedLooksRowInner({
   onRetry,
   onChanged,
   onReopenStylePiece,
+  initiallyExpanded = false,
 }: ClosetSavedLooksRowProps) {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const samples = getGuestPreviewStrings(i18n.language)
@@ -209,7 +212,7 @@ function ClosetSavedLooksRowInner({
   const mountedRef = useRef(true)
   const ownedNoticeIdsRef = useRef<Set<string>>(new Set())
   const detailLookIdRef = useRef<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(initiallyExpanded)
   const [detailLook, setDetailLook] = useState<SavedLookContract | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
@@ -262,6 +265,9 @@ function ClosetSavedLooksRowInner({
   const readLiveOnline = () =>
     statusBarRef.current.isOnline &&
     (typeof navigator === 'undefined' || navigator.onLine !== false)
+
+  const savedLookTitle = (look: SavedLookContract) =>
+    look.title || sampleLookText({ id: look.lookId }, samples).name || look.lookId
 
   const weatherLabel = (weather: string) =>
     samples.values.weather[weather as SampleWeatherKey] ?? weather
@@ -589,10 +595,7 @@ function ClosetSavedLooksRowInner({
             <p className="text-sm text-ink-muted">{t('savedLooks.empty')}</p>
           ) : (
             savedLooks.map((look) => {
-              const title =
-                look.title ||
-                sampleLookText({ id: look.lookId }, samples).name ||
-                look.lookId
+              const title = savedLookTitle(look)
               return (
                 <article
                   key={look.id}
@@ -662,11 +665,13 @@ function ClosetSavedLooksRowInner({
           isOpen
           onClose={() => setDetailLook(null)}
           titleId="saved-look-detail-heading"
-          title={t('savedLooks.detailTitle')}
-          closeLabel={t('savedLooks.close')}
+          // Story CC-7.11 D12: a full-height layer under a top bar with back and the look's
+          // title; it closes like any overlay (back arrow, Escape, swipe down, browser back).
+          presentation="screen"
+          title={savedLookTitle(detailLook)}
           invokingElementRef={detailInvokerRef}
         >
-          <div data-testid="saved-look-detail-modal" className="mt-3 space-y-4">
+          <div data-testid="saved-look-detail-modal" className="space-y-4">
             <p className="text-sm text-ink-soft">
               {weatherLabel(detailLook.weather)} ·{' '}
               {detailLook.source === 'style_piece'

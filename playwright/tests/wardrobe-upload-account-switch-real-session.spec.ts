@@ -19,8 +19,12 @@
 //       without this tab hearing of it; the reload must drop A's bearer and load B.
 //
 // Final review F-1: an absence check alone also passes on a load-error screen, so every case
-// that keeps the Silhouette dialog open asserts B's profile through a marker seeded for B
+// that keeps the Silhouette screen open asserts B's profile through a marker seeded for B
 // (height 73, build 27) before it asserts that nothing of A shows.
+//
+// Story CC-7.11 D5, D6: Silhouette left the Closet as a modal and is the `/wardrobe/silhouette`
+// route, opened from the Closet top bar More menu. On a switch the route stays open and its
+// panel follows the new account, where the modal used to close and be reopened.
 import path from 'node:path'
 import type {
   APIResponse,
@@ -120,24 +124,43 @@ async function switchToMemberB(context: BrowserContext, b: RealCommunityAccount)
   return second
 }
 
-/** Opens the Silhouette dialog and confirms the basewear guidance. */
+/**
+ * Story CC-7.11 D5, D6: opens the Silhouette route from the Closet More menu, waits for its
+ * loaded panel and confirms the basewear guidance. Returns the route's main column.
+ */
+async function openSilhouette(page: Page) {
+  await page.getByTestId('app-header').getByTestId('closet-more-menu').click()
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Silhouette' }).click()
+  await expect(page).toHaveURL('/wardrobe/silhouette')
+  const screen = page.locator('main#main-content')
+  await expect(screen.getByTestId('silhouette-settings-panel')).toBeVisible()
+  return screen
+}
+
+/** Opens the Silhouette screen from the Closet and confirms the basewear guidance. */
 async function openMyForm(page: Page) {
   await page.goto('/wardrobe')
   await waitForAccessibilityReady(page)
-  const silhouette = page.getByRole('button', { name: 'Silhouette' })
-  await expect(silhouette).toBeEnabled()
-  await silhouette.click()
-  const dialog = page.getByRole('dialog', { name: 'Silhouette' })
-  await dialog.getByLabel(/I'm wearing plain white or black clothing/).check()
-  return dialog
+  await expectHubSignedIn(page)
+  const screen = await openSilhouette(page)
+  await screen.getByLabel(/I'm wearing plain white or black clothing/).check()
+  return screen
 }
 
 /**
- * The hub has the signed-in account: Silhouette is enabled (the user id resolved), the closet
- * and the setup progress loaded, and no signed-out or account error shows.
+ * The hub has the signed-in account: the user id resolved, the closet and the setup progress
+ * loaded, and no signed-out or account error shows.
  */
 async function expectHubSignedIn(page: Page) {
-  await expect(page.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+  // Story CC-7.11 D4, D6: the Silhouette button that proved the user id resolved left the
+  // Closet. The Closet gate opens only once that read answered (CC-7.7 D3), and with a member
+  // Add is the capture button, not the visitor's sign-in link.
+  await expect(
+    page.locator('[data-testid="screen-gate"][data-ready="true"]')
+  ).toBeVisible()
+  await expect(
+    page.getByTestId('app-header').getByTestId('garment-capture-open')
+  ).toHaveJSProperty('tagName', 'BUTTON')
   await expect(
     page.getByText('Unable to load your account', { exact: false })
   ).toHaveCount(0)
@@ -183,21 +206,28 @@ async function saveSliders(
   expect((saved.body as SilhouetteBody).data).toMatchObject(sliders)
 }
 
-/** The dialog shows member B's seeded profile: B's sliders, in place of a load error. */
-async function expectMemberBProfile(dialog: Locator) {
-  await expect(dialog.getByTestId('silhouette-height-slider')).toHaveValue(
+/** The screen shows member B's seeded profile: B's sliders, in place of a load error. */
+async function expectMemberBProfile(screen: Locator) {
+  await expect(screen.getByTestId('silhouette-height-slider')).toHaveValue(
     String(B_SLIDERS.heightSlider)
   )
-  await expect(dialog.getByTestId('silhouette-build-slider')).toHaveValue(
+  await expect(screen.getByTestId('silhouette-build-slider')).toHaveValue(
     String(B_SLIDERS.buildSlider)
   )
 }
 
-async function reopenMemberBSilhouette(page: Page, previousDialog: Locator) {
-  await expect(previousDialog).toBeHidden()
-  await expectHubSignedIn(page)
-  await page.getByRole('button', { name: 'Silhouette' }).click()
-  await expectMemberBProfile(previousDialog)
+/**
+ * Story CC-7.11 D6: after the switch the Silhouette route stays open and its panel now belongs
+ * to B. This replaces "the modal closed, the hub reloaded for B and the reopened modal showed
+ * B": the route, no account error, and B's seeded profile in the panel.
+ */
+async function expectSilhouetteFollowsMemberB(page: Page, screen: Locator) {
+  await expect(page).toHaveURL('/wardrobe/silhouette')
+  await expect(
+    page.getByText('Unable to load your account', { exact: false })
+  ).toHaveCount(0)
+  await expect(page.getByText('Your session expired', { exact: false })).toHaveCount(0)
+  await expectMemberBProfile(screen)
 }
 
 /** How the browser ended a held read: its answer read in full, or cancelled by the app. */
@@ -402,27 +432,28 @@ test.describe('Upload state follows the signed-in account', () => {
       handler: (route) => route.abort('failed'),
     })
 
-    const dialog = await openMyForm(page)
-    const basewear = dialog.getByLabel(/I'm wearing plain white or black clothing/)
-    await dialog
+    const screen = await openMyForm(page)
+    const basewear = screen.getByLabel(/I'm wearing plain white or black clothing/)
+    await screen
       .getByRole('button', { name: 'Upload a full-body photo', exact: true })
       .click()
-    await dialog.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
-    const retry = dialog.getByRole('button', { name: 'Retry upload' })
+    await screen.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
+    const retry = screen.getByRole('button', { name: 'Retry upload' })
     await expect(retry).toBeVisible({ timeout: 20_000 })
 
     const uploads = watchUploadRequests(context, page)
     await switchToMemberB(context, b)
 
-    await reopenMemberBSilhouette(page, dialog)
+    await expectSilhouetteFollowsMemberB(page, screen)
     await expect(retry).toHaveCount(0)
-    await expect(dialog.getByAltText('My Form')).toHaveCount(0)
+    await expect(screen.getByAltText('My Form')).toHaveCount(0)
     await expect(basewear).not.toBeChecked()
     expect(uploads, 'upload requests after the switch').toEqual([])
   })
   test('AS-3: member A ready My Form photo is cleared when member B signs in', async ({
     apiRequest,
     context,
+    interceptNetworkCall,
     page,
   }) => {
     const a = await member(apiRequest, 'upload-switch-a')
@@ -430,20 +461,54 @@ test.describe('Upload state follows the signed-in account', () => {
     await saveSliders(apiRequest, b, B_SLIDERS)
     await signInWithCode(page, a)
 
-    const dialog = await openMyForm(page)
-    await dialog
+    const screen = await openMyForm(page)
+    await screen
       .getByRole('button', { name: 'Upload a full-body photo', exact: true })
       .click()
-    await dialog.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
-    await expect(dialog.getByText('My Form photo ready')).toBeVisible({ timeout: 20_000 })
-    await expect(dialog.getByAltText('My Form')).toBeVisible()
+    await screen.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
+    await expect(screen.getByText('My Form photo ready')).toBeVisible({ timeout: 20_000 })
+    await expect(screen.getByAltText('My Form')).toBeVisible()
+
+    // Codex 7.11 #16: hold B's first profile read, so A's photo is proved gone before B's
+    // profile can paint over it (not only after B's sliders arrived).
+    let release: () => void = () => undefined
+    const released = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let holdNext = false
+    let heldOne = false
+    let markHeld: () => void = () => undefined
+    const held = new Promise<void>((resolve) => {
+      markHeld = resolve
+    })
+    void interceptNetworkCall({
+      method: 'GET',
+      url: '**/api/v1/wardrobe/silhouette',
+      handler: async (route) => {
+        if (!holdNext || heldOne) return route.fallback()
+        heldOne = true
+        const response = await route.fetch()
+        markHeld()
+        await released
+        await route.fulfill({ response }).catch(() => undefined)
+      },
+    })
 
     const uploads = watchUploadRequests(context, page)
+    holdNext = true
     await switchToMemberB(context, b)
+    await held
 
-    await reopenMemberBSilhouette(page, dialog)
-    await expect(dialog.getByAltText('My Form')).toHaveCount(0)
-    await expect(dialog.getByText('My Form photo ready')).toHaveCount(0)
+    await expect(
+      screen.getByAltText('My Form'),
+      'A photo gone while B loads'
+    ).toHaveCount(0)
+    await expect(screen.getByText('My Form photo ready')).toHaveCount(0)
+    release()
+
+    await expectSilhouetteFollowsMemberB(page, screen)
+    await expect(screen.getByAltText('My Form')).toHaveCount(0)
+    await expect(screen.getByText('My Form photo ready')).toHaveCount(0)
     expect(uploads, 'upload requests after the switch').toEqual([])
   })
 
@@ -519,24 +584,24 @@ test.describe('Upload state follows the signed-in account', () => {
       },
     })
 
-    const dialog = await openMyForm(page)
-    await dialog
+    const screen = await openMyForm(page)
+    await screen
       .getByRole('button', { name: 'Upload a full-body photo', exact: true })
       .click()
-    await dialog.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
+    await screen.getByLabel('My Form photo file').setInputFiles(myFormFixturePath)
     await expect.poll(() => heldReady, { timeout: 20_000 }).toBe(true)
-    await expect(dialog.getByAltText('My Form')).toHaveCount(0)
+    await expect(screen.getByAltText('My Form')).toHaveCount(0)
 
     await switchToMemberB(context, b)
     holding = false
-    await reopenMemberBSilhouette(page, dialog)
+    await expectSilhouetteFollowsMemberB(page, screen)
     // The app either reads A's ready answer after the switch or cancelled the read on it; either
     // way B's profile stays and nothing of A shows.
     await releaseHeldRead(page, await held, release)
 
-    await expectMemberBProfile(dialog)
-    await expect(dialog.getByAltText('My Form')).toHaveCount(0)
-    await expect(dialog.getByText('My Form photo ready')).toHaveCount(0)
+    await expectMemberBProfile(screen)
+    await expect(screen.getByAltText('My Form')).toHaveCount(0)
+    await expect(screen.getByText('My Form photo ready')).toHaveCount(0)
   })
 
   conflictTest(
@@ -550,13 +615,13 @@ test.describe('Upload state follows the signed-in account', () => {
       await saveSliders(apiRequest, b, B_SLIDERS)
       await signInWithCode(page, a)
 
-      const dialog = await openMyForm(page)
-      const height = dialog.getByTestId('silhouette-height-slider')
+      const screen = await openMyForm(page)
+      const height = screen.getByTestId('silhouette-height-slider')
       await expect(height).toBeVisible()
       // Another client saves A's sliders behind the open panel, so A's next save is stale.
       await saveSliders(apiRequest, a, A_SLIDERS)
       await height.fill('40')
-      const reloadLatest = dialog.getByRole('button', {
+      const reloadLatest = screen.getByRole('button', {
         name: 'Reload the latest version',
       })
       await expect(reloadLatest).toBeVisible()
@@ -595,15 +660,15 @@ test.describe('Upload state follows the signed-in account', () => {
       await expect(height).toHaveValue('40')
 
       await switchToMemberB(context, b)
-      await reopenMemberBSilhouette(page, dialog)
+      await expectSilhouetteFollowsMemberB(page, screen)
       // The app either reads A's answer after the switch or cancelled the read on it; either way
       // B's sliders stay and A's conflict is gone.
       await releaseHeldRead(page, read, release)
 
-      await expectMemberBProfile(dialog)
+      await expectMemberBProfile(screen)
       await expect(reloadLatest).toHaveCount(0)
       await expect(
-        dialog.getByLabel(/I'm wearing plain white or black clothing/)
+        screen.getByLabel(/I'm wearing plain white or black clothing/)
       ).not.toBeChecked()
 
       // B's next save carries B's own revision: a revision left by A's answer would fail it.
@@ -666,9 +731,8 @@ test.describe('Upload state follows the signed-in account', () => {
     await waitForAccessibilityReady(page)
     expect((await closet).status, 'closet read').toBe(200)
     await expectHubSignedIn(page)
-    const silhouette = page.getByRole('button', { name: 'Silhouette' })
-    await silhouette.click()
-    await expectMemberBProfile(page.getByRole('dialog', { name: 'Silhouette' }))
+    // Story CC-7.11 D5, D6: Silhouette opens from the Closet More menu as its own route.
+    await expectMemberBProfile(await openSilhouette(page))
 
     // Every signed API request after the reload carried B's bearer; none went out with A's.
     expect(bearers, 'signed API requests after the reload').toContain(b.authUserId)

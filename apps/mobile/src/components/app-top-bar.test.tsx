@@ -3,6 +3,11 @@
 // Story CC-7.9 test owner: 7.9-NAT-002, the native top bar is 56 pt plus the top safe-area
 // inset, one row with the title as the header and a back control labeled from the catalog (D6).
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 (TEA): tab titles read Closet and Today (D1), Capsules' parent is Looks (D10), and
+// the tab header carries the trailing actions a tab sets (the Closet's Add and More, D4).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import React from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { colorRoles, shell } from '@couture/utils'
@@ -59,12 +64,12 @@ describe('7.9-NAT-002 AppTopBar (native)', () => {
   })
 
   it('is 56 pt plus the top inset, on the page surface, with the title as its header', () => {
-    render(<AppTopBar title="Wardrobe" />)
+    render(<AppTopBar title="Closet" />)
 
     const style = getComputedStyle(bar())
     expect(style.height).toBe(`${shell.topBarHeight + 24}px`)
     expect(style.paddingTop).toBe('24px')
-    expect(screen.getByRole('heading')).toHaveTextContent('Wardrobe')
+    expect(screen.getByRole('heading')).toHaveTextContent('Closet')
     expect(screen.queryByTestId('app-top-bar-back')).toBeNull()
     expect(colorRoles.light.page).toBe('#FFFFFF')
     expect(style.backgroundColor).toBe('rgb(255, 255, 255)')
@@ -94,7 +99,7 @@ describe('7.9-NAT-002 AppTopBar (native)', () => {
   })
 
   it('as the stack header goes back to the screen below', () => {
-    const props = stackProps({ back: { title: 'Wardrobe', href: undefined } })
+    const props = stackProps({ back: { title: 'Closet', href: undefined } })
     render(renderStackTopBar(props))
 
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
@@ -102,18 +107,36 @@ describe('7.9-NAT-002 AppTopBar (native)', () => {
     expect(routerMocks.replace).not.toHaveBeenCalled()
   })
 
-  it('on a direct entry goes back to the parent tab', () => {
+  it('[7.11 D10] on a direct entry goes back to the parent tab, Looks for Capsules', () => {
     render(renderStackTopBar(stackProps()))
 
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
-    expect(routerMocks.replace).toHaveBeenCalledWith('/wardrobe')
+    expect(routerMocks.replace).toHaveBeenCalledExactlyOnceWith('/looks')
+  })
+
+  it('[7.11 D4] as the tab header draws the trailing actions the tab sets', () => {
+    render(
+      renderTabTopBar({
+        ...stackProps({
+          options: {
+            title: 'Closet',
+            headerRight: () => <button type="button" data-testid="closet-trailing" />,
+          },
+        }),
+      })
+    )
+
+    const bar = screen.getByTestId('app-top-bar')
+    expect(bar).toContainElement(screen.getByTestId('closet-trailing'))
+    expect(screen.getByRole('heading')).toHaveTextContent('Closet')
+    expect(screen.queryByTestId('app-top-bar-back')).toBeNull()
   })
 
   it('hides the back control when the screen asks for none', () => {
     render(
       renderStackTopBar(
         stackProps({
-          back: { title: 'Home', href: undefined },
+          back: { title: 'Today', href: undefined },
           options: { title: 'Finish', headerBackVisible: false },
         })
       )

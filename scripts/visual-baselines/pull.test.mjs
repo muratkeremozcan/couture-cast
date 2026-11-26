@@ -82,9 +82,9 @@ test('[7.9-VIS-U02b] native captures come from Maestro debug output, never the b
   assert.equal(fs.readFileSync(plan[0].source, 'utf8'), capture)
 })
 
-test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): eight per platform', () => {
-  assert.equal(WEB_BASELINES.length, 8)
-  assert.equal(NATIVE_BASELINES.length, 8)
+test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): ten per platform (five tabs, Story CC-7.11)', () => {
+  assert.equal(WEB_BASELINES.length, 10)
+  assert.equal(NATIVE_BASELINES.length, 10)
   const plan = NATIVE_BASELINES.slice(0, 3).map((name) => ({ name, source: name }))
   assert.deepEqual(missingBaselines(plan, NATIVE_BASELINES), NATIVE_BASELINES.slice(3))
   assert.deepEqual(missingBaselines(plan, []), [])
@@ -99,7 +99,7 @@ test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): eight per plat
     path.join(root, 'maestro/subflows/shell-visual-tabs.yaml'),
     'utf8'
   )
-  for (const tab of ['home', 'wardrobe', 'community', 'profile'])
+  for (const tab of ['home', 'wardrobe', 'looks', 'community', 'profile'])
     assert.match(tabs, new RegExp(`NAME: '${tab}'`), tab)
 })
 

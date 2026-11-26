@@ -1,24 +1,38 @@
 // R52 owner: every overlay Modal spans the whole screen and keeps its content clear of the
 // system bars. R57/R61: it also lifts that content above the software keyboard.
+// Story CC-7.11 D13 owner: every layer closes by system back (`onRequestClose`, required) and by a
+// downward swipe on its header (LayerSwipeHandle), and hands accessibility focus back to its
+// opener (`returnFocusRef`) once it closes.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 import React, {
   Fragment,
   cloneElement,
+  createContext,
   createElement,
   isValidElement,
+  useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
+  type ReactNode,
 } from 'react'
 import {
+  AccessibilityInfo,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   StyleSheet,
   View,
   type ModalProps,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
   LiveFontMountMarker,
   liveFontMountMarkersEnabled,
@@ -72,10 +86,26 @@ export function modalKeyboardAvoiding(keyboardOpen: boolean) {
   } as const
 }
 
+/** Anything a ref can hold that takes focus: a Pressable, a View, a Text. */
+export type LayerFocusTarget = React.RefObject<unknown>
+
 type EdgeToEdgeModalProps = Omit<
   ModalProps,
-  'statusBarTranslucent' | 'navigationBarTranslucent'
+  'statusBarTranslucent' | 'navigationBarTranslucent' | 'onRequestClose'
 > & {
+  /**
+   * D13: Android back and the iOS accessibility escape close the layer, and so does a swipe
+   * down on its LayerSwipeHandle. Required, so no layer ignores system back.
+   */
+  onRequestClose: () => void
+  /**
+   * D13: the control that opened the layer; it gets accessibility focus once the layer closes.
+   * `null` only where the caller already returns focus itself (and says so where it passes it),
+   * for example to one of several openers it tracks. Omitted only by the share-card composer,
+   * whose source is pinned byte for byte by the Story 6.9 iPad anchor proof
+   * (scripts/lib/story69-ipad-evidence.mjs); it restores focus itself on dismiss.
+   */
+  returnFocusRef?: LayerFocusTarget | null
   /**
    * The scrim's color, painted by the full-screen layer that holds the keyboard view,
    * so the space that view gives up while the keyboard moves never shows the screen
@@ -208,10 +238,85 @@ export function underModalAccessibility(open: boolean, os: string = Platform.OS)
   } as const
 }
 
+/** D13: how far down, in px, a drag on a layer's header must travel to close it. */
+export const LAYER_SWIPE_CLOSE_PX = 80
+
+/** A drag counts as vertical once it moved this far, so a tap never starts one. */
+const LAYER_SWIPE_SLOP_PX = 8
+
+/**
+ * Whether a drag that ended `dx` across and `dy` down closes the layer: 80 px or more downward
+ * and more down than across. A horizontal or upward drag never closes.
+ */
+export function layerSwipeCloses(dx: number, dy: number): boolean {
+  return dy >= LAYER_SWIPE_CLOSE_PX && Math.abs(dx) < dy
+}
+
+/** The open layer's close request, for the swipe handle inside it. */
+const LayerCloseContext = createContext<(() => void) | null>(null)
+
+/**
+ * D13: the draggable header of a layer. A downward drag of LAYER_SWIPE_CLOSE_PX or more that
+ * starts on it closes the layer through its `onRequestClose`, the same path as system back. It
+ * claims only a vertical move, so taps on the controls inside it (back, close) still land. It
+ * never animates, so reduced motion needs nothing more; the modal's own exit follows the setting.
+ */
+export function LayerSwipeHandle({
+  children,
+  style,
+  testID = 'layer-swipe-handle',
+}: {
+  children: ReactNode
+  style?: StyleProp<ViewStyle>
+  testID?: string
+}) {
+  const close = useContext(LayerCloseContext)
+  const closeRef = useRef(close)
+  closeRef.current = close
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        // Captured, so a drag that starts on the back arrow or the title still closes.
+        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+          gesture.dy > LAYER_SWIPE_SLOP_PX && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+        onPanResponderRelease: (_event, gesture) => {
+          if (layerSwipeCloses(gesture.dx, gesture.dy)) closeRef.current?.()
+        },
+        onPanResponderTerminationRequest: () => true,
+      }),
+    []
+  )
+  return (
+    <View testID={testID} style={style} {...responder.panHandlers}>
+      {children}
+    </View>
+  )
+}
+
+/**
+ * Moves accessibility focus (keyboard focus on web) to the layer's opener: an element, or a
+ * native node handle a caller kept from the press event.
+ */
+function focusOpener(target: unknown) {
+  if (target == null) return
+  if (typeof target === 'number') {
+    if (Platform.OS !== 'web') AccessibilityInfo.setAccessibilityFocus(target)
+    return
+  }
+  if (Platform.OS === 'web') {
+    ;(target as { focus?: () => void }).focus?.()
+    return
+  }
+  const node = safeFindNodeHandle(target)
+  if (node != null) AccessibilityInfo.setAccessibilityFocus(node)
+}
+
 export function EdgeToEdgeModal({
   scrim,
   scrimTestID,
   children,
+  returnFocusRef,
+  onDismiss,
   ...props
 }: EdgeToEdgeModalProps) {
   const [keyboardOpen] = useKeyboardOpen()
@@ -233,15 +338,40 @@ export function EdgeToEdgeModal({
   // The opening render takes the setting as it is now (CodeRabbit r2 #3); every later render of
   // that presentation keeps it.
   const animationType = visible && presentation.open ? presentation.animation : requested
+  const returnFocus = useRef(returnFocusRef)
+  returnFocus.current = returnFocusRef
+  // D13: the opener takes focus as the layer closes. An iOS sheet that closes by `visible` and
+  // is still animating away hands it over once more on onDismiss, when VoiceOver can reach the
+  // screen again; Android, web and any unmount focus once.
+  const mounted = useRef(true)
+  const focusOnDismiss = useRef<unknown>(null)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   useEffect(() => {
     if (!visible) return
     setOpenModals(1)
-    return () => setOpenModals(-1)
+    return () => {
+      setOpenModals(-1)
+      const opener = returnFocus.current?.current
+      if (opener == null) return
+      focusOpener(opener)
+      if (Platform.OS === 'ios' && mounted.current) focusOnDismiss.current = opener
+    }
   }, [visible])
   return (
     <Modal
       transparent
       {...props}
+      onDismiss={() => {
+        const opener = focusOnDismiss.current
+        focusOnDismiss.current = null
+        focusOpener(opener)
+        onDismiss?.()
+      }}
       animationType={animationType}
       statusBarTranslucent
       navigationBarTranslucent
@@ -252,7 +382,9 @@ export function EdgeToEdgeModal({
           style={styles.fill}
           {...modalKeyboardAvoiding(keyboardOpen)}
         >
-          {withModalMarker(children)}
+          <LayerCloseContext.Provider value={props.onRequestClose}>
+            {withModalMarker(children)}
+          </LayerCloseContext.Provider>
         </KeyboardAvoidingView>
       </View>
     </Modal>

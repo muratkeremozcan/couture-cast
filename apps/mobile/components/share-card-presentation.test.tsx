@@ -1,6 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeModalModule from './edge-to-edge-modal'
 import React, { createElement, useEffect, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -73,7 +74,9 @@ vi.mock('../modules/accessibility-focus', () => ({
   // No placement-aware move here: the composer's single-shot move records every focus.
   focusAccessibilityElementAfterPlacement: () => null,
 }))
-vi.mock('./edge-to-edge-modal', () => ({
+// Story CC-7.11 D13: every other export stays real, so the header keeps its LayerSwipeHandle.
+vi.mock('./edge-to-edge-modal', async (importOriginal) => ({
+  ...(await importOriginal<typeof EdgeToEdgeModalModule>()),
   useModalInsets: () => ({ top: 10, bottom: 10, left: 0, right: 0 }),
   EdgeToEdgeModal: ({
     visible,

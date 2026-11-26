@@ -62,10 +62,16 @@ import { acquireScrollLock } from './modal-stack'
 
 export interface PlannerRailProps {
   isOpen: boolean
-  onClose: () => void
+  /** The rail's own X and the overlay's Escape; the Plan route hides both (`hideHeader`). */
+  onClose?: () => void
   variant: 'rail' | 'overlay'
   /** The control that opened the rail, so `overlay` can restore focus to it on close. */
   invokingElementRef?: React.RefObject<HTMLElement | null>
+  /**
+   * Story CC-7.11 D9: on the Plan route the top bar carries the title and back, so the rail
+   * drops its own heading row and close button.
+   */
+  hideHeader?: boolean
 }
 
 type EntitlementState = 'checking' | 'entitled' | 'locked' | 'error' | 'missing_city'
@@ -419,6 +425,7 @@ export function PlannerRail({
   onClose,
   variant,
   invokingElementRef,
+  hideHeader = false,
 }: PlannerRailProps) {
   const { t } = useTranslation()
   /** True while the member's week is still being checked, for the landmark's `aria-busy`. */
@@ -472,7 +479,7 @@ export function PlannerRail({
       if (variant !== 'overlay') return
       if (event.key === 'Escape') {
         event.preventDefault()
-        onClose()
+        onClose?.()
         return
       }
       if (event.key !== 'Tab') return
@@ -518,22 +525,24 @@ export function PlannerRail({
       }
       aria-busy={isChecking}
     >
-      <div className="flex items-center justify-between border-b border-theme-card-border pb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-theme-card-text">
-            {t('commerce.premium.planner.sectionTitle')}
-          </h3>
+      {!hideHeader && (
+        <div className="flex items-center justify-between border-b border-theme-card-border pb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-theme-card-text">
+              {t('commerce.premium.planner.sectionTitle')}
+            </h3>
+          </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            onClick={onClose}
+            aria-label={t('commerce.premium.planner.close')}
+            className="min-h-11 min-w-11 rounded-md p-1 text-theme-card-text hover:opacity-70"
+          >
+            ✕
+          </button>
         </div>
-        <button
-          ref={closeButtonRef}
-          type="button"
-          onClick={onClose}
-          aria-label={t('commerce.premium.planner.close')}
-          className="min-h-11 min-w-11 rounded-md p-1 text-theme-card-text hover:opacity-70"
-        >
-          ✕
-        </button>
-      </div>
+      )}
 
       {/*
         The week belongs to the member the session bridge names right now: it is keyed by that

@@ -1,9 +1,16 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-030..032 for the saved look detail layer (D12): its
+// header is the app top bar with back and the look's title, and back, system back and a header
+// swipe close it and hand accessibility focus back to the look's Reopen.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ReactNativeModule from 'react-native'
 import type {
   GarmentItemContract,
   SavedLookContract,
@@ -27,6 +34,31 @@ const {
   notifyMobileSavedLooksChanged: vi.fn(),
   restoreSavedLookFromMobile: vi.fn(),
 }))
+
+// D13: native accessibility focus. react-native-web's findNodeHandle always throws, so each node
+// gets a stable fake tag; on web (every other case here) the wrapper never asks for one.
+const a11y = vi.hoisted(() => {
+  const tags = new Map<unknown, number>()
+  return {
+    tags,
+    tagOf: (node: unknown) => {
+      if (!tags.has(node)) tags.set(node, 300 + tags.size)
+      return tags.get(node)!
+    },
+    setAccessibilityFocus: vi.fn(),
+  }
+})
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  return {
+    ...actual,
+    findNodeHandle: (node: unknown) => (node ? a11y.tagOf(node) : null),
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: a11y.setAccessibilityFocus,
+    },
+  }
+})
 
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn().mockResolvedValue(null),
@@ -53,8 +85,12 @@ vi.mock('@/src/lib/saved-looks', () => ({
     `"saved-look:${id}:${revision}"`,
 }))
 
+import { Platform } from 'react-native'
 import { MobileSavedLookRequestError } from '../../lib/saved-looks'
 import { ClosetSavedLooksRow } from './saved-looks-row'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { press } from '@/src/test-utils/press'
 
 const ACTIVE_GARMENT: GarmentItemContract = {
   id: 'garment-1',
@@ -160,8 +196,11 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(screen.getByTestId('closet-saved-looks-row'))
     expect(screen.getByTestId('saved-look-photo-placeholder')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByTestId('saved-look-reopen'))
-    expect(onReopenStylePiece).toHaveBeenCalledWith(look)
+    // [Codex 7.11 #8] Story CC-7.11 D13: the Reopen pressed rides along as the editor's opener,
+    // so focus can return to it once the editor closes.
+    const reopen = screen.getByTestId('saved-look-reopen')
+    await userEvent.click(reopen)
+    expect(onReopenStylePiece).toHaveBeenCalledExactlyOnceWith(look, reopen)
 
     await userEvent.click(screen.getByTestId('saved-look-remove'))
     await waitFor(() =>
@@ -310,7 +349,11 @@ describe('ClosetSavedLooksRow (mobile)', () => {
       })
     )
 
-    await userEvent.click(screen.getByTestId('saved-look-detail-close'))
+    // Story CC-7.11 D12: the top bar back arrow replaced the detail's Close.
+    await userEvent.click(screen.getByTestId('app-top-bar-back'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+    )
     await userEvent.click(screen.getByTestId('saved-looks-load-more'))
     expect(onLoadMore).toHaveBeenCalledTimes(1)
   })
@@ -386,7 +429,7 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     // Opening missing-garment detail modal shows missing notice and closes cleanly.
     await userEvent.click(screen.getAllByTestId('saved-look-reopen')[0]!)
     expect(await screen.findByTestId('saved-look-detail-missing')).toBeInTheDocument()
-    await userEvent.click(screen.getByTestId('saved-look-detail-close'))
+    await userEvent.click(screen.getByTestId('app-top-bar-back'))
     await waitFor(() =>
       expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
     )
@@ -439,5 +482,144 @@ describe('ClosetSavedLooksRow (mobile)', () => {
     await userEvent.click(screen.getAllByTestId('saved-look-remove')[0]!)
     expect(deleteSavedLookFromMobile).not.toHaveBeenCalled()
     resetNetworkStatusForTests(true)
+  })
+})
+
+/**
+ * Story CC-7.11 D12, D13: a saved look's detail is a full-height layer under the app top bar. The
+ * cases run the native focus path (Android): react-native-web would also refocus the clicked
+ * Reopen on its own, which would hide a lost `returnFocusRef`.
+ */
+describe('ClosetSavedLooksRow detail layer (Story CC-7.11)', () => {
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    setMobileApplicationUserId(null)
+    a11y.tags.clear()
+    shown.clear()
+    // The photo refresh an opened detail asks for returns the same look.
+    getSavedLookFromMobile.mockImplementation((id: string) =>
+      Promise.resolve(shown.get(id))
+    )
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+  })
+  afterEach(() => {
+    Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+  })
+
+  const shown = new Map<string, SavedLookContract>()
+
+  /** A look whose slots are out of the editor's order, so Reopen opens its detail. */
+  function detailLook(id: string, title: string | null = null): SavedLookContract {
+    const base = makeExactEditorLook()
+    const look = makeExactEditorLook({
+      id,
+      title,
+      composition: [
+        base.composition[0]!,
+        { ...base.composition[base.composition.length - 1]!, slotIndex: 1 },
+        { ...base.composition[1]!, slotIndex: 2 },
+      ],
+    })
+    shown.set(id, look)
+    return look
+  }
+
+  async function openDetail(title: string) {
+    await render(
+      <ClosetSavedLooksRow
+        owner="user-1"
+        savedLooks={[
+          detailLook('sl-first', 'Rainy commute'),
+          detailLook('sl-second', title),
+        ]}
+        isLoading={false}
+        loadError={null}
+        garments={[ACTIVE_GARMENT]}
+        onRetry={vi.fn()}
+        onChanged={vi.fn()}
+        onReopenStylePiece={vi.fn()}
+        variant="list"
+      />
+    )
+    // The second look's Reopen, so focus has to come back to the opener, not the first match.
+    const reopen = screen.getAllByTestId('saved-look-reopen')[1]!
+    press(reopen)
+    const detail = await screen.findByTestId('saved-look-detail-modal')
+    return { reopen, detail }
+  }
+
+  it("[7.11-NAT-030] the header is the app top bar with a back arrow and the look's title", async () => {
+    const { detail } = await openDetail('Weekend layers')
+    const handle = within(detail).getByTestId('layer-swipe-handle')
+    const bar = within(handle).getByTestId('app-top-bar')
+    const back = within(bar).getByTestId('app-top-bar-back')
+    expect(back.getAttribute('role')).toBe('button')
+    expect(back.getAttribute('aria-label')).toBe('Back')
+    const title = within(bar).getByTestId('app-top-bar-title')
+    expect(title.getAttribute('role')).toBe('heading')
+    expect(title).toHaveTextContent('Weekend layers')
+    // One header: the old detail heading and its Close are gone.
+    expect(within(detail).queryByText('Saved look')).toBeNull()
+    expect(within(detail).queryByText('Close')).toBeNull()
+    expect(within(detail).getByTestId('layer-body')).toBeInTheDocument()
+  })
+
+  it.each([
+    [
+      '7.11-NAT-031',
+      'the top bar back arrow',
+      (detail: HTMLElement): void | Promise<void> => {
+        press(within(detail).getByTestId('app-top-bar-back'))
+      },
+    ],
+    [
+      '7.11-NAT-030',
+      'system back',
+      (): void | Promise<void> => {
+        // react-native-web calls the Modal's onRequestClose on Escape, as Android does on back.
+        fireEvent.keyUp(document.body, { key: 'Escape' })
+      },
+    ],
+    [
+      '7.11-NAT-032',
+      'a swipe down on the top bar',
+      async (detail: HTMLElement) => {
+        await dragFrom(within(detail).getByTestId('app-top-bar-title'), {
+          dy: LAYER_SWIPE_CLOSE_PX + 40,
+        })
+      },
+    ],
+  ] as const)(
+    '[%s] %s closes the detail and accessibility focus returns to its Reopen',
+    async (_id, _way, close) => {
+      const { reopen, detail } = await openDetail('Weekend layers')
+      expect(a11y.setAccessibilityFocus).not.toHaveBeenCalled()
+
+      await close(detail)
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('saved-look-detail-modal')).not.toBeInTheDocument()
+      )
+      const reopenTag = a11y.tagOf(reopen)
+      await waitFor(() =>
+        expect(a11y.setAccessibilityFocus).toHaveBeenLastCalledWith(reopenTag)
+      )
+      const firstReopen = screen.getAllByTestId('saved-look-reopen')[0]!
+      expect(a11y.setAccessibilityFocus).not.toHaveBeenCalledWith(a11y.tagOf(firstReopen))
+    }
+  )
+
+  it('[7.11-NAT-033] a short swipe on the top bar leaves the detail open', async () => {
+    const { detail } = await openDetail('Weekend layers')
+    await dragFrom(within(detail).getByTestId('app-top-bar-title'), {
+      dy: LAYER_SWIPE_CLOSE_PX / 2,
+    })
+    expect(screen.getByTestId('saved-look-detail-modal')).toBeInTheDocument()
+    expect(a11y.setAccessibilityFocus).not.toHaveBeenCalled()
   })
 })

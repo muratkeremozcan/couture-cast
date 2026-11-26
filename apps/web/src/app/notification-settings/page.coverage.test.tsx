@@ -1,8 +1,13 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the top bar's history-aware back reads the router (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as NextNavigation from 'next/navigation'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { getI18n } from '../../i18n'
 const session = vi.hoisted(() => ({
@@ -17,6 +22,20 @@ vi.mock('../../lib/web-session', () => ({
   signOutWebSession: session.logout,
 }))
 import NotificationSettingsPage from './page'
+
+// Story CC-7.11 D11: the top bar's back reads the router. Outside a mounted app router the real
+// hook throws, so the test supplies one and keeps the rest of next/navigation.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => ({
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}))
 const endpoint = '*/api/v1/community/notification-preferences'
 const label = (key: string) => getI18n().t(`community.notifications.${key}`)
 const settings = () => ({

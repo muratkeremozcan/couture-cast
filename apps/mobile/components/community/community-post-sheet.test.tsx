@@ -1,5 +1,11 @@
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the compose sheet.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the compose header is the layer's
+// swipe handle beside its X. [Codex 7.11 #3]: X and a swipe share one guarded close, so a draft
+// with a photo or text asks "Discard this post?" first (Keep editing or Discard).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 //
 // The network boundary stays REAL and is driven through MSW: the sheet's job is to
 // turn a three-step publish (allocate, raw-byte PUT, publish) and its failures into
@@ -112,6 +118,8 @@ vi.mock('react-native', async (importOriginal) => {
       setAccessibilityFocus: vi.fn(),
     },
     findNodeHandle: vi.fn(),
+    // react-native-web's Alert draws nothing; the recorded call is the discard prompt.
+    Alert: { ...actual.Alert, alert: vi.fn() },
     Platform: { ...actual.Platform, OS: 'web' },
     TouchableOpacity: RecordingTouchable,
   }
@@ -119,7 +127,7 @@ vi.mock('react-native', async (importOriginal) => {
 
 touchableSpy.createElement = createElement
 
-import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
+import { AccessibilityInfo, Alert, Platform, findNodeHandle } from 'react-native'
 import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
   COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
@@ -133,6 +141,8 @@ import {
 } from '@/src/lib/community'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { press } from '@/src/test-utils/press'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { setViewport } from '@/src/test-utils/viewport'
 import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import { server } from '@/src/test-utils/msw/server'
@@ -233,6 +243,30 @@ function SheetHarness() {
       />
     </>
   )
+}
+
+/**
+ * Story CC-7.11 D13: the one discard prompt a dirty close raised, with its two choices. Each
+ * choice runs the button's own handler, as the native alert does when it is tapped.
+ */
+function discardPrompt() {
+  const alert = vi.mocked(Alert.alert)
+  expect(alert, 'one discard prompt').toHaveBeenCalledTimes(1)
+  const [title, message, buttons = []] = alert.mock.calls[0]!
+  expect(title).toBe(enUS.community.compose.discardTitle)
+  expect(title).toBe('Discard this post?')
+  // Story CC-7.11 D13: the prompt says what a discard loses.
+  expect(message).toBe(enUS.community.compose.discardMessage)
+  expect(message).toBe('The photo and text in this post will be lost.')
+  expect(buttons.map(({ text, style }) => ({ text, style }))).toEqual([
+    { text: enUS.community.compose.discardKeep, style: 'cancel' },
+    { text: enUS.community.compose.discard, style: 'destructive' },
+  ])
+  const choose = (index: number) => () =>
+    act(() => {
+      buttons[index]!.onPress?.()
+    })
+  return { keepEditing: choose(0), discard: choose(1) }
 }
 
 async function pickAndAllocate() {
@@ -362,8 +396,13 @@ describe('CommunityPostSheet (Story 6.1)', () => {
           ).toBe(SUGGESTION)
         )
       } else {
-        if (outcome === 'close') press(screen.getByTestId('community-post-sheet-close'))
-        else if (outcome === 'identity')
+        if (outcome === 'close') {
+          // The picked photo makes the draft dirty, so X asks first (Story CC-7.11 D13).
+          press(screen.getByTestId('community-post-sheet-close'))
+          expect(callbacks.onClose).not.toHaveBeenCalled()
+          discardPrompt().discard()
+          expect(callbacks.onClose).toHaveBeenCalledTimes(1)
+        } else if (outcome === 'identity')
           view.rerender(<CommunityPostSheet key="new-owner" visible {...callbacks} />)
         else view.rerender(<CommunityPostSheet visible={false} {...callbacks} />)
         view.rerender(
@@ -425,9 +464,19 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     const { onClose } = renderSheet()
 
     press(screen.getByTestId('community-pick-image-button'))
-    await screen.findByTestId('community-publish-status')
+    // The busy status shows while the picker is still open, before the photo is in the draft;
+    // the case starts once the photo is in and its allocate is on the wire.
+    await screen.findByTestId('community-post-preview-image')
+    await waitFor(() => expect(allocateCommunityLookFromMobile).toHaveBeenCalledOnce())
+    expect(screen.getByTestId('community-publish-status')).toBeInTheDocument()
 
-    press(screen.getByTestId('community-post-sheet-close'))
+    // Story CC-7.11 D13: the photo makes the draft dirty, so X asks before it drops it. The
+    // busy guard holds only a publish, so X stays live while the photo uploads.
+    const close = screen.getByTestId('community-post-sheet-close')
+    expect(close).not.toHaveAttribute('aria-disabled', 'true')
+    press(close)
+    expect(onClose).not.toHaveBeenCalled()
+    discardPrompt().discard()
     expect(onClose).toHaveBeenCalledTimes(1)
 
     // The abandoned request must not come back to complain, or to fill in a
@@ -439,7 +488,60 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     ).toBe('')
   })
 
-  it('6.1-MOB-078 abandons an in-flight publish quietly when the sheet is closed', async () => {
+  // Story CC-7.11 D13: the compose sheet keeps its X, and its header is the swipe handle.
+  it('[7.11-NAT-032] [7.11-NAT-033] a swipe down on the header closes like the X; a short one does not', async () => {
+    const { onClose } = renderSheet()
+    const handle = screen.getByTestId('layer-swipe-handle')
+    expect(handle.contains(screen.getByTestId('community-post-sheet-close'))).toBe(true)
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(onClose).not.toHaveBeenCalled()
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    // An empty draft has nothing to lose, so it closes at once.
+    expect(Alert.alert).not.toHaveBeenCalled()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe on a dirty draft asks first; Keep editing keeps the sheet and the draft', async () => {
+    const { onClose } = renderSheet()
+    const caption = screen.getByTestId('community-caption-input')
+    fireEvent.change(caption, { target: { value: 'Layers for the wind.' } })
+
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    const prompt = discardPrompt()
+    expect(onClose).not.toHaveBeenCalled()
+
+    prompt.keepEditing()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('community-post-sheet')).toBeInTheDocument()
+    expect(screen.getByTestId('community-caption-input')).toHaveValue(
+      'Layers for the wind.'
+    )
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe on a dirty draft closes the sheet once the member picks Discard', async () => {
+    const { onClose } = renderSheet()
+    await pickAndAllocate()
+
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    const prompt = discardPrompt()
+    expect(onClose).not.toHaveBeenCalled()
+
+    prompt.discard()
+    expect(onClose).toHaveBeenCalledTimes(1)
+    // Discard drops the draft: the sheet the parent keeps mounted starts empty.
+    expect(screen.queryByTestId('community-post-preview-image')).toBeNull()
+    expect(
+      screen.getByTestId<HTMLTextAreaElement>('community-alt-text-input').value
+    ).toBe('')
+  })
+
+  it('6.1-MOB-078 keeps the sheet open while a post publishes, then the publish lands', async () => {
     server.use(
       http.post('*/api/v1/community/posts/publish', async () => {
         await delay(250)
@@ -458,11 +560,18 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     press(screen.getByTestId('community-publish-button'))
     await screen.findByTestId('community-publish-status')
 
-    press(screen.getByTestId('community-post-sheet-close'))
-    expect(onClose).toHaveBeenCalledTimes(1)
+    // Story CC-7.11 D13 busy guard (replaces "X abandons the publish"): X is disabled while
+    // publishing, and neither X nor a swipe closes or prompts.
+    const close = screen.getByTestId('community-post-sheet-close')
+    expect(close.getAttribute('aria-disabled')).toBe('true')
+    press(close)
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(Alert.alert).not.toHaveBeenCalled()
 
-    await delay(400)
-    expect(onPublished).not.toHaveBeenCalled()
+    await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1))
     expect(screen.queryByTestId('community-publish-error')).toBeNull()
   })
 

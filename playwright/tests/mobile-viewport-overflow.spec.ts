@@ -1,3 +1,5 @@
+// Story CC-7.11 D4: the Closet actions now live in the top bar (Add and More); the row that
+// broke below is gone and `wardrobeHeaderProblems` holds the new placement.
 // Owner report 2026-11-16, iPhone 16 Safari: the Wardrobe Hub header put its title and three
 // actions on one row, so Outfit capsules broke onto two lines and + Add Garment ran off the
 // screen. TEA test design for fix/web-signed-in-landing, case O-1: at phone widths no page
@@ -13,7 +15,15 @@ import { seedWebSession } from '../support/helpers/commerce-session'
 
 const WIDTHS = [393, 320] as const
 const SCHEMES = ['light', 'dark'] as const
-const MEMBER_ROUTES = ['/', '/wardrobe', '/wardrobe/capsules', '/community', '/settings']
+// Story CC-7.11 D1: Looks is the new tab; its capsules row opens `/wardrobe/capsules`.
+const MEMBER_ROUTES = [
+  '/',
+  '/wardrobe',
+  '/looks',
+  '/wardrobe/capsules',
+  '/community',
+  '/settings',
+]
 const GUEST_ROUTES = ['/']
 
 type Problem = string
@@ -42,9 +52,39 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       }
       return null
     }
-    /** Line boxes of a range's rects: a rect starting below the current line opens a new one. */
-    const linesOf = (range: Range) => {
-      const rects = Array.from(range.getClientRects())
+    /**
+     * The boxes a control's content paints: one per text fragment and one per icon. Story
+     * CC-7.11 D2: an inline svg icon is one box; its paths are not lines of text (a range over
+     * the icon reports a rect per path, which read the multi-path tab icons as two lines).
+     */
+    const contentRects = (element: Element): DOMRect[] => {
+      const rects: DOMRect[] = []
+      const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: (node) => {
+            if (node instanceof SVGSVGElement) {
+              rects.push(node.getBoundingClientRect())
+              // FILTER_REJECT skips the icon's paths with it.
+              return NodeFilter.FILTER_REJECT
+            }
+            return node.nodeType === Node.TEXT_NODE
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_SKIP
+          },
+        }
+      )
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        rects.push(...Array.from(range.getClientRects()))
+      }
+      return rects
+    }
+    /** Line boxes of a set of rects: a rect starting below the current line opens a new one. */
+    const linesOf = (all: DOMRect[]) => {
+      const rects = all
         .filter((rect) => rect.width > 0 && rect.height > 0)
         .sort((a, b) => a.top - b.top)
       let lines = 0
@@ -65,9 +105,7 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       const style = getComputedStyle(element)
       if (style.display.includes('flex') && style.flexDirection.startsWith('column'))
         return Math.max(0, ...Array.from(element.children).map(lineCount))
-      const range = document.createRange()
-      range.selectNodeContents(element)
-      return linesOf(range)
+      return linesOf(contentRects(element))
     }
     const controlProblems = (control: HTMLElement): string[] => {
       const box = control.getBoundingClientRect()
@@ -85,7 +123,11 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       const clip = clippedBy(control, box)
       if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
       const lines = lineCount(control)
-      if (lines > 1) problems.push(`"${name}" wraps onto ${lines} lines`)
+      // Story CC-7.11 D3 (and 7.9-CMP-NAV-001): a bottom tab label may wrap to a second line
+      // where five 64 px tabs leave too little width (Community at 320 px), never a third,
+      // and the cut and overflow checks below still apply to it.
+      const maxLines = control.closest('[data-testid="sticky-bottom-nav"]') ? 2 : 1
+      if (lines > maxLines) problems.push(`"${name}" wraps onto ${lines} lines`)
       // TEA P5, R2: a label cut by its own box, whatever its overflow: content wider than a box,
       // or text that reaches past the control's edges.
       // A screen-reader-only part is a 1 px clipped box on purpose.
@@ -140,42 +182,39 @@ async function settle(page: Page) {
 }
 
 /**
- * TEA P4: below the sm breakpoint the Wardrobe's two secondary actions share the first row in
- * equal halves and + Add Garment takes the whole second row. CC-7.9 D6 moved the three actions
- * out of the top bar into the first row of the body, so the bar stays one 56 px row.
+ * TEA P4 as amended by Story CC-7.11 D4: the Capsules / Silhouette / + Add Garment row above the
+ * grid is gone. + Add Garment (the one gold primary) and the neutral More button sit in the top
+ * bar's trailing slot, on its one 56 px row, beside the title; `layoutProblems` already holds
+ * every header control inside the viewport on one line.
  */
 async function wardrobeHeaderProblems(page: Page): Promise<Problem[]> {
   return page.evaluate(() => {
-    const box = (element: Element | null) => element?.getBoundingClientRect()
-    const actions = document.querySelector('[data-testid="wardrobe-actions"]')
-    const capsules = box(
-      actions?.querySelector('[data-testid="wardrobe-capsules-link"]') ?? null
-    )
-    const add = box(
-      actions?.querySelector('[data-testid="garment-capture-open"]') ?? null
-    )
-    const silhouette = box(
-      Array.from(actions?.querySelectorAll('button') ?? []).find(
-        (button) => button.getAttribute('data-testid') !== 'garment-capture-open'
-      ) ?? null
-    )
-    if (!capsules || !silhouette || !add) return ['a Wardrobe action is missing']
-    const near = (a: number, b: number) => Math.abs(a - b) <= 1
+    const header = document.querySelector('[data-testid="app-header"]')
+    const box = (testId: string) =>
+      header?.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect()
+    const bar = header?.getBoundingClientRect()
+    const add = box('garment-capture-open')
+    const more = box('closet-more-menu')
+    const title = header?.querySelector('h1')?.getBoundingClientRect()
     const problems: string[] = []
-    if (
-      document.querySelector(
-        '[data-testid="app-header"] [data-testid="wardrobe-actions"]'
-      )
-    )
-      problems.push('the actions are inside the top bar')
-    if (!near(capsules.top, silhouette.top))
-      problems.push('the secondaries are not on one row')
-    if (!near(capsules.width, silhouette.width))
-      problems.push('the secondaries are not equal halves')
-    if (!(add.top >= capsules.bottom))
-      problems.push('+ Add Garment is not below the secondaries')
-    if (!near(add.left, capsules.left) || !near(add.right, silhouette.right))
-      problems.push('+ Add Garment does not span the row')
+    // Story CC-7.11 D4: the old action row must not come back above the grid.
+    if (document.querySelector('[data-testid="wardrobe-actions"]'))
+      problems.push('the old Closet action row is still on the page')
+    if (!bar || !add || !more || !title)
+      return [...problems, 'a Closet top bar part is missing']
+    const centre = (rect: DOMRect) => rect.top + rect.height / 2
+    if (Math.round(bar.height) !== 56)
+      problems.push(`the top bar is ${bar.height} px tall`)
+    for (const [name, rect] of [
+      ['+ Add Garment', add],
+      ['More', more],
+    ] as const) {
+      if (rect.top < bar.top - 0.5 || rect.bottom > bar.bottom + 0.5)
+        problems.push(`${name} is outside the top bar row`)
+      if (Math.abs(centre(rect) - centre(title)) > 1)
+        problems.push(`${name} is not on the title's row`)
+    }
+    if (!(more.left >= add.right)) problems.push('More is not after + Add Garment')
     return problems
   })
 }

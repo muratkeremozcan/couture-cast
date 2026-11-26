@@ -13,6 +13,9 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/community',
   '/guardian/accept',
   '/guardian/dashboard',
+  // Story CC-7.11 D8, D9: the Looks tab and its Plan route.
+  '/looks',
+  '/looks/plan',
   '/moderation',
   '/moderation/cases/[caseId]',
   '/moderation/evidence',
@@ -23,6 +26,8 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/preview/continue',
   '/privacy',
   '/settings',
+  // Story CC-7.11 D7: Profile > Style.
+  '/settings/style',
   '/signin',
   '/signup',
   '/signup/finish',
@@ -31,6 +36,8 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/wardrobe',
   '/wardrobe/capsules',
   '/wardrobe/onboarding',
+  // Story CC-7.11 D6: Silhouette as a route.
+  '/wardrobe/silhouette',
 ] as const)
 
 /** Expo Router paths: route groups such as `(tabs)` are not part of the path. */
@@ -41,6 +48,8 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/guardian-accept',
   '/guardian-dashboard',
   '/locations',
+  // Story CC-7.11 D8: the Looks tab.
+  '/looks',
   '/modal',
   '/notification-settings',
   '/palette-advisor',
@@ -48,6 +57,8 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/preview',
   '/preview-continue',
   '/settings',
+  // Story CC-7.11 D7: Profile > Style.
+  '/settings-style',
   '/signin',
   '/signup',
   '/signup-finish',

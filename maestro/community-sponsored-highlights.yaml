@@ -178,6 +178,7 @@ tags:
 - assertNotVisible:
     id: 'community-card-shop-error-seed-spotlight-1'
     label: 'An accepted click shows no error'
+# Story CC-7.11 D12: the rank line is the detail layer's own anchor.
 - assertNotVisible:
-    id: 'community-spotlight-detail-title'
+    id: 'community-spotlight-detail-rank'
     label: 'The CTA never opened the card detail'

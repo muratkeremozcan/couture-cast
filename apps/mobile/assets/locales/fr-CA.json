@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Onglet Un",
     "tab_two": "Paramètres",
-    "home": "Accueil",
-    "wardrobe": "Garde-robe",
+    "today": "Aujourd'hui",
+    "closet": "Garde-robe",
+    "looks": "Looks",
     "community": "Communauté",
     "profile": "Profil"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "État de l'API: {{status}}",
     "api_health_unavailable": "API indisponible",
     "diagnostic_alert_btn": "Enregistrer l'analyse d'alerte météo",
-    "diagnostic_info": "Le suivi alert_received est relié aux écouteurs de réception de notifications push réels."
+    "diagnostic_info": "Le suivi alert_received est relié aux écouteurs de réception de notifications push réels.",
+    "style": {
+      "row": "Style",
+      "title": "Style",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configuration de la garde-robe",
+      "palette": "Palette de couleurs"
+    }
   },
   "common": {
     "loading": "Chargement",
@@ -419,6 +427,16 @@
         "unknown": "En cours"
       },
       "detailTitle": "Détails de la pièce"
+    },
+    "menu": {
+      "add": "Ajouter",
+      "more": "Plus",
+      "moreLabel": "Plus d’options de garde-robe",
+      "label": "Options de la garde-robe",
+      "setup": "Configuration de la garde-robe",
+      "setupDone": "Configuration de la garde-robe : terminée",
+      "silhouette": "Silhouette",
+      "close": "Fermer"
     }
   },
   "commerce": {
@@ -759,7 +777,8 @@
       "loadMore": "Charger plus de looks",
       "loadingMore": "Chargement",
       "yourPostsTitle": "Vos looks en cours",
-      "yourPostsBody": "Vous êtes la seule personne à les voir tant que la vérification n’est pas terminée."
+      "yourPostsBody": "Vous êtes la seule personne à les voir tant que la vérification n’est pas terminée.",
+      "detailTitle": "Look partagé"
     },
     "card": {
       "label": "Look de {{author}}",
@@ -867,7 +886,11 @@
       "publishing": "Vérification et publication",
       "uploading": "Téléversement de votre photo",
       "cancel": "Annuler",
-      "success": "Votre look a été soumis pour examen."
+      "success": "Votre look a été soumis pour examen.",
+      "discardTitle": "Abandonner cette publication ?",
+      "discardMessage": "La photo et le texte de cette publication seront perdus.",
+      "discardKeep": "Continuer la modification",
+      "discard": "Abandonner"
     },
     "validation": {
       "photoRequired": "Choisissez une photo à partager.",
@@ -1237,5 +1260,10 @@
       "linkedGuardians": "Tuteurs associés",
       "empty": "Aucun tuteur n'a encore donné son consentement."
     }
+  },
+  "looks": {
+    "empty": "Enregistre un look pour le voir ici",
+    "capsules": "Capsules",
+    "plan": "Plan"
   }
 }

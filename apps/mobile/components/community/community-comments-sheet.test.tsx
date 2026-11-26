@@ -1,5 +1,10 @@
 // Learning path Step 42: Screened threaded comments.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the comments header is the
+// layer's swipe handle; a swipe takes the Back path, so an open keyboard closes first.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React, { createElement } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -34,6 +39,8 @@ import {
   paddingBottomOf,
   liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { CommunityCommentsSheet } from './community-comments-sheet'
 
 /**
@@ -573,6 +580,22 @@ describe('Story 6.4 native comments sheet through real wrappers', () => {
     const close = vi.fn()
     renderSheet({ onClose: close })
     press(await screen.findByRole('button', { name: 'Close comments' }))
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the header closes the sheet like Close', async () => {
+    const close = vi.fn()
+    renderSheet({ onClose: close })
+    await screen.findByRole('heading', { name: 'Comments' })
+    const handle = within(screen.getByTestId('comments-sheet')).getByTestId(
+      'layer-swipe-handle'
+    )
+    expect(handle.contains(sheetTitle())).toBe(true)
+    expect(handle.contains(screen.getByTestId('comments-close'))).toBe(true)
+
+    await dragFrom(sheetTitle(), { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(close).not.toHaveBeenCalled()
+    await dragFrom(sheetTitle(), { dy: LAYER_SWIPE_CLOSE_PX + 40 })
     expect(close).toHaveBeenCalledOnce()
   })
 
@@ -1155,6 +1178,25 @@ describe('R51 comments sheet with the keyboard open', () => {
     expect(onClose).not.toHaveBeenCalled()
     expect(thread()).toBeVisible()
     fireEvent.keyUp(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe with the keyboard open closes only the keyboard, then the sheet on the next swipe', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    await screen.findByTestId('comment-root-long')
+    const draft = 'A wool coat would work.'
+    fireEvent.change(composer(), { target: { value: draft } })
+    act(() => composer().focus())
+    keyboardShown()
+    expect(thread()).not.toBeVisible()
+
+    await dragFrom(sheetTitle(), { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(thread()).toBeVisible()
+    expect(composer()).toHaveValue(draft)
+
+    await dragFrom(sheetTitle(), { dy: LAYER_SWIPE_CLOSE_PX + 40 })
     expect(onClose).toHaveBeenCalledOnce()
   })
 

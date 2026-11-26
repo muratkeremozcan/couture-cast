@@ -24,7 +24,11 @@ import {
   updateGarmentTagsFromMobile,
 } from '../../src/lib/wardrobe'
 import { useAccessibilityAnnouncer } from '../../src/hooks/use-accessibility-announcer'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { createSchemeStyles, useSchemeColors } from '@/components/themed'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
@@ -169,12 +173,9 @@ export function MobileGarmentTaggingModal({
             onCloseRef.current()
             return true
           })
+    // Story CC-7.11 D13: EdgeToEdgeModal hands focus back to the invoker (returnFocusRef).
     return () => {
       backSubscription?.remove()
-      const invoker = invokingNodeHandleRef.current
-      if (Platform.OS !== 'web' && invoker) {
-        AccessibilityInfo.setAccessibilityFocus(invoker)
-      }
     }
   }, [visible])
 
@@ -326,6 +327,7 @@ export function MobileGarmentTaggingModal({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
+      returnFocusRef={invokingNodeHandleRef}
       scrim={scrim}
     >
       <View style={styles.overlay}>
@@ -335,7 +337,8 @@ export function MobileGarmentTaggingModal({
           accessibilityViewIsModal={true}
           onAccessibilityEscape={() => onCloseRef.current()}
         >
-          <View style={styles.header}>
+          {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+          <LayerSwipeHandle style={styles.header}>
             <Text
               ref={titleRef}
               style={styles.title}
@@ -353,7 +356,7 @@ export function MobileGarmentTaggingModal({
             >
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
-          </View>
+          </LayerSwipeHandle>
 
           <TaggingError
             message={suggestionError}

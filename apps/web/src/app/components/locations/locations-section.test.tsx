@@ -4,6 +4,10 @@
 // shapes, the platform header and the contract parsing are exercised with the UI.
 // Interactions go through user-event, so typing reaches the debounce one key at a
 // time and keyboard presses land on the focused element, as they do for a reader.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): guided city setup from the planner returns to /looks/plan (D9).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -654,7 +658,7 @@ describe('LocationsSection', () => {
 
   it('finds a city that was saved before the response failed and returns to Planner on retry', async () => {
     signIn()
-    searchParams = new URLSearchParams({ addLocation: '1', returnTo: '/?planner=1' })
+    searchParams = new URLSearchParams({ addLocation: '1', returnTo: '/looks/plan' })
     const lists = vi.fn(() => HttpResponse.json({ data: saved }))
     const save = vi.fn(() => {
       saved = [location({ label: CANDIDATE.city })]
@@ -677,13 +681,13 @@ describe('LocationsSection', () => {
     expect(push).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith('/?planner=1'))
+    await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith('/looks/plan'))
     expect(lists).toHaveBeenCalledTimes(2)
     expect(save).toHaveBeenCalledTimes(1)
   })
 
   it.each([
-    ['/?planner=1', '/?planner=1'],
+    ['/looks/plan', '/looks/plan'],
     ['//evil.example', '/'],
   ])(
     'cancels guided city setup from %s without saving a selected city',

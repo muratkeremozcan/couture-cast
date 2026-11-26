@@ -4,13 +4,20 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Learning path Step 58: Image uploads straight to storage.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the capture header is the layer's
+// swipe handle beside its X. [Codex 7.11 #3]: the swipe takes the X's guarded close, so a
+// picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
-import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
+import { AccessibilityInfo, Alert, findNodeHandle, Platform } from 'react-native'
+import { getGuestPreviewStrings } from '@couture/utils'
 import { http, HttpResponse } from 'msw'
 import {
   createGarmentItemInputSchema,
@@ -25,6 +32,8 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { MobileGarmentCaptureModal } from './garment-capture-modal'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
 import {
   EDGE_TO_EDGE_MODAL_PROPS,
   TEST_SAFE_AREA_INSETS,
@@ -63,6 +72,8 @@ vi.mock('react-native', async (importOriginal) => {
       openSettings: openSettingsMock,
     },
     findNodeHandle: vi.fn(),
+    // react-native-web's Alert draws nothing; the recorded call is the discard prompt.
+    Alert: { ...actual.Alert, alert: vi.fn() },
     Modal: recordModalProps(
       ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
         visible ? children : null
@@ -269,6 +280,75 @@ describe('MobileGarmentCaptureModal', () => {
     fireEvent.click(screen.getByTestId('garment-capture-close'))
 
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  // Story CC-7.11 D13: the plan's contract keeps the X and makes the header the swipe handle.
+  it('[7.11-NAT-032] [7.11-NAT-033] a swipe down on the header closes like the X; a short one does not', async () => {
+    const { onClose } = renderModal()
+    const handle = screen.getByTestId('layer-swipe-handle')
+    expect(handle.contains(screen.getByTestId('garment-capture-close'))).toBe(true)
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
+    expect(onClose).not.toHaveBeenCalled()
+
+    await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe on a picked photo asks first; Keep editing keeps the crop, Discard closes', async () => {
+    const copy = getGuestPreviewStrings('en-US').firstUse
+    const { onClose } = renderModal({ confirmDiscard: true })
+    await pickLibraryPhoto()
+
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    const alert = vi.mocked(Alert.alert)
+    expect(alert).toHaveBeenCalledTimes(1)
+    const [title, message, buttons = []] = alert.mock.calls[0]!
+    expect(title).toBe(copy.discardPhoto)
+    expect(message).toBeUndefined()
+    expect(buttons.map(({ text, style }) => ({ text, style }))).toEqual([
+      { text: copy.keepEditing, style: 'cancel' },
+      { text: copy.discard, style: 'destructive' },
+    ])
+
+    act(() => buttons[0]!.onPress?.())
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('garment-crop-preview')).toBeInTheDocument()
+
+    act(() => buttons[1]!.onPress?.())
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] while a photo uploads, X, swipe and back keep the sheet open and the upload running', async () => {
+    let allocations = 0
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', () => {
+        allocations++
+        return new Promise<never>(() => undefined)
+      })
+    )
+    const { onClose, onGarmentCommitted } = renderModal()
+    await pickLibraryPhotoAndConfirm()
+    await waitFor(() => screen.getByTestId('garment-upload-progress'))
+
+    // Story CC-7.11 D13 busy guard: the X is disabled and announces it.
+    const close = screen.getByTestId('garment-capture-close')
+    expect(close.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(close)
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+    expect(Alert.alert).not.toHaveBeenCalled()
+    expect(screen.getByTestId('garment-upload-progress')).toBeInTheDocument()
+    expect(allocations, 'the upload was not restarted or dropped').toBe(1)
+    expect(onGarmentCommitted).not.toHaveBeenCalled()
   })
 
   it('4.4-MOB-CAP-04 moves to the crop step after picking a library photo', async () => {

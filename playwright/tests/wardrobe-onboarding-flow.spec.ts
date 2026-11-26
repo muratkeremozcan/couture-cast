@@ -95,8 +95,9 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       await test.step('Land on the permission step', async () => {
         await page.goto('/wardrobe/onboarding')
         await waitForAccessibilityReady(page)
+        // Story CC-7.11 D5, D10: the setup screen is titled Closet setup, as the More menu names it.
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Set up your closet' })
+          page.getByRole('heading', { level: 1, name: 'Closet setup' })
         ).toBeVisible()
         await expect(
           page.getByRole('heading', {
@@ -152,13 +153,28 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
       await test.step('The completion redirect returns to the wardrobe hub', async () => {
         await page.getByRole('button', { name: 'Continue' }).click()
         await expect(page).toHaveURL(/\/wardrobe$/)
+        // Story CC-7.11 D1: the tab title reads Closet.
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe' })
+          page.getByRole('heading', { level: 1, name: 'Closet' })
         ).toBeVisible()
+        // Story CC-7.11 D5: with setup finished the More menu's setup item reads done.
+        const more = page.getByTestId('app-header').getByTestId('closet-more-menu')
+        await more.click()
+        await expect(more).toHaveAttribute('aria-expanded', 'true')
+        await expect(
+          page.getByRole('menu').getByRole('menuitem', { name: 'Closet setup: done' })
+        ).toHaveAttribute('data-testid', 'closet-more-setup')
+        await page.keyboard.press('Escape')
+        await expect(more).toHaveAttribute('aria-expanded', 'false')
       })
 
-      await test.step('Reopening onboarding after completion redirects straight back to the hub', async () => {
+      // Story CC-7.11 D5: Closet setup is a More and Style entry now, so a finished setup
+      // opens on its completion step (no silent redirect); Continue returns to the Closet.
+      await test.step('Reopening onboarding after completion shows the completion step', async () => {
         await page.goto('/wardrobe/onboarding')
+        await expect(page).toHaveURL(/\/wardrobe\/onboarding$/)
+        await expect(page.getByText('Your closet is ready')).toBeVisible()
+        await page.getByRole('button', { name: 'Continue' }).click()
         await expect(page).toHaveURL(/\/wardrobe$/)
       })
     }

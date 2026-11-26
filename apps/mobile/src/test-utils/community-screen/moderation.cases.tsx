@@ -19,6 +19,7 @@ import {
   type CommunityBannedError,
 } from '@couture/api-client/contracts/http'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { CommunityTab } from './community-tab'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
@@ -81,7 +82,7 @@ export function registerCommunityModerationCases() {
   it('C-MOB-D-NOTICE a ban found on a later read takes the feed and the composer away', async () => {
     let refuse = false
     serveFeed(() => (refuse ? banned(TEMPORARY) : feedJson({ items: [item()] })))
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     await screen.findByTestId('community-post-card-post-a')
     refuse = true
     press(await screen.findByTestId('community-filter-chip-all'))

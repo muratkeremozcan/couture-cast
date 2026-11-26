@@ -49,7 +49,11 @@ import {
   throwUploadStepError,
   useUploadSessionChange,
 } from '@/src/lib/upload-attempts'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
@@ -142,12 +146,9 @@ export function MobileGarmentCaptureModal({
             const node = safeFindNodeHandle(titleRef.current)
             if (node) AccessibilityInfo.setAccessibilityFocus(node)
           }, 150)
+    // Story CC-7.11 D13: EdgeToEdgeModal hands focus back to the invoker (returnFocusRef).
     return () => {
       if (focusTimer !== null) clearTimeout(focusTimer)
-      const invoker = invokingNodeHandleRef.current
-      if (Platform.OS !== 'web' && invoker) {
-        AccessibilityInfo.setAccessibilityFocus(invoker)
-      }
     }
   }, [visible])
 
@@ -164,6 +165,9 @@ export function MobileGarmentCaptureModal({
   useUploadSessionChange(resetCapture)
 
   const handleClose = () => {
+    // Story CC-7.11 D13 (busy guard): while a photo uploads, X, back and swipe keep the sheet
+    // open; Cancel is the one way to stop an upload.
+    if (step === 'uploading') return
     const close = () => {
       resetCapture()
       onClose()
@@ -421,6 +425,7 @@ export function MobileGarmentCaptureModal({
       animationType={modalAnimation}
       visible={visible}
       onRequestClose={handleClose}
+      returnFocusRef={invokingNodeHandleRef}
     >
       <View
         style={[
@@ -432,7 +437,8 @@ export function MobileGarmentCaptureModal({
         accessibilityViewIsModal={true}
         onAccessibilityEscape={handleClose}
       >
-        <View style={styles.modalHeader}>
+        {/* Story CC-7.11 D13: the header is the layer's swipe-down handle; the X stays. */}
+        <LayerSwipeHandle style={styles.modalHeader}>
           {/* A native Text: the themed one forwards no ref, and focus lands on this title. */}
           <NativeText
             ref={titleRef}
@@ -447,10 +453,12 @@ export function MobileGarmentCaptureModal({
             accessibilityLabel={t('common.close', { defaultValue: 'Close' })}
             testID="garment-capture-close"
             onPress={handleClose}
+            disabled={step === 'uploading'}
+            aria-disabled={step === 'uploading'}
           >
             <Text style={[styles.closeButton, themed.text]}>✕</Text>
           </Pressable>
-        </View>
+        </LayerSwipeHandle>
 
         {errorMessage ? (
           <View accessibilityRole="alert" style={[styles.errorBox, themed.errorBox]}>

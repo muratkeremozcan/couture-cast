@@ -2,6 +2,11 @@
 // member-facing string from the de-DE catalog, with no en-US source string left on screen.
 // Learning path Step 66: One app shell and visual system.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 (TEA): the Closet's Add and More moved into its top bar and setup and Silhouette
+// into the More sheet (D4, D5), so the hub renders under its tab top bar (TabTopBar) here and
+// the sheet is opened for its de-DE copy too.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -20,7 +25,10 @@ vi.mock('expo-router', async () => ({
   router: { replace: vi.fn(), push: vi.fn(), setParams: vi.fn(), navigate: vi.fn() },
   Stack: { Screen: () => null },
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
+// AppTopBar and the More sheet's X import the icon font, whose native module the browser lacks.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 
 vi.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: vi.fn(),
@@ -90,6 +98,8 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { WardrobeHubScreen } from '@/src/features/wardrobe/wardrobe-hub-screen'
+import { press } from '@/src/test-utils/press'
+import { TabTopBar, tabNavigation } from '@/src/test-utils/tab-navigation'
 import WardrobeCapsulesScreen from '../../app/wardrobe-capsules'
 
 /** Built at runtime so the fixture never looks like a credential to secret scanners. */
@@ -281,28 +291,45 @@ describe('7.9-NAT-005 native Wardrobe strings under de-DE', () => {
   afterEach(() => {
     restoreAccessTokenResolver()
     setMobileApplicationUserId(null)
+    tabNavigation.reset()
     vi.clearAllMocks()
   })
 
-  it('[P1] the Wardrobe hub renders de-DE copy and no en-US source string', async () => {
-    render(<WardrobeHubScreen pollOffsetsMs={[1, 1, 1, 1]} />)
+  it('[P1] [7.11 D4, D5] the Closet, its top bar and its More sheet render de-DE copy and no en-US source string', async () => {
+    render(
+      <>
+        <TabTopBar title={deDE.tabs.closet} route="wardrobe" />
+        <WardrobeHubScreen pollOffsetsMs={[1, 1, 1, 1]} />
+      </>
+    )
 
     await waitFor(() => expect(screen.getByTestId('wardrobe-garment-list')).toBeVisible())
-    await waitFor(() => expect(screen.getByText(deDE.wardrobe.empty_desc)).toBeVisible())
-    await waitFor(() => expect(screen.getByText(deDE.wardrobe.add_garment)).toBeVisible())
-    await waitFor(() =>
-      expect(screen.getByText(deDE.wardrobe.capsules.title)).toBeVisible()
-    )
-    expect(screen.getByTestId('wardrobe-onboarding-card')).toHaveTextContent(
-      deDE.wardrobe.onboarding.title
-    )
+    // The top bar's Add reads the short "+ Hinzufügen" with the full name for assistive tech.
+    const add = screen.getByTestId('garment-capture-open')
+    expect(add).toHaveTextContent(`+ ${deDE.wardrobe.menu.add}`)
+    expect(add).toHaveAccessibleName(deDE.wardrobe.add_garment)
+    const more = screen.getByTestId('closet-more-menu')
+    expect(more).toHaveTextContent(deDE.wardrobe.menu.more)
     expect(screen.getByTestId('garment-status-awaiting_tags')).toHaveTextContent(
       deDE.wardrobe.hub.status.awaiting_tags
     )
     expect(screen.getAllByTestId('garment-status-ready')[0]).toHaveTextContent(
       deDE.wardrobe.hub.status.ready
     )
+    expect(englishLeftOnScreen()).toEqual([])
 
+    press(more)
+    const sheet = await screen.findByTestId('closet-more-sheet')
+    expect(sheet).toHaveTextContent(deDE.wardrobe.menu.label)
+    expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+      deDE.wardrobe.menu.setup
+    )
+    expect(screen.getByTestId('closet-more-silhouette')).toHaveTextContent(
+      deDE.wardrobe.menu.silhouette
+    )
+    expect(screen.getByTestId('closet-more-close')).toHaveAccessibleName(
+      deDE.wardrobe.menu.close
+    )
     expect(englishLeftOnScreen()).toEqual([])
   })
 

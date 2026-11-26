@@ -3,6 +3,11 @@
 //
 // Story 6.15 r46: on a native platform a tab label reports its height only once it has settled,
 // and a new text, scale or position starts unsettled again.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 (TEA): the labels read Today and Community (D1); at text scale 2 on Android a
+// wrapped label shrinks only to its 12 rendered px floor (D3, P7).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as ReactNative from 'react-native'
 import { act, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -22,6 +27,7 @@ vi.mock('react-native', async (original) => {
   }
 })
 
+import { StyleSheet } from 'react-native'
 import { TabBarLabel, useTabBarSizing } from './tab-bar-label'
 
 const latest = (text: string) =>
@@ -37,14 +43,14 @@ describe('6.15 tab bar label on a native platform', () => {
     const onHeight = vi.fn()
     const view = render(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
-        Home
+        Today
       </TabBarLabel>
     )
     // Unsettled: a layout before the text layout reports nothing.
-    layout(latest('Home'), 40)
+    layout(latest('Today'), 40)
     expect(onHeight).not.toHaveBeenCalled()
-    oneLine(latest('Home'))
-    expect(onHeight).toHaveBeenLastCalledWith('Home', 40, 'below-icon')
+    oneLine(latest('Today'))
+    expect(onHeight).toHaveBeenLastCalledWith('Today', 40, 'below-icon')
 
     view.rerender(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
@@ -67,13 +73,35 @@ describe('6.15 tab bar label on a native platform', () => {
     }
     render(<Probe />)
     // At 2.0 a 28 high label grew 14: the bar grows 14 and, below the icon, the underline too.
-    act(() => sizing!.onLabelHeight('Home', 28, 'below-icon'))
+    act(() => sizing!.onLabelHeight('Today', 28, 'below-icon'))
     expect(sizing!.growth).toBe(14)
     expect(sizing!.indicatorDrop).toBe(14)
     // Beside the icon the bar still fits the label, but the underline stays put.
-    act(() => sizing!.onLabelHeight('Home', 28, 'beside-icon'))
+    act(() => sizing!.onLabelHeight('Today', 28, 'beside-icon'))
     expect(sizing!.growth).toBe(14)
     expect(sizing!.indicatorDrop).toBe(0)
+  })
+
+  it('[7.11-NAT-004] at text scale 2 shrinks a wrapped label to 12 rendered px and no further, on two lines', () => {
+    captured.props.length = 0
+    render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()}>
+        Community
+      </TabBarLabel>
+    )
+    // A label three times wider than its tab asks for a third of its size; the floor at scale 2
+    // is half of 12 px, which the device draws at 12 px.
+    for (let pass = 0; pass < 3; pass += 1)
+      act(() =>
+        latest('Community').onTextLayout!({
+          nativeEvent: { lines: [{ width: 100 }, { width: 100 }, { width: 100 }] },
+        } as never)
+      )
+    const props = latest('Community')
+    const fontSize = Number(StyleSheet.flatten(props.style).fontSize)
+    expect(fontSize).toBe(6)
+    expect(fontSize * 2).toBe(12)
+    expect(props.numberOfLines).toBe(2)
   })
 
   it('6.15-MOB-TAB-13 never reports the previous label height after a change', () => {
@@ -81,11 +109,11 @@ describe('6.15 tab bar label on a native platform', () => {
     const onHeight = vi.fn()
     const view = render(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
-        Home
+        Today
       </TabBarLabel>
     )
-    layout(latest('Home'), 40)
-    oneLine(latest('Home'))
+    layout(latest('Today'), 40)
+    oneLine(latest('Today'))
     view.rerender(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
         Community

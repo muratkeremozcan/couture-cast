@@ -213,8 +213,12 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
   )
 
   a11yTest(
-    '4.4-A11Y-06 exposes the standalone Silhouette settings modal as a named dialog with a focus trap and restores focus on close',
+    '4.4-A11Y-06 reaches the Silhouette screen from the Closet More menu by keyboard, passes axe and backs out to Closet',
     async ({ apiRequest, cleanupState, page }, testInfo) => {
+      // Story CC-7.11 D5, D6: the Silhouette modal on /wardrobe (named dialog, focus trap,
+      // focus back to its button) is gone. Silhouette is the `/wardrobe/silhouette` route,
+      // opened from the Closet top bar More menu. This proves the menu's keyboard contract
+      // (focus returns to More on Escape) and the route's a11y in place of the modal's.
       await signUpAndAuthenticate(
         apiRequest,
         page,
@@ -225,35 +229,58 @@ a11yTest.describe('Wardrobe Onboarding Accessibility', () => {
       await page.goto('/wardrobe')
       await waitForAccessibilityReady(page)
 
-      const invoker = page.getByRole('button', { name: 'Silhouette' })
-      await expect(invoker).toBeEnabled()
-      await invoker.click()
+      const more = page.getByTestId('app-header').getByTestId('closet-more-menu')
+      await test.step('More opens a menu; Escape closes it and returns focus to More', async () => {
+        await more.focus()
+        await page.keyboard.press('Enter')
+        await expect(more).toHaveAttribute('aria-expanded', 'true')
+        const item = page.getByRole('menu').getByRole('menuitem', { name: 'Silhouette' })
+        await expect(item).toHaveAttribute('data-testid', 'closet-more-silhouette')
+        await page.keyboard.press('Escape')
+        await expect(page.getByRole('menu')).toHaveCount(0)
+        await expect(more).toHaveAttribute('aria-expanded', 'false')
+        await expect(more).toBeFocused()
+      })
 
-      const dialog = page.getByRole('dialog', { name: 'Silhouette' })
-      await expect(dialog).toBeVisible()
+      await test.step('The Silhouette item opens the Silhouette route from the keyboard', async () => {
+        // Codex 7.11 #16: keyboard only, no click. The menu focuses its first item (Closet
+        // setup); ArrowDown moves to Silhouette and Enter activates it.
+        await page.keyboard.press('Enter')
+        const menu = page.getByRole('menu')
+        await expect(menu.getByRole('menuitem').first()).toBeFocused()
+        await page.keyboard.press('ArrowDown')
+        await expect(menu.getByRole('menuitem', { name: 'Silhouette' })).toBeFocused()
+        await page.keyboard.press('Enter')
+        await expect(page).toHaveURL('/wardrobe/silhouette')
+        await expect(
+          page.getByTestId('app-header').getByRole('heading', { level: 1 })
+        ).toHaveText('Silhouette')
+        await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
+        await expect(page.getByRole('dialog')).toHaveCount(0)
+      })
+
+      await waitForAccessibilityReady(page)
       await checkA11y(page, {
         includedImpacts: ['critical', 'serious', 'moderate', 'minor'],
       })
 
-      await test.step('Tab cycles never move focus outside the dialog', async () => {
-        // More presses than the panel's known focusable elements (close
-        // button, two sliders, confirm checkbox, upload button), so any cycle
-        // wrap is exercised at least once.
-        for (let index = 0; index < 15; index += 1) {
+      await test.step('Tab from the top reaches the height slider', async () => {
+        const slider = page.getByTestId('silhouette-height-slider')
+        let reached = false
+        // More presses than the shell's controls before the panel (skip link, back, the
+        // desktop tab links) plus the panel's own, so a slider Tab never reaches fails.
+        for (let index = 0; index < 20 && !reached; index += 1) {
           await page.keyboard.press('Tab')
-          const focusStayedInsideDialog = await dialog.evaluate((dialogEl) =>
-            dialogEl.contains(document.activeElement)
-          )
-          expect(
-            focusStayedInsideDialog,
-            `focus after Tab press ${index + 1} must stay inside the dialog`
-          ).toBe(true)
+          reached = await slider.evaluate((node) => node === document.activeElement)
         }
+        expect(reached, 'the height slider is in the Tab order').toBe(true)
       })
 
-      await page.keyboard.press('Escape')
-      await expect(dialog).toHaveCount(0)
-      await expect(invoker).toBeFocused()
+      await test.step('Back in the top bar returns to the Closet', async () => {
+        await page.getByTestId('app-header').getByTestId('app-top-bar-back').click()
+        await expect(page).toHaveURL('/wardrobe')
+        await expect(more).toBeVisible()
+      })
     }
   )
 })

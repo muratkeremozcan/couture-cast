@@ -19,7 +19,7 @@ export default async function GuardianAcceptPage({
   return (
     // Story CC-7.9 D6, D7: the shared top bar and page surface; the always-dark page is gone.
     <AppPage>
-      <AppTopBar titleKey="guardian.accept.title" backHref="/" />
+      <AppTopBar titleKey="guardian.accept.title" parentHref="/" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <GuardianAcceptView initialToken={token ?? null} />
       </main>

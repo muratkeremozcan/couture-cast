@@ -27,10 +27,17 @@ tags:
 - assertVisible: 'Dil'
 - assertVisible: 'Türkçe'
 
+# Story CC-7.11 D1: the first tab reads Today (tr-TR Bugün); tap it by id.
 - tapOn:
-    text: 'Ana Sayfa'
+    id: 'tab-home'
     retryTapIfNoChange: true
+- assertVisible: 'Bugün'
 
+# Story CC-7.11 D16: the scenario toggles and the hourly ribbon follow the outfit card.
+- scrollUntilVisible:
+    element: 'Sabah gezisi'
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible: 'Sabah gezisi'
 - assertVisible: 'Saatlik tahmin'
 - assertVisible: 'Genişlet (48 sa)'

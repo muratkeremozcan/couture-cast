@@ -89,7 +89,8 @@ tags:
 # By id: Android reports the bar's title beside app-top-bar, not under it, so childOf never matches.
 - assertVisible:
     id: 'app-top-bar-title'
-    text: 'Color palette advisor'
+    # Story CC-7.11 D7: the palette opens from Profile > Style, titled settings.style.palette.
+    text: 'Color palette'
     label: 'Localized screen title in the top bar'
 
 - assertVisible:

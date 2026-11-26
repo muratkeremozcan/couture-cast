@@ -13,7 +13,7 @@
  *   `Mobile E2E` (pr-mobile-e2e.yml), folder `shell-visual/`, one `<scheme>-<tab>.png` per tab.
  *
  * Usage: npm run visual:pull-baselines -- --web <run-id> [--native <run-id>] [--all]
- * `--all` requires all eight web screens (the first pull); native always requires all eight.
+ * `--all` requires all ten web screens (the first pull); native always requires all ten.
  * Review every changed PNG before committing it: a baseline is the expected screen.
  */
 import { spawnSync } from 'node:child_process'
@@ -54,15 +54,17 @@ const filesUnder = (dir) =>
         .map((entry) => path.join(entry.parentPath ?? entry.path, entry.name))
     : []
 
-/** Every web baseline the snapshot spec takes (7.9-VIS-001..008). */
+/** Every web baseline the snapshot spec takes (7.9-VIS-001..008, Story CC-7.11 Looks). */
 export const WEB_BASELINES = ['light', 'dark'].flatMap((scheme) =>
-  ['home', 'closet', 'community', 'profile'].map(
+  ['home', 'closet', 'looks', 'community', 'profile'].map(
     (tab) => `${tab}-${scheme}-chromium-linux.png`
   )
 )
-/** Every native capture of the visual flow (7.9-NVIS-001..008). */
+/** Every native capture of the visual flow (7.9-NVIS-001..008, Story CC-7.11 Looks). */
 export const NATIVE_BASELINES = ['light', 'dark'].flatMap((scheme) =>
-  ['home', 'wardrobe', 'community', 'profile'].map((tab) => `${scheme}-${tab}.png`)
+  ['home', 'wardrobe', 'looks', 'community', 'profile'].map(
+    (tab) => `${scheme}-${tab}.png`
+  )
 )
 
 /**

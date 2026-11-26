@@ -1,6 +1,11 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Story 4.4 Task 5 owner: unit-test the web silhouette settings panel
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-SIL-INFLIGHT-01..02 (Codex 7.11 #11: Silhouette is a
+// route, so leaving it lets a started save or photo removal finish).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // @vitest-environment jsdom
 import React from 'react'
 import { Blob as NodeBlob } from 'node:buffer'
@@ -1777,5 +1782,109 @@ describe('SilhouetteSettingsPanel My Form Retry through the real upload', () => 
     expect(keys.upload).toHaveLength(1)
     expect(keys.commit[0]).toMatch(UUID_V4)
     expect(keys.commit).toEqual([keys.commit[0], keys.commit[0]])
+  })
+})
+
+/**
+ * Story CC-7.11 D6, D10 (Codex 7.11 #11): Silhouette is a route whose back stays available while a
+ * save runs. Leaving it unmounts the panel; a slider save or photo removal already on the wire
+ * finishes (its signal is never aborted) and its answer lands in no screen, so reopening reads
+ * the saved value back.
+ */
+describe('7.11 Silhouette route: in-flight mutations survive leaving', () => {
+  it('[Codex 7.11 #11] 7.11-CMP-SIL-INFLIGHT-01 a held slider save is not aborted by leaving, completes, and reopening shows its value', async () => {
+    const held = Promise.withResolvers<SilhouetteProfileContract>()
+    const signals: AbortSignal[] = []
+    const saveSliders = vi.fn(
+      (
+        _input: { heightSlider: number; buildSlider: number },
+        _ifMatch: string,
+        signal?: AbortSignal
+      ) => {
+        if (signal) signals.push(signal)
+        return held.promise
+      }
+    )
+    const onProfileChange = vi.fn()
+    const { unmount } = renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(buildProfile({ revision: 2 })),
+      saveSliders,
+      onProfileChange,
+      sliderSaveDebounceMs: 5,
+    })
+
+    fireEvent.change(await screen.findByLabelText('Height'), { target: { value: '80' } })
+    await waitFor(() => expect(saveSliders).toHaveBeenCalledTimes(1))
+    onProfileChange.mockClear()
+
+    unmount()
+    expect(signals).toHaveLength(1)
+    expect(signals[0]!.aborted, 'leaving does not abort the save on the wire').toBe(false)
+    // Nothing was debounced, so leaving starts no second save.
+    expect(saveSliders).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      held.resolve(buildProfile({ heightSlider: 80, revision: 3 }))
+      await held.promise
+    })
+    expect(signals[0]!.aborted).toBe(false)
+    expect(onProfileChange, 'the late answer lands in no screen').not.toHaveBeenCalled()
+
+    // Reopening the route reads the value the finished save stored.
+    const getProfile = vi
+      .fn()
+      .mockResolvedValue(buildProfile({ heightSlider: 80, revision: 3 }))
+    renderPanel({ userId: 'user-1', getProfile })
+    await waitFor(() => expect(screen.getByLabelText('Height')).toHaveValue('80'))
+    expect(saveSliders).toHaveBeenCalledWith(
+      { heightSlider: 80, buildSlider: 50 },
+      '"silhouette:user-1:2"',
+      expect.anything()
+    )
+  })
+
+  it('[Codex 7.11 #11] 7.11-CMP-SIL-INFLIGHT-02 a held My Form removal is not aborted by leaving the route', async () => {
+    const held = Promise.withResolvers<SilhouetteProfileContract>()
+    const signals: AbortSignal[] = []
+    const removeMyFormPhoto = vi.fn((_ifMatch: string, signal?: AbortSignal) => {
+      if (signal) signals.push(signal)
+      return held.promise
+    })
+    const user = userEvent.setup()
+    const { unmount } = renderPanel({
+      userId: 'user-1',
+      getProfile: vi.fn().mockResolvedValue(
+        buildProfile({
+          mode: 'my_form',
+          revision: 4,
+          myForm: {
+            status: 'ready',
+            failureReason: null,
+            committedAt: '2026-08-09T09:05:00.000Z',
+            imageAccess: {
+              url: 'https://example.test/me.png',
+              expiresAt: '2026-08-09T10:00:00.000Z',
+            },
+          },
+        })
+      ),
+      removeMyFormPhoto,
+    })
+
+    await user.click(await screen.findByRole('button', { name: 'Remove My Form photo' }))
+    expect(removeMyFormPhoto).toHaveBeenCalledTimes(1)
+
+    unmount()
+    expect(signals).toHaveLength(1)
+    expect(signals[0]!.aborted, 'leaving does not abort the removal on the wire').toBe(
+      false
+    )
+
+    await act(async () => {
+      held.resolve(buildProfile({ revision: 5 }))
+      await held.promise
+    })
+    expect(signals[0]!.aborted).toBe(false)
   })
 })

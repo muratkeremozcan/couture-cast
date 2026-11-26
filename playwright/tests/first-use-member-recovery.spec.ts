@@ -139,6 +139,8 @@ test.describe('Member Home and Planner recovery', () => {
 
       const load = interceptNetworkCall({ method: 'GET', url: planner })
       await page.getByTestId('planner-open-control').click()
+      // Story CC-7.11 D9: Plan week links to the Plan route under Looks.
+      await expect(page).toHaveURL('/looks/plan')
       const response = await load
       expect(response.status).toBe(400)
       expect(response.responseJson).toMatchObject({
@@ -155,7 +157,8 @@ test.describe('Member Home and Planner recovery', () => {
       ).toBeVisible()
       const target = new URL(page.url())
       expect(target.pathname).toBe('/settings')
-      expect(target.searchParams.get('returnTo')).toBe('/?planner=1')
+      // Story CC-7.11 D9: city setup returns to the Plan route, which replaced `/?planner=1`.
+      expect(target.searchParams.get('returnTo')).toBe('/looks/plan')
     }
   )
 
@@ -181,6 +184,8 @@ test.describe('Member Home and Planner recovery', () => {
         fulfillResponse: unavailable,
       })
       await page.getByTestId('planner-open-control').click()
+      // Story CC-7.11 D9: Plan week links to the Plan route under Looks.
+      await expect(page).toHaveURL('/looks/plan')
       expect((await initial).status).toBe(503)
       const rail = page.getByRole('complementary', { name: 'Planner Rail' })
       await expect(rail.getByTestId('planner-rail-error')).toBeVisible()

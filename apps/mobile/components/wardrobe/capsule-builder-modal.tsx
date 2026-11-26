@@ -21,7 +21,11 @@ import type {
   GarmentItemContract,
   OutfitCapsuleContract,
 } from '@couture/api-client/contracts/http'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 import { useTokens } from '@/src/theme/tokens'
@@ -163,13 +167,12 @@ export function MobileCapsuleBuilderModal({
      */
   }, [visible, initialCapsule])
 
-  /** Focus returns to the control that opened the sheet, as the AC requires. */
-  useEffect(() => {
-    if (visible || Platform.OS === 'web' || !invokingNodeHandle) {
-      return
-    }
-    AccessibilityInfo.setAccessibilityFocus(invokingNodeHandle)
-  }, [visible, invokingNodeHandle])
+  /**
+   * Focus returns to the control that opened the sheet, as the AC requires: EdgeToEdgeModal
+   * hands it back on close (Story CC-7.11 D13, returnFocusRef).
+   */
+  const invokingNodeHandleRef = useRef(invokingNodeHandle)
+  invokingNodeHandleRef.current = invokingNodeHandle
 
   const toggleGarment = (id: string) => {
     if (selectedGarmentIds.includes(id)) {
@@ -289,6 +292,7 @@ export function MobileCapsuleBuilderModal({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
+      returnFocusRef={invokingNodeHandleRef}
       scrim={scrim}
     >
       <View style={styles.overlay}>
@@ -299,7 +303,8 @@ export function MobileCapsuleBuilderModal({
           testID="mobile-capsule-builder-container"
           accessibilityViewIsModal
         >
-          <View style={styles.header}>
+          {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+          <LayerSwipeHandle style={styles.header}>
             <Text
               ref={titleRef}
               style={styles.title}
@@ -319,7 +324,7 @@ export function MobileCapsuleBuilderModal({
             >
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
-          </View>
+          </LayerSwipeHandle>
 
           {errorMessage && (
             <View

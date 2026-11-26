@@ -9,7 +9,7 @@ export default function ModerationPage() {
   return (
     // Story CC-7.9 D6, D7: the shared top bar and page surface; staff wording stays as it is (D9).
     <AppPage>
-      <AppTopBar titleKey="moderation.title" backHref="/" />
+      <AppTopBar titleKey="moderation.title" parentHref="/" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <ModerationQueueView />
       </main>

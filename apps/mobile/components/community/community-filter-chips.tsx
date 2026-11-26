@@ -27,6 +27,24 @@ export interface CommunityFilterChipsProps {
   viewerBand?: ClimateBand | null
 }
 
+/**
+ * Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a climate band
+ * and nothing said what a band is, so one line says it. Story CC-7.11 AC2, D16: it follows the
+ * Community's first content (the Spotlight or the first post), so no explanation comes first.
+ */
+export function CommunityFiltersExplainer() {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  return (
+    <Text
+      testID="community-filters-explainer"
+      style={[styles.explainer, { color: palette.inkMuted }]}
+    >
+      {t('community.filters.explainer')}
+    </Text>
+  )
+}
+
 export function CommunityFilterChips({
   selectedMode,
   onSelectMode,
@@ -44,14 +62,6 @@ export function CommunityFilterChips({
         { backgroundColor: palette.page, borderBottomColor: palette.line },
       ]}
     >
-      {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
-          climate band and nothing said what a band is, so one line above them does. */}
-      <Text
-        testID="community-filters-explainer"
-        style={[styles.explainer, { color: palette.inkMuted }]}
-      >
-        {t('community.filters.explainer')}
-      </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -130,7 +140,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingVertical: 8,
   },
   scrollContent: {
     paddingHorizontal: 16,

@@ -4,6 +4,17 @@
 // screen budget under the empty, populated and guardian-pending members). A member with no saved
 // location gets production's `no_location` band notice and its Add location action, counted.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-010 and 040 (Community's first content inside the
+// 360 x 640 fold with no alert or setup before it, every fixture). D16 (spec Plan Change Log):
+// the first content is the City Spotlight when it shows looks, else the first feed card, else
+// the empty state; the band notice follows it. The three fixtures take one branch each:
+// populated has a city and its Spotlight, guardian-pending serves looks with no city, empty
+// serves nothing. Community's own header counts as content until CC-7.15 calms it.
+// New post is the top bar's trailing action (TabTopBar draws what the screen sets), and the
+// climate explainer follows the first content.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
@@ -15,12 +26,12 @@ vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn(), setParams: vi.fn() }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+  // Story CC-7.11 D16: New post goes into the tab top bar through setOptions (TabTopBar).
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
-// AppTopBar (drawn by WithTopBar) imports the icon font, whose native module the browser lacks.
-vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 vi.mock('@/src/analytics/mobile-analytics', async () =>
   (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
 )
@@ -90,14 +101,21 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import {
+  WithFoldScene,
+  chromeBefore,
+  expectFirstContentInFold,
+  setFoldViewport,
+} from '@/src/test-utils/fold-band'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import {
   hasSavedLocation,
   serveScreenBudgetFixture,
   type ScreenBudgetMode,
 } from '@/src/test-utils/msw/screen-budget-fixtures'
+import { TabTopBar, tabNavigation } from '@/src/test-utils/tab-navigation'
 import {
-  WithTopBar,
+  WithTabHeader,
   expectNativeMeasureFloors,
   expectNativeWithinBudget,
   measureNativeScreen,
@@ -112,15 +130,38 @@ const AUDITS: readonly (readonly [string, ScreenBudgetMode])[] = [
   ['7.10-NAT-011', 'guardian-pending'],
 ]
 
+/** D16: the block each fixture's first content must be. */
+const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode, string, string])[] = [
+  ['7.11-NAT-010', 'empty', 'the empty state', 'community-feed-empty'],
+  [
+    '7.11-NAT-010',
+    'populated',
+    'its City Spotlight',
+    'community-spotlight-item-budget-spot-1',
+  ],
+  [
+    '7.11-NAT-040',
+    'guardian-pending',
+    'its first feed card',
+    'community-post-card-budget-look-1',
+  ],
+]
+
+/** The Community top bar as the navigator draws it, New post in its trailing slot (D16). */
+const communityTopBar = () => (
+  <TabTopBar title={i18n.t('tabs.community')} route="community" />
+)
+
 /** Community as the tab layout draws it: under the Community top bar, inside the root providers. */
-function renderCommunity() {
+function renderCommunity(fold = false) {
+  const Frame = fold ? WithFoldScene : WithTabHeader
   return render(
     <AccessibilityAnnouncerProvider>
       <AppThemeProvider>
         <SaveFeedbackProvider>
-          <WithTopBar title={i18n.t('tabs.community')}>
+          <Frame header={communityTopBar()}>
             <CommunityRoute />
-          </WithTopBar>
+          </Frame>
         </SaveFeedbackProvider>
       </AppThemeProvider>
     </AccessibilityAnnouncerProvider>
@@ -173,6 +214,7 @@ describe('Screen budget: native Community', () => {
     restoreToken = undefined
     setMobileApplicationUserId(null)
     screenFocus.reset()
+    tabNavigation.reset()
   })
 
   for (const [id, fixture] of AUDITS) {
@@ -195,6 +237,61 @@ describe('Screen budget: native Community', () => {
         expect(within(notice!).getByTestId('community-add-location')).toBeVisible()
       }
       expectNativeWithinBudget('community', fixture, measurement)
+    }, 30_000)
+  }
+
+  for (const [id, fixture, block, blockId] of FOLD_CASES) {
+    it(`[P0] [${id}] [D16] native community (${fixture}) opens on ${block} inside the 360 x 640 fold`, async () => {
+      await setFoldViewport()
+      serveScreenBudgetFixture(fixture, MEMBER)
+      renderCommunity(true)
+      await communitySettled(fixture)
+      await waitFor(() => expect(screen.getByTestId(blockId)).toBeVisible())
+
+      const anchors = screen.getAllByTestId('community-first-content')
+      expect(anchors, 'one Community first content').toHaveLength(1)
+      const first = anchors[0]!
+      expect(within(first).getByTestId(blockId)).toBeVisible()
+      if (fixture === 'populated') {
+        // The Spotlight leads, so the first feed card below it is not the anchor.
+        expect(first).not.toContainElement(
+          screen.getByTestId('community-post-card-budget-look-1')
+        )
+      }
+      expectFirstContentInFold(first, 'Community first content')
+      expect(chromeBefore(first), 'alerts or setup before Community').toEqual([])
+      // D16: New post is the top bar's trailing action, so no row above the first content
+      // holds it.
+      expect(
+        within(screen.getByTestId('app-top-bar')).getByTestId('community-new-post-button')
+      ).toBeVisible()
+      // D16: the climate explainer follows the first content (Spotlight, first post or empty
+      // state), outside it and below it.
+      const explainers = screen.getAllByTestId('community-filters-explainer')
+      expect(explainers, 'one climate explainer').toHaveLength(1)
+      const explainer = explainers[0]!
+      expect(explainer).toBeVisible()
+      expect(first).not.toContainElement(explainer)
+      expect(
+        first.compareDocumentPosition(explainer) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the explainer follows the first content'
+      ).toBeTruthy()
+      expect(
+        explainer.getBoundingClientRect().top,
+        'the explainer sits below the first content'
+      ).toBeGreaterThanOrEqual(first.getBoundingClientRect().bottom - 1)
+      // D16: a member with no city reads the band notice after the first content.
+      const notice = screen.queryByTestId('community-band-unresolved')
+      if (hasSavedLocation(fixture)) {
+        expect(notice).toBeNull()
+      } else {
+        expect(notice).toBeVisible()
+        expect(first).not.toContainElement(notice)
+        expect(
+          first.compareDocumentPosition(notice!) & Node.DOCUMENT_POSITION_FOLLOWING,
+          'the band notice follows the first content'
+        ).toBeTruthy()
+      }
     }, 30_000)
   }
 })

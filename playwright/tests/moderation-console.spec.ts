@@ -172,9 +172,11 @@ const topBarBack = (page: Page) =>
   page.getByTestId('app-header').getByRole('link', { name: 'Back', exact: true })
 
 /** D6: from 768 px the top bar also holds the tab links, in this order, after Back. */
+// Story CC-7.11 D1: five tabs; Looks (`nav-looks`) sits between Closet and Community.
 const TOP_BAR_TABS = [
   'nav-ritual',
   'nav-wardrobe',
+  'nav-looks',
   'nav-community',
   'nav-profile',
 ] as const

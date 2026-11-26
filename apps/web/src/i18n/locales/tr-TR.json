@@ -636,6 +636,16 @@
           "name": "Çok sıcak"
         }
       }
+    },
+    "menu": {
+      "add": "Ekle",
+      "more": "Daha fazla",
+      "moreLabel": "Daha fazla dolap seçeneği",
+      "label": "Dolap seçenekleri",
+      "setup": "Dolap kurulumu",
+      "setupDone": "Dolap kurulumu: tamam",
+      "silhouette": "Silüet",
+      "close": "Kapat"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Daha fazla kombin yükle",
       "loadingMore": "Yükleniyor",
       "yourPostsTitle": "Sürmekte olan kombinlerin",
-      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün."
+      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün.",
+      "detailTitle": "Paylaşılan kombin"
     },
     "spotlight": {
       "eyebrow": "Şehir Vitrini",
@@ -826,7 +837,11 @@
       "publishing": "İnceleniyor ve yayımlanıyor",
       "uploading": "Fotoğrafın yükleniyor",
       "cancel": "İptal",
-      "success": "Kombinin incelenmek üzere gönderildi."
+      "success": "Kombinin incelenmek üzere gönderildi.",
+      "discardTitle": "Bu gönderiden vazgeçilsin mi?",
+      "discardMessage": "Bu gönderinin fotoğrafı ve metni silinecek.",
+      "discardKeep": "Düzenlemeye devam et",
+      "discard": "Vazgeç"
     },
     "validation": {
       "photoRequired": "Paylaşmak için bir fotoğraf seç.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Profil",
-    "account": "Hesabınız"
+    "account": "Hesabınız",
+    "style": {
+      "row": "Stil",
+      "title": "Stil",
+      "silhouette": "Silüet",
+      "closetSetup": "Dolap kurulumu",
+      "palette": "Renk paleti"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Alt gezinme",
     "primaryLabel": "Ana gezinme",
     "home": "Ana Sayfa",
-    "wardrobe": "Gardırop",
+    "today": "Bugün",
+    "closet": "Dolap",
+    "looks": "Kombinler",
     "community": "Topluluk",
     "profile": "Profil",
     "navigatedTo": "{{label}} sekmesine geçildi"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Bağlı veliler",
       "empty": "Henüz hiçbir veli onay vermedi."
     }
+  },
+  "looks": {
+    "empty": "Burada görmek için bir kombin kaydet",
+    "capsules": "Kapsüller",
+    "plan": "Plan"
   }
 }

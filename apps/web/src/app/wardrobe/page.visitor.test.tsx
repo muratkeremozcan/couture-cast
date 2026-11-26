@@ -1,3 +1,8 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-CLOSET-008 (D4, D5: a visitor's Closet top bar keeps
+// Add as the one gold primary beside a neutral More menu whose Silhouette item is a route link).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 66: One app shell and visual system.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
 // Story CC-7.9 add-on B (builder test, 7.9-E2E-012 is TEA's browser check): a visitor who never
@@ -6,7 +11,15 @@
 // held a session keeps the member error, so an expiry still says so.
 // @vitest-environment jsdom
 import React from 'react'
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   GarmentItemContract,
@@ -26,7 +39,17 @@ const wardrobe = vi.hoisted(() => ({
   resolveCurrentUserId: vi.fn<() => Promise<string>>(),
 }))
 
+// Story CC-7.11 D11: the top bar back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   useSearchParams: () => new URLSearchParams(''),
 }))
@@ -102,9 +125,25 @@ describe('7.9 add-on B: the Closet for a visitor who never signed in', () => {
     const add = screen.getByTestId('garment-capture-open')
     expect(add.tagName).toBe('A')
     expect(add).toHaveAttribute('href', '/signin')
+    // CC-7.11 D4: Add sits in the top bar as the one gold primary, "+ Add" with the full name.
+    const header = screen.getByTestId('app-header')
+    expect(header).toContainElement(add)
+    expect(add).toHaveAccessibleName(enUS.wardrobe.hub.addGarment)
+    expect(add).toHaveTextContent(`+ ${enUS.wardrobe.menu.add}`)
+    expect(add).toHaveAttribute('data-gold', 'primary')
+    expect(document.querySelectorAll('[data-gold="primary"]')).toHaveLength(1)
+    // CC-7.11 D5, D6: Silhouette is no Closet button any more; the neutral More menu links to
+    // its route, which offers a visitor sign-in.
     expect(
-      screen.getByRole('button', { name: enUS.wardrobe.silhouette.title })
-    ).toBeDisabled()
+      screen.queryByRole('button', { name: enUS.wardrobe.silhouette.title })
+    ).toBeNull()
+    const more = within(header).getByTestId('closet-more-menu')
+    expect(more).not.toHaveAttribute('data-gold')
+    fireEvent.click(more)
+    expect(screen.getByTestId('closet-more-silhouette')).toHaveAttribute(
+      'href',
+      '/wardrobe/silhouette'
+    )
   })
 
   it('keeps the member errors on a page that held a session', async () => {

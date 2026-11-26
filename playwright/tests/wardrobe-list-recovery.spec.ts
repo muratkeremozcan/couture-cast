@@ -45,7 +45,16 @@ test(
     await page.goto('/wardrobe')
     expect((await setup).status).toBe(200)
     expect((await failed).status).toBe(503)
-    await expect(page.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    // Story CC-7.11 D4, D5: the "Set up your closet" banner left the Closet; the answered setup
+    // read now shows as the More menu's unfinished Closet setup item, beside the list error.
+    const more = page.getByTestId('app-header').getByTestId('closet-more-menu')
+    await more.click()
+    const setupItem = page
+      .getByRole('menu')
+      .getByRole('menuitem', { name: 'Closet setup', exact: true })
+    await expect(setupItem).toHaveAttribute('href', '/wardrobe/onboarding')
+    await page.keyboard.press('Escape')
+    await expect(more).toHaveAttribute('aria-expanded', 'false')
     const retry = page.getByRole('alert').getByTestId('wardrobe-list-retry')
     const empty = page.getByRole('heading', { name: 'No garments added yet' })
     await expect(retry).toHaveAccessibleName('Try again')

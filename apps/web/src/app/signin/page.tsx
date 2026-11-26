@@ -64,7 +64,7 @@ export default function SignInPage() {
   return (
     // Story CC-7.9 D6, D7: the shared top bar owns the page's only heading; the form is one card.
     <AppPage>
-      <AppTopBar title={t('community.notifications.signin')} backHref="/" />
+      <AppTopBar title={t('community.notifications.signin')} parentHref="/" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <div className="mx-auto flex w-full max-w-md flex-col gap-5">
           <div

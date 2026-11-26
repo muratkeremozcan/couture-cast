@@ -45,6 +45,9 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
 
     const activeHomeTab = page.getByTestId('bottom-nav-home')
     await expect(activeHomeTab).toHaveAttribute('aria-current', 'page')
+    // Story CC-7.11 D1, D2: the Home tab reads Today and draws an inline svg icon, no emoji.
+    await expect(activeHomeTab).toHaveAccessibleName(enUS.nav.today)
+    await expect(activeHomeTab.locator('svg')).toHaveCount(1)
     await expect(activeHomeTab.getByTestId('gold-active-indicator')).toBeVisible()
 
     await page.getByTestId('bottom-nav-community').click()
@@ -304,7 +307,7 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
    * chip bar height it would float with a gap, and inside an `overflow-x-hidden`
    * wrapper it would stick to that wrapper and scroll away with the feed.
    */
-  test('3.6-E2E-008: /community pins its filters to the top and links back to Home on desktop', async ({
+  test('3.6-E2E-008: /community pins its filters to the top and links back to Today on desktop', async ({
     page,
     communitySession,
     recurse,
@@ -333,6 +336,8 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     // CC-7.9 D6: the desktop tab links live in the top bar's trailing slot.
     const home = page.getByTestId('primary-nav').getByTestId('nav-ritual')
     await expect(home).toBeVisible()
+    // Story CC-7.11 D1: the desktop link to `/` reads Today.
+    await expect(home).toHaveAccessibleName(enUS.nav.today)
     await home.click()
     await expect(page).toHaveURL('/')
   })

@@ -2,6 +2,12 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 M-GATE-*, M-* functional, M-STORAGE-DENIED and the D1 session check for the
 // mobile guest preview, through the real store and policy.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-031, the sample item detail hands accessibility focus
+// back to the item that opened it (its `returnFocusRef`). [Codex 7.11 #3], 7.11-NAT-032: each
+// preview sheet header is the layer's swipe handle, through the same close as its X.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import {
   act,
   configure,
@@ -12,6 +18,7 @@ import {
 } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ReactNativeModule from 'react-native'
 import {
   createGuestPreviewStore,
   GUEST_PREVIEW_STRINGS,
@@ -20,6 +27,33 @@ import {
 } from '@couture/utils'
 import { screenFocus } from '../../test-utils/focus-effect.js'
 import { press } from '@/src/test-utils/press'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
+
+// D13: native accessibility focus. react-native-web's findNodeHandle always throws, so each node
+// gets a stable fake tag; on web (every other case here) nothing asks for one.
+const a11y = vi.hoisted(() => {
+  const tags = new Map<unknown, number>()
+  return {
+    tags,
+    tagOf: (node: unknown) => {
+      if (!tags.has(node)) tags.set(node, 400 + tags.size)
+      return tags.get(node)!
+    },
+    setAccessibilityFocus: vi.fn(),
+  }
+})
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  return {
+    ...actual,
+    findNodeHandle: (node: unknown) => (node ? a11y.tagOf(node) : null),
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: a11y.setAccessibilityFocus,
+    },
+  }
+})
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }))
 vi.mock('expo-router', async () => ({
@@ -48,6 +82,7 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
   resetMobileAnalyticsIdentity: analytics.reset,
 }))
 
+import { Platform } from 'react-native'
 import { setMobileGuestPreviewStoreForTests } from '@/src/lib/guest-preview'
 import { initI18n } from '@/src/lib/i18n'
 import { GuestPreviewReviewScreen } from './guest-preview-review-screen'
@@ -375,6 +410,28 @@ describe('mobile guest preview surfaces', () => {
     )
   })
 
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the swap sheet header closes it and keeps the garment', async () => {
+    await passGate()
+    press(screen.getByTestId('guest-preview-swap-shoes'))
+    const sheet = await screen.findByTestId('guest-preview-swap-sheet')
+    const handle = within(sheet).getByTestId('layer-swipe-handle')
+    expect(handle.contains(within(sheet).getByText('Swap the shoes'))).toBe(true)
+    expect(
+      handle.contains(within(sheet).getByTestId('guest-preview-swap-sheet-close'))
+    ).toBe(true)
+
+    await dragFrom(within(sheet).getByText('Swap the shoes'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    await waitFor(() =>
+      expect(screen.queryByTestId('guest-preview-swap-sheet')).toBeNull()
+    )
+    // Closed without a choice: the look keeps its shoes and offers no Undo.
+    expect(garmentIds()).toContain('loafers')
+    expect(garmentIds()).not.toContain('white-sneakers')
+    expect(screen.queryByTestId('guest-preview-undo-swaps')).toBeNull()
+  })
+
   it('records reversible votes with progress and an empty state', async () => {
     await passGate()
     press(screen.getByTestId('guest-preview-nav-preferences'))
@@ -450,6 +507,59 @@ describe('mobile guest preview surfaces', () => {
     press(screen.getByTestId('guest-preview-back-to-outfit'))
     expect(await screen.findByTestId('guest-preview-outfit')).toBeTruthy()
     expect(garmentIds()).toContain('white-sneakers')
+  })
+
+  // Story CC-7.11 D13. The close runs the native focus path (Android); react-native-web would
+  // also refocus the pressed item on its own, which would hide a lost `returnFocusRef`.
+  it('[7.11-NAT-031] closing a sample item detail returns accessibility focus to the item that opened it', async () => {
+    await passGate()
+    press(screen.getByTestId('guest-preview-browse-wardrobe'))
+    await screen.findByTestId('guest-preview-wardrobe')
+    const item = screen.getByTestId('guest-preview-item-white-sneakers')
+    press(item)
+    const detail = await screen.findByTestId('guest-preview-item-detail')
+    a11y.tags.clear()
+    a11y.setAccessibilityFocus.mockClear()
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    try {
+      press(within(detail).getByTestId('guest-preview-item-detail-close'))
+      await waitFor(() =>
+        expect(screen.queryByTestId('guest-preview-item-detail')).toBeNull()
+      )
+      await waitFor(() =>
+        expect(a11y.setAccessibilityFocus).toHaveBeenLastCalledWith(a11y.tagOf(item))
+      )
+      expect(a11y.setAccessibilityFocus).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    }
+  })
+})
+
+describe('mobile guest preview item detail swipe', () => {
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the item detail header closes it and focus returns to the item', async () => {
+    await passGate()
+    press(screen.getByTestId('guest-preview-browse-wardrobe'))
+    await screen.findByTestId('guest-preview-wardrobe')
+    const item = screen.getByTestId('guest-preview-item-white-sneakers')
+    press(item)
+    const detail = await screen.findByTestId('guest-preview-item-detail')
+    const handle = within(detail).getByTestId('layer-swipe-handle')
+    a11y.tags.clear()
+    a11y.setAccessibilityFocus.mockClear()
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    try {
+      await dragFrom(handle, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
+      await waitFor(() =>
+        expect(screen.queryByTestId('guest-preview-item-detail')).toBeNull()
+      )
+      await waitFor(() =>
+        expect(a11y.setAccessibilityFocus).toHaveBeenLastCalledWith(a11y.tagOf(item))
+      )
+      expect(a11y.setAccessibilityFocus).toHaveBeenCalledTimes(1)
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    }
   })
 })
 

@@ -992,6 +992,8 @@ function LookbookCardContent({
 interface LookbookCardProps {
   /** Empty for the feed; `spotlight-` for the City Spotlight's copy of a post. */
   scope?: string
+  /** Story CC-7.11 P5: the feed's first card marks its photo as Community's first content. */
+  firstContent?: boolean
   onComments: (item: CommunityFeedItem) => void
   reactionControls: ReactionControls
   item: CommunityFeedItem
@@ -1052,6 +1054,7 @@ function SponsoredCtaSlot({
 
 function LookbookCard({
   scope = '',
+  firstContent = false,
   onComments,
   reactionControls,
   item,
@@ -1084,15 +1087,29 @@ function LookbookCard({
           : 'border-theme-card-border'
       }`}
     >
-      <LookbookCardImageSurface
-        scope={scope}
-        item={item}
-        isFailedImage={isFailedImage}
-        t={t}
-        onImageError={onImageError}
-        onImageRetry={onImageRetry}
-        onOpen={onOpen}
-      />
+      {firstContent ? (
+        <div data-testid="community-first-content">
+          <LookbookCardImageSurface
+            scope={scope}
+            item={item}
+            isFailedImage={isFailedImage}
+            t={t}
+            onImageError={onImageError}
+            onImageRetry={onImageRetry}
+            onOpen={onOpen}
+          />
+        </div>
+      ) : (
+        <LookbookCardImageSurface
+          scope={scope}
+          item={item}
+          isFailedImage={isFailedImage}
+          t={t}
+          onImageError={onImageError}
+          onImageRetry={onImageRetry}
+          onOpen={onOpen}
+        />
+      )}
       <SponsoredCtaSlot
         scope={scope}
         item={item}
@@ -1190,10 +1207,12 @@ function LookbookDetailDialog({
       onClose={onClose}
       title={item.title || t('community.card.label', { author: authorName })}
       surface="theme"
+      // Story CC-7.11 D12: post detail is a full-height layer under a top bar with back and the
+      // post title; it closes like any overlay (back arrow, Escape, swipe down, browser back).
+      presentation="screen"
       titleId="community-detail-title"
       fallbackFocusSelector={restoreFocus.opener}
       finalFocusSelector={restoreFocus.final}
-      closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">
         {canAct &&
@@ -2138,6 +2157,8 @@ interface CommunityFeedStatesProps {
   onClearFilters: (() => void) | undefined
   onRetry: () => void
   onShare: () => void
+  /** Story CC-7.11 P5: the empty state is Community's first content when no Spotlight shows. */
+  firstContent: boolean
   t: Translate
 }
 
@@ -2151,6 +2172,7 @@ function CommunityFeedStates({
   onRetry,
   onClearFilters,
   onShare,
+  firstContent,
   t,
 }: CommunityFeedStatesProps) {
   return (
@@ -2207,7 +2229,10 @@ function CommunityFeedStates({
           data-surface="card"
           className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-10 text-center"
         >
-          <p className="text-sm font-semibold text-theme-card-text">
+          <p
+            data-testid={firstContentTestId(firstContent)}
+            className="text-sm font-semibold text-theme-card-text"
+          >
             {t('community.feed.emptyTitle')}
           </p>
           <p className="mt-1 text-xs text-ink-muted">{t('community.feed.emptyBody')}</p>
@@ -2474,6 +2499,16 @@ function StandaloneHeaderActions({
 /** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
 const communityAsideClass = (banned: boolean) =>
   banned ? 'flex flex-col gap-6 pt-6' : 'flex flex-col gap-6'
+
+/** The City Spotlight section renders once its read left idle, wherever the feed may show. */
+function spotlightSectionShown(status: string, available: boolean): boolean {
+  return status !== 'idle' && available
+}
+
+/** Story CC-7.11 P5: the id of Community's first own content, when this block is it. */
+function firstContentTestId(isFirst: boolean): string | undefined {
+  return isFirst ? 'community-first-content' : undefined
+}
 
 /** Story 6.11: a banned member has no community notifications to manage. */
 function CommunitySettingsLink({
@@ -4683,6 +4718,11 @@ export function CommunityLookbookGrid({
     />
   )
 
+  const spotlightShown = spotlightSectionShown(
+    spotlight.state.status,
+    feedVisible(communityAvailable, bannedSanction)
+  )
+
   return (
     <ShareCardHostContext.Provider value={shareHost}>
       <aside
@@ -4690,47 +4730,51 @@ export function CommunityLookbookGrid({
         className={communityAsideClass(banned)}
       >
         <SpotlightFocusNotice notice={spotlightNotice} t={t} />
-        <CommunitySpotlightSection
-          state={spotlight.state}
-          available={feedVisible(communityAvailable, bannedSanction)}
-          isMobilePreview={isMobilePreview}
-          t={t}
-          onLoadMore={() => {
-            void spotlight.loadMore()
-          }}
-          onRetry={() => {
-            void spotlight.retry()
-          }}
-          onFocused={spotlight.clearFocusTarget}
-          renderCard={(item) => (
-            <LookbookCard
-              scope={SPOTLIGHT_CARD_SCOPE}
-              reactionControls={reactionState.controls(item.id)}
-              item={item}
-              isHighlighted={false}
-              isFailedImage={
-                failedImages.spotlight[item.id]?.url === item.imageAccess.url
-              }
-              isReported={reportedPostIds.has(item.id)}
-              canAct={presentation.canAct}
-              t={t}
-              sponsored={sponsoredHost('community_spotlight')}
-              onImageError={handleSpotlightImageError}
-              onImageRetry={handleSpotlightImageRetry}
-              onOpen={() => {
-                handleOpenSpotlightCard(item)
-              }}
-              onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
-              onReport={(postId) => {
-                setReportError(null)
-                setReportingPostId(postId)
-              }}
-              onWithdraw={(postId) => {
-                void handleWithdrawPost(postId)
-              }}
-            />
-          )}
-        />
+        {/* Story CC-7.11 P5, AC2: Community's first own content is the City Spotlight when it
+            renders; otherwise the first feed card or the feed's empty state carries the id. */}
+        <div data-testid={firstContentTestId(spotlightShown)}>
+          <CommunitySpotlightSection
+            state={spotlight.state}
+            available={feedVisible(communityAvailable, bannedSanction)}
+            isMobilePreview={isMobilePreview}
+            t={t}
+            onLoadMore={() => {
+              void spotlight.loadMore()
+            }}
+            onRetry={() => {
+              void spotlight.retry()
+            }}
+            onFocused={spotlight.clearFocusTarget}
+            renderCard={(item) => (
+              <LookbookCard
+                scope={SPOTLIGHT_CARD_SCOPE}
+                reactionControls={reactionState.controls(item.id)}
+                item={item}
+                isHighlighted={false}
+                isFailedImage={
+                  failedImages.spotlight[item.id]?.url === item.imageAccess.url
+                }
+                isReported={reportedPostIds.has(item.id)}
+                canAct={presentation.canAct}
+                t={t}
+                sponsored={sponsoredHost('community_spotlight')}
+                onImageError={handleSpotlightImageError}
+                onImageRetry={handleSpotlightImageRetry}
+                onOpen={() => {
+                  handleOpenSpotlightCard(item)
+                }}
+                onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
+                onReport={(postId) => {
+                  setReportError(null)
+                  setReportingPostId(postId)
+                }}
+                onWithdraw={(postId) => {
+                  void handleWithdrawPost(postId)
+                }}
+              />
+            )}
+          />
+        </div>
 
         {showFilterNav && (
           <LookbookFilterNav
@@ -4792,6 +4836,7 @@ export function CommunityLookbookGrid({
             onRetry={handleRetry}
             onClearFilters={clearClimateFilters(currentMode, handleModeChange)}
             onShare={openCreateModal}
+            firstContent={!spotlightShown}
             t={t}
           />
         )}
@@ -4824,8 +4869,9 @@ export function CommunityLookbookGrid({
             aria-busy={isLoading || isLoadingMore}
             className={`grid gap-6 ${gridColumns}`}
           >
-            {presentation.items.map((item) => (
+            {presentation.items.map((item, index) => (
               <LookbookCard
+                firstContent={index === 0 && !spotlightShown}
                 reactionControls={reactionState.controls(item.id)}
                 key={item.id}
                 item={item}

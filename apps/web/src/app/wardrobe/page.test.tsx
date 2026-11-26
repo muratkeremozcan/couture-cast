@@ -1,3 +1,8 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-CMP-CLOSET-001 to 7.11-CMP-CLOSET-009 (D4 to D6: setup and
+// Silhouette moved from the Closet body into the top bar More menu and the Silhouette route).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 63: Garment detail and tag edit (placeholder photo name).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-63-garment-detail-and-tag-edit
 // Learning path Step 29: Garment capture flow.
@@ -10,7 +15,15 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 // @vitest-environment jsdom
 import React, { useSyncExternalStore } from 'react'
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import type {
@@ -63,7 +76,17 @@ const {
   deleteMyFormPhotoFromWeb: vi.fn(),
 }))
 
+// Story CC-7.11 D11: the top bar back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
   // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
@@ -151,6 +174,19 @@ vi.mock('../../lib/saved-looks', () => ({
 }))
 
 import WardrobePage from './page'
+import WardrobeSilhouettePage from './silhouette/page'
+import enUS from '../../i18n/locales/en-US.json'
+
+/** Story CC-7.11 D5: opens the Closet top bar More menu (if closed) and returns its setup item. */
+async function openMoreSetupItem() {
+  const more = await screen.findByTestId('closet-more-menu')
+  if (more.getAttribute('aria-expanded') !== 'true') {
+    act(() => {
+      more.click()
+    })
+  }
+  return screen.getByTestId('closet-more-setup')
+}
 
 beforeEach(stubGarmentPreviewUrl)
 // Story CC-7.7: the Closet snapshot lives in module memory; each test starts without one.
@@ -399,17 +435,25 @@ describe('WardrobePage onboarding entry card', () => {
     deleteMyFormPhotoFromWeb.mockReset()
   })
 
-  it('shows the "Set up your closet" entry card while onboarding is not completed', async () => {
+  // Story CC-7.11 D4, D5: the setup banner left the space above the grid; setup progress now
+  // shows in the top bar More menu, whose setup item reads "Closet setup: done" once completed.
+  it('7.11-CMP-CLOSET-001 offers Closet setup from the More menu, with no banner above the grid, while onboarding is not completed', async () => {
     getOnboardingStateFromWeb.mockResolvedValue(
       onboardingState({ status: 'in_progress' })
     )
     render(<WardrobePage />)
 
-    const link = await screen.findByRole('link', { name: 'Set up your closet' })
-    expect(link).toHaveAttribute('href', '/wardrobe/onboarding')
+    await screen.findByText('No garments added yet')
+    await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalled())
+    expect(
+      screen.queryByRole('link', { name: 'Set up your closet' })
+    ).not.toBeInTheDocument()
+    const setup = await openMoreSetupItem()
+    expect(setup).toHaveTextContent(/^Closet setup$/)
+    expect(setup).toHaveAttribute('href', '/wardrobe/onboarding')
   })
 
-  it('hides the entry card once onboarding is completed', async () => {
+  it('7.11-CMP-CLOSET-002 marks Closet setup done in the More menu once onboarding is completed', async () => {
     getOnboardingStateFromWeb.mockResolvedValue(
       onboardingState({ status: 'completed', currentStep: 'complete' })
     )
@@ -419,6 +463,16 @@ describe('WardrobePage onboarding entry card', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
+    await openMoreSetupItem()
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
+    expect(screen.getByTestId('closet-more-setup')).toHaveAttribute(
+      'href',
+      '/wardrobe/onboarding'
+    )
   })
 
   it('does not break the wardrobe hub when the onboarding status fetch fails', async () => {
@@ -429,6 +483,10 @@ describe('WardrobePage onboarding entry card', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
+    // CC-7.11 D5: setup stays reachable from More, unmarked, when the progress is unknown.
+    const setup = await openMoreSetupItem()
+    expect(setup).toHaveTextContent(/^Closet setup$/)
+    expect(setup).toHaveAttribute('href', '/wardrobe/onboarding')
   })
 
   it('surfaces a visible, retryable error instead of silently hiding the onboarding entry point', async () => {
@@ -439,13 +497,19 @@ describe('WardrobePage onboarding entry card', () => {
     const alert = await screen.findByRole('alert')
     expect(alert).toHaveTextContent('Unable to check your closet setup progress.')
 
+    // CC-7.11 D5: the Retry's answer is the only way the setup item can read done.
     getOnboardingStateFromWeb.mockResolvedValueOnce(
-      onboardingState({ status: 'in_progress' })
+      onboardingState({ status: 'completed', currentStep: 'complete' })
     )
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-    await screen.findByRole('link', { name: 'Set up your closet' })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    await openMoreSetupItem()
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
   })
 
   // CodeRabbit round 2 on PR 292 (#10): the automatic read and Retry share one request sequence.
@@ -466,8 +530,11 @@ describe('WardrobePage onboarding entry card', () => {
       .mockRejectedValueOnce(new Error('network down'))
       // That automatic read is slow.
       .mockReturnValueOnce(automatic.promise)
-      // The member's Retry, sent after it, answers first.
-      .mockResolvedValueOnce(onboardingState({ status: 'in_progress' }))
+      // The member's Retry, sent after it, answers first. CC-7.11 D5: completed, so the More
+      // menu's setup item is the evidence that this answer landed.
+      .mockResolvedValueOnce(
+        onboardingState({ status: 'completed', currentStep: 'complete' })
+      )
     render(<WardrobePage />)
     await screen.findByRole('alert')
 
@@ -477,8 +544,13 @@ describe('WardrobePage onboarding entry card', () => {
     })
     await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(2))
     await user.click(screen.getByRole('button', { name: 'Retry' }))
-    await screen.findByRole('link', { name: 'Set up your closet' })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    await openMoreSetupItem()
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
 
     // The older automatic read fails late: the Retry's answer stays, with no error.
     await act(async () => {
@@ -486,63 +558,74 @@ describe('WardrobePage onboarding entry card', () => {
       await automatic.promise.catch(() => undefined)
     })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeInTheDocument()
+    expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+      /^Closet setup: done$/
+    )
   })
 
-  it('opens the silhouette settings in an accessible modal and restores focus on close', async () => {
+  // Story CC-7.11 D6: the Silhouette modal on the Closet became the `/wardrobe/silhouette` route;
+  // the More menu links there and Escape returns focus to More.
+  it('7.11-CMP-CLOSET-003 opens Silhouette from the More menu as the Silhouette route and returns focus to More on Escape', async () => {
     const user = userEvent.setup()
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
     render(<WardrobePage />)
 
-    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
-    await user.click(silhouetteButton)
+    await screen.findByText('No garments added yet')
+    expect(screen.queryByRole('button', { name: 'Silhouette' })).toBeNull()
+    await openMoreSetupItem()
+    const silhouette = screen.getByRole('menuitem', { name: 'Silhouette' })
+    expect(silhouette).toHaveAttribute('href', '/wardrobe/silhouette')
+    expect(screen.queryByRole('dialog')).toBeNull()
 
-    await screen.findByRole('dialog')
-    await screen.findByLabelText('Height')
+    await user.keyboard('{Escape}')
 
-    await user.click(screen.getByLabelText('Close modal'))
-
-    await waitFor(() => expect(silhouetteButton).toHaveFocus())
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(screen.getByTestId('closet-more-menu')).toHaveFocus()
   })
 
-  it('disables the Silhouette button until the signed-in user id has resolved', async () => {
+  it('7.11-CMP-CLOSET-004 offers Silhouette before the signed-in user id has resolved, since the route reads its own account', async () => {
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
-    let resolveUserId: (id: string) => void = () => undefined
-    resolveCurrentUserId.mockReset().mockReturnValue(
-      new Promise((resolve) => {
-        resolveUserId = resolve
-      })
-    )
+    resolveCurrentUserId.mockReset().mockReturnValue(new Promise(() => undefined))
     render(<WardrobePage />)
 
-    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
-    expect(silhouetteButton).toBeDisabled()
-
-    resolveUserId('user-hub-1')
-
-    await waitFor(() => expect(silhouetteButton).toBeEnabled())
+    await openMoreSetupItem()
+    const silhouette = screen.getByRole('menuitem', { name: 'Silhouette' })
+    expect(silhouette).toHaveAttribute('href', '/wardrobe/silhouette')
+    expect(silhouette).not.toHaveAttribute('aria-disabled')
+    expect(resolveCurrentUserId).toHaveBeenCalled()
   })
 
-  it('surfaces an error and keeps the Silhouette button disabled when resolving the user id fails', async () => {
+  it('7.11-CMP-CLOSET-005 surfaces the account error and still links Silhouette to its route when resolving the user id fails', async () => {
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
     resolveCurrentUserId.mockReset().mockRejectedValue(new Error('unauthorized'))
     render(<WardrobePage />)
 
-    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
-    await waitFor(() => expect(silhouetteButton).toBeDisabled())
     await screen.findByRole('alert')
+    await openMoreSetupItem()
+    expect(screen.getByRole('menuitem', { name: 'Silhouette' })).toHaveAttribute(
+      'href',
+      '/wardrobe/silhouette'
+    )
   })
 
-  it('keeps the silhouette modal open while a My Form upload is still in flight', async () => {
+  // The busy guard lived on the Closet modal's close; on the route the panel stays mounted while
+  // a My Form upload is in flight and the screen announces the save (CC-7.11 D6).
+  it('7.11-CMP-CLOSET-006 the Silhouette route keeps the panel and announces the save while a My Form upload is still in flight', async () => {
     const user = userEvent.setup()
-    getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
+    verifiedSession.owner = 'silhouette-member'
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'test-token-silhouette-member'
+    )
+    onTestFinished(() => {
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    })
     uploadMyFormPhotoFromWeb.mockReturnValue(new Promise(() => undefined))
-    render(<WardrobePage />)
+    render(<WardrobeSilhouettePage />)
 
-    const silhouetteButton = await screen.findByRole('button', { name: 'Silhouette' })
-    await waitFor(() => expect(silhouetteButton).toBeEnabled())
-    await user.click(silhouetteButton)
-    await screen.findByRole('dialog')
+    expect(screen.getByTestId('app-top-bar-title')).toHaveTextContent(/^Silhouette$/)
+    expect(screen.getByTestId('app-top-bar-back')).toHaveAttribute('href', '/wardrobe')
     await screen.findByLabelText('Height')
 
     await user.click(screen.getByLabelText(/I'm wearing plain white or black clothing/))
@@ -553,11 +636,10 @@ describe('WardrobePage onboarding entry card', () => {
     )
     await screen.findByText('Processing your photo…')
 
-    await user.click(screen.getByLabelText('Close modal'))
-
-    // Escape and the close button both funnel through the same busy-guarded
-    // handler; the dialog must still be here after either close attempt.
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByText(enUS.wardrobe.hub.silhouetteSaving)).toBeInTheDocument()
+    )
+    expect(screen.getByLabelText('Height')).toBeInTheDocument()
   })
 })
 
@@ -1292,6 +1374,14 @@ describe('WardrobePage late bootstrap results', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
+    // CC-7.11 D5: the remount's own completed read marks setup done in the More menu; the
+    // torn-down instance's late in_progress answer never reaches it.
+    await openMoreSetupItem()
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
   })
 })
 
@@ -1523,9 +1613,12 @@ describe('WardrobePage commit deduplication', () => {
   })
 })
 
-// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet and the setup progress
-// have answered, so the setup banner is already above the grid at reveal and nothing is inserted
-// there afterwards. The measured budget is 7.7-E2E-001.
+// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet and the saved looks
+// have answered, so nothing is inserted above the grid afterwards. The measured budget is
+// 7.7-E2E-001. Story CC-7.11 D4, D5 and TEA d: the setup banner left the body; the setup progress
+// only names the top bar More menu's Closet setup item, which sits outside the gate and updates
+// in place, and the account and setup notices sit below the closet, so neither the setup progress
+// nor the account read holds the gate.
 describe('WardrobePage screen gate', () => {
   beforeEach(() => {
     resetWardrobeMocks()
@@ -1542,7 +1635,7 @@ describe('WardrobePage screen gate', () => {
     document.documentElement.removeAttribute('data-session')
   })
 
-  it('7.7-CMP-006 waits for the closet and the setup progress, and reveals with the setup banner in place', async () => {
+  it('7.7-CMP-006 waits for the closet only, then the setup progress updates the More menu in place with no setup banner above the grid', async () => {
     const inventory = Promise.withResolvers<GarmentItemContract[]>()
     const onboarding = Promise.withResolvers<WardrobeOnboardingStateContract>()
     listGarmentsFromWeb.mockReset().mockReturnValue(inventory.promise)
@@ -1558,18 +1651,30 @@ describe('WardrobePage screen gate', () => {
       inventory.resolve([])
       await inventory.promise
     })
-    // The closet answered; the setup progress has not, so the body stays hidden.
-    expect(gate).not.toHaveAttribute('data-ready')
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
-
-    await act(async () => {
-      onboarding.resolve(onboardingState({ status: 'in_progress' }))
-      await onboarding.promise
-    })
+    // The closet answered; the setup progress has not, and the body is revealed anyway.
     await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
-    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
     expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+    expect(getOnboardingStateFromWeb).toHaveBeenCalled()
+    expect(await openMoreSetupItem()).toHaveTextContent(/^Closet setup$/)
+
+    await act(async () => {
+      onboarding.resolve(
+        onboardingState({ status: 'completed', currentStep: 'complete' })
+      )
+      await onboarding.promise
+    })
+    // The late progress lands in the top bar item, never as a banner above the grid.
+    await waitFor(() =>
+      expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+        /^Closet setup: done$/
+      )
+    )
+    expect(gate).toHaveAttribute('data-ready', 'true')
+    expect(
+      screen.queryByRole('link', { name: 'Set up your closet', hidden: true })
+    ).toBeNull()
+    expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
   })
 
   // A total only the answered page can carry, so "3 saved" proves the read landed (the row
@@ -1582,17 +1687,29 @@ describe('WardrobePage screen gate', () => {
    * Holds one of the gate's four reads (or none, the control); the others answer at once with
    * values that leave evidence on the page. Returns the release.
    */
+  /** Reads whose answer has been handed to the page (CC-7.11: the account read shows nothing). */
+  const answered = new Set<GateRead>()
+
   function holdOneRead(read: GateRead | 'none') {
     const held = Promise.withResolvers<void>()
+    answered.clear()
     const answer = <T,>(name: GateRead, value: T) =>
-      read === name ? held.promise.then(() => value) : Promise.resolve(value)
+      (read === name ? held.promise.then(() => value) : Promise.resolve(value)).then(
+        (result) => {
+          answered.add(name)
+          return result
+        }
+      )
     listGarmentsFromWeb
       .mockReset()
       .mockImplementation(() => answer('garments', [persistedGarment]))
     getOnboardingStateFromWeb
       .mockReset()
       .mockImplementation(() =>
-        answer('onboarding', onboardingState({ status: 'in_progress' }))
+        answer(
+          'onboarding',
+          onboardingState({ status: 'completed', currentStep: 'complete' })
+        )
       )
     resolveCurrentUserId
       .mockReset()
@@ -1612,16 +1729,22 @@ describe('WardrobePage screen gate', () => {
           screen.getByTestId(`garment-card-${persistedGarment.id}`)
         ).toBeInTheDocument()
         return
-      case 'onboarding':
+      case 'onboarding': {
+        // CC-7.11 D5: the top bar sits outside the gate; its More menu marks setup done once
+        // the completed progress lands.
         expect(getOnboardingStateFromWeb).toHaveBeenCalled()
-        expect(
-          screen.getByRole('link', { name: 'Set up your closet', hidden: true })
-        ).toBeInTheDocument()
+        const more = screen.getByTestId('closet-more-menu')
+        if (more.getAttribute('aria-expanded') !== 'true') fireEvent.click(more)
+        expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
+          /^Closet setup: done$/
+        )
         return
+      }
       case 'profile':
-        // The header sits outside the gate: Silhouette enables once the account read answers.
+        // CC-7.11 D6: Silhouette left the Closet for its route, so the account read renders
+        // nothing here; its answer having been handed to the page is the evidence.
         expect(resolveCurrentUserId).toHaveBeenCalled()
-        expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+        expect(answered.has('profile')).toBe(true)
         return
       case 'savedLooks':
         expect(savedLooksMocks.listSavedLooksPageFromWeb).toHaveBeenCalled()
@@ -1639,10 +1762,17 @@ describe('WardrobePage screen gate', () => {
     })
     await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    expect(
+      screen.queryByRole('link', { name: 'Set up your closet', hidden: true })
+    ).toBeNull()
   })
 
-  it.each(GATE_READS)(
+  // CC-7.7 D3: the closet and the saved looks row are the reads the gate waits for.
+  const HOLDING_READS: GateRead[] = ['garments', 'savedLooks']
+  // CC-7.11 TEA d: the setup progress and the account read land after the reveal, in place.
+  const LATE_READS: GateRead[] = ['onboarding', 'profile']
+
+  it.each(HOLDING_READS)(
     '7.7-CMP-006 stays closed while the %s read is unanswered and the others have landed, then opens',
     async (read) => {
       const held = holdOneRead(read)
@@ -1665,6 +1795,34 @@ describe('WardrobePage screen gate', () => {
       expectLanded(read)
       expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
       expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+    }
+  )
+
+  it.each(LATE_READS)(
+    '7.11-CMP-CLOSET-009 opens while the %s read is unanswered, and its answer lands in place without closing the gate',
+    async (read) => {
+      const held = holdOneRead(read)
+      render(<WardrobePage />)
+      const gate = screen.getByTestId('screen-gate')
+
+      await waitFor(() => {
+        for (const other of GATE_READS) if (other !== read) expectLanded(other)
+      })
+      await waitFor(() => expect(gate).toHaveAttribute('data-ready', 'true'))
+      expect(answered.has(read), `the ${read} read is still held`).toBe(false)
+      expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+      expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+
+      await act(async () => {
+        held.resolve()
+        await held.promise
+      })
+      await waitFor(() => expectLanded(read))
+      expect(gate).toHaveAttribute('data-ready', 'true')
+      expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
+      expect(
+        screen.queryByRole('link', { name: 'Set up your closet', hidden: true })
+      ).toBeNull()
     }
   )
 
@@ -1804,7 +1962,9 @@ describe('WardrobePage screen gate', () => {
         'closet'
       )?.userId
     await waitFor(() => expect(keptUserId()).toBe('user-fixture-b'))
-    expect(screen.getByRole('button', { name: 'Silhouette' })).toBeEnabled()
+    // CC-7.11 D6: no Silhouette button reads the account on the Closet any more; B's account
+    // answered, so no account error shows either.
+    expect(screen.queryByText(/Unable to load your account/)).toBeNull()
     const storedUserIds = remember.mock.calls
       .filter(([, screenName, part]) => screenName === 'closet' && part === 'closet')
       .map(([, , , value]) => (value as { userId: string | null }).userId)

@@ -2,6 +2,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): [Codex 7.11 #3], 7.11-NAT-032: the builder header is the
+// layer's swipe handle, through the same close as its X.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -49,6 +54,8 @@ vi.mock('react-native', async (importOriginal) => {
 })
 
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { MobileCapsuleBuilderModal } from './capsule-builder-modal'
 import {
   EDGE_TO_EDGE_MODAL_PROPS,
@@ -140,6 +147,24 @@ describe('MobileCapsuleBuilderModal', () => {
 
   afterEach(() => {
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+  })
+
+  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the header closes the builder like its X; a short one does not', async () => {
+    const { onClose, onSave } = renderModal()
+    const handle = screen.getByTestId('layer-swipe-handle')
+    expect(handle.contains(screen.getByTestId('capsule-modal-title'))).toBe(true)
+    expect(handle.contains(screen.getByTestId('close-modal-button'))).toBe(true)
+    selectGarments(['g-1', 'g-2'])
+
+    await dragFrom(screen.getByTestId('capsule-modal-title'), {
+      dy: LAYER_SWIPE_CLOSE_PX / 2,
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    await dragFrom(screen.getByTestId('capsule-modal-title'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onSave).not.toHaveBeenCalled()
   })
 
   it('4.3-MOB-MODAL-01 starts with nothing selected rather than auto-picking garments', () => {

@@ -42,6 +42,9 @@ const VIS_ID: Record<string, string> = {
   'closet-dark': '7.9-VIS-006',
   'community-dark': '7.9-VIS-007',
   'profile-dark': '7.9-VIS-008',
+  // Story CC-7.11 D1, D8: the Looks tab joins the shell tabs, with its own two baselines.
+  'looks-light': '7.11-VIS-001',
+  'looks-dark': '7.11-VIS-002',
 }
 
 test.describe('CC-7.9 tab snapshots @local-lane', () => {

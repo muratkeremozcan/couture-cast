@@ -5,6 +5,7 @@ const paths = [
   '/community',
   '/settings',
   '/wardrobe',
+  '/looks',
   '/two',
   '/locations',
   '/modal',

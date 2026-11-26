@@ -13,7 +13,7 @@ import { LegalLinks } from '../components/legal-page'
 export function SignupTopBar() {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   return (
-    <AppTopBar title={getFederatedSignInStrings(i18n.language).create} backHref="/" />
+    <AppTopBar title={getFederatedSignInStrings(i18n.language).create} parentHref="/" />
   )
 }
 

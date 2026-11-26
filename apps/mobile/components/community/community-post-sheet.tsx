@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Alert,
   Image,
   Platform,
   ScrollView,
@@ -36,7 +37,12 @@ import {
   type CommunityPhotoAsset,
   type CommunityPublishState,
 } from '@/src/lib/community'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+  type LayerFocusTarget,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useTokens } from '@/src/theme/tokens'
 import { useGlyphBox } from '@/components/glyph-box'
@@ -255,6 +261,19 @@ function ComposePhotoSection({
   )
 }
 
+/** Story CC-7.11 D13: a draft with a photo or any text is worth asking about before it is dropped. */
+function composeDraftDirty(draft: {
+  asset: unknown
+  caption: string
+  title: string
+  altText: string
+}): boolean {
+  return (
+    draft.asset !== null ||
+    [draft.caption, draft.title, draft.altText].some((text) => text.trim() !== '')
+  )
+}
+
 export interface CommunityPostSheetProps {
   /** Pause new server actions during access revalidation; retain this owned draft and native host. */
   suspended?: boolean
@@ -265,6 +284,8 @@ export interface CommunityPostSheetProps {
   defaultChallengeOptIn?: boolean
   onClose: () => void
   onPublished: (post: CommunityFeedItem) => void
+  /** Story CC-7.11 D13: the control that opened the layer; it takes focus back on close. */
+  returnFocusRef?: LayerFocusTarget | null
 }
 
 export function CommunityPostSheet({
@@ -274,6 +295,7 @@ export function CommunityPostSheet({
   defaultChallengeOptIn = false,
   onClose,
   onPublished,
+  returnFocusRef = null,
 }: CommunityPostSheetProps) {
   const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
@@ -397,6 +419,32 @@ export function CommunityPostSheet({
     resetState()
     onClose()
   }, [onClose, resetState])
+
+  // Story CC-7.11 D13: X, system back and a swipe down share one guarded close. A draft with a
+  // photo or any text asks before it is dropped; an empty one closes at once.
+  const dirty = composeDraftDirty({ asset, caption, title, altText })
+  // Story CC-7.11 D13 (busy guard): while a post publishes, X, back and swipe keep the sheet
+  // open, so closing never abandons a publish half way.
+  const publishing = publishState === 'publishing'
+  const requestClose = useCallback(() => {
+    if (publishing) return
+    if (!dirty) {
+      handleClose()
+      return
+    }
+    Alert.alert(
+      t('community.compose.discardTitle'),
+      t('community.compose.discardMessage'),
+      [
+        { text: t('community.compose.discardKeep'), style: 'cancel' },
+        {
+          text: t('community.compose.discard'),
+          style: 'destructive',
+          onPress: handleClose,
+        },
+      ]
+    )
+  }, [dirty, handleClose, publishing, t])
 
   const handlePickImage = useCallback(async () => {
     if (access.current.suspended || !access.current.visible) return
@@ -623,7 +671,8 @@ export function CommunityPostSheet({
       testID="community-post-sheet"
       visible={visible}
       animationType={modalAnimation}
-      onRequestClose={handleClose}
+      onRequestClose={requestClose}
+      returnFocusRef={returnFocusRef}
       scrim={scrim}
     >
       <View style={styles.overlay}>
@@ -641,20 +690,24 @@ export function CommunityPostSheet({
             },
           ]}
         >
-          <View style={[styles.header, { borderBottomColor: palette.line }]}>
+          {/* Story CC-7.11 D13: the compose sheet is an overlay, so it keeps its X; its header
+              is the swipe-down handle. */}
+          <LayerSwipeHandle style={[styles.header, { borderBottomColor: palette.line }]}>
             <Text style={[styles.headerTitle, { color: palette.ink }]}>
               {t('community.compose.title')}
             </Text>
             <TouchableOpacity
               testID="community-post-sheet-close"
               style={styles.closeButton}
-              onPress={handleClose}
+              onPress={requestClose}
+              disabled={publishing}
+              aria-disabled={publishing}
               accessibilityRole="button"
               accessibilityLabel={t('community.compose.close')}
             >
               <Text style={[styles.closeButtonText, { color: palette.ink }]}>✕</Text>
             </TouchableOpacity>
-          </View>
+          </LayerSwipeHandle>
 
           <ScrollView
             {...reveal.scrollProps}

@@ -19,13 +19,14 @@
     "minCardSizePx": 64
   },
   "platforms": ["web", "native"],
-  "screens": ["today", "closet", "community", "profile"],
+  "screens": ["today", "closet", "looks", "community", "profile"],
   "fixtures": ["empty", "populated", "guardian-pending"],
   "tabBarSelectors": {
     "web": ["[data-testid=\"sticky-bottom-nav\"]"],
     "native": [
       "[data-testid=\"tab-home\"]",
       "[data-testid=\"tab-wardrobe\"]",
+      "[data-testid=\"tab-looks\"]",
       "[data-testid=\"tab-community\"]",
       "[data-testid=\"tab-settings\"]"
     ]
@@ -62,14 +63,16 @@
       "closetAnchors": [
         "[data-testid=\"closet-garment-grid\"]",
         "[data-testid=\"closet-empty-state\"]"
-      ]
+      ],
+      "looksAnchors": ["[data-testid=\"looks-first-content\"]"]
     },
     "native": {
       "todayHeight": "[data-testid=\"hero-experience-scrollview\"]",
       "closetAnchors": [
         "[data-testid=\"wardrobe-garment-list\"]",
-        "[data-testid=\"wardrobe-screen\"]:has([data-testid=\"wardrobe-empty-state\"]) [data-testid=\"garment-capture-open\"]"
-      ]
+        "[data-testid=\"wardrobe-empty-state\"]"
+      ],
+      "looksAnchors": ["[data-testid=\"looks-first-content\"]"]
     }
   },
   "analyticsRequests": [
@@ -93,16 +96,6 @@
   "known": [
     {
       "platform": "native",
-      "screen": "closet",
-      "fixture": "populated",
-      "rule": "closet-chrome",
-      "value": 334,
-      "story": "7.11",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
       "screen": "community",
       "fixture": "empty",
       "rule": "paragraph-lines",
@@ -188,10 +181,10 @@
       "screen": "profile",
       "fixture": "empty",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",
@@ -232,10 +225,10 @@
       "screen": "profile",
       "fixture": "guardian-pending",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",
@@ -276,10 +269,10 @@
       "screen": "profile",
       "fixture": "populated",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",
@@ -326,38 +319,8 @@
       "screen": "today",
       "fixture": "populated",
       "rule": "targets-above-fold",
-      "value": 12,
+      "value": 11,
       "story": "7.13",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "web",
-      "screen": "closet",
-      "fixture": "empty",
-      "rule": "closet-chrome",
-      "value": 476,
-      "story": "7.11",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "web",
-      "screen": "closet",
-      "fixture": "guardian-pending",
-      "rule": "closet-chrome",
-      "value": 476,
-      "story": "7.11",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "web",
-      "screen": "closet",
-      "fixture": "populated",
-      "rule": "closet-chrome",
-      "value": 390,
-      "story": "7.11",
       "decision": "D-KNOWN-7.10",
       "decidedIn": "7.10"
     },

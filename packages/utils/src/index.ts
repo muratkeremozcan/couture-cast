@@ -213,3 +213,13 @@ export type {
   ScreenBudgetRule,
   ScreenBudgetScreen,
 } from './screen-budget'
+
+export { APP_TABS, appTab } from './app-tabs'
+export type { AppTab, AppTabId, AppTabLabelKey } from './app-tabs'
+
+export {
+  TAB_ICON_PATHS,
+  TAB_ICON_SIZE,
+  TAB_ICON_STROKE_WIDTH,
+  TAB_ICON_VIEWBOX,
+} from './tab-icons'

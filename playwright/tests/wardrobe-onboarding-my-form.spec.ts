@@ -48,16 +48,20 @@ const contrastFixturePath = path.resolve(
   '../fixtures/wardrobe/silhouette-photo-contrast.png'
 )
 
-/** Opens the standalone Silhouette settings modal from the wardrobe hub (decision 3). */
+/**
+ * Opens the standalone Silhouette settings from the Closet (decision 3). Story CC-7.11 D5, D6:
+ * the modal became the `/wardrobe/silhouette` route, reached from the Closet top bar More menu,
+ * so this returns the route's main column, where the loaded panel renders.
+ */
 async function openSilhouetteSettings(page: Page): Promise<Locator> {
   await page.goto('/wardrobe')
   await waitForAccessibilityReady(page)
-  const silhouetteButton = page.getByRole('button', { name: 'Silhouette' })
-  await expect(silhouetteButton).toBeEnabled()
-  await silhouetteButton.click()
-  const dialog = page.getByRole('dialog', { name: 'Silhouette' })
-  await expect(dialog).toBeVisible()
-  return dialog
+  await page.getByTestId('app-header').getByTestId('closet-more-menu').click()
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Silhouette' }).click()
+  await expect(page).toHaveURL('/wardrobe/silhouette')
+  const screen = page.locator('main#main-content')
+  await expect(screen.getByTestId('silhouette-settings-panel')).toBeVisible()
+  return screen
 }
 
 const MY_FORM_COMMIT_URL = /\/api\/v1\/wardrobe\/silhouette\/my-form\/commit(\?|$)/
@@ -130,8 +134,8 @@ function watchMyFormCommits(page: Page): Promise<{ status: number; code?: string
 
 const BASEWEAR_CONFIRM_LABEL = /I'm wearing plain white or black clothing/
 
-async function confirmBasewearGuidance(dialog: Locator) {
-  await dialog.getByLabel(BASEWEAR_CONFIRM_LABEL).check()
+async function confirmBasewearGuidance(silhouette: Locator) {
+  await silhouette.getByLabel(BASEWEAR_CONFIRM_LABEL).check()
 }
 
 myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
@@ -154,14 +158,14 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         testInfo,
         'wardrobe-my-form-ready'
       )
-      const dialog = await openSilhouetteSettings(page)
+      const silhouette = await openSilhouetteSettings(page)
 
       await test.step('Confirm the basewear guidance and upload a photo', async () => {
-        await confirmBasewearGuidance(dialog)
-        await dialog
+        await confirmBasewearGuidance(silhouette)
+        await silhouette
           .getByRole('button', { name: 'Upload a full-body photo', exact: true })
           .click()
-        await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
+        await silhouette.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
         // The transient "Processing your photo…" state is not asserted: the real
         // worker can settle before Playwright observes it, since a tiny synthetic
         // fixture image processes in single-digit milliseconds. The terminal ready
@@ -169,18 +173,18 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
       })
 
       await test.step('The photo reaches ready and becomes the active silhouette mode', async () => {
-        await expect(dialog.getByText('My Form photo ready')).toBeVisible({
+        await expect(silhouette.getByText('My Form photo ready')).toBeVisible({
           timeout: 20_000,
         })
-        await expect(dialog.getByText('My Form photo', { exact: true })).toBeVisible()
-        await expect(dialog.getByAltText('My Form')).toBeVisible()
+        await expect(silhouette.getByText('My Form photo', { exact: true })).toBeVisible()
+        await expect(silhouette.getByAltText('My Form')).toBeVisible()
         await expect(
-          dialog.getByRole('button', { name: 'Remove My Form photo' })
+          silhouette.getByRole('button', { name: 'Remove My Form photo' })
         ).toBeVisible()
       })
 
       await test.step('Adjusting a slider switches the active mode back to the default mannequin (AC 2)', async () => {
-        const heightSlider = dialog.getByTestId('silhouette-height-slider')
+        const heightSlider = silhouette.getByTestId('silhouette-height-slider')
         const saveResponse = interceptNetworkCall({
           method: 'PUT',
           url: '**/api/v1/wardrobe/silhouette*',
@@ -188,7 +192,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         await heightSlider.focus()
         await heightSlider.press('ArrowRight')
         await saveResponse
-        await expect(dialog.getByText('Adjustable silhouette')).toBeVisible()
+        await expect(silhouette.getByText('Adjustable silhouette')).toBeVisible()
       })
     }
   )
@@ -203,32 +207,37 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         testInfo,
         'wardrobe-my-form-contrast'
       )
-      const dialog = await openSilhouetteSettings(page)
+      const silhouette = await openSilhouetteSettings(page)
 
-      await confirmBasewearGuidance(dialog)
-      await dialog
+      await confirmBasewearGuidance(silhouette)
+      await silhouette
         .getByRole('button', { name: 'Upload a full-body photo', exact: true })
         .click()
-      await dialog.getByLabel('My Form photo file').setInputFiles(contrastFixturePath)
+      await silhouette.getByLabel('My Form photo file').setInputFiles(contrastFixturePath)
 
       await test.step('The contrast-specific error appears with no retry action', async () => {
         await expect(
-          dialog.getByText(
+          silhouette.getByText(
             /We couldn't separate you from the background clearly\. Retake the photo with plainer clothing or a plainer background\./
           )
         ).toBeVisible({ timeout: 20_000 })
-        await expect(dialog.getByRole('button', { name: 'Retry upload' })).toHaveCount(0)
+        await expect(
+          silhouette.getByRole('button', { name: 'Retry upload' })
+        ).toHaveCount(0)
       })
 
       await test.step('Choosing a different photo recovers and reaches ready', async () => {
         await expect(
-          dialog.getByRole('button', { name: 'Upload a full-body photo', exact: true })
+          silhouette.getByRole('button', {
+            name: 'Upload a full-body photo',
+            exact: true,
+          })
         ).toBeVisible()
-        await dialog
+        await silhouette
           .getByRole('button', { name: 'Upload a full-body photo', exact: true })
           .click()
-        await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
-        await expect(dialog.getByText('My Form photo ready')).toBeVisible({
+        await silhouette.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
+        await expect(silhouette.getByText('My Form photo ready')).toBeVisible({
           timeout: 20_000,
         })
       })
@@ -245,7 +254,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         testInfo,
         'wardrobe-my-form-retry'
       )
-      const dialog = await openSilhouetteSettings(page)
+      const silhouette = await openSilhouetteSettings(page)
 
       await test.step('Fail the raw-bytes PUT exactly once, simulating a transient network drop', () => {
         let abortedOnce = false
@@ -282,20 +291,20 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
 
       const commits = watchMyFormCommits(page)
 
-      await confirmBasewearGuidance(dialog)
-      await dialog
+      await confirmBasewearGuidance(silhouette)
+      await silhouette
         .getByRole('button', { name: 'Upload a full-body photo', exact: true })
         .click()
-      await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
+      await silhouette.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
 
       await test.step('An inline error with a Retry action appears', async () => {
-        const retryButton = dialog.getByRole('button', { name: 'Retry upload' })
+        const retryButton = silhouette.getByRole('button', { name: 'Retry upload' })
         await expect(retryButton).toBeVisible({ timeout: 20_000 })
       })
 
       await test.step('Retrying reuses the same attempt and reaches ready', async () => {
-        await dialog.getByRole('button', { name: 'Retry upload' }).click()
-        await expect(dialog.getByText('My Form photo ready')).toBeVisible({
+        await silhouette.getByRole('button', { name: 'Retry upload' }).click()
+        await expect(silhouette.getByText('My Form photo ready')).toBeVisible({
           timeout: 20_000,
         })
       })
@@ -337,7 +346,7 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         testInfo,
         'wardrobe-my-form-lost-response'
       )
-      const dialog = await openSilhouetteSettings(page)
+      const silhouette = await openSilhouetteSettings(page)
 
       await test.step('Let the first byte PUT reach storage, then drop its response', () => {
         let droppedOnce = false
@@ -361,21 +370,23 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
       const puts = watchPuts(page)
       const commits = watchMyFormCommits(page)
 
-      await confirmBasewearGuidance(dialog)
-      await dialog
+      await confirmBasewearGuidance(silhouette)
+      await silhouette
         .getByRole('button', { name: 'Upload a full-body photo', exact: true })
         .click()
-      await dialog.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
+      await silhouette.getByLabel('My Form photo file').setInputFiles(readyFixturePath)
 
       await test.step('The dropped response surfaces a Retry action', async () => {
-        await expect(dialog.getByRole('button', { name: 'Retry upload' })).toBeVisible({
+        await expect(
+          silhouette.getByRole('button', { name: 'Retry upload' })
+        ).toBeVisible({
           timeout: 20_000,
         })
       })
 
       await test.step('Retrying commits the stored bytes and reaches ready', async () => {
-        await dialog.getByRole('button', { name: 'Retry upload' }).click()
-        await expect(dialog.getByText('My Form photo ready')).toBeVisible({
+        await silhouette.getByRole('button', { name: 'Retry upload' }).click()
+        await expect(silhouette.getByText('My Form photo ready')).toBeVisible({
           timeout: 20_000,
         })
       })
@@ -425,14 +436,14 @@ myFormTest.describe('Wardrobe Silhouette "My Form" Upload', () => {
         testInfo,
         'wardrobe-my-form-large'
       )
-      const dialog = await openSilhouetteSettings(page)
-      await confirmBasewearGuidance(dialog)
-      await dialog
+      const silhouette = await openSilhouetteSettings(page)
+      await confirmBasewearGuidance(silhouette)
+      await silhouette
         .getByRole('button', { name: 'Upload a full-body photo', exact: true })
         .click()
-      await dialog.getByLabel('My Form photo file').setInputFiles(photoPath)
+      await silhouette.getByLabel('My Form photo file').setInputFiles(photoPath)
 
-      await expect(dialog.getByText('My Form photo ready')).toBeVisible({
+      await expect(silhouette.getByText('My Form photo ready')).toBeVisible({
         timeout: 30_000,
       })
       // The photo went to the signed storage URL and nowhere else.

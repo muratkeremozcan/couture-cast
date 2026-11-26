@@ -34,10 +34,11 @@ test.use({
 
 /** Routed sub-screens of a member (spec D7); `parent` is where back lands on a direct entry. */
 const SUB_SCREENS = [
+  // Story CC-7.11 D10: capsules is a Looks row now, so a direct entry backs out to Looks.
   {
     name: 'capsules',
     path: '/wardrobe/capsules',
-    parent: '/wardrobe',
+    parent: '/looks',
     mode: 'populated',
   },
   // Closet setup shows only while setup is unfinished: a finished closet redirects to /wardrobe.
@@ -53,11 +54,11 @@ const SUB_SCREENS = [
     parent: '/wardrobe',
     mode: 'populated',
   },
-  // D6 as recorded: notification settings are reached from Community, so Back lands there.
+  // Story CC-7.11 D10: notification settings moved from Community to Profile, so Back lands there.
   {
     name: 'notification settings',
     path: '/notification-settings',
-    parent: '/community',
+    parent: '/settings',
     mode: 'populated',
   },
 ] as const
@@ -204,10 +205,13 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
     )
     // The placeholder running under the tab bar must not take its taps: the topmost element at
     // the centre of each tab is inside the tab bar (Codex replaced-assertions check).
+    // Story CC-7.11 D1: every one of the five tabs, Looks included.
     for (const tab of [
       'bottom-nav-home',
       'bottom-nav-wardrobe',
+      'bottom-nav-looks',
       'bottom-nav-community',
+      'bottom-nav-settings',
     ]) {
       const box = await page.getByTestId(tab).boundingBox()
       const hit = await page.evaluate(

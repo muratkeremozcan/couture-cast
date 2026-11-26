@@ -7,7 +7,7 @@ export default function GuardianDashboardPage() {
     // Story CC-7.9 D6, D7: the shared top bar (its back control replaces the old "Back home"
     // link) on the page surface; the always-dark gradient is gone.
     <AppPage>
-      <AppTopBar titleKey="guardian.dashboard.title" backHref="/" />
+      <AppTopBar titleKey="guardian.dashboard.title" parentHref="/settings" />
       <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
         <div className="mx-auto w-full max-w-5xl">
           <GuardianDashboardView />

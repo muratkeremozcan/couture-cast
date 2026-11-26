@@ -13,6 +13,8 @@ import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { TabTopBar } from '@/src/test-utils/tab-navigation'
+import i18n from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { press } from '@/src/test-utils/press'
 import { screenFocus } from '@/src/test-utils/focus-effect'
@@ -136,10 +138,14 @@ function backgroundAndResume() {
 
 /** Renders the screen in a phone-sized frame and lets one catch-up verify access. */
 async function openVerifiedFeed(feed: ReturnType<typeof verifiedFeed>) {
+  // Story CC-7.11 D16: New post is in the Community top bar, so the bar is drawn too.
   await render(
-    <View style={{ height: 640 }}>
-      <CommunityScreen />
-    </View>
+    <>
+      <TabTopBar title={i18n.t('tabs.community')} route="community" />
+      <View style={{ height: 640 }}>
+        <CommunityScreen />
+      </View>
+    </>
   )
   await screen.findByTestId('community-post-card-post-a')
   await act(async () => {

@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): router stub for the history-aware top bar back (D11)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 // Learning path Step 61: Import device-saved looks for the same member.
@@ -61,7 +65,17 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => session.owner,
 }))
 
+// Story CC-7.11 D11: the top bar back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
   // with native History API calls and Back/Forward. This stand-in does the same for jsdom.

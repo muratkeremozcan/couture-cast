@@ -325,6 +325,20 @@ function RootLayoutNav() {
                       name="wardrobe-capsules"
                       options={{ title: t('wardrobe.capsules.title') }}
                     />
+                    {/* Story CC-7.11 D7, D10: Profile > Style, and the guardian and teen
+                      dashboards, whose bars name them (the bodies drop their second title). */}
+                    <Stack.Screen
+                      name="settings-style"
+                      options={{ title: t('settings.style.title') }}
+                    />
+                    <Stack.Screen
+                      name="guardian-dashboard"
+                      options={{ title: t('guardian.dashboard.title') }}
+                    />
+                    <Stack.Screen
+                      name="teen-dashboard"
+                      options={{ title: t('teen.dashboard.title') }}
+                    />
                     {/* The native header carries each title; the screens render no second one. */}
                     <Stack.Screen
                       name="signin"

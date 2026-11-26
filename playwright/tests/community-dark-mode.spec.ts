@@ -580,9 +580,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
           await page.goto('/')
           await setPalette(page, palette)
 
+          // Story CC-7.11 D9: Plan week is a link to the Plan route, where the locked rail shows.
           await page
-            .getByRole('button', { name: enUS.commerce.premium.planner.openControl })
+            .getByRole('link', { name: enUS.commerce.premium.planner.openControl })
             .click()
+          await expect(page).toHaveURL('/looks/plan')
           const cta = page.getByTestId('planner-rail-get-premium')
           await expect(cta).toBeVisible()
           expect(await textContrastFailures(cta)).toEqual([])
@@ -598,7 +600,8 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
         await setPalette(page, palette)
 
         const nav = page.getByTestId('sticky-bottom-nav')
-        const home = nav.getByRole('link', { name: /home/i })
+        // Story CC-7.11 D1: the Home tab (`bottom-nav-home`) reads Today.
+        const home = nav.getByRole('link', { name: enUS.nav.today, exact: true })
         // The tab as it looks before focus, then after keyboard focus (so :focus-visible applies).
         const ring = await focusRing(home, async () => {
           await home.focus()

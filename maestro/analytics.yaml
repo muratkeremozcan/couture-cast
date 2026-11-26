@@ -33,6 +33,11 @@ env:
     retryTapIfNoChange: true
     label: 'Open home'
 
+# Story CC-7.11 D16: the scenario toggles follow the outfit card, below the first screen.
+- scrollUntilVisible:
+    element: 'Morning commute'
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible: 'Morning commute'
 - tapOn:
     text: 'Evening plans'

@@ -1,12 +1,19 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 owner: the mobile City Spotlight module through the real HTTP boundary.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-030..032 on the Community screen: the post detail layer
+// (D12) closes by its top bar back, system back or a header swipe, and focus returns to its card.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import { item, errorEnvelope, feedJson, imageEvents, serveFeed } from './harness'
 import { refreshEvents } from './mock-state'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
+import { dragFrom } from '@/src/test-utils/layer-swipe'
+import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
 import { expect, it, vi } from 'vitest'
 import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
@@ -268,8 +275,12 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     const card = await screen.findByTestId('community-spotlight-item-spot-2')
     press(within(card).getByTestId('community-card-open-spot-2'))
-    const title = await screen.findByTestId('community-spotlight-detail-title')
-    expect(title.textContent).toBe('City Spotlight')
+    // Story CC-7.11 D12: the layer's title is its top bar's; an untitled look reads the
+    // Spotlight label.
+    const detail = await screen.findByTestId('community-spotlight-detail')
+    expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(
+      'City Spotlight'
+    )
     expect(screen.getByTestId('community-spotlight-detail-rank').textContent).toBe(
       'Rank 2'
     )
@@ -279,9 +290,9 @@ export function registerCommunitySpotlightCases() {
         { postId: 'spot-2', body: { surface: 'spotlight', rank: 2, level: 'city' } },
       ])
     )
-    press(screen.getByTestId('community-spotlight-detail-close'))
+    press(within(detail).getByTestId('app-top-bar-back'))
     await waitFor(() =>
-      expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+      expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
     // The detail's own copy of the card cannot record a second open.
     expect(opened).toHaveLength(1)
@@ -422,7 +433,7 @@ export function registerCommunitySpotlightCases() {
     const card = await screen.findByTestId('community-spotlight-item-spot-1')
     await catchUp()
     press(within(card).getByTestId('community-card-open-spot-1'))
-    await screen.findByTestId('community-spotlight-detail-title')
+    await screen.findByTestId('community-spotlight-detail')
 
     phase = 'removed'
     await catchUp()
@@ -431,7 +442,7 @@ export function registerCommunitySpotlightCases() {
       expect(screen.queryByTestId('community-spotlight-item-spot-1')).toBeNull()
     )
     await waitFor(() =>
-      expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+      expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
     await waitFor(() =>
       expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
@@ -465,7 +476,7 @@ export function registerCommunitySpotlightCases() {
 
     await waitFor(() => expect(withdrawn).toBe('spot-self'))
     await waitFor(() =>
-      expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+      expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-item-spot-self')).toBeNull()
@@ -646,7 +657,7 @@ export function registerCommunitySpotlightCases() {
 
     // iOS presents one modal at a time: the report opens once the detail has left.
     await screen.findByTestId('community-report-modal')
-    expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+    expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
 
     press(screen.getByTestId('cancel-report-button'))
     const rank = screen.getByTestId('community-spotlight-rank-spot-2')
@@ -795,10 +806,14 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     const card = await screen.findByTestId('community-spotlight-item-spot-2')
     press(within(card).getByTestId('community-card-open-spot-2'))
-    await screen.findByTestId('community-spotlight-detail-title')
-    press(screen.getByTestId('community-spotlight-detail-close'))
+    await screen.findByTestId('community-spotlight-detail')
+    press(
+      within(screen.getByTestId('community-spotlight-detail')).getByTestId(
+        'app-top-bar-back'
+      )
+    )
     await waitFor(() =>
-      expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+      expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
     const rank = screen.getByTestId('community-spotlight-rank-spot-2')
     await waitFor(() =>
@@ -807,6 +822,56 @@ export function registerCommunitySpotlightCases() {
       )
     )
   })
+
+  // Story CC-7.11 D13: every way out of the post detail layer hands focus back to the card's rank,
+  // as the top bar back above does.
+  it.each([
+    [
+      '7.11-NAT-030',
+      'system back',
+      (): void | Promise<void> => {
+        // react-native-web calls the Modal's onRequestClose on Escape, as Android does on back.
+        fireEvent.keyUp(document.body, { key: 'Escape' })
+      },
+    ],
+    [
+      '7.11-NAT-032',
+      'a swipe down on its top bar',
+      async (detail: HTMLElement) => {
+        await dragFrom(within(detail).getByTestId('app-top-bar-title'), {
+          dy: LAYER_SWIPE_CLOSE_PX + 40,
+        })
+      },
+    ],
+  ] as const)(
+    '[%s] %s closes the spotlight detail and returns focus to the card it was opened from',
+    async (_id, _way, close) => {
+      const handles = iosFocusHandles()
+      serveSpotlight(() => page())
+      server.use(
+        http.post('*/api/v1/community/posts/:postId/opened', () =>
+          HttpResponse.json({ tracked: true })
+        )
+      )
+      await render(<CommunityScreen />)
+      const card = await screen.findByTestId('community-spotlight-item-spot-2')
+      press(within(card).getByTestId('community-card-open-spot-2'))
+      const detail = await screen.findByTestId('community-spotlight-detail')
+      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+
+      await close(detail)
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
+      )
+      const rank = screen.getByTestId('community-spotlight-rank-spot-2')
+      await waitFor(() =>
+        expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+          handles.get(rank)
+        )
+      )
+    }
+  )
 
   it('6.6-MOB-050 a spotlight-only post that becomes unavailable over realtime leaves the module (R25)', async () => {
     const catchUp = captureCatchUp()
@@ -883,7 +948,7 @@ export function registerCommunitySpotlightCases() {
     expect(spotlightReads).toBe(1)
   })
 
-  it('keeps newer author edits across a delayed Spotlight load and shows Edited in Spotlight detail', async () => {
+  it('[Codex 7.11 #10] keeps newer author edits across a delayed Spotlight load and shows Edited and the title in Spotlight detail', async () => {
     const base = item({
       id: 'spot-edit',
       title: 'Initial spotlight title',
@@ -945,6 +1010,10 @@ export function registerCommunitySpotlightCases() {
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
     press(within(spotCard).getByTestId('community-card-open-spot-edit'))
     const detail = await screen.findByTestId('community-spotlight-detail')
+    // Codex 7.11 #10 (D12): a titled look names the layer's top bar, the edited title included.
+    expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(
+      'Updated spotlight title'
+    )
     expect(
       within(detail).getByTestId('community-card-title-spot-edit')
     ).toHaveTextContent('Updated spotlight title')

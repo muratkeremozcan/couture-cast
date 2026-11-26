@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): post detail header back arrow (D12)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 // Learning path Step 42: Screened threaded comments.
@@ -86,17 +90,21 @@ describe('Story 6.3 screen request ownership', () => {
     signIn()
   })
   /**
-   * The modal header close. The in-thread comments close shares its name on
-   * purpose (both close the look), so scope to the dialog's own control:
-   * the one outside the detail body.
+   * The detail layer's header control. Story CC-7.11 D12: post detail is a full-height layer
+   * whose top bar carries a back arrow in place of the X, so the header has no "Close this look"
+   * control left; the in-thread comments close keeps that name inside the detail body.
    */
   function detailHeaderClose() {
     const body = screen.getByTestId('community-detail')
-    const closes = within(screen.getByRole('dialog'))
-      .getAllByRole('button', { name: 'Close this look' })
+    const dialog = screen.getByRole('dialog')
+    const headerCloses = within(dialog)
+      .queryAllByRole('button', { name: 'Close this look' })
       .filter((button) => !body.contains(button))
-    expect(closes).toHaveLength(1)
-    return closes[0]!
+    expect(headerCloses).toHaveLength(0)
+    const back = within(dialog).getByTestId('app-top-bar-back')
+    expect(back).toHaveAccessibleName('Back')
+    expect(body.contains(back)).toBe(false)
+    return back
   }
   /**
    * The open look modal hides every body sibling, the grid included, from

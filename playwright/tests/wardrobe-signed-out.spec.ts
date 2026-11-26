@@ -50,8 +50,10 @@ test.describe('Closet for a visitor who never signed in', () => {
       await expect(page.getByText(message, { exact: false }), message).toHaveCount(0)
 
     // Adding a garment is a member action: the visitor is taken to sign in, not told a session
-    // expired.
-    await page.getByTestId('garment-capture-open').click()
+    // expired. Story CC-7.11 D4: Add, the Closet's one gold primary, sits in the top bar.
+    const add = page.getByTestId('app-header').getByTestId('garment-capture-open')
+    await expect(add).toHaveAttribute('data-gold', 'primary')
+    await add.click()
     await expect(page).toHaveURL(/\/signin/)
   })
 })

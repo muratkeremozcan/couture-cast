@@ -369,7 +369,8 @@ test.describe('Story 6.4 screened threaded comments', () => {
     await expect(page.getByTestId('community-detail')).toBeVisible()
     expect(measurements).toEqual([{ experimentVariant }])
 
-    await page.getByRole('dialog').getByLabel('Close this look', { exact: true }).click()
+    // Story CC-7.11 D12: the post detail header is the top bar with back, in place of its X.
+    await page.getByRole('dialog').getByTestId('app-top-bar-back').click()
     await expect(page.getByRole('dialog')).not.toBeVisible()
     await reopenThread(opener, interceptNetworkCall)
     await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
@@ -391,10 +392,14 @@ test.describe('Story 6.4 screened threaded comments', () => {
     const { opener, thread } = await openThread(page, interceptNetworkCall)
     await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
     await thread.getByLabel('Add a comment').fill(draft)
-    // The dialog header and the thread each render a close control with this name.
+    // Story CC-7.11 D12: the dialog header's X became the top bar back, so only the thread
+    // renders a control with this name; the header holds Back.
     await expect(
       page.getByRole('button', { name: 'Close this look', exact: true })
-    ).toHaveCount(2)
+    ).toHaveCount(1)
+    await expect(
+      page.getByRole('dialog').getByTestId('app-top-bar-back')
+    ).toHaveAccessibleName('Back')
     await thread.getByRole('button', { name: 'Close this look', exact: true }).click()
     await expect(thread).toHaveCount(0)
     await expect(opener).toBeFocused()
@@ -535,7 +540,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
     const { opener, thread } = await openThread(page, interceptNetworkCall)
     const heading = thread.getByRole('heading', { name: 'Comments' })
     const send = thread.getByRole('button', { name: 'Send comment', exact: true })
-    // Scoped to the thread: the dialog header carries a second control with this name.
+    // Scoped to the thread, where this close control lives (CC-7.11 D12: the header has Back).
     const closeLook = thread.getByRole('button', { name: 'Close this look', exact: true })
     await expect(heading).toBeFocused()
 

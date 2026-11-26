@@ -2,8 +2,9 @@
   "tabs": {
     "tab_one": "Scheda Uno",
     "tab_two": "Impostazioni",
-    "home": "Home",
-    "wardrobe": "Guardaroba",
+    "today": "Oggi",
+    "closet": "Armadio",
+    "looks": "Look",
     "community": "Community",
     "profile": "Profilo"
   },
@@ -88,7 +89,14 @@
     "api_health_status": "Stato dell'API: {{status}}",
     "api_health_unavailable": "Stato dell'API non disponibile",
     "diagnostic_alert_btn": "Registra analisi allerta meteo",
-    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali."
+    "diagnostic_info": "Il tracciamento alert_received è collegato ai listener di ricezione delle notifiche push reali.",
+    "style": {
+      "row": "Stile",
+      "title": "Stile",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configura armadio",
+      "palette": "Palette colori"
+    }
   },
   "common": {
     "loading": "Caricamento",
@@ -419,6 +427,16 @@
         "unknown": "In corso"
       },
       "detailTitle": "Dettagli del capo"
+    },
+    "menu": {
+      "add": "Aggiungi",
+      "more": "Altro",
+      "moreLabel": "Altro: opzioni dell’armadio",
+      "label": "Opzioni dell'armadio",
+      "setup": "Configura armadio",
+      "setupDone": "Configura armadio: fatto",
+      "silhouette": "Silhouette",
+      "close": "Chiudi"
     }
   },
   "commerce": {
@@ -759,7 +777,8 @@
       "loadMore": "Carica altri look",
       "loadingMore": "Caricamento",
       "yourPostsTitle": "I tuoi look in corso",
-      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso."
+      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso.",
+      "detailTitle": "Look condiviso"
     },
     "card": {
       "label": "Look di {{author}}",
@@ -867,7 +886,11 @@
       "publishing": "Controllo e pubblicazione",
       "uploading": "Caricamento della tua foto",
       "cancel": "Annulla",
-      "success": "Il tuo look è stato inviato per la revisione."
+      "success": "Il tuo look è stato inviato per la revisione.",
+      "discardTitle": "Scartare questo post?",
+      "discardMessage": "La foto e il testo di questo post andranno persi.",
+      "discardKeep": "Continua a modificare",
+      "discard": "Scarta"
     },
     "validation": {
       "photoRequired": "Scegli una foto da condividere.",
@@ -1237,5 +1260,10 @@
       "linkedGuardians": "Genitori collegati",
       "empty": "Nessun genitore ha ancora dato il consenso."
     }
+  },
+  "looks": {
+    "empty": "Salva un look per vederlo qui",
+    "capsules": "Capsule",
+    "plan": "Piano"
   }
 }

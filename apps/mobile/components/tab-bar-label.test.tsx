@@ -3,6 +3,12 @@
 //
 // Story 6.15 F-00i: the bottom tab bar grows with its labels, and a label wider than its tab
 // shrinks to fit instead of ellipsizing.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 (TEA): D3 (P6, P7) floors the shrink at 12 rendered px and lets a label that still
+// does not fit wrap to two lines, so at the default text size a 12 px label never shrinks; the
+// active label is semibold. The full locale sweep is five-tab-label-floor.test.tsx (7.11-NAT-004).
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as ReactNative from 'react-native'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -58,8 +64,10 @@ describe('6.15 tab bar label', () => {
     expect(getComputedStyle(label).color).toBe('rgb(1, 2, 3)')
     const props = captured.props.find((entry) => entry.children === 'Community')!
     // r45 P2-4: Fabric Android drops minimumFontScale, so adjustsFontSizeToFit could shrink a
-    // label toward 4 dp. The label fits itself from its own text layout, and never ellipsizes.
-    expect(props.numberOfLines).toBeUndefined()
+    // label toward 4 dp. The label fits itself from its own text layout. CC-7.11 D3 (P7): at its
+    // 12 px floor a label wraps to two lines at most, with no ellipsis mode of its own.
+    expect(props.numberOfLines).toBe(2)
+    expect(props.ellipsizeMode).toBeUndefined()
     expect(props.adjustsFontSizeToFit).toBeUndefined()
     expect(props.onTextLayout).toEqual(expect.any(Function))
     await waitFor(() =>
@@ -120,7 +128,7 @@ describe('6.15 tab bar label fit and position', () => {
     )
   })
 
-  it('6.15-MOB-TAB-07 redraws a wrapped label at its fitted size', () => {
+  it('6.15-MOB-TAB-07 [7.11 D3] keeps a wrapped 12 pt label at 12 px at the default text size, on two lines', () => {
     captured.props.length = 0
     render(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()}>
@@ -133,9 +141,27 @@ describe('6.15 tab bar label fit and position', () => {
         nativeEvent: { lines: [{ width: 100 }, { width: 20 }] },
       } as never)
     )
+    // Before CC-7.11 this shrank to 12 * (100 / 120) * 0.98 px; the floor now holds 12 px and
+    // the label wraps instead.
+    expect(getComputedStyle(screen.getByText('Community')).fontSize).toBe('12px')
     expect(
-      Number.parseFloat(getComputedStyle(screen.getByText('Community')).fontSize)
-    ).toBeCloseTo(12 * (100 / 120) * 0.98, 1)
+      captured.props.findLast((entry) => entry.children === 'Community')!.numberOfLines
+    ).toBe(2)
+  })
+
+  it('[7.11-NAT-003] [7.11 D3, P6] draws the active label semibold and an inactive one medium', () => {
+    render(
+      <>
+        <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} focused>
+          Closet
+        </TabBarLabel>
+        <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()}>
+          Looks
+        </TabBarLabel>
+      </>
+    )
+    expect(getComputedStyle(screen.getByText('Closet')).fontWeight).toBe('600')
+    expect(getComputedStyle(screen.getByText('Looks')).fontWeight).toBe('500')
   })
 
   it('6.15-MOB-TAB-08 draws a label beside its icon the way React Navigation does', () => {
@@ -153,7 +179,7 @@ describe('6.15 tab bar label fit and position', () => {
 })
 
 describe('6.15 tab bar sizing (r46)', () => {
-  it('6.15-MOB-TAB-10 shrinks a beside-icon label with its line height and lets it shrink in its row', () => {
+  it('6.15-MOB-TAB-10 [7.11 D3] shrinks a beside-icon label with its line height, only down to 12 px, and lets it shrink in its row', () => {
     captured.props.length = 0
     render(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} position="beside-icon">
@@ -167,8 +193,10 @@ describe('6.15 tab bar sizing (r46)', () => {
       } as never)
     )
     const label = getComputedStyle(screen.getByText('Community'))
-    const fit = (100 / 120) * 0.98
-    expect(Number.parseFloat(label.fontSize)).toBeCloseTo(14 * fit, 1)
+    // The overflow asks for 14 * (100 / 120) * 0.98 = 11.4 px; the D3 floor stops it at 12 px,
+    // and the line height shrinks by the same factor.
+    const fit = 12 / 14
+    expect(Number.parseFloat(label.fontSize)).toBeCloseTo(12, 1)
     expect(Number.parseFloat(label.lineHeight)).toBeCloseTo(24 * fit, 1)
     const props = captured.props.findLast((entry) => entry.children === 'Community')!
     expect(StyleSheet.flatten(props.style).flexShrink).toBe(1)

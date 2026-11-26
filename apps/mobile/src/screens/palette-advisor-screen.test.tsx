@@ -197,7 +197,8 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
 
     const section = screen.getByTestId('palette-advisor-screen')
     expect(section).toHaveAttribute('aria-label', 'Color palette advisor')
-    // The stack's AppTopBar shows 'Color palette advisor'; the body has no second copy of it.
+    // The stack's AppTopBar shows the route title (Color palette since CC-7.11 D10,
+    // app/palette-advisor.tsx); the body keeps no copy of the section name as a title.
     expect(within(section).queryByText('Color palette advisor')).toBeNull()
     expect(
       within(section).queryByRole('heading', { name: 'Color palette advisor' })

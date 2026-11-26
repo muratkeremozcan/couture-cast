@@ -6,7 +6,7 @@ export default function PaletteAdvisorRoute() {
   const { t } = useTranslation()
   return (
     <>
-      <Stack.Screen options={{ title: t('commerce.premium.palette.sectionTitle') }} />
+      <Stack.Screen options={{ title: t('settings.style.palette') }} />
       <PaletteAdvisorScreen />
     </>
   )

@@ -39,6 +39,9 @@ tags:
       id: 'tab-wardrobe'
     timeout: 60000
 
+# CC-7.11 D5: the Silhouette link left the Closet header; it is the Closet
+# More menu's `closet-more-silhouette` row.
+#
 # CI39302588027 left Expo Go's invisible developer-sheet backdrop over the
 # Wardrobe hub. The link remained discoverable while its tap was swallowed.
 # Reuse the tab helpers' bounded relaunch recovery only for this transition;
@@ -55,9 +58,17 @@ tags:
           label: 'A silhouette tap was swallowed; relaunch before navigating again'
       - runFlow:
           file: subflows/open-wardrobe.yaml
-          label: 'Open the Wardrobe tab'
+          label: 'Open the Closet tab'
       - tapOn:
-          id: 'wardrobe-silhouette-link'
+          id: 'closet-more-menu'
+          label: 'Open the Closet More menu'
+      - extendedWaitUntil:
+          visible:
+            id: 'closet-more-silhouette'
+          timeout: 15000
+      - tapOn:
+          id: 'closet-more-silhouette'
+          label: 'Open Silhouette'
       - extendedWaitUntil:
           visible:
             id: 'wardrobe-silhouette-screen'

@@ -314,7 +314,8 @@ describe('check-screen-budget-decisions', () => {
     const problems = check(
       budgetWith({
         known: [
-          knownTargets({ story: '7.12', screen: 'looks' }),
+          // Story CC-7.11 D8: looks is a measured screen now, so the unknown one is invented.
+          knownTargets({ story: '7.12', screen: 'wardrobe-hub' }),
           knownTargets({ value: 7 }),
           knownTargets({ fixture: 'empty' }),
           knownTargets({ fixture: 'empty' }),
@@ -329,7 +330,7 @@ describe('check-screen-budget-decisions', () => {
       null
     )
     assert.deepEqual(problems, [
-      'known[0] web looks populated targets-above-fold: unknown screen looks, story 7.12 (owning stories: 7.11, 7.13, 7.15, 7.16, 7.17)',
+      'known[0] web wardrobe-hub populated targets-above-fold: unknown screen wardrobe-hub, story 7.12 (owning stories: 7.11, 7.13, 7.15, 7.16, 7.17)',
       'known[1] web today populated targets-above-fold: value 7 is within the limit 7, so it is not a violation',
       'known[3] web today empty targets-above-fold: duplicate entry',
       'known[4] web today empty paragraph-lines: value 1 must equal the 2 element key(s) and be 1 or more',

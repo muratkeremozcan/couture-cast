@@ -636,6 +636,16 @@
           "name": "Heiß"
         }
       }
+    },
+    "menu": {
+      "add": "Hinzufügen",
+      "more": "Mehr",
+      "moreLabel": "Mehr Schrankoptionen",
+      "label": "Schrankoptionen",
+      "setup": "Schrank einrichten",
+      "setupDone": "Schrank einrichten: fertig",
+      "silhouette": "Silhouette",
+      "close": "Schließen"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Mehr Looks laden",
       "loadingMore": "Wird geladen",
       "yourPostsTitle": "Deine Looks in Bearbeitung",
-      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie."
+      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie.",
+      "detailTitle": "Geteilter Look"
     },
     "spotlight": {
       "eyebrow": "Stadt-Highlights",
@@ -826,7 +837,11 @@
       "publishing": "Wird geprüft und veröffentlicht",
       "uploading": "Dein Foto wird hochgeladen",
       "cancel": "Abbrechen",
-      "success": "Dein Look wurde zur Prüfung eingereicht."
+      "success": "Dein Look wurde zur Prüfung eingereicht.",
+      "discardTitle": "Diesen Beitrag verwerfen?",
+      "discardMessage": "Foto und Text dieses Beitrags gehen verloren.",
+      "discardKeep": "Weiter bearbeiten",
+      "discard": "Verwerfen"
     },
     "validation": {
       "photoRequired": "Wähle ein Foto zum Teilen aus.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Profil",
-    "account": "Dein Konto"
+    "account": "Dein Konto",
+    "style": {
+      "row": "Stil",
+      "title": "Stil",
+      "silhouette": "Silhouette",
+      "closetSetup": "Schrank einrichten",
+      "palette": "Farbpalette"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Untere Navigation",
     "primaryLabel": "Hauptnavigation",
     "home": "Startseite",
-    "wardrobe": "Garderobe",
+    "today": "Heute",
+    "closet": "Schrank",
+    "looks": "Looks",
     "community": "Community",
     "profile": "Profil",
     "navigatedTo": "Zum Tab {{label}} gewechselt"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Verknüpfte Erziehungsberechtigte",
       "empty": "Noch hat keine erziehungsberechtigte Person eingewilligt."
     }
+  },
+  "looks": {
+    "empty": "Speichere einen Look, um ihn hier zu sehen",
+    "capsules": "Kapseln",
+    "plan": "Plan"
   }
 }

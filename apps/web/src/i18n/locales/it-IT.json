@@ -636,6 +636,16 @@
           "name": "Molto caldo"
         }
       }
+    },
+    "menu": {
+      "add": "Aggiungi",
+      "more": "Altro",
+      "moreLabel": "Altro: opzioni dell’armadio",
+      "label": "Opzioni dell'armadio",
+      "setup": "Configura armadio",
+      "setupDone": "Configura armadio: fatto",
+      "silhouette": "Silhouette",
+      "close": "Chiudi"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Carica altri look",
       "loadingMore": "Caricamento",
       "yourPostsTitle": "I tuoi look in corso",
-      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso."
+      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso.",
+      "detailTitle": "Look condiviso"
     },
     "spotlight": {
       "eyebrow": "In evidenza in città",
@@ -826,7 +837,11 @@
       "publishing": "Controllo e pubblicazione",
       "uploading": "Caricamento della tua foto",
       "cancel": "Annulla",
-      "success": "Il tuo look è stato inviato per la revisione."
+      "success": "Il tuo look è stato inviato per la revisione.",
+      "discardTitle": "Scartare questo post?",
+      "discardMessage": "La foto e il testo di questo post andranno persi.",
+      "discardKeep": "Continua a modificare",
+      "discard": "Scarta"
     },
     "validation": {
       "photoRequired": "Scegli una foto da condividere.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Profilo",
-    "account": "Il tuo account"
+    "account": "Il tuo account",
+    "style": {
+      "row": "Stile",
+      "title": "Stile",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configura armadio",
+      "palette": "Palette colori"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Navigazione inferiore",
     "primaryLabel": "Navigazione principale",
     "home": "Home",
-    "wardrobe": "Guardaroba",
+    "today": "Oggi",
+    "closet": "Armadio",
+    "looks": "Look",
     "community": "Community",
     "profile": "Profilo",
     "navigatedTo": "Scheda {{label}} aperta"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Genitori collegati",
       "empty": "Nessun genitore ha ancora dato il consenso."
     }
+  },
+  "looks": {
+    "empty": "Salva un look per vederlo qui",
+    "capsules": "Capsule",
+    "plan": "Piano"
   }
 }

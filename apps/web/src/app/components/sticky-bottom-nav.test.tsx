@@ -6,11 +6,17 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 58: Production follow-ups after the project close.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
+// Story CC-7.11 test owner (TEA): 7.11-UNIT-013 (resolveActiveNavTab), 7.11-UNIT-021 (five tabs,
+// catalog labels, shared svg icons, no emoji); five-tab updates to 3.6, 5.4, 7.7 and 7.9 cases.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { createElement, type ComponentProps } from 'react'
 import type * as NextLinkModule from 'next/link'
 import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { APP_TABS, TAB_ICON_PATHS, TAB_ICON_VIEWBOX } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { AppTopBar } from './app-top-bar'
 import { resolveActiveNavTab, StickyBottomNav } from './sticky-bottom-nav'
@@ -28,9 +34,16 @@ vi.mock('posthog-js', () => ({
   },
 }))
 
+// Story CC-7.11 D11: the top bar's back reads the router, so the mock names it too.
+const router = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }))
+
 vi.mock('next/navigation', () => ({
   usePathname: () => navigationMocks.pathname,
+  useRouter: () => router,
 }))
+
+/** The five tab ids in D1 order: Today, Closet, Looks, Community, Profile. */
+const TAB_IDS = ['home', 'wardrobe', 'looks', 'community', 'settings'] as const
 
 // Story CC-7.7 D5 (7.7-CMP-009): Next renders `scroll` into no attribute, so the props each tab
 // link is built with are recorded here; the real Link still renders, so the other cases see the
@@ -60,18 +73,22 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
     navigationMocks.pathname = '/'
   })
 
-  it('3.6-UNIT-006: renders 4 destination tabs with gold active indicator line on active route', () => {
+  it('3.6-UNIT-006: renders 5 destination tabs with gold active indicator line on active route', () => {
     render(<BottomNavHarness />)
 
     const homeTab = screen.getByTestId('bottom-nav-home')
     const wardrobeTab = screen.getByTestId('bottom-nav-wardrobe')
+    const looksTab = screen.getByTestId('bottom-nav-looks')
     const communityTab = screen.getByTestId('bottom-nav-community')
     const settingsTab = screen.getByTestId('bottom-nav-settings')
 
     expect(homeTab).toHaveAttribute('aria-current', 'page')
     expect(wardrobeTab).not.toHaveAttribute('aria-current')
+    expect(looksTab).not.toHaveAttribute('aria-current')
     expect(communityTab).not.toHaveAttribute('aria-current')
     expect(settingsTab).not.toHaveAttribute('aria-current')
+    // P6: the indicator renders on the active tab only.
+    expect(screen.getAllByTestId('gold-active-indicator')).toHaveLength(1)
 
     expect(
       homeTab.querySelector('[data-testid="gold-active-indicator"]')
@@ -81,6 +98,7 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
     ).not.toBeInTheDocument()
     expect(homeTab).toHaveAttribute('href', '/')
     expect(wardrobeTab).toHaveAttribute('href', '/wardrobe')
+    expect(looksTab).toHaveAttribute('href', '/looks')
     expect(communityTab).toHaveAttribute('href', '/community')
     expect(settingsTab).toHaveAttribute('href', '/settings')
   })
@@ -115,28 +133,29 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
 
   /**
    * Story 5.4 Decision 14. The exact-equality match this replaced highlighted Home on
-   * every nested route, so `/wardrobe/capsules` told the reader they were on the home
-   * tab. Adding `/palette`, a destination route under no tab at all, is what made
-   * the second half of the rule necessary: no tab is a real answer, and defaulting to
-   * Home is the same lie in a different place.
+   * every nested route, so `/wardrobe/onboarding` told the reader they were on the home
+   * tab. A route under no tab at all is what made the second half of the rule
+   * necessary: no tab is a real answer, and defaulting to Home is the same lie in a
+   * different place. Story CC-7.11 D10 moved capsules to Looks and made `/palette` a
+   * Profile row, so those two now name their parent tab (7.11-UNIT-013 below).
    */
-  it('5.4-WEB-030: resolves the active tab by longest prefix, with no tab for /palette', () => {
+  it('5.4-WEB-030: resolves the active tab by longest prefix, with no tab for a route under none', () => {
     expect(resolveActiveNavTab('/')).toBe('home')
     expect(resolveActiveNavTab('/wardrobe')).toBe('wardrobe')
-    expect(resolveActiveNavTab('/wardrobe/capsules')).toBe('wardrobe')
+    expect(resolveActiveNavTab('/wardrobe/capsules')).toBe('looks')
     expect(resolveActiveNavTab('/wardrobe/onboarding')).toBe('wardrobe')
     expect(resolveActiveNavTab('/settings')).toBe('settings')
     expect(resolveActiveNavTab('/community')).toBe('community')
     // A sibling route that merely starts with the same characters is not nested
     // under the tab, so the boundary check has to reject it.
     expect(resolveActiveNavTab('/wardrobe-silhouette')).toBeNull()
-    expect(resolveActiveNavTab('/palette')).toBeNull()
+    expect(resolveActiveNavTab('/palette')).toBe('settings')
     expect(resolveActiveNavTab('/signup')).toBeNull()
     expect(resolveActiveNavTab(null)).toBeNull()
   })
 
-  it('5.4-WEB-031: highlights Wardrobe on a nested wardrobe route', () => {
-    navigationMocks.pathname = '/wardrobe/capsules'
+  it('5.4-WEB-031: highlights Closet on a nested wardrobe route', () => {
+    navigationMocks.pathname = '/wardrobe/onboarding'
     render(<BottomNavHarness />)
 
     expect(screen.getByTestId('bottom-nav-wardrobe')).toHaveAttribute(
@@ -146,13 +165,30 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
     expect(screen.getByTestId('bottom-nav-home')).not.toHaveAttribute('aria-current')
   })
 
-  it('5.4-WEB-032: highlights no tab on /palette and announces nothing on arrival', () => {
+  // Story CC-7.11 D10: `/palette` is a Profile > Style row now, so Profile marks it; a route
+  // under no tab (sign-up) still highlights nothing and announces nothing on arrival.
+  it('5.4-WEB-032: highlights Profile on /palette and no tab, with no announcement, under none', () => {
     navigationMocks.pathname = '/palette'
-    render(<BottomNavHarness />)
+    const { unmount } = render(<BottomNavHarness />)
 
-    for (const id of ['home', 'wardrobe', 'community', 'settings']) {
+    expect(screen.getByTestId('bottom-nav-settings')).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    for (const id of ['home', 'wardrobe', 'looks', 'community']) {
       expect(screen.getByTestId(`bottom-nav-${id}`)).not.toHaveAttribute('aria-current')
     }
+    expect(screen.getByTestId('bottom-nav-status')).toHaveTextContent(
+      'Navigated to Profile tab'
+    )
+    unmount()
+
+    navigationMocks.pathname = '/signup'
+    render(<BottomNavHarness />)
+    for (const id of TAB_IDS) {
+      expect(screen.getByTestId(`bottom-nav-${id}`)).not.toHaveAttribute('aria-current')
+    }
+    expect(screen.queryByTestId('gold-active-indicator')).not.toBeInTheDocument()
     expect(screen.getByTestId('bottom-nav-status')).toHaveTextContent('')
   })
 
@@ -211,8 +247,9 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
       render(<BottomNavHarness />)
 
       const names = Object.entries({
-        home: 'Startseite',
-        wardrobe: 'Garderobe',
+        home: 'Heute',
+        wardrobe: 'Schrank',
+        looks: 'Looks',
         community: 'Community',
         settings: 'Profil',
       })
@@ -232,29 +269,35 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
       })
     })
 
-    it('7.9-CMP-NAV-001 keeps each German label on one line at the D4 caption size, without the wide uppercase that cut it at 320 px', async () => {
+    // Story CC-7.11 D3 replaced the one-line rule: five tabs share 320 px, so a label too wide
+    // for its tab wraps to a second line at 12 px; it is never cut, shrunk or uppercased.
+    it('7.9-CMP-NAV-001 keeps each German label at the 12 px caption size, wrapping and never cut, without the wide uppercase that cut it at 320 px', async () => {
       await act(async () => {
         await getI18n().changeLanguage('de-DE')
       })
       render(<StickyBottomNav />)
 
       for (const [id, name] of Object.entries({
-        home: 'Startseite',
-        wardrobe: 'Garderobe',
+        home: 'Heute',
+        wardrobe: 'Schrank',
+        looks: 'Looks',
         community: 'Community',
         settings: 'Profil',
       })) {
         const label = within(screen.getByTestId(`bottom-nav-${id}`)).getByText(name)
         // Vercel Preview O-1 on 3d7af2a2: uppercase and tracking-wider at text-xs left
         // STARTSEITE, GARDEROBE and COMMUNITY wider than their tabs at 320 px.
-        expect(label).toHaveClass('text-xs', 'whitespace-nowrap')
+        expect(label).toHaveClass('text-xs', 'max-w-full', 'text-center')
+        expect(label.className).not.toMatch(
+          /\bwhitespace-nowrap\b|\btruncate\b|\btext-ellipsis\b|\bline-clamp-/
+        )
         expect(label.className).not.toMatch(/\buppercase\b|\btracking-/)
       }
     })
 
     // Story CC-7.9 D6: the top bar's desktop tab links replaced the home header ProfileNavLink.
     it('PROFILE-NAV-WEB-03 the top bar Profile link reads the reader language and records English', async () => {
-      render(<AppTopBar titleKey="nav.home" />)
+      render(<AppTopBar titleKey="nav.today" />)
       const link = screen.getByTestId('nav-profile')
       expect(link).toHaveAccessibleName('Profile')
       expect(link).toHaveAttribute('href', '/settings')
@@ -282,10 +325,118 @@ describe('StickyBottomNav scroll (Story CC-7.7)', () => {
   it('7.7-CMP-009 every tab link renders with scroll={false}', () => {
     render(<StickyBottomNav />)
 
-    const tabs = ['home', 'wardrobe', 'community', 'settings']
+    const tabs = [...TAB_IDS]
     for (const tab of tabs) expect(screen.getByTestId(`bottom-nav-${tab}`)).toBeVisible()
     const tabLinks = [...linkProps.keys()].filter((key) => key.startsWith('bottom-nav-'))
     expect(tabLinks.sort()).toEqual(tabs.map((tab) => `bottom-nav-${tab}`).sort())
     for (const key of tabLinks) expect(linkProps.get(key)?.scroll).toBe(false)
+  })
+})
+
+// Story CC-7.11 D1, D2 (7.11-UNIT-021): the bar reads the one shared tab list and draws the one
+// shared icon set; emoji left the bar.
+describe('7.11-UNIT-021 StickyBottomNav five tabs and shared icons', () => {
+  beforeEach(() => {
+    navigationMocks.pathname = '/wardrobe'
+  })
+
+  it('renders five links in D1 order with the catalog labels and routes', () => {
+    render(<StickyBottomNav />)
+
+    const nav = screen.getByRole('navigation', { name: 'Bottom navigation' })
+    const links = within(nav).getAllByRole('link')
+    expect(links.map((link) => link.getAttribute('data-testid'))).toEqual(
+      TAB_IDS.map((id) => `bottom-nav-${id}`)
+    )
+    expect(links.map((link) => link.textContent)).toEqual([
+      'Today',
+      'Closet',
+      'Looks',
+      'Community',
+      'Profile',
+    ])
+    expect(links.map((link) => link.getAttribute('href'))).toEqual([
+      '/',
+      '/wardrobe',
+      '/looks',
+      '/community',
+      '/settings',
+    ])
+    // The bar is built from the shared list, so the two never drift.
+    expect(APP_TABS.map((tab) => tab.id)).toEqual([...TAB_IDS])
+    // Each link's accessible name is its label alone: the icon adds nothing to it.
+    expect(links.map((link) => link.getAttribute('aria-label'))).toEqual(
+      TAB_IDS.map(() => null)
+    )
+    expect(within(nav).getByRole('link', { name: 'Closet' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+  })
+
+  it('draws each icon as an aria-hidden inline svg with the shared path set', () => {
+    render(<StickyBottomNav />)
+
+    for (const id of TAB_IDS) {
+      const link = screen.getByTestId(`bottom-nav-${id}`)
+      const svgs = link.querySelectorAll('svg')
+      expect(svgs).toHaveLength(1)
+      const svg = svgs[0]!
+      expect(svg).toBe(within(link).getByTestId(`tab-icon-${id}`))
+      expect(svg).toHaveAttribute('aria-hidden', 'true')
+      expect(svg).toHaveAttribute('focusable', 'false')
+      expect(svg).toHaveAttribute('viewBox', TAB_ICON_VIEWBOX)
+      // D2: the icon strokes in the label color, so active and inactive follow the text.
+      expect(svg).toHaveAttribute('stroke', 'currentColor')
+      expect(svg).toHaveAttribute('fill', 'none')
+      expect(
+        [...svg.querySelectorAll('path')].map((path) => path.getAttribute('d'))
+      ).toEqual([...TAB_ICON_PATHS[id]])
+    }
+  })
+
+  it('carries no emoji anywhere in the bar', () => {
+    render(<StickyBottomNav />)
+
+    const nav = screen.getByTestId('sticky-bottom-nav')
+    expect(nav.textContent).not.toMatch(/\p{Extended_Pictographic}/u)
+    expect(nav.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u)
+  })
+})
+
+// Story CC-7.11 D10 (7.11-UNIT-013): a sub-screen highlights its parent tab, including the ones
+// whose path sits under another tab's prefix or under none.
+describe('7.11-UNIT-013 resolveActiveNavTab for the five tabs and their sub-screens', () => {
+  it.each([
+    ['/looks', 'looks'],
+    ['/looks/plan', 'looks'],
+    ['/wardrobe/capsules', 'looks'],
+    ['/wardrobe/silhouette', 'wardrobe'],
+    ['/wardrobe/onboarding', 'wardrobe'],
+    ['/settings/style', 'settings'],
+    ['/palette', 'settings'],
+    ['/notification-settings', 'settings'],
+    ['/guardian/dashboard', 'settings'],
+    ['/teen/dashboard', 'settings'],
+  ] as const)('%s resolves to %s', (pathname, tab) => {
+    expect(resolveActiveNavTab(pathname)).toBe(tab)
+  })
+
+  it('matches Today on / exactly and never as a prefix', () => {
+    expect(resolveActiveNavTab('/')).toBe('home')
+    expect(resolveActiveNavTab('/signup')).toBeNull()
+    expect(resolveActiveNavTab('/looksbook')).toBeNull()
+    expect(resolveActiveNavTab('/settings-style')).toBeNull()
+  })
+
+  it('highlights Looks in the bar on the Plan route', () => {
+    navigationMocks.pathname = '/looks/plan'
+    render(<StickyBottomNav />)
+
+    expect(screen.getByTestId('bottom-nav-looks')).toHaveAttribute('aria-current', 'page')
+    expect(
+      within(screen.getByTestId('bottom-nav-looks')).getByTestId('gold-active-indicator')
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('bottom-nav-home')).not.toHaveAttribute('aria-current')
   })
 })

@@ -636,6 +636,16 @@
           "name": "Caluroso"
         }
       }
+    },
+    "menu": {
+      "add": "Agregar",
+      "more": "Más",
+      "moreLabel": "Más opciones del clóset",
+      "label": "Opciones del clóset",
+      "setup": "Configurar clóset",
+      "setupDone": "Configurar clóset: listo",
+      "silhouette": "Silueta",
+      "close": "Cerrar"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Cargar más looks",
       "loadingMore": "Cargando",
       "yourPostsTitle": "Tus looks en proceso",
-      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión."
+      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión.",
+      "detailTitle": "Look compartido"
     },
     "spotlight": {
       "eyebrow": "Destacados de la ciudad",
@@ -826,7 +837,11 @@
       "publishing": "Revisando y publicando",
       "uploading": "Subiendo tu foto",
       "cancel": "Cancelar",
-      "success": "Tu look se envió a revisión."
+      "success": "Tu look se envió a revisión.",
+      "discardTitle": "¿Descartar esta publicación?",
+      "discardMessage": "Se perderán la foto y el texto de esta publicación.",
+      "discardKeep": "Seguir editando",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Elige una foto para compartir.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Perfil",
-    "account": "Tu cuenta"
+    "account": "Tu cuenta",
+    "style": {
+      "row": "Estilo",
+      "title": "Estilo",
+      "silhouette": "Silueta",
+      "closetSetup": "Configurar clóset",
+      "palette": "Paleta de colores"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Navegación inferior",
     "primaryLabel": "Navegación principal",
     "home": "Inicio",
-    "wardrobe": "Guardarropa",
+    "today": "Hoy",
+    "closet": "Clóset",
+    "looks": "Looks",
     "community": "Comunidad",
     "profile": "Perfil",
     "navigatedTo": "Pestaña {{label}} abierta"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Tutores vinculados",
       "empty": "Ningún tutor ha aceptado el consentimiento todavía."
     }
+  },
+  "looks": {
+    "empty": "Guarda un look para verlo aquí",
+    "capsules": "Cápsulas",
+    "plan": "Plan"
   }
 }

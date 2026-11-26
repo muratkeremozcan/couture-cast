@@ -79,7 +79,11 @@ import {
   garmentTitle,
   parseGarmentId,
 } from '@/components/hero/garment-item-tile'
-import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { TAB_BODY_INSET, useTokens, withAlpha } from '@/src/theme/tokens'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
@@ -165,14 +169,6 @@ function focusAccessibilityTarget(
   const node = safeFindNodeHandle(target)
   if (node) {
     AccessibilityInfo.setAccessibilityFocus(node)
-  }
-}
-
-function restoreAccessibilityFocus(target: SwapFocusTarget | null) {
-  if (typeof target === 'object') {
-    requestAnimationFrame(() => target?.focus?.())
-  } else if (typeof target === 'number') {
-    requestAnimationFrame(() => AccessibilityInfo.setAccessibilityFocus(target))
   }
 }
 
@@ -888,16 +884,11 @@ export default function TabOneScreen() {
     setIsSwapModalVisible(true)
   }
 
-  const restoreSwapTriggerFocus = () => {
-    const trigger = swapTriggerRef.current
-    swapTriggerRef.current = null
-    restoreAccessibilityFocus(trigger)
-  }
-
+  // Story CC-7.11 D13: EdgeToEdgeModal returns focus to the swap trigger (returnFocusRef); a
+  // completed swap clears the trigger and focuses the new garment instead.
   const closeSwapModal = () => {
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
-    restoreSwapTriggerFocus()
   }
 
   useEffect(() => {
@@ -1072,33 +1063,61 @@ export default function TabOneScreen() {
         activeOutfit
       ) ? (
       <>
+        {/* Story CC-7.11 P5: Today's first own content; the Plan link follows it (D16). */}
+        <NativeView testID="today-first-content">
+          <MemberSampleOutfit
+            key={applicationUserId}
+            owner={applicationUserId}
+            error={error}
+            busy={isLoading}
+            onRetry={handleRetry}
+          />
+        </NativeView>
         <HomePlannerLink />
-        <MemberSampleOutfit
-          key={applicationUserId}
-          owner={applicationUserId}
-          error={error}
-          busy={isLoading}
-          onRetry={handleRetry}
-        />
       </>
     ) : (
       <>
-        {/* Weather Alert Banner */}
+        {/* Weather Header. Story CC-7.11 AC2, D16: the weather line and the outfit card come
+            first; the ribbon, scenario toggles, add prompt and Plan link follow the card. */}
+        <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
+
+        {/* Primary Outfit Card; Story CC-7.11 P5: Today's first own content. */}
+        <NativeView testID="today-first-content">
+          <OutfitRecommendationCard
+            outfit={activeOutfit}
+            onExport={(recommendationId, opener) => {
+              if (
+                openAndroidShareCard(
+                  { kind: 'outfit', recommendationId },
+                  'outfit',
+                  opener
+                )
+              )
+                return
+              shareCardInvoker.current = {
+                node: opener,
+                member: mobileApplicationUserId(),
+              }
+              setShareCardSource({ kind: 'outfit', recommendationId })
+              setShareCardOpen(true)
+              traceShareCardOpener('state-open')
+            }}
+            onSwapGarment={handleSwapGarment}
+            onGarmentRef={(garmentId, element) => {
+              garmentRefs.current.set(garmentId, element)
+            }}
+            isLoading={isLoading}
+            isCacheServed={isCacheServed}
+          />
+        </NativeView>
+
+        {/* Story CC-7.11 D4, AC2: the weather alert banner follows the outfit, so no banner
+            comes before Today's first own content. */}
         {ritual?.data.weather.alerts && (
           <WeatherAlertBanner alerts={ritual.data.weather.alerts} />
         )}
 
-        {sessionState === 'member' && <HomePlannerLink />}
-
-        {/* Weather Header */}
-        <WeatherHeader current={ritual?.data.weather.current} isLoading={isLoading} />
-
-        {/* Hourly Forecast Ribbon */}
-        <HourlyForecastRibbon
-          hourly={ritual?.data.weather.hourly}
-          isLoading={isLoading}
-          onToggleExpand={handleRibbonToggle}
-        />
+        {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
 
         {/* Scenario Quick Toggles */}
         {!isLoading && ritual && (
@@ -1108,31 +1127,14 @@ export default function TabOneScreen() {
           />
         )}
 
-        {activeOutfit && !activeOutfit.displayGarments?.length && <HomeAddGarment />}
-
-        {/* Primary Outfit Card */}
-        <OutfitRecommendationCard
-          outfit={activeOutfit}
-          onExport={(recommendationId, opener) => {
-            if (
-              openAndroidShareCard({ kind: 'outfit', recommendationId }, 'outfit', opener)
-            )
-              return
-            shareCardInvoker.current = {
-              node: opener,
-              member: mobileApplicationUserId(),
-            }
-            setShareCardSource({ kind: 'outfit', recommendationId })
-            setShareCardOpen(true)
-            traceShareCardOpener('state-open')
-          }}
-          onSwapGarment={handleSwapGarment}
-          onGarmentRef={(garmentId, element) => {
-            garmentRefs.current.set(garmentId, element)
-          }}
+        {/* Hourly Forecast Ribbon */}
+        <HourlyForecastRibbon
+          hourly={ritual?.data.weather.hourly}
           isLoading={isLoading}
-          isCacheServed={isCacheServed}
+          onToggleExpand={handleRibbonToggle}
         />
+
+        {sessionState === 'member' && <HomePlannerLink />}
       </>
     )
 
@@ -1207,7 +1209,9 @@ export default function TabOneScreen() {
           session={sessionState}
           ready={homeGateReady(sessionState, ritualSettled)}
         >
-          {/* Stale Cache Banner */}
+          {renderHero()}
+
+          {/* Story CC-7.11 D4, AC2: the cached-data notice follows the outfit. */}
           {isStale && (
             <View
               style={[
@@ -1227,8 +1231,6 @@ export default function TabOneScreen() {
             </View>
           )}
 
-          {renderHero()}
-
           {/*
           Story 6.7: after the whole hero conditional, so it follows in focus
           order. It reads on its own and never waits on, hides or re-renders the hero.
@@ -1246,6 +1248,7 @@ export default function TabOneScreen() {
         animationType={swapModalAnimation}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
+        returnFocusRef={swapTriggerRef}
         scrim={scrim}
       >
         <View style={styles.modalOverlay}>
@@ -1270,16 +1273,19 @@ export default function TabOneScreen() {
                 aria-modal
                 aria-labelledby="garment-swap-title"
               >
-                <Text
-                  nativeID="garment-swap-title"
-                  style={[styles.modalTitle, { color: palette.ink }]}
-                  accessibilityRole="header"
-                >
-                  {t('hero.garment_swap_title', {
-                    category: localizedCategory,
-                    defaultValue: `Choose alternate ${swapCategory}`,
-                  })}
-                </Text>
+                {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
+                <LayerSwipeHandle>
+                  <Text
+                    nativeID="garment-swap-title"
+                    style={[styles.modalTitle, { color: palette.ink }]}
+                    accessibilityRole="header"
+                  >
+                    {t('hero.garment_swap_title', {
+                      category: localizedCategory,
+                      defaultValue: `Choose alternate ${swapCategory}`,
+                    })}
+                  </Text>
+                </LayerSwipeHandle>
                 <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
                   {swapOptions.map((option, index) => {
                     const isCurrent = option === swappingGarmentId

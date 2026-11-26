@@ -6,7 +6,7 @@ export default function PlannerRoute() {
   const { t } = useTranslation()
   return (
     <>
-      <Stack.Screen options={{ title: t('commerce.premium.planner.sectionTitle') }} />
+      <Stack.Screen options={{ title: t('looks.plan') }} />
       <PlannerScreen />
     </>
   )

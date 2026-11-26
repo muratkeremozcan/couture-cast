@@ -3,7 +3,7 @@
 //
 // Jade's "Upload fail" investigation found a second, user-visible fault on production: opening
 // /wardrobe in a fresh tab, or reloading it, painted "Your session expired. Sign in again before
-// adding a garment." and left Silhouette disabled, because a fresh document dropped the verified
+// adding a garment." and left Silhouette disabled (Silhouette is its own route since CC-7.11), because a fresh document dropped the verified
 // bearer until the profile check answered and the hub read the bearer once, at mount, inside that
 // window. It was fixed in #260 (the stored principal and the retrying hub reads); only the owned
 // real-session lane, which is not a production check, held it. This is the production check, as
@@ -54,15 +54,23 @@ test.describe('The wardrobe hub on production, signed in on a phone', () => {
         await open()
         expect((await closet).status(), `closet read on ${label}`).toBe(200)
 
+        // Story CC-7.11 D1: the tab title reads Closet.
         await expect(
-          page.getByRole('heading', { level: 1, name: 'Wardrobe' }),
+          page.getByRole('heading', { level: 1, name: 'Closet' }),
           label
         ).toBeVisible()
-        // The account loaded: Silhouette needs the user id the hub resolves from the session.
+        // Story CC-7.11 D4, D6: the Silhouette button left the Closet for its own route, so it
+        // can no longer prove the account loaded. The Closet gate opens only once the user id
+        // the hub resolves from the session has answered (CC-7.7 D3), and with a member Add is
+        // the capture button, not the visitor's sign-in link.
         await expect(
-          page.getByRole('button', { name: 'Silhouette' }),
-          `Silhouette on ${label}`
-        ).toBeEnabled()
+          page.locator('[data-testid="screen-gate"][data-ready="true"]'),
+          `Closet gate on ${label}`
+        ).toBeVisible()
+        await expect(
+          page.getByTestId('app-header').getByTestId('garment-capture-open'),
+          `member Add on ${label}`
+        ).toHaveJSProperty('tagName', 'BUTTON')
         await expect(page.getByText('Your session expired')).toHaveCount(0)
         await expect(page.getByText('Unable to load your account')).toHaveCount(0)
         await expect(

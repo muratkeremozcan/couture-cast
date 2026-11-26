@@ -82,10 +82,8 @@ async function openSettings(
 }
 
 /**
- * The lookbook home at the one viewport where the planner rail renders inline
- * (>=1440px, Decision 7's third-column form), with the "Plan week" control already
- * clicked open: the rail defaults closed, so a caller that only navigated here
- * would see nothing. The realtime poll is stubbed so the page settles without a
+ * The Plan route reached from the Today "Plan week" link at 1440px (Story CC-7.11 D9: the
+ * planner left Today for `/looks/plan`, where the rail renders inline). The realtime poll is stubbed so the page settles without a
  * live events dependency. Register any network watch (e.g. on `PLANNER_URL`) before
  * calling this, since the open click happens inside it.
  */
@@ -100,6 +98,8 @@ async function openLookbookUltrawide(
   await page.setViewportSize(ULTRAWIDE_VIEWPORT)
   await page.goto('/')
   await page.getByTestId('planner-open-control').click()
+  // Story CC-7.11 D9: Plan week links to the Plan route, where the rail renders inline.
+  await expect(page).toHaveURL('/looks/plan')
 }
 
 function subscribeButton(page: Page, plan: 'monthly' | 'annual'): Locator {

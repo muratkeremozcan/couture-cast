@@ -16,7 +16,7 @@ export default function Home() {
     // bar and filter nav would stick to it otherwise).
     <AppPage className="overflow-x-clip">
       {/* D6/D8: the top bar renders outside the gate, so the placeholder sits inside the shell. */}
-      <AppTopBar titleKey="nav.home" />
+      <AppTopBar titleKey="nav.today" />
       <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-16`}>
         {/* The brand line keeps the small gap the old page header gave it. On the main gap-16
             a member, whose tagline is hidden, saw 64 px of blank page above Plan week. */}

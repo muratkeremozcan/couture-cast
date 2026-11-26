@@ -1,3 +1,7 @@
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): the Closet top bar title reads Closet (D1); router stub for the back (D11)
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 // Story 7.5 test plan 7.5-CMP-002..004: the Closet grid opens a ready garment's detail at
 // /wardrobe?garment=<id>, keeps the grid mounted for back, and names photos by color plus
 // category.
@@ -16,6 +20,7 @@ import { useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearAppHistory } from '../../lib/app-history'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import type { GarmentWithColor } from '@couture/api-client/contracts/http'
 import {
@@ -37,7 +42,17 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   webSessionIdentity: () => session.owner,
 }))
 
+// Story CC-7.11 D11: the top bar back reads the router.
+const router = vi.hoisted(() => ({
+  back: vi.fn(),
+  replace: vi.fn(),
+  push: vi.fn(),
+  prefetch: vi.fn(),
+  refresh: vi.fn(),
+  forward: vi.fn(),
+}))
 vi.mock('next/navigation', () => ({
+  useRouter: () => router,
   usePathname: () => '/wardrobe',
   // Story 7.5: the closet reads the open garment from useSearchParams, which Next keeps in sync
   // with native History API calls and Back/Forward. This stand-in does the same for jsdom.
@@ -184,8 +199,15 @@ beforeEach(() => {
   )
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
+  // Story CC-7.11 D11, D13: jsdom keeps one history per file. Let any back step a test started
+  // (a closed layer's go(-1), the detail's back) land before the next test begins, then start
+  // from a fresh top entry with nothing below it, so no traversal leaks across tests.
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  window.history.pushState(null, '', '/wardrobe')
+  clearAppHistory()
   setUrl('')
   session.owner = null
   sessionStorage.clear()
@@ -256,7 +278,7 @@ describe('Closet garment detail', () => {
 
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(window.location.search).toBe('')
-    expect(topBarTitle()).toHaveTextContent(/^Wardrobe$/)
+    expect(topBarTitle()).toHaveTextContent(/^Closet$/)
     expect(topBar().queryByTestId('app-top-bar-back')).toBeNull()
     expect(scrollTo).toHaveBeenLastCalledWith(0, 640)
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()

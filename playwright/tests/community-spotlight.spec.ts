@@ -62,13 +62,17 @@ test.describe('Story 6.6 City Spotlight', () => {
       await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
         `Spotlight in ${SEEDED_SPOTLIGHT_AREA.city}`
       )
-      // The module is the first thing in the community section.
-      await expect(
-        page
-          .getByRole('complementary', { name: 'Community lookbook' })
-          .locator(':scope > *')
-          .first()
-      ).toHaveAttribute('data-testid', 'community-spotlight')
+      // The module is the first thing in the community section. Story CC-7.11 P5: it sits in
+      // the section's first-content block, the anchor the fold checks measure.
+      const firstBlock = page
+        .getByRole('complementary', { name: 'Community lookbook' })
+        .locator(':scope > *')
+        .first()
+      await expect(firstBlock).toHaveAttribute('data-testid', 'community-first-content')
+      await expect(firstBlock.locator(':scope > *').first()).toHaveAttribute(
+        'data-testid',
+        'community-spotlight'
+      )
       const firstPage = SEEDED_SPOTLIGHT_POST_IDS.slice(
         0,
         COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT

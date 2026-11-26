@@ -28,18 +28,16 @@ import { StickyBottomNav } from '../components/sticky-bottom-nav'
  * documents: Next.js generates route types from this directory, and a
  * non-route file under `app/palette/` would be typed as one.
  *
- * Story CC-7.9 D6, D7: the shared top bar and page surface replace the always-dark page. The
- * top bar's `h1` is the panel's own localized title, with back to Profile, where the palette
- * advisor is reached from; the panel's heading is an `h2` for assistive technology only.
+ * Story CC-7.9 D6, D7: the shared top bar and page surface replace the always-dark page; the
+ * panel's heading is an `h2` for assistive technology only. Story CC-7.11 D7, D10: the top bar
+ * reads Color palette, the Profile > Style row that opens it, and back goes to Profile on a
+ * direct entry.
  */
 export default function PalettePage() {
   return (
     <I18nextProvider i18n={getI18n()}>
       <AppPage>
-        <AppTopBar
-          titleKey="commerce.premium.palette.sectionTitle"
-          backHref="/settings"
-        />
+        <AppTopBar titleKey="settings.style.palette" parentHref="/settings" />
         <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
           <PaletteAdvisorPanel />
         </main>

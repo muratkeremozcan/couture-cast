@@ -63,7 +63,8 @@ export const SCREEN_BUDGET_OWNING_STORIES = [
 ] as const
 
 export type ScreenBudgetPlatform = 'web' | 'native'
-export type ScreenBudgetScreen = 'today' | 'closet' | 'community' | 'profile'
+/** Story CC-7.11 D8: Looks joins the audited tabs. */
+export type ScreenBudgetScreen = 'today' | 'closet' | 'looks' | 'community' | 'profile'
 export type ScreenBudgetFixture = 'empty' | 'populated' | 'guardian-pending'
 export type ScreenBudgetLimits = Readonly<Record<ScreenBudgetRule, number>>
 
@@ -114,6 +115,8 @@ export interface ScreenBudgetPlatformSelectors {
   /** Null reads the document scroll height. */
   readonly todayHeight: string | null
   readonly closetAnchors: readonly string[]
+  /** Story CC-7.11 D8: the Looks tab's first own content, which must sit above the fold. */
+  readonly looksAnchors: readonly string[]
 }
 
 export interface ScreenBudgetFile {

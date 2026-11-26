@@ -34,7 +34,7 @@ export default function GlobalError({
   return (
     // Story CC-7.9 D6, D7: the shared top bar (back to Home) on the page surface.
     <AppPage>
-      <AppTopBar title={t('shell.error.title')} backHref="/" />
+      <AppTopBar title={t('shell.error.title')} parentHref="/" />
       <main
         id="main-content"
         tabIndex={-1}

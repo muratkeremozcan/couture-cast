@@ -52,12 +52,16 @@ tags:
 
 - runFlow:
     file: subflows/open-wardrobe.yaml
-    label: 'Open the Wardrobe tab'
+    label: 'Open the Closet tab'
 
+# CC-7.11 D5: Closet setup moved from the card above the grid into the Closet
+# More menu (`closet-more-menu`, then `closet-more-setup`).
+#
 # Expo Go can leave its developer sheet parked off screen with the dimmed
 # backdrop still up. Maestro cannot see that sheet, so the text-guarded absorb
-# in open-app.yaml skips it, and the backdrop swallows the card tap while the
-# deep link above still lands. CI run 39827475510 (shard 4) failed exactly so.
+# in open-app.yaml skips it, and the backdrop swallows the menu tap while the
+# deep link above still lands. CI run 39827475510 (shard 4) failed exactly so
+# on the pre-7.11 setup card.
 # The tap is therefore paired with its destination and retried, relaunching
 # the app first on a retry, as subflows/open-wardrobe-tab.yaml does for the tab.
 - evalScript: ${output.onboardingCardAttempt = 0}
@@ -71,14 +75,22 @@ tags:
           commands:
             - runFlow:
                 file: subflows/relaunch-app.yaml
-                label: 'The card tap was swallowed; relaunch the app before trying again'
+                label: 'The setup tap was swallowed; relaunch the app before trying again'
             - runFlow: subflows/open-wardrobe.yaml
       - extendedWaitUntil:
           visible:
-            id: 'wardrobe-onboarding-card'
+            id: 'closet-more-menu'
           timeout: 15000
       - tapOn:
-          id: 'wardrobe-onboarding-card'
+          id: 'closet-more-menu'
+          label: 'Open the Closet More menu'
+      - extendedWaitUntil:
+          visible:
+            id: 'closet-more-setup'
+          timeout: 15000
+      - tapOn:
+          id: 'closet-more-setup'
+          label: 'Open Closet setup'
       - extendedWaitUntil:
           visible:
             id: 'wardrobe-onboarding-screen'
@@ -199,9 +211,24 @@ tags:
       id: 'wardrobe-screen'
     timeout: 15000
 
-# The onboarding card is no longer offered once status is `completed`.
-- assertNotVisible:
-    id: 'wardrobe-onboarding-card'
+# CC-7.11 D5: once status is `completed` the More menu's setup row reads done.
+- tapOn:
+    id: 'closet-more-menu'
+    label: 'Reopen the Closet More menu'
+- extendedWaitUntil:
+    visible:
+      id: 'closet-more-setup'
+      text: 'Closet setup: done'
+    timeout: 15000
+    label: 'The setup row reports the completed onboarding'
+- tapOn:
+    id: 'closet-more-close'
+    label: 'Close the More menu with its X'
+- extendedWaitUntil:
+    notVisible:
+      id: 'closet-more-setup'
+    timeout: 15000
+    label: 'The More menu closed'
 
 # No in-app action reverts a completed WardrobeOnboardingState (decision 3
 # never adds one -- the automatic first-run entry point fires at most once by

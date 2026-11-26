@@ -125,6 +125,9 @@ describe('TeenDashboardScreen', () => {
     })
     expect(screen.getByRole('heading', { name: 'teen5@example.com' })).toBeInTheDocument()
     expect(screen.getByText('No guardian has accepted consent yet.')).toBeInTheDocument()
+    // Story CC-7.11 D10 (7.11-NAT-021): the stack top bar names the screen, so the body has no
+    // second title or eyebrow.
+    expect(screen.queryByText(i18n.t('teen.dashboard.title'))).toBeNull()
   })
 
   it('surfaces the load failure instead of spinning on the loading copy', async () => {

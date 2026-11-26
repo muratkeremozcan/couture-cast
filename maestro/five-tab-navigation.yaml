@@ -1,0 +1,181 @@
+# Learning path Step 68: Five-tab navigation and back pattern.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+# Story CC-7.11 test owner (TEA): device proof of AC1 to AC4 on the signed-in shell, spec D1, D4,
+# D5, D8, D10 and P5.
+# Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+#
+# The tab bar shows five tabs in order (Today, Closet, Looks, Community, Profile), each by its
+# test id. Each tab tap selects that tab and lands on its first own content: Today's
+# `today-first-content`, the Closet grid or its empty state, `looks-first-content`,
+# `community-first-content` and Profile's `profile-account`. Closet's More menu offers Closet setup
+# and Silhouette and closes with its X. Last, a sub-screen under Looks (the capsule library) shows
+# the top bar back and title, and back returns to the Looks tab.
+#
+# Labels and active-state styling at large text are the RNW harness's (7.11-NAT-*); this flow
+# proves the real navigator on a device. scripts/lib/native-maestro-flows.mjs discovers it like
+# every root flow, so it runs wherever the generic Maestro suite runs (pr-mobile-e2e.yml).
+appId: ${MAESTRO_APP_ID}
+name: 'CC-7.11 five tabs, Closet More menu and sub-screen back'
+tags:
+  - e2e
+  - navigation
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# --- AC1, D1: five tabs, left to right, by id ----------------------------------
+- extendedWaitUntil:
+    visible:
+      id: 'tab-home'
+    timeout: 60000
+- assertVisible:
+    id: 'tab-wardrobe'
+    rightOf:
+      id: 'tab-home'
+    label: 'Closet follows Today'
+- assertVisible:
+    id: 'tab-looks'
+    rightOf:
+      id: 'tab-wardrobe'
+    label: 'Looks follows Closet'
+- assertVisible:
+    id: 'tab-community'
+    rightOf:
+      id: 'tab-looks'
+    label: 'Community follows Looks'
+- assertVisible:
+    id: 'tab-settings'
+    rightOf:
+      id: 'tab-community'
+    label: 'Profile follows Community'
+
+# --- Today ---------------------------------------------------------------------
+- runFlow: subflows/absorb-expo-dev-sheet.yaml
+- tapOn:
+    id: 'tab-home'
+    retryTapIfNoChange: true
+    label: 'Open Today'
+- extendedWaitUntil:
+    visible:
+      id: 'today-first-content'
+    timeout: 15000
+    label: 'Today opens on its first own content'
+# By id: Android reports the bar's title beside app-top-bar, not under it (CI 3d7af2a2).
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Today'
+- assertVisible:
+    id: 'tab-home'
+    selected: true
+    label: 'Today is the selected tab'
+
+# --- Closet (AC2, D4) and its More menu (AC3, D5) ----------------------------
+- runFlow: subflows/open-wardrobe-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'closet-garment-grid|wardrobe-empty-state'
+    timeout: 15000
+    label: 'Closet opens on its grid, or on the empty state for an empty closet'
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Closet'
+- assertVisible:
+    id: 'garment-capture-open'
+    label: 'Add sits in the Closet top bar'
+- assertVisible:
+    id: 'tab-wardrobe'
+    selected: true
+    label: 'Closet is the selected tab'
+
+- tapOn:
+    id: 'closet-more-menu'
+    label: 'Open the Closet More menu'
+- extendedWaitUntil:
+    visible:
+      id: 'closet-more-setup'
+    timeout: 15000
+    label: 'More offers Closet setup'
+- assertVisible:
+    id: 'closet-more-silhouette'
+    label: 'More offers Silhouette'
+- tapOn:
+    id: 'closet-more-close'
+    label: 'Close the More menu with its X'
+- extendedWaitUntil:
+    notVisible:
+      id: 'closet-more-setup'
+    timeout: 15000
+    label: 'The More menu closed'
+- assertVisible:
+    id: 'wardrobe-screen'
+    label: 'Closing the menu leaves Closet on top'
+
+# --- Looks (D8) ----------------------------------------------------------------
+- runFlow: subflows/open-looks-tab.yaml
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Looks'
+- assertVisible:
+    id: 'tab-looks'
+    selected: true
+    label: 'Looks is the selected tab'
+
+# --- Community -------------------------------------------------------------------
+- runFlow: subflows/open-community-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'community-first-content'
+    timeout: 15000
+    label: 'Community opens on its first feed card or its empty state'
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Community'
+- assertVisible:
+    id: 'tab-community'
+    selected: true
+    label: 'Community is the selected tab'
+
+# --- Profile ---------------------------------------------------------------------
+- runFlow: subflows/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'profile-account'
+    direction: UP
+    timeout: 10000
+    label: 'Profile opens on its account header'
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Profile'
+- assertVisible:
+    id: 'tab-settings'
+    selected: true
+    label: 'Profile is the selected tab'
+
+# --- AC4, D10: a sub-screen has the top bar back and title; back returns to its tab ---
+- runFlow: subflows/open-capsules.yaml
+- assertVisible:
+    id: 'app-top-bar-back'
+    label: 'The capsule library has the top bar back'
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Outfit capsules'
+    label: 'The capsule library has its title'
+- tapOn:
+    id: 'app-top-bar-back'
+    label: 'Back from the capsule library'
+- extendedWaitUntil:
+    visible:
+      id: 'looks-first-content'
+    timeout: 15000
+    label: 'Back returns to the Looks tab'
+- assertVisible:
+    id: 'tab-looks'
+    selected: true
+
+- takeScreenshot:
+    path: maestro/artifacts/five-tab-navigation

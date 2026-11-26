@@ -6,6 +6,16 @@
 // under the header app/(tabs)/_layout.tsx declares for Home, About button included, read from
 // the layout itself through a `Tabs` double.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+// Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Story CC-7.11 test owner (TEA): 7.11-NAT-010 and 040 (Today's first content, the outfit card
+// or the labeled sample, inside the 360 x 640 fold with no alert or setup before it, every
+// fixture), under the same header the layout declares. D16 (spec Plan Change Log): with a city
+// Today opens on the weather header and then the outfit card; the alert, the add prompt, the
+// scenario toggles, the hourly ribbon and the Plan link all follow the first content.
+// With no city there is no forecast: the labeled sample is the first content, and its add-piece
+// and set-city prompts are its own continuation, inside it after the look name.
+// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import {
   type CapturedTabLayout,
@@ -20,7 +30,7 @@ import {
   tabHeader,
 } from '@/src/test-utils/screen-budget'
 import React, { type ReactElement, type ReactNode } from 'react'
-import { configure, render, screen, waitFor } from '@testing-library/react'
+import { configure, render, screen, waitFor, within } from '@testing-library/react'
 import {
   afterEach,
   beforeAll,
@@ -117,6 +127,16 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import {
+  WithFoldScene,
+  chromeBefore,
+  expectFirstContentInFold,
+  foldBand,
+  setFoldViewport,
+} from '@/src/test-utils/fold-band'
+import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import { server } from '@/src/test-utils/msw/server'
+import { http, HttpResponse } from 'msw'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import {
   hasSavedLocation,
@@ -151,15 +171,101 @@ function captureTabLayout() {
     throw new Error('the tab layout declared no Home tab')
 }
 
+const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode])[] = [
+  ['7.11-NAT-010', 'empty'],
+  ['7.11-NAT-010', 'populated'],
+  ['7.11-NAT-040', 'guardian-pending'],
+]
+
+/**
+ * D16: the blocks that follow Today's first content when they show. `required` are the ones the
+ * fixture always draws, so the order check can never pass on an absent block.
+ */
+const AFTER_FIRST = [
+  'weather-alert-banner',
+  'home-add-garment-container',
+  'scenario-toggles',
+  'hourly-forecast-ribbon',
+  'home-plan-week',
+] as const
+
+/**
+ * D16 with no city: no forecast, so no weather header; the labeled sample is the first content
+ * and its own prompts (add a first piece, set a city) are its continuation, inside the sample
+ * after the look it names. They are never above the sample, and never outside it.
+ */
+const SAMPLE_OWN_PROMPTS = [
+  'home-add-garment-container',
+  'hero-no-location-state',
+] as const
+
+function expectSampleOrder(first: HTMLElement) {
+  expect(
+    screen.queryByTestId('weather-header'),
+    'a weather header with no city'
+  ).toBeNull()
+  const firstBox = first.getBoundingClientRect()
+  const look = within(first).getByTestId('guest-preview-look-name')
+  const lookBox = look.getBoundingClientRect()
+  expect(lookBox.top, 'the sample opens on the look it names').toBeGreaterThanOrEqual(
+    firstBox.top - 1
+  )
+  for (const id of SAMPLE_OWN_PROMPTS) {
+    const prompt = within(first).getByTestId(id)
+    expect(prompt, id).toBeVisible()
+    expect(
+      prompt.getBoundingClientRect().top,
+      `${id} follows the sample's look (bottom ${lookBox.bottom})`
+    ).toBeGreaterThanOrEqual(lookBox.bottom - 1)
+  }
+}
+
+function expectTodayD16Order(
+  first: HTMLElement,
+  fixture: ScreenBudgetMode,
+  required: readonly (typeof AFTER_FIRST)[number][]
+) {
+  const band = foldBand()
+  const firstBox = first.getBoundingClientRect()
+  const located = hasSavedLocation(fixture)
+  if (located) {
+    // The weather header leads, wholly inside the band, right above the outfit card.
+    const header = screen.getByTestId('weather-header')
+    expect(first.contains(header), 'the weather header sits outside the card').toBe(false)
+    const box = header.getBoundingClientRect()
+    expect(box.top, 'weather header below the top bar').toBeGreaterThanOrEqual(
+      band.top - 1
+    )
+    expect(box.bottom, 'weather header inside the band').toBeLessThanOrEqual(
+      band.bottom + 1
+    )
+    expect(box.bottom, 'weather header above the outfit card').toBeLessThanOrEqual(
+      firstBox.top + 1
+    )
+  } else expectSampleOrder(first)
+  for (const id of required) expect(screen.getByTestId(id), id).toBeVisible()
+  for (const id of AFTER_FIRST) {
+    // The sample's own prompts are checked inside it, above; every other block follows it.
+    if (!located && (SAMPLE_OWN_PROMPTS as readonly string[]).includes(id)) continue
+    for (const block of screen.queryAllByTestId(id)) {
+      expect(first.contains(block), `${id} outside the first content`).toBe(false)
+      expect(
+        block.getBoundingClientRect().top,
+        `${id} follows the first content (bottom ${firstBox.bottom})`
+      ).toBeGreaterThanOrEqual(firstBox.bottom - 1)
+    }
+  }
+}
+
 /** Today as the tab layout draws it: under the Home tab header, inside the root providers. */
-function renderToday() {
+function renderToday(Frame: typeof WithTabHeader | typeof WithFoldScene = WithTabHeader) {
   return render(
     <AccessibilityAnnouncerProvider>
       <AppThemeProvider>
         <SaveFeedbackProvider>
-          <WithTabHeader header={tabHeader(tabLayout, 'index')}>
+          <Frame header={tabHeader(tabLayout, 'index')}>
             <TabOneScreen />
-          </WithTabHeader>
+          </Frame>
         </SaveFeedbackProvider>
       </AppThemeProvider>
     </AccessibilityAnnouncerProvider>
@@ -236,6 +342,83 @@ describe('Screen budget: native Today', () => {
       expectNativeWithinBudget('today', fixture, measurement)
     }, 30_000)
   }
+
+  for (const [id, fixture] of FOLD_CASES) {
+    it(`[P0] [${id}] [D16] native today (${fixture}) opens on weather and its own content inside the 360 x 640 fold`, async () => {
+      await setFoldViewport()
+      serveScreenBudgetFixture(fixture, MEMBER)
+      renderToday(WithFoldScene)
+      await todaySettled(fixture)
+
+      // The header reads Today (D1) from the layout's own options.
+      expect(screen.getByTestId('app-top-bar')).toHaveTextContent(i18n.t('tabs.today'))
+      const anchors = screen.getAllByTestId('today-first-content')
+      expect(anchors, 'one Today first content').toHaveLength(1)
+      const first = anchors[0]!
+      await waitFor(() =>
+        expect(
+          within(first).getByTestId(
+            hasSavedLocation(fixture)
+              ? 'outfit-recommendation-card'
+              : 'member-sample-outfit'
+          )
+        ).toBeVisible()
+      )
+      expectFirstContentInFold(first, 'Today first content')
+      expect(chromeBefore(first), 'alerts or setup before Today').toEqual([])
+      // D16: with a city, weather then the outfit; the ribbon, toggles and Plan link follow.
+      // With none, the sample leads with its own prompts inside it; the Plan link follows.
+      expectTodayD16Order(
+        first,
+        fixture,
+        hasSavedLocation(fixture)
+          ? ['scenario-toggles', 'hourly-forecast-ribbon', 'home-plan-week']
+          : ['home-plan-week']
+      )
+    }, 30_000)
+  }
+
+  it('[P0] [7.11-NAT-010] [D16] a weather alert follows the outfit card, so no alert comes before Today', async () => {
+    await setFoldViewport()
+    serveScreenBudgetFixture('populated', MEMBER)
+    server.use(
+      http.get('*/api/v1/ritual', () =>
+        HttpResponse.json({
+          ...mockRitualResponse,
+          data: {
+            ...mockRitualResponse.data,
+            weather: {
+              ...mockRitualResponse.data.weather,
+              alerts: [
+                {
+                  event: 'Severe Wind Advisory',
+                  description: 'High winds expected up to 50mph.',
+                  start: '2026-07-22T00:00:00.000Z',
+                  end: '2026-07-22T06:00:00.000Z',
+                  severity: 'high',
+                },
+              ],
+            },
+          },
+        })
+      )
+    )
+    renderToday(WithFoldScene)
+    await todaySettled('populated')
+
+    const first = screen.getByTestId('today-first-content')
+    await waitFor(() =>
+      expect(within(first).getByTestId('outfit-recommendation-card')).toBeVisible()
+    )
+    expectFirstContentInFold(first, 'Today first content')
+    expect(chromeBefore(first), 'alerts or setup before Today').toEqual([])
+    expectTodayD16Order(first, 'populated', [
+      'weather-alert-banner',
+      'scenario-toggles',
+      'hourly-forecast-ribbon',
+      'home-plan-week',
+    ])
+  }, 30_000)
 
   for (const [id, fixture] of PROBES) {
     it(`[P0] [${id}] native today (${fixture}): no control whose only effect is analytics`, async () => {

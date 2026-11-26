@@ -1309,16 +1309,22 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
     await dialog.getByTestId('share-card-save').click()
     await navigationGate.started
     const navigationCancelled = cancellationWitness(page, navigationGate.request!)
+    const layerUrl = page.url()
+    // Story CC-7.11 D13: the composer owns one same-URL history entry, so the first browser
+    // back closes the layer on this page (and cancels the held save); the second leaves.
     await page.goBack()
-    await expect(page).toHaveURL('/notification-settings')
-    await sameDocument()
+    await expect(dialog).not.toBeVisible()
+    expect(page.url(), 'back closed the layer without leaving the page').toBe(layerUrl)
     await expect(page.getByTestId('share-card-save')).toHaveCount(0)
     navigationGate.release()
     await navigationGate.finished
     expect(
       await navigationCancelled,
-      'unmounted save authorization request was cancelled'
+      'closed save authorization request was cancelled'
     ).toBe(true)
+    await page.goBack()
+    await expect(page).toHaveURL('/notification-settings')
+    await sameDocument()
   } finally {
     navigationGate.release()
   }

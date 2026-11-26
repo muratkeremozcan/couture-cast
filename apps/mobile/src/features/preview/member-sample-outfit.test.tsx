@@ -331,15 +331,28 @@ describe('MemberSampleOutfit (mobile)', () => {
     // member's tap cannot land that fast.
     await userEvent.click(saveBtn)
     await waitFor(() => expect(store.items).toHaveLength(2))
+    // The store fills when the POST lands, before the app reads the reply. The settled save then
+    // broadcasts a saved-looks change, and this view's refresh GET merges the server look in.
+    // Unmounting before both finish let the late broadcast reach the next view, whose refresh
+    // GET ran beside the held initial GET and showed Save early (CI 215a46ee, line 361 below).
+    await waitFor(() => {
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
+        'Saved to your looks.'
+      )
+      expect(
+        within(screen.getByTestId('sample-saved-looks')).getAllByRole('button')
+      ).toHaveLength(2)
+    })
     await view.unmount()
 
     // Slow initial GET merged with early Save retains both the early-saved look and the server look.
     let releaseSlowGet!: () => void
     let heldGet = false
+    let listGets = 0
     store.onGet = async (request) => {
-      if (heldGet || new URL(request.url).pathname !== '/api/v1/wardrobe/saved-looks') {
-        return
-      }
+      if (new URL(request.url).pathname !== '/api/v1/wardrobe/saved-looks') return
+      listGets += 1
+      if (heldGet) return
       heldGet = true
       await new Promise<void>((resolve) => {
         releaseSlowGet = resolve
@@ -358,6 +371,8 @@ describe('MemberSampleOutfit (mobile)', () => {
     )
     // While initial GET is in flight, Save stays disabled/hidden until loading completes; after release, the existing look appears.
     await waitFor(() => expect(heldGet).toBe(true))
+    // The held GET is this view's only list request, so nothing else can mark storage ready.
+    expect(listGets).toBe(1)
     expect(screen.queryByTestId('sample-save-look')).not.toBeInTheDocument()
     releaseSlowGet()
     expect(await screen.findByTestId('sample-save-look')).toBeInTheDocument()

@@ -131,7 +131,9 @@ export const PICK_IMAGE_TAP_ATTEMPT_MS =
   (2 + PICK_IMAGE_GUARDED_STEPS + 1) * CONDITION_CHECK_MS + 8_000
 export const PICK_IMAGE_TAP_WORST_CASE_MS =
   PICK_IMAGE_TAP_ATTEMPTS * PICK_IMAGE_TAP_ATTEMPT_MS
-export const PICK_IMAGE_OTHER_STEPS_MS = 117_000
+// Story CC-7.11 D13: a dirty draft asks before X drops it, so the opening clean-up and the
+// closing step each answer Discard: a nested guard and tap (2 checks) and a 5 s wait and tap.
+export const PICK_IMAGE_OTHER_STEPS_MS = 140_000
 export const PICK_IMAGE_FLOW = 'maestro/story68/community-draft-background-ios.yaml'
 
 /**

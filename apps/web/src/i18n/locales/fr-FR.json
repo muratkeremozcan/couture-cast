@@ -636,6 +636,16 @@
           "name": "Très chaud"
         }
       }
+    },
+    "menu": {
+      "add": "Ajouter",
+      "more": "Plus",
+      "moreLabel": "Plus d’options du dressing",
+      "label": "Options du dressing",
+      "setup": "Configuration du dressing",
+      "setupDone": "Configuration du dressing : terminée",
+      "silhouette": "Silhouette",
+      "close": "Fermer"
     }
   },
   "community": {
@@ -692,7 +702,8 @@
       "loadMore": "Charger plus de looks",
       "loadingMore": "Chargement",
       "yourPostsTitle": "Vos looks en cours",
-      "yourPostsBody": "Vous seul les voyez tant que la vérification n’est pas terminée."
+      "yourPostsBody": "Vous seul les voyez tant que la vérification n’est pas terminée.",
+      "detailTitle": "Look partagé"
     },
     "spotlight": {
       "eyebrow": "À la une de la ville",
@@ -826,7 +837,11 @@
       "publishing": "Vérification et publication",
       "uploading": "Envoi de votre photo",
       "cancel": "Annuler",
-      "success": "Votre look a été envoyé pour examen."
+      "success": "Votre look a été envoyé pour examen.",
+      "discardTitle": "Abandonner cette publication ?",
+      "discardMessage": "La photo et le texte de cette publication seront perdus.",
+      "discardKeep": "Continuer la modification",
+      "discard": "Abandonner"
     },
     "validation": {
       "photoRequired": "Choisissez une photo à partager.",
@@ -1017,7 +1032,14 @@
   },
   "settings": {
     "title": "Profil",
-    "account": "Votre compte"
+    "account": "Votre compte",
+    "style": {
+      "row": "Style",
+      "title": "Style",
+      "silhouette": "Silhouette",
+      "closetSetup": "Configuration du dressing",
+      "palette": "Palette de couleurs"
+    }
   },
   "home": {
     "spotlightTeaser": {
@@ -1544,7 +1566,9 @@
     "label": "Navigation inférieure",
     "primaryLabel": "Navigation principale",
     "home": "Accueil",
-    "wardrobe": "Garde-robe",
+    "today": "Aujourd'hui",
+    "closet": "Dressing",
+    "looks": "Looks",
     "community": "Communauté",
     "profile": "Profil",
     "navigatedTo": "Onglet {{label}} ouvert"
@@ -1660,5 +1684,10 @@
       "linkedGuardians": "Tuteurs associés",
       "empty": "Aucun tuteur n'a encore donné son consentement."
     }
+  },
+  "looks": {
+    "empty": "Enregistre un look pour le voir ici",
+    "capsules": "Capsules",
+    "plan": "Plan"
   }
 }

@@ -54,11 +54,13 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -74,7 +76,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   type CommunityBannedError,
@@ -97,7 +104,10 @@ import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
-import { CommunityFilterChips } from '@/components/community/community-filter-chips'
+import {
+  CommunityFilterChips,
+  CommunityFiltersExplainer,
+} from '@/components/community/community-filter-chips'
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
 import { CommunityCard } from '@/components/community/community-card'
 import { CommunityReportModal } from '@/components/community/community-report-modal'
@@ -204,12 +214,74 @@ function sheetPostId(
   return available && focused ? postId : null
 }
 
-function spotlightDetailForVisit(
-  item: CommunityReactionSpotlightItem | null,
+/** Story CC-7.11 D16: the Community top bar's New post action, the screen's one primary. */
+function CommunityNewPostButton({
+  buttonRef,
+  onPress,
+}: {
+  buttonRef: RefObject<View | null>
+  onPress: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  return (
+    <View style={styles.topBarAction}>
+      <TouchableOpacity
+        ref={buttonRef}
+        testID="community-new-post-button"
+        style={[styles.primaryButton, { backgroundColor: palette.primary }]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={t('community.newPost')}
+      >
+        <Text
+          style={[styles.primaryButtonText, { color: palette.onPrimary }]}
+          testID="community-new-post-label"
+        >
+          {t('community.newPost')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+/** Story CC-7.11 D16: where the climate explainer sits; a banned member has no chips. */
+function explainerPlacement(
+  hasChips: boolean,
+  spotlightLeads: boolean
+): 'spotlight' | 'first-post' | null {
+  if (!hasChips) return null
+  return spotlightLeads ? 'spotlight' : 'first-post'
+}
+
+/** Story CC-7.11 D16: the Spotlight leads Community when it shows looks above the feed. */
+function spotlightLeadsFeed(available: boolean, items: readonly unknown[]): boolean {
+  return available && items.length > 0
+}
+
+/** Story CC-7.11 P5: the test id of Community's first own content, on the block that leads. */
+function firstContentId(leads: boolean): string | undefined {
+  return leads ? 'community-first-content' : undefined
+}
+
+function spotlightDetailForVisit<T>(
+  item: T | null,
   available: boolean,
   currentVisit: boolean
 ) {
   return available && currentVisit ? item : null
+}
+
+/** Story CC-7.11 D12: the open feed detail's post as the feed holds it now, or null once gone. */
+function liveFeedPost(
+  shown: CommunityFeedItem | null,
+  items: readonly CommunityFeedItem[],
+  deepLinkPost: CommunityFeedItem | null
+): CommunityFeedItem | null {
+  if (!shown) return null
+  const listed = items.find((post) => post.id === shown.id)
+  if (listed) return listed
+  return deepLinkPost?.id === shown.id ? deepLinkPost : null
 }
 
 function UnlessBanned({ banned, children }: { banned: boolean; children: ReactNode }) {
@@ -489,6 +561,14 @@ export function CommunityScreen() {
   const spotlightReturnRef = useRef<View | null>(null)
   /** A report or comments action chosen inside the detail, run once it has closed. */
   const pendingSpotlightActionRef = useRef<(() => void) | null>(null)
+  // Story CC-7.11 D12: a regular feed card opens the same full-height detail as Spotlight.
+  const [feedDetail, setFeedDetail] = useState<CommunityFeedItem | null>(null)
+  // Story CC-7.11 D13: each layer's opener, recorded when it opens; EdgeToEdgeModal hands
+  // accessibility focus back to it on close.
+  const feedDetailOpenerRef = useRef<View | null>(null)
+  const spotlightDetailOpenerRef = useRef<View | null>(null)
+  const reportOpenerRef = useRef<View | null>(null)
+  const postSheetOpenerRef = useRef<View | null>(null)
   const highlightedTargetRef = useRef<string | null>(null)
   const detailGenerationRef = useRef(0)
   const notificationIntentRef = useRef(0)
@@ -1088,6 +1168,7 @@ export function CommunityScreen() {
       setCommentTarget(undefined)
       setReportingPost(null)
       setSpotlightDetail(null)
+      setFeedDetail(null)
       pendingSpotlightActionRef.current = null
       // A teaser intent belongs to the member who tapped it.
       setSpotlightIntent(null)
@@ -1460,6 +1541,10 @@ export function CommunityScreen() {
 
   const handleOpenCard = useCallback(
     (post: CommunityFeedItem) => {
+      feedDetailOpenerRef.current =
+        cardRefs.current.get(post.id) ??
+        (deepLinkPost?.id === post.id ? targetRef.current : null)
+      setFeedDetail(post)
       if (!experimentVariant) {
         // The arm is server-assigned and arrives on the feed response. An open
         // recorded before the first read would be filed under an arm the client
@@ -1472,7 +1557,7 @@ export function CommunityScreen() {
         () => undefined
       )
     },
-    [experimentVariant]
+    [deepLinkPost, experimentVariant]
   )
 
   /**
@@ -1490,6 +1575,7 @@ export function CommunityScreen() {
           post.rank,
           spotlightLevel
         ).catch(() => undefined)
+      spotlightDetailOpenerRef.current = spotlightRankRefs.current.get(post.id) ?? null
       retainedSpotlight.setPostId(post.id)
       setSpotlightDetail(post)
     },
@@ -1500,6 +1586,11 @@ export function CommunityScreen() {
   // changed) cannot stay open in its detail. While it stays, the detail shows the
   // live copy, so a refreshed image or realtime update reaches it too.
   const spotlightItems = spotlight.items
+  // Story CC-7.11 D16: whether the Spotlight shows looks above the feed, so it carries the
+  // first-content anchor.
+  const spotlightLeads = spotlightLeadsFeed(communityAvailable, spotlightItems)
+  // D16: the climate explainer follows the first content block, never precedes it.
+  const explainerAfter = explainerPlacement(bannedSanction === null, spotlightLeads)
   useEffect(() => {
     if (!retainedSpotlight.managed) return
     if (!retainedSpotlight.active || !retainedSpotlight.postId) {
@@ -1542,42 +1633,50 @@ export function CommunityScreen() {
 
   const closeSpotlightDetail = useCallback(
     (action?: () => void) => {
-      const closing = spotlightDetail
       retainedSpotlight.setPostId(null)
       setSpotlightDetail(null)
       if (action) {
+        // The action's own layer takes focus, so the rank does not.
+        spotlightDetailOpenerRef.current = null
         pendingSpotlightActionRef.current = action
         // iOS cannot present a second modal while this one is still leaving, so
         // the action waits for its dismissal there; other platforms run it now.
         if (Platform.OS !== 'ios') runPendingSpotlightAction()
-        return
       }
-      if (closing) focusNode(spotlightRankRefs.current.get(closing.id) ?? null)
     },
-    [focusNode, runPendingSpotlightAction, spotlightDetail, retainedSpotlight.setPostId]
+    [runPendingSpotlightAction, retainedSpotlight.setPostId]
   )
+
+  /** Closes a feed post's detail; an action from inside it runs once the layer has gone. */
+  const closeFeedDetail = useCallback(
+    (action?: () => void) => {
+      setFeedDetail(null)
+      if (!action) return
+      feedDetailOpenerRef.current = null
+      pendingSpotlightActionRef.current = action
+      if (Platform.OS !== 'ios') runPendingSpotlightAction()
+    },
+    [runPendingSpotlightAction]
+  )
+  const feedDetailItem = liveFeedPost(feedDetail, items, deepLinkPost)
 
   const markReported = useCallback((postId: string) => {
     setReportedPostIds((previous) => new Set(previous).add(postId))
   }, [])
 
   const handleReportPost = useCallback((post: CommunityFeedItem) => {
+    // A report from the Spotlight returns to its rank, any other to the reported card.
+    reportOpenerRef.current =
+      spotlightReturnRef.current ?? cardRefs.current.get(post.id) ?? null
+    spotlightReturnRef.current = null
     setReportError(null)
     setReportingPost(post)
   }, [])
 
   const closeReportModal = useCallback(() => {
-    const invokerId = reportingPost?.id
     setReportingPost(null)
     setReportError(null)
-    const spotlightReturn = spotlightReturnRef.current
-    spotlightReturnRef.current = null
-    if (spotlightReturn) {
-      focusNode(spotlightReturn)
-    } else if (invokerId) {
-      focusNode(cardRefs.current.get(invokerId) ?? null)
-    }
-  }, [focusNode, reportingPost])
+  }, [])
 
   const handleSubmitReport = useCallback(
     async (postId: string, reason: CommunityReportReason, details?: string) => {
@@ -1640,15 +1739,33 @@ export function CommunityScreen() {
     void loadFeed(mode, { refresh: true })
   }, [loadFeed, mode])
 
-  const openPostSheet = useCallback((optIntoChallenge: boolean) => {
+  const openPostSheet = useCallback((optIntoChallenge: boolean, opener?: View | null) => {
+    postSheetOpenerRef.current = opener ?? newPostButtonRef.current
     setChallengeOptIn(optIntoChallenge)
     setIsPostSheetVisible(true)
   }, [])
 
   const closePostSheet = useCallback(() => {
     setIsPostSheetVisible(false)
-    focusNode(newPostButtonRef.current)
-  }, [focusNode])
+  }, [])
+
+  // Story CC-7.11 D16: New post sits in the Community top bar's trailing slot, as the Closet's
+  // Add does, so no row above the first content holds a lone button. A banned member has
+  // nothing to post to (Story 6.11), so the slot stays empty.
+  const navigation = useNavigation()
+  const canPost = bannedSanction === null
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: canPost
+        ? () => (
+            <CommunityNewPostButton
+              buttonRef={newPostButtonRef}
+              onPress={() => openPostSheet(false)}
+            />
+          )
+        : undefined,
+    })
+  }, [canPost, navigation, openPostSheet])
 
   const handlePostPublished = useCallback(() => {
     setNoticeKey('community.compose.success')
@@ -1950,7 +2067,9 @@ export function CommunityScreen() {
               borderWidth: 1,
             },
           ]}
-          onPress={() => openPostSheet(false)}
+          onPress={(event) =>
+            openPostSheet(false, event.currentTarget as unknown as View | null)
+          }
           accessibilityRole="button"
           accessibilityLabel={t('community.share')}
         >
@@ -2042,6 +2161,28 @@ export function CommunityScreen() {
     spotlight.applyText(postId, text)
   }
 
+  /** A feed post inside its detail: every control first closes the layer (D12). */
+  const renderFeedDetailCard = (post: CommunityFeedItem) => (
+    <CommunityCard
+      onExport={(postId, opener) => closeFeedDetail(() => openShareCard(postId, opener))}
+      onComments={(target) =>
+        closeFeedDetail(() => {
+          notificationIntentRef.current++
+          commentsInvokerRef.current = commentsButtonRefs.current.get(target.id) ?? null
+          setCommentsPostId(target.id)
+        })
+      }
+      reactionControls={reactionState.controls(post.id)}
+      item={post}
+      onTextSaved={updateSavedText}
+      textEditingEnabled={communityAvailable && screenFocused}
+      isReported={reportedPostIds.has(post.id)}
+      onReport={(target) => closeFeedDetail(() => handleReportPost(target))}
+      onWithdraw={(target) => closeFeedDetail(() => void handleWithdrawPost(target))}
+      onImageExpiry={handleImageExpiry}
+    />
+  )
+
   const renderSpotlightCard = (
     post: CommunityReactionSpotlightItem,
     inDetail: boolean
@@ -2089,8 +2230,14 @@ export function CommunityScreen() {
     )
   }
 
-  const renderHeaderComponent = () => (
+  /**
+   * Story CC-7.11 D4, AC2: notices, the challenge banner, the band explanation and the
+   * looks still in screening follow the first feed card (or the empty state), so nothing of
+   * that kind comes before Community's first own content.
+   */
+  const renderLeadNotices = () => (
     <View>
+      {explainerAfter === 'first-post' ? <CommunityFiltersExplainer /> : null}
       {bannerMessage ? (
         <InfoBanner
           ref={noticeRef}
@@ -2151,6 +2298,18 @@ export function CommunityScreen() {
           ) : null}
         </View>
       ) : null}
+      {activeChallenge && (
+        <CommunityChallengeBanner
+          challenge={activeChallenge}
+          onParticipate={() => openPostSheet(true)}
+        />
+      )}
+      {renderAuthorStates()}
+    </View>
+  )
+
+  const renderHeaderComponent = () => (
+    <View>
       {deepLinkPost && communityAvailable ? (
         <View
           testID={`highlighted-community-card-${deepLinkPost.id}`}
@@ -2179,31 +2338,29 @@ export function CommunityScreen() {
         </View>
       ) : null}
       {communityAvailable ? (
-        <CommunitySpotlightModule
-          status={spotlight.status}
-          level={spotlight.level}
-          label={spotlight.label}
-          items={spotlight.items}
-          hasMore={spotlight.hasMore}
-          isLoadingMore={spotlight.isLoadingMore}
-          isReplacing={spotlight.isReplacing}
-          loadMoreFailed={spotlight.loadMoreFailed}
-          focusRequest={spotlight.focusRequest}
-          onFocusRequestHandled={spotlight.acknowledgeFocusRequest}
-          canMoveFocus={canMoveSpotlightFocus}
-          onRetry={spotlight.reload}
-          onViewMore={spotlight.loadMore}
-          renderCard={(post) => renderSpotlightCard(post, false)}
-          registerRank={registerSpotlightRank}
-        />
+        // Story CC-7.11 AC2, D16: the Spotlight is Community's first own content when it shows
+        // looks, as on web; otherwise the first feed card or the empty state is.
+        <View testID={firstContentId(spotlightLeads)}>
+          <CommunitySpotlightModule
+            status={spotlight.status}
+            level={spotlight.level}
+            label={spotlight.label}
+            items={spotlight.items}
+            hasMore={spotlight.hasMore}
+            isLoadingMore={spotlight.isLoadingMore}
+            isReplacing={spotlight.isReplacing}
+            loadMoreFailed={spotlight.loadMoreFailed}
+            focusRequest={spotlight.focusRequest}
+            onFocusRequestHandled={spotlight.acknowledgeFocusRequest}
+            canMoveFocus={canMoveSpotlightFocus}
+            onRetry={spotlight.reload}
+            onViewMore={spotlight.loadMore}
+            renderCard={(post) => renderSpotlightCard(post, false)}
+            registerRank={registerSpotlightRank}
+          />
+        </View>
       ) : null}
-      {activeChallenge && (
-        <CommunityChallengeBanner
-          challenge={activeChallenge}
-          onParticipate={() => openPostSheet(true)}
-        />
-      )}
-      {renderAuthorStates()}
+      {explainerAfter === 'spotlight' ? <CommunityFiltersExplainer /> : null}
     </View>
   )
 
@@ -2267,24 +2424,6 @@ export function CommunityScreen() {
         <LiveFontMountMarker scope="community" />
         {/* Story 6.11: a banned member has nothing to post to or filter. */}
         <UnlessBanned banned={bannedSanction !== null}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              ref={newPostButtonRef}
-              testID="community-new-post-button"
-              style={[styles.primaryButton, { backgroundColor: palette.primary }]}
-              onPress={() => openPostSheet(false)}
-              accessibilityRole="button"
-              accessibilityLabel={t('community.newPost')}
-            >
-              <Text
-                style={[styles.primaryButtonText, { color: palette.onPrimary }]}
-                testID="community-new-post-label"
-              >
-                {t('community.newPost')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <CommunityFilterChips
             selectedMode={servedMode}
             onSelectMode={handleSelectMode}
@@ -2307,31 +2446,38 @@ export function CommunityScreen() {
             onContentSizeChange={feedScroll.onContentSizeChange}
             scrollEventThrottle={16}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <CommunityCard
-                onExport={openShareCard}
-                onComments={(post) => {
-                  notificationIntentRef.current++
-                  commentsInvokerRef.current =
-                    commentsButtonRefs.current.get(post.id) ?? null
-                  setCommentsPostId(post.id)
-                }}
-                commentsButtonRef={(node) => {
-                  commentsButtonRefs.current.set(item.id, node)
-                }}
-                reactionControls={reactionState.controls(item.id)}
-                item={item}
-                onTextSaved={updateSavedText}
-                textEditingEnabled={communityAvailable && screenFocused}
-                isReported={reportedPostIds.has(item.id)}
-                containerRef={(node) => {
-                  cardRefs.current.set(item.id, node)
-                }}
-                onReport={handleReportPost}
-                onWithdraw={handleWithdrawPost}
-                onImageExpiry={handleImageExpiry}
-                onOpen={handleOpenCard}
-              />
+            renderItem={({ item, index }) => (
+              // Story CC-7.11 P5: the first feed card is Community's first own content. Every
+              // card sits in the same wrapper, so a new first card never remounts the others.
+              <View>
+                <View testID={firstContentId(index === 0 && !spotlightLeads)}>
+                  <CommunityCard
+                    onExport={openShareCard}
+                    onComments={(post) => {
+                      notificationIntentRef.current++
+                      commentsInvokerRef.current =
+                        commentsButtonRefs.current.get(post.id) ?? null
+                      setCommentsPostId(post.id)
+                    }}
+                    commentsButtonRef={(node) => {
+                      commentsButtonRefs.current.set(item.id, node)
+                    }}
+                    reactionControls={reactionState.controls(item.id)}
+                    item={item}
+                    onTextSaved={updateSavedText}
+                    textEditingEnabled={communityAvailable && screenFocused}
+                    isReported={reportedPostIds.has(item.id)}
+                    containerRef={(node) => {
+                      cardRefs.current.set(item.id, node)
+                    }}
+                    onReport={handleReportPost}
+                    onWithdraw={handleWithdrawPost}
+                    onImageExpiry={handleImageExpiry}
+                    onOpen={handleOpenCard}
+                  />
+                </View>
+                {index === 0 ? renderLeadNotices() : null}
+              </View>
             )}
             refreshControl={
               <RefreshControl
@@ -2345,7 +2491,15 @@ export function CommunityScreen() {
             ListHeaderComponent={renderHeaderComponent()}
             // Elements keep the empty state and the load-more control mounted across
             // renders; a fresh function per render would remount them and drop focus.
-            ListEmptyComponent={renderEmptyComponent()}
+            // Story CC-7.11 P5: with no cards, the empty state is the first own content.
+            ListEmptyComponent={
+              <View>
+                <View testID={firstContentId(!spotlightLeads)}>
+                  {renderEmptyComponent()}
+                </View>
+                {renderLeadNotices()}
+              </View>
+            }
             ListFooterComponent={
               <>
                 {renderExampleInspiration()}
@@ -2383,6 +2537,7 @@ export function CommunityScreen() {
           isSubmitting={isSubmittingReport}
           onClose={closeReportModal}
           onSubmit={handleSubmitReport}
+          returnFocusRef={reportOpenerRef}
         />
 
         <CommunityCommentsSheet
@@ -2430,6 +2585,21 @@ export function CommunityScreen() {
           onClose={() => closeSpotlightDetail()}
           onDismissed={runPendingSpotlightAction}
           renderCard={(post) => renderSpotlightCard(post, true)}
+          fallbackTitle={t('community.spotlight.eyebrow')}
+          returnFocusRef={spotlightDetailOpenerRef}
+        />
+        <CommunitySpotlightDetail
+          testID="community-post-detail"
+          item={spotlightDetailForVisit(
+            feedDetailItem,
+            communityAvailable,
+            screenFocused
+          )}
+          onClose={() => closeFeedDetail()}
+          onDismissed={runPendingSpotlightAction}
+          renderCard={renderFeedDetailCard}
+          fallbackTitle={t('community.feed.detailTitle')}
+          returnFocusRef={feedDetailOpenerRef}
         />
         <ScreenShareCardComposer
           source={shareCardSource}
@@ -2456,6 +2626,7 @@ export function CommunityScreen() {
           defaultChallengeOptIn={challengeOptIn}
           onClose={closePostSheet}
           onPublished={handlePostPublished}
+          returnFocusRef={postSheetOpenerRef}
         />
       </View>
     </SponsoredCtaImpressions>
@@ -2486,14 +2657,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: TAB_BODY_INSET,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 12,
+  topBarAction: {
+    paddingEnd: 8,
   },
   title: {
     fontSize: 24,
