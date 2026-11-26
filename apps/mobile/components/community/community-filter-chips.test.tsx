@@ -50,7 +50,11 @@ touchableSpy.createElement = createElement
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n, supportedLocales } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
-import { COMMUNITY_FILTER_MODES, CommunityFilterChips } from './community-filter-chips'
+import {
+  COMMUNITY_FILTER_MODES,
+  CommunityFilterChips,
+  CommunityFiltersExplainer,
+} from './community-filter-chips'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
@@ -180,10 +184,11 @@ describe('CommunityFilterChips (Story 6.1)', () => {
   /*
    * Production follow-up after the project close (2026-11-19): a tester asked what
    * the "Cold and wet" chip meant. Nothing on the surface said the chips filter
-   * looks by the weather they were shared in, so one visible line now sits above
-   * the strip. Above, not beside: it is read before the first chip, which is the
-   * order a screen reader walks the strip in, and it stays put while the chips
-   * scroll horizontally.
+   * looks by the weather they were shared in, so one visible line says it.
+   * Story CC-7.11 AC2, D16 (replaces "the line sits above the strip"): no explanation may
+   * come before Community's first content, so the line left the sticky strip and is its own
+   * block, which the screen draws after the Spotlight or the first post (the order itself is
+   * asserted in community-screen and screen-budget-community).
    */
   describe('climate filter explainer', () => {
     afterEach(async () => {
@@ -191,48 +196,32 @@ describe('CommunityFilterChips (Story 6.1)', () => {
     })
 
     it.each(supportedLocales)(
-      '%s shows the explainer above the chip strip',
+      '%s says what the climate chips filter by',
       async (locale) => {
         expect(
           i18n.exists('community.filters.explainer', { lng: locale }),
           `${locale} community.filters.explainer`
         ).toBe(true)
         await i18n.changeLanguage(locale)
-        const explainer = i18n.t('community.filters.explainer')
 
-        renderChips()
+        render(<CommunityFiltersExplainer />)
 
-        const strip = screen.getByTestId('community-sticky-filter-chips')
-        const line = within(strip).getByText(explainer)
+        const line = screen.getByTestId('community-filters-explainer')
+        expect(line).toHaveTextContent(i18n.t('community.filters.explainer'))
         expect(line).toBeVisible()
-
-        const firstChip = within(strip).getByTestId(
-          `community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`
-        )
-        // DOCUMENT_POSITION_FOLLOWING: the first chip comes after the explainer.
-        expect(
-          line.compareDocumentPosition(firstChip) & Node.DOCUMENT_POSITION_FOLLOWING
-        ).toBeTruthy()
       }
     )
 
-    it('keeps the explainer outside the horizontally scrolling chip row', () => {
-      const explainer = i18n.t('community.filters.explainer')
+    it('[7.11 D16] the sticky chip strip carries no explainer above the first content', () => {
       renderChips()
 
-      const firstChip = screen.getByTestId(
-        `community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`
-      )
-      const line = screen.getByText(explainer)
-      // The row's scroll container is the chips' nearest common ancestor; the
-      // explainer must not be inside it or it scrolls out of view with the chips.
-      const lastChip = screen.getByTestId(
-        `community-filter-chip-${COMMUNITY_FILTER_MODES[COMMUNITY_FILTER_MODES.length - 1]}`
-      )
-      let row: HTMLElement | null = firstChip.parentElement
-      while (row && !row.contains(lastChip)) row = row.parentElement
-      expect(row).not.toBeNull()
-      expect(row).not.toContainElement(line)
+      const strip = screen.getByTestId('community-sticky-filter-chips')
+      expect(within(strip).queryByTestId('community-filters-explainer')).toBeNull()
+      expect(within(strip).queryByText(i18n.t('community.filters.explainer'))).toBeNull()
+      // The strip is the chips alone: the first thing in it is the first chip.
+      expect(
+        within(strip).getByTestId(`community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`)
+      ).toBeVisible()
     })
   })
 })

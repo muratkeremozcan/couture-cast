@@ -29,10 +29,16 @@ vi.mock('@/src/lib/community', { spy: true })
 vi.mock('expo-router', async () => {
   const { routing } = await import('../test-utils/community-screen/mock-state.js')
   const { useFocusEffect } = await import('../test-utils/focus-effect.js')
+  // Story CC-7.11 D16: the screen puts New post in its tab top bar through setOptions; the
+  // store module, never tab-navigation.tsx, which imports this mocked module back.
+  const { useTabNavigation } = await import('../test-utils/tab-navigation-store.js')
   return {
+    // `TabTopBar` (harness `CommunityTab`) draws the real top bar, whose module imports it.
+    router: routing.router,
     useLocalSearchParams: () => routing.params,
     useRouter: () => routing.router,
     useFocusEffect,
+    useNavigation: useTabNavigation,
   }
 })
 vi.mock('expo-localization', () => ({
@@ -162,6 +168,7 @@ import { registerCommunitySpotlightFocusCases } from '../test-utils/community-sc
 import { registerCommunitySponsoredCases } from '../test-utils/community-screen/sponsored.cases'
 import { refreshEvents } from '../test-utils/community-screen/mock-state'
 import { screenFocus } from '../test-utils/focus-effect'
+import { tabNavigation } from '../test-utils/tab-navigation-store'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, vi } from 'vitest'
@@ -215,6 +222,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   afterEach(async () => {
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
+    tabNavigation.reset()
     await i18n.changeLanguage('en-US')
     Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
     // A test that publishes leaves one refresh read in flight, and MSW's service

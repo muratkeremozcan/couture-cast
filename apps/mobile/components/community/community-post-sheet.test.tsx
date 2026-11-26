@@ -255,7 +255,9 @@ function discardPrompt() {
   const [title, message, buttons = []] = alert.mock.calls[0]!
   expect(title).toBe(enUS.community.compose.discardTitle)
   expect(title).toBe('Discard this post?')
-  expect(message).toBeUndefined()
+  // Story CC-7.11 D13: the prompt says what a discard loses.
+  expect(message).toBe(enUS.community.compose.discardMessage)
+  expect(message).toBe('The photo and text in this post will be lost.')
   expect(buttons.map(({ text, style }) => ({ text, style }))).toEqual([
     { text: enUS.community.compose.discardKeep, style: 'cancel' },
     { text: enUS.community.compose.discard, style: 'destructive' },
@@ -462,10 +464,17 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     const { onClose } = renderSheet()
 
     press(screen.getByTestId('community-pick-image-button'))
-    await screen.findByTestId('community-publish-status')
+    // The busy status shows while the picker is still open, before the photo is in the draft;
+    // the case starts once the photo is in and its allocate is on the wire.
+    await screen.findByTestId('community-post-preview-image')
+    await waitFor(() => expect(allocateCommunityLookFromMobile).toHaveBeenCalledOnce())
+    expect(screen.getByTestId('community-publish-status')).toBeInTheDocument()
 
-    // Story CC-7.11 D13: the photo makes the draft dirty, so X asks before it drops it.
-    press(screen.getByTestId('community-post-sheet-close'))
+    // Story CC-7.11 D13: the photo makes the draft dirty, so X asks before it drops it. The
+    // busy guard holds only a publish, so X stays live while the photo uploads.
+    const close = screen.getByTestId('community-post-sheet-close')
+    expect(close).not.toHaveAttribute('aria-disabled', 'true')
+    press(close)
     expect(onClose).not.toHaveBeenCalled()
     discardPrompt().discard()
     expect(onClose).toHaveBeenCalledTimes(1)
@@ -532,7 +541,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     ).toBe('')
   })
 
-  it('6.1-MOB-078 abandons an in-flight publish quietly when the sheet is closed', async () => {
+  it('6.1-MOB-078 keeps the sheet open while a post publishes, then the publish lands', async () => {
     server.use(
       http.post('*/api/v1/community/posts/publish', async () => {
         await delay(250)
@@ -551,14 +560,18 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     press(screen.getByTestId('community-publish-button'))
     await screen.findByTestId('community-publish-status')
 
-    // Story CC-7.11 D13: the draft is dirty, so X asks before it drops it.
-    press(screen.getByTestId('community-post-sheet-close'))
+    // Story CC-7.11 D13 busy guard (replaces "X abandons the publish"): X is disabled while
+    // publishing, and neither X nor a swipe closes or prompts.
+    const close = screen.getByTestId('community-post-sheet-close')
+    expect(close.getAttribute('aria-disabled')).toBe('true')
+    press(close)
+    await dragFrom(screen.getByTestId('layer-swipe-handle'), {
+      dy: LAYER_SWIPE_CLOSE_PX + 40,
+    })
     expect(onClose).not.toHaveBeenCalled()
-    discardPrompt().discard()
-    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(Alert.alert).not.toHaveBeenCalled()
 
-    await delay(400)
-    expect(onPublished).not.toHaveBeenCalled()
+    await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1))
     expect(screen.queryByTestId('community-publish-error')).toBeNull()
   })
 

@@ -38,7 +38,8 @@ vi.mock('expo-router', async () => ({
   // Imported, not importActual'd, so the hub and `screenFocus` share one module instance.
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
   // Story CC-7.11 D4: the hub sets its top bar Add and More through setOptions.
-  useNavigation: (await import('../../test-utils/tab-navigation.js')).useTabNavigation,
+  useNavigation: (await import('../../test-utils/tab-navigation-store.js'))
+    .useTabNavigation,
 }))
 // The Closet More sheet's X imports the icon font, whose native module the browser lacks.
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))

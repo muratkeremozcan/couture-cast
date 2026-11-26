@@ -19,13 +19,18 @@ type Listener = [
   EventListenerOrEventListenerObject,
   boolean | AddEventListenerOptions | undefined,
 ]
-/** jsdom's own addEventListener on window, around the spy that records module listeners. */
+/**
+ * jsdom's own addEventListener on window, taken before any spy replaces it. Vitest binds the
+ * window's methods to the jsdom window, so calling EventTarget.prototype's with the test
+ * global fails jsdom's brand check ("not a valid instance of EventTarget", CI job 140098473776).
+ */
+const originalAddEventListener = window.addEventListener.bind(window)
 function nativeAddEventListener(
   type: string,
   listener: EventListenerOrEventListenerObject,
   options?: boolean | AddEventListenerOptions
 ) {
-  EventTarget.prototype.addEventListener.call(window, type, listener, options)
+  originalAddEventListener(type, listener, options)
 }
 let listeners: Listener[] = []
 

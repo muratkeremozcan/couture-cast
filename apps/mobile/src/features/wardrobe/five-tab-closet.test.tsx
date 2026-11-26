@@ -34,7 +34,8 @@ vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
   // Story CC-7.11 D4: the hub puts Add and More in its tab top bar through setOptions.
-  useNavigation: (await import('../../test-utils/tab-navigation.js')).useTabNavigation,
+  useNavigation: (await import('../../test-utils/tab-navigation-store.js'))
+    .useTabNavigation,
 }))
 // AppTopBar (drawn by TabTopBar) imports the icon font, whose native module the browser lacks.
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))

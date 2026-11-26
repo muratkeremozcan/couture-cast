@@ -426,8 +426,9 @@ test.describe('CC-7.11 Looks tab and Plan @local-lane', () => {
     await page.goto(SHELL_TABS.home.path)
     await waitForShellSettled(page, router)
 
-    // D9: the planner is a route now; Today renders no planner panel (role complementary).
-    await expect(page.getByRole('complementary')).toHaveCount(0)
+    // D9: the planner is a route now; Today renders no Planner Rail. (Today still embeds the
+    // Community grid's own aside until CC-7.13, so the check names the rail.)
+    await expect(page.getByRole('complementary', { name: 'Planner Rail' })).toHaveCount(0)
     const planLink = page.getByTestId('planner-open-control')
     await expect(planLink).toHaveAttribute('href', '/looks/plan')
     await expect(planLink).toBeVisible()

@@ -25,7 +25,7 @@ vi.mock('expo-router', async () => ({
   router: { replace: vi.fn(), push: vi.fn(), setParams: vi.fn(), navigate: vi.fn() },
   Stack: { Screen: () => null },
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
-  useNavigation: (await import('../test-utils/tab-navigation.js')).useTabNavigation,
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
 // AppTopBar and the More sheet's X import the icon font, whose native module the browser lacks.
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))

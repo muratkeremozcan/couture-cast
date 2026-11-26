@@ -8,7 +8,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): 7.11-NAT-032, 7.11-NAT-033, the capture header is the layer's
 // swipe handle beside its X. [Codex 7.11 #3]: the swipe takes the X's guarded close, so a
-// picked photo asks "Discard this photo?" first and an upload in flight is abandoned like X.
+// picked photo asks "Discard this photo?" first; an upload in flight keeps the sheet open (busy guard).
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
@@ -323,7 +323,7 @@ describe('MobileGarmentCaptureModal', () => {
     expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
   })
 
-  it('[Codex 7.11 #3] [7.11-NAT-032] a swipe during an upload takes the X path: the upload is abandoned and nothing commits', async () => {
+  it('[Codex 7.11 #3] [7.11-NAT-032] while a photo uploads, X, swipe and back keep the sheet open and the upload running', async () => {
     let allocations = 0
     server.use(
       http.post('*/api/v1/wardrobe/upload-url', () => {
@@ -335,16 +335,19 @@ describe('MobileGarmentCaptureModal', () => {
     await pickLibraryPhotoAndConfirm()
     await waitFor(() => screen.getByTestId('garment-upload-progress'))
 
+    // Story CC-7.11 D13 busy guard: the X is disabled and announces it.
+    const close = screen.getByTestId('garment-capture-close')
+    expect(close.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(close)
     await dragFrom(screen.getByTestId('layer-swipe-handle'), {
       dy: LAYER_SWIPE_CLOSE_PX + 40,
     })
-    expect(onClose).toHaveBeenCalledOnce()
-    // Without confirmDiscard the X never asks, so neither does the swipe.
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
     expect(Alert.alert).not.toHaveBeenCalled()
-    // The capture reset: the next open starts on the source step with no upload running.
-    expect(screen.queryByTestId('garment-upload-progress')).not.toBeInTheDocument()
-    expect(screen.getByTestId('garment-source-library')).toBeInTheDocument()
-    expect(allocations).toBe(1)
+    expect(screen.getByTestId('garment-upload-progress')).toBeInTheDocument()
+    expect(allocations, 'the upload was not restarted or dropped').toBe(1)
     expect(onGarmentCommitted).not.toHaveBeenCalled()
   })
 

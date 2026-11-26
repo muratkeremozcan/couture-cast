@@ -6,53 +6,24 @@
 // the real `renderTabTopBar` with the options the screen set, as the tab navigator merges them.
 //
 // Use it like `focus-effect.ts`: the expo-router mock factory returns
-// `useNavigation: (await import('<path>/test-utils/tab-navigation.js')).useTabNavigation`, and
-// the suite imports `TabTopBar` and `tabNavigation` from '@/src/test-utils/tab-navigation'.
+// `useNavigation: (await import('<path>/test-utils/tab-navigation-store.js')).useTabNavigation`,
+// and the suite imports `TabTopBar` and `tabNavigation` from '@/src/test-utils/tab-navigation'.
+// The factory must load the store, never this module: this one imports AppTopBar, which imports
+// expo-router, the module the factory is still building.
 // AppTopBar imports `@expo/vector-icons/FontAwesome`, so the suite mocks that module too.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { renderTabTopBar } from '@/src/components/app-top-bar'
+import { currentTabOptions, subscribeTabOptions } from './tab-navigation-store'
 
-type TabOptions = Parameters<typeof renderTabTopBar>[0]['options']
-
-const listeners = new Set<() => void>()
-let current: TabOptions = {}
-
-/** The one navigation object every screen in the suite gets (stable, as a real navigator's). */
-export const tabNavigation = {
-  setOptions: (next: Partial<TabOptions>) => {
-    current = { ...current, ...next }
-    for (const listener of [...listeners]) listener()
-  },
-  /** The options the screen has set so far. */
-  get options(): TabOptions {
-    return current
-  },
-  /** Clears the set options; call it in `afterEach`. */
-  reset() {
-    current = {}
-    listeners.clear()
-  },
-}
-
-/** The expo-router `useNavigation` the mock factory hands out. */
-export function useTabNavigation() {
-  return tabNavigation
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
-}
+export { tabNavigation, useTabNavigation } from './tab-navigation-store'
 
 /**
  * The tab's top bar as the navigator draws it: `renderTabTopBar` with the layout's `title` under
  * the options the screen set (headerRight included). A tab root has no back.
  */
 export function TabTopBar({ title, route }: { title: string; route: string }): ReactNode {
-  const options = useSyncExternalStore(subscribe, () => current)
+  const options = useSyncExternalStore(subscribeTabOptions, currentTabOptions)
   return renderTabTopBar({
     options: { title, ...options },
     route: { key: `${route}-tab`, name: route },

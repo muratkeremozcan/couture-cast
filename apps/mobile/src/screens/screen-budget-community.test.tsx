@@ -12,6 +12,8 @@
 // the empty state; the band notice follows it. The three fixtures take one branch each:
 // populated has a city and its Spotlight, guardian-pending serves looks with no city, empty
 // serves nothing. Community's own header counts as content until CC-7.15 calms it.
+// New post is the top bar's trailing action (TabTopBar draws what the screen sets), and the
+// climate explainer follows the first content.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
@@ -24,6 +26,8 @@ vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: vi.fn(), setParams: vi.fn() }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+  // Story CC-7.11 D16: New post goes into the tab top bar through setOptions (TabTopBar).
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -97,7 +101,6 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { AppThemeProvider } from '@/src/theme/theme-context'
-import { AppTopBar } from '@/src/components/app-top-bar'
 import {
   WithFoldScene,
   chromeBefore,
@@ -110,8 +113,9 @@ import {
   serveScreenBudgetFixture,
   type ScreenBudgetMode,
 } from '@/src/test-utils/msw/screen-budget-fixtures'
+import { TabTopBar, tabNavigation } from '@/src/test-utils/tab-navigation'
 import {
-  WithTopBar,
+  WithTabHeader,
   expectNativeMeasureFloors,
   expectNativeWithinBudget,
   measureNativeScreen,
@@ -143,21 +147,21 @@ const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode, string, string])
   ],
 ]
 
+/** The Community top bar as the navigator draws it, New post in its trailing slot (D16). */
+const communityTopBar = () => (
+  <TabTopBar title={i18n.t('tabs.community')} route="community" />
+)
+
 /** Community as the tab layout draws it: under the Community top bar, inside the root providers. */
 function renderCommunity(fold = false) {
+  const Frame = fold ? WithFoldScene : WithTabHeader
   return render(
     <AccessibilityAnnouncerProvider>
       <AppThemeProvider>
         <SaveFeedbackProvider>
-          {fold ? (
-            <WithFoldScene header={<AppTopBar title={i18n.t('tabs.community')} />}>
-              <CommunityRoute />
-            </WithFoldScene>
-          ) : (
-            <WithTopBar title={i18n.t('tabs.community')}>
-              <CommunityRoute />
-            </WithTopBar>
-          )}
+          <Frame header={communityTopBar()}>
+            <CommunityRoute />
+          </Frame>
         </SaveFeedbackProvider>
       </AppThemeProvider>
     </AccessibilityAnnouncerProvider>
@@ -210,6 +214,7 @@ describe('Screen budget: native Community', () => {
     restoreToken = undefined
     setMobileApplicationUserId(null)
     screenFocus.reset()
+    tabNavigation.reset()
   })
 
   for (const [id, fixture] of AUDITS) {
@@ -255,6 +260,26 @@ describe('Screen budget: native Community', () => {
       }
       expectFirstContentInFold(first, 'Community first content')
       expect(chromeBefore(first), 'alerts or setup before Community').toEqual([])
+      // D16: New post is the top bar's trailing action, so no row above the first content
+      // holds it.
+      expect(
+        within(screen.getByTestId('app-top-bar')).getByTestId('community-new-post-button')
+      ).toBeVisible()
+      // D16: the climate explainer follows the first content (Spotlight, first post or empty
+      // state), outside it and below it.
+      const explainers = screen.getAllByTestId('community-filters-explainer')
+      expect(explainers, 'one climate explainer').toHaveLength(1)
+      const explainer = explainers[0]!
+      expect(explainer).toBeVisible()
+      expect(first).not.toContainElement(explainer)
+      expect(
+        first.compareDocumentPosition(explainer) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'the explainer follows the first content'
+      ).toBeTruthy()
+      expect(
+        explainer.getBoundingClientRect().top,
+        'the explainer sits below the first content'
+      ).toBeGreaterThanOrEqual(first.getBoundingClientRect().bottom - 1)
       // D16: a member with no city reads the band notice after the first content.
       const notice = screen.queryByTestId('community-band-unresolved')
       if (hasSavedLocation(fixture)) {

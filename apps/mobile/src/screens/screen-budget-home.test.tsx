@@ -13,6 +13,8 @@
 // fixture), under the same header the layout declares. D16 (spec Plan Change Log): with a city
 // Today opens on the weather header and then the outfit card; the alert, the add prompt, the
 // scenario toggles, the hourly ribbon and the Plan link all follow the first content.
+// With no city there is no forecast: the labeled sample is the first content, and its add-piece
+// and set-city prompts are its own continuation, inside it after the look name.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import {
@@ -187,6 +189,37 @@ const AFTER_FIRST = [
   'home-plan-week',
 ] as const
 
+/**
+ * D16 with no city: no forecast, so no weather header; the labeled sample is the first content
+ * and its own prompts (add a first piece, set a city) are its continuation, inside the sample
+ * after the look it names. They are never above the sample, and never outside it.
+ */
+const SAMPLE_OWN_PROMPTS = [
+  'home-add-garment-container',
+  'hero-no-location-state',
+] as const
+
+function expectSampleOrder(first: HTMLElement) {
+  expect(
+    screen.queryByTestId('weather-header'),
+    'a weather header with no city'
+  ).toBeNull()
+  const firstBox = first.getBoundingClientRect()
+  const look = within(first).getByTestId('guest-preview-look-name')
+  const lookBox = look.getBoundingClientRect()
+  expect(lookBox.top, 'the sample opens on the look it names').toBeGreaterThanOrEqual(
+    firstBox.top - 1
+  )
+  for (const id of SAMPLE_OWN_PROMPTS) {
+    const prompt = within(first).getByTestId(id)
+    expect(prompt, id).toBeVisible()
+    expect(
+      prompt.getBoundingClientRect().top,
+      `${id} follows the sample's look (bottom ${lookBox.bottom})`
+    ).toBeGreaterThanOrEqual(lookBox.bottom - 1)
+  }
+}
+
 function expectTodayD16Order(
   first: HTMLElement,
   fixture: ScreenBudgetMode,
@@ -194,7 +227,8 @@ function expectTodayD16Order(
 ) {
   const band = foldBand()
   const firstBox = first.getBoundingClientRect()
-  if (hasSavedLocation(fixture)) {
+  const located = hasSavedLocation(fixture)
+  if (located) {
     // The weather header leads, wholly inside the band, right above the outfit card.
     const header = screen.getByTestId('weather-header')
     expect(first.contains(header), 'the weather header sits outside the card').toBe(false)
@@ -208,9 +242,11 @@ function expectTodayD16Order(
     expect(box.bottom, 'weather header above the outfit card').toBeLessThanOrEqual(
       firstBox.top + 1
     )
-  }
+  } else expectSampleOrder(first)
   for (const id of required) expect(screen.getByTestId(id), id).toBeVisible()
   for (const id of AFTER_FIRST) {
+    // The sample's own prompts are checked inside it, above; every other block follows it.
+    if (!located && (SAMPLE_OWN_PROMPTS as readonly string[]).includes(id)) continue
     for (const block of screen.queryAllByTestId(id)) {
       expect(first.contains(block), `${id} outside the first content`).toBe(false)
       expect(
@@ -331,6 +367,7 @@ describe('Screen budget: native Today', () => {
       expectFirstContentInFold(first, 'Today first content')
       expect(chromeBefore(first), 'alerts or setup before Today').toEqual([])
       // D16: with a city, weather then the outfit; the ribbon, toggles and Plan link follow.
+      // With none, the sample leads with its own prompts inside it; the Plan link follows.
       expectTodayD16Order(
         first,
         fixture,

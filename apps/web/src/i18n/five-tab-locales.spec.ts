@@ -83,6 +83,8 @@ describe('7.11 Looks tab and Closet More menu strings (web)', () => {
       'looks.plan': 'Plan',
       'wardrobe.menu.add': 'Add',
       'wardrobe.menu.more': 'More',
+      // Codex 7.11 gap (a): the More button's name starts with its visible label (WCAG 2.5.3).
+      'wardrobe.menu.moreLabel': 'More closet options',
       'wardrobe.menu.label': 'Closet options',
       'wardrobe.menu.setup': 'Closet setup',
       'wardrobe.menu.setupDone': 'Closet setup: done',

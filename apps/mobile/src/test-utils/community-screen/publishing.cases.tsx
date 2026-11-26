@@ -17,6 +17,7 @@ import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { CommunityTab } from './community-tab'
 import enUS from '@/assets/locales/en-US.json'
 import i18n from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
@@ -133,7 +134,7 @@ export function registerCommunityPublishingCases() {
       })
     )
 
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     press(await screen.findByTestId('community-new-post-button'))
     await screen.findByTestId('community-post-sheet')
 
@@ -218,7 +219,7 @@ export function registerCommunityPublishingCases() {
       })
     )
 
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     press(await screen.findByTestId('community-new-post-button'))
     await screen.findByTestId('community-post-sheet')
 
@@ -259,7 +260,7 @@ export function registerCommunityPublishingCases() {
       })
     )
 
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     press(await screen.findByTestId('community-new-post-button'))
     await screen.findByTestId('community-post-sheet')
 

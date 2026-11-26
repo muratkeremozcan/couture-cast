@@ -13,6 +13,7 @@ import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { CommunityTab } from './community-tab'
 import { server } from '@/src/test-utils/msw/server'
 import {
   feedJson,
@@ -248,7 +249,7 @@ export function registerCommunityRealtimeCases() {
   })
   it('A09 a recovering signal within the verification bound keeps the feed while HTTP catch-up serves it', async () => {
     const recover = recoveryCoordinator()
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     await screen.findByTestId('community-post-card-post-a')
     await act(recover)
     let releaseEvents!: () => void
@@ -388,7 +389,7 @@ export function registerCommunityRealtimeCases() {
       return { remove: () => undefined }
     })
     const recover = recoveryCoordinator()
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     await screen.findByTestId('community-post-card-post-a')
     await act(recover)
     press(screen.getByTestId('community-new-post-button'))
@@ -479,7 +480,7 @@ export function registerCommunityRealtimeCases() {
       ),
       http.put(UPLOAD_URL, () => new HttpResponse(null, { status: 200 }))
     )
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     press(await screen.findByTestId('community-new-post-button'))
     press(await screen.findByTestId('community-pick-image-button'))
     await waitFor(() =>
@@ -702,7 +703,7 @@ export function registerCommunityRealtimeCases() {
         })
       })
     )
-    await render(<CommunityScreen />)
+    await render(<CommunityTab />)
     press(await screen.findByTestId('community-new-post-button'))
     press(await screen.findByTestId('community-pick-image-button'))
     await screen.findByTestId('community-post-preview-image')

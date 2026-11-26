@@ -13,7 +13,15 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-# Assert landing screen elements are visible
+# Story CC-7.11 D16: Today opens on the weather header and the outfit card; the morning,
+# midday and evening toggles follow the card, so scroll to them.
+- assertVisible:
+    id: 'outfit-recommendation-card'
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggles'
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible:
     id: 'scenario-toggles'
 - assertVisible: 'Morning commute'
@@ -26,6 +34,11 @@ tags:
 # handlers; the live API composes comfortNotes from the templates in
 # `ritual.service.ts`, so those assertions could never pass against a real
 # server and this flow could only ever have gone green against mocks.
+# (Scrolling to the toggles may have moved the card up; bring its notes back first.)
+- scrollUntilVisible:
+    element:
+      id: 'outfit-comfort-notes'
+    direction: UP
 - assertVisible:
     id: 'outfit-recommendation-card'
 - assertVisible:

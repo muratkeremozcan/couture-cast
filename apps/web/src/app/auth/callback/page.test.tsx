@@ -19,7 +19,21 @@ import {
   SAMPLE_CATALOG,
 } from '@couture/utils'
 import type * as WebSession from '../../../lib/web-session'
+import type * as NextNavigation from 'next/navigation'
 
+// Story CC-7.11 D11: the shared top bar reads the app router for its history-aware back, and
+// this page renders outside one; the callback itself navigates with window.location.
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => ({
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}))
 vi.mock(
   '@couture/api-client',
   () => import('../../../../../../packages/api-client/src/index')

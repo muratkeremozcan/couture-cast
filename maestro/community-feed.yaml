@@ -589,8 +589,16 @@ tags:
 
 - tapOn:
     id: 'community-post-sheet-close'
-    retryTapIfNoChange: true
     label: 'Close the sheet without publishing'
+
+# Story CC-7.11 D13: the draft holds an image description, so X asks before it drops it.
+- extendedWaitUntil:
+    visible: 'Discard this post\?'
+    timeout: 10000
+    label: 'A dirty draft asks before it is dropped'
+- tapOn:
+    text: '(?i)^discard$'
+    label: 'Discard the draft'
 
 - assertNotVisible:
     id: 'community-post-sheet-content'

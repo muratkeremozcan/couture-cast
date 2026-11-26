@@ -6,8 +6,10 @@ import {
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   listSavedLocationsResponseSchema,
+  plannerResponseSchema,
   resolveCommunityTargetsResponseSchema,
   ritualResponseSchema,
+  silhouetteProfileResponseSchema,
   trackedResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
@@ -90,6 +92,9 @@ export function readKey(url: string, method: string) {
     'commerce/subscription': 'subscription',
     'commerce/premium/access': 'premium-access',
     'commerce/premium/theme': 'premium-theme',
+    // Story CC-7.11 D6, D9: the Silhouette and Plan routes a sub-screen spec opens.
+    'wardrobe/silhouette': 'silhouette',
+    'commerce/premium/planner': 'planner',
   }
   return known[path] ?? null
 }
@@ -235,7 +240,7 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
     id: 'shell-saved-look-1',
     ownerUserId: memberId,
     source: 'home_sample',
-    lookId: 'office-oxford',
+    lookId: 'sample:l:office-oxford',
     weather: 'mild-dry',
     title: null,
     anchorGarmentId: null,
@@ -364,6 +369,32 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
       offset: 0,
     },
     'events-poll': { events: [], nextSince: null },
+    silhouette: checked(silhouetteProfileResponseSchema, {
+      data: {
+        mode: 'default_mannequin',
+        heightSlider: null,
+        buildSlider: null,
+        myForm: null,
+        revision: 0,
+        updatedAt: iso,
+      },
+    }),
+    // Seven failed days: a valid week with nothing generated, so Plan renders without a
+    // forecast service (the spec asserts its top bar and back, not the outfits).
+    planner: checked(plannerResponseSchema, {
+      data: {
+        locationId: 'shell-home',
+        timezone: 'America/Chicago',
+        anchorDate: '2026-11-20',
+        daysReady: 0,
+        days: Array.from({ length: 7 }, (_, day) => ({
+          status: 'error',
+          planDate: `2026-11-${String(20 + day).padStart(2, '0')}`,
+          errorCode: 'generation_failed',
+          retryable: true,
+        })),
+      },
+    }),
     'community-opened': checked(trackedResponseSchema, { tracked: true }),
     'community-comments': checked(communityCommentsResponseSchema, {
       data: { items: [], nextCursor: null, snapshot: 0, hasNewer: false },

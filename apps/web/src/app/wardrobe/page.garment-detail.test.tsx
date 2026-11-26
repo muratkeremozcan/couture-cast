@@ -20,6 +20,7 @@ import { useSyncExternalStore } from 'react'
 import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearAppHistory } from '../../lib/app-history'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import type { GarmentWithColor } from '@couture/api-client/contracts/http'
 import {
@@ -198,8 +199,15 @@ beforeEach(() => {
   )
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
+  // Story CC-7.11 D11, D13: jsdom keeps one history per file. Let any back step a test started
+  // (a closed layer's go(-1), the detail's back) land before the next test begins, then start
+  // from a fresh top entry with nothing below it, so no traversal leaks across tests.
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  window.history.pushState(null, '', '/wardrobe')
+  clearAppHistory()
   setUrl('')
   session.owner = null
   sessionStorage.clear()

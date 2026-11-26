@@ -64,6 +64,8 @@ vi.mock('expo-router', async () => ({
   useFocusEffect: (
     await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
   ).useFocusEffect,
+  // Story CC-7.11 D16: the Community screen sets its top bar's New post through setOptions.
+  useNavigation: (await import('../test-utils/tab-navigation-store.js')).useTabNavigation,
 }))
 
 vi.mock('expo-localization', () => ({

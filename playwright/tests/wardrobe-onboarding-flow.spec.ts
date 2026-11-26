@@ -168,8 +168,13 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
         await expect(more).toHaveAttribute('aria-expanded', 'false')
       })
 
-      await test.step('Reopening onboarding after completion redirects straight back to the hub', async () => {
+      // Story CC-7.11 D5: Closet setup is a More and Style entry now, so a finished setup
+      // opens on its completion step (no silent redirect); Continue returns to the Closet.
+      await test.step('Reopening onboarding after completion shows the completion step', async () => {
         await page.goto('/wardrobe/onboarding')
+        await expect(page).toHaveURL(/\/wardrobe\/onboarding$/)
+        await expect(page.getByText('Your closet is ready')).toBeVisible()
+        await page.getByRole('button', { name: 'Continue' }).click()
         await expect(page).toHaveURL(/\/wardrobe$/)
       })
     }

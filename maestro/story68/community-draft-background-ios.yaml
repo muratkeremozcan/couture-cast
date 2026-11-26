@@ -7,6 +7,13 @@ appId: ${MAESTRO_APP_ID}
     commands:
       - tapOn:
           id: community-post-sheet-close
+      # Story CC-7.11 D13: a dirty draft asks before X drops it.
+      - runFlow:
+          when:
+            visible: 'Discard this post\?'
+          commands:
+            - tapOn:
+                text: '(?i)^discard$'
 - runFlow:
     when:
       notVisible:
@@ -87,3 +94,9 @@ appId: ${MAESTRO_APP_ID}
 - assertVisible: A draft kept across background
 - tapOn:
     id: community-post-sheet-close
+# Story CC-7.11 D13: the kept draft is dirty, so X asks before it drops it.
+- extendedWaitUntil:
+    visible: 'Discard this post\?'
+    timeout: 10000
+- tapOn:
+    text: '(?i)^discard$'

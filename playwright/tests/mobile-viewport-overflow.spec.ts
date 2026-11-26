@@ -52,9 +52,39 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       }
       return null
     }
-    /** Line boxes of a range's rects: a rect starting below the current line opens a new one. */
-    const linesOf = (range: Range) => {
-      const rects = Array.from(range.getClientRects())
+    /**
+     * The boxes a control's content paints: one per text fragment and one per icon. Story
+     * CC-7.11 D2: an inline svg icon is one box; its paths are not lines of text (a range over
+     * the icon reports a rect per path, which read the multi-path tab icons as two lines).
+     */
+    const contentRects = (element: Element): DOMRect[] => {
+      const rects: DOMRect[] = []
+      const walker = document.createTreeWalker(
+        element,
+        NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+        {
+          acceptNode: (node) => {
+            if (node instanceof SVGSVGElement) {
+              rects.push(node.getBoundingClientRect())
+              // FILTER_REJECT skips the icon's paths with it.
+              return NodeFilter.FILTER_REJECT
+            }
+            return node.nodeType === Node.TEXT_NODE
+              ? NodeFilter.FILTER_ACCEPT
+              : NodeFilter.FILTER_SKIP
+          },
+        }
+      )
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        rects.push(...Array.from(range.getClientRects()))
+      }
+      return rects
+    }
+    /** Line boxes of a set of rects: a rect starting below the current line opens a new one. */
+    const linesOf = (all: DOMRect[]) => {
+      const rects = all
         .filter((rect) => rect.width > 0 && rect.height > 0)
         .sort((a, b) => a.top - b.top)
       let lines = 0
@@ -75,9 +105,7 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       const style = getComputedStyle(element)
       if (style.display.includes('flex') && style.flexDirection.startsWith('column'))
         return Math.max(0, ...Array.from(element.children).map(lineCount))
-      const range = document.createRange()
-      range.selectNodeContents(element)
-      return linesOf(range)
+      return linesOf(contentRects(element))
     }
     const controlProblems = (control: HTMLElement): string[] => {
       const box = control.getBoundingClientRect()
