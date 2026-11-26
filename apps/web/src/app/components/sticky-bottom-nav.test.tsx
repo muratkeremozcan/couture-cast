@@ -232,6 +232,26 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
       })
     })
 
+    it('7.9-CMP-NAV-001 keeps each German label on one line at the D4 caption size, without the wide uppercase that cut it at 320 px', async () => {
+      await act(async () => {
+        await getI18n().changeLanguage('de-DE')
+      })
+      render(<StickyBottomNav />)
+
+      for (const [id, name] of Object.entries({
+        home: 'Startseite',
+        wardrobe: 'Garderobe',
+        community: 'Community',
+        settings: 'Profil',
+      })) {
+        const label = within(screen.getByTestId(`bottom-nav-${id}`)).getByText(name)
+        // Vercel Preview O-1 on 3d7af2a2: uppercase and tracking-wider at text-xs left
+        // STARTSEITE, GARDEROBE and COMMUNITY wider than their tabs at 320 px.
+        expect(label).toHaveClass('text-xs', 'whitespace-nowrap')
+        expect(label.className).not.toMatch(/\buppercase\b|\btracking-/)
+      }
+    })
+
     // Story CC-7.9 D6: the top bar's desktop tab links replaced the home header ProfileNavLink.
     it('PROFILE-NAV-WEB-03 the top bar Profile link reads the reader language and records English', async () => {
       render(<AppTopBar titleKey="nav.home" />)

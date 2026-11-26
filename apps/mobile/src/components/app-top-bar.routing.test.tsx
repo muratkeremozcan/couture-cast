@@ -33,7 +33,12 @@ vi.mock('expo-localization', () => ({
 
 import { ExpoRoot, Stack, Tabs, router, usePathname } from 'expo-router'
 import i18n, { initI18n } from '@/src/lib/i18n'
-import { renderStackTopBar, renderTabTopBar, tabsAnchorListeners } from './app-top-bar'
+import {
+  forgetSeenTabAnchorsForTesting,
+  renderStackTopBar,
+  renderTabTopBar,
+  tabsAnchorListeners,
+} from './app-top-bar'
 
 /** Expo Router's in-memory route context (expo-router/testing-library inMemoryContext). */
 function inMemoryContext(modules: Record<string, Record<string, unknown>>) {
@@ -83,6 +88,7 @@ const appContext = inMemoryContext({
               <Stack.Screen key={name} name={name} options={{ title: name }} />
             ))}
             <Stack.Screen name="planner" options={{ title: 'planner' }} />
+            <Stack.Screen name="locations" options={{ title: 'locations' }} />
           </Stack>
           <Pathname />
         </>
@@ -108,6 +114,7 @@ const appContext = inMemoryContext({
   '(tabs)/settings': body('profile body'),
   ...Object.fromEntries(WARDROBE_SCREENS.map((name) => [name, body(`${name} body`)])),
   planner: body('planner body'),
+  locations: body('locations body'),
 })
 
 const pathname = () => screen.getByTestId('pathname')
@@ -235,6 +242,28 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await navigate(() => router.push('/wardrobe-onboarding'), '/wardrobe-onboarding')
 
     await navigate(() => router.back(), '/')
+    expect(screen.getByText('home body')).toBeVisible()
+  })
+
+  // CI on 3d7af2a2 (Android): Home, Add location, Locations, Save landed on Profile. The launch's
+  // first focus of the tab group reached no listener, so the real caller looked like a cold
+  // link's anchor. The push over it still blurs it, which is what marks it as a caller.
+  it('a guided Locations save from Home returns to Home even when the first focus went unheard', async () => {
+    await openApp('/')
+    forgetSeenTabAnchorsForTesting()
+    await navigate(() => router.push('/locations?guided=1'), '/locations')
+
+    // The guided save leaves with router.back().
+    await navigate(() => router.back(), '/')
+    expect(screen.getByText('home body')).toBeVisible()
+  })
+
+  it('the top bar Back from Locations pushed by Home returns to Home after an unheard first focus', async () => {
+    await openApp('/')
+    forgetSeenTabAnchorsForTesting()
+    await navigate(() => router.push('/locations?guided=1'), '/locations')
+
+    await pressBack('/')
     expect(screen.getByText('home body')).toBeVisible()
   })
 })

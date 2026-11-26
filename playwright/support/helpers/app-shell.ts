@@ -7,6 +7,7 @@
 // the snapshot spec (app-shell-visual-snapshots.spec.ts). The probes read what the browser
 // painted, never class names: a migrated class that emits no CSS shows up here as the colour it
 // fell back to.
+import { outfitCapsuleListResponseSchema } from '@couture/api-client/contracts/http'
 import { colorRoles, hexToChannels } from '@couture/utils'
 import { expect, type Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -63,6 +64,19 @@ export async function openFixtureShell(
     requireBearer: true,
   })
   void interceptNetworkCall({ url: '**/api/v1/**', handler: router.handler })
+  // The capsules list is no shell read, so the router lets it through to the local API, which
+  // answers 404 for a fixture member. A member with no capsules gets an empty page instead
+  // (registered later, so it answers first).
+  await page.route('**/api/v1/wardrobe/*/capsules**', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback()
+    const body = outfitCapsuleListResponseSchema.parse({
+      data: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    })
+    return route.fulfill({ json: body })
+  })
   await closeCommunitySocket(page)
   if (options.storedSession) await seedStoredSession(page, memberId)
   else await seedWebSession(page, localE2EAccessToken(memberId))
@@ -307,3 +321,26 @@ export const rgbOf = (triple: string) => `rgb(${triple.trim().split(/\s+/).join(
 /** A role's colour as the browser reports it, read from the one token source (spec D1, D2). */
 export const roleRgb = (scheme: Scheme, role: keyof (typeof colorRoles)['light']) =>
   rgbOf(hexToChannels(colorRoles[scheme][role]))
+
+/**
+ * Lets the painted-contrast probe measure text under a stretched-link overlay: a transparent,
+ * textless link or button laid over a whole tile (garment-open, spotlight-lookbook-open) so the
+ * tile is one tap target. Only such overlays stop taking hit tests during the scan; a sticky bar
+ * or anything that paints still covers and still fails the probe.
+ */
+export async function measureThroughOverlays(page: Page) {
+  await page.evaluate(() => {
+    for (const control of Array.from(document.querySelectorAll('a, button'))) {
+      const style = getComputedStyle(control)
+      const parent = control.parentElement
+      if (!parent || style.position !== 'absolute') continue
+      const own = control.getBoundingClientRect()
+      const host = parent.getBoundingClientRect()
+      const covers = own.width * own.height >= host.width * host.height * 0.9
+      const transparent = /rgba\(0, 0, 0, 0\)|transparent/.test(style.backgroundColor)
+      const textless = !(control.textContent ?? '').trim()
+      if (covers && transparent && textless)
+        (control as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
+    }
+  })
+}

@@ -88,7 +88,11 @@ const readArg = (name, fallback) => {
   return index === -1 ? fallback : path.resolve(process.argv[index + 1])
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// A symlinked checkout still runs this file directly (scripts/direct-run-guard.test.mjs).
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const problems = await compareAll({
     actualDir: readArg('actual', path.join(root, 'maestro/artifacts/shell-visual')),
     baselineDir: readArg('baseline', path.join(root, 'maestro/snapshots/shell-visual')),

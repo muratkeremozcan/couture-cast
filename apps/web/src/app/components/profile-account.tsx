@@ -9,15 +9,21 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWebSession } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
-import { useGuestFirstPaint, useSectionSnapshot } from './screen-gate'
+import { useGuestFirstPaint, useScreenGateOpen, useSectionSnapshot } from './screen-gate'
 
 /**
  * The header's footprint: its two lines (an 18px name line on a 28px line box and a 14px email
- * line on a 20px one, 48px together) are held from the first frame until the member leaves, so
- * an account without a display name, or a read that failed, never shrinks it and pulls the
- * sections below up after the reveal (CodeRabbit r2 #9).
+ * line on a 20px one, 48px together). Once the reserved lines were on screen they are held until
+ * the member leaves, so an account without a display name, or a read that failed, never shrinks
+ * it and pulls the sections below up after the reveal (CodeRabbit r2 #9).
  */
-const ACCOUNT_FOOTPRINT = 'mt-4 min-h-12 max-w-2xl'
+const ACCOUNT_FOOTPRINT = 'min-h-12 max-w-2xl'
+/**
+ * An account that answered while Profile's gate still hid the body takes only the lines it
+ * shows: the email alone left 28 px of blank page under it (CC-7.9 CI snapshot), and nothing
+ * moves on screen because the body is not shown yet.
+ */
+const ACCOUNT_SETTLED_FOOTPRINT = 'max-w-2xl'
 
 interface Account {
   displayName: string | null
@@ -43,6 +49,17 @@ export function ProfileAccount() {
    */
   const guestFirstPaint = useGuestFirstPaint()
   const reserved = owner !== null || (session.status === 'checking' && !guestFirstPaint)
+
+  /*
+   * The member whose reserved lines were shown in an open body. Their account keeps the full
+   * footprint when it lands, so a late answer never pulls the sections up.
+   */
+  const gateOpen = useScreenGateOpen()
+  const [heldFor, setHeldFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (gateOpen && !account && owner !== null) setHeldFor(owner)
+  }, [account, gateOpen, owner])
+  const held = owner !== null && heldFor === owner
 
   const { beginRead, remember } = snapshot
   // One profile request per member, like the Locations list. The restored member's account
@@ -82,7 +99,9 @@ export function ProfileAccount() {
     <section
       aria-label={t('settings.account')}
       data-testid="profile-account"
-      className={ACCOUNT_FOOTPRINT}
+      className={
+        held || account.displayName ? ACCOUNT_FOOTPRINT : ACCOUNT_SETTLED_FOOTPRINT
+      }
     >
       {account.displayName && (
         <p className="text-lg font-semibold text-ink" data-testid="profile-account-name">

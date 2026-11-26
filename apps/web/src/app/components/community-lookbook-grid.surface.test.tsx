@@ -61,6 +61,32 @@ const TARGETS_PATH = '/api/v1/community/targets/resolve'
 describe('CommunityLookbookGrid (Story 6.1)', () => {
   setupCommunityGridSurface()
 
+  it('7.9-CMP-CARD-001 closes the card with Comments beside Report, after the author, words and reactions', async () => {
+    signIn()
+    useMswHandlers(
+      feedHandler({ items: [item({ title: 'Rain layers', caption: 'A cool day.' })] })
+    )
+    renderGrid()
+
+    const card = await screen.findByTestId('lookbook-card-post-1')
+    const order = [
+      'author-name-post-1',
+      'title-post-1',
+      'caption-post-1',
+      'comments-button-post-1',
+      'report-button-post-1',
+    ].map((id) => within(card).getByTestId(id))
+    // CI snapshot on 3d7af2a2: Comments sat alone above the author line.
+    order.slice(1).forEach((node, index) => {
+      expect(
+        order[index]!.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    })
+    expect(screen.getByTestId('comments-button-post-1').parentElement).toBe(
+      screen.getByTestId('report-button-post-1').parentElement
+    )
+  })
+
   describe('weekly challenge', () => {
     let restoreObjectUrl = () => undefined as void
 

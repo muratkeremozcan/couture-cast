@@ -18,19 +18,25 @@ export default function Home() {
       {/* D6/D8: the top bar renders outside the gate, so the placeholder sits inside the shell. */}
       <AppTopBar titleKey="nav.home" />
       <main id="main-content" tabIndex={-1} className={`${APP_MAIN_CLASS} gap-16`}>
-        <HomeBrandLine />
-        {/* Story CC-7.7 D3: the body appears once the member's outfit (the ritual read with its
-            city line), the Spotlight teaser in the hero, the City Spotlight above the feed and
-            any deep link above the grid have answered; the feed is the last section and fills
-            in below them. */}
-        <ScreenGate
-          screen="home"
-          reads={HOME_GATE_READS}
-          placeholderClassName={HOME_PLACEHOLDER_CLASS}
-        >
-          <GuestPreviewEntry />
-          <LookbookPrismLayout />
-        </ScreenGate>
+        {/* The brand line keeps the small gap the old page header gave it. On the main gap-16
+            a member, whose tagline is hidden, saw 64 px of blank page above Plan week. */}
+        <div className="flex flex-col gap-4">
+          <HomeBrandLine />
+          {/* Story CC-7.7 D3: the body appears once the member's outfit (the ritual read with
+              its city line), the Spotlight teaser in the hero, the City Spotlight above the feed
+              and any deep link above the grid have answered; the feed is the last section and
+              fills in below them. */}
+          <ScreenGate
+            screen="home"
+            reads={HOME_GATE_READS}
+            placeholderClassName={HOME_PLACEHOLDER_CLASS}
+          >
+            <div className="flex flex-col gap-16">
+              <GuestPreviewEntry />
+              <LookbookPrismLayout />
+            </div>
+          </ScreenGate>
+        </div>
         {/* The hero reads nothing, and its landing actions follow <html data-session> from first
             paint, so it stays outside the gate: a pending session shows the hero with neither
             set of actions while it is verified (real-session L-10), instead of a hidden body that

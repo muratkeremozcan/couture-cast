@@ -13,6 +13,7 @@ import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import deDE from '../../apps/web/src/i18n/locales/de-DE.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
+  measureThroughOverlays,
   openFixtureShell,
   paintFindings,
   rgbOf,
@@ -40,20 +41,38 @@ test.use({
 
 /** Routed sub-screens of a member (spec D7); `parent` is where back lands on a direct entry. */
 const SUB_SCREENS = [
-  { name: 'capsules', path: '/wardrobe/capsules', parent: '/wardrobe' },
-  { name: 'closet setup', path: '/wardrobe/onboarding', parent: '/wardrobe' },
+  {
+    name: 'capsules',
+    path: '/wardrobe/capsules',
+    parent: '/wardrobe',
+    mode: 'populated',
+  },
+  // Closet setup shows only while setup is unfinished: a finished closet redirects to /wardrobe.
+  {
+    name: 'closet setup',
+    path: '/wardrobe/onboarding',
+    parent: '/wardrobe',
+    mode: 'empty',
+  },
   {
     name: 'garment detail',
     path: '/wardrobe?garment=shell-garment-1',
     parent: '/wardrobe',
+    mode: 'populated',
   },
   // D6 as recorded: notification settings are reached from Community, so Back lands there.
-  { name: 'notification settings', path: '/notification-settings', parent: '/community' },
+  {
+    name: 'notification settings',
+    path: '/notification-settings',
+    parent: '/community',
+    mode: 'populated',
+  },
 ] as const
 /** Other routed screens that still carry the one top bar and page surface. */
 const OTHER_SCREENS = [
-  { name: 'palette', path: '/palette' },
-  { name: 'not found', path: '/no-such-page-7-9' },
+  { name: 'palette', path: '/palette', mode: 'populated', expected404: false },
+  // The 404 document is this screen's subject, so the network monitor is off for it alone.
+  { name: 'not found', path: '/no-such-page-7-9', mode: 'populated', expected404: true },
 ] as const
 
 const TOP_BAR_HEIGHT = 56
@@ -136,7 +155,10 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
         const main = page.locator('main').first()
         expect(await placeholderContrastFailures(main), 'placeholders').toEqual([])
         await main.evaluate((root) => {
-          for (const field of Array.from(root.querySelectorAll('input, textarea'))) {
+          // Text-like fields only: a file, checkbox or range input holds no typed value.
+          const textLike =
+            'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"]'
+          for (const field of Array.from(root.querySelectorAll(textLike))) {
             const input = field as HTMLInputElement
             const rect = input.getBoundingClientRect()
             if (
@@ -148,6 +170,7 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
               input.value = 'Chicago'
           }
         })
+        await measureThroughOverlays(page)
         expect(await textContrastFailures(main)).toEqual([])
       })
     }
@@ -180,20 +203,26 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
     }
   })
 
-  for (const sub of [...SUB_SCREENS, ...OTHER_SCREENS]) {
-    test(`[P1] [7.9-E2E-001..002] ${sub.name}: the same top bar and one page surface`, async ({
-      page,
-      interceptNetworkCall,
-    }) => {
-      await openFixtureShell(page, interceptNetworkCall, {
-        mode: 'populated',
-        screen: 'closet',
-      })
-      await page.goto(sub.path)
-      await expect(page.getByTestId('app-header')).toBeVisible()
-      await expectOneTopBar(page, sub.name)
-      await expectOneSurface(page, sub.name)
-    })
+  for (const sub of [
+    ...SUB_SCREENS.map((screen) => ({ ...screen, expected404: false })),
+    ...OTHER_SCREENS,
+  ]) {
+    test(
+      `[P1] [7.9-E2E-001..002] ${sub.name}: the same top bar and one page surface`,
+      {
+        annotation: sub.expected404 ? [{ type: 'skipNetworkMonitoring' }] : [],
+      },
+      async ({ page, interceptNetworkCall }) => {
+        await openFixtureShell(page, interceptNetworkCall, {
+          mode: sub.mode,
+          screen: 'closet',
+        })
+        await page.goto(sub.path)
+        await expect(page.getByTestId('app-header')).toBeVisible()
+        await expectOneTopBar(page, sub.name)
+        await expectOneSurface(page, sub.name)
+      }
+    )
   }
 
   for (const sub of SUB_SCREENS) {
@@ -202,7 +231,7 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
       interceptNetworkCall,
     }) => {
       await openFixtureShell(page, interceptNetworkCall, {
-        mode: 'populated',
+        mode: sub.mode,
         screen: 'closet',
       })
       await page.goto(sub.path)
@@ -268,7 +297,7 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
       nav.boundingBox(),
       placeholder.boundingBox(),
     ])
-    // Home gives the placeholder a 60vh minimum on purpose, so it runs under the fixed tab bar:
+    // Home's gate is min-h-screen on purpose, so its placeholder runs under the fixed tab bar:
     // it starts below the top bar and is on screen between the two bars.
     expect(hole!.y, 'placeholder below the top bar').toBeGreaterThanOrEqual(
       header!.y + 56
@@ -279,6 +308,22 @@ test.describe('CC-7.9 one app shell @local-lane', () => {
       'background-color',
       rgbOf(roles['--cc-card-muted'] ?? '')
     )
+    // The placeholder running under the tab bar must not take its taps: the topmost element at
+    // the centre of each tab is inside the tab bar (Codex replaced-assertions check).
+    for (const tab of [
+      'bottom-nav-home',
+      'bottom-nav-wardrobe',
+      'bottom-nav-community',
+    ]) {
+      const box = await page.getByTestId(tab).boundingBox()
+      const hit = await page.evaluate(
+        ({ x, y }) =>
+          document.elementFromPoint(x, y)?.closest('[data-testid="sticky-bottom-nav"]') !=
+          null,
+        { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 }
+      )
+      expect(hit, `${tab} takes its tap while the session is pending`).toBe(true)
+    }
 
     release()
     await waitForShellSettled(page, router)
@@ -339,7 +384,8 @@ test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
       await page.goto(screen.path)
       await expect(page.getByTestId('app-header')).toBeVisible()
       await expect(page.locator('html')).toHaveAttribute('lang', /^de/)
-      await expect(page.locator('main [aria-busy="true"]')).toHaveCount(0)
+      // The opened gate keeps its hidden placeholder in the DOM; only a visible busy node counts.
+      await expect(page.locator('main [aria-busy="true"]:visible')).toHaveCount(0)
 
       const texts = await page.evaluate(() => {
         const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
@@ -520,6 +566,7 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
           expect(await surfacePixel(comments, 2), `${name} painted surface`).toBe(
             expectedSurface
           )
+          await measureThroughOverlays(page)
           expect(await textContrastFailures(card), `${name} text`).toEqual([])
         }
 
@@ -543,6 +590,7 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
         expect(railSurface, 'planner computed surface').toBe(expectedSurface)
         expect(railSurface, `planner is not the ${other} variant`).not.toBe(otherSurface)
         expect(await surfacePixel(rail), 'planner painted surface').toBe(expectedSurface)
+        await measureThroughOverlays(page)
         expect(await textContrastFailures(rail), 'planner text').toEqual([])
       })
     }

@@ -3,6 +3,8 @@
 // required D3 hide gives the member back their place in the feed when the same items return.
 // R46: the same hide gives back an unsent comment and the composer focus it had.
 // R48: and only on Community, when access returns while another tab is on screen.
+// Story CC-7.9: an app resume (back from the in-app browser) gives back a place in the City
+// Spotlight above an empty feed, with the same list mounted throughout.
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { actStep } from '@/src/test-utils/act-step'
@@ -14,7 +16,10 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import { server } from '@/src/test-utils/msw/server'
 import { press } from '@/src/test-utils/press'
 import { screenFocus } from '@/src/test-utils/focus-effect'
-import { COMMUNITY_BANNED_MESSAGE } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_BANNED_MESSAGE,
+  communityReactionSpotlightResponseSchema,
+} from '@couture/api-client/contracts/http'
 import { feedJson, item, serveFeed } from './harness'
 import { refreshEvents } from './mock-state'
 
@@ -28,7 +33,7 @@ const summary = {
 const POST_IDS = ['post-a', 'post-b', 'post-c', 'post-d', 'post-e', 'post-f']
 
 /** Serves a verified feed under a sync whose catch-ups the test drives. */
-function verifiedFeed() {
+function verifiedFeed(ids: readonly string[] = POST_IDS) {
   const syncs: CommunitySyncState[] = []
   vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
     this: CommunitySyncState
@@ -36,7 +41,7 @@ function verifiedFeed() {
     syncs.push(this)
   })
   const look = (id: string) => item({ id, reactions: summary })
-  serveFeed(() => feedJson({ items: POST_IDS.map(look) }))
+  serveFeed(() => feedJson({ items: ids.map(look) }))
   let held: Promise<void> | undefined
   server.use(
     http.get('*/api/v1/community/events', async () => {
@@ -86,6 +91,46 @@ function verifiedFeed() {
       })
       return release
     },
+  }
+}
+
+/** A City Spotlight of two ranked looks, parsed through the contract. */
+function serveSpotlight() {
+  const ranked = (rank: number) => ({
+    ...item({ id: `spot-${rank}`, caption: `Spotlight caption ${rank}` }),
+    rank,
+    reactions: summary,
+  })
+  server.use(
+    http.get('*/api/v1/community/spotlight', () =>
+      HttpResponse.json(
+        communityReactionSpotlightResponseSchema.parse({
+          data: {
+            level: 'city',
+            label: 'Lisbon',
+            items: [ranked(1), ranked(2)],
+            nextCursor: null,
+          },
+        })
+      )
+    )
+  )
+}
+
+/** Moves the app to the background and back, as closing the in-app browser does. */
+function backgroundAndResume() {
+  let state: DocumentVisibilityState = 'hidden'
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => state,
+  })
+  try {
+    document.dispatchEvent(new Event('visibilitychange'))
+    state = 'visible'
+    document.dispatchEvent(new Event('visibilitychange'))
+  } finally {
+    // The own property shadowed the prototype getter; removing it restores the real one.
+    Reflect.deleteProperty(document, 'visibilityState')
   }
 }
 
@@ -306,6 +351,48 @@ export function registerCommunityAvailabilityRestoreCases() {
     }
     await screen.findByTestId('community-post-card-post-a')
     await waitFor(() => expect(list.scrollTop).toBe(600))
+  })
+
+  it('CC-7.9-MOB-SCROLL-001 an app resume keeps the list mounted and gives back a Spotlight offset above an empty feed', async () => {
+    serveSpotlight()
+    const feed = verifiedFeed([])
+    await render(
+      <View style={{ height: 640 }}>
+        <CommunityScreen />
+      </View>
+    )
+    await screen.findByTestId('community-spotlight-item-spot-1')
+    await act(async () => {
+      const sync = feed.sync()
+      sync.foreground()
+      await sync.catchUp()
+    })
+    await screen.findByTestId('community-spotlight-item-spot-1')
+    const list = screen.getByTestId('community-feed-list')
+    // The member reads the Spotlight's card, below the top of the list.
+    await waitFor(() =>
+      expect(list.scrollHeight - list.clientHeight).toBeGreaterThan(200)
+    )
+    list.scrollTop = 200
+    fireEvent.scroll(list)
+    expect(list.scrollTop).toBe(200)
+
+    const release = feed.hold()
+    // The browser stayed open past the 8 s verification bound (D3).
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
+    try {
+      await actStep(backgroundAndResume)
+      // The resume hides Community until a catch-up verifies access again.
+      expect(screen.queryByTestId('community-spotlight-item-spot-1')).toBeNull()
+      await waitFor(() => expect(list.scrollTop).toBe(0))
+    } finally {
+      clock.mockRestore()
+      release()
+    }
+    await screen.findByTestId('community-spotlight-item-spot-1')
+    // The same list stayed mounted, and the member is back where they were reading.
+    expect(screen.getByTestId('community-feed-list')).toBe(list)
+    await waitFor(() => expect(list.scrollTop).toBe(200))
   })
 
   it('6.5-R46-MOB-001 gives the composer back its draft and focus after a stale-access hide', async () => {

@@ -167,8 +167,9 @@ async function loadCases(page: Page, caseIds: string[]) {
 }
 
 // CC-7.9 D6: a case returns to the queue through the shared top bar's Back (backHref /moderation).
+// Codex replaced-assertions check: a link named Back, as the old Back to queue lookup required.
 const topBarBack = (page: Page) =>
-  page.getByTestId('app-header').getByTestId('app-top-bar-back')
+  page.getByTestId('app-header').getByRole('link', { name: 'Back', exact: true })
 
 /** D6: from 768 px the top bar also holds the tab links, in this order, after Back. */
 const TOP_BAR_TABS = [
@@ -650,7 +651,9 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     await expect(page).toHaveURL(
       new RegExp(`/moderation/cases/post\\.${queue.posts.B.id}$`)
     )
-    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
     const reporters = page.getByRole('region', { name: 'Reporters' })
     await expect(reporters.getByRole('listitem')).toHaveCount(3)
     for (const n of [1, 2, 3])
@@ -742,7 +745,9 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     expect(await count()).toBe(0)
 
     await page.goto(caseUrl(queue.expectations.A!.caseId))
-    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
     // A focus change or a minute tick must not refetch.
     await page.evaluate(() => window.dispatchEvent(new Event('focus')))
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
@@ -807,7 +812,9 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     })
     await signInAs(page, queue.moderator.id)
     await page.goto(caseUrl(`post.${post.id}`))
-    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
     await expect(page.getByRole('region', { name: 'Reporters' })).toContainText(
       '<img src=x onerror="window.__cc610xss=1">'
     )
@@ -868,7 +875,9 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
   }) => {
     await signInAs(page, queue.moderator.id)
     await page.goto(caseUrl(queue.expectations.C!.caseId))
-    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
     await expect(page.getByRole('region', { name: 'Machine findings' })).toContainText(
       '1.2.0'
     )

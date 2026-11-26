@@ -35,11 +35,9 @@ export default function SettingsPage() {
       {/* Story CC-7.9 D6, D7: the shared top bar and page surface; the always-dark page is gone. */}
       <AppPage>
         <AppTopBar titleKey="nav.profile" />
-        <main
-          id="main-content"
-          tabIndex={-1}
-          className={`${APP_MAIN_NARROW_CLASS} gap-8`}
-        >
+        <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
+          {/* Each section sets its own top margin and rule, so the column adds no gap: a gap-8
+              here doubled the space above every section. */}
           {/* Story CC-7.7 D3 (amended): the body appears once the locations, shopping,
               subscription and theme reads have answered; each used to land and push the next.
               The account header above them keeps its own space while it reads

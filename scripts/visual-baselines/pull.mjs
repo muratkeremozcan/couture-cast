@@ -107,7 +107,11 @@ const readArg = (name) => {
   return index === -1 ? undefined : process.argv[index + 1]
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+// A symlinked checkout still runs this file directly (scripts/direct-run-guard.test.mjs).
+if (
+  process.argv[1] &&
+  fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   const web = readArg('web')
   const native = readArg('native')
   // --all: the first pull, when every web screen is new and must be present. A later web run

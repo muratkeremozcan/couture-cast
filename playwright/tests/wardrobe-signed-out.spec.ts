@@ -43,7 +43,9 @@ test.describe('Closet for a visitor who never signed in', () => {
       .getByRole('link', { name: enUS.community.notifications.signin })
     await expect(signIn).toBeVisible()
     await expect(signIn).toHaveAttribute('href', /^\/signin/)
-    await expect(page.getByRole('alert')).toHaveCount(0)
+    // In main: a production build also renders Next's route announcer (role alert, outside main),
+    // which is no error (Vercel Preview e2e on 3d7af2a2).
+    await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0)
     for (const message of MEMBER_ERRORS)
       await expect(page.getByText(message, { exact: false }), message).toHaveCount(0)
 

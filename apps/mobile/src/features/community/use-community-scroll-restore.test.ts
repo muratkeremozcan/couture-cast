@@ -70,4 +70,29 @@ describe('useCommunityScrollRestore (Story 6.5 R43)', () => {
     act(() => result.current.onContentSizeChange())
     expect(scrollToOffset).not.toHaveBeenCalled()
   })
+
+  it('CC-7.9-MOB-SCROLL-002 restores a header offset over an empty feed once access returns', () => {
+    const scope = { current: 1 }
+    const scrollToOffset = vi.fn()
+    const view = renderHook(
+      ({ available, data }: Props) =>
+        useCommunityScrollRestore({ available, data, scope }),
+      { initialProps: { available: true, data: [] as Row[] } }
+    )
+    Object.assign(view.result.current.listRef, { current: { scrollToOffset } })
+    // The member reads the list header (the City Spotlight); the feed has no rows.
+    act(() => view.result.current.onScroll(scrolledTo(240)))
+    view.rerender({ available: false, data: [] })
+    view.rerender({ available: true, data: [] })
+    expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 240, animated: false })
+  })
+
+  it('CC-7.9-MOB-SCROLL-003 waits for hidden rows instead of dropping the restore when access returns first', () => {
+    const { rerender, result, scrollToOffset } = hiddenAt600()
+    rerender({ available: true, data: [] })
+    act(() => result.current.onContentSizeChange())
+    expect(scrollToOffset).not.toHaveBeenCalled()
+    rerender({ available: true, data: SHOWN })
+    expect(scrollToOffset).toHaveBeenLastCalledWith({ offset: 600, animated: false })
+  })
 })

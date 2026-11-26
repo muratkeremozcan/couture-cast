@@ -821,6 +821,7 @@ interface LookbookCardContentProps {
   isReported: boolean
   canAct: boolean
   t: Translate
+  onComments: (item: CommunityFeedItem) => void
   onReport: (postId: string) => void
   onWithdraw: (postId: string) => void
 }
@@ -838,6 +839,7 @@ function LookbookCardContent({
   isReported,
   canAct,
   t,
+  onComments,
   onReport,
   onWithdraw,
 }: LookbookCardContentProps) {
@@ -893,9 +895,20 @@ function LookbookCardContent({
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
-      {canAct && (
-        <div className="flex items-center gap-3 border-t border-theme-card-border pt-3 text-xs">
-          {item.author.isSelf ? (
+      {/* Story CC-7.9 (CI snapshot): the comments affordance closes the card with its moderation
+          action, after the look it belongs to. Above the author line it read as a stray label
+          with a blank band under it. Signed out, it opens the read-only thread on its own. */}
+      <div className="flex items-center gap-3 border-t border-theme-card-border pt-3 text-xs">
+        <button
+          type="button"
+          className="min-h-11 text-sm font-medium"
+          data-testid={`${scope}comments-button-${item.id}`}
+          onClick={() => onComments(item)}
+        >
+          {t('community.comments.title')}
+        </button>
+        {canAct &&
+          (item.author.isSelf ? (
             <button
               type="button"
               data-testid={`${scope}withdraw-button-${item.id}`}
@@ -922,9 +935,8 @@ function LookbookCardContent({
             >
               {isReported ? t('community.card.reported') : t('community.card.report')}
             </button>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </div>
   )
 }
@@ -1040,14 +1052,6 @@ function LookbookCard({
         t={t}
         host={sponsored}
       />
-      <button
-        type="button"
-        className="min-h-11 px-5 text-left text-sm font-medium"
-        data-testid={`${scope}comments-button-${item.id}`}
-        onClick={() => onComments(item)}
-      >
-        {t('community.comments.title')}
-      </button>
       <LookbookCardContent
         scope={scope}
         reactionControls={reactionControls}
@@ -1055,6 +1059,7 @@ function LookbookCard({
         isReported={isReported}
         canAct={canAct}
         t={t}
+        onComments={onComments}
         onReport={onReport}
         onWithdraw={onWithdraw}
       />

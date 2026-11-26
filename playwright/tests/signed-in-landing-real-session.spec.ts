@@ -405,6 +405,10 @@ for (const [state, stored] of [
   }) => {
     const errors = collectPageErrors(page, { strict: true })
     await page.goto('/privacy')
+    // CC-7.9 D6: /privacy now carries the top bar, whose Back link to / starts an RSC prefetch.
+    // The strict case must leave with nothing in flight (WebKit reports a cancelled fetch as an
+    // access-control error, CI 3d7af2a2), so the page settles before the next navigation.
+    await page.waitForLoadState('networkidle')
     await page.evaluate(
       ([key, value]) => {
         window.localStorage.setItem(key, value)

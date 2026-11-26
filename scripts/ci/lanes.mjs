@@ -268,6 +268,8 @@ export const LANES = {
       'playwright/support/**',
       // real-session-burn-in.test.mjs holds its repeat count to this config's.
       'playwright/config/.burn-in.config.ts',
+      // scripts/visual-baselines/pull.test.mjs holds its baseline names to this spec's (CC-7.9).
+      'playwright/tests/app-shell-visual-snapshots.spec.ts',
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },

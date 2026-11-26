@@ -103,7 +103,10 @@ env:
 - inputText: ${ADULT_BIRTHDATE}
 - hideKeyboard:
     optional: true
-- tapOn: 'Create account'
+# CC-7.9 P2-8: the top bar title also reads "Create account" (and comes first in the hierarchy,
+# not clickable), so the submit button is tapped by its id (CI 3d7af2a2, shard 10).
+- tapOn:
+    id: 'signup-submit'
 - extendedWaitUntil:
     visible:
       id: 'signup-success-message'

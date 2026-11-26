@@ -67,9 +67,15 @@ export function AppTopBar({ title, onBack, titleNode, trailing }: AppTopBarProps
           </Text>
         </Pressable>
       ) : null}
-      <View style={[styles.title, { paddingHorizontal: space[2] }]}>
+      {/* One `app-top-bar-title` either way: Android reports the title as a sibling of the bar,
+          so UI tests find it by its own id. */}
+      <View
+        testID={titleNode ? 'app-top-bar-title' : undefined}
+        style={[styles.title, { paddingHorizontal: space[2] }]}
+      >
         {titleNode ?? (
           <Text
+            testID="app-top-bar-title"
             accessibilityRole="header"
             numberOfLines={1}
             style={{
@@ -184,6 +190,13 @@ const coldLinkParents = new Map<string, Href>()
  */
 export function tabsAnchorListeners({ route }: { route: { key: string } }) {
   return {
+    // A screen pushed over the tab group blurs it, so a real caller's anchor counts as seen even
+    // when its first focus reached no listener (an Android launch delivered none: Home, Add
+    // location, Save then landed on Profile).
+    blur: () => {
+      seenTabAnchors.add(route.key)
+      coldLinkParents.delete(route.key)
+    },
     focus: () => {
       const firstFocus = !seenTabAnchors.has(route.key)
       seenTabAnchors.add(route.key)
@@ -192,6 +205,12 @@ export function tabsAnchorListeners({ route }: { route: { key: string } }) {
       if (firstFocus && parent !== undefined) router.navigate(parent)
     },
   }
+}
+
+/** Test seam: forget which anchors were seen, as a launch whose first focus went unheard. */
+export function forgetSeenTabAnchorsForTesting() {
+  seenTabAnchors.clear()
+  coldLinkParents.clear()
 }
 
 /** The route right below this one in the root stack, if any. */

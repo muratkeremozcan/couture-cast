@@ -1,14 +1,21 @@
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Story 4.1 Task 8 step 4 owner: E2E Playwright test for wardrobe capture modal accessibility and landmark visibility in `playwright/tests/wardrobe-garment-capture.spec.ts`
+import { randomUUID } from 'node:crypto'
 import { expect, test } from '../support/fixtures/merged-fixtures'
+import { seedWebSession } from '../support/helpers/commerce-session'
+import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 
-test.describe('Wardrobe Garment Capture Flow', () => {
+// CC-7.9 add-on B: capture is a member action; a visitor's Add leads to sign in (covered on every
+// lane by wardrobe-signed-out.spec.ts). This case signs a local fixture member in first: before
+// add-on B it reached the modal as a visitor, which the Closet no longer offers.
+test.describe('Wardrobe Garment Capture Flow @local-lane', () => {
   test('opens wardrobe hub, launches capture modal, and checks accessibility', async ({
     page,
     interceptNetworkCall,
   }) => {
+    await seedWebSession(page, localE2EAccessToken(`capture-${randomUUID()}`))
     // Network-first: the readiness response is intercepted before navigating.
     const responsePromise = interceptNetworkCall({
       method: 'GET',

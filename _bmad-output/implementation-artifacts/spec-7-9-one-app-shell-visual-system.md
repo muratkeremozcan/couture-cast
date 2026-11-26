@@ -3,7 +3,7 @@ title: 'Story CC-7.9: One app shell and visual system'
 type: feature
 ticket: '7-9-one-app-shell-visual-system'
 created: '2026-11-25'
-status: in-review
+status: built
 baseline_revision: '812cadce47adddfb4c891a5b8ae327c504e09f57'
 route: full
 route_source: auto
@@ -271,6 +271,11 @@ changes to the rendered share-card image.
   the lowest that keeps every palette at 4.5:1 on the white page (Jewel Radiance fell to 3.77:1).
 - 2026-11-25, builder, D9: the native capsules catalog carries the web capsule keys too (92 keys),
   because 4.3-I18N-MOB-06 requires one key tree on both surfaces.
+
+- 2026-11-26, builder, D7 width: every tab shares one main column capped at `max-w-6xl` (1152
+  px), the same as the top bar, so the desktop lookbook with the planner rail open measures 1120
+  px at a 1440 px viewport (before: full bleed, 1300 px or more). Intended; lookbook-prism.spec
+  asserts the new width and keeps its no-overflow and rail checks.
 
 ## Review Triage Log
 

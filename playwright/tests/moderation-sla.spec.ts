@@ -350,7 +350,9 @@ test.describe('P-SLA: the page', () => {
     const link = page.locator(`a[href="/moderation/cases/${seeded.caseId}"]`).first()
     await expect(link).toBeVisible()
     await link.click()
-    await expect(page.getByRole('heading', { level: 2, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
   })
 
   test('[P0] P-SLA-AXE passes axe on the live page, in light and dark', async ({
@@ -616,7 +618,8 @@ test.describe('P-SLA: the page', () => {
     ])
     // CC-7.9 D6: Back is the shared top bar control and points at the queue (backHref).
     await expect(
-      page.getByTestId('app-header').getByTestId('app-top-bar-back')
+      // A link named Back (Codex replaced-assertions check).
+      page.getByTestId('app-header').getByRole('link', { name: 'Back', exact: true })
     ).toHaveAttribute('href', '/moderation')
   })
 })

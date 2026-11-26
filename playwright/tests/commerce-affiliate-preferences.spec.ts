@@ -220,14 +220,15 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
     const primaryNav = page.getByTestId('primary-nav')
-    for (const tab of ['nav-ritual', 'nav-wardrobe', 'nav-community', 'nav-profile']) {
+    // Each stop is a link with its tab name, Home first, as the old named Home link lookup
+    // required (Codex replaced-assertions check).
+    for (const name of ['Home', 'Wardrobe', 'Community', 'Profile']) {
       await page.keyboard.press('Tab')
-      await expect(primaryNav.getByTestId(tab)).toBeFocused()
+      await expect(primaryNav.getByRole('link', { name, exact: true })).toBeFocused()
     }
-    await expect(primaryNav.getByTestId('nav-profile')).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+    await expect(
+      primaryNav.getByRole('link', { name: 'Profile', exact: true })
+    ).toHaveAttribute('aria-current', 'page')
     await page.keyboard.press('Tab')
     await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
     await page.keyboard.press('Tab')

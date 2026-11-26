@@ -1,6 +1,9 @@
 // Story 6.5 (R43): content that hides as unverified (D3) unmounts, which drops the feed
 // list's scroll offset. When the same items return in the same scope, the list goes back
-// to the offset the member left it at.
+// to the offset the member left it at. The list header (the City Spotlight) hides with the
+// rows, so a feed with no rows restores the offset too: an app resume hides Community until
+// access verifies again, and a member reading the Spotlight above an empty feed kept their
+// place only when that hide did not happen.
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 import type { FlatList, NativeScrollEvent, NativeSyntheticEvent } from 'react-native'
 
@@ -26,7 +29,7 @@ export function useCommunityScrollRestore<T extends { id: string }>({
   availableRef.current = available
   const dataRef = useRef(data)
   dataRef.current = data
-  if (available && data.length) shownRef.current = data
+  if (available) shownRef.current = data
 
   useEffect(() => {
     if (available || hiddenRef.current || offsetRef.current <= 0) return
@@ -60,7 +63,9 @@ export function useCommunityScrollRestore<T extends { id: string }>({
   const restore = useCallback(() => {
     const hidden = hiddenRef.current
     const rows = dataRef.current
-    if (!hidden || !availableRef.current || !rows.length) return
+    if (!hidden || !availableRef.current) return
+    // Rows hidden with the feed come back after access does; wait for them.
+    if (hidden.ids.length && !rows.length) return
     const ids = new Set(rows.map((item) => item.id))
     if (hidden.scope !== scope.current || !hidden.ids.every((id) => ids.has(id))) {
       hiddenRef.current = null
@@ -71,7 +76,7 @@ export function useCommunityScrollRestore<T extends { id: string }>({
 
   const hasRows = data.length > 0
   useEffect(() => {
-    if (available && hasRows) restore()
+    if (available) restore()
   }, [available, hasRows, restore])
 
   return { listRef, onScroll, onScrollBeginDrag, onContentSizeChange: restore }

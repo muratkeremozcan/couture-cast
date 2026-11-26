@@ -145,8 +145,11 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               <span aria-hidden="true" className="text-base leading-none">
                 {tab.icon}
               </span>
+              {/* D4 has no 10 px step, so the label keeps text-xs in sentence case, as the
+                  native tab bar does: uppercase with wide tracking cut the German labels at
+                  320 px (O-1). One line, so a two-word label never stacks. */}
               <span
-                className={`text-xs uppercase tracking-wider ${
+                className={`whitespace-nowrap text-xs ${
                   isActive ? 'font-semibold text-ink' : 'text-ink-muted'
                 }`}
               >

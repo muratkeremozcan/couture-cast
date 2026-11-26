@@ -4,11 +4,11 @@ appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
     id: ${TAB_ID}
+# By id: Android reports the bar's title beside app-top-bar, not under it (CI 3d7af2a2).
 - extendedWaitUntil:
     visible:
+      id: 'app-top-bar-title'
       text: ${TITLE}
-      childOf:
-        id: 'app-top-bar'
     timeout: 15000
 - extendedWaitUntil:
     notVisible:

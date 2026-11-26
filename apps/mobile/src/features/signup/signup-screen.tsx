@@ -540,6 +540,7 @@ function SignupNextStep({
     )
   return (
     <Pressable
+      testID="signup-submit"
       accessibilityRole="button"
       accessibilityLabel={submitLabel}
       style={[styles.button, isSubmitting ? styles.buttonDisabled : null]}
