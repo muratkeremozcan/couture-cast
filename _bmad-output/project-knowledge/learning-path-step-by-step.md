@@ -21950,13 +21950,17 @@ Technical architecture:
 - `packages/utils/src/screen-budget.ts`: `screenBudgetMeasureConfig(platform, screen)`,
   `evaluateScreenBudget(audit, limits, known)` and `isAnalyticsRequest`. Count and height rules
   match their known value exactly; card-in-card, paragraph and analytics-only entries list
-  element keys (testid, else tag and the first 40 characters of text).
-- `scripts/check-screen-budget-decisions.mjs` (PR checks lint job): a limit above its AC value
-  needs a `limitDecisions` entry, every `known` entry needs a decision id recorded under
-  `## Screen budget decisions` in the spec of its `decidedIn` story, and a raise or a new entry
-  must cite a decision the base revision's budget did not already use. Lowering or deleting
-  needs none.
-- New anchors: web `closet-garment-grid` and `closet-empty-state`, native `wardrobe-empty-state`.
+  element keys (testid, else tag and the first 40 characters of text), and a paragraph entry
+  records each paragraph's line count, so a known paragraph that grows still fails.
+- `scripts/check-screen-budget-decisions.mjs` (PR checks lint job): every increase against the
+  merge base (a raised limit, an added `known` entry, a raised value, a new element key, a
+  paragraph with more lines) must cite a decision the base did not already use, and every cited
+  decision must be recorded under `## Screen budget decisions` in its `decidedIn` story's spec
+  as term lines (`rule=... scope=<platform>/<screen>/<fixture> max=...`, or `scope=limit`) that
+  bind the rule, scope and ceiling the JSON may use. Lowering or deleting needs none.
+- New anchors: web `closet-garment-grid` and `closet-empty-state`, native
+  `wardrobe-garment-list` and the Add control (`garment-capture-open`) while
+  `wardrobe-empty-state` renders.
 
 Hard-won lessons from the implementation of this story:
 
@@ -22012,11 +22016,14 @@ Task owner map:
 Tests that cover this step:
 
 - [`scripts/check-screen-budget-decisions.test.mjs`](../../scripts/check-screen-budget-decisions.test.mjs):
-  7.10-DEC-001 to 7.10-DEC-008.
+  7.10-DEC-001 to 7.10-DEC-012.
 - The unit (`packages/utils/src/screen-budget.test.ts`), rule
   (`playwright/tests/screen-budget-rules.spec.ts`), web audit and Home probe
   (`playwright/tests/screen-budget.spec.ts`, `screen-budget-home-actions.spec.ts`) and native
-  (`apps/mobile/src/screens/screen-budget.test.tsx`) suites are listed in
+  (`apps/mobile/src/screens/screen-budget-home.test.tsx`,
+  `apps/mobile/src/screens/screen-budget-profile.test.tsx`,
+  `apps/mobile/src/screens/screen-budget-community.test.tsx`,
+  `apps/mobile/src/features/wardrobe/screen-budget-closet.test.tsx`) suites are listed in
   `_bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md`.
 
 Evidence boundaries:

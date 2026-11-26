@@ -1,5 +1,7 @@
 // Story CC-7.10 D6: a screen budget limit or `known` entry moves only with a recorded decision.
-// Cases 7.10-DEC-001..008 from _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+// Cases 7.10-DEC-001..008 from _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md;
+// 7.10-DEC-009..012 from the CC-7.10 Codex review (#2: raises against the base, decision terms
+// that bind rule, scope and ceiling; #8: per-paragraph line counts; #10: AC values as fixtures).
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 import assert from 'node:assert/strict'
@@ -11,10 +13,10 @@ import { afterEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
-  AC_LIMITS,
   BUDGET_PATH,
   checkScreenBudgetDecisions,
   decisionsSection,
+  decisionTerms,
   mentionsDecision,
   PER_ELEMENT_RULES,
   RULES,
@@ -27,11 +29,26 @@ const script = fileURLToPath(
 )
 const checkedIn = JSON.parse(fs.readFileSync(path.join(repository, BUDGET_PATH), 'utf8'))
 
-/** The checked-in budget with `known` and `limitDecisions` replaced. */
+/**
+ * CC-7.10 AC2 and AC3 as a fixture (review #10): the live limits may move under a recorded
+ * decision, so no case pins the checked-in file to these values.
+ */
+const AC_FIXTURE = Object.freeze({
+  'targets-above-fold': 7,
+  'primary-buttons': 1,
+  'chip-rows': 1,
+  'nested-cards': 0,
+  'paragraph-lines': 2,
+  'today-height': 1688,
+  'closet-chrome': 160,
+  'analytics-only': 0,
+})
+
+/** The checked-in budget's lists and selectors, with AC limits, `known` and decisions given. */
 function budgetWith({ limits = {}, known = [], limitDecisions = [] } = {}) {
   return structuredClone({
     ...checkedIn,
-    limits: { ...checkedIn.limits, ...limits },
+    limits: { ...AC_FIXTURE, ...limits },
     known,
     limitDecisions,
   })
@@ -43,6 +60,10 @@ const SPEC_7_10 = [
   '## Screen budget decisions',
   '',
   '- D-KNOWN-7.10 (owner delegated): the measured violations are accepted as known.',
+  '- D-KNOWN-7.10: `rule=targets-above-fold scope=web/today/* max=9`',
+  '- D-KNOWN-7.10: `rule=targets-above-fold scope=native/today/populated max=9`',
+  '- D-KNOWN-7.10: `rule=paragraph-lines scope=web/today/* max=2 lines=4`',
+  '- D-PROSE-7.10: a prose line after the id names no term.',
   '',
   '## Design Notes',
   '',
@@ -58,6 +79,11 @@ const SPEC_7_13 = [
   '## Screen budget decisions',
   '',
   '- D-TARGETS-7.13 (owner, 2026-12-01): Today may show eight targets.',
+  '- D-TARGETS-7.13: `rule=targets-above-fold scope=limit max=8`',
+  '- D-RESTORE-7.13 (owner, 2026-12-02): the target limit returns to seven.',
+  '- D-RESTORE-7.13: `rule=targets-above-fold scope=limit max=7`',
+  '- D-TODAY-7.13: `rule=targets-above-fold scope=web/today/* max=10`',
+  '- D-LINES-7.13: `rule=paragraph-lines scope=web/today/empty max=2 lines=6`',
   '',
 ].join('\n')
 
@@ -97,13 +123,18 @@ const knownTargets = (overrides = {}) => ({
   ...overrides,
 })
 
+/** A paragraph-lines entry; each element is a key (3 lines) or `[key, lines]`. */
 const knownParagraphs = (elements, overrides = {}) => ({
   platform: 'web',
   screen: 'today',
   fixture: 'empty',
   rule: 'paragraph-lines',
   value: elements.length,
-  elements,
+  elements: elements.map((element) =>
+    Array.isArray(element)
+      ? { key: element[0], lines: element[1] }
+      : { key: element, lines: 3 }
+  ),
   story: '7.17',
   decision: 'D-KNOWN-7.10',
   decidedIn: '7.10',
@@ -112,20 +143,30 @@ const knownParagraphs = (elements, overrides = {}) => ({
 
 describe('check-screen-budget-decisions', () => {
   test('7.10-DEC-001 limits at the AC values and no known change pass', () => {
-    assert.deepEqual(checkedIn.limits, AC_LIMITS)
     assert.deepEqual(check(budgetWith(), budgetWith()), [])
     assert.deepEqual(check(budgetWith(), null), [])
     const base = budgetWith({ known: [knownTargets()] })
     assert.deepEqual(check(budgetWith({ known: [knownTargets()] }), base), [])
   })
 
-  test('7.10-DEC-001 the checked-in budget is clean against HEAD', () => {
-    const result = spawnSync(process.execPath, [script, '--base', 'HEAD'], {
-      cwd: repository,
-      encoding: 'utf8',
-    })
+  // Every checked-in entry and limit sits within its recorded decision terms. The base-relative
+  // half (a raise needs a new decision) runs in the PR gate against the merge base: a working
+  // tree that adds entries under this story's own decision is clean there and not against HEAD.
+  test('7.10-DEC-001 the checked-in budget is clean with no base', () => {
+    assert.deepEqual(checkScreenBudgetDecisions({ budget: checkedIn, base: null }), [])
+    const env = { ...process.env }
+    delete env.CI
+    const result = spawnSync(
+      process.execPath,
+      [script, '--base', 'refs/heads/no-such-screen-budget-base'],
+      { cwd: repository, encoding: 'utf8', env }
+    )
     assert.equal(result.status, 0, result.stderr)
-    assert.match(result.stdout, /check-screen-budget-decisions: clean \(base: HEAD/)
+    assert.match(
+      result.stderr,
+      /base revision refs\/heads\/no-such-screen-budget-base not found/
+    )
+    assert.match(result.stdout, /check-screen-budget-decisions: clean \(base: none\)/)
   })
 
   test('7.10-DEC-001 the rule ids match the shared module and the limits file', () => {
@@ -149,7 +190,7 @@ describe('check-screen-budget-decisions', () => {
       budgetWith()
     )
     assert.deepEqual(problems, [
-      'limits.targets-above-fold 8 (AC 7): above the AC value without a limitDecisions entry allowing it',
+      'limits.targets-above-fold 8 (base 7, AC 7): raised from 7 without a limitDecisions entry allowing it',
     ])
     const short = check(
       budgetWith({
@@ -168,7 +209,7 @@ describe('check-screen-budget-decisions', () => {
     assert.equal(short.length, 1)
     assert.match(
       short[0],
-      /^limits\.today-height 1800 \(AC 1688\): above the AC value without/
+      /^limits\.today-height 1800 \(base 1688, AC 1688\): raised from 1688 without/
     )
   })
 
@@ -188,7 +229,7 @@ describe('check-screen-budget-decisions', () => {
       budgetWith()
     )
     assert.deepEqual(problems, [
-      `limits.targets-above-fold 8 (AC 7): decision D-LIMIT-7.13 is not recorded under "## Screen budget decisions" in ${SPEC_DIR}/spec-7-13-calm-today.md`,
+      `limits.targets-above-fold 8 (base 7, AC 7): decision D-LIMIT-7.13 is not recorded under "## Screen budget decisions" in ${SPEC_DIR}/spec-7-13-calm-today.md`,
     ])
     const noSection = check(
       budgetWith({
@@ -201,7 +242,7 @@ describe('check-screen-budget-decisions', () => {
       specRoot({ 'spec-7-13-calm-today.md': '# Story CC-7.13\n\nD-CHIPS-7.13\n' })
     )
     assert.deepEqual(noSection, [
-      `limits.chip-rows 2 (AC 1): ${SPEC_DIR}/spec-7-13-calm-today.md has no "## Screen budget decisions" section`,
+      `limits.chip-rows 2 (base 1, AC 1): ${SPEC_DIR}/spec-7-13-calm-today.md has no "## Screen budget decisions" section`,
     ])
   })
 
@@ -218,7 +259,8 @@ describe('check-screen-budget-decisions', () => {
       ],
     })
     assert.deepEqual(check(raised, budgetWith()), [])
-    // Raising it again under the decision the base already used needs a new one.
+    // Raising it again under the decision the base already used needs a new one, and its
+    // recorded ceiling of 8 does not stretch to 9.
     const again = budgetWith({
       limits: { 'targets-above-fold': 9 },
       limitDecisions: [
@@ -231,7 +273,8 @@ describe('check-screen-budget-decisions', () => {
       ],
     })
     assert.deepEqual(check(again, raised), [
-      'limits.targets-above-fold 9 (AC 7): raised or added under decision D-TARGETS-7.13, which the base already used; record a new decision',
+      `limits.targets-above-fold 9 (base 8, AC 7): limit 9 is above the max 8 of D-TARGETS-7.13 "rule=targets-above-fold scope=limit max=8" (${SPEC_DIR}/spec-7-13-calm-today.md)`,
+      'limits.targets-above-fold 9 (base 8, AC 7): raised or added under decision D-TARGETS-7.13, which the base already used; record a new decision',
     ])
   })
 
@@ -274,6 +317,8 @@ describe('check-screen-budget-decisions', () => {
           knownTargets({ fixture: 'empty' }),
           knownParagraphs(['a', 'b'], { value: 1 }),
           knownParagraphs([], { value: 0, fixture: 'populated' }),
+          knownParagraphs(['a'], { fixture: 'guardian-pending', elements: ['a'] }),
+          knownParagraphs([['a', 2]], { screen: 'closet' }),
           knownTargets({ fixture: 'guardian-pending', elements: ['x'] }),
           knownTargets({ platform: 'native', decision: 'known' }),
         ],
@@ -286,8 +331,11 @@ describe('check-screen-budget-decisions', () => {
       'known[3] web today empty targets-above-fold: duplicate entry',
       'known[4] web today empty paragraph-lines: value 1 must equal the 2 element key(s) and be 1 or more',
       'known[5] web today populated paragraph-lines: value 0 must equal the 0 element key(s) and be 1 or more',
-      'known[6] web today guardian-pending targets-above-fold: only per-element rules list elements',
-      'known[7] native today populated targets-above-fold: decision must be an id like D-KNOWN-7.10, got known',
+      'known[6] web today guardian-pending paragraph-lines: a paragraph-lines entry lists each paragraph as { "key": ..., "lines": <measured lines> }',
+      'known[7] web closet empty paragraph-lines: paragraph a has 2 lines, within the limit 2, so it is not a violation',
+      `known[7] web closet empty paragraph-lines: decision D-KNOWN-7.10 records no term for rule paragraph-lines scope web/closet/empty (${SPEC_DIR}/spec-7-10-screen-budget-guard.md)`,
+      'known[8] web today guardian-pending targets-above-fold: only per-element rules list elements',
+      'known[9] native today populated targets-above-fold: decision must be an id like D-KNOWN-7.10, got known',
     ])
   })
 
@@ -299,7 +347,7 @@ describe('check-screen-budget-decisions', () => {
       ],
     })
     const lowered = budgetWith({
-      known: [knownTargets({ value: 8 }), knownParagraphs(['home-tagline'])],
+      known: [knownTargets({ value: 8 }), knownParagraphs([['home-tagline', 3]])],
     })
     assert.deepEqual(check(lowered, base), [])
     assert.deepEqual(check(budgetWith({ known: [knownTargets({ value: 9 })] }), base), [])
@@ -372,8 +420,224 @@ describe('check-screen-budget-decisions', () => {
     const section = decisionsSection(spec)
     assert.ok(section, 'spec-7-10 has no decisions section')
     assert.ok(mentionsDecision(section, 'D-KNOWN-7.10'))
+    const terms = decisionTerms(section).get('D-KNOWN-7.10') ?? []
+    assert.ok(terms.length > 0, 'D-KNOWN-7.10 records its terms')
+    // Every term-shaped line under the heading parses, so none is silently skipped.
+    const termShaped = section
+      .split('\n')
+      .filter((line) => /^- D-KNOWN-7\.10: /.test(line))
+    assert.equal(terms.length, termShaped.length)
+    assert.deepEqual(
+      terms.filter((term) => term.problem),
+      [],
+      'every D-KNOWN-7.10 term parses'
+    )
     assert.equal(mentionsDecision('- D-KNOWN-7.10 (owner)', 'D-KNOWN-7.1'), false)
     assert.equal(mentionsDecision('- D-KNOWN-7.10-B', 'D-KNOWN-7.10'), false)
     assert.equal(mentionsDecision('see D-KNOWN-7.10.', 'D-KNOWN-7.10'), true)
+  })
+
+  test('7.10-DEC-009 a limit lowered on the base and raised back fails without a new decision', () => {
+    const lowered = budgetWith({ limits: { 'targets-above-fold': 6 } })
+    // Back at the AC value, but above the base: still an increase.
+    assert.deepEqual(check(budgetWith(), lowered), [
+      'limits.targets-above-fold 7 (base 6, AC 7): raised from 6 without a limitDecisions entry allowing it',
+    ])
+    const restored = budgetWith({
+      limitDecisions: [
+        {
+          limit: 'targets-above-fold',
+          value: 7,
+          decision: 'D-RESTORE-7.13',
+          decidedIn: '7.13',
+        },
+      ],
+    })
+    assert.deepEqual(check(restored, lowered), [])
+    // A decision the base already cites cannot carry the raise.
+    const reused = budgetWith({
+      limits: { 'targets-above-fold': 6 },
+      limitDecisions: restored.limitDecisions,
+    })
+    assert.deepEqual(check(restored, reused), [
+      'limits.targets-above-fold 7 (base 6, AC 7): raised or added under decision D-RESTORE-7.13, which the base already used; record a new decision',
+    ])
+  })
+
+  test('7.10-DEC-010 a decision term authorizes only its rule, scope and ceiling', () => {
+    const spec = `${SPEC_DIR}/spec-7-13-calm-today.md`
+    // A limit term does not authorize another rule's limit.
+    const otherRule = check(
+      budgetWith({
+        limits: { 'chip-rows': 2 },
+        limitDecisions: [
+          { limit: 'chip-rows', value: 2, decision: 'D-TARGETS-7.13', decidedIn: '7.13' },
+        ],
+      }),
+      budgetWith()
+    )
+    assert.deepEqual(otherRule, [
+      `limits.chip-rows 2 (base 1, AC 1): decision D-TARGETS-7.13 records no term for rule chip-rows scope limit (${spec})`,
+    ])
+    // The JSON's own limitDecisions value cannot lift the recorded ceiling.
+    const higher = check(
+      budgetWith({
+        limits: { 'targets-above-fold': 9 },
+        limitDecisions: [
+          {
+            limit: 'targets-above-fold',
+            value: 9,
+            decision: 'D-TARGETS-7.13',
+            decidedIn: '7.13',
+          },
+        ],
+      }),
+      budgetWith()
+    )
+    assert.deepEqual(higher, [
+      `limits.targets-above-fold 9 (base 7, AC 7): limit 9 is above the max 8 of D-TARGETS-7.13 "rule=targets-above-fold scope=limit max=8" (${spec})`,
+    ])
+    // A known-entry term covers its scope up to its max, and nothing else.
+    const today = (overrides) =>
+      knownTargets({ decision: 'D-TODAY-7.13', decidedIn: '7.13', ...overrides })
+    assert.deepEqual(
+      check(budgetWith({ known: [today({ value: 10 })] }), budgetWith()),
+      []
+    )
+    assert.deepEqual(
+      check(
+        budgetWith({
+          known: [
+            today({ value: 11 }),
+            today({ platform: 'native' }),
+            today({ rule: 'primary-buttons', value: 2 }),
+          ],
+        }),
+        budgetWith()
+      ),
+      [
+        `known[0] web today populated targets-above-fold: value 11 is above the max 10 of D-TODAY-7.13 "rule=targets-above-fold scope=web/today/* max=10" (${spec})`,
+        `known[1] native today populated targets-above-fold: decision D-TODAY-7.13 records no term for rule targets-above-fold scope native/today/populated (${spec})`,
+        `known[2] web today populated primary-buttons: decision D-TODAY-7.13 records no term for rule primary-buttons scope web/today/populated (${spec})`,
+      ]
+    )
+    // A limit term never covers a known entry, nor a known-entry term a limit.
+    assert.deepEqual(
+      check(
+        budgetWith({
+          known: [knownTargets({ decision: 'D-TARGETS-7.13', decidedIn: '7.13' })],
+        }),
+        budgetWith()
+      ),
+      [
+        `known[0] web today populated targets-above-fold: decision D-TARGETS-7.13 records no term for rule targets-above-fold scope web/today/populated (${spec})`,
+      ]
+    )
+    // An unchanged entry must still sit within its decision's terms.
+    const outside = budgetWith({ known: [knownTargets({ value: 10 })] })
+    assert.deepEqual(check(outside, outside), [
+      `known[0] web today populated targets-above-fold: value 10 is above the max 9 of D-KNOWN-7.10 "rule=targets-above-fold scope=web/today/* max=9" (${SPEC_DIR}/spec-7-10-screen-budget-guard.md)`,
+    ])
+  })
+
+  test('7.10-DEC-011 a known paragraph that gains lines needs a new decision within its lines', () => {
+    const base = budgetWith({ known: [knownParagraphs([['home-hero-copy', 3]])] })
+    // Same key, more lines: an increase, even with the count unchanged.
+    assert.deepEqual(
+      check(budgetWith({ known: [knownParagraphs([['home-hero-copy', 4]])] }), base),
+      [
+        'known[0] web today empty paragraph-lines: raised or added under decision D-KNOWN-7.10, which the base already used; record a new decision',
+      ]
+    )
+    // Above the recorded lines ceiling, under the base's decision or a new one.
+    assert.deepEqual(
+      check(budgetWith({ known: [knownParagraphs([['home-hero-copy', 5]])] }), null),
+      [
+        `known[0] web today empty paragraph-lines: a paragraph of 5 lines is above the lines 4 of D-KNOWN-7.10 "rule=paragraph-lines scope=web/today/* max=2 lines=4" (${SPEC_DIR}/spec-7-10-screen-budget-guard.md)`,
+      ]
+    )
+    const decided = (lines) =>
+      budgetWith({
+        known: [
+          knownParagraphs([['home-hero-copy', lines]], {
+            decision: 'D-LINES-7.13',
+            decidedIn: '7.13',
+          }),
+        ],
+      })
+    assert.deepEqual(check(decided(6), base), [])
+    assert.equal(check(decided(7), base).length, 1)
+    // Fewer lines is a decrease and needs no decision.
+    assert.deepEqual(
+      check(budgetWith({ known: [knownParagraphs([['home-hero-copy', 3]])] }), base),
+      []
+    )
+    // Recording the count of a base entry in the old string shape migrates it.
+    const stringShaped = budgetWith({
+      known: [{ ...knownParagraphs(['home-hero-copy']), elements: ['home-hero-copy'] }],
+    })
+    assert.deepEqual(
+      check(
+        budgetWith({ known: [knownParagraphs([['home-hero-copy', 4]])] }),
+        stringShaped
+      ),
+      []
+    )
+  })
+
+  test('7.10-DEC-012 decision terms parse strictly and a decision needs at least one', () => {
+    const section = [
+      '- D-A-7.13 (owner): prose names the id but no term.',
+      '- D-A-7.13: prose after a colon is not a term either.',
+      '- D-B-7.13: `rule=chip-rows scope=web/*/* max=2`',
+      '- D-B-7.13: rule=nested-cards scope=native/profile/empty max=1',
+      '- D-B-7.13: `rule=analytics-only scope=*/today/* max=3` (a note after the term)',
+      '- D-C-7.13: `rule=paragraph-lines scope=web/today/* max=1`',
+      '- D-D-7.13: `rule=chip-rows scope=web/today max=2`',
+      '- D-E-7.13: `rule=chips scope=limit max=2`',
+      '- D-F-7.13: `rule=chip-rows scope=limit max=two`',
+      '- D-G-7.13: `rule=chip-rows scope=limit max=2 lines=3`',
+      '- D-H-7.13: `rule=chip-rows scope=limit max=2 owner=me`',
+    ].join('\n')
+    const terms = decisionTerms(section)
+    assert.equal(terms.has('D-A-7.13'), false)
+    assert.deepEqual(
+      terms.get('D-B-7.13').map(({ rule, scope, max }) => ({ rule, scope, max })),
+      [
+        { rule: 'chip-rows', scope: ['web', '*', '*'], max: 2 },
+        { rule: 'nested-cards', scope: ['native', 'profile', 'empty'], max: 1 },
+        { rule: 'analytics-only', scope: ['*', 'today', '*'], max: 3 },
+      ]
+    )
+    const problem = (id) => terms.get(id)[0].problem
+    assert.equal(problem('D-C-7.13'), 'a paragraph-lines term records lines')
+    assert.equal(
+      problem('D-D-7.13'),
+      'scope must be limit or <platform>/<screen>/<fixture>'
+    )
+    assert.equal(problem('D-E-7.13'), 'unknown rule chips')
+    assert.equal(problem('D-F-7.13'), 'max must be a whole number')
+    assert.equal(problem('D-G-7.13'), 'a limit term takes no lines')
+    assert.equal(problem('D-H-7.13'), 'unknown field(s) owner')
+
+    const root = specRoot({
+      'spec-7-10-screen-budget-guard.md': SPEC_7_10,
+      'spec-7-13-calm-today.md': `# Story CC-7.13\n\n## Screen budget decisions\n\n${section}\n`,
+    })
+    const cite = (decision) =>
+      check(
+        budgetWith({ known: [knownTargets({ decision, decidedIn: '7.13' })] }),
+        null,
+        root
+      )
+    const spec = `${SPEC_DIR}/spec-7-13-calm-today.md`
+    assert.deepEqual(cite('D-A-7.13'), [
+      `known[0] web today populated targets-above-fold: decision D-A-7.13 in ${spec} records no term line ("- D-A-7.13: \`rule=<rule> scope=<platform>/<screen>/<fixture> max=<value>\`")`,
+    ])
+    assert.deepEqual(cite('D-E-7.13'), [
+      `known[0] web today populated targets-above-fold: decision D-E-7.13 term "rule=chips scope=limit max=2" in ${spec}: unknown rule chips`,
+    ])
+    // A prose line after a decision id is ignored by the term parser.
+    assert.equal(decisionTerms(SPEC_7_10).has('D-PROSE-7.10'), false)
   })
 })

@@ -713,6 +713,8 @@ function MemberWardrobeHub({
                 ref={addGarmentButtonRef}
                 accessibilityRole="button"
                 testID="garment-capture-open"
+                // CC-7.10 D3: the empty-closet Add block the screen budget measures Closet
+                // chrome to (screen-budget.json native closetAnchors).
                 // D3: the screen's one main action takes the primary role (gold), as on web;
                 // Outfit capsules and Silhouette stay neutral.
                 style={[styles.primaryButton, { backgroundColor: colors.primary }]}
@@ -832,7 +834,8 @@ function MemberWardrobeHub({
               <ActivityIndicator accessibilityLabel={t('wardrobe.hub.loading')} />
             ) : visibleGarments.length === 0 ? (
               hasLoaded && !loadFailed ? (
-                // CC-7.10: the empty-closet anchor the screen budget measures Closet chrome to.
+                // CC-7.10: marks the empty closet. The screen budget measures empty Closet chrome
+                // to the Add control (garment-capture-open) while this renders (review #11).
                 <View style={styles.emptyState} testID="wardrobe-empty-state">
                   <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
                 </View>

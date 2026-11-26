@@ -66,7 +66,10 @@ export interface ScreenBudgetMeasurement {
   readonly targetsAboveFold: readonly ScreenBudgetElement[]
   /** Rendered targets anywhere on the screen whose background is the primary token. */
   readonly primaryButtons: readonly ScreenBudgetElement[]
-  /** Rows of two or more pills, one of them selectable, one entry per row container. */
+  /**
+   * Chip rows: one entry per visual line of a row container that holds two or more chips, one of
+   * them selectable. A wrapping group counts each such line; a horizontal scroller is one line.
+   */
   readonly chipRows: readonly ScreenBudgetElement[]
   /** Cards with a card ancestor, one entry per inner card. */
   readonly nestedCards: readonly ScreenBudgetElement[]
@@ -74,8 +77,12 @@ export interface ScreenBudgetMeasurement {
   readonly paragraphs: readonly ScreenBudgetParagraph[]
   /** Today's scroll height in px, when the config asks for it. */
   readonly todayHeight?: number
+  /** What `todayHeight` read: `document`, or the scroll element's key (review #12). */
+  readonly todayHeightElement?: ScreenBudgetElement
   /** The Closet anchor's top in px from the top of the page at scroll 0, when asked. */
   readonly closetChrome?: number
+  /** The anchor `closetChrome` measured: the highest rendered one (review #12). */
+  readonly closetChromeElement?: ScreenBudgetElement
   /** Floors for the callers (R1): what was found and excluded. */
   readonly stats: {
     readonly tabBarTargets: number
@@ -352,19 +359,28 @@ export async function measureScreenBudget(
     if (ROW_ROLES.includes(el.getAttribute('role') ?? '')) return true
     return /^(inline-)?(flex|grid)$/.test(style(el).display)
   }
-  // Chips on the first member's visual line (P11): a flex column of toggles is not a row, a
-  // horizontal scroller with chips off to the right still is.
-  const onOneLine = (members: readonly Element[]) => {
-    const first = members[0]?.getBoundingClientRect()
-    if (!first) return []
-    return members.filter((member) => {
-      const rect = member.getBoundingClientRect()
-      return rect.top < first.bottom && rect.bottom > first.top
-    })
+  // The container's chips by visual line (P11, review #7): a chip joins the first line whose
+  // opening chip it overlaps vertically. A flex column of toggles is one chip per line, so no
+  // row; a horizontal scroller with chips off to the right is one line; a wrapping group is one
+  // line per wrapped run.
+  const visualLines = (members: readonly Element[]) => {
+    const boxes = members
+      .map((member) => ({ member, rect: member.getBoundingClientRect() }))
+      .sort((a, b) => a.rect.top - b.rect.top)
+    const lines: { readonly rect: DOMRect; readonly members: Element[] }[] = []
+    for (const { member, rect } of boxes) {
+      const line = lines.find(
+        (candidate) =>
+          rect.top < candidate.rect.bottom && rect.bottom > candidate.rect.top
+      )
+      if (line) line.members.push(member)
+      else lines.push({ rect, members: [member] })
+    }
+    return lines.map((line) => line.members)
   }
-  // A row is two or more chips in one container on one line, at least one carrying a selection
-  // state: a row of links marks only its active chip (`aria-current`), and a row of CTA pills
-  // with no selected member is not a chip row (M3).
+  // A row is two or more chips of one container on one visual line, at least one carrying a
+  // selection state: a row of links marks only its active chip (`aria-current`), and a row of
+  // CTA pills with no selected member is not a chip row (M3).
   const measureChipRows = () => {
     const chips = uniqueTargets.filter(chipCandidate)
     const rows = new Map<Element, Element[]>()
@@ -378,10 +394,18 @@ export async function measureScreenBudget(
         break
       }
     }
-    return Array.from(rows)
-      .map(([row, members]) => [row, onOneLine(members)] as const)
-      .filter(([, members]) => members.length >= 2 && members.some(selectable))
-      .map(([row, members]) => ({ key: keyOf(row), detail: `${members.length} chips` }))
+    return Array.from(rows).flatMap(([row, members]) => {
+      const lines = visualLines(members).filter(
+        (line) => line.length >= 2 && line.some(selectable)
+      )
+      return lines.map((line, index) => ({
+        key: keyOf(row),
+        detail:
+          lines.length > 1
+            ? `${line.length} chips, line ${index + 1} of ${lines.length}`
+            : `${line.length} chips`,
+      }))
+    })
   }
   const chipRows = measureChipRows()
 
@@ -523,26 +547,32 @@ export async function measureScreenBudget(
 
   const measureTodayHeight = (selector: string | null) => {
     if (selector === null)
-      return Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight)
+      return {
+        value: Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight),
+        element: { key: 'document' },
+      }
     const el = doc.querySelector(selector)
-    if (el) return el.scrollHeight
+    if (el) return { value: el.scrollHeight, element: { key: keyOf(el) } }
     errors.push(`today height element missing: ${selector}`)
     return undefined
   }
-  const todayHeight = config.todayHeight
+  const today = config.todayHeight
     ? measureTodayHeight(config.todayHeight.selector)
     : undefined
 
   const measureClosetChrome = (anchors: readonly string[]) => {
-    const tops = anchors
+    const found = anchors
       .map((selector) => doc.querySelector(selector))
       .filter((el): el is Element => el !== null && rendered(el))
-      .map((el) => el.getBoundingClientRect().top + win.scrollY)
-    if (tops.length) return Math.round(Math.min(...tops))
+      .map((el) => ({ el, top: el.getBoundingClientRect().top + win.scrollY }))
+      .sort((a, b) => a.top - b.top)
+    const highest = found[0]
+    if (highest)
+      return { value: Math.round(highest.top), element: { key: keyOf(highest.el) } }
     errors.push(`closet anchor missing: ${anchors.join(', ')}`)
     return undefined
   }
-  const closetChrome = config.closetChrome
+  const closet = config.closetChrome
     ? measureClosetChrome(config.closetChrome.anchors)
     : undefined
 
@@ -553,8 +583,10 @@ export async function measureScreenBudget(
     chipRows,
     nestedCards,
     paragraphs,
-    ...(todayHeight === undefined ? {} : { todayHeight }),
-    ...(closetChrome === undefined ? {} : { closetChrome }),
+    ...(today ? { todayHeight: today.value, todayHeightElement: today.element } : {}),
+    ...(closet
+      ? { closetChrome: closet.value, closetChromeElement: closet.element }
+      : {}),
     stats: { tabBarTargets, tileTargets, cards: cards.length },
     errors,
   }

@@ -97,15 +97,22 @@ function garment(index: number) {
   } as const
 }
 
+/** Only the populated member has a saved location; `empty` and `guardian-pending` have none. */
+export const hasSavedLocation = (mode: ScreenBudgetMode) => mode === 'populated'
+
 /**
  * Serves every read the four tab screens make on mount for `mode`, on top of the default
  * handlers. Spec D1: `guardian-pending` is a 14 year old teen whose one linked guardian is still
  * `pending`. Under the production consent policy `off` the API lets that teen through on every
- * read, so the member's own reads answer as `empty` while the shared Community feed and
- * Spotlight answer as `populated`.
+ * read, so the member's own reads answer as `empty` while the shared Community feed serves its
+ * looks. With no saved location the API answers both Community reads the way production does:
+ * the feed reports the band unresolved for `no_location` and serves every region
+ * (community.service.ts resolveViewerBand), and the Spotlight resolves no area, level `none`
+ * with no items (community-spotlight.service.ts resolveViewer).
  */
 export function serveScreenBudgetFixture(mode: ScreenBudgetMode, memberId: string) {
   const populated = mode === 'populated'
+  const located = hasSavedLocation(mode)
   const community = mode !== 'empty'
   const teenPending = mode === 'guardian-pending'
   const feedItems = community
@@ -243,9 +250,9 @@ export function serveScreenBudgetFixture(mode: ScreenBudgetMode, memberId: strin
           authorStates: [],
           nextCursor: null,
           mode: 'auto',
-          viewerBand: 'temperate_dry',
-          bandResolved: true,
-          bandUnresolvedReason: null,
+          viewerBand: located ? 'temperate_dry' : null,
+          bandResolved: located,
+          bandUnresolvedReason: located ? null : 'no_location',
           experimentVariant: 'auto',
           activeChallenge: null,
         },
@@ -253,7 +260,7 @@ export function serveScreenBudgetFixture(mode: ScreenBudgetMode, memberId: strin
     ),
     http.get('*/api/v1/community/spotlight', () =>
       parsed(communityReactionSpotlightResponseSchema, {
-        data: community
+        data: located
           ? {
               level: 'city',
               label: 'Chicago',

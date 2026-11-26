@@ -108,6 +108,8 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 | 7.10-RULE-023 | Reaction rows (role group, aria-pressed pills) inside tiles are excluded                                                                                                     | P1     |
 | 7.10-RULE-024 | P11: an underline aria-pressed filter row is a chip row; a segment tablist, a vertical stack of toggles and switches or checkboxes are not                                   | 2, P11 |
 | 7.10-RULE-025 | P11: two underline filter rows count as two chip rows                                                                                                                        | 2, P11 |
+| 7.10-RULE-026 | Codex #7: a wrapping group with one wide chip on line one and two toggles on line two is one row                                                                             | 2      |
+| 7.10-RULE-027 | Codex #7: a wrapping group with two chips on each of two lines is two rows                                                                                                   | 2      |
 | 7.10-RULE-030 | Card in a card fails; sibling cards pass; a card-coloured input or button is not a card                                                                                      | 2, D3  |
 | 7.10-RULE-031 | Card detection: card background, cardMuted background, card shadow each with a radius; under 64 x 64 or radius 0 is not a card                                               | D3, P4 |
 | 7.10-RULE-032 | Card in a card inside a tile still fails                                                                                                                                     | P1     |
@@ -128,6 +130,10 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 | 7.10-RULE-064 | Background churn (a ticking clock node) without a click is ignored. Known limit: a click that only changes a node that also churns on its own is not attributed to the click                             | P6     |
 | 7.10-RULE-065 | A change inside the control only (its own pressed state, label) is not an effect                                                                                                                         | D4     |
 | 7.10-RULE-066 | A target not re-found in its fresh load fails with its key                                                                                                                                               | P6     |
+| 7.10-RULE-069 | Codex #1: a control below the fold that only captures is analytics-only; the probe scrolls it into view first                                                                                            | D4     |
+| 7.10-RULE-070 | Codex #5: an on switch, a checked checkbox and a lone pressed toggle are probed; a checked radio is the current choice                                                                                   | D4     |
+| 7.10-RULE-071 | Codex #6: a fresh load resolves the target by the listing rules: no hidden copy, no same-name control of another role                                                                                    | P6     |
+| 7.10-RULE-072 | A read alone is no effect; a bare # link below the fold that jumps to the top is analytics-only                                                                                                          | D4     |
 | 7.10-RULE-067 | An already selected option (aria-pressed, aria-selected, aria-checked true, aria-current) is not probed; twins keep their positions (CI a45f15a1: the active chip and the current scenario were flagged) | D4     |
 | 7.10-RULE-068 | A panel inserted under a parent that churns on its own is still an effect (inserted nodes are new)                                                                                                       | P6     |
 
@@ -135,9 +141,12 @@ Probe scope as built: text entry (fields, text areas, selects, editable regions)
 not clicked, so it is not probed; a label handing focus to its own control is the click landing,
 not an effect; GET requests to a path the page already requested before the click (polls) are
 not effects. An option that is already selected is not probed: choosing the current state again
-does nothing by design. The web probe runs in 4 chunk tests per fixture (control i in chunk
-i % 4) so sharding spreads the fresh loads; each chunk is judged against the known entries for its
-own controls, and chunk 1 fails on a known control that no longer exists.
+does nothing by design. The web probe is one test per fixture, so the analytics-only limit is judged
+per screen (Codex #10); about 80 s a fixture once the baseline passes (CI 61701d25). A read
+alone (GET or HEAD) is no effect: polls and link prefetches arrive after any click, and a read
+that matters changes the DOM or the URL. A jump to a fragment with no target is no scroll effect.
+The probe scrolls a control into view and waits for the scroll to settle before its baseline, and
+leaves out controls clipped away by an ancestor.
 
 ### E2E audit, web (12 tests)
 

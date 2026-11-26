@@ -95,8 +95,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # The shard count lives here once: merge-reports passes the same anchor to the report,
+        # so its summary names the shards that ran. shardIndex lists 1 to that count.
         shardIndex: [1, 2, 3, 4]
-        shardTotal: [4]
+        shardTotal: [&pw-shard-total 4]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -683,7 +685,7 @@ jobs:
         with:
           environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
-          shards: '3'
+          shards: *pw-shard-total
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

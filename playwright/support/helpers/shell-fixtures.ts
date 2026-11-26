@@ -149,13 +149,17 @@ function bodies(memberId: string, populated: boolean, teenPending = false) {
     authorStates: [],
     nextCursor: null,
     mode: 'auto',
-    viewerBand: 'temperate_dry',
-    bandResolved: true,
-    bandUnresolvedReason: null,
+    // A member with no saved city gets the all-regions feed with the reason, as the API answers
+    // (community.service.ts resolveViewerBand: no locations is `no_location`; CC-7.10 Codex #9).
+    viewerBand: populated ? 'temperate_dry' : null,
+    bandResolved: populated,
+    bandUnresolvedReason: populated ? null : 'no_location',
     experimentVariant: 'auto',
     activeChallenge: null,
   }
-  const spotlight = community
+  // The Spotlight needs a saved city (community-spotlight.service.ts resolveViewer): a member
+  // without one gets level none, whatever the feed holds.
+  const spotlight = populated
     ? {
         level: 'city',
         label: 'Chicago',

@@ -9,8 +9,9 @@
  * against the limits (the epic AC values) and the `known` ratchet: a violation absent from
  * `known`, a value above or below its known value, a new or vanished element of a per-element
  * rule, or a known entry that no longer reproduces each fails, naming the platform, screen,
- * fixture, rule, value and elements. `scripts/check-screen-budget-decisions.mjs` keeps the
- * limits at the AC values and every raised or added `known` entry tied to a recorded decision.
+ * fixture, rule, value and elements. `scripts/check-screen-budget-decisions.mjs` ties every
+ * raised limit and every raised or added `known` entry to a recorded decision's rule, scope
+ * and ceiling.
  */
 import budgetFile from './screen-budget.json'
 import {
@@ -42,7 +43,9 @@ export type ScreenBudgetRule = (typeof SCREEN_BUDGET_RULES)[number]
 
 /**
  * P7: these rules list element keys in a known entry, so fixing one element and adding another
- * at the same count still fails. Every other rule matches its known value exactly.
+ * at the same count still fails. Every other rule matches its known value exactly. A
+ * `paragraph-lines` entry lists each paragraph with its measured line count (review #8), so a
+ * known paragraph that grows under the same key fails too.
  */
 export const SCREEN_BUDGET_PER_ELEMENT_RULES = [
   'nested-cards',
@@ -64,6 +67,12 @@ export type ScreenBudgetScreen = 'today' | 'closet' | 'community' | 'profile'
 export type ScreenBudgetFixture = 'empty' | 'populated' | 'guardian-pending'
 export type ScreenBudgetLimits = Readonly<Record<ScreenBudgetRule, number>>
 
+/** A known paragraph over the line limit and the line count CI measured for it. */
+export interface ScreenBudgetKnownParagraph {
+  readonly key: string
+  readonly lines: number
+}
+
 export interface ScreenBudgetKnownViolation {
   readonly platform: ScreenBudgetPlatform
   readonly screen: ScreenBudgetScreen
@@ -71,8 +80,11 @@ export interface ScreenBudgetKnownViolation {
   readonly rule: ScreenBudgetRule
   /** The measured value: a count, or px for `today-height` and `closet-chrome`. */
   readonly value: number
-  /** Per-element rules only: the offending element keys (P7). */
-  readonly elements?: readonly string[]
+  /**
+   * Per-element rules only: the offending element keys (P7). `paragraph-lines` lists
+   * `{ key, lines }` objects; `nested-cards` and `analytics-only` list the keys.
+   */
+  readonly elements?: readonly string[] | readonly ScreenBudgetKnownParagraph[]
   /** The story that removes it: one of `SCREEN_BUDGET_OWNING_STORIES`. */
   readonly story: string
   /** The decision id recorded under `## Screen budget decisions` in `decidedIn`'s spec. */
@@ -149,6 +161,7 @@ export type ScreenBudgetFailureKind =
   | 'fixed'
   | 'new-element'
   | 'missing-element'
+  | 'lines'
   | 'error'
 
 export interface ScreenBudgetFailure {
@@ -187,12 +200,21 @@ function label(element: ScreenBudgetElement): string {
   return element.detail ? `${element.key} (${element.detail})` : element.key
 }
 
+/** The element keys a known entry lists, whatever its rule's element shape. */
+export function screenBudgetKnownKeys(entry: ScreenBudgetKnownViolation): string[] {
+  return (entry.elements ?? []).map((element: string | ScreenBudgetKnownParagraph) =>
+    typeof element === 'string' ? element : element.key
+  )
+}
+
 interface RuleReading {
   readonly value: number
   readonly violation: boolean
   /** The keys a per-element known entry lists. */
   readonly keys: readonly string[]
   readonly elements: readonly string[]
+  /** `paragraph-lines` only: the line count of each paragraph over the limit, by position. */
+  readonly lines?: readonly number[]
 }
 
 function countReading(
@@ -227,13 +249,21 @@ function read(
     const over = measurement.paragraphs.filter(
       (paragraph: ScreenBudgetParagraph) => paragraph.lines > limit
     )
-    return countReading(over, 0)
+    return { ...countReading(over, 0), lines: over.map((paragraph) => paragraph.lines) }
   }
   if (rule === 'today-height' || rule === 'closet-chrome') {
-    const value =
-      rule === 'today-height' ? measurement.todayHeight : measurement.closetChrome
+    const [value, element] =
+      rule === 'today-height'
+        ? [measurement.todayHeight, measurement.todayHeightElement]
+        : [measurement.closetChrome, measurement.closetChromeElement]
     if (value === undefined) return null
-    return { value, violation: value > limit, keys: [], elements: [] }
+    // Review #12: a pixel failure names what was measured (the document or the element).
+    return {
+      value,
+      violation: value > limit,
+      keys: [],
+      elements: element ? [label(element)] : [],
+    }
   }
   const elements = measurement[COUNT_FIELDS[rule]]
   return elements ? countReading(elements, limit) : null
@@ -283,7 +313,7 @@ function judge(
     return
   }
   if (isPerElement(rule)) {
-    const knownKeys = entry.elements ?? []
+    const knownKeys = screenBudgetKnownKeys(entry)
     const added = extraKeys(reading.keys, knownKeys)
     const gone = extraKeys(knownKeys, reading.keys)
     if (added.length)
@@ -297,6 +327,7 @@ function judge(
         `known element(s) no longer reproduce: ${gone.join(', ')}; remove them from known` +
           ` and lower the known value to ${reading.value}${shown}`
       )
+    if (rule === 'paragraph-lines') judgeParagraphLines(reading, entry, fail)
     return
   }
   if (reading.value > entry.value)
@@ -307,6 +338,62 @@ function judge(
       `${measured}, below known ${entry.value}${px}: lower the known value to ` +
         `${reading.value}${shown}`
     )
+}
+
+/**
+ * Review #8: each known paragraph that still reproduces under its key must keep its measured
+ * line count. Repeats of one key pair longest with longest.
+ */
+function judgeParagraphLines(
+  reading: RuleReading,
+  entry: ScreenBudgetKnownViolation,
+  fail: (kind: ScreenBudgetFailureKind, message: string) => void
+): void {
+  const byKey = <T>(pairs: readonly (readonly [string, T])[]) => {
+    const groups = new Map<string, T[]>()
+    for (const [key, value] of pairs) {
+      const group = groups.get(key)
+      if (group) group.push(value)
+      else groups.set(key, [value])
+    }
+    return groups
+  }
+  const measured = byKey(
+    reading.keys.map((key, index) => [key, reading.lines?.[index] ?? 0] as const)
+  )
+  const known = byKey(
+    (entry.elements ?? []).map((element: string | ScreenBudgetKnownParagraph) =>
+      typeof element === 'string'
+        ? ([element, undefined] as const)
+        : ([element.key, element.lines] as const)
+    )
+  )
+  const descending = (a: number | undefined, b: number | undefined) =>
+    (b ?? -1) - (a ?? -1)
+  for (const [key, counts] of measured) {
+    const recorded = (known.get(key) ?? []).sort(descending)
+    counts.sort(descending)
+    counts.slice(0, recorded.length).forEach((lines, index) => {
+      const before = recorded[index]
+      if (before === undefined)
+        fail(
+          'lines',
+          `known paragraph ${key} records no line count; measured ${lines} lines: ` +
+            `record { "key": ${JSON.stringify(key)}, "lines": ${lines} } in known`
+        )
+      else if (lines > before)
+        fail(
+          'worse',
+          `${key} has ${lines} lines, above known ${before} lines (story ${entry.story})`
+        )
+      else if (lines < before)
+        fail(
+          'lower',
+          `${key} has ${lines} lines, below known ${before} lines: lower the known value ` +
+            `to ${lines} lines`
+        )
+    })
+  }
 }
 
 /**

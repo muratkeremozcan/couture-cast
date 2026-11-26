@@ -48,6 +48,10 @@ test.describe('CC-7.10 screen budget on web @local-lane', () => {
           screen,
           fixture
         )
+        // A member with no saved city sees the Add location action the API's no_location answer
+        // brings (Codex #9): the audit measures the screen production shows that member.
+        if (screen === 'community' && fixture !== 'populated')
+          await expect(page.getByTestId('community-add-location')).toBeVisible()
         const measurement = await measureWebScreen(page, screen)
         expectMeasureFloors(measurement, screen)
         expect(

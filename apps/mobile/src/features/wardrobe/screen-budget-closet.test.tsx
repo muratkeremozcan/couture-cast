@@ -1,8 +1,11 @@
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 // Story CC-7.10 test owner (TEA): 7.10-NAT-002, 006, 010 (the native Wardrobe tab, the Closet,
-// within the screen budget under the empty, populated and guardian-pending members).
+// within the screen budget under the empty, populated and guardian-pending members). An empty
+// Closet's chrome is measured to its Add block, the gold `garment-capture-open`, which sits
+// above the empty title.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+import { screenBudget } from '@couture/utils'
 import React from 'react'
 import { configure, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -90,6 +93,18 @@ import {
 } from '@/src/test-utils/screen-budget'
 
 const MEMBER = 'budget-member'
+/** The empty Closet's Add block (spec D3, review #11): the gold Add above the empty title. */
+const EMPTY_CLOSET_ADD = 'garment-capture-open'
+
+/** The checked-in native Closet anchors that render now, read at test time from the budget. */
+const renderedClosetAnchors = () =>
+  screenBudget.selectors.native.closetAnchors.flatMap((selector) =>
+    Array.from(document.querySelectorAll(selector))
+  )
+
+/** An element's top in px from the top of the page, as the shared measure reads an anchor. */
+const pageTop = (el: Element) =>
+  Math.round(el.getBoundingClientRect().top + window.scrollY)
 
 const AUDITS: readonly (readonly [string, ScreenBudgetMode])[] = [
   ['7.10-NAT-002', 'empty'],
@@ -164,6 +179,23 @@ describe('Screen budget: native Closet', () => {
 
       const measurement = await measureNativeScreen('closet')
       expectNativeMeasureFloors(measurement, 'closet')
+      // The budget's own anchor, as rendered: the grid with garments, the Add block without.
+      const anchors = renderedClosetAnchors()
+      expect(anchors, 'one rendered native Closet anchor').toHaveLength(1)
+      const anchor = anchors[0]!
+      expect(measurement.closetChrome, 'Closet chrome: the rendered anchor top').toBe(
+        pageTop(anchor)
+      )
+      if (fixture === 'populated') {
+        expect(anchor).toBe(screen.getByTestId('wardrobe-garment-list'))
+      } else {
+        // The empty title sits below Add, so anchoring to it would let Add move down unseen.
+        const add = screen.getByTestId(EMPTY_CLOSET_ADD)
+        expect(anchor, 'the empty Closet anchor is its Add block').toBe(add)
+        expect(pageTop(add)).toBeLessThan(
+          pageTop(screen.getByTestId('wardrobe-empty-state'))
+        )
+      }
       expectNativeWithinBudget('closet', fixture, measurement)
     }, 30_000)
   }

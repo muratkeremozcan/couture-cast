@@ -258,10 +258,57 @@ known)`; `packages/utils/src/screen-budget.json` (new) -- D5; export both from t
   (the filter-chips pattern), since ARIA forbids `aria-selected` on buttons and radios.
   `share-card-composer.tsx` is left as is: its blob SHA is pinned by the Story 6.9 iPad proof.
 
+## Review Triage Log
+
+- 2026-11-26, Codex review (7.10-codex-review.md), builder findings:
+  - #2 The decisions check compares every limit with its merge-base value (the AC value when
+    the base has no file), so a limit lowered and raised back needs a decision. A decision now
+    records term lines that bind rule, scope and ceiling (format under `## Screen budget
+decisions`); a cited JSON value outside every term fails, and so does a decision with no
+    term line. D-KNOWN-7.10 records the initial baseline as rule and scope tuples with the
+    highest CI value per fixture group. Cases 7.10-DEC-009 to 012.
+  - #7 Chip rows group each row container's chips by visual line; each line with two or more
+    chips, one selectable, is a row. A horizontal scroller stays one row, a vertical stack none.
+  - #8 Known `paragraph-lines` entries list `{ key, lines }`; a known paragraph with more lines
+    fails as worse, fewer as lower, and a key with no recorded count fails as `lines` naming the
+    measured count. The checker counts more lines as an increase and caps them by the term's
+    `lines`. The line counts come from CI runs 45826461262 (native) and 45826456240 (web).
+  - #10 The decisions test keeps the AC values as a fixture and no longer pins the live limits.
+  - #11 Native empty Closet chrome measures the Add control (`garment-capture-open`) while
+    `wardrobe-empty-state` renders; the grid stays the populated anchor. Web already measures
+    `closet-empty-state`, which holds its Add button.
+  - #12 Today height and Closet chrome carry what they measured (`document`, the scroll
+    element or the anchor) into `todayHeightElement` and `closetChromeElement`, the verdict's
+    elements and its failure messages.
+  - #13 The Playwright report reads the matrix's shard count through one YAML anchor
+    (`pw-shard-total`), pinned by `scripts/ci/pr-pipeline-shape.test.mjs`.
+
 ## Screen budget decisions
 
+A decision binds what it allows with one or more term lines, which
+`scripts/check-screen-budget-decisions.mjs` parses: `- <id>: ` then, in backticks,
+`rule=<rule> scope=<platform>/<screen>/<fixture> max=<value>` for `known` entries (any scope
+segment may be `*`; `paragraph-lines` adds `lines=<most lines per paragraph>`), or
+`rule=<rule> scope=limit max=<value>` for a limit. A cited JSON value must be within one term's
+rule, scope and max, and every increase against the merge base needs a decision the base did
+not already cite.
+
 - D-KNOWN-7.10 (owner delegated, 2026-11-26): the violations measured on this story's head are
-  accepted as `known`, each owned by the story the epic assigns its removal to.
+  accepted as `known`, each owned by the story the epic assigns its removal to. The ceilings are
+  the CI-measured values (per fixture group, the highest):
+- D-KNOWN-7.10: `rule=targets-above-fold scope=native/profile/* max=13`
+- D-KNOWN-7.10: `rule=targets-above-fold scope=native/today/* max=11`
+- D-KNOWN-7.10: `rule=targets-above-fold scope=web/today/* max=9`
+- D-KNOWN-7.10: `rule=chip-rows scope=web/today/* max=3`
+- D-KNOWN-7.10: `rule=closet-chrome scope=native/closet/* max=453`
+- D-KNOWN-7.10: `rule=closet-chrome scope=web/closet/* max=476`
+- D-KNOWN-7.10: `rule=paragraph-lines scope=native/community/* max=1 lines=3`
+- D-KNOWN-7.10: `rule=paragraph-lines scope=native/profile/* max=3 lines=7`
+- D-KNOWN-7.10: `rule=paragraph-lines scope=web/profile/* max=4 lines=8`
+- D-KNOWN-7.10: `rule=paragraph-lines scope=web/today/* max=1 lines=4`
+- D-KNOWN-7.10: `rule=today-height scope=web/today/* max=4247`
+- D-KNOWN-7.10: `rule=analytics-only scope=*/today/* max=3` (the three analytics-only Home
+  actions the Intent names)
 
 ## Design Notes
 

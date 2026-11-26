@@ -359,6 +359,36 @@ test.describe('CC-7.10 screen budget measure rules @local-lane', () => {
     expect(keys(result.chipRows)).toEqual(['row-a', 'row-b'])
   })
 
+  // Codex #7: a wrapping group is judged per visual line, not only on its first chip's line.
+  test('[P1] [7.10-RULE-026] a wrapping group: one wide chip on line one and two toggles on line two is one row', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<div class="row" data-testid="wrap" style="flex-wrap:wrap;width:390px">
+         <button class="pill" aria-pressed="true" style="width:380px">Your climate: Temperate and dry</button>
+         <button class="pill" aria-pressed="false">All</button>
+         <button class="pill" aria-pressed="false">Cold</button>
+       </div>`
+    )
+    expect(result.chipRows).toHaveLength(1)
+  })
+
+  test('[P1] [7.10-RULE-027] a wrapping group with two chips on each of two lines is two rows', async ({
+    page,
+  }) => {
+    const result = await measure(
+      page,
+      `<div class="row" data-testid="wrap" style="flex-wrap:wrap;width:390px">
+         <button class="pill" aria-pressed="true" style="width:180px">One</button>
+         <button class="pill" aria-pressed="false" style="width:180px">Two</button>
+         <button class="pill" aria-pressed="false" style="width:180px">Three</button>
+         <button class="pill" aria-pressed="false" style="width:180px">Four</button>
+       </div>`
+    )
+    expect(result.chipRows).toHaveLength(2)
+  })
+
   test('[P0] [7.10-RULE-030] a card inside a card is reported; sibling cards pass; a card-coloured control is not a card', async ({
     page,
   }) => {
@@ -600,7 +630,7 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
     const results = await probeHtml(
       page,
       `<button data-testid="push" onclick="history.pushState({}, '', '/next?tab=1')">Push</button>
-       <button data-testid="api" onclick="fetch('/api/v1/wardrobe/garments')">Api</button>
+       <button data-testid="api" onclick="fetch('/api/v1/wardrobe/saved-looks', { method: 'POST', body: '{}' })">Api</button>
        <button data-testid="alert" onclick="window.confirm('Sure?')">Confirm</button>
        <button data-testid="focus" onclick="document.getElementById('field').focus()">Focus</button>
        <a data-testid="popup" href="${ORIGIN}/next" target="_blank">Popup</a>
@@ -610,7 +640,7 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
     )
     expect(byKey(results, 'push').effects).toContain('navigation /next?tab=1')
     expect(byKey(results, 'api').effects).toContain(
-      'request GET /api/v1/wardrobe/garments'
+      'request POST /api/v1/wardrobe/saved-looks'
     )
     expect(byKey(results, 'alert').effects).toContain('dialog confirm')
     expect(byKey(results, 'focus').effects).toContain('focus input')
@@ -691,6 +721,80 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
        <script>let t = 0; setInterval(() => document.getElementById('group').setAttribute('data-tick', String(++t)), 100)</script>`
     )
     expect(byKey(results, 'expander').effects.join(' ')).toMatch(/dom \d+ change/)
+  })
+
+  test('[P0] [7.10-RULE-069] a control below the fold that only captures is analytics-only; the probe scrolls it into view first (Codex #1)', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<div style="height:2400px"></div>
+       <button data-testid="deep-capture" onclick="${CAPTURE}">Preview outfits</button>`
+    )
+    expect(byKey(results, 'deep-capture').effects).toEqual([])
+    expect(analyticsOnly(results)).toEqual([{ key: 'deep-capture' }])
+  })
+
+  test('[P0] [7.10-RULE-070] toggles that can be turned off are probed: an on switch, a checked checkbox and a lone pressed button whose off path only captures (Codex #5)', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<div role="switch" tabindex="0" aria-checked="true" data-testid="switch" onclick="${CAPTURE}">Tips</div>
+       <div role="checkbox" tabindex="0" aria-checked="true" data-testid="checkbox" onclick="${CAPTURE}">Daily</div>
+       <section><button aria-pressed="true" data-testid="lone-toggle" onclick="${CAPTURE}">Follow</button></section>
+       <div role="radiogroup">
+         <div role="radio" tabindex="0" aria-checked="true" data-testid="radio-on">Cold</div>
+         <div role="radio" tabindex="0" aria-checked="false" data-testid="radio-off"
+              onclick="document.getElementById('out').textContent = 'warm'">Warm</div>
+       </div>
+       <p id="out"></p>`
+    )
+    expect(
+      analyticsOnly(results)
+        .map((element) => element.key)
+        .sort()
+    ).toEqual(['checkbox', 'lone-toggle', 'switch'])
+    // The checked radio is the current choice of an exclusive set: not probed.
+    expect(results.map((result) => result.target.key)).not.toContain('radio-on')
+    expect(byKey(results, 'radio-off').effects.join(' ')).toMatch(/dom \d+ change/)
+  })
+
+  test('[P1] [7.10-RULE-071] a fresh load resolves the target by the rules that listed it: a hidden copy and a same-name control of another role cannot stand in (Codex #6)', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<button data-testid="twin" style="display:none" onclick="location.href='/next'">Hidden copy</button>
+       <button data-testid="twin" onclick="${CAPTURE}">Visible copy</button>
+       <a href="/next" role="tab">Share</a>
+       <span role="button" tabindex="0" onclick="${CAPTURE}">Share</span>`
+    )
+    expect(byKey(results, 'twin').effects).toEqual([])
+    expect(probeErrors(results)).toEqual([])
+    const share = results.filter((result) => result.target.name === 'Share')
+    expect(share.map((result) => result.target.role).sort()).toEqual(['button', 'tab'])
+    expect(share.find((result) => result.target.role === 'button')?.effects).toEqual([])
+    expect(
+      share.find((result) => result.target.role === 'tab')?.effects.join(' ')
+    ).toMatch(/navigation \/next/)
+  })
+
+  test('[P0] [7.10-RULE-072] a read alone is no effect; a bare # link below the fold that jumps to the top is analytics-only (CI 61701d25)', async ({
+    page,
+  }) => {
+    const results = await probeHtml(
+      page,
+      `<button data-testid="read-only" onclick="fetch('/api/v1/community/events'); ${CAPTURE}">Refresh</button>
+       <button data-testid="read-shown"
+               onclick="fetch('/api/v1/ritual').then(() => { document.getElementById('out').textContent = 'loaded' })">Load</button>
+       <p id="out"></p>
+       <div style="height:2400px"></div>
+       <a href="#" data-testid="deep-hash" onclick="${CAPTURE}">Preview outfits</a>`
+    )
+    expect(byKey(results, 'read-only').effects).toEqual([])
+    expect(byKey(results, 'read-shown').effects.join(' ')).toMatch(/dom \d+ change/)
+    expect(byKey(results, 'deep-hash').effects).toEqual([])
   })
 
   test('[P1] [7.10-RULE-066] a target that is not found in its fresh load is a probe error, never a silent skip', async ({

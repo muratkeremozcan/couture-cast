@@ -266,8 +266,24 @@ describe('CC-7.10 screen-budget.json', () => {
     'analytics-only': ['today'],
   }
 
-  it('[P0] [7.10-UNIT-009] limits are the epic AC values and every rule has one', () => {
-    expect(screenBudget.limits).toEqual(AC_LIMITS)
+  // Codex #10: the live limits are governed by scripts/check-screen-budget-decisions.mjs (a
+  // raise needs a recorded decision, a stricter cap needs none), so this checks only that each
+  // live limit is at or under its AC value or under a decision's ceiling; the AC values stay the
+  // evaluator fixtures above.
+  it('[P0] [7.10-UNIT-009] every rule has a limit at or under the AC value or a recorded ceiling', () => {
+    for (const rule of SCREEN_BUDGET_RULES) {
+      const limit = screenBudget.limits[rule]
+      expect(Number.isInteger(limit) && limit >= 0, `${rule} limit`).toBe(true)
+      const ceiling = Math.max(
+        AC_LIMITS[rule],
+        ...screenBudget.limitDecisions
+          .filter((decision) => decision.limit === rule)
+          .map((decision) => decision.value)
+      )
+      expect(limit, `${rule}: above the AC value with no decision`).toBeLessThanOrEqual(
+        ceiling
+      )
+    }
     expect(Object.keys(screenBudget.limits).sort()).toEqual(
       [...SCREEN_BUDGET_RULES].sort()
     )

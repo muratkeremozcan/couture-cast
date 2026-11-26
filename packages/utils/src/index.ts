@@ -191,6 +191,7 @@ export {
   SCREEN_BUDGET_PER_ELEMENT_RULES,
   SCREEN_BUDGET_RULES,
   screenBudget,
+  screenBudgetKnownKeys,
   screenBudgetMeasureConfig,
 } from './screen-budget'
 export type {
@@ -202,6 +203,7 @@ export type {
   ScreenBudgetFailureKind,
   ScreenBudgetFile,
   ScreenBudgetFixture,
+  ScreenBudgetKnownParagraph,
   ScreenBudgetKnownViolation,
   ScreenBudgetLimitDecision,
   ScreenBudgetLimits,

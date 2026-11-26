@@ -1,14 +1,15 @@
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
-// Story CC-7.10 test owner (TEA): the native half of the screen budget (7.10-NAT-001..015), shared
-// by the four screen-budget-*.test.tsx suites. The screens render through react-native-web in
-// Chromium (spec D7, P9): `testID` becomes `data-testid` and RN styles computed CSS, so the same
+// Story CC-7.10 test owner (TEA): the native half of the screen budget (7.10-NAT-001..015 and
+// the probe rules 7.10-NAT-017..022), shared by the four screen-budget-*.test.tsx suites and
+// screen-budget-probe.test.tsx. The screens render through react-native-web in Chromium (spec D7,
+// P9): `testID` becomes `data-testid` and RN styles computed CSS, so the same
 // `measureScreenBudget` and verdict as the web run here unchanged.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
 //
-// `WithTopBar` renders AppTopBar, which imports `@expo/vector-icons/FontAwesome`: every suite
-// that uses it mocks that module (`vi.mock('@expo/vector-icons/FontAwesome', () => ({ default:
-// () => null }))`), as app-top-bar.test.tsx does.
+// `WithTopBar` and `tabHeader` render AppTopBar, which imports `@expo/vector-icons/FontAwesome`:
+// every suite that uses them mocks that module (`vi.mock('@expo/vector-icons/FontAwesome', () =>
+// ({ default: () => null }))`), as app-top-bar.test.tsx does.
 import {
   evaluateScreenBudget,
   measureScreenBudget,
@@ -20,11 +21,12 @@ import {
   type ScreenBudgetMeasurement,
   type ScreenBudgetScreen,
 } from '@couture/utils'
+import { DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import { act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { View } from 'react-native'
 import { expect } from 'vitest'
-import { AppTopBar } from '@/src/components/app-top-bar'
+import { AppTopBar, type renderTabTopBar } from '@/src/components/app-top-bar'
 import { press } from './press'
 import { setViewport } from './viewport'
 
@@ -44,18 +46,70 @@ export function setBudgetViewport() {
 }
 
 /**
- * The screen under the tab's top bar, as the tab layout draws it on a device
- * (`renderTabTopBar`): the bar's 56 px belong to the Closet chrome and the Today height. The
- * layout's trailing header controls are not drawn here (Home's About button), so native Today
- * counts one target fewer than the device; recorded in the test design.
+ * The screen under a tab header, as the tab navigator draws it on a device: the bar's 56 px
+ * belong to the Closet chrome and the Today height. The root layout's navigation theme is
+ * around both, as app/_layout.tsx mounts it (the tab heading reads it).
+ */
+export function WithTabHeader({
+  header,
+  children,
+}: {
+  header: ReactNode
+  children: ReactNode
+}) {
+  return (
+    // The navigation themes type as `error` under the lint program, as in app/_layout.tsx.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    <ThemeProvider value={DefaultTheme}>
+      <View style={{ height: BUDGET_VIEWPORT.height }}>
+        {header}
+        <View style={{ flex: 1 }}>{children}</View>
+      </View>
+    </ThemeProvider>
+  )
+}
+
+/**
+ * The screen under a plain AppTopBar with the tab title. Closet, Community and Profile declare
+ * no trailing header control in app/(tabs)/_layout.tsx, so their bar is this one; Home declares
+ * the About button and draws its header with `tabHeader` instead.
  */
 export function WithTopBar({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <View style={{ height: BUDGET_VIEWPORT.height }}>
-      <AppTopBar title={title} />
-      <View style={{ flex: 1 }}>{children}</View>
-    </View>
-  )
+  return <WithTabHeader header={<AppTopBar title={title} />}>{children}</WithTabHeader>
+}
+
+type TabHeaderProps = Parameters<typeof renderTabTopBar>[0]
+
+/**
+ * What app/(tabs)/_layout.tsx hands its navigator, read through an expo-router `Tabs` double
+ * (as profile-tab.test.tsx reads it): the navigator `screenOptions` and each `Tabs.Screen`.
+ */
+export interface CapturedTabLayout {
+  screenOptions: Record<string, unknown>
+  readonly screens: Map<string, { readonly options?: Record<string, unknown> }>
+}
+
+/**
+ * The header the tab navigator draws for `route`: the layout's own `header` called with the
+ * navigator options merged under the route's, as React Navigation merges them. A tab root has
+ * nothing below it, so there is no back control.
+ */
+export function tabHeader(layout: CapturedTabLayout, route: string): ReactNode {
+  const header = layout.screenOptions.header as
+    | ((props: TabHeaderProps) => ReactNode)
+    | undefined
+  const routeOptions = layout.screens.get(route)?.options
+  if (!header || !routeOptions)
+    throw new Error(`the tab layout declared no header or no options for "${route}"`)
+  return header({
+    options: { ...layout.screenOptions, ...routeOptions } as TabHeaderProps['options'],
+    route: { key: `${route}-screen-budget`, name: route },
+    navigation: {
+      goBack: () => undefined,
+      canGoBack: () => false,
+      getState: () => ({ routes: [] }),
+    },
+  })
 }
 
 /** The shared measure on what is rendered now, with the native config for `screen`. */
@@ -112,7 +166,7 @@ interface NativeProbeTarget {
   readonly testId: string | null
   readonly name: string
   readonly index: number
-  /** Already selected: listed so the others keep their positions, never pressed. */
+  /** An exclusive set's current choice: listed so the others keep their places, not pressed. */
   readonly skip: boolean
 }
 
@@ -140,14 +194,33 @@ function visible(el: Element) {
   return el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
 }
 
-/** Text entry is typed into, not pressed (as on web): fields are not probed. */
-/** An already selected option does nothing when chosen again, by design (as on web). */
-const selected = (el: Element) =>
-  ['aria-pressed', 'aria-selected', 'aria-checked'].some(
-    (attribute) => el.getAttribute(attribute) === 'true'
-  ) ||
-  (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
+/**
+ * The current choice of an exclusive set, which does nothing when chosen again by design: the
+ * selected tab or option, the current page, the checked radio, and the pressed chip of a group
+ * (a parent holding at least one other `aria-pressed` control, an exclusive filter or chip row).
+ * Everything that can still be turned off is probed: a standalone pressed toggle, a checked
+ * checkbox, an on switch.
+ */
+function currentChoice(el: Element) {
+  if (el.getAttribute('aria-selected') === 'true') return true
+  if (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
+    return true
+  const role = el.getAttribute('role')
+  if (
+    el.getAttribute('aria-checked') === 'true' &&
+    (role === 'radio' || role === 'menuitemradio')
+  )
+    return true
+  if (el instanceof HTMLInputElement && el.type === 'radio' && el.checked) return true
+  if (el.getAttribute('aria-pressed') !== 'true') return false
+  const siblings = Array.from(el.parentElement?.children ?? [])
+  return siblings.some(
+    (other) =>
+      other !== el && other.hasAttribute('aria-pressed') && other.matches(TARGET_SELECTOR)
+  )
+}
 
+/** Text entry is typed into, not pressed (as on web): fields are not probed. */
 const textEntry = (el: Element) =>
   el.matches('textarea, select, [contenteditable]:not([contenteditable="false"])') ||
   (el.tagName === 'INPUT' &&
@@ -187,7 +260,7 @@ function collectTargets(): { target: NativeProbeTarget; el: HTMLElement }[] {
         testId,
         name,
         index,
-        skip: selected(el),
+        skip: currentChoice(el),
       }
       return { target, el: el as HTMLElement }
     })
@@ -219,13 +292,66 @@ export interface NativeProbeResult {
   readonly error?: string
 }
 
+/** The Navigation API's `navigate` event, which TypeScript 5.9's DOM lib does not declare yet. */
+interface NavigateEventLike extends Event {
+  readonly destination: { readonly url: string }
+  readonly hashChange: boolean
+}
+
+/** The window's Navigation API (Chromium), where every navigation the page starts is announced. */
+function windowNavigation(): EventTarget {
+  const navigation = (window as Window & { navigation?: EventTarget }).navigation
+  if (!navigation)
+    throw new Error(
+      'probeNativeScreen needs the Navigation API (Chromium) to hold a followed link'
+    )
+  return navigation
+}
+
+/** A fragment that names nothing on the page scrolls nowhere: no target, a bare `#`, `#top`. */
+function hashTargetExists(url: URL) {
+  const id = decodeURIComponent(url.hash.slice(1))
+  if (!id || id.toLowerCase() === 'top') return false
+  return Boolean(document.getElementById(id) ?? document.getElementsByName(id)[0])
+}
+
+/**
+ * A link that opens another window would start its navigation where the probe cannot hold it:
+ * for the press only, the link targets this window, so the hold below sees and cancels it.
+ * Returns the restore.
+ */
+function retargetNewWindowLinks(): () => void {
+  const restores: (() => void)[] = []
+  const retarget = (event: MouseEvent) => {
+    const link = (event.target as Element | null)?.closest?.('a[href][target]')
+    const target = link?.getAttribute('target')
+    if (!link || !target || target === '_self') return
+    link.removeAttribute('target')
+    restores.push(() => link.setAttribute('target', target))
+  }
+  document.addEventListener('click', retarget, true)
+  return () => {
+    document.removeEventListener('click', retarget, true)
+    for (const restore of restores) restore()
+  }
+}
+
 /**
  * Spec D4 on native: each visible target is pressed in a fresh render. An effect is a router or
- * other outside call, a request MSW sees to a path the screen had not read before the press, a
- * DOM change outside the control that did not also happen with no press, or focus moved to
- * another element. Analytics on native is the mocked capture client, which sends nothing.
+ * other outside call, a write request (not GET or HEAD) the screen had not made before the
+ * press, a DOM change outside the control that did not also happen with no press, focus moved
+ * by the press to another element, or a link the press followed. Analytics on native is the
+ * mocked capture client, which sends nothing.
+ *
+ * A followed link is read from the Navigation API's `navigate` event. It fires only once every
+ * click handler has run and the click's default action really navigates: a link whose handler
+ * called `preventDefault` never fires it (an expo-router Link routes through the router mock
+ * instead, an outside call). The probe cancels the navigation there to keep the test frame, and
+ * credits it unless it is a fragment that names no element. A document click listener cannot
+ * judge this: react-native-web's Pressable stops the click's propagation at the React root.
  */
 export async function probeNativeScreen(options: NativeProbeOptions) {
+  const navigation = windowNavigation()
   const unmountFirst = await options.mount()
   const targets = collectTargets()
     .map(({ target }) => target)
@@ -244,7 +370,29 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       )
       return realFetch(input, init)
     }
-    const unmount = await options.mount()
+    // Held for the whole render: no navigation leaves the test frame, pressed or not.
+    let pressed = false
+    const followed: string[] = []
+    const holdNavigation = (event: Event) => {
+      const { destination, hashChange } = event as NavigateEventLike
+      event.preventDefault()
+      if (!pressed) return
+      const url = new URL(destination.url)
+      if (hashChange) {
+        if (hashTargetExists(url)) followed.push(url.hash)
+        return
+      }
+      followed.push(`${url.pathname}${url.search}${url.hash}`)
+    }
+    navigation.addEventListener('navigate', holdNavigation)
+    const release = () => {
+      navigation.removeEventListener('navigate', holdNavigation)
+      globalThis.fetch = realFetch
+    }
+    const unmount = await options.mount().catch((error: unknown) => {
+      release()
+      throw error
+    })
     try {
       const control = find(target)
       if (!control) {
@@ -254,7 +402,6 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       const churn = new WeakSet<Node>()
       const childChurn = new WeakSet<Node>()
       const after: Node[] = []
-      let pressed = false
       const observer = new MutationObserver((records) => {
         for (const record of records) {
           const list = record.type === 'childList'
@@ -281,29 +428,33 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       await act(() => sleep(BASELINE_MS))
       const before = new Set(requested)
       const calls = options.outsideCalls()
-      // A real anchor would navigate the test frame away: the press is held here and counted as
-      // the navigation it is (an expo-router Link or ExternalLink renders one).
-      let linkFollowed = false
-      const holdLinks = (event: MouseEvent) => {
-        const link = (event.target as Element | null)?.closest?.('a[href]')
-        if (!link) return
-        event.preventDefault()
-        linkFollowed = true
-      }
-      document.addEventListener('click', holdLinks, true)
+      // Focus the screen already held elsewhere is not evidence of the press.
+      const focusBefore = document.activeElement
+      const restoreTargets = retargetNewWindowLinks()
       pressed = true
-      press(control)
+      try {
+        press(control)
+      } finally {
+        restoreTargets()
+      }
       await act(() => sleep(OBSERVE_MS))
-      document.removeEventListener('click', holdLinks, true)
       observer.disconnect()
       const effects: string[] = []
-      if (linkFollowed) effects.push('link')
+      for (const url of followed) effects.push(`link ${url}`)
       if (options.outsideCalls() > calls) effects.push('outside call')
-      // A read the screen already made (a poll, a refetch) is not evidence of the press.
+      // A read is no effect by itself: polls, prefetches and refetches fire with or without a
+      // press, and a read that matters shows as a DOM change, a router call or a navigation.
+      // A write (any method but GET and HEAD) the screen had not made before the press counts.
       for (const request of requested)
-        if (!before.has(request)) effects.push(`request ${request}`)
+        if (!before.has(request) && !/^(GET|HEAD) /.test(request))
+          effects.push(`request ${request}`)
       const active = document.activeElement
-      if (active && active !== document.body && !control.contains(active))
+      if (
+        active &&
+        active !== focusBefore &&
+        active !== document.body &&
+        !control.contains(active)
+      )
         effects.push(`focus ${active.tagName.toLowerCase()}`)
       const outside = after.filter(
         (node) => !churn.has(node) && !control.contains(node) && node.isConnected
@@ -313,7 +464,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       results.push({ target, effects })
     } finally {
       unmount()
-      globalThis.fetch = realFetch
+      release()
     }
   }
   return { targets, results }

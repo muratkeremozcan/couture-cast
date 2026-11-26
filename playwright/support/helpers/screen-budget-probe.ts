@@ -30,7 +30,9 @@ export interface ProbeTarget extends ScreenBudgetElement {
   readonly tag: string
   readonly role: string | null
   readonly name: string
-  /** Its position among the targets that share its testid or tag and name. */
+  /** Its testid, else its tag, role and name: what a fresh load matches it by. */
+  readonly identity: string
+  /** Its position among the targets that share its identity. */
   readonly index: number
 }
 
@@ -53,111 +55,162 @@ const PNG = Buffer.from(
  * bar), in document order, with what it takes to find it again. A visually hidden control
  * counts as its rendered label, as in the measure.
  */
-export function listProbeTargets(
+/** The attribute that marks the one element a fresh load resolves a target to (Codex #6). */
+const MARK = 'data-budget-probe-target'
+
+/**
+ * Every visible, outermost interactive target on the page outside `exclude` (the tab bar), in
+ * document order, with what it takes to find it again. A visually hidden control counts as its
+ * rendered label, as in the measure. With `mark`, the same inventory is taken and the element
+ * with the mark's identity and position gets MARK, so a fresh load resolves a target by the very
+ * rules that listed it (a hidden copy or a same-name control of another role cannot stand in).
+ */
+function inventory({
+  exclude,
+  mark,
+  attribute,
+}: {
+  exclude: readonly string[]
+  mark: { identity: string; index: number } | null
+  attribute: string
+}) {
+  const selector = [
+    'a[href]',
+    'button',
+    'input:not([type="hidden"])',
+    'select',
+    'textarea',
+    'summary',
+    '[role="button"]',
+    '[role="link"]',
+    '[role="tab"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[role="switch"]',
+    '[role="menuitem"]',
+    '[role="option"]',
+    '[tabindex]:not([tabindex^="-"])',
+  ].join(', ')
+  // Clipped away by itself or an ancestor (an sr-only wrapper): a member cannot click it
+  // (CI 61701d25: the skip link inside a clipped wrapper timed out).
+  const clipped = (el: Element) => {
+    for (
+      let node: Element | null = el;
+      node && node !== document.body;
+      node = node.parentElement
+    ) {
+      const cs = getComputedStyle(node)
+      if (/rect\(\s*0(px)?[\s,]+0(px)?[\s,]+0(px)?[\s,]+0(px)?\s*\)/.test(cs.clip))
+        return true
+      if (/inset\(\s*50%/.test(cs.clipPath)) return true
+      const box = node.getBoundingClientRect()
+      if (cs.overflow !== 'visible' && (box.width <= 1 || box.height <= 1)) return true
+    }
+    return false
+  }
+  const visible = (el: Element) => {
+    if (el.closest('[aria-hidden="true"], [inert]')) return false
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 1 || rect.height <= 1) return false
+    if (!el.checkVisibility({ opacityProperty: true, visibilityProperty: true }))
+      return false
+    return !clipped(el)
+  }
+  // Text entry is used by typing, not by a click, so a click that only focuses it is no
+  // evidence of anything: fields, text areas, selects and editable regions are not probed.
+  const BUTTON_INPUTS = [
+    'button',
+    'submit',
+    'reset',
+    'image',
+    'checkbox',
+    'radio',
+    'file',
+  ]
+  const textEntry = (el: Element) =>
+    el.matches('textarea, select, [contenteditable]:not([contenteditable="false"])') ||
+    (el.tagName === 'INPUT' && !BUTTON_INPUTS.includes((el as HTMLInputElement).type))
+  // The current choice of an exclusive set does nothing when chosen again, by design: the
+  // selected tab or option, the current page, the checked radio, and the pressed chip of a
+  // group of pressable chips (CI a45f15a1 flagged the active chip). A toggle that can be turned
+  // off (a standalone pressed button, a checked checkbox, an on switch) is still probed
+  // (Codex #5).
+  const RADIOS = ['radio', 'menuitemradio']
+  const currentChoice = (el: Element) => {
+    if (el.getAttribute('aria-selected') === 'true') return true
+    if (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
+      return true
+    const radio =
+      RADIOS.includes(el.getAttribute('role') ?? '') ||
+      (el.tagName === 'INPUT' && (el as HTMLInputElement).type === 'radio')
+    if (
+      radio &&
+      (el.getAttribute('aria-checked') === 'true' || (el as HTMLInputElement).checked)
+    )
+      return true
+    if (el.getAttribute('aria-pressed') !== 'true') return false
+    const group = el.parentElement
+    return Array.from(group?.querySelectorAll('[aria-pressed]') ?? []).some(
+      (other) => other !== el && other.parentElement === group
+    )
+  }
+  const excluded = (el: Element) =>
+    textEntry(el) || exclude.some((s) => el.closest(s) !== null)
+  // A visually hidden control stands for its rendered labels.
+  const standIns = (el: Element) =>
+    visible(el)
+      ? [el]
+      : Array.from((el as HTMLInputElement).labels ?? []).filter(
+          (label) => visible(label) && !excluded(label)
+        )
+  const found = Array.from(document.querySelectorAll(selector))
+    .filter((el) => !excluded(el))
+    .flatMap(standIns)
+  const set = new Set(found)
+  const outermost = Array.from(set).filter((el) => {
+    for (let node = el.parentElement; node; node = node.parentElement)
+      if (set.has(node)) return false
+    return true
+  })
+  const describe = (el: Element) => {
+    const testId = el.getAttribute('data-testid')
+    const name =
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim() ||
+      el.getAttribute('aria-label') ||
+      ''
+    const tag = el.tagName.toLowerCase()
+    const role = el.getAttribute('role')
+    return { testId, name, tag, role, identity: testId ?? `${tag} ${role ?? ''} ${name}` }
+  }
+  const seen = new Map<string, number>()
+  const targets = []
+  for (const el of outermost) {
+    const { testId, name, tag, role, identity } = describe(el)
+    const index = seen.get(identity) ?? 0
+    seen.set(identity, index + 1)
+    if (mark?.identity === identity && mark.index === index) {
+      el.setAttribute(attribute, '')
+      return { marked: true, targets: [] }
+    }
+    // Skipped after its index is counted, so a current choice keeps the others' positions.
+    if (currentChoice(el)) continue
+    const base = testId ?? (name ? `${tag} "${name.slice(0, 40)}"` : tag)
+    const key = index ? `${base} #${index + 1}` : base
+    targets.push({ key, identity, testId, tag, role, name, index })
+  }
+  return { marked: false, targets }
+}
+
+export async function listProbeTargets(
   page: Page,
   excludeSelectors: readonly string[]
 ): Promise<ProbeTarget[]> {
-  return page.evaluate((exclude) => {
-    const selector = [
-      'a[href]',
-      'button',
-      'input:not([type="hidden"])',
-      'select',
-      'textarea',
-      'summary',
-      '[role="button"]',
-      '[role="link"]',
-      '[role="tab"]',
-      '[role="checkbox"]',
-      '[role="radio"]',
-      '[role="switch"]',
-      '[role="menuitem"]',
-      '[role="option"]',
-      '[tabindex]:not([tabindex^="-"])',
-    ].join(', ')
-    const visible = (el: Element) => {
-      if (el.closest('[aria-hidden="true"], [inert]')) return false
-      const rect = el.getBoundingClientRect()
-      if (rect.width <= 1 || rect.height <= 1) return false
-      return el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
-    }
-    // Text entry is used by typing, not by a click, so a click that only focuses it is no
-    // evidence of anything: fields, text areas, selects and editable regions are not probed.
-    const BUTTON_INPUTS = [
-      'button',
-      'submit',
-      'reset',
-      'image',
-      'checkbox',
-      'radio',
-      'file',
-    ]
-    const textEntry = (el: Element) =>
-      el.matches('textarea, select, [contenteditable]:not([contenteditable="false"])') ||
-      (el.tagName === 'INPUT' && !BUTTON_INPUTS.includes((el as HTMLInputElement).type))
-    // An option that is already selected does nothing when chosen again, by design: it is
-    // the current state, not a control to prove (CI a45f15a1 flagged the active chip).
-    const selected = (el: Element) =>
-      ['aria-pressed', 'aria-selected', 'aria-checked'].some(
-        (attribute) => el.getAttribute(attribute) === 'true'
-      ) ||
-      (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
-    const excluded = (el: Element) =>
-      textEntry(el) || exclude.some((s) => el.closest(s) !== null)
-    const found: Element[] = []
-    for (const el of Array.from(document.querySelectorAll(selector))) {
-      if (excluded(el)) continue
-      if (visible(el)) found.push(el)
-      else
-        for (const label of Array.from((el as HTMLInputElement).labels ?? []))
-          if (visible(label) && !excluded(label)) found.push(label)
-    }
-    const set = new Set(found)
-    const outermost = found.filter((el) => {
-      for (let node = el.parentElement; node; node = node.parentElement)
-        if (set.has(node)) return false
-      return true
-    })
-    const seen = new Map<string, number>()
-    return Array.from(new Set(outermost))
-      .map((el) => {
-        const testId = el.getAttribute('data-testid')
-        const name =
-          (el.textContent ?? '').replace(/\s+/g, ' ').trim() ||
-          el.getAttribute('aria-label') ||
-          ''
-        const tag = el.tagName.toLowerCase()
-        const identity = testId ?? `${tag} ${name}`
-        const index = seen.get(identity) ?? 0
-        seen.set(identity, index + 1)
-        const base = testId ?? (name ? `${tag} "${name.slice(0, 40)}"` : tag)
-        return {
-          key: index ? `${base} #${index + 1}` : base,
-          testId,
-          tag,
-          role: el.getAttribute('role'),
-          name,
-          index,
-          // Skipped after its index is counted, so a selected twin keeps the others' positions.
-          skip: selected(el),
-        }
-      })
-      .filter((target) => !target.skip)
-      .map(({ skip: _skip, ...target }) => target)
-  }, excludeSelectors)
-}
-
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-/** Every element with the target's identity in this load; the target is `.nth(index)`. */
-function candidates(page: Page, target: ProbeTarget) {
-  if (target.testId) return page.getByTestId(target.testId)
-  const exact = new RegExp(`^\\s*${escapeRegExp(target.name).replace(/ /g, '\\s+')}\\s*$`)
-  // A control named only by aria-label has no text to match.
-  return page
-    .locator(target.tag)
-    .filter({ hasText: exact })
-    .or(page.locator(`${target.tag}[aria-label=${JSON.stringify(target.name)}]`))
+  const { targets } = await page.evaluate(inventory, {
+    exclude: excludeSelectors,
+    mark: null,
+    attribute: MARK,
+  })
+  return targets
 }
 
 /**
@@ -167,14 +220,32 @@ function candidates(page: Page, target: ProbeTarget) {
 export async function probeTarget(
   page: Page,
   open: () => Promise<void>,
-  target: ProbeTarget
+  target: ProbeTarget,
+  excludeSelectors: readonly string[]
 ): Promise<ProbeResult> {
   await open()
-  const all = candidates(page, target)
-  const count = await all.count()
-  if (count <= target.index)
-    return { target, effects: [], error: `not found in a fresh load (${count} matches)` }
-  const control = all.nth(target.index)
+  const { marked } = await page.evaluate(inventory, {
+    exclude: excludeSelectors,
+    mark: { identity: target.identity, index: target.index },
+    attribute: MARK,
+  })
+  if (!marked) return { target, effects: [], error: 'not found in a fresh load' }
+  const control = page.locator(`[${MARK}]`)
+  // Codex #1: Playwright scrolls a control below the fold into view to click it. That scroll is
+  // the probe's, not the control's, so it happens before the scroll baseline is taken.
+  await control.scrollIntoViewIfNeeded()
+  // A smooth scroll keeps moving after scrollIntoViewIfNeeded resolves (CI 61701d25: every
+  // control below the fold read as `scroll`): wait for three still frames first.
+  await page.evaluate(async () => {
+    let last = ''
+    let still = 0
+    while (still < 3) {
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      const now = `${window.scrollX},${window.scrollY}`
+      still = now === last ? still + 1 : 0
+      last = now
+    }
+  })
 
   // Baseline: a window with no click marks the nodes that change on their own (P6c).
   await page.evaluate(async (observeMs) => {
@@ -215,13 +286,6 @@ export async function probeTarget(
 
   const before = new URL(page.url())
   const scrollBefore = await page.evaluate(() => [window.scrollX, window.scrollY])
-  const seenPaths = new Set(
-    await page.evaluate(() =>
-      performance
-        .getEntriesByType('resource')
-        .map((entry) => new URL(entry.name, location.href).pathname)
-    )
-  )
   const effects: string[] = []
   // The first effect ends the window early: only a control with none waits the full second
   // (CI a0f4d24b: full windows on every Today control ran a shard past 20 minutes).
@@ -233,10 +297,15 @@ export async function probeTarget(
     effects.push(effect)
     signal()
   }
+  // A read by itself is no evidence: polls, link prefetches and refetches arrive after any
+  // click (CI 61701d25), and a read that matters changes the DOM or the URL, which count. So a
+  // request is an effect when it writes (any method but GET and HEAD) or loads a new document.
   const onRequest = (request: Request) => {
     if (isAnalyticsRequest(request.url(), before.href)) return
+    const read = request.method() === 'GET' || request.method() === 'HEAD'
+    if (read && !(request.isNavigationRequest() && request.frame() === page.mainFrame()))
+      return
     const url = new URL(request.url(), before)
-    if (request.method() === 'GET' && seenPaths.has(url.pathname)) return
     record(`request ${request.method()} ${url.pathname}`)
   }
   const onDialog = (dialog: Dialog) => {
@@ -255,9 +324,14 @@ export async function probeTarget(
   page.on('filechooser', onFileChooser)
   try {
     const handle = await control.elementHandle()
-    await control.click()
+    // A control drawn under its own visual (a styled checkbox) intercepts the pointer: the click
+    // lands on what covers it, as a member's would, through a dispatched click.
+    await control.click({ timeout: 5_000 }).catch(async (error: unknown) => {
+      if (!/intercepts pointer events/.test(String(error))) throw error
+      await control.dispatchEvent('click')
+    })
     const observation = page.evaluate(
-      async ({ el, observeMs, scroll, start }) => {
+      async ({ el, observeMs, scroll, start, hash }) => {
         const deadline = performance.now() + observeMs
         const state = (
           window as unknown as {
@@ -272,7 +346,18 @@ export async function probeTarget(
           if (!state) return ['document replaced']
           const now = `${location.pathname}${location.search}`
           if (now !== start) found.push(`navigation ${now}`)
-          if (window.scrollX !== scroll[0] || window.scrollY !== scroll[1])
+          // A jump to a fragment with no target (a bare `#`) is the browser's default, not the
+          // control's: the D4 matrix row "hash link no-op" (Preview outfits).
+          const fragment =
+            location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : ''
+          const deadHash =
+            location.hash !== hash &&
+            !(
+              fragment &&
+              (document.getElementById(fragment) ||
+                document.getElementsByName(fragment)[0])
+            )
+          if ((window.scrollX !== scroll[0] || window.scrollY !== scroll[1]) && !deadHash)
             found.push('scroll')
           const active = document.activeElement
           if (
@@ -301,6 +386,7 @@ export async function probeTarget(
         observeMs: OBSERVE_MS,
         scroll: scrollBefore,
         start: `${before.pathname}${before.search}`,
+        hash: before.hash,
       }
     )
     // A window the node side ended early keeps running in the page until the next load.
@@ -348,7 +434,8 @@ export async function probeScreen(
   await open()
   const targets = await listProbeTargets(page, excludeSelectors)
   const results: ProbeResult[] = []
-  for (const target of targets) results.push(await probeTarget(page, open, target))
+  for (const target of targets)
+    results.push(await probeTarget(page, open, target, excludeSelectors))
   return { targets, results }
 }
 

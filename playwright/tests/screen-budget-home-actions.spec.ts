@@ -6,14 +6,12 @@
 // The known ones must still be detected, or their entries fail, so the probe proves itself on
 // the analytics-only actions while they exist.
 //
-// Each fixture's controls are split into PROBE_CHUNKS tests by position (control i goes to chunk
-// i % PROBE_CHUNKS), so smart sharding can spread one fresh load per control over the shards
-// (CI a45f15a1: three whole-screen probes, retried, ran one shard past 20 minutes). A chunk is
-// judged against the known entries for its own controls; chunk 1 also fails on a known control
-// that no longer exists at all, which no chunk would otherwise see.
-// Probe rules: screen-budget-rules.spec.ts (7.10-RULE-060..066).
+// One test per fixture judges the whole screen at once, so the analytics-only limit applies to
+// the screen (Codex #10). With retries off and a passing baseline a fixture takes about 80 s
+// (CI 61701d25), so the chunks that spread the first, failing baseline runs are gone.
+// Probe rules: screen-budget-rules.spec.ts (7.10-RULE-060..072).
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
-import { screenBudget, type ScreenBudgetKnownViolation } from '@couture/utils'
+import { screenBudget } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   BUDGET_FIXTURES,
@@ -22,12 +20,9 @@ import {
 } from '../support/helpers/screen-budget'
 import {
   analyticsOnly,
-  listProbeTargets,
   probeErrors,
-  probeTarget,
+  probeScreen,
 } from '../support/helpers/screen-budget-probe'
-
-const PROBE_CHUNKS = 4
 
 test.use({
   authSessionEnabled: false,
@@ -36,81 +31,42 @@ test.use({
   hasTouch: true,
 })
 
-/** The known analytics-only entry for this fixture, cut down to the keys `chunkKeys` holds. */
-function knownForChunk(
-  fixture: (typeof BUDGET_FIXTURES)[number],
-  chunkKeys: ReadonlySet<string>
-): ScreenBudgetKnownViolation[] {
-  return screenBudget.known.flatMap((entry) => {
-    const ours =
-      entry.platform === 'web' &&
-      entry.screen === 'today' &&
-      entry.fixture === fixture &&
-      entry.rule === 'analytics-only'
-    if (!ours) return [entry]
-    const elements = (entry.elements ?? []).filter((key) => chunkKeys.has(key))
-    return elements.length ? [{ ...entry, value: elements.length, elements }] : []
-  })
-}
-
 test.describe('CC-7.10 Today controls with an effect @local-lane', () => {
   // The verdict is deterministic (CI a45f15a1: identical values on all three attempts), so a
   // retry cannot change it and only triples a red run: a budget failure fails once.
   test.describe.configure({ retries: 0 })
 
-  BUDGET_FIXTURES.forEach((fixture, fixtureIndex) => {
-    const testId = `7.10-E2E-0${20 + fixtureIndex}`
-    for (let chunk = 0; chunk < PROBE_CHUNKS; chunk += 1) {
-      test(`[P0] [${testId}] web today (${fixture}) controls ${chunk + 1}/${PROBE_CHUNKS}: no control whose only effect is analytics`, async ({
+  BUDGET_FIXTURES.forEach((fixture, index) => {
+    const testId = `7.10-E2E-0${20 + index}`
+    test(`[P0] [${testId}] web today (${fixture}): no control whose only effect is analytics`, async ({
+      page,
+      interceptNetworkCall,
+    }, testInfo) => {
+      // One fresh load per control plus the observation windows.
+      test.setTimeout(300_000)
+      const { reopen } = await openBudgetScreen(
         page,
         interceptNetworkCall,
-      }, testInfo) => {
-        // One fresh load per control plus the observation windows.
-        test.setTimeout(180_000)
-        const { reopen } = await openBudgetScreen(
-          page,
-          interceptNetworkCall,
-          'today',
-          fixture
-        )
-        const all = await listProbeTargets(page, screenBudget.tabBarSelectors.web)
-        expect(all.length, 'Today controls found').toBeGreaterThan(0)
-
-        if (chunk === 0) {
-          const listed = new Set(all.map((target) => target.key))
-          const vanished = screenBudget.known
-            .filter(
-              (entry) =>
-                entry.platform === 'web' &&
-                entry.screen === 'today' &&
-                entry.fixture === fixture &&
-                entry.rule === 'analytics-only'
-            )
-            .flatMap((entry) => (entry.elements ?? []).filter((key) => !listed.has(key)))
-          expect(
-            vanished,
-            `known analytics-only controls no longer on web today (${fixture}): delete them from known`
-          ).toEqual([])
-        }
-
-        const mine = all.filter((_, index) => index % PROBE_CHUNKS === chunk)
-        const results = []
-        for (const target of mine) results.push(await probeTarget(page, reopen, target))
-        await testInfo.attach(
-          `screen-budget-probe-web-today-${fixture}-${chunk + 1}.json`,
-          { body: JSON.stringify(results, null, 2), contentType: 'application/json' }
-        )
-        await expectWithinBudget(
-          testInfo,
-          'today',
-          fixture,
-          { analyticsOnly: analyticsOnly(results), errors: probeErrors(results) },
-          {
-            known: knownForChunk(fixture, new Set(mine.map((target) => target.key))),
-            label: `-probe-${chunk + 1}`,
-          }
-        )
+        'today',
+        fixture
+      )
+      const { targets, results } = await probeScreen(
+        page,
+        reopen,
+        screenBudget.tabBarSelectors.web
+      )
+      expect(targets.length, 'Today controls probed').toBeGreaterThan(0)
+      await testInfo.attach(`screen-budget-probe-web-today-${fixture}.json`, {
+        body: JSON.stringify(results, null, 2),
+        contentType: 'application/json',
       })
-    }
+      await expectWithinBudget(
+        testInfo,
+        'today',
+        fixture,
+        { analyticsOnly: analyticsOnly(results), errors: probeErrors(results) },
+        { label: '-probe' }
+      )
+    })
   })
 })

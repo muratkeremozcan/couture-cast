@@ -1,12 +1,13 @@
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 // Story CC-7.10 test owner (TEA): 7.10-NAT-003, 007, 011 (the native Community tab within the
-// screen budget under the empty, populated and guardian-pending members).
+// screen budget under the empty, populated and guardian-pending members). A member with no saved
+// location gets production's `no_location` band notice and its Add location action, counted.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
-import { configure, render, screen, waitFor } from '@testing-library/react'
+import { configure, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('expo-router', async () => ({
@@ -91,6 +92,7 @@ import {
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import {
+  hasSavedLocation,
   serveScreenBudgetFixture,
   type ScreenBudgetMode,
 } from '@/src/test-utils/msw/screen-budget-fixtures'
@@ -127,7 +129,8 @@ function renderCommunity() {
 
 /**
  * The CC-7.7 gate is open (first feed page and City Spotlight settled) and the feed it gates
- * has landed: the fixture's first look when the feed serves looks, the empty state otherwise.
+ * has landed: the fixture's first look when the feed serves looks, the empty state otherwise,
+ * and the unresolved band notice for a member with no saved location.
  */
 async function communitySettled(fixture: ScreenBudgetMode) {
   await waitFor(() =>
@@ -141,6 +144,10 @@ async function communitySettled(fixture: ScreenBudgetMode) {
       )
     ).toBeVisible()
   )
+  if (!hasSavedLocation(fixture))
+    await waitFor(() =>
+      expect(screen.getByTestId('community-band-unresolved')).toBeVisible()
+    )
 }
 
 describe('Screen budget: native Community', () => {
@@ -176,6 +183,17 @@ describe('Screen budget: native Community', () => {
 
       const measurement = await measureNativeScreen('community')
       expectNativeMeasureFloors(measurement, 'community')
+      // Production's no_location panel (community.service.ts) carries the guided Add location
+      // action; a member with a city has neither.
+      const notice = screen.queryByTestId('community-band-unresolved')
+      if (hasSavedLocation(fixture)) {
+        expect(notice).toBeNull()
+      } else {
+        expect(notice?.textContent).toBe(
+          `${i18n.t('community.band.unresolved.no_location')}${i18n.t('locations.guided.add')}`
+        )
+        expect(within(notice!).getByTestId('community-add-location')).toBeVisible()
+      }
       expectNativeWithinBudget('community', fixture, measurement)
     }, 30_000)
   }

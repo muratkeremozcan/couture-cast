@@ -75,6 +75,31 @@ test('burn-in still runs on pull requests, fails its own job and feeds the repor
   assert.match(report.run, /❌ Burn-in gate blocked"\n\s*exit 1/)
 })
 
+// CC-7.10 review #13: the merged report said three shards while four ran. The report reads the
+// matrix's own shard count (one YAML anchor), so the two cannot drift apart again.
+test('the merged Playwright report names the shard count the matrix runs', () => {
+  const source = readFileSync(
+    fileURLToPath(
+      new URL('../../.github/workflows/pr-pw-e2e-local.yml', import.meta.url)
+    ),
+    'utf8'
+  )
+  const { jobs } = parse(source)
+  const { shardIndex, shardTotal } = jobs['pw-e2e'].strategy.matrix
+  assert.equal(shardTotal.length, 1)
+  const [total] = shardTotal
+  assert.deepEqual(
+    shardIndex,
+    Array.from({ length: total }, (_, index) => index + 1)
+  )
+  const report = jobs['merge-reports'].steps.find(
+    (step) => step.uses === './.github/actions/playwright-merge-report-comment'
+  )
+  assert.equal(Number(report.with.shards), total)
+  assert.match(source, /shardTotal: \[&pw-shard-total \d+\]/)
+  assert.match(source, /shards: \*pw-shard-total\n/)
+})
+
 // Each job a pull request push starts takes one of the account's 20 concurrent job slots
 // (GitHub Free) and pays its own checkout and install. Checks that ran a minute or less
 // now run as named steps of a neighbour, each run whatever the others did, so a failure
