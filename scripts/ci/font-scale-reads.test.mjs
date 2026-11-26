@@ -83,6 +83,8 @@ const ALLOWED = {
     'tallestTabLabel',
     'useTabBarSizing',
     'TabBarLabel',
+    // Story CC-7.11 D3: the shrink-to-fit floor that keeps a label at 12 rendered px or more.
+    'tabLabelFitFloor',
     // A type with a fontScale field: the scale the stored label heights were measured at.
     'TabLabelHeights',
   ],

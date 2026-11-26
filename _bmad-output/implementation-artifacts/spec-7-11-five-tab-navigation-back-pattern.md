@@ -354,6 +354,14 @@ spec.ts:143-177`, `wardrobe-signed-out.spec.ts`; web unit `sticky-bottom-nav.tes
   stays non-sticky (D14): returning to a Closet scrolled before opening More lands where the
   member was when they tapped More.
 
+- 2026-11-26, builder, native-harness gate (browser-acceptance on a60e7deb): the share-card
+  composer is restored byte for byte to its baseline blob (a6b91072), because the Story 6.9 iPad
+  anchor proof pins it and that proof needs a physical iPad capture that no PR lane can make
+  (the 7.10 precedent). The composer keeps its X and system back and returns focus itself on
+  dismiss; its swipe-down waits for the next iPad proof run, so `returnFocusRef` is optional for
+  that one caller. Native tab buttons keep literal test ids (`tab-home` ... `tab-settings`) so
+  flow checks find them in the source, and the label fit floor joins the font-scale allow list.
+
 ## Review Triage Log
 
 - 2026-11-26, Codex review (7.11-codex-review.md, 16 findings through 58937e72), verdicts:

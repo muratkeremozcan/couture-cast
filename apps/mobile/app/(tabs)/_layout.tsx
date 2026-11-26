@@ -64,6 +64,18 @@ function TabBarIcon(props: {
   )
 }
 
+/**
+ * The tab buttons' test ids, spelled out so flows and their static checks find each one in the
+ * source (scripts/lib/test-store-runner.test.mjs). Story CC-7.11 D1: the routes' old ids stay.
+ */
+const TAB_TEST_IDS: Record<AppTabId, string> = {
+  home: 'tab-home',
+  wardrobe: 'tab-wardrobe',
+  looks: 'tab-looks',
+  community: 'tab-community',
+  settings: 'tab-settings',
+}
+
 export default function TabLayout() {
   const navigationIntent = useAndroidNavigationIntent()
   const { colors, shell } = useTokens()
@@ -175,7 +187,7 @@ export default function TabLayout() {
             name={tab.nativeRoute}
             options={{
               title: label,
-              tabBarButtonTestID: `tab-${tab.id}`,
+              tabBarButtonTestID: TAB_TEST_IDS[tab.id],
               tabBarAccessibilityLabel: label,
               tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
                 <TabBarIcon

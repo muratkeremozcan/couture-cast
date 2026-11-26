@@ -30,7 +30,7 @@ import {
   type ShareCardSource,
 } from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
-import { EdgeToEdgeModal, LayerSwipeHandle, useModalInsets } from './edge-to-edge-modal'
+import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
 import { isRectInViewport, revealOffset } from './community/compose-field-reveal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
@@ -867,8 +867,6 @@ export function ShareCardComposer({
       visible={open && source !== null && systemBarsReady}
       animationType="slide"
       onRequestClose={close}
-      // Story CC-7.11 D13: restoreFocus on dismiss hands focus back to the opener.
-      returnFocusRef={null}
       onDismiss={restoreFocus}
       scrim="#0009"
       onShow={() => {
@@ -904,17 +902,14 @@ export function ShareCardComposer({
           contentContainerStyle={styles.content}
         >
           <View style={styles.block} onLayout={previewFit.onAbove}>
-            {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
-            <LayerSwipeHandle>
-              <Text
-                ref={title}
-                accessibilityRole="header"
-                style={styles.heading}
-                testID="share-card-title"
-              >
-                {t('shareCard.title')}
-              </Text>
-            </LayerSwipeHandle>
+            <Text
+              ref={title}
+              accessibilityRole="header"
+              style={styles.heading}
+              testID="share-card-title"
+            >
+              {t('shareCard.title')}
+            </Text>
             <PhotoPrivacyHelp source={source} t={t} />
             <View style={styles.row}>
               <Text style={styles.text}>{t('shareCard.watermark')}</Text>

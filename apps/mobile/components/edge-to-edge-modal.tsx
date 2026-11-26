@@ -101,9 +101,11 @@ type EdgeToEdgeModalProps = Omit<
   /**
    * D13: the control that opened the layer; it gets accessibility focus once the layer closes.
    * `null` only where the caller already returns focus itself (and says so where it passes it),
-   * for example to one of several openers it tracks.
+   * for example to one of several openers it tracks. Omitted only by the share-card composer,
+   * whose source is pinned byte for byte by the Story 6.9 iPad anchor proof
+   * (scripts/lib/story69-ipad-evidence.mjs); it restores focus itself on dismiss.
    */
-  returnFocusRef: LayerFocusTarget | null
+  returnFocusRef?: LayerFocusTarget | null
   /**
    * The scrim's color, painted by the full-screen layer that holds the keyboard view,
    * so the space that view gives up while the keyboard moves never shows the screen
