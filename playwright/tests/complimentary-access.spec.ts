@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { APIRequestContext, Page, Response } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import pg from 'pg'
@@ -42,6 +42,33 @@ const COPY = {
   none: "You don't have a Premium subscription yet.",
   feedDisabled: 'The community feed is temporarily unavailable.',
 }
+/**
+ * The feed refusal a locked member's Home gets, from whichever feed read answers it. The
+ * realtime channel is refused too, and that denial cancels the page read still in flight and
+ * sends a one-row read that answers the same 403 (COMMUNITY-DENIED-RACE-01). Which read
+ * answers is a race (run 45736490719: the page read was cancelled 29 ms in), so the refusal
+ * is taken from the first feed answer whose body arrives, never from the first request.
+ */
+function watchFeedRefusal(page: Page) {
+  const answers: { status: number; body: unknown }[] = []
+  const onResponse = (response: Response) => {
+    const request = response.request()
+    if (request.method() !== 'GET' || new URL(response.url()).pathname !== FEED_PATH)
+      return
+    void response.json().then(
+      (body: unknown) => answers.push({ status: response.status(), body }),
+      // A read cancelled after its headers has no body; the other read carries the answer.
+      () => undefined
+    )
+  }
+  page.on('response', onResponse)
+  return async () => {
+    await expect.poll(() => answers.length, { timeout: 15_000 }).toBeGreaterThan(0)
+    page.off('response', onResponse)
+    return answers[0]!
+  }
+}
+
 const SUBSCRIBE_CONTROLS = ['premium-subscribe-monthly', 'premium-subscribe-annual']
 const MOBILE = { width: 390, height: 844 }
 const DESKTOP = { width: 1280, height: 800 }
@@ -304,11 +331,11 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
         await evidenceShot(page, `control-settings-${viewport.width}`)
       }
 
-      const feed = interceptNetworkCall({ method: 'GET', url: `**${FEED_PATH}*` })
+      const refusal = watchFeedRefusal(page)
       await page.goto('/')
-      const denied = await feed
+      const denied = await refusal()
       expect(denied.status).toBe(403)
-      expect(denied.responseJson).toMatchObject({ code: 'denied' })
+      expect(denied.body).toMatchObject({ code: 'denied' })
       // The grid container renders for every signed-in reader; the denial is the status copy.
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
@@ -375,9 +402,11 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await expect(page.getByTestId('premium-status-line')).toHaveText(COPY.none)
       await expect(page.getByTestId('premium-theme-gallery')).toHaveCount(0)
 
-      const feed = interceptNetworkCall({ method: 'GET', url: `**${FEED_PATH}*` })
+      const refusal = watchFeedRefusal(page)
       await page.goto('/')
-      expect((await feed).status).toBe(403)
+      const denied = await refusal()
+      expect(denied.status).toBe(403)
+      expect(denied.body).toMatchObject({ code: 'denied' })
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()

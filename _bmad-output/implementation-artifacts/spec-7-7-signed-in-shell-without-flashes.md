@@ -226,6 +226,12 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
 
 ## Review Triage Log
 
+- 2026-11-26, CodeRabbit reviews after the three-round cap (rounds 4 and 5): fixed the web
+  withdrawn-row and restored-cursor findings; accepted as non-blocking (no data loss, security
+  or crash): native swap across a spring-forward night, native swap cache read time, native
+  notification deep link landing after the feed (inserts once, may miss its one-time focus), a
+  restored auto feed keeping the previous climate's rows after a location change until the next
+  full load, and a fixture-only city read scope check on rejection.
 - 2026-11-25, CodeRabbit round 2 on 330e6966 (10 findings). Decision for native Home: a
   member's garment swap stays in place for the ritual it was made on (same saved location and
   same anchor day, 08:00 local rollover, read from when the shown ritual's read

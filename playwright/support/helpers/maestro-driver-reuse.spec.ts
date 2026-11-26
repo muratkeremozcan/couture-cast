@@ -4,6 +4,8 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import {
+  DRIVER_CHECK_PAUSE_MS,
+  DRIVER_CHECK_READS,
   MAESTRO_DRIVER_INSTRUMENTATION,
   MaestroDriverNotReady,
   createMaestroDriverReuse,
@@ -44,7 +46,12 @@ function fakeDevice(initial: string[] = []) {
     packages.add('dev.mobile.maestro')
     packages.add('dev.mobile.maestro.test')
   }
-  return { packages, inspect, uninstall, maestroInstalls }
+  /** The wait between reuse listings, instant here. */
+  const pause = vi.fn((ms: number) => {
+    void ms
+    return Promise.resolve()
+  })
+  return { packages, inspect, uninstall, maestroInstalls, pause }
 }
 
 describe('Maestro driver reuse (R62)', () => {
@@ -101,6 +108,40 @@ describe('Maestro driver reuse (R62)', () => {
     expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
     expect(device.uninstall).toHaveBeenCalledTimes(2)
     expect(device.packages.size).toBe(0)
+  })
+
+  it('R62-07 reads a short listing again before failing a flow on a driver that is there', async () => {
+    const device = fakeDevice()
+    const reuse = createMaestroDriverReuse(device)
+    await reuse.argsFor('android', 'emulator-5554')
+    device.maestroInstalls()
+    reuse.recordInvocation('android', 'emulator-5554')
+    // CI run 45736490697 shard 2: one listing named no driver package while the
+    // instrumentation the test app registers was still listed.
+    device.inspect.mockClear()
+    device.uninstall.mockClear()
+    device.inspect.mockResolvedValueOnce({
+      packagesOutput: '',
+      instrumentationOutput: INSTRUMENTATION,
+    })
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
+    expect(device.inspect).toHaveBeenCalledTimes(2)
+    expect(device.pause.mock.calls).toEqual([[DRIVER_CHECK_PAUSE_MS]])
+    expect(device.uninstall).toHaveBeenCalledTimes(0)
+    expect(device.packages.size).toBe(2)
+  })
+
+  it('R62-08 fails a flow only when every listing of the check names the missing part', async () => {
+    const device = fakeDevice()
+    const reuse = createMaestroDriverReuse(device)
+    await reuse.argsFor('android', 'emulator-5554')
+    reuse.recordInvocation('android', 'emulator-5554')
+    device.inspect.mockClear()
+    await expect(reuse.argsFor('android', 'emulator-5554')).rejects.toThrow(
+      'Maestro driver not ready on emulator-5554: package dev.mobile.maestro is not installed'
+    )
+    expect(device.inspect).toHaveBeenCalledTimes(DRIVER_CHECK_READS)
+    expect(device.pause).toHaveBeenCalledTimes(DRIVER_CHECK_READS - 1)
   })
 
   it('R62-05 refuses a first flow whose leftover driver could not be removed', async () => {
@@ -235,7 +276,11 @@ function fakeFleet(devices: string[]) {
     on(device).add('dev.mobile.maestro')
     on(device).add('dev.mobile.maestro.test')
   }
-  return { packages, inspect, uninstall, maestroInstallsOn }
+  const pause = vi.fn((ms: number) => {
+    void ms
+    return Promise.resolve()
+  })
+  return { packages, inspect, uninstall, maestroInstallsOn, pause }
 }
 
 describe('Maestro driver lifecycle on the parallel shard path (R68)', () => {
