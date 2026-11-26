@@ -1899,6 +1899,11 @@ describe('WardrobeHubScreen garment delete (Story 7.6)', () => {
     closet = pieces
     renderHub()
     await screen.findByTestId('garment-card-delete-piece-12')
+    // The cards mount under the Closet gate before it opens (Story 7.7), and a hidden list
+    // drops a scroll offset, so the offset is set once the gate shows the list.
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
     const grid = screen.getByTestId('wardrobe-garment-list')
     const scroller = scrollContainerOf(grid)
     act(() => {
