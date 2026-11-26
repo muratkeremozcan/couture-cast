@@ -78,6 +78,12 @@ const nativeStyleRuntime = vi.hoisted(() => ({
   nodeHandles: new Map<unknown, number>(),
   holdDismissal: false,
   finishDismissal: undefined as (() => void) | undefined,
+  /**
+   * Story CC-7.11 D13: when set, an opening Modal keeps its onShow in `finishShow` until the test
+   * calls it, the way the native dialog reports onShow only once its slide-in ends.
+   */
+  holdShow: false,
+  finishShow: undefined as (() => void) | undefined,
   state: 'active' as ReactNativeModule.AppStateStatus,
   stateListeners: new Set<(state: ReactNativeModule.AppStateStatus) => void>(),
 }))
@@ -205,12 +211,18 @@ vi.mock('react-native', async (importOriginal) => {
       visible?: boolean
     }) => {
       const wasVisible = useRef(false)
+      const latestOnShow = useRef(onShow)
+      latestOnShow.current = onShow
       useEffect(() => {
         const previous = wasVisible.current
         wasVisible.current = visible
         if (!nativeStyleRuntime.enabled || previous === visible) return
-        if (visible) onShow?.()
-        else if (nativeStyleRuntime.platform === 'ios') {
+        if (visible) {
+          // A held onShow calls the dialog's latest prop, as the native event would.
+          if (nativeStyleRuntime.holdShow)
+            nativeStyleRuntime.finishShow = () => latestOnShow.current?.()
+          else onShow?.()
+        } else if (nativeStyleRuntime.platform === 'ios') {
           if (nativeStyleRuntime.holdDismissal)
             nativeStyleRuntime.finishDismissal = onDismiss
           else onDismiss?.()
@@ -437,6 +449,8 @@ describe('WardrobeHubScreen', () => {
     nativeStyleRuntime.nodeHandles.clear()
     nativeStyleRuntime.holdDismissal = false
     nativeStyleRuntime.finishDismissal = undefined
+    nativeStyleRuntime.holdShow = false
+    nativeStyleRuntime.finishShow = undefined
     nativeStyleRuntime.state = 'active'
     nativeStyleRuntime.stateListeners.clear()
     routerMock.replace.mockClear()
@@ -1006,11 +1020,21 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(82))
   })
 
-  it('refreshes an unsigned card and retries a failed photo inside the iOS styling panel', async () => {
+  /**
+   * Story CC-7.11 D13: the iOS retry flow inside Style this piece. The card refreshes an unsigned
+   * photo, the panel opens on a held photo check that fails, one retry stays unsigned and the next
+   * renews the photo, so the selected weather option (84) takes focus. The dialog's onShow is held
+   * (`holdShow`); `showAtOpen` reports it while the photo check is still running, otherwise the
+   * caller reports it after the retry, the late slide-in end that once took focus back to Close.
+   */
+  async function retryFailedPhotoInPanel(
+    owner: string,
+    { showAtOpen }: { showAtOpen: boolean }
+  ) {
     nativeStyleRuntime.enabled = true
-    setMobileApplicationUserId('style-native-retry-owner')
+    setMobileApplicationUserId(owner)
     const ready = createReadyGarmentFixture({
-      id: 'style-native-retry-piece',
+      id: `${owner}-piece`,
       imageAccess: fixtureWardrobePhoto('#223355'),
     })
     const unsigned = { ...ready, imageAccess: null }
@@ -1043,16 +1067,26 @@ describe('WardrobeHubScreen', () => {
 
       garment = failedPhoto
       holdVerification = true
+      nativeStyleRuntime.holdShow = true
+      nativeStyleRuntime.focus.mockClear()
       await browserUser.click(opener)
       const panel = await screen.findByTestId('style-piece-panel')
       expect(within(panel).getByRole('progressbar')).toHaveTextContent(
         'Checking your photo'
       )
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(83))
+      const finishShow = nativeStyleRuntime.finishShow
+      expect(finishShow).toBeDefined()
+      if (showAtOpen) {
+        act(() => finishShow!())
+        expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83)
+      } else {
+        expect(nativeStyleRuntime.focus).not.toHaveBeenCalled()
+      }
       verification.resolve()
 
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
+      await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
       const retry = within(panel).getByTestId('style-piece-refresh')
       garment = unsigned
       await browserUser.click(retry)
@@ -1070,9 +1104,78 @@ describe('WardrobeHubScreen', () => {
         )
       }
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(84))
+      return { finishShow: finishShow!, panel }
     } finally {
       verification.resolve()
     }
+  }
+
+  /** The fake native handles setAccessibilityFocus received, in order. */
+  const focusTargets = () => nativeStyleRuntime.focus.mock.calls.map(([target]) => target)
+
+  it('refreshes an unsigned card and retries a failed photo inside the iOS styling panel', async () => {
+    await retryFailedPhotoInPanel('style-native-retry-owner', { showAtOpen: true })
+  })
+
+  // [Codex 7.11 #8] Story CC-7.11 D13: the dialog's onShow focuses Close only while nothing in the
+  // panel has moved focus since it opened. The CI flake: the slide-in ended after the retry had
+  // focused the selected weather option, and onShow took focus back to Close (83 after 84).
+  describe('[Codex 7.11 #8] Style this piece dialog onShow', () => {
+    it('[P1] [Codex 7.11 #8] [7.11-NAT-031] a late dialog onShow does not take focus back from the weather option', async () => {
+      const { finishShow, panel } = await retryFailedPhotoInPanel(
+        'style-native-late-show-owner',
+        { showAtOpen: false }
+      )
+
+      act(() => finishShow())
+      await act(() => new Promise<void>((done) => requestAnimationFrame(() => done())))
+
+      expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(84)
+      const targets = focusTargets()
+      expect(targets.lastIndexOf(83)).toBeLessThan(targets.lastIndexOf(84))
+      expect(within(panel).getByTestId('style-piece-weather-mild-dry')).toBeVisible()
+    })
+
+    it('[P1] [Codex 7.11 #8] [7.11-NAT-031] a dialog onShow before any content moved focus focuses Close', async () => {
+      nativeStyleRuntime.enabled = true
+      setMobileApplicationUserId('style-native-early-show-owner')
+      const garment = createReadyGarmentFixture({
+        id: 'style-native-early-show-piece',
+        imageAccess: fixtureWardrobePhoto('#335522'),
+      })
+      const verification = deferred()
+      let holdVerification = false
+      server.use(
+        http.get('*/api/v1/wardrobe/garments', async () => {
+          if (holdVerification) {
+            holdVerification = false
+            await verification.promise
+          }
+          return HttpResponse.json({ data: [garment] })
+        })
+      )
+      renderScreen()
+      try {
+        const opener = await screen.findByTestId('style-piece-open')
+        await waitFor(() => expect(opener).toBeEnabled())
+        holdVerification = true
+        nativeStyleRuntime.holdShow = true
+        nativeStyleRuntime.focus.mockClear()
+        await browserUser.click(opener)
+        const panel = await screen.findByTestId('style-piece-panel')
+        expect(within(panel).getByRole('progressbar')).toBeVisible()
+        expect(nativeStyleRuntime.focus).not.toHaveBeenCalled()
+        expect(nativeStyleRuntime.finishShow).toBeDefined()
+
+        act(() => nativeStyleRuntime.finishShow!())
+
+        expect(nativeStyleRuntime.focus).toHaveBeenCalledExactlyOnceWith(83)
+        verification.resolve()
+        expect(await within(panel).findAllByTestId('style-piece-anchor')).toHaveLength(3)
+      } finally {
+        verification.resolve()
+      }
+    })
   })
 
   it('restores the Android garment action when verification finishes after dismissal', async () => {
