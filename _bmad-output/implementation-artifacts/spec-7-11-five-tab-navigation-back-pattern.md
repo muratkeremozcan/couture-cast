@@ -3,7 +3,7 @@ title: 'Story CC-7.11: Five-tab navigation and back pattern'
 type: feature
 ticket: '7-11-five-tab-navigation-back-pattern'
 created: '2026-11-26'
-status: in-review
+status: built
 baseline_revision: '4e5702c3c130899d9c4a9b1548d6e911dc49744a'
 route: full
 route_source: auto
