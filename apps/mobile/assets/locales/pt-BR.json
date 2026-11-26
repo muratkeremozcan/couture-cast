@@ -888,6 +888,7 @@
       "cancel": "Cancelar",
       "success": "Seu look foi enviado para análise.",
       "discardTitle": "Descartar esta publicação?",
+      "discardMessage": "A foto e o texto desta publicação serão perdidos.",
       "discardKeep": "Continuar editando",
       "discard": "Descartar"
     },

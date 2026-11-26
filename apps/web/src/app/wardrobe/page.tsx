@@ -1324,21 +1324,21 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                           />
                         )}
                         <div className="pointer-events-none relative z-10 flex flex-col gap-1 p-2 [&_button]:pointer-events-auto">
-                          <div className="flex min-w-0 items-center gap-1">
-                            <span
-                              data-testid="garment-card-label"
-                              className="min-w-0 flex-1 truncate text-sm font-medium text-ink-soft"
-                            >
-                              {garmentCardLabel(i18n.language, garment)}
-                            </span>
+                          {/* The name has the row to itself so the category reads whole at
+                              390 px; the status chip leads the actions row below it. */}
+                          <span
+                            data-testid="garment-card-label"
+                            className="min-w-0 truncate text-sm font-medium text-ink-soft"
+                          >
+                            {garmentCardLabel(i18n.language, garment)}
+                          </span>
+                          <div className="flex flex-wrap items-center gap-1">
                             <span
                               data-testid={`garment-status-${garment.status}`}
                               className="shrink-0 rounded-sm bg-card-muted px-2 py-0.5 text-xs font-semibold text-ink-soft"
                             >
                               {garmentStatusLabel(t, garment.status)}
                             </span>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1">
                             {garment.status === 'awaiting_tags' && (
                               <button
                                 ref={(element) => {

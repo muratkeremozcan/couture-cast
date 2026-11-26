@@ -80,6 +80,7 @@ function ProfileRows() {
         href="/notification-settings"
         label={t('community.notifications.title')}
         testId="profile-notifications-row"
+        last
       />
     </>
   )

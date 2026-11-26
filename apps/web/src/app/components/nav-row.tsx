@@ -8,15 +8,22 @@ export interface NavRowProps {
   href: string
   label: string
   testId: string
+  /**
+   * The last row of a group that a ruled section follows: it drops its own rule, so the two
+   * rules never frame an empty band (Profile's rows above Locations).
+   */
+  last?: boolean
 }
 
 /** A neutral full-width link row with a chevron: a 44 px target with a rule below. */
-export function NavRow({ href, label, testId }: NavRowProps) {
+export function NavRow({ href, label, testId, last = false }: NavRowProps) {
   return (
     <Link
       href={href}
       data-testid={testId}
-      className="flex min-h-touch items-center justify-between gap-2 border-b border-line py-3 text-base font-medium text-ink"
+      className={`flex min-h-touch items-center justify-between gap-2 py-3 text-base font-medium text-ink ${
+        last ? '' : 'border-b border-line'
+      }`}
     >
       <span className="min-w-0 truncate">{label}</span>
       <svg

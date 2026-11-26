@@ -888,6 +888,7 @@
       "cancel": "Annulla",
       "success": "Il tuo look è stato inviato per la revisione.",
       "discardTitle": "Scartare questo post?",
+      "discardMessage": "La foto e il testo di questo post andranno persi.",
       "discardKeep": "Continua a modificare",
       "discard": "Scarta"
     },

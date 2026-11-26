@@ -888,6 +888,7 @@
       "cancel": "İptal",
       "success": "Kombinin incelenmek üzere gönderildi.",
       "discardTitle": "Bu gönderiden vazgeçilsin mi?",
+      "discardMessage": "Bu gönderinin fotoğrafı ve metni silinecek.",
       "discardKeep": "Düzenlemeye devam et",
       "discard": "Vazgeç"
     },

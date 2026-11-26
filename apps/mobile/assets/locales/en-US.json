@@ -888,6 +888,7 @@
       "cancel": "Cancel",
       "success": "Your look was submitted for review.",
       "discardTitle": "Discard this post?",
+      "discardMessage": "The photo and text in this post will be lost.",
       "discardKeep": "Keep editing",
       "discard": "Discard"
     },

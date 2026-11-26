@@ -432,14 +432,18 @@ export function CommunityPostSheet({
       handleClose()
       return
     }
-    Alert.alert(t('community.compose.discardTitle'), undefined, [
-      { text: t('community.compose.discardKeep'), style: 'cancel' },
-      {
-        text: t('community.compose.discard'),
-        style: 'destructive',
-        onPress: handleClose,
-      },
-    ])
+    Alert.alert(
+      t('community.compose.discardTitle'),
+      t('community.compose.discardMessage'),
+      [
+        { text: t('community.compose.discardKeep'), style: 'cancel' },
+        {
+          text: t('community.compose.discard'),
+          style: 'destructive',
+          onPress: handleClose,
+        },
+      ]
+    )
   }, [dirty, handleClose, publishing, t])
 
   const handlePickImage = useCallback(async () => {

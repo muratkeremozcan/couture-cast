@@ -888,6 +888,7 @@
       "cancel": "Abbrechen",
       "success": "Dein Look wurde zur Prüfung eingereicht.",
       "discardTitle": "Diesen Beitrag verwerfen?",
+      "discardMessage": "Foto und Text dieses Beitrags gehen verloren.",
       "discardKeep": "Weiter bearbeiten",
       "discard": "Verwerfen"
     },
