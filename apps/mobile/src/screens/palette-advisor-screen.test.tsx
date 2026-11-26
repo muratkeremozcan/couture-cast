@@ -21,7 +21,7 @@
  */
 /* eslint-disable @typescript-eslint/await-thenable */
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
@@ -187,6 +187,21 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     forgetAllUploadAttempts()
     restoreAccessTokenResolver?.()
     restoreAccessTokenResolver = undefined
+  })
+
+  it('[7.9 D6] leaves the title to the top bar and keeps the section name', async () => {
+    restoreAccessTokenResolver?.()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    await render(<PaletteAdvisorScreen />)
+    await screen.findByTestId('palette-advisor-locked')
+
+    const section = screen.getByTestId('palette-advisor-screen')
+    expect(section).toHaveAttribute('aria-label', 'Color palette advisor')
+    // The stack's AppTopBar shows 'Color palette advisor'; the body has no second copy of it.
+    expect(within(section).queryByText('Color palette advisor')).toBeNull()
+    expect(
+      within(section).queryByRole('heading', { name: 'Color palette advisor' })
+    ).toBeNull()
   })
 
   it('5.4-MOB-010 renders the signed-out locked panel with no session', async () => {

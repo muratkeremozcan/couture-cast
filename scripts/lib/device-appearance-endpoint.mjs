@@ -19,6 +19,8 @@ import { spawn } from 'node:child_process'
 import http from 'node:http'
 
 export const APPEARANCE_TIMEOUT_MS = 15_000
+/** A request body is a few dozen bytes; anything past this is refused (Codex P3-3). */
+export const MAX_BODY_BYTES = 1024
 
 /** @param {string} device @param {'yes' | 'no'} mode */
 export const nightModeCommands = (device, mode) => [
@@ -84,9 +86,13 @@ const runCommand = (binary, args, signal) =>
     child.on('close', (code) => resolve({ code, output }))
   })
 
+/** The body as text, or null once it grows past MAX_BODY_BYTES. */
 const readBody = async (request) => {
   let body = ''
-  for await (const chunk of request) body += chunk
+  for await (const chunk of request) {
+    body += chunk
+    if (body.length > MAX_BODY_BYTES) return null
+  }
   return body
 }
 
@@ -105,7 +111,14 @@ export function appearanceCommands(route, body, devices) {
     demo: demoMode,
   } = /** @type {Record<string, unknown>} */ (body ?? {})
   if (typeof device !== 'string' || !devices.includes(device))
-    return { status: 400, message: `Unknown device ${String(device)}` }
+    // A fixed diagnostic: a non-string device is never stringified (Codex P3-3).
+    return {
+      status: 400,
+      message:
+        typeof device === 'string'
+          ? `Unknown device ${device}`
+          : 'device must be a string',
+    }
   if (route === '/night') {
     if (mode !== 'yes' && mode !== 'no')
       return { status: 400, message: 'mode must be "yes" or "no"' }
@@ -116,7 +129,7 @@ export function appearanceCommands(route, body, devices) {
       return { status: 400, message: 'demo must be a boolean' }
     return { commands: statusBarDemoCommands(device, demoMode) }
   }
-  return { status: 404, message: `No route ${String(route)}` }
+  return { status: 404, message: `No route ${typeof route === 'string' ? route : ''}` }
 }
 
 /**
@@ -133,14 +146,19 @@ export async function startDeviceAppearanceEndpoint({
   timeoutMs = APPEARANCE_TIMEOUT_MS,
   run = runCommand,
 }) {
-  const server = http.createServer(async (request, response) => {
+  const handle = async (request, response) => {
     if (request.method !== 'POST') {
       response.writeHead(405).end()
       return
     }
+    const text = await readBody(request)
+    if (text === null) {
+      response.writeHead(413).end(`Body over ${MAX_BODY_BYTES} bytes`)
+      return
+    }
     let body
     try {
-      body = JSON.parse(await readBody(request))
+      body = JSON.parse(text)
     } catch {
       response.writeHead(400).end('Body must be JSON')
       return
@@ -164,6 +182,13 @@ export async function startDeviceAppearanceEndpoint({
       }
     }
     response.writeHead(200).end(output)
+  }
+  // A failure inside one request answers 500 and never rejects the server callback.
+  const server = http.createServer((request, response) => {
+    handle(request, response).catch(() => {
+      if (!response.headersSent) response.writeHead(500)
+      response.end('Appearance endpoint failed')
+    })
   })
   await new Promise((resolve, reject) => {
     server.once('error', reject)

@@ -9,6 +9,7 @@ import { expect } from '../support/fixtures/merged-fixtures'
 // destructure it because the events feed behind that alert requires an account.
 import { communityTest as test } from '../support/helpers/community-session'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
+import { focusBackdrop, focusRing } from '../support/helpers/painted-contrast'
 
 // This scan discovers nothing: it iterates this literal array, so a destination
 // route missing from it is never scanned at either viewport and AC 8's axe evidence
@@ -153,16 +154,36 @@ function contrastRatio(left: string, right: string): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
 }
 
-async function focusColors(target: Locator) {
-  await target.focus()
-  return target.evaluate((element) => {
+/**
+ * Story CC-7.9 D3 and D7: a keyboard focus ring is the `focusEssential` outline inside the gold
+ * `focus` halo, and it must stand out from the surface it is drawn over: the nearest painted
+ * ancestor (`data-surface="card"`, the top bar, or the `data-surface="page"` surface). The
+ * computed outline is held to 3:1 on that backdrop, and the pixels focus actually changes are
+ * held to 3:1 against what was painted there before.
+ */
+async function expectVisibleFocusRing(target: Locator, label: string) {
+  const ring = await focusRing(target, async () => {
+    await target.focus()
+    await expect(target).toBeFocused()
+  })
+  expect(ring!.painted, `${label}: painted ring pixels`).toBeGreaterThan(20)
+  expect(ring!.ratio, `${label}: painted ring contrast`).toBeGreaterThanOrEqual(3)
+  const focused = await target.evaluate((element) => {
     const styles = getComputedStyle(element)
     return {
-      background: styles.backgroundColor,
+      visible: element.matches(':focus-visible'),
       outline: styles.outlineColor,
       outlineStyle: styles.outlineStyle,
     }
   })
+  expect(focused.visible, `${label}: :focus-visible`).toBe(true)
+  expect(focused.outlineStyle, label).toBe('solid')
+  const backdrop = await focusBackdrop(target)
+  expect(
+    contrastRatio(focused.outline, backdrop.color),
+    `${label}: outline on ${backdrop.node}`
+  ).toBeGreaterThanOrEqual(3)
+  return backdrop
 }
 
 test.describe('Story 3.8 route audit matrix', () => {
@@ -398,42 +419,57 @@ test.describe('Story 3.8 interaction states', () => {
     expect(forcedStyles.outlineStyle).toBe('solid')
   })
 
-  test('rendered light, dark, gold, and alert focus outlines meet 3:1', async ({
+  test('rendered top bar, chip, selected chip, and alert focus outlines meet 3:1 in both schemes', async ({
     page,
     interceptNetworkCall,
     communitySession,
   }) => {
     // The alert surface below needs a signed-in account (see installSevereAlert).
     expect(communitySession.userId).toBeTruthy()
-    await openStablePage(page, '/', interceptNetworkCall)
+    // Desktop width: the tab links sit in the top bar only from 768 px (Story CC-7.9 D6).
+    await page.setViewportSize(viewports[0])
 
-    const dark = await focusColors(page.getByTestId('nav-ritual'))
-    expect(contrastRatio(dark.outline, 'rgb(0, 0, 0)')).toBeGreaterThanOrEqual(3)
-    expect(dark.outlineStyle).toBe('solid')
+    // Story CC-7.9 D2, D7: the always-dark page and its black nav are gone, so each ring is
+    // measured on the surface it really sits on, in the light and the dark scheme.
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme })
+      await openStablePage(page, '/', interceptNetworkCall)
 
-    const lightChip = page.getByTestId('chip-community')
-    const light = await focusColors(lightChip)
-    expect(contrastRatio(light.outline, 'rgb(255, 255, 255)')).toBeGreaterThanOrEqual(3)
-    expect(light.outlineStyle).toBe('solid')
+      const nav = page.getByTestId('primary-nav').getByTestId('nav-ritual')
+      const navBackdrop = await expectVisibleFocusRing(nav, `${colorScheme} top bar tab`)
+      expect(navBackdrop.surface, `${colorScheme} top bar tab`).toBe('page')
 
-    const gold = await focusColors(page.getByTestId('chip-personal'))
-    expect(contrastRatio(gold.outline, gold.background)).toBeGreaterThanOrEqual(3)
-    expect(gold.outlineStyle).toBe('solid')
+      await expectVisibleFocusRing(
+        page.getByTestId('chip-community'),
+        `${colorScheme} chip`
+      )
+      // Story CC-7.9 D3: the selected chip is `inverse`, no longer gold; its ring still shows.
+      const selected = page.getByTestId('chip-personal')
+      await expect(selected).toHaveAttribute('aria-pressed', 'true')
+      await expectVisibleFocusRing(selected, `${colorScheme} selected chip`)
+    }
 
+    // The alert stub answers every later events poll, so the alert pages run after the Home ones.
     installSevereAlert(interceptNetworkCall)
-    await openStablePage(
-      page,
-      '/?source=notification&type=severe_weather&alertId=alert-999',
-      interceptNetworkCall
-    )
-    // Scoped to the alert panel: the page also carries a persistent "Plan week"
-    // control near the hero actions (Story 5.5 Decision 7) with the same accessible
-    // name, and this assertion is about the alert's own dark surface.
-    const severeAlert = page.getByTestId('severe-weather-alert-focused')
-    const alert = await focusColors(
-      severeAlert.getByRole('button', { name: 'Plan week' })
-    )
-    expect(contrastRatio(alert.outline, 'rgb(54, 31, 31)')).toBeGreaterThanOrEqual(3)
-    expect(alert.outlineStyle).toBe('solid')
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.emulateMedia({ colorScheme })
+      await openStablePage(
+        page,
+        '/?source=notification&type=severe_weather&alertId=alert-999',
+        interceptNetworkCall
+      )
+      // Scoped to the alert panel: the page also carries a persistent "Plan week"
+      // control near the hero actions (Story 5.5 Decision 7) with the same accessible
+      // name, and this assertion is about the alert's own surface (`dangerSurface`, D2).
+      const severeAlert = page.getByTestId('severe-weather-alert-focused')
+      await expect(severeAlert).toBeVisible()
+      const alertBackdrop = await expectVisibleFocusRing(
+        severeAlert.getByRole('button', { name: 'Plan week' }),
+        `${colorScheme} alert action`
+      )
+      expect(alertBackdrop.color, `${colorScheme} alert action`).toBe(
+        await severeAlert.evaluate((panel) => getComputedStyle(panel).backgroundColor)
+      )
+    }
   })
 })

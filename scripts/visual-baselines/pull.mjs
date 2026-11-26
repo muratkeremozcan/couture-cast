@@ -12,7 +12,8 @@
  * - native: the visual shard's `android-test-results-shard-11-attempt-<n>` artifact of
  *   `Mobile E2E` (pr-mobile-e2e.yml), folder `shell-visual/`, one `<scheme>-<tab>.png` per tab.
  *
- * Usage: npm run visual:pull-baselines -- --web <run-id> [--native <run-id>]
+ * Usage: npm run visual:pull-baselines -- --web <run-id> [--native <run-id>] [--all]
+ * `--all` requires all eight web screens (the first pull); native always requires all eight.
  * Review every changed PNG before committing it: a baseline is the expected screen.
  */
 import { spawnSync } from 'node:child_process'
@@ -47,21 +48,44 @@ const filesUnder = (dir) =>
         .map((entry) => path.join(entry.parentPath ?? entry.path, entry.name))
     : []
 
+/** Every web baseline the snapshot spec takes (7.9-VIS-001..008). */
+export const WEB_BASELINES = ['light', 'dark'].flatMap((scheme) =>
+  ['home', 'closet', 'community', 'profile'].map(
+    (tab) => `${tab}-${scheme}-chromium-linux.png`
+  )
+)
+/** Every native capture of the visual flow (7.9-NVIS-001..008). */
+export const NATIVE_BASELINES = ['light', 'dark'].flatMap((scheme) =>
+  ['home', 'wardrobe', 'community', 'profile'].map((tab) => `${scheme}-${tab}.png`)
+)
+
 /**
- * Copies every captured snapshot found under `downloaded` into `targetDir`, named by `nameOf`,
- * from folders called `folder`. Returns the baselines written.
+ * The copies to make: every captured snapshot under `downloaded`, from folders called `folder`,
+ * named by `nameOf`, as `{ source, name }` sorted by name (one source per name).
  */
-export function placeBaselines({ downloaded, folder, targetDir, nameOf }) {
-  const written = []
+export function planBaselines({ downloaded, folder, nameOf }) {
+  const byName = new Map()
   for (const file of filesUnder(downloaded)) {
     if (path.basename(path.dirname(file)) !== folder) continue
     const name = nameOf(path.basename(file))
-    if (!name) continue
-    fs.mkdirSync(targetDir, { recursive: true })
-    fs.copyFileSync(file, path.join(targetDir, name))
-    written.push(path.join(targetDir, name))
+    if (name && !byName.has(name)) byName.set(name, file)
   }
-  return [...new Set(written)].sort()
+  return [...byName.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, source]) => ({ name, source }))
+}
+
+/** Names in `expected` the plan does not cover. */
+export const missingBaselines = (plan, expected) =>
+  expected.filter((name) => !plan.some((entry) => entry.name === name))
+
+/** Copies a plan into `targetDir`; returns the files written. */
+export function placeBaselines(plan, targetDir) {
+  fs.mkdirSync(targetDir, { recursive: true })
+  return plan.map(({ name, source }) => {
+    fs.copyFileSync(source, path.join(targetDir, name))
+    return path.join(targetDir, name)
+  })
 }
 
 const download = (runId, pattern) => {
@@ -86,34 +110,51 @@ const readArg = (name) => {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const web = readArg('web')
   const native = readArg('native')
+  // --all: the first pull, when every web screen is new and must be present. A later web run
+  // fails only the screens that changed, so its pull is partial by nature.
+  const all = process.argv.includes('--all')
   if (!web && !native) {
     console.error(
-      'Usage: npm run visual:pull-baselines -- --web <run-id> [--native <run-id>]'
+      'Usage: npm run visual:pull-baselines -- --web <run-id> [--native <run-id>] [--all]'
     )
     process.exit(2)
   }
-  const written = []
+  const jobs = []
   if (web)
-    written.push(
-      ...placeBaselines({
+    jobs.push({
+      label: 'web',
+      plan: planBaselines({
         downloaded: download(web, 'blob-report-*'),
         folder: 'visual-actuals',
-        targetDir: path.join(root, WEB_SNAPSHOT_DIR),
         nameOf: webBaselineName,
-      })
-    )
+      }),
+      targetDir: path.join(root, WEB_SNAPSHOT_DIR),
+      expected: all ? WEB_BASELINES : [],
+    })
   if (native)
-    written.push(
-      ...placeBaselines({
+    jobs.push({
+      label: 'native',
+      plan: planBaselines({
         downloaded: download(
           native,
           `android-test-results-shard-${VISUAL_SHARD}-attempt-*`
         ),
         folder: 'shell-visual',
-        targetDir: path.join(root, NATIVE_SNAPSHOT_DIR),
         nameOf: nativeBaselineName,
-      })
-    )
+      }),
+      targetDir: path.join(root, NATIVE_SNAPSHOT_DIR),
+      // The flow captures every screen on every run: a short set means it stopped early.
+      expected: NATIVE_BASELINES,
+    })
+  // Nothing is copied unless every job is complete, so a partial set never lands.
+  const gaps = jobs.flatMap(({ label, plan, expected }) =>
+    missingBaselines(plan, expected).map((name) => `${label}: ${name}`)
+  )
+  if (gaps.length) {
+    console.error(`Missing captures, nothing copied:\n  ${gaps.join('\n  ')}`)
+    process.exit(1)
+  }
+  const written = jobs.flatMap(({ plan, targetDir }) => placeBaselines(plan, targetDir))
   if (written.length === 0) {
     console.error(
       'No captured snapshots in those runs: nothing changed, or the run was not a visual one.'

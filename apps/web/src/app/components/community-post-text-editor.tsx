@@ -18,9 +18,9 @@ type Translator = (key: string) => string
 type OutcomeFeedbackKey = 'editSaved' | 'editNoChanges'
 
 const inputClass =
-  'min-h-11 w-full rounded-md border border-theme-card-border bg-page p-2 text-theme-card-text'
+  'min-h-11 w-full rounded-md border border-line-strong bg-page p-2 text-theme-card-text'
 const buttonClass =
-  'min-h-11 rounded-md border border-theme-card-border px-3 text-sm font-semibold disabled:opacity-50'
+  'min-h-11 rounded-md border border-line-strong px-3 text-sm font-semibold disabled:opacity-50'
 
 function editErrorKey(failure: unknown): string {
   if (!(failure instanceof CommunityRequestError)) return 'editFailed'

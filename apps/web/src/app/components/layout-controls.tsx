@@ -49,7 +49,7 @@ export function LayoutControls({
 
   return (
     <div
-      aria-label={t('home.layoutControls.label')}
+      aria-label={t('landing.layoutControls.label')}
       data-surface="card"
       className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-card p-3"
     >
@@ -63,7 +63,7 @@ export function LayoutControls({
             : 'border-line-strong bg-page text-ink'
         }`}
       >
-        {t('home.layoutControls.comparison')}
+        {t('landing.layoutControls.comparison')}
       </button>
 
       <button
@@ -76,7 +76,7 @@ export function LayoutControls({
             : 'border-line-strong bg-page text-ink'
         }`}
       >
-        {t('home.layoutControls.mobilePreview')}
+        {t('landing.layoutControls.mobilePreview')}
       </button>
     </div>
   )

@@ -562,7 +562,8 @@
         "processing": "Processando",
         "awaiting_tags": "Aguardando etiquetas",
         "ready": "Pronta",
-        "failed": "Falhou"
+        "failed": "Falhou",
+        "unknown": "Em andamento"
       },
       "detailTitle": "Detalhes da peça"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Look em destaque em {{label}} de {{author}}, {{count}} reação. Abre Destaques da cidade.",
       "linkLabel_other": "Look em destaque em {{label}} de {{author}}, {{count}} reações. Abre Destaques da cidade.",
       "cta": "Ver em Destaques da cidade"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Planos de guarda-roupa de acordo com o clima para cada trajeto",
     "hero": {
       "eyebrow": "Ritual diário",
@@ -1603,7 +1606,13 @@
       "retry": "Tentar de novo"
     },
     "dismissBanner": "Fechar aviso",
-    "skipToContent": "Pular para o conteúdo principal"
+    "skipToContent": "Pular para o conteúdo principal",
+    "close": "Fechar a janela",
+    "legal": {
+      "label": "Informações legais",
+      "privacy": "Política de Privacidade",
+      "terms": "Termos de Serviço"
+    }
   },
   "guardian": {
     "accept": {

@@ -40,6 +40,7 @@ import {
 } from '../../lib/wardrobe'
 import { readStorage, WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import { LANDING_SESSION_ATTRIBUTE } from '../../lib/landing-session'
+import { hasStoredWebSession } from '../../lib/web-session'
 import { useRetryOnVerifiedSession } from '../../lib/session-retry'
 import {
   currentWebSessionBearer,
@@ -100,12 +101,18 @@ function GarmentDetailParamSync({
 const WARDROBE_LOAD_FAILED = 'Unable to load your wardrobe.'
 const WARDROBE_REFRESH_FAILED = 'Unable to refresh your wardrobe.'
 
-/** A garment status chip label; the status list is an open set, so an unknown one reads as is. */
+/**
+ * A garment status chip label. The status list is an open set, so a status the catalogs do not
+ * name reads as the localized "In progress" (review P2-11); the raw API code stays out of the
+ * visible text and is kept only in the chip's `data-testid` for diagnostics.
+ */
 function garmentStatusLabel(
   t: (key: string, options?: Record<string, unknown>) => string,
   status: string
 ): string {
-  return t(`wardrobe.hub.status.${status}`, { defaultValue: status.replace(/_/g, ' ') })
+  return t(`wardrobe.hub.status.${status}`, {
+    defaultValue: t('wardrobe.hub.status.unknown'),
+  })
 }
 
 /** The visible card label: localized category and material, or "Untagged garment". */
@@ -136,27 +143,45 @@ function subscribeLandingSession(onChange: () => void): () => void {
   return () => observer.disconnect()
 }
 
-const landingSaysNoSession = () =>
-  document.documentElement.getAttribute(LANDING_SESSION_ATTRIBUTE) === 'none'
+const readLandingAttribute = () =>
+  document.documentElement.getAttribute(LANDING_SESSION_ATTRIBUTE)
+
+/**
+ * Whether this page has seen any sign of a session: the landing attribute naming a member or a
+ * stored session still to verify, stored credentials, or a member holding the Closet. It reads
+ * the browser only, so the server render (and the hydration render) says no.
+ */
+function sawSessionEvidence(owner: string | null, landing: string | null): boolean {
+  if (owner !== null || landing === 'member' || landing === 'pending') return true
+  return typeof window !== 'undefined' && hasStoredWebSession()
+}
 
 /**
  * Story CC-7.9 add-on B: a visitor who never signed in. The pre-paint landing attribute says no
- * session was stored (`none`), and no member has held this Closet since it mounted. Such a
- * visitor has no session that expired and no account that failed to load, so the Closet shows
- * none of those errors; it offers sign-in instead. A member whose session ends while the Closet
- * is open is not a visitor and still sees "Your session expired".
+ * session (`none`), and this page saw no evidence of one since it mounted. Such a visitor has no
+ * session that expired and no account that failed to load, so the Closet shows none of those
+ * errors; it offers sign-in instead. Evidence (review P2-2) is a `member` or `pending` landing
+ * attribute, stored credentials or a member holding the Closet. A returning member whose stored
+ * session is refused or expires before verification names them, and a member whose session ends
+ * while the Closet is open, keep "Your session expired". The evidence lives here, above the
+ * owner-keyed view, so a remount for a new owner keeps it; it holds a flag and no member data.
  */
 function useClosetVisitor(owner: string | null): boolean {
-  const noSession = useSyncExternalStore(
+  const landing = useSyncExternalStore(
     subscribeLandingSession,
-    landingSaysNoSession,
-    () => false
+    readLandingAttribute,
+    () => null
   )
-  const [hadMember, setHadMember] = useState(false)
+  const [hadSession, setHadSession] = useState(() =>
+    sawSessionEvidence(
+      owner,
+      typeof document === 'undefined' ? null : readLandingAttribute()
+    )
+  )
   useEffect(() => {
-    if (owner !== null) setHadMember(true)
-  }, [owner])
-  return owner === null && noSession && !hadMember
+    if (sawSessionEvidence(owner, landing)) setHadSession(true)
+  }, [owner, landing])
+  return owner === null && landing === 'none' && !hadSession
 }
 
 /**

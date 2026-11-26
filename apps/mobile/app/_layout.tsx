@@ -26,7 +26,7 @@ import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-an
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import { useTokens, type Tokens } from '@/src/theme/tokens'
-import { renderStackTopBar } from '@/src/components/app-top-bar'
+import { renderStackTopBar, tabsAnchorListeners } from '@/src/components/app-top-bar'
 import {
   underModalAccessibility,
   useEdgeToEdgeModalOpen,
@@ -302,7 +302,13 @@ function RootLayoutNav() {
                       ...rootStackMotionOptions(reduceMotion),
                     }}
                   >
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    {/* A cold deep link mounts the tab group below the linked screen without
+                      focusing it; the listener tells the top bar which anchors were seen. */}
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                      listeners={tabsAnchorListeners}
+                    />
                     {/* The modal names itself in its own heading; an untitled header would
                       show the raw route name "modal". Android keeps the bar for its back
                       arrow; an iOS sheet dismisses by swipe or Cancel and needs no empty bar. */}
@@ -338,9 +344,11 @@ function RootLayoutNav() {
                         title: getGuestPreviewStrings(i18n.language).chrome.entry,
                       }}
                     />
-                    {/* Signup names itself in its own heading; an untitled header would show the
-                      raw route name "signup". */}
-                    <Stack.Screen name="signup" options={{ title: '' }} />
+                    {/* The web signup bar's title; the body keeps its own heading. */}
+                    <Stack.Screen
+                      name="signup"
+                      options={{ title: getFederatedSignInStrings(i18n.language).create }}
+                    />
                     {/* Story 6.17 D3, D5: the Google finish step and its callback. The header
                       carries the finish step's title; the screen renders no second one. */}
                     <Stack.Screen

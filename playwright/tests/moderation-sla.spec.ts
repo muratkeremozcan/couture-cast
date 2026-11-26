@@ -583,7 +583,8 @@ test.describe('P-SLA: the page', () => {
       await page.keyboard.press('Tab')
       const focused = await page.evaluate(() => {
         const element = document.activeElement as HTMLElement | null
-        if (!element || !element.closest('main')) return null
+        // CC-7.9 D6: Back is the shared top bar control, so the bar is part of the tab order.
+        if (!element || !element.closest('[data-testid="app-header"], main')) return null
         const look = () => {
           const style = getComputedStyle(element)
           return `${style.outlineStyle} ${style.outlineWidth} ${style.boxShadow}`
@@ -602,11 +603,20 @@ test.describe('P-SLA: the page', () => {
       expect(focused.ring, focused.label).toBe(true)
       order.push(focused.label)
     }
-    expect(order.slice(0, 4)).toEqual([
+    // CC-7.9 D6: Back is the shared top bar control; from 768 px the bar's tab links follow it.
+    expect(order.slice(0, 8)).toEqual([
+      'Back',
+      'Home',
+      'Wardrobe',
+      'Community',
+      'Profile',
       'Refresh',
-      'Back to queue',
       'Open case',
       'Open case',
     ])
+    // CC-7.9 D6: Back is the shared top bar control and points at the queue (backHref).
+    await expect(
+      page.getByTestId('app-header').getByTestId('app-top-bar-back')
+    ).toHaveAttribute('href', '/moderation')
   })
 })

@@ -417,7 +417,8 @@
         "ready": "Ready",
         "failed": "Upload failed",
         "unknown": "In progress"
-      }
+      },
+      "detailTitle": "Piece details"
     }
   },
   "commerce": {

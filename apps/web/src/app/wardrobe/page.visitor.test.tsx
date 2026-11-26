@@ -6,7 +6,7 @@
 // held a session keeps the member error, so an expiry still says so.
 // @vitest-environment jsdom
 import React from 'react'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   GarmentItemContract,
@@ -14,6 +14,7 @@ import type {
 } from '@couture/api-client/contracts/http'
 import type * as WebSession from '../../lib/web-session'
 import { screenSnapshot } from '../../lib/screen-snapshot'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import enUS from '../../i18n/locales/en-US.json'
 
 const SIGNED_OUT_MESSAGE = enUS.wardrobe.capture.errors.signedOut
@@ -33,9 +34,12 @@ vi.mock('../../lib/wardrobe', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ...wardrobe,
 }))
+/** The member the session bridge names; null for a page with no verified member. */
+const session = vi.hoisted(() => ({ member: null as string | null }))
+
 vi.mock('../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
-  webSessionIdentity: () => null,
+  webSessionIdentity: () => session.member,
 }))
 
 import WardrobePage from './page'
@@ -49,6 +53,7 @@ function noBearer() {
 }
 
 beforeEach(() => {
+  session.member = null
   screenSnapshot.clear()
   for (const mock of Object.values(wardrobe)) mock.mockReset()
   noBearer()
@@ -57,7 +62,22 @@ beforeEach(() => {
 afterEach(() => {
   cleanup()
   document.documentElement.removeAttribute('data-session')
+  window.localStorage.clear()
+  window.sessionStorage.clear()
 })
+
+function setLanding(state: 'member' | 'pending' | 'none') {
+  document.documentElement.setAttribute('data-session', state)
+}
+
+/** The member alerts a page that held a session keeps, with no sign-in offer in their place. */
+async function expectMemberErrors() {
+  expect(await screen.findByText(SIGNED_OUT_MESSAGE)).toBeInTheDocument()
+  expect(await screen.findByText(enUS.wardrobe.hub.setupFailed)).toBeInTheDocument()
+  expect(screen.queryByTestId('wardrobe-sign-in')).not.toBeInTheDocument()
+  expect(screen.queryByTestId('wardrobe-visitor-offer')).not.toBeInTheDocument()
+  expect(screen.getByTestId('garment-capture-open').tagName).toBe('BUTTON')
+}
 
 describe('7.9 add-on B: the Closet for a visitor who never signed in', () => {
   it('shows no error, offers one Sign in link and sends Add to sign-in', async () => {
@@ -95,5 +115,52 @@ describe('7.9 add-on B: the Closet for a visitor who never signed in', () => {
     expect(await screen.findByText(enUS.wardrobe.hub.setupFailed)).toBeInTheDocument()
     expect(screen.queryByTestId('wardrobe-sign-in')).not.toBeInTheDocument()
     expect(screen.getByTestId('garment-capture-open').tagName).toBe('BUTTON')
+  })
+})
+
+// Review P2-2: the Closet carries evidence of a prior session across verification and the
+// owner-keyed remount, so only a page that never saw one treats the person as a visitor.
+describe('7.9 P2-2: prior-session evidence decides visitor or member', () => {
+  it('a fresh visitor (none from the start, nothing stored) gets the sign-in offer and no alerts', async () => {
+    setLanding('none')
+    render(<WardrobePage />)
+
+    expect(await screen.findByTestId('wardrobe-sign-in')).toHaveAttribute(
+      'href',
+      '/signin'
+    )
+    await waitFor(() => expect(wardrobe.listGarmentsFromWeb).toHaveBeenCalled())
+    expect(screen.queryAllByRole('alert')).toHaveLength(0)
+    expect(screen.queryByText(SIGNED_OUT_MESSAGE)).not.toBeInTheDocument()
+  })
+
+  it('a returning session that fails before verification keeps the member errors', async () => {
+    // The head script found a stored session (`pending`); verification then refused it and the
+    // session bridge wrote `none` before any owner resolved. Storage stays empty so the landing
+    // attribute is the only evidence this case proves.
+    setLanding('pending')
+    render(<WardrobePage />)
+    act(() => setLanding('none'))
+
+    await waitFor(() => expect(wardrobe.listGarmentsFromWeb).toHaveBeenCalled())
+    await expectMemberErrors()
+  })
+
+  it('a verified session that ends with the Closet open keeps the member errors', async () => {
+    // The landing attribute stays `none` throughout, so the member who held the Closet is the
+    // only evidence; the owner change remounts the keyed view.
+    setLanding('none')
+    session.member = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'member-token')
+    render(<WardrobePage />)
+    expect(screen.queryByTestId('wardrobe-visitor-offer')).not.toBeInTheDocument()
+
+    act(() => {
+      session.member = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+    await expectMemberErrors()
   })
 })

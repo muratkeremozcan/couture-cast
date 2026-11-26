@@ -17,12 +17,12 @@ export function HomeHero() {
   return (
     <section id="ritual" data-testid="hero-section" className="flex flex-col gap-4">
       <p className="text-xs font-semibold uppercase tracking-widest text-ink-muted">
-        {t('home.hero.eyebrow')}
+        {t('landing.hero.eyebrow')}
       </p>
       <h2 data-testid="hero-headline" className="text-3xl font-semibold leading-tight">
-        {t('home.hero.headline')}
+        {t('landing.hero.headline')}
       </h2>
-      <p className="max-w-2xl text-lg text-ink-soft">{t('home.hero.body')}</p>
+      <p className="max-w-2xl text-lg text-ink-soft">{t('landing.hero.body')}</p>
       {/* TEA P3: one gap for the whole stack of landing actions, sign-in and analytics alike. */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center gap-4" data-landing="member">
@@ -46,7 +46,7 @@ export function HomeBrandLine() {
         CoutureCast
       </p>
       <p data-landing="guest" className="text-sm text-ink-muted">
-        {t('home.tagline')}
+        {t('landing.tagline')}
       </p>
     </div>
   )

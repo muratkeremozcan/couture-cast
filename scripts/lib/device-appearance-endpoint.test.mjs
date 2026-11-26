@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   appearanceCommands,
+  MAX_BODY_BYTES,
   nightModeCommands,
   startDeviceAppearanceEndpoint,
   statusBarDemoCommands,
@@ -103,6 +104,47 @@ test('[7.9-NVIS-U04] the endpoint runs the commands in order and reports adb fai
     assert.equal(notJson.status, 400)
     const get = await fetch(`${endpoint.url}/night`)
     assert.equal(get.status, 405)
+  } finally {
+    await endpoint.close()
+  }
+})
+
+test('[7.9-NVIS-U14] malformed requests get fixed answers and never break the server (Codex P3-3)', async () => {
+  // A device value whose toString is not callable would throw if it were stringified.
+  assert.deepEqual(
+    appearanceCommands('/night', { device: { toString: 1 }, mode: 'yes' }, [DEVICE]),
+    { status: 400, message: 'device must be a string' }
+  )
+  assert.deepEqual(appearanceCommands('/night', null, [DEVICE]), {
+    status: 400,
+    message: 'device must be a string',
+  })
+  const endpoint = await startDeviceAppearanceEndpoint({
+    adbBinary: 'adb',
+    devices: [DEVICE],
+    run: async () => {
+      throw new Error('runner exploded')
+    },
+  })
+  try {
+    const odd = await fetch(`${endpoint.url}/night`, {
+      method: 'POST',
+      body: JSON.stringify({ device: { toString: 1 }, mode: 'yes' }),
+    })
+    assert.equal(odd.status, 400)
+    const huge = await fetch(`${endpoint.url}/night`, {
+      method: 'POST',
+      body: 'x'.repeat(MAX_BODY_BYTES + 1),
+    })
+    assert.equal(huge.status, 413)
+    const failed = await fetch(`${endpoint.url}/night`, {
+      method: 'POST',
+      body: JSON.stringify({ device: DEVICE, mode: 'yes' }),
+    })
+    assert.equal(failed.status, 500)
+    // Still serving after all three.
+    const after = await fetch(`${endpoint.url}/night`, { method: 'GET' })
+    assert.equal(after.status, 405)
   } finally {
     await endpoint.close()
   }

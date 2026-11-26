@@ -100,8 +100,12 @@ interface NavigatorHeaderProps {
     headerRight?: (props: { tintColor?: string; canGoBack: boolean }) => ReactNode
     headerBackVisible?: boolean
   }
-  route: { name: string }
-  navigation: { goBack: () => void; canGoBack: () => boolean }
+  route: { key: string; name: string }
+  navigation: {
+    goBack: () => void
+    canGoBack: () => boolean
+    getState: () => { routes: readonly { key: string; name: string }[] }
+  }
   back?: unknown
 }
 
@@ -141,7 +145,7 @@ export function renderTabTopBar(props: NavigatorHeaderProps) {
 
 /**
  * The parent tab of each root stack screen, for a direct entry (a deep link or a cold start on the
- * screen) that has nothing below it to go back to.
+ * screen) that has no caller below it to go back to.
  */
 const PARENT_TAB: Readonly<Record<string, Href>> = {
   'wardrobe-capsules': '/wardrobe',
@@ -156,19 +160,71 @@ const PARENT_TAB: Readonly<Record<string, Href>> = {
   'teen-dashboard': '/settings',
 }
 
-/** The root stack's `header`: the screen title and a back control to the screen below it. */
+/** The root stack route of the tab group, the `unstable_settings.initialRouteName` anchor. */
+const TABS_ANCHOR = '(tabs)'
+
+/**
+ * Root stack keys of tab group routes the member has had in front. A cold deep link makes Expo
+ * Router insert the tab group below the linked screen as its initial route, mounted on Home and
+ * never focused, and pass `back` for it; such an anchor is no caller to return to.
+ */
+const seenTabAnchors = new Set<string>()
+
+/**
+ * The parent tab owed to an unseen anchor: a cold-linked screen above it records its parent, so
+ * a pop that bypasses the top bar (Android hardware back, the iOS swipe, any `goBack()`) still
+ * lands on that tab when the anchor comes to the front for the first time.
+ */
+const coldLinkParents = new Map<string, Href>()
+
+/**
+ * The root stack `listeners` of the tab group screen. On focus it marks its anchor as seen, and
+ * on the first focus of an anchor a cold link inserted it switches the tab group to the parent
+ * tab of the screen that was popped; a real caller's anchor was already seen and keeps its tab.
+ */
+export function tabsAnchorListeners({ route }: { route: { key: string } }) {
+  return {
+    focus: () => {
+      const firstFocus = !seenTabAnchors.has(route.key)
+      seenTabAnchors.add(route.key)
+      const parent = coldLinkParents.get(route.key)
+      coldLinkParents.delete(route.key)
+      if (firstFocus && parent !== undefined) router.navigate(parent)
+    },
+  }
+}
+
+/** The route right below this one in the root stack, if any. */
+function routeBelow({ navigation, route }: NavigatorHeaderProps) {
+  const { routes } = navigation.getState()
+  return routes[routes.findIndex((entry) => entry.key === route.key) - 1]
+}
+
+/** Whether the route below this one is a caller the member came from. */
+function hasCallerBelow(props: NavigatorHeaderProps) {
+  const below = routeBelow(props)
+  if (below === undefined) return false
+  return below.name !== TABS_ANCHOR || seenTabAnchors.has(below.key)
+}
+
+/**
+ * The root stack's `header`: the screen title and a back control to the caller below it, or to
+ * the parent tab on a direct entry.
+ */
 export function renderStackTopBar(props: NavigatorHeaderProps) {
   if (props.options.headerBackVisible === false) {
     return <NavigatorTopBar {...props} showBack={false} />
   }
-  if (props.back !== undefined) return <NavigatorTopBar {...props} showBack />
   const parent = PARENT_TAB[props.route.name] ?? '/'
+  const below = routeBelow(props)
+  if (below?.name === TABS_ANCHOR && !seenTabAnchors.has(below.key))
+    coldLinkParents.set(below.key, parent)
+  const goBack = () => {
+    if (props.back !== undefined && hasCallerBelow(props)) props.navigation.goBack()
+    else router.replace(parent)
+  }
   return (
-    <NavigatorTopBar
-      {...props}
-      navigation={{ ...props.navigation, goBack: () => router.replace(parent) }}
-      showBack
-    />
+    <NavigatorTopBar {...props} navigation={{ ...props.navigation, goBack }} showBack />
   )
 }
 

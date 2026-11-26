@@ -11,6 +11,12 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CommunityCommentsState } from '@couture/api-client'
 import {
+  colorRoles,
+  contrastRatio,
+  PREMIUM_PALETTE_KEYS,
+  premiumPalettes,
+} from '@couture/utils'
+import {
   createCommunityComment,
   createCommunityCommentSubmission,
 } from '@couture/testing'
@@ -877,6 +883,24 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     expect(screen.getByText('1 / 280 characters')).toBeVisible()
     fireEvent.compositionEnd(compose, { data: 'e\u0301' })
     expect(compose).toHaveValue('é')
+  })
+
+  it('7.9 P2-9 outlines the empty composer with the meaning-bearing boundary on the page fill', async () => {
+    useMswHandlers(http.get(`${base}/comments`, () => HttpResponse.json(page([]))))
+    render(<Journey state={makeState()} />)
+    const compose = await screen.findByLabelText('Add a comment')
+    expect(compose).toHaveClass('border-line-strong', 'bg-page')
+    expect(compose).not.toHaveClass('border-theme-card-border', 'bg-theme-card-bg')
+    // The outline meets 3:1 on the field fill and on every themed card it can sit on.
+    for (const scheme of ['light', 'dark'] as const) {
+      const line = colorRoles[scheme].lineStrong
+      const cards = (['default', ...PREMIUM_PALETTE_KEYS] as const).map(
+        (key) => premiumPalettes[key][scheme].cardBg
+      )
+      for (const surface of [colorRoles[scheme].page, ...cards]) {
+        expect(contrastRatio(line, surface)).toBeGreaterThanOrEqual(3)
+      }
+    }
   })
 
   it('moves focus to the private status region after deleting an own submission and paging private submissions', async () => {

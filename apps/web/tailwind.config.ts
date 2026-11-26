@@ -11,6 +11,8 @@ import {
   PREMIUM_PALETTE_FIELDS,
   radius,
   shell,
+  space,
+  typeScale,
 } from '@couture/utils'
 
 /**
@@ -44,6 +46,34 @@ export const designTokenColors = {
   ...paletteColors,
 }
 
+const rem = (px: number) => `${px / 16}rem`
+
+/**
+ * D4 type: `text-xs` to `text-3xl` from `typeScale`, in rem so text follows the reader's
+ * browser text size. Replaced wholesale, so `text-4xl` and up emit nothing.
+ */
+export const designTokenFontSize = Object.fromEntries(
+  Object.entries(typeScale).map(([key, { fontSize, lineHeight }]) => [
+    key,
+    [rem(fontSize), { lineHeight: rem(lineHeight) }],
+  ])
+) as Record<keyof typeof typeScale, [string, { lineHeight: string }]>
+
+/** D4 spacing under its Tailwind keys (`4` is 16 px), in rem. */
+export const designTokenSpacing = Object.fromEntries(
+  Object.entries(space).map(([key, px]) => [key, px === 0 ? '0px' : rem(px)])
+) as Record<keyof typeof space, string>
+
+/**
+ * The two shell clearances, the only padding keys beyond D4's scale: `pb-safe` is the device's
+ * bottom safe area and `pb-tab-bar` clears the fixed bottom tab bar (its height, 32 px of
+ * breathing room and the safe area). The guard allows exactly these two names.
+ */
+const shellClearance = {
+  safe: 'env(safe-area-inset-bottom, 0px)',
+  'tab-bar': `calc(${shell.tabBarHeight + space[8]}px + env(safe-area-inset-bottom, 0px))`,
+}
+
 /** Emits every `--cc-*` variable: `:root`, the dark media query and each `[data-theme]`. */
 export const designTokenPlugin = plugin((api) => {
   api.addBase(buildDesignTokenCssRules())
@@ -74,16 +104,23 @@ export default {
       sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
       mono: ['var(--font-geist-mono)', 'ui-monospace', 'monospace'],
     },
+    fontSize: designTokenFontSize,
+    // D4: padding, margin, gap and space take the token scale only, so an off-scale key emits
+    // nothing (the guard names it). Sizes (w-, h-, inset-) keep Tailwind's dimension keys.
+    padding: { ...designTokenSpacing, ...shellClearance },
+    margin: { ...designTokenSpacing, auto: 'auto' },
+    gap: designTokenSpacing,
+    space: designTokenSpacing,
     extend: {
-      /**
-       * The two shell clearances, the only spacing keys beyond D4's scale: `pb-safe` is the
-       * device's bottom safe area and `pb-tab-bar` clears the fixed bottom tab bar (its 56 px,
-       * 32 px of breathing room and the safe area). The guard allows exactly these two names.
-       */
-      spacing: {
-        safe: 'env(safe-area-inset-bottom, 0px)',
-        'tab-bar': `calc(${shell.tabBarHeight + 32}px + env(safe-area-inset-bottom, 0px))`,
+      // The D4 keys of every other spacing-based utility read the tokens too.
+      spacing: { ...designTokenSpacing, ...shellClearance },
+      // D6 shell sizes: the top bar and tab bar heights and the 44 px touch target.
+      height: {
+        'top-bar': `${shell.topBarHeight}px`,
+        'tab-bar': `${shell.tabBarHeight}px`,
       },
+      minHeight: { touch: `${shell.touchTarget}px` },
+      minWidth: { touch: `${shell.touchTarget}px` },
       borderColor: {
         DEFAULT: 'rgb(var(--cc-line))',
       },

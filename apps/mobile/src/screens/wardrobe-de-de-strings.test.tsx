@@ -143,8 +143,25 @@ const CAPSULE = {
   availabilityStatus: 'needs_repair',
   unavailableGarmentCount: 1,
   garments: [
-    { id: 'g-1', garmentOrder: 0, availabilityStatus: 'ready' },
-    { id: 'g-2', garmentOrder: 1, availabilityStatus: 'ready' },
+    // The full contract shape: the capsule list response is schema-checked.
+    {
+      id: 'g-1',
+      category: 'top',
+      material: 'cotton',
+      comfortRange: 'mild',
+      imageAccess: null,
+      availabilityStatus: 'ready',
+      garmentOrder: 0,
+    },
+    {
+      id: 'g-2',
+      category: 'bottom',
+      material: 'denim',
+      comfortRange: 'mild',
+      imageAccess: null,
+      availabilityStatus: 'ready',
+      garmentOrder: 1,
+    },
   ],
   createdAt: '2026-08-05T10:00:00.000Z',
   updatedAt: '2026-08-05T10:00:00.000Z',
@@ -232,7 +249,6 @@ describe('7.9-NAT-005 native Wardrobe strings under de-DE', () => {
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
           data: {
-            userId: 'user-1',
             status: 'in_progress',
             currentStep: 'capture',
             usedStarterWardrobe: false,

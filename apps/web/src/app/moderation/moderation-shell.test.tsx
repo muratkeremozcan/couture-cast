@@ -107,4 +107,29 @@ describe('CC-7.9 moderation routes in the app shell', () => {
     const main = document.getElementById('main-content')!
     expect(within(main).getAllByRole('heading')[0]).toBe(caseTitle)
   })
+
+  it('/moderation/cases/[caseId] keeps a programmatic focus target for a client navigation', async () => {
+    // Next focuses a segment's first element after a client navigation. Before CC-7.9 that was
+    // the case page's `main` (tabIndex -1); now it is the page surface, and both stay focusable,
+    // so the first Tab after opening a case lands on the top bar Back.
+    navigation.pathname = '/moderation/cases/post.p1'
+    mockApi(
+      detailHandler(() => json({ data: detail() })),
+      evidenceOff
+    )
+    const { container } = render(
+      await ModerationCasePage({ params: Promise.resolve({ caseId: 'post.p1' }) })
+    )
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
+
+    const root = container.firstElementChild as HTMLElement
+    expect(root).toHaveAttribute('data-surface', 'page')
+    expect(root).toHaveAttribute('tabindex', '-1')
+    root.focus()
+    expect(root).toHaveFocus()
+    const main = document.getElementById('main-content')!
+    expect(main).toHaveAttribute('tabindex', '-1')
+    main.focus()
+    expect(main).toHaveFocus()
+  })
 })

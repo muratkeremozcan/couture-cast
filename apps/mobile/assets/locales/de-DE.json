@@ -417,7 +417,8 @@
         "ready": "Fertig",
         "failed": "Hochladen fehlgeschlagen",
         "unknown": "In Bearbeitung"
-      }
+      },
+      "detailTitle": "Teil-Details"
     }
   },
   "commerce": {

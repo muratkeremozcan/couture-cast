@@ -14,6 +14,8 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 vi.mock('expo-router', () => ({ router: { replace: routerMocks.replace } }))
+// The icon font loader has no web module Vite resolves; the chevron is decoration.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 vi.mock('react-native-safe-area-context', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return {
@@ -27,11 +29,20 @@ import { AppTopBar, renderStackTopBar, renderTabTopBar } from './app-top-bar'
 
 const bar = () => screen.getByTestId('app-top-bar')
 
+// The root stack with a real caller below the screen; the cold-link anchor case runs through
+// Expo Router itself in app-top-bar.routing.test.tsx.
+const capsules = { key: 'wardrobe-capsules-1', name: 'wardrobe-capsules' }
+const caller = { key: 'wardrobe-onboarding-1', name: 'wardrobe-onboarding' }
+
 function stackProps(overrides: Record<string, unknown> = {}) {
   return {
     options: { title: 'Outfit capsules' },
-    route: { name: 'wardrobe-capsules' },
-    navigation: { goBack: vi.fn(), canGoBack: () => true },
+    route: capsules,
+    navigation: {
+      goBack: vi.fn(),
+      canGoBack: () => true,
+      getState: () => ({ routes: [caller, capsules] }),
+    },
     ...overrides,
   }
 }

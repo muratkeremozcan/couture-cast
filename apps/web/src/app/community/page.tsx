@@ -34,6 +34,7 @@ export default function CommunityPage() {
             showFilterNav
             filterNavStickyTop={0}
             returnPath="/community"
+            newPostEmphasis="primary"
           />
         </ScreenGate>
       </main>

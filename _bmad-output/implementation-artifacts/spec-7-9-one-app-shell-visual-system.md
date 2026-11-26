@@ -3,14 +3,14 @@ title: 'Story CC-7.9: One app shell and visual system'
 type: feature
 ticket: '7-9-one-app-shell-visual-system'
 created: '2026-11-25'
-status: in-progress
+status: in-review
 baseline_revision: '812cadce47adddfb4c891a5b8ae327c504e09f57'
 route: full
 route_source: auto
 risk: high
-review: ''
-review_source: ''
-lenses_ran: []
+review: quick
+review_source: pinned
+lenses_ran: ['codex']
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -273,6 +273,28 @@ changes to the rendered share-card image.
   because 4.3-I18N-MOB-06 requires one key tree on both surfaces.
 
 ## Review Triage Log
+
+- 2026-11-26, Codex review of c8d1fcd6 (2 P1, 12 P2, 3 P3; epic7-coord/7.9-codex-review.md).
+  All 17 routed as patch in this PR (none rejected, none deferred). TEA: P1-1 (native capture
+  pass collects all eight actuals; pull checks the full 16 set; baselines from the first CI run),
+  P1-2 (`@local-lane` on fixture-bearer shell suites), P2-4 (shell probes; notification settings
+  Back stays `/community` per the D6 as-built decision), P2-5 and P2-6 (web and iOS Maestro Back
+  selectors), P2-7 (painted contrast and palette probes plus 7.9-E2E-008; palettes go dark per
+  D5), P3-3, and the proxy tests for P2-1 and P3-2. Builder: P2-1 (strip reserved `x-vercel-*`
+  query options, drop platform cookies), P2-2 (returning member keeps Closet recovery on web and
+  native), P2-3 (native cold deep link Back goes to the parent tab), P2-8 (titles everywhere, one
+  title style, no duplicate body titles, callback in the shell), P2-9 (meaning-bearing field
+  boundaries; native dimmed palette preview), P2-10 (embedded Home feed New post neutral),
+  P2-11 (legal links, landmark and close labels, unknown wardrobe status from catalogs), P2-12
+  (Tailwind type and spacing and shell sizes and guard scale from the tokens), P3-1 (guard checks
+  CSS declarations and the full CSS color keyword list), P3-2 (reject fragment and user info in
+  the preview API base).
+  As fixed: the proxy drops every upstream Set-Cookie (TEA: the API sets none and web reads
+  none); web-only Home catalog keys moved to `landing.*` (6.7-I18N-MOB-002 was red at c8d1fcd6);
+  `AppPage` root is `tabIndex=-1` so focus after client navigation lands on the page surface and
+  the first Tab reaches top bar Back; native system back from a cold deep link lands on the
+  parent tab, accepted residual: during the iOS swipe or the 200 ms Android back animation Home
+  shows behind the leaving screen before the tab switches on focus.
 
 ## Design Notes
 

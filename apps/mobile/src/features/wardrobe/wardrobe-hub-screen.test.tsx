@@ -1441,11 +1441,65 @@ describe('WardrobeHubScreen', () => {
     expect(screen.queryByTestId('wardrobe-error-banner')).toBeNull()
     expect(screen.queryByRole('alert')).toBeNull()
 
-    fireEvent.click(signIn)
+    // react-native-web refreshes a Pressable's onPress in a passive effect; flushing effects first
+    // means Add presses with the visitor render's handler (src/test-utils/press.ts).
+    await act(() => Promise.resolve())
+    press(signIn)
     expect(routerMock.push).toHaveBeenLastCalledWith('/signin')
-    fireEvent.click(screen.getByTestId('garment-capture-open'))
-    expect(routerMock.push).toHaveBeenLastCalledWith('/signin')
+    routerMock.push.mockClear()
+    press(screen.getByTestId('garment-capture-open'))
+    expect(routerMock.push).toHaveBeenCalledExactlyOnceWith('/signin')
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+  })
+
+  // Review P2-2: the session evidence lives above the identity-epoch keyed hub, so a sign-out or
+  // expiry that remounts the hub keeps it. Only a screen that never saw a session is a visitor.
+  it('7.9-NAT-VISITOR-02 a fresh visitor (no token, no member from the start) gets the sign-in offer', async () => {
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+
+    renderScreen()
+
+    expect(await screen.findByTestId('wardrobe-sign-in')).toBeInTheDocument()
+    expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR-03 a returning session that fails before verification keeps the failure notice', async () => {
+    // A stored token resolves but no member is named yet, and the API refuses it; the session
+    // is then cleared, so the Retry read finds no token while no member ever held the screen.
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ error: 'unauthorized' }, { status: 401 })
+      )
+    )
+    renderScreen()
+    const retry = await screen.findByTestId('wardrobe-list-retry')
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    await waitFor(() => expect(retry).toBeEnabled())
+    press(retry)
+
+    await waitFor(() => expect(screen.getByTestId('wardrobe-list-retry')).toBeEnabled())
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-visitor-offer')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR-04 a verified session that ends with the Closet open keeps the failure notice', async () => {
+    setMobileApplicationUserId('member-1')
+    renderScreen()
+    expect(await screen.findByText(i18n.t('wardrobe.empty_title'))).toBeInTheDocument()
+
+    // The session ends: the token is gone and the identity epoch advances, remounting the hub.
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    act(() => setMobileApplicationUserId(null))
+
+    expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-visitor-offer')).toBeNull()
   })
 
   it('4.4-MOB-HUB-10 opens tagging from the Needs tags action on an already-untagged garment', async () => {

@@ -20,7 +20,12 @@ export function AppPage({ children, className, testId }: AppPageProps) {
     <div
       data-surface="page"
       data-testid={testId}
-      className={`flex min-h-screen flex-col bg-page text-ink ${className ?? ''}`}
+      // Next's App Router focuses a route segment's first element after a client navigation.
+      // Before CC-7.9 that element was each page's `main` (tabIndex -1); the page surface is the
+      // first element now, so it takes the same programmatic focus target and the first Tab after
+      // a navigation lands on the top bar, the first control.
+      tabIndex={-1}
+      className={`flex min-h-screen flex-col bg-page text-ink outline-none ${className ?? ''}`}
     >
       {children}
     </div>

@@ -22,11 +22,13 @@ const REPOSITORY = fileURLToPath(new URL('../', import.meta.url))
  * palette carrier, kebab-cased, read from the token module's source so this list cannot drift
  * from it, plus the three CSS keywords.
  */
+const TOKEN_SOURCE = fs.readFileSync(
+  path.join(REPOSITORY, 'packages/utils/src/design-tokens.ts'),
+  'utf8'
+)
+
 function loadColorNames() {
-  const source = fs.readFileSync(
-    path.join(REPOSITORY, 'packages/utils/src/design-tokens.ts'),
-    'utf8'
-  )
+  const source = TOKEN_SOURCE
   const list = (name) => {
     const block = source.match(
       new RegExp(`export const ${name} = [^\\[]*\\[([^\\]]*)\\]`)
@@ -45,6 +47,55 @@ function loadColorNames() {
   ])
 }
 export const COLOR_NAMES = loadColorNames()
+
+/** The `{ ... }` body of `export const <name> = ... Object.freeze({ ... })` in the token module. */
+function tokenObjectBody(name) {
+  const start = TOKEN_SOURCE.search(new RegExp(`export const ${name}\\b`))
+  const open = TOKEN_SOURCE.indexOf('({', start)
+  if (start < 0 || open < 0)
+    throw new Error(`check-design-tokens: ${name} not found in design-tokens.ts`)
+  let depth = 0
+  for (let index = open + 1; index < TOKEN_SOURCE.length; index += 1) {
+    const char = TOKEN_SOURCE[index]
+    if (char === '{') depth += 1
+    if (char === '}') depth -= 1
+    if (depth === 0) return TOKEN_SOURCE.slice(open + 2, index)
+  }
+  throw new Error(
+    `check-design-tokens: ${name} is not a closed object in design-tokens.ts`
+  )
+}
+
+/** `key: number` pairs of a flat token object (`space`, `radius`). */
+function tokenNumbers(name) {
+  const pairs = [...tokenObjectBody(name).matchAll(/'?([\w.]+)'?\s*:\s*(-?[\d.]+)/g)]
+  if (!pairs.length) throw new Error(`check-design-tokens: ${name} has no values`)
+  return new Map(pairs.map((match) => [match[1], Number(match[2])]))
+}
+
+/**
+ * D4 scales, read from the token module so the guard cannot keep a list of its own: the
+ * Tailwind spacing keys and their px, the type steps and their font sizes, the radius and
+ * elevation names.
+ */
+function loadScales() {
+  const space = tokenNumbers('space')
+  const type = new Map(
+    [
+      ...tokenObjectBody('typeScale').matchAll(
+        /'?([\w]+)'?\s*:\s*Object\.freeze\(\{\s*fontSize:\s*(\d+)/g
+      ),
+    ].map((match) => [match[1], Number(match[2])])
+  )
+  const radius = tokenNumbers('radius')
+  const elevation = [
+    ...tokenObjectBody('elevation').matchAll(/(\w+)\s*:\s*Object\.freeze\(\{\s*offsetY/g),
+  ].map((match) => match[1])
+  if (!type.size || !elevation.length)
+    throw new Error('check-design-tokens: type or elevation scale not found')
+  return { space, type, radius, elevation }
+}
+export const SCALES = loadScales()
 
 /** Files scanned per app. Tests and test support never are. */
 const WEB = { root: 'apps/web/src', extensions: ['.ts', '.tsx', '.css'] }
@@ -94,7 +145,9 @@ const WIDTH = '(?:0|1|2|4|8)'
 const SIDE = '(?:x|y|t|r|b|l|s|e)'
 const NON_COLOR_KEYS = {
   bg: /^(?:fixed|local|scroll|clip-(?:border|padding|content|text)|origin-(?:border|padding|content)|no-repeat|repeat(?:-x|-y|-round|-space)?|auto|cover|contain|center|top|bottom|left|right|(?:left|right)-(?:top|bottom)|none|gradient-to-(?:t|tr|r|br|b|bl|l|tl)|blend-[a-z-]+)$/,
-  text: /^(?:xs|sm|base|lg|xl|2xl|3xl|left|center|right|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip)$/,
+  text: new RegExp(
+    `^(?:${[...SCALES.type.keys()].join('|')}|left|center|right|justify|start|end|wrap|nowrap|balance|pretty|ellipsis|clip)$`
+  ),
   border: new RegExp(
     `^(?:${WIDTH}|${SIDE}|${SIDE}-${WIDTH}|solid|dashed|dotted|double|hidden|none|collapse|separate|spacing-[0-9.]+)$`
   ),
@@ -136,33 +189,46 @@ const ARBITRARY_COLOR = /-\[(?:#|rgba?\(|hsla?\(|var\(--|color:|color-mix)/g
 const HEX = /(?<![&\w])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/g
 const RAW_FUNCTION = /(?<![\w-])(?:rgba?|hsla?)\((?!var\(--cc-)/g
 const DARK_COLOR = new RegExp(`(?<![\\w-])dark:(?:[a-z-]+:)*(?:${COLOR_UTILITIES})-`, 'g')
-const SPACING_SCALE = new Set([
-  '0',
-  '0.5',
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  '6',
-  '8',
-  '10',
-  '12',
-  '14',
-  '16',
-])
+const SPACING_SCALE = new Set(SCALES.space.keys())
 const SPACING_NAMES = new Set(['safe', 'tab-bar'])
 const SPACING_CLASS =
   /(?<![\w-])-?(gap-x|gap-y|gap|space-x|space-y|px|py|pt|pr|pb|pl|ps|pe|p|mx|my|mt|mr|mb|ml|ms|me|m)-(\d+(?:\.\d+)?|px|safe|tab-bar|auto|\[[^\]\s]*\])(?![\w-])/g
+/** A type step Tailwind would size (`text-sm`, `text-4xl`) or an arbitrary size. */
 const TEXT_SIZE =
-  /(?<![\w-])text-(?:[4-9]xl|\[(?!color:|#|rgba?\(|hsla?\(|var\(|color-mix)[^\]\s]*\])/g
+  /(?<![\w-])text-(?:(xs|sm|base|lg|\d?xl)|\[(?!color:|#|rgba?\(|hsla?\(|var\(|color-mix)[^\]\s]*\])(?![\w-])/g
 const RADIUS_CLASS =
   /(?<![\w-])rounded(?:-(?:tl|tr|br|bl|ss|se|es|ee|t|r|b|l|s|e))?(?:-([a-z0-9]+|\[[^\]\s]*\]))?(?![\w-])/g
-const RADIUS_SCALE = new Set(['none', 'sm', 'md', 'lg', 'xl', 'full'])
+const RADIUS_SCALE = new Set(SCALES.radius.keys())
 const SHADOW_CLASS = /(?<![\w-])shadow(?:-([a-z0-9-]+|\[[^\]\s]*\]))?(?![\w-[])/g
-const SHADOW_SCALE = new Set(['none', 'card', 'overlay'])
-const NAMED_COLORS =
-  'white|black|red|green|blue|gray|grey|yellow|orange|purple|pink|silver|gold|navy|teal|brown|maroon|olive|lime|aqua|fuchsia'
+const SHADOW_SCALE = new Set(SCALES.elevation)
+/**
+ * Every CSS named color keyword (CSS Color 4). System colors (`Canvas`, `CanvasText`,
+ * `ButtonText`...) and `transparent`, `currentColor` and `inherit` are not on this list, so
+ * forced-colors rules and token expressions pass.
+ */
+export const CSS_NAMED_COLORS = Object.freeze(
+  (
+    'aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue ' +
+    'blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk ' +
+    'crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki ' +
+    'darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen ' +
+    'darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue ' +
+    'dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite ' +
+    'gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki ' +
+    'lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan ' +
+    'lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen ' +
+    'lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen ' +
+    'magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen ' +
+    'mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream ' +
+    'mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid ' +
+    'palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum ' +
+    'powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown ' +
+    'seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen ' +
+    'steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow ' +
+    'yellowgreen'
+  ).split(' ')
+)
+const NAMED_COLORS = [...CSS_NAMED_COLORS].sort((a, b) => b.length - a.length).join('|')
 /** A named color as a style value or an SVG paint attribute (`color: 'white'`, `fill="gold"`). */
 const NAMED_COLOR = new RegExp(
   `(?:color|\\bfill|\\bstroke|background)\\s*[:=]\\s*\\{?\\s*['"\`](?:${NAMED_COLORS})['"\`]`,
@@ -324,7 +390,8 @@ const CLASS_RULES = [
   },
   {
     pattern: TEXT_SIZE,
-    fails: () => true,
+    // A named step passes when the token type scale has it; an arbitrary size always fails.
+    fails: (match) => !SCALES.type.has(match[1] ?? ''),
     message: (token) =>
       `type size \`${token}\` is off the D4 scale (text-xs to text-3xl)`,
   },
@@ -374,15 +441,33 @@ function colorLiteralProblems(text, firstLine) {
   return problems
 }
 
+/** A CSS declaration that paints a color (`color`, `background`, `border-*`, `fill`...). */
+const CSS_PAINT_DECLARATION =
+  /(?<![\w-])((?:background|border|outline|text-decoration|column-rule)(?:-[a-z-]+)?|color|fill|stroke|caret-color|accent-color|stop-color|flood-color|lighting-color|box-shadow|text-shadow|text-emphasis-color)\s*:\s*([^;{}]+)/gi
+const CSS_NAMED_COLOR_WORD = new RegExp(`(?<![\\w-])(?:${NAMED_COLORS})(?![\\w-])`, 'i')
+
+function cssNamedColorProblems(text) {
+  const problems = []
+  for (const { match, line } of matches(CSS_PAINT_DECLARATION, text, 1)) {
+    const named = match[2].match(CSS_NAMED_COLOR_WORD)
+    if (named)
+      problems.push({
+        line,
+        message: `named color \`${named[0]}\` in \`${match[1]}\`; use a token role`,
+      })
+  }
+  return problems
+}
+
 /**
  * D4 on native: a literal font size, corner radius or spacing value must be on the token scale
  * (`useTokens().type`, `.radius`, `.space`). Sizes (width, height, icon `size`) stay free.
  */
 const NATIVE_SCALE =
   /\b(fontSize|borderRadius|border(?:Top|Bottom)(?:Left|Right|Start|End)Radius|padding(?:Top|Bottom|Left|Right|Horizontal|Vertical|Start|End)?|margin(?:Top|Bottom|Left|Right|Horizontal|Vertical|Start|End)?|gap|rowGap|columnGap)\s*:\s*(-?\d+(?:\.\d+)?)(?![\w.])/g
-const NATIVE_FONT_SIZES = new Set([12, 14, 16, 18, 20, 24, 30])
-const NATIVE_RADII = new Set([0, 4, 8, 12, 16, 9999])
-const NATIVE_SPACE = new Set([0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64])
+const NATIVE_FONT_SIZES = new Set(SCALES.type.values())
+const NATIVE_RADII = new Set(SCALES.radius.values())
+const NATIVE_SPACE = new Set(SCALES.space.values())
 
 function nativeScaleAllowed(property, value) {
   if (property === 'fontSize') return NATIVE_FONT_SIZES.has(value)
@@ -418,6 +503,7 @@ export function checkSource(
       comment.replace(/[^\n]/g, ' ')
     )
     problems.push(...colorLiteralProblems(text, 1))
+    problems.push(...cssNamedColorProblems(text))
     for (const { match, line } of matches(/@apply[^;]*;/g, text, 1))
       problems.push(...classProblems(match[0], line, { spacing }))
   } else {

@@ -6,8 +6,9 @@
 # Each tab in light, then the system flips to dark with the app still open and each tab again,
 # so the dark half also proves the app follows a live change of the system setting. Runs only
 # in the visual shard of pr-mobile-e2e.yml, on the Android small_phone (360 x 640 dp), the
-# smallest supported phone; baselines live in maestro/snapshots/shell-visual/. The status bar
-# is in SystemUI demo mode (fixed 12:00 clock, full battery, no notification icons).
+# smallest supported phone. The flow captures; the job's next step compares all eight captures
+# with maestro/snapshots/shell-visual/ (scripts/visual-baselines/compare-native.mjs). The status
+# bar is in SystemUI demo mode (fixed 12:00 clock, full battery, no notification icons).
 appId: ${MAESTRO_APP_ID}
 name: 'CC-7.9 shell snapshots in light and dark on the smallest phone'
 tags:

@@ -562,7 +562,8 @@
         "processing": "Elaborazione",
         "awaiting_tags": "In attesa di etichette",
         "ready": "Pronto",
-        "failed": "Non riuscito"
+        "failed": "Non riuscito",
+        "unknown": "In corso"
       },
       "detailTitle": "Dettagli del capo"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Look in evidenza a {{label}} di {{author}}, {{count}} reazione. Apre In evidenza in città.",
       "linkLabel_other": "Look in evidenza a {{label}} di {{author}}, {{count}} reazioni. Apre In evidenza in città.",
       "cta": "Vedi in In evidenza in città"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Piani guardaroba in base al meteo per ogni tragitto",
     "hero": {
       "eyebrow": "Rituale quotidiano",
@@ -1603,7 +1606,13 @@
       "retry": "Riprova"
     },
     "dismissBanner": "Chiudi il banner",
-    "skipToContent": "Vai al contenuto principale"
+    "skipToContent": "Vai al contenuto principale",
+    "close": "Chiudi la finestra",
+    "legal": {
+      "label": "Note legali",
+      "privacy": "Informativa sulla privacy",
+      "terms": "Termini di servizio"
+    }
   },
   "guardian": {
     "accept": {

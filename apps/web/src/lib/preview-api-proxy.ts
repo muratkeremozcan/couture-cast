@@ -44,12 +44,24 @@ export function previewApiProxyConfig(
   if (env.VERCEL_ENV !== 'preview') return null
   const bypassSecret = env.PREVIEW_API_PROTECTION_BYPASS_SECRET?.trim() ?? ''
   if (!bypassSecret) return null
-  const baseUrl = previewApiBaseUrl(env)
-  if (!baseUrl) return null
+  const configured = previewApiBaseUrl(env)
+  if (!configured) return null
+  // A fragment would swallow the appended path and query, and user information makes fetch
+  // refuse the URL: both are rejected, and the destination is built from the parsed origin.
+  if (/[#@]/.test(configured)) return null
+  let baseUrl: string
   try {
-    const parsed = new URL(baseUrl)
-    if (parsed.protocol !== 'https:' || parsed.pathname !== '/' || parsed.search)
+    const parsed = new URL(configured)
+    if (
+      parsed.protocol !== 'https:' ||
+      parsed.pathname !== '/' ||
+      parsed.search ||
+      parsed.hash ||
+      parsed.username ||
+      parsed.password
+    )
       return null
+    baseUrl = parsed.origin
   } catch {
     return null
   }
@@ -78,6 +90,8 @@ const DROPPED_RESPONSE_HEADERS = new Set([
   'transfer-encoding',
   'content-encoding',
   'content-length',
+  // The API sets no cookie and the web reads none, so nothing is allowed through: a platform
+  // cookie (the deployment JWT or a bypass cookie) would open the protected API directly.
   'set-cookie',
 ])
 
@@ -95,12 +109,38 @@ function isUnsafeSegment(segment: string): boolean {
   return decoded === '.' || decoded === '..' || /[/\\]/.test(decoded)
 }
 
+/** Vercel's own cookie names (`_vercel_jwt`, the bypass cookie and any later `_vercel*`). */
+const isVercelCookieName = (name: string) => /^_+vercel/i.test(name.trim())
+
+/**
+ * The query without Vercel's reserved deployment-protection options (`x-vercel-set-bypass-cookie`,
+ * `x-vercel-protection-bypass` and any other `x-vercel-*` name), which would otherwise ask the
+ * protected API for a cookie that opens it directly. Every other part passes through as sent.
+ */
+function withoutVercelQueryOptions(search: string): string {
+  const kept = search
+    .replace(/^\?/, '')
+    .split('&')
+    .filter((part) => {
+      if (!part) return false
+      const rawName = part.split('=')[0] ?? ''
+      let name = rawName
+      try {
+        name = decodeURIComponent(rawName.replace(/\+/g, ' '))
+      } catch {
+        // An undecodable name is compared as written.
+      }
+      return !name.trim().toLowerCase().startsWith('x-vercel-')
+    })
+  return kept.length ? `?${kept.join('&')}` : ''
+}
+
 /** Removes Vercel's own cookies (the web deployment's share/auth JWT) from a Cookie header. */
 function withoutVercelCookies(cookie: string): string {
   return cookie
     .split(';')
     .map((part) => part.trim())
-    .filter((part) => part && !part.startsWith('_vercel'))
+    .filter((part) => part && !isVercelCookieName(part.split('=')[0] ?? ''))
     .join('; ')
 }
 
@@ -129,7 +169,6 @@ function browserResponseHeaders(source: Headers): Headers {
     if (DROPPED_RESPONSE_HEADERS.has(key) || key === PROTECTION_BYPASS_HEADER) return
     headers.set(name, value)
   })
-  for (const cookie of source.getSetCookie()) headers.append('set-cookie', cookie)
   return headers
 }
 
@@ -150,7 +189,7 @@ export async function proxyPreviewApi(
   // Every forwarded call stays under /api/v1 on the API host.
   if (pathSegments.some(isUnsafeSegment))
     return new Response('Not Found', { status: 404 })
-  const search = new URL(request.url).search
+  const search = withoutVercelQueryOptions(new URL(request.url).search)
   const path = pathSegments.map((segment) => encodeURIComponent(segment)).join('/')
   const target = `${config.baseUrl}/api/v1/${path}${search}`
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD'

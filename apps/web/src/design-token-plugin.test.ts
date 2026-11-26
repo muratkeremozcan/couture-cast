@@ -12,15 +12,20 @@ import {
   PREMIUM_PALETTE_FIELDS,
   PREMIUM_PALETTE_KEYS,
   premiumPalettes,
+  shell,
+  space,
+  typeScale,
   type ColorScheme,
 } from '@couture/utils'
 import postcss, { type Root, type Rule } from 'postcss'
 import tailwindcss from 'tailwindcss'
 import { beforeAll, describe, expect, it } from 'vitest'
-import config from '../tailwind.config'
+import config, { designTokenFontSize, designTokenSpacing } from '../tailwind.config'
 
-const PROBE_CLASSES =
-  'bg-page text-ink-muted bg-scrim/50 border-line-strong bg-amber-300 text-white'
+const PROBE_CLASSES = [
+  'bg-page text-ink-muted bg-scrim/50 border-line-strong bg-amber-300 text-white',
+  'text-sm text-3xl text-4xl p-4 p-7 gap-3 -mt-2 mt-auto h-top-bar h-tab-bar min-h-touch',
+].join(' ')
 
 let root: Root
 
@@ -93,5 +98,44 @@ describe('7.9-UNIT-006 the token plugin emits the --cc-* variables', () => {
     // `colors` is replaced wholesale: a Tailwind palette class emits nothing (the guard's reason).
     expect(css).not.toMatch(/\.bg-amber-300/)
     expect(css).not.toMatch(/\.text-white/)
+  })
+})
+
+describe('7.9-UNIT-006 type, spacing and shell sizes come from the tokens', () => {
+  const rem = (px: number) => `${px / 16}rem`
+  const utility = (selector: string) => declarations(selector, false)
+
+  it('maps every D4 type step to its font size and line height, and nothing larger', () => {
+    for (const [key, { fontSize, lineHeight }] of Object.entries(typeScale)) {
+      expect(designTokenFontSize[key as keyof typeof typeScale]).toEqual([
+        rem(fontSize),
+        { lineHeight: rem(lineHeight) },
+      ])
+    }
+    expect(utility('.text-sm')).toEqual({
+      'font-size': rem(typeScale.sm.fontSize),
+      'line-height': rem(typeScale.sm.lineHeight),
+    })
+    expect(utility('.text-3xl')['font-size']).toBe(rem(typeScale['3xl'].fontSize))
+    expect(utility('.text-4xl')).toEqual({})
+  })
+
+  it('maps every D4 spacing step and builds no off-scale padding', () => {
+    for (const [key, px] of Object.entries(space)) {
+      expect(designTokenSpacing[key as unknown as keyof typeof space]).toBe(
+        px === 0 ? '0px' : rem(px)
+      )
+    }
+    expect(utility('.p-4')).toEqual({ padding: rem(space[4]) })
+    expect(utility('.gap-3')).toEqual({ gap: rem(space[3]) })
+    expect(utility('.-mt-2')).toEqual({ 'margin-top': `-${rem(space[2])}` })
+    expect(utility('.mt-auto')).toEqual({ 'margin-top': 'auto' })
+    expect(utility('.p-7')).toEqual({})
+  })
+
+  it('sizes the top bar, the tab bar and the touch target from the shell tokens', () => {
+    expect(utility('.h-top-bar')).toEqual({ height: `${shell.topBarHeight}px` })
+    expect(utility('.h-tab-bar')).toEqual({ height: `${shell.tabBarHeight}px` })
+    expect(utility('.min-h-touch')).toEqual({ 'min-height': `${shell.touchTarget}px` })
   })
 })

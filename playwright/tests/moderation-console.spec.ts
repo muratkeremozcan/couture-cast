@@ -166,6 +166,18 @@ async function loadCases(page: Page, caseIds: string[]) {
     ).toHaveCount(1)
 }
 
+// CC-7.9 D6: a case returns to the queue through the shared top bar's Back (backHref /moderation).
+const topBarBack = (page: Page) =>
+  page.getByTestId('app-header').getByTestId('app-top-bar-back')
+
+/** D6: from 768 px the top bar also holds the tab links, in this order, after Back. */
+const TOP_BAR_TABS = [
+  'nav-ritual',
+  'nav-wardrobe',
+  'nav-community',
+  'nav-profile',
+] as const
+
 const hrefsOf = async (links: Locator) =>
   links.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href') ?? ''))
 
@@ -318,7 +330,9 @@ test.describe('Moderator console, live (Story 6.10)', () => {
       await expect(
         page.getByRole('heading', { level: 2, name: /^(Post|Comment) case$/ })
       ).toBeVisible()
-      await page.getByRole('link', { name: 'Back to queue' }).click()
+      // CC-7.9 D6: Back is the shared top bar control
+      await expect(topBarBack(page)).toHaveAccessibleName('Back')
+      await topBarBack(page).click()
       await expect(page).toHaveURL(/\/moderation$/)
     }
   })
@@ -388,12 +402,29 @@ test.describe('Moderator console, live (Story 6.10)', () => {
     await expect(
       page.getByRole('heading', { level: 2, name: /^(Post|Comment) case$/ })
     ).toBeVisible()
+    // CC-7.9 D6: Back is the shared top bar control; the first Tab on the opened case reaches it.
+    const back = topBarBack(page)
     await page.keyboard.press('Tab')
-    await expect(page.getByRole('link', { name: 'Back to queue' })).toBeFocused()
+    await expect(back).toBeFocused()
+    await expect(back).toHaveAccessibleName('Back')
+    expect(await back.evaluate((node) => getComputedStyle(node).outlineStyle)).not.toBe(
+      'none'
+    )
+    // CC-7.9 D6: the bar's tab links sit between Back and the case, in both directions.
+    const bar = page.getByTestId('app-header')
+    for (const tab of TOP_BAR_TABS) {
+      await page.keyboard.press('Tab')
+      await expect(bar.getByTestId(tab)).toBeFocused()
+    }
     await page.keyboard.press('Tab')
     await expect(page.getByRole('button', { name: 'Reload case' })).toBeFocused()
+    for (const tab of [...TOP_BAR_TABS].reverse()) {
+      await page.keyboard.press('Shift+Tab')
+      await expect(bar.getByTestId(tab)).toBeFocused()
+    }
     await page.keyboard.press('Shift+Tab')
-    await expect(page.getByRole('link', { name: 'Back to queue' })).toBeFocused()
+    // CC-7.9 D6: Back is the shared top bar control
+    await expect(back).toBeFocused()
     await page.keyboard.press('Enter')
     await expect(page).toHaveURL(/\/moderation$/)
   })
@@ -624,7 +655,8 @@ test.describe('Moderator console, seeded (Story 6.10)', () => {
     await expect(reporters.getByRole('listitem')).toHaveCount(3)
     for (const n of [1, 2, 3])
       await expect(reporters).toContainText(`${queue.runId}-reporter${n}`)
-    await page.getByRole('link', { name: 'Back to queue' }).click()
+    // CC-7.9 D6: Back is the shared top bar control
+    await topBarBack(page).click()
     await expect(page).toHaveURL(/\/moderation$/)
   })
 

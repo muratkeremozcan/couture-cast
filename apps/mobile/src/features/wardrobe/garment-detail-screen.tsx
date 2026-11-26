@@ -201,7 +201,10 @@ function MemberGarmentDetail({
   const garment =
     closet.garments?.find((item) => item.id === garmentId && item.status === 'ready') ??
     null
-  const title = garment ? garmentPhotoLabel(locale, garment) : ''
+  // Loading or missing, the piece has no name yet; the bar still names the screen.
+  const title = garment
+    ? garmentPhotoLabel(locale, garment)
+    : t('wardrobe.hub.detailTitle')
 
   // Story CC-7.9 D6: the root stack's AppTopBar shows this title and the back control (back to
   // the hub, or the Wardrobe tab on a direct entry), so the body carries no second heading.

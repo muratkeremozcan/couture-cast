@@ -562,7 +562,8 @@
         "processing": "Procesando",
         "awaiting_tags": "Esperando etiquetas",
         "ready": "Lista",
-        "failed": "Error"
+        "failed": "Error",
+        "unknown": "En curso"
       },
       "detailTitle": "Detalles de la prenda"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Look destacado en {{label}} de {{author}}, {{count}} reacción. Abre Destacados de la ciudad.",
       "linkLabel_other": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
       "cta": "Ver en Destacados de la ciudad"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Planes de vestuario según el clima para cada trayecto",
     "hero": {
       "eyebrow": "Ritual diario",
@@ -1603,7 +1606,13 @@
       "retry": "Reintentar"
     },
     "dismissBanner": "Cerrar aviso",
-    "skipToContent": "Saltar al contenido principal"
+    "skipToContent": "Saltar al contenido principal",
+    "close": "Cerrar el cuadro de diálogo",
+    "legal": {
+      "label": "Información legal",
+      "privacy": "Política de privacidad",
+      "terms": "Términos del servicio"
+    }
   },
   "guardian": {
     "accept": {

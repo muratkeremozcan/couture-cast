@@ -85,10 +85,12 @@ tags:
 
 # --- AC 8: the screen renders from the locale catalogs, not from literals -----
 
+# CC-7.9 D6: the stack's shared top bar carries the localized title; the body heading is gone.
 - assertVisible:
-    id: 'palette-advisor-title'
     text: 'Color palette advisor'
-    label: 'Localized screen title'
+    childOf:
+      id: 'app-top-bar'
+    label: 'Localized screen title in the top bar'
 
 - assertVisible:
     text: 'Find the makeup shades and accessories that suit your tones. Premium reads your wardrobe colors, or one selfie you choose to share, and keeps only the result.'

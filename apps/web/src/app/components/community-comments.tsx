@@ -427,7 +427,7 @@ export function CommunityComments({
           ref={composerRef}
           data-testid="comment-body"
           value={thread.draft.body}
-          className="min-h-11 w-full rounded-md border border-theme-card-border bg-theme-card-bg px-3 text-theme-card-text"
+          className="min-h-11 w-full rounded-md border border-line-strong bg-page px-3 text-theme-card-text"
           onChange={(event) =>
             state.draft(postId, {
               body: composing.current

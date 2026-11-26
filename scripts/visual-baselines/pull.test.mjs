@@ -10,9 +10,13 @@ import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import {
+  missingBaselines,
+  NATIVE_BASELINES,
   nativeBaselineName,
   placeBaselines,
+  planBaselines,
   VISUAL_SHARD,
+  WEB_BASELINES,
   webBaselineName,
 } from './pull.mjs'
 
@@ -28,7 +32,7 @@ test('[7.9-VIS-U01] Playwright actuals map to the Linux Chromium baseline names'
   assert.equal(nativeBaselineName('chip-navigation-bottom-nav.png'), null)
 })
 
-test('[7.9-VIS-U02] only files in the named folder are placed, across shard folders', () => {
+test('[7.9-VIS-U02] only files in the named folder are planned, across shard folders', () => {
   const downloaded = path.join(tmp, 'download')
   for (const [dir, name] of [
     ['blob-report-1/visual-actuals', 'home-light-actual.png'],
@@ -38,21 +42,42 @@ test('[7.9-VIS-U02] only files in the named folder are placed, across shard fold
     fs.mkdirSync(path.join(downloaded, dir), { recursive: true })
     fs.writeFileSync(path.join(downloaded, dir, name), dir)
   }
-  const targetDir = path.join(tmp, 'snapshots')
-  const written = placeBaselines({
+  const plan = planBaselines({
     downloaded,
     folder: 'visual-actuals',
-    targetDir,
     nameOf: webBaselineName,
   })
   assert.deepEqual(
-    written.map((file) => path.basename(file)),
+    plan.map((entry) => entry.name),
     ['home-light-chromium-linux.png', 'profile-dark-chromium-linux.png']
   )
+  const targetDir = path.join(tmp, 'snapshots')
+  placeBaselines(plan, targetDir)
   assert.equal(
     fs.readFileSync(path.join(targetDir, 'home-light-chromium-linux.png'), 'utf8'),
     'blob-report-1/visual-actuals'
   )
+})
+
+test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): eight per platform', () => {
+  assert.equal(WEB_BASELINES.length, 8)
+  assert.equal(NATIVE_BASELINES.length, 8)
+  const plan = NATIVE_BASELINES.slice(0, 3).map((name) => ({ name, source: name }))
+  assert.deepEqual(missingBaselines(plan, NATIVE_BASELINES), NATIVE_BASELINES.slice(3))
+  assert.deepEqual(missingBaselines(plan, []), [])
+  // The names match what the specs and the flow produce.
+  const spec = fs.readFileSync(
+    path.join(root, 'playwright/tests/app-shell-visual-snapshots.spec.ts'),
+    'utf8'
+  )
+  for (const name of WEB_BASELINES)
+    assert.match(spec, new RegExp(`'${name.replace('-chromium-linux.png', '')}'`), name)
+  const tabs = fs.readFileSync(
+    path.join(root, 'maestro/subflows/shell-visual-tabs.yaml'),
+    'utf8'
+  )
+  for (const tab of ['home', 'wardrobe', 'community', 'profile'])
+    assert.match(tabs, new RegExp(`NAME: '${tab}'`), tab)
 })
 
 test('[7.9-VIS-U03] the workflows export what the script reads', () => {

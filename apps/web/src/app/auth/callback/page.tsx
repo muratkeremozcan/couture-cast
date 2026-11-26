@@ -13,6 +13,8 @@ import {
   type SignInDoor,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
+import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
+import { AppTopBar } from '../../components/app-top-bar'
 import { takeOAuthCallbackParams } from '../../../lib/oauth-callback-url'
 import { destinationAfterSignIn } from '../../../lib/post-signin-destination'
 import { completeWebOAuth, type WebOAuthOutcome } from '../../../lib/web-session'
@@ -63,14 +65,19 @@ export default function OAuthCallbackPage() {
     }
   }, [])
   return (
-    <main
-      id="main-content"
-      className="mx-auto flex min-h-[50vh] max-w-md flex-col justify-center gap-4 p-6"
-    >
-      <h1 className="text-2xl font-semibold">{strings.continueWithGoogle}</h1>
-      <p role="status" aria-live="polite" data-testid="oauth-callback-status">
-        {failed ? strings.unavailable : strings.finishing}
-      </p>
-    </main>
+    // Story CC-7.9 D6, D7: the shared top bar owns the page's only heading, as on /signin.
+    <AppPage>
+      <AppTopBar title={strings.continueWithGoogle} backHref="/" />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <p
+          role="status"
+          aria-live="polite"
+          data-testid="oauth-callback-status"
+          className="mx-auto w-full max-w-md text-base text-ink"
+        >
+          {failed ? strings.unavailable : strings.finishing}
+        </p>
+      </main>
+    </AppPage>
   )
 }

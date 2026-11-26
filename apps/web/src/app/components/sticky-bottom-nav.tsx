@@ -126,7 +126,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
       }`}
     >
-      <div className="mx-auto flex h-14 w-full max-w-md items-center justify-around px-2">
+      <div className="mx-auto flex h-tab-bar w-full max-w-md items-center justify-around px-2">
         {NAV_TABS.map((tab) => {
           const isActive = activeTab === tab.id
 
@@ -140,7 +140,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               data-testid={`bottom-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
-              className="relative flex h-full min-h-11 min-w-16 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-xs font-medium text-ink sm:px-3"
+              className="relative flex h-full min-h-touch min-w-16 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-xs font-medium text-ink sm:px-3"
             >
               <span aria-hidden="true" className="text-base leading-none">
                 {tab.icon}

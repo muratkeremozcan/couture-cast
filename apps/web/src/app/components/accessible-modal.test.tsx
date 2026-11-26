@@ -5,6 +5,7 @@ import { renderToString } from 'react-dom/server'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 
 function renderModal(
@@ -252,6 +253,22 @@ describe('AccessibleModal', () => {
     renderModal()
 
     expect(document.activeElement).toBe(screen.getByLabelText('Close modal'))
+  })
+
+  // Story CC-7.9 P2-11: the fallback close name comes from the catalog, so it follows the reader.
+  it('7.9 P2-11 names the fallback close button in the reader language', async () => {
+    await act(async () => {
+      await getI18n().changeLanguage('de-DE')
+    })
+    try {
+      renderModal()
+      expect(screen.getByRole('button', { name: 'Dialog schließen' })).toHaveFocus()
+      expect(screen.queryByRole('button', { name: 'Close modal' })).toBeNull()
+    } finally {
+      await act(async () => {
+        await getI18n().changeLanguage('en-US')
+      })
+    }
   })
 
   it('honors an explicit initial focus target over the close button', () => {

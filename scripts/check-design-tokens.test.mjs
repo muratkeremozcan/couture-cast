@@ -232,6 +232,69 @@ describe('check-design-tokens', () => {
     assert.equal(clean.status, 0, clean.stderr)
   })
 
+  test('7.9-GRD-013 a CSS named colour in a plain declaration and any CSS Color 4 keyword in JSX or native fail (Codex P3-1)', () => {
+    expectFlagged(
+      'apps/web/src/app/mutant.css',
+      (line) => `.a {\n  color: rgb(var(--cc-ink));\n${line}\n}\n`,
+      [
+        '  border: 1px solid Red;',
+        '  background: rebeccapurple;',
+        '  box-shadow: 0 0 0 2px navy;',
+        '  text-decoration: underline wavy Crimson;',
+        '  caret-color: hotpink;',
+      ]
+    )
+    expectFlagged(WEB_FILE, webLine, [
+      'export const b = <svg fill="RebeccaPurple" />',
+      "export const b = <p style={{ borderColor: 'darkslategray' }} />",
+    ])
+    expectFlagged(NATIVE_FILE, nativeLine, [
+      "export const s = { color: 'Tomato' }",
+      "export const s = { backgroundColor: 'aliceblue' }",
+    ])
+    const clean = guardTree({
+      'apps/web/src/app/mutant.css':
+        '.a {\n  outline-color: CanvasText;\n  background: Canvas;\n  border-color: transparent;\n  color: currentColor;\n  fill: inherit;\n  box-shadow: 0 0 0 4px rgb(var(--cc-focus));\n  font-family: Georgia, serif;\n  content: "red";\n}\n',
+      [WEB_FILE]: webLine('export const b = <svg fill="currentColor" stroke="none" />'),
+      [NATIVE_FILE]: nativeLine(
+        "export const s = { color: 'transparent', fontFamily: 'System' }"
+      ),
+    })
+    assert.equal(clean.status, 0, clean.stderr)
+  })
+
+  test('7.9-GRD-014 the guard reads its scales from design-tokens.ts, which hold D4 (Codex P2-12)', async () => {
+    const { SCALES } = await import('./check-design-tokens.mjs')
+    assert.deepEqual(Object.fromEntries(SCALES.type), {
+      xs: 12,
+      sm: 14,
+      base: 16,
+      lg: 18,
+      xl: 20,
+      '2xl': 24,
+      '3xl': 30,
+    })
+    assert.deepEqual(
+      [...SCALES.space.values()],
+      [0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 56, 64]
+    )
+    assert.deepEqual(Object.fromEntries(SCALES.radius), {
+      none: 0,
+      sm: 4,
+      md: 8,
+      lg: 12,
+      xl: 16,
+      full: 9999,
+    })
+    assert.deepEqual([...SCALES.elevation], ['none', 'card', 'overlay'])
+    // No scale of its own: the guard source holds no literal step list.
+    const source = fs.readFileSync(script, 'utf8')
+    assert.doesNotMatch(source, /new Set\(\[\s*'0',\s*'0\.5'/)
+    assert.doesNotMatch(source, /new Set\(\['none', 'sm', 'md', 'lg', 'xl', 'full'\]\)/)
+    // A type step outside the token type scale fails.
+    expectFlagged(WEB_FILE, webLine, ['export const b = <p className="text-[17px]" />'])
+  })
+
   test('a fixture tree written only in token roles exits 0', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'design-tokens-clean-'))
     try {

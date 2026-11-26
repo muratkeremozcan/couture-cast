@@ -63,6 +63,8 @@ describe('Profile and navigation locale parity (web)', () => {
   it('PROFILE-I18N-WEB-01 matches the canonical en-US strings', () => {
     expect(Object.fromEntries(reference)).toEqual({
       'nav.label': 'Bottom navigation',
+      // Story CC-7.9 D6: the top bar's desktop tab links name their landmark.
+      'nav.primaryLabel': 'Main navigation',
       'nav.home': 'Home',
       'nav.wardrobe': 'Wardrobe',
       'nav.community': 'Community',

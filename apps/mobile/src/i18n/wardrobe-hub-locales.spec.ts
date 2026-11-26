@@ -1,6 +1,6 @@
 // Story CC-7.9 D9 owner: the native Wardrobe hub strings that were hard-coded English (the
 // loading label, the Saved Looks fallback error, the garment status words and the signed-out
-// error) ship in all ten mobile catalogs.
+// error) ship in all ten mobile catalogs, with the garment detail title the web catalog uses.
 // Learning path Step 66: One app shell and visual system.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
 import { describe, expect, it } from 'vitest'
@@ -15,6 +15,16 @@ import itIT from '../../assets/locales/it-IT.json'
 import ptBR from '../../assets/locales/pt-BR.json'
 import ptPT from '../../assets/locales/pt-PT.json'
 import trTR from '../../assets/locales/tr-TR.json'
+import webDeDE from '../../../web/src/i18n/locales/de-DE.json'
+import webEnCA from '../../../web/src/i18n/locales/en-CA.json'
+import webEnUS from '../../../web/src/i18n/locales/en-US.json'
+import webEs419 from '../../../web/src/i18n/locales/es-419.json'
+import webFrCA from '../../../web/src/i18n/locales/fr-CA.json'
+import webFrFR from '../../../web/src/i18n/locales/fr-FR.json'
+import webItIT from '../../../web/src/i18n/locales/it-IT.json'
+import webPtBR from '../../../web/src/i18n/locales/pt-BR.json'
+import webPtPT from '../../../web/src/i18n/locales/pt-PT.json'
+import webTrTR from '../../../web/src/i18n/locales/tr-TR.json'
 
 type Catalog = Record<string, unknown>
 
@@ -44,6 +54,19 @@ const CATALOGS: Record<SupportedLocale, Catalog> = {
   'pt-BR': ptBR as Catalog,
   'pt-PT': ptPT as Catalog,
   'tr-TR': trTR as Catalog,
+}
+
+const WEB_CATALOGS: Record<SupportedLocale, Catalog> = {
+  'en-US': webEnUS as Catalog,
+  'en-CA': webEnCA as Catalog,
+  'de-DE': webDeDE as Catalog,
+  'es-419': webEs419 as Catalog,
+  'fr-CA': webFrCA as Catalog,
+  'fr-FR': webFrFR as Catalog,
+  'it-IT': webItIT as Catalog,
+  'pt-BR': webPtBR as Catalog,
+  'pt-PT': webPtPT as Catalog,
+  'tr-TR': webTrTR as Catalog,
 }
 
 /** Every garment status the contract names today, plus the open-set fallback. */
@@ -83,10 +106,20 @@ function flatten(value: unknown, prefix = ''): Map<string, string> {
 const reference = flatten(hubTree(enUS as Catalog))
 
 describe('7.9 mobile Wardrobe hub locale parity', () => {
-  it('7.9-I18N-MOB-01 ships 10 hub keys in the reference catalog, one per garment status', () => {
-    expect(reference.size).toBe(10)
+  it('7.9-I18N-MOB-01 ships 11 hub keys in the reference catalog, one per garment status', () => {
+    expect(reference.size).toBe(11)
     for (const status of STATUS_KEYS) {
       expect(reference.has(`hub.status.${status}`), status).toBe(true)
+    }
+    expect(reference.has('hub.detailTitle')).toBe(true)
+  })
+
+  it('7.9-I18N-MOB-06 titles garment detail with the web catalog words', () => {
+    // A loading or missing garment has no name yet; its top bar shows this title on both hosts.
+    for (const locale of SUPPORTED_LOCALES) {
+      const wardrobe = CATALOGS[locale].wardrobe as { hub: { detailTitle: string } }
+      const web = WEB_CATALOGS[locale].wardrobe as { hub: { detailTitle: string } }
+      expect(wardrobe.hub.detailTitle, locale).toBe(web.hub.detailTitle)
     }
   })
 

@@ -39,7 +39,7 @@ const CHIP_DEFAULT_FILTER: Record<ChipCategory, FilterCategory> = {
 
 /**
  * Story 3.5 design copy. Every entry names hardcoded demonstration content (its
- * copy lives under `home.lookbook.recommendations.<key>` in the web catalogs since
+ * copy lives under `landing.lookbook.recommendations.<key>` in the web catalogs since
  * Story CC-7.9 D9; the garment chips below the card are demonstration too), and
  * it is what the hero renders until a real recommendation feed reaches this surface.
  *
@@ -75,7 +75,7 @@ const HERO_RECOMMENDATIONS: Record<ChipCategory, { key: string; score: string }>
   Sponsored: { key: 'brands', score: '90%' },
 }
 
-/** The demonstration garment chips under the hero look (catalog keys under `home.lookbook.demo.garments`). */
+/** The demonstration garment chips under the hero look (catalog keys under `landing.lookbook.demo.garments`). */
 const DEMO_GARMENT_KEYS = ['blazer', 'scarf', 'loafers'] as const
 
 interface PlannerSlotProps {
@@ -374,10 +374,10 @@ export function LookbookPrismLayout() {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-4 sm:mb-8">
         <div data-landing="guest">
           <span className="text-xs uppercase tracking-[0.3em] text-ink-muted">
-            {i18n.t('home.lookbook.eyebrow')}
+            {i18n.t('landing.lookbook.eyebrow')}
           </span>
           <h2 className="text-3xl font-semibold tracking-tight text-ink">
-            {i18n.t('home.lookbook.title')}
+            {i18n.t('landing.lookbook.title')}
           </h2>
         </div>
         {/*
@@ -411,7 +411,7 @@ export function LookbookPrismLayout() {
           role="alert"
           aria-live="assertive"
           aria-atomic="true"
-          aria-label={i18n.t('home.lookbook.alert.label')}
+          aria-label={i18n.t('landing.lookbook.alert.label')}
           data-testid="severe-weather-alert-focused"
           tabIndex={-1}
           className="my-4 rounded-xl border border-danger-line bg-danger-surface p-5 text-ink"
@@ -419,7 +419,7 @@ export function LookbookPrismLayout() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-danger-ink">
               ⚠️{' '}
-              {i18n.t('home.lookbook.alert.severity', {
+              {i18n.t('landing.lookbook.alert.severity', {
                 severity: focusedWeatherAlert.event.data.severity,
               })}
               {` (#${focusedWeatherAlert.id})`}
@@ -429,7 +429,7 @@ export function LookbookPrismLayout() {
             </span>
           </div>
           <h3 className="mt-2 text-lg font-semibold">
-            {i18n.t('home.lookbook.alert.advisory', {
+            {i18n.t('landing.lookbook.alert.advisory', {
               type: focusedWeatherAlert.event.data.alertType.replace('_', ' '),
             })}
           </h3>
@@ -442,7 +442,7 @@ export function LookbookPrismLayout() {
               onClick={() => handleChipCategoryChange('Personal')}
               className="rounded-lg border border-line-strong bg-page px-4 py-2 text-xs font-semibold text-ink"
             >
-              {i18n.t('home.lookbook.alert.adjustOutfit')}
+              {i18n.t('landing.lookbook.alert.adjustOutfit')}
             </button>
             <button
               type="button"
@@ -485,7 +485,7 @@ export function LookbookPrismLayout() {
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
         <section
           ref={heroCanvasRef}
-          aria-label={i18n.t('home.lookbook.heroLabel')}
+          aria-label={i18n.t('landing.lookbook.heroLabel')}
           // Focusable from code, so focus has somewhere to land when the teaser leaves.
           tabIndex={-1}
           // Story CC-7.9 D7: the hero canvas is the one card; the looks inside it are sections.
@@ -503,24 +503,24 @@ export function LookbookPrismLayout() {
                     data-share-card-focus-fallback="hero"
                     className="text-xs uppercase tracking-widest text-ink-muted"
                   >
-                    {i18n.t('home.lookbook.demo.heading')}
+                    {i18n.t('landing.lookbook.demo.heading')}
                   </h2>
                   <span className="rounded-full border border-line bg-page px-3 py-1 text-xs text-ink">
-                    {i18n.t('home.lookbook.demo.timeCity')}
+                    {i18n.t('landing.lookbook.demo.timeCity')}
                   </span>
                 </div>
 
                 {/* Weather Numerical Banner */}
                 <div className="flex items-baseline gap-4">
                   <span className="text-3xl font-bold text-ink">
-                    {i18n.t('home.lookbook.demo.temperature')}
+                    {i18n.t('landing.lookbook.demo.temperature')}
                   </span>
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-ink">
-                      {i18n.t('home.lookbook.demo.humidity')}
+                      {i18n.t('landing.lookbook.demo.humidity')}
                     </p>
                     <p className="text-xs text-ink-muted">
-                      {i18n.t('home.lookbook.demo.change')}
+                      {i18n.t('landing.lookbook.demo.change')}
                     </p>
                   </div>
                 </div>
@@ -528,7 +528,7 @@ export function LookbookPrismLayout() {
                 {/* Outfit Tiles */}
                 <div className="space-y-4">
                   <h3 className="text-xl font-semibold text-ink">
-                    {i18n.t('home.lookbook.demo.primaryLook')}
+                    {i18n.t('landing.lookbook.demo.primaryLook')}
                     {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
                     <span
                       data-testid="hero-example-label"
@@ -552,11 +552,11 @@ export function LookbookPrismLayout() {
                         <div className="mb-4 flex items-center justify-between">
                           <span className="text-xs uppercase text-ink-muted">
                             {i18n.t(
-                              `home.lookbook.recommendations.${heroRecommendation.key}.eyebrow`
+                              `landing.lookbook.recommendations.${heroRecommendation.key}.eyebrow`
                             )}
                           </span>
                           <span className="text-xs text-ink-muted">
-                            {i18n.t('home.lookbook.demo.matchScore', {
+                            {i18n.t('landing.lookbook.demo.matchScore', {
                               score: heroRecommendation.score,
                             })}
                           </span>
@@ -566,12 +566,12 @@ export function LookbookPrismLayout() {
                           className="mb-2 text-lg font-semibold text-ink"
                         >
                           {i18n.t(
-                            `home.lookbook.recommendations.${heroRecommendation.key}.title`
+                            `landing.lookbook.recommendations.${heroRecommendation.key}.title`
                           )}
                         </h4>
                         <p className="mb-4 text-xs leading-relaxed text-ink-soft">
                           {i18n.t(
-                            `home.lookbook.recommendations.${heroRecommendation.key}.description`
+                            `landing.lookbook.recommendations.${heroRecommendation.key}.description`
                           )}
                         </p>
                         <div className="flex flex-wrap gap-2">
@@ -580,7 +580,7 @@ export function LookbookPrismLayout() {
                               key={garment}
                               className="rounded-md border border-line bg-page px-2 py-1 text-xs text-ink-soft"
                             >
-                              {i18n.t(`home.lookbook.demo.garments.${garment}`)}
+                              {i18n.t(`landing.lookbook.demo.garments.${garment}`)}
                             </span>
                           ))}
                         </div>
@@ -598,28 +598,28 @@ export function LookbookPrismLayout() {
                         {/* Look A */}
                         <div className="space-y-3 border-t border-line pt-4">
                           <div className="flex items-center justify-between text-xs font-semibold text-ink">
-                            <span>{i18n.t('home.lookbook.demo.lookA.label')}</span>
+                            <span>{i18n.t('landing.lookbook.demo.lookA.label')}</span>
                             <span>96%</span>
                           </div>
                           <h4 className="text-base font-semibold text-ink">
-                            {i18n.t('home.lookbook.demo.lookA.title')}
+                            {i18n.t('landing.lookbook.demo.lookA.title')}
                           </h4>
                           <p className="text-xs text-ink-soft">
-                            {i18n.t('home.lookbook.demo.lookA.body')}
+                            {i18n.t('landing.lookbook.demo.lookA.body')}
                           </p>
                         </div>
 
                         {/* Look B */}
                         <div className="space-y-3 border-t border-line pt-4">
                           <div className="flex items-center justify-between text-xs text-ink-muted">
-                            <span>{i18n.t('home.lookbook.demo.lookB.label')}</span>
+                            <span>{i18n.t('landing.lookbook.demo.lookB.label')}</span>
                             <span>91%</span>
                           </div>
                           <h4 className="text-base font-semibold text-ink">
-                            {i18n.t('home.lookbook.demo.lookB.title')}
+                            {i18n.t('landing.lookbook.demo.lookB.title')}
                           </h4>
                           <p className="text-xs text-ink-soft">
-                            {i18n.t('home.lookbook.demo.lookB.body')}
+                            {i18n.t('landing.lookbook.demo.lookB.body')}
                           </p>
                         </div>
                       </div>
@@ -645,7 +645,7 @@ export function LookbookPrismLayout() {
 
         {/* Right Column / Slot 2: Community Lookbook Grid */}
         <section
-          aria-label={i18n.t('home.lookbook.communityLabel')}
+          aria-label={i18n.t('landing.lookbook.communityLabel')}
           className="w-full min-w-0"
         >
           <CommunityLookbookGrid
@@ -657,6 +657,8 @@ export function LookbookPrismLayout() {
             // to render in the hero column, which on a phone put the outfit cards between the
             // chips and the looks.
             showFilterNav
+            // Story CC-7.9 D3: Open wardrobe is Home's one gold action.
+            newPostEmphasis="neutral"
             onTabChange={setActiveTab}
             onBannedChange={setCommunityBanned}
             spotlightFocusIntent={teaser.focusIntent}

@@ -36,6 +36,10 @@ const phone = {
   serviceWorkers: 'block' as const,
 }
 
+// CC-7.9 D6: the detail's back control is the shared top bar's, outside the detail itself.
+const topBarBack = (page: Page) =>
+  page.getByTestId('app-header').getByTestId('app-top-bar-back')
+
 async function openDetail(page: Page, garmentId: string, name: string) {
   const open = page.getByTestId(`garment-open-${garmentId}`)
   await expect(open).toHaveAccessibleName(name)
@@ -130,7 +134,9 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
         await expect
           .poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth))
           .toBeGreaterThan(0)
-        await expect(detail.getByTestId('garment-detail-back')).toBeVisible()
+        // CC-7.9 D6: Back is the shared top bar control
+        await expect(topBarBack(page)).toBeVisible()
+        await expect(topBarBack(page)).toHaveAccessibleName('Back')
         await expect(detail.getByTestId('style-piece-open')).toBeVisible()
         await expectTags(page, { category: 'Top', material: 'Cotton', comfort: 'Mild' })
       })
@@ -204,7 +210,8 @@ realTest.describe('Garment detail and tag edit against the local API', () => {
       )
 
       await realTest.step('Back shows the grid with the new tags', async () => {
-        await page.getByTestId('garment-detail-back').click()
+        // CC-7.9 D6: Back is the shared top bar control
+        await topBarBack(page).click()
         await expect(page.getByTestId('garment-detail')).toHaveCount(0)
         await expect(page).not.toHaveURL(/[?&]garment=/)
         const card = page.getByTestId(`garment-card-${garment.id}`)
@@ -430,7 +437,8 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     await openDetail(page, blueTop.id, 'Blue top')
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
 
-    await page.getByTestId('garment-detail-back').click()
+    // CC-7.9 D6: Back is the shared top bar control
+    await topBarBack(page).click()
     await expect(page.getByTestId('garment-detail')).toHaveCount(0)
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(gridScroll)
     await expect(open).toBeFocused()
@@ -442,7 +450,7 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(gridScroll)
   })
 
-  test('[P2] [7.5-E2E-001] browser Back and Forward keep the detail Back control on history', async ({
+  test('[P2] [7.5-E2E-001] browser Back and Forward keep the top bar Back control on history', async ({
     baseURL,
     interceptNetworkCall,
     page,
@@ -458,9 +466,10 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     await expect(page.getByTestId('garment-detail')).toBeVisible()
     await expect(page).toHaveURL(new RegExp(`[?&]garment=${blueTop.id}(?:&|$)`))
 
-    // The detail Back control steps back through history: it adds no grid entry, so Forward
+    // The top bar Back control steps back through history: it adds no grid entry, so Forward
     // still reaches the detail.
-    await page.getByTestId('garment-detail-back').click()
+    // CC-7.9 D6: Back is the shared top bar control
+    await topBarBack(page).click()
     await expect(page.getByTestId('garment-detail')).toHaveCount(0)
     await expect(page).not.toHaveURL(/[?&]garment=/)
     expect(await page.evaluate(() => history.length)).toBe(entries + 1)
@@ -530,7 +539,8 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
     await checkA11y(page)
 
     // The back control and the tag choices are reachable and operable by keyboard.
-    const back = page.getByTestId('garment-detail-back')
+    // CC-7.9 D6: Back is the shared top bar control
+    const back = topBarBack(page)
     await back.focus()
     await expect(back).toBeFocused()
     const wool = page.getByTestId('garment-tag-option-material-wool')

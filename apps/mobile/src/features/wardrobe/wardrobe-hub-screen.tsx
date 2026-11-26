@@ -185,15 +185,19 @@ function showFirstReadSpinner(
 
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
-  return <MemberWardrobeHub key={epoch} epoch={epoch} {...props} />
+  const sessionSeen = useSessionSeen(mobileApplicationUserId())
+  return (
+    <MemberWardrobeHub key={epoch} epoch={epoch} sessionSeen={sessionSeen} {...props} />
+  )
 }
 
 function MemberWardrobeHub({
   pollOffsetsMs,
   addEntry,
   epoch,
+  sessionSeen,
   deletion = garmentDeletion,
-}: WardrobeHubScreenProps & { epoch: number }) {
+}: WardrobeHubScreenProps & { epoch: number; sessionSeen: SessionSeen }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
@@ -209,10 +213,10 @@ function MemberWardrobeHub({
   const [hasLoaded, setHasLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
   /**
-   * Story CC-7.9 add-on B: a visitor who never signed in. The closet read finds no token and no
-   * member has held this screen, so there is nothing that failed: the screen offers sign-in in
-   * place of the "could not load" notice, and Add goes to sign-in. A member whose session ends
-   * here keeps the failure notice and its Retry.
+   * Story CC-7.9 add-on B: a visitor who never signed in. The closet read finds no token and the
+   * screen has seen no session (`useSessionSeen`), so there is nothing that failed: the screen
+   * offers sign-in in place of the "could not load" notice, and Add goes to sign-in. A member
+   * whose session ends here keeps the failure notice and its Retry.
    */
   const [visitor, setVisitor] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -243,7 +247,6 @@ function MemberWardrobeHub({
   const taggingOpen = useRef(false)
   const styleLabels = getStylePieceStrings(i18n.language)
   const owner = mobileApplicationUserId()
-  const hadMemberRef = useHadMember(owner)
   const [, updatePhotoClock] = useState(0)
   const photoExpiry = nextStylePiecePhotoExpiry(garments, Date.now())
   useEffect(
@@ -405,6 +408,7 @@ function MemberWardrobeHub({
       const token = await resolveMobileAccessToken()
       if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
       if (!token) throw new Error('AUTHENTICATION_REQUIRED')
+      sessionSeen.current = true
       setAccessToken(token)
       const next = await refreshGarmentList(token, signal)
       if (next) {
@@ -420,7 +424,7 @@ function MemberWardrobeHub({
       }
       return next
     },
-    [epoch, refreshGarmentList]
+    [epoch, refreshGarmentList, sessionSeen]
   )
 
   const savedLooksLoadEpochRef = useRef(0)
@@ -544,7 +548,7 @@ function MemberWardrobeHub({
         if (controller.signal.aborted) return
         const noSession =
           error instanceof Error && error.message === 'AUTHENTICATION_REQUIRED'
-        if (noSession && !hadMemberRef.current) setVisitor(true)
+        if (noSession && !sessionSeen.current) setVisitor(true)
         else setLoadFailed(true)
       })
       .finally(() => {
@@ -553,7 +557,7 @@ function MemberWardrobeHub({
         setInventorySettled(true)
       })
     return () => controller.abort()
-  }, [loadAttempt, loadGarments])
+  }, [loadAttempt, loadGarments, sessionSeen])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -1057,11 +1061,20 @@ const styles = StyleSheet.create({
   errorBox: { borderRadius: 12, padding: 12, gap: 8 },
 })
 
-/** Whether a member has held this screen since it mounted (add-on B). */
-function useHadMember(owner: string | null) {
-  const hadMember = useRef(false)
-  if (owner !== null) hadMember.current = true
-  return hadMember
+/** Set once this screen has seen a member or a stored session token. */
+type SessionSeen = { current: boolean }
+
+/**
+ * Add-on B, review P2-2: whether this screen has seen any session since it mounted, a member
+ * holding it or a token the closet read resolved. It lives in the screen, above the
+ * identity-epoch keyed hub, so a sign-out or expiry that remounts the hub keeps it: that person
+ * keeps the failure notice and its Retry, and only someone who never had a session is a
+ * visitor. It holds one flag and no member data.
+ */
+function useSessionSeen(owner: string | null): SessionSeen {
+  const seen = useRef(false)
+  if (owner !== null) seen.current = true
+  return seen
 }
 
 /** Add-on B: the visitor's sign-in offer, where the empty closet would be. */

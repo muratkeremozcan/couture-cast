@@ -417,7 +417,8 @@
         "ready": "Prêt",
         "failed": "Échec de l’envoi",
         "unknown": "En cours"
-      }
+      },
+      "detailTitle": "Détails de la pièce"
     }
   },
   "commerce": {

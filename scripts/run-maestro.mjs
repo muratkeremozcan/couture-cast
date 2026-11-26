@@ -36,6 +36,7 @@ import {
 import {
   assertGenericMaestroFlows,
   discoverRunnableMaestroFlows,
+  isVisualMaestroFlow,
 } from './lib/native-maestro-flows.mjs'
 import {
   iosDriverPidfile,
@@ -2006,11 +2007,12 @@ let androidFlowTree
  * @returns {Promise<{ sourceDir: string, targetDir: string }>}
  */
 /**
- * Story CC-7.9: the Android appearance endpoint (scripts/lib/device-appearance-endpoint.mjs).
- * iOS gets an empty URL, so a flow that needs it fails by name there.
+ * Story CC-7.9: the Android appearance endpoint (scripts/lib/device-appearance-endpoint.mjs),
+ * started only for a run that includes a visual flow. Elsewhere the URL is empty, so a flow that
+ * needs it fails by name.
  */
 const startAppearanceEndpoint = async (platform, devices) =>
-  platform === 'android'
+  platform === 'android' && flowsToRun.some((flow) => isVisualMaestroFlow(flow))
     ? startDeviceAppearanceEndpoint({ adbBinary: resolveAdbBinary(), devices })
     : { url: '', close: async () => undefined }
 

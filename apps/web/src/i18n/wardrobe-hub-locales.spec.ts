@@ -28,7 +28,10 @@ const REQUIRED_KEYS = [
   'detailTitle',
 ] as const
 
-/** Every garment status the contract lists today (an open set; unknown ones read as is). */
+/**
+ * Every garment status the contract lists today, plus `unknown`: the status list is an open set,
+ * and a status the catalogs do not name reads as that localized label (review P2-11).
+ */
 const STATUS_KEYS = [
   'pending_upload',
   'bytes_uploaded',
@@ -36,14 +39,17 @@ const STATUS_KEYS = [
   'awaiting_tags',
   'ready',
   'failed',
+  'unknown',
 ] as const
 
-const hubOf = (locale: string) =>
-  (
-    JSON.parse(
-      fs.readFileSync(new URL(`./locales/${locale}.json`, import.meta.url), 'utf8')
-    ) as { wardrobe?: { hub?: HubCatalog } }
-  ).wardrobe?.hub
+// The path goes through a parameter: Vite rewrites `new URL()` called with a template literal
+// path and import.meta.url into a served asset URL, which node:fs cannot open.
+const json = (relative: string) =>
+  JSON.parse(fs.readFileSync(new URL(relative, import.meta.url), 'utf8')) as {
+    wardrobe?: { hub?: HubCatalog }
+  }
+
+const hubOf = (locale: string) => json(`./locales/${locale}.json`).wardrobe?.hub
 
 const catalogs = SUPPORTED_LOCALES.map((locale) => ({ locale, hub: hubOf(locale) }))
 const baseline = catalogs.find((item) => item.locale === DEFAULT_LOCALE)!.hub!

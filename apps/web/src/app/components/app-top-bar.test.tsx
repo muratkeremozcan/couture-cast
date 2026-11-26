@@ -16,8 +16,8 @@ describe('7.9-CMP-001 AppTopBar', () => {
 
     const header = screen.getByTestId('app-header')
     expect(header.tagName).toBe('HEADER')
-    // h-14 is the shell's 56 px; the border sits inside it (border-box).
-    expect(header).toHaveClass('h-14')
+    // h-top-bar is the tokens' 56 px shell height; the border sits inside it (border-box).
+    expect(header).toHaveClass('h-top-bar')
     const headings = within(header).getAllByRole('heading', { level: 1 })
     expect(headings).toHaveLength(1)
     expect(headings[0]).toHaveTextContent('Wardrobe')

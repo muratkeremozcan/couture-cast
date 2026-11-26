@@ -562,7 +562,8 @@
         "processing": "Processing",
         "awaiting_tags": "Awaiting tags",
         "ready": "Ready",
-        "failed": "Failed"
+        "failed": "Failed",
+        "unknown": "In progress"
       },
       "detailTitle": "Piece details"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Standout look in {{label}} by {{author}}, {{count}} reaction. Opens the City Spotlight.",
       "linkLabel_other": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
       "cta": "See it in the City Spotlight"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Weather-aware wardrobe plans for every commute",
     "hero": {
       "eyebrow": "Daily ritual",
@@ -1603,7 +1606,13 @@
       "retry": "Retry"
     },
     "dismissBanner": "Dismiss banner",
-    "skipToContent": "Skip to main content"
+    "skipToContent": "Skip to main content",
+    "close": "Close modal",
+    "legal": {
+      "label": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service"
+    }
   },
   "guardian": {
     "accept": {

@@ -2059,7 +2059,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   themeCardDisabled: {
-    opacity: 0.7,
+    // Story CC-7.9 D5: 0.8 matches web's `disabled:opacity-80`, the lowest step that keeps
+    // every palette's cardText at 4.5:1 on its dimmed cardBg in both schemes (0.7 left light
+    // Jewel Radiance at 3.77:1).
+    opacity: 0.8,
   },
   themeCardHeader: {
     flexDirection: 'row',

@@ -87,7 +87,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 0,
     borderBottomWidth: 1,
-    paddingHorizontal: 12,
+    // 8 keeps the three short en-US labels on a 360-point phone at the 14-point step.
+    paddingHorizontal: 8,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',

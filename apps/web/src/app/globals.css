@@ -16,9 +16,10 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+/* D6: the 44 px touch target, from the design tokens' shell sizes. */
 :where(button, a[href], input, select, textarea) {
-  min-height: 44px;
-  min-width: 44px;
+  min-height: theme('minHeight.touch');
+  min-width: theme('minWidth.touch');
 }
 
 /* D3: the focus ring is the essential outline (ink or white) inside the gold `focus` halo. */

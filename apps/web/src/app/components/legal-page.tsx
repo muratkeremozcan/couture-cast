@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { AppPage, APP_MAIN_CLASS } from './app-page'
 import { AppTopBar } from './app-top-bar'
+import { LegalLinks } from './legal-links'
 
 /**
  * Story 6.17: the shared frame for the public legal pages (/privacy, /terms).
@@ -82,37 +82,6 @@ export function ContactLink() {
 export const LEGAL_INLINE_LINK_CLASS =
   'font-medium text-ink underline underline-offset-4 hover:opacity-80'
 
-// Story CC-7.9: every host page sits on the page surface now, so the links carry their own role.
-const linkClass =
-  'inline-flex min-h-11 items-center underline underline-offset-4 hover:opacity-80'
-
-/**
- * The legal links every public entry point shows: the home page, signup, sign-in and the
- * finish step. Google's consent screen links to the same two pages.
- */
-export function LegalLinks({
-  home = false,
-  className = '',
-}: {
-  home?: boolean
-  className?: string
-}) {
-  return (
-    <nav
-      aria-label="Legal"
-      className={`flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-soft ${className}`}
-    >
-      {home ? (
-        <Link href="/" className={linkClass}>
-          Home
-        </Link>
-      ) : null}
-      <Link href="/privacy" className={linkClass}>
-        Privacy Policy
-      </Link>
-      <Link href="/terms" className={linkClass}>
-        Terms of Service
-      </Link>
-    </nav>
-  )
-}
+// Story CC-7.9 P2-11: the links read the catalogs, so they live in a client component; the
+// legal pages themselves stay server-rendered English.
+export { LegalLinks }

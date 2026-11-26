@@ -989,7 +989,10 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       })
 
       // The case left the open queue. The list is left out at zero items, so an empty queue also answers.
-      await page.getByRole('link', { name: 'Back to queue' }).click()
+      // CC-7.9 D6: Back is the shared top bar control
+      const back = page.getByTestId('app-header').getByTestId('app-top-bar-back')
+      await expect(back).toHaveAccessibleName('Back')
+      await back.click()
       await expect(page).toHaveURL(/\/moderation$/)
       await expect(list.or(page.getByText('No open cases.'))).toBeVisible()
       await expect(link).toHaveCount(0)

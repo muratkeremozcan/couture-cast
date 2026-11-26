@@ -417,7 +417,8 @@
         "ready": "Pronta",
         "failed": "Falha no envio",
         "unknown": "Em andamento"
-      }
+      },
+      "detailTitle": "Detalhes da peça"
     }
   },
   "commerce": {

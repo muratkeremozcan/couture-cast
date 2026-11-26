@@ -417,7 +417,8 @@
         "ready": "Hazır",
         "failed": "Yükleme başarısız",
         "unknown": "Devam ediyor"
-      }
+      },
+      "detailTitle": "Parça ayrıntıları"
     }
   },
   "commerce": {

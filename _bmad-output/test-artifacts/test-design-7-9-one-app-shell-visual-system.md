@@ -5,6 +5,11 @@ Updated: 2026-11-25. As built by TEA: baselines come from a failing CI run's cap
 (no dispatch input), the native dark flip goes through a runner endpoint, unit IDs NVIS-U01..U10
 and VIS-U01..U03 added.
 
+Updated: 2026-11-26. Codex review (c8d1fcd6): native flow captures only and
+`compare-native.mjs` compares all eight after it (P1-1); pull copies nothing unless complete;
+fixture suites `@local-lane` (P1-2); shell probe fixes (P2-4); endpoint hardening (P3-3); proxy
+UNIT-113 and no relayed Set-Cookie (P2-1), fragment and userinfo bases (P3-2).
+
 Status: active
 
 ## Scope
@@ -85,20 +90,22 @@ structural assertion that names what broke.
 Each case writes one offending line and expects exit 1 naming `file:line`; the clean fixture and
 the real branch tree exit 0.
 
-| ID          | Offence                                                                                                                                                  |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 7.9-GRD-001 | Tailwind palette class `bg-amber-300`, `text-zinc-500`                                                                                                   |
-| 7.9-GRD-002 | Arbitrary color `bg-[#fff]`, `text-[rgb(0,0,0)]`, `bg-[var(--x)]`                                                                                        |
-| 7.9-GRD-003 | Raw hex / `rgb(` in a web `.tsx` style object and in `.css` outside base rules                                                                           |
-| 7.9-GRD-004 | `dark:` color variant                                                                                                                                    |
-| 7.9-GRD-005 | Off-scale spacing `p-7`, `gap-[13px]`; `text-4xl`, `text-[15px]`; `rounded-3xl`, `shadow-2xl`                                                            |
-| 7.9-GRD-006 | Native hex, `rgb(`, named color literal (`'white'`) in a `.tsx`                                                                                          |
-| 7.9-GRD-007 | Exemption list: an exempt file passes, the same line in a non-exempt sibling fails; a test file is ignored                                               |
-| 7.9-GRD-008 | Real tree: `node scripts/check-design-tokens.mjs` exits 0 on the branch (PR gate step)                                                                   |
-| 7.9-GRD-009 | Web named colour in a style object or `fill`/`stroke`/`stopColor` (TEA probe gap 1)                                                                      |
-| 7.9-GRD-010 | Colour class naming no token role (`bg-gold`, `text-foreground`): emits no CSS, R1 (TEA probe gap 2)                                                     |
-| 7.9-GRD-011 | Interpolated colour class (`` `bg-${tone}` ``) and upper-case named colour (TEA probe gap 3)                                                             |
-| 7.9-GRD-012 | Native literal `fontSize`, `borderRadius` (per corner too), padding, margin and gap off D4 (13, 10, 6, 18, -7, 9, 66 fail; 14, 9999, 4, 20, -8, 64 pass) |
+| ID          | Offence                                                                                                                                                                                                                                             |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.9-GRD-001 | Tailwind palette class `bg-amber-300`, `text-zinc-500`                                                                                                                                                                                              |
+| 7.9-GRD-002 | Arbitrary color `bg-[#fff]`, `text-[rgb(0,0,0)]`, `bg-[var(--x)]`                                                                                                                                                                                   |
+| 7.9-GRD-003 | Raw hex / `rgb(` in a web `.tsx` style object and in `.css` outside base rules                                                                                                                                                                      |
+| 7.9-GRD-004 | `dark:` color variant                                                                                                                                                                                                                               |
+| 7.9-GRD-005 | Off-scale spacing `p-7`, `gap-[13px]`; `text-4xl`, `text-[15px]`; `rounded-3xl`, `shadow-2xl`                                                                                                                                                       |
+| 7.9-GRD-006 | Native hex, `rgb(`, named color literal (`'white'`) in a `.tsx`                                                                                                                                                                                     |
+| 7.9-GRD-007 | Exemption list: an exempt file passes, the same line in a non-exempt sibling fails; a test file is ignored                                                                                                                                          |
+| 7.9-GRD-008 | Real tree: `node scripts/check-design-tokens.mjs` exits 0 on the branch (PR gate step)                                                                                                                                                              |
+| 7.9-GRD-009 | Web named colour in a style object or `fill`/`stroke`/`stopColor` (TEA probe gap 1)                                                                                                                                                                 |
+| 7.9-GRD-010 | Colour class naming no token role (`bg-gold`, `text-foreground`): emits no CSS, R1 (TEA probe gap 2)                                                                                                                                                |
+| 7.9-GRD-011 | Interpolated colour class (`` `bg-${tone}` ``) and upper-case named colour (TEA probe gap 3)                                                                                                                                                        |
+| 7.9-GRD-012 | Native literal `fontSize`, `borderRadius` (per corner too), padding, margin and gap off D4 (13, 10, 6, 18, -7, 9, 66 fail; 14, 9999, 4, 20, -8, 64 pass)                                                                                            |
+| 7.9-GRD-013 | CSS named colour in a plain declaration (`border: 1px solid Red`, `background: rebeccapurple`) and any CSS Color 4 keyword in JSX or native fail; system colours, `transparent`, `currentColor`, `inherit` and `rgb(var(--cc-*))` pass (Codex P3-1) |
+| 7.9-GRD-014 | The guard exports `SCALES` read from `design-tokens.ts`, equal to D4, with no literal step list of its own; `text-[17px]` fails (Codex P2-12)                                                                                                       |
 
 ### Web E2E (TEA, `playwright/tests/app-shell-visual-system.spec.ts`)
 
@@ -123,10 +130,10 @@ inline garment detail, sign-in, not-found.
 
 ### Coordinator add-ons in this PR (TEA)
 
-| ID                | File                                           | What it proves                                                                                                                                                                                                                                                                                         |
-| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 7.9-UNIT-101..112 | `apps/web/src/lib/preview-api-proxy.test.ts`   | Preview proxy (ea7c7936): production and local keep the direct rewrite; 404 unconfigured; no `..` escape from `/api/v1` (was red: reached `/api/internal`); secret never logged or returned (was red: an echoed bypass header reached the browser); browser `x-vercel-*` and `_vercel` cookies dropped |
-| 7.9-E2E-012       | `playwright/tests/wardrobe-signed-out.spec.ts` | Signed-out `/wardrobe`: no alert, no member error copy, a sign-in link, Add garment goes to sign-in. Reproduced on production (main) 2026-11-25: three alerts, no API call                                                                                                                             |
+| ID                | File                                           | What it proves                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 7.9-UNIT-101..113 | `apps/web/src/lib/preview-api-proxy.test.ts`   | Preview proxy (ea7c7936): production and local keep the direct rewrite; 404 unconfigured; no `..` escape from `/api/v1` (was red: reached `/api/internal`); secret never logged or returned (was red: an echoed bypass header reached the browser); browser `x-vercel-*` and `_vercel` cookies dropped; reserved `x-vercel-*` query options stripped and no upstream Set-Cookie relayed (Codex P2-1); fragment and userinfo bases refused (P3-2) |
+| 7.9-E2E-012       | `playwright/tests/wardrobe-signed-out.spec.ts` | Signed-out `/wardrobe`: no alert, no member error copy, a sign-in link, Add garment goes to sign-in. Reproduced on production (main) 2026-11-25: three alerts, no API call                                                                                                                                                                                                                                                                       |
 
 ### Web snapshots (TEA, `playwright/tests/app-shell-visual-snapshots.spec.ts`, tag `@local-lane`)
 
@@ -169,18 +176,22 @@ half also proves the live flip (R9). `onFlowComplete` puts the device back.
 | 7.9-NVIS-005..008 | Same four, dark                               |
 
 Each tab waits for its top bar title (`childOf: app-top-bar`) and the gate to open, then
-`takeScreenshot` into `maestro/artifacts/shell-visual/` and `assertScreenshot` against
-`maestro/snapshots/shell-visual/<scheme>-<tab>.png` at `thresholdPercentage: 99`. Baselines:
+`takeScreenshot` into `maestro/artifacts/shell-visual/`. The flow never compares: the visual row's
+next step, `node scripts/visual-baselines/compare-native.mjs`, compares all eight captures with
+`maestro/snapshots/shell-visual/<scheme>-<tab>.png` (channel tolerance 16, at most 1% of pixels
+changed), names every missing capture, missing baseline, size change and pixel change in one run,
+and writes `<name>-diff.png` beside each changed capture (Codex P1-1). Baselines:
 `npm run visual:pull-baselines -- --native <run-id>` from the visual shard's artifact. iPhone SE stays on the nightly and
 manual iOS lanes without pixel baselines: 360 x 640 dp is the smallest supported phone (D11).
 
 ### CI plumbing unit tests (TEA)
 
-| ID                | File                                              | What it proves                                                                      |
-| ----------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 7.9-NVIS-U01..U04 | `scripts/lib/device-appearance-endpoint.test.mjs` | Fixed adb commands only, named device only, 400/404/405/502                         |
-| 7.9-NVIS-U05..U10 | `scripts/ci/maestro-visual-lane.test.mjs`         | Flow kept out of the suite, `--lane visual`, the shard 11 row, device and cache key |
-| 7.9-VIS-U01..U03  | `scripts/visual-baselines/pull.test.mjs`          | Actual to baseline names, folder filter, workflows export what the script reads     |
+| ID                     | File                                               | What it proves                                                                                                                        |
+| ---------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 7.9-NVIS-U01..U04, U14 | `scripts/lib/device-appearance-endpoint.test.mjs`  | Fixed adb commands only, named device only, 400/404/405/413/500/502, the server survives bad input (Codex P3-3)                       |
+| 7.9-NVIS-U05..U10      | `scripts/ci/maestro-visual-lane.test.mjs`          | Flow kept out of the suite, `--lane visual`, the shard 11 row, device and cache key                                                   |
+| 7.9-VIS-U01..U04       | `scripts/visual-baselines/pull.test.mjs`           | Actual to baseline names, folder filter, workflows export what the script reads, a short set is named and nothing copied (Codex P1-1) |
+| 7.9-NVIS-U11..U13      | `scripts/visual-baselines/compare-native.test.mjs` | Noise tolerance, all eight reported in one run with diffs, flow capture-only, compare step before the upload                          |
 
 `scripts/ci/maestro-signed-out-lane.test.mjs` and `scripts/lib/native-maestro-flows.test.mjs`
 count the visual row and flow separately.
@@ -190,16 +201,20 @@ count the visual row and flow separately.
 Rule: a replaced or loosened assertion goes to Codex before merge; a selector or value moved to
 the new token is a straight update. None below loosens a check.
 
-| Spec                                                                                                             | Change                                                                                                                                                                               |
-| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `chip-navigation-bottom-nav.spec.ts`                                                                             | Focus ring read from the tokens (`focusEssential` outline, `focus` halo, now `#9A7A2A` in light); desktop Home link is `primary-nav` > `nav-ritual`; Community h1 is in `app-header` |
-| `community-jade-signed-out.spec.ts`                                                                              | Community h1 is in `app-header`, above `community-page`                                                                                                                              |
-| `sign-in-doors-locale.spec.ts`                                                                                   | /signup h1 is the top bar title (`Créer le compte`); the age-check heading is an h2, still French                                                                                    |
-| `wardrobe-smart-tagging`, `wardrobe-garment-capture`, `wardrobe-onboarding-flow`, `wardrobe-session-reload.prod` | h1 `Wardrobe Hub` becomes the top bar title `Wardrobe` (D6)                                                                                                                          |
-| `moderation-console`, `moderation-sla`, `moderation-decisions`                                                   | Case title `Post case` / `Comment case` is an h2; the top bar holds `Case review`                                                                                                    |
-| `mobile-viewport-overflow.spec.ts`                                                                               | TEA P4 layout read from `wardrobe-actions` in the body, plus a check the actions are not in the bar                                                                                  |
-| `maestro/garment-detail-tag-edit-flow.yaml`                                                                      | Back is the top bar's `app-top-bar-back` (the in-body `garment-detail-back` is gone, D6)                                                                                             |
-| `guest-preview.spec.ts`                                                                                          | Unchanged on purpose: its above-the-fold checks are product rules; a red there is a layout fix                                                                                       |
+| Spec                                                                                                                                                                     | Change                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chip-navigation-bottom-nav.spec.ts`                                                                                                                                     | Focus ring read from the tokens (`focusEssential` outline, `focus` halo, now `#9A7A2A` in light); desktop Home link is `primary-nav` > `nav-ritual`; Community h1 is in `app-header`                                                                                                  |
+| `community-jade-signed-out.spec.ts`                                                                                                                                      | Community h1 is in `app-header`, above `community-page`                                                                                                                                                                                                                               |
+| `sign-in-doors-locale.spec.ts`                                                                                                                                           | /signup h1 is the top bar title (`Créer le compte`); the age-check heading is an h2, still French                                                                                                                                                                                     |
+| `wardrobe-smart-tagging`, `wardrobe-garment-capture`, `wardrobe-onboarding-flow`, `wardrobe-session-reload.prod`                                                         | h1 `Wardrobe Hub` becomes the top bar title `Wardrobe` (D6)                                                                                                                                                                                                                           |
+| `moderation-console`, `moderation-sla`, `moderation-decisions`                                                                                                           | Case title `Post case` / `Comment case` is an h2; the top bar holds `Case review`                                                                                                                                                                                                     |
+| `mobile-viewport-overflow.spec.ts`                                                                                                                                       | TEA P4 layout read from `wardrobe-actions` in the body, plus a check the actions are not in the bar                                                                                                                                                                                   |
+| `maestro/garment-detail-tag-edit-flow.yaml`                                                                                                                              | Back is the top bar's `app-top-bar-back` (the in-body `garment-detail-back` is gone, D6)                                                                                                                                                                                              |
+| `wardrobe-garment-detail`, `moderation-console`, `moderation-decisions`, `moderation-sla` (Codex P2-5)                                                                   | Back is the top bar `app-top-bar-back`; destination, keyboard, focus, history and scroll restore kept; tab order now includes the bar                                                                                                                                                 |
+| `maestro/garment-capsule-repair-flow.yaml`, `subflows/open-app.yaml`, `subflows/open-settings.yaml`, `story65/open-app.yaml`, `story67/teaser-signout.yaml` (Codex P2-6) | iOS `BackButton` becomes `app-top-bar-back` with a destination wait; Android system back only where no top bar Back                                                                                                                                                                   |
+| `community-dark-mode`, `community-reactions`, `accessibility-hardening`, `commerce-affiliate-preferences`, `helpers/painted-contrast.ts` (Codex P2-7)                    | Surfaces read from `data-surface`; palette cards dark in dark mode (D5) at 4.5:1; focus outline `focusEssential` at 3:1 on its real backdrop plus a painted ring; desktop tab order through the top bar. Replaced expected colours only (retired by D2, D3, D5); no threshold lowered |
+| `app-shell-visual-system.spec.ts` 7.9-E2E-008                                                                                                                            | Three palettes x two schemes: Community cards and planner carry the scheme's palette `cardBg` (computed and painted), text contrast passes                                                                                                                                            |
+| `guest-preview.spec.ts`                                                                                                                                                  | Unchanged on purpose: its above-the-fold checks are product rules; a red there is a layout fix                                                                                                                                                                                        |
 
 ## Ownership
 

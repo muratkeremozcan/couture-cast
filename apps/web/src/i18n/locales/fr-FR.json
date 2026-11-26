@@ -562,7 +562,8 @@
         "processing": "Traitement en cours",
         "awaiting_tags": "En attente d'étiquettes",
         "ready": "Prêt",
-        "failed": "Échec"
+        "failed": "Échec",
+        "unknown": "En cours"
       },
       "detailTitle": "Détails de la pièce"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Look à la une à {{label}} par {{author}}, {{count}} réaction. Ouvre À la une de la ville.",
       "linkLabel_other": "Look à la une à {{label}} par {{author}}, {{count}} réactions. Ouvre À la une de la ville.",
       "cta": "Voir dans À la une de la ville"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Des plans de garde-robe adaptés à la météo pour chaque trajet",
     "hero": {
       "eyebrow": "Rituel quotidien",
@@ -1603,7 +1606,13 @@
       "retry": "Réessayer"
     },
     "dismissBanner": "Fermer la bannière",
-    "skipToContent": "Aller au contenu principal"
+    "skipToContent": "Aller au contenu principal",
+    "close": "Fermer la fenêtre",
+    "legal": {
+      "label": "Mentions légales",
+      "privacy": "Politique de confidentialité",
+      "terms": "Conditions d'utilisation"
+    }
   },
   "guardian": {
     "accept": {

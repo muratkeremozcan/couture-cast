@@ -562,7 +562,8 @@
         "processing": "Wird verarbeitet",
         "awaiting_tags": "Wartet auf Tags",
         "ready": "Bereit",
-        "failed": "Fehlgeschlagen"
+        "failed": "Fehlgeschlagen",
+        "unknown": "In Bearbeitung"
       },
       "detailTitle": "Teil-Details"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktion. Öffnet die Stadt-Highlights.",
       "linkLabel_other": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktionen. Öffnet die Stadt-Highlights.",
       "cta": "In den Stadt-Highlights ansehen"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Wetterbewusste Garderobenpläne für jeden Weg",
     "hero": {
       "eyebrow": "Tägliches Ritual",
@@ -1603,7 +1606,13 @@
       "retry": "Erneut versuchen"
     },
     "dismissBanner": "Banner schließen",
-    "skipToContent": "Zum Hauptinhalt springen"
+    "skipToContent": "Zum Hauptinhalt springen",
+    "close": "Dialog schließen",
+    "legal": {
+      "label": "Rechtliches",
+      "privacy": "Datenschutzerklärung",
+      "terms": "Nutzungsbedingungen"
+    }
   },
   "guardian": {
     "accept": {

@@ -417,7 +417,8 @@
         "ready": "Lista",
         "failed": "No se pudo subir",
         "unknown": "En curso"
-      }
+      },
+      "detailTitle": "Detalles de la prenda"
     }
   },
   "commerce": {

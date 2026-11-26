@@ -64,6 +64,11 @@ describe('previewApiProxyConfig', () => {
       'http://couture-api.vercel.app',
       'https://couture-api.vercel.app/api',
       'https://couture-api.vercel.app/?x=1',
+      // Codex P3-2: a fragment would swallow the appended path; credentials make fetch throw.
+      'https://couture-api.vercel.app/#x',
+      'https://couture-api.vercel.app#',
+      'https://user:pass@couture-api.vercel.app',
+      'https://user@couture-api.vercel.app',
       'not a url',
       '',
     ])
@@ -186,6 +191,23 @@ describe('proxyPreviewApi', () => {
     }
   })
 
+  it('[P0] [7.9-UNIT-113] reserved deployment-protection query options never reach the API (Codex P2-1)', async () => {
+    const { fetchImpl, calls } = upstream()
+    await proxyPreviewApi(
+      browserRequest(
+        'ritual?x-vercel-protection-bypass=guess&x-vercel-set-bypass-cookie=samesitenone&X-Vercel-Set-Bypass-Cookie=true&limit=24&city=Chicago'
+      ),
+      ['ritual'],
+      CONFIG,
+      fetchImpl
+    )
+    const sent = new URL(calls[0]!.url)
+    expect(sent.origin + sent.pathname).toBe(`${API}/api/v1/ritual`)
+    expect([...sent.searchParams.keys()]).toEqual(['limit', 'city'])
+    expect(sent.searchParams.get('limit')).toBe('24')
+    expect(new Headers(calls[0]!.init.headers).get(PROTECTION_BYPASS_HEADER)).toBe(SECRET)
+  })
+
   it('[P0] [7.9-UNIT-108] the secret never comes back to the browser and never reaches a log', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -219,15 +241,18 @@ describe('proxyPreviewApi', () => {
     expect([...echoed.headers.values()].join(' ')).not.toContain(SECRET)
   })
 
-  it('[P1] [7.9-UNIT-109] response hop-by-hop headers drop, every Set-Cookie passes, HEAD has no body', async () => {
+  it('[P1] [7.9-UNIT-109] response hop-by-hop headers and every Set-Cookie drop, HEAD has no body', async () => {
     const headers = new Headers({
       'content-type': 'application/json',
       connection: 'keep-alive',
       'content-encoding': 'gzip',
       'cache-control': 'no-store',
     })
+    // The API sets no cookie the web reads, and Vercel's own (a protection bypass cookie
+    // included) would grant direct access to the protected API: none reaches the browser
+    // (Codex P2-1).
     headers.append('set-cookie', 'a=1; Path=/')
-    headers.append('set-cookie', 'b=2; Path=/')
+    headers.append('set-cookie', '_vercel_jwt=bypass-grant; Path=/; HttpOnly')
     const { fetchImpl } = upstream(new Response('{"x":1}', { status: 200, headers }))
     const response = await proxyPreviewApi(
       browserRequest('ritual'),
@@ -238,7 +263,8 @@ describe('proxyPreviewApi', () => {
     expect(response.headers.get('connection')).toBeNull()
     expect(response.headers.get('content-encoding')).toBeNull()
     expect(response.headers.get('cache-control')).toBe('no-store')
-    expect(response.headers.getSetCookie()).toEqual(['a=1; Path=/', 'b=2; Path=/'])
+    expect(response.headers.getSetCookie()).toEqual([])
+    expect(response.headers.get('set-cookie')).toBeNull()
 
     const head = await proxyPreviewApi(
       browserRequest('ritual', { method: 'HEAD' }),

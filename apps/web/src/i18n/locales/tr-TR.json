@@ -562,7 +562,8 @@
         "processing": "İşleniyor",
         "awaiting_tags": "Etiket bekliyor",
         "ready": "Hazır",
-        "failed": "Başarısız"
+        "failed": "Başarısız",
+        "unknown": "Devam ediyor"
       },
       "detailTitle": "Parça ayrıntıları"
     },
@@ -1028,7 +1029,9 @@
       "linkLabel_one": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "linkLabel_other": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
       "cta": "Şehir Vitrininde gör"
-    },
+    }
+  },
+  "landing": {
     "tagline": "Her yolculuk için hava durumuna uygun gardırop planları",
     "hero": {
       "eyebrow": "Günlük ritüel",
@@ -1603,7 +1606,13 @@
       "retry": "Tekrar dene"
     },
     "dismissBanner": "Bildirimi kapat",
-    "skipToContent": "Ana içeriğe geç"
+    "skipToContent": "Ana içeriğe geç",
+    "close": "Pencereyi kapat",
+    "legal": {
+      "label": "Yasal",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Hizmet Şartları"
+    }
   },
   "guardian": {
     "accept": {

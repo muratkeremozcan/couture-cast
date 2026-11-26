@@ -513,6 +513,13 @@ jobs:
           # any member flow, and a member row refuses any guest flow.
           script: bash ./scripts/ci-mobile-e2e.sh ${{ matrix.auth == 'signed-out' && '--signed-out' || '' }} ${{ steps.flows.outputs.list }}
 
+      # Story CC-7.9 (7.9-NVIS): the visual shard's flow only captures; this compares all eight
+      # captures with the committed baselines and writes a diff beside each changed one, before
+      # the upload below. It runs after a failed flow too, so the report names every screen.
+      - name: Compare native shell snapshots
+        if: ${{ !cancelled() && matrix.lane == 'visual' && steps.flows.outputs.empty != 'true' }}
+        run: node scripts/visual-baselines/compare-native.mjs
+
       # Blocks the upload when a log or report carries a secret this job
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
       - name: Check Maestro artifacts for secret values

@@ -109,15 +109,21 @@ tags:
 # moving the app. The assertion below was `optional: true`, so it could not fail
 # either, and the pair could never have caught a regression on iOS.
 # https://docs.maestro.dev/reference/commands-available/back
+#
+# CC-7.9 D6: Back is the shared top bar control. `app-top-bar-back` is the app's
+# own Pressable on both platforms, so the tap is required and the Android system
+# `back` that stood in for the old iOS-only `BackButton` is gone: after this tap
+# it would pop the wardrobe tab root and send Expo Go to the background, and it
+# would hide a Back control that stopped working on Android.
 - tapOn:
-    id: 'BackButton'
-    optional: true
+    id: 'app-top-bar-back'
     label: 'Leave the capsule library'
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - back
+# CC-7.9 D6: Back is the shared top bar control; it lands on the wardrobe hub.
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-screen'
+    timeout: 15000
+    label: 'Back on the wardrobe hub'
 # The "Saved capsule" badge is deliberately NOT asserted here.
 #
 # It was, as `assertVisible: text: 'Saved capsule'` with `optional: true`, which

@@ -442,9 +442,8 @@ function MemberPlannerScreen() {
       testID="planner-screen"
       accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
     >
-      <Text accessibilityRole="header" style={styles.title} testID="planner-title">
-        {t('commerce.premium.planner.sectionTitle')}
-      </Text>
+      {/* Story CC-7.9 D6: the stack's AppTopBar carries the title; the labeled scroll view keeps
+        the section name, and the body repeats it in no heading of its own. */}
       <Text style={styles.body}>{t('commerce.premium.planner.intro')}</Text>
 
       {screenState === 'loading' ? (
@@ -538,7 +537,6 @@ const useTone = createSchemeStyles((colors) => ({
 
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12 },
-  title: { fontSize: 24, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 20 },
   panel: { gap: 8, paddingVertical: 8 },
   panelTitle: { fontSize: 18, fontWeight: '600' },

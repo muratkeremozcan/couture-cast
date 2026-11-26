@@ -59,9 +59,9 @@ const DESKTOP_TABS: readonly {
 ]
 
 /**
- * D6: exactly 56 px high (`h-14`, border included), one row: optional back, the `h1` title and
- * an optional trailing slot. From 768 px, where the bottom nav hides, the trailing slot also
- * holds the tab links.
+ * D6: exactly the shell top bar height, 56 px (`h-top-bar`, border included), one row:
+ * optional back, the `h1` title and an optional trailing slot. From 768 px, where the bottom
+ * nav hides, the trailing slot also holds the tab links.
  */
 export function AppTopBar({
   title,
@@ -75,12 +75,12 @@ export function AppTopBar({
   const activeTab = resolveActiveNavTab(usePathname())
   const backLabel = t('shell.back')
   const backClass =
-    'flex min-h-11 min-w-11 shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium text-ink'
+    'flex min-h-touch min-w-touch shrink-0 items-center gap-1 rounded-md px-2 text-sm font-medium text-ink'
 
   return (
     <header
       data-testid="app-header"
-      className="h-14 w-full shrink-0 border-b border-line bg-page text-ink"
+      className="h-top-bar w-full shrink-0 border-b border-line bg-page text-ink"
     >
       <div className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4">
         {backHref !== undefined ? (
@@ -119,7 +119,7 @@ export function AppTopBar({
                   data-ph-event="nav_link_clicked"
                   data-ph-label={tab.label}
                   data-ph-href={tab.href}
-                  className={`flex min-h-11 items-center whitespace-nowrap rounded-md px-3 text-sm ${
+                  className={`flex min-h-touch items-center whitespace-nowrap rounded-md px-3 text-sm ${
                     active
                       ? 'font-semibold text-ink underline underline-offset-8'
                       : 'text-ink-muted'

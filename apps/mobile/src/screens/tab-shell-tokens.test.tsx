@@ -39,6 +39,9 @@ vi.mock('react-native-safe-area-context', async (importOriginal) => {
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   }
 })
+// The icon font loader has no web module Vite resolves; tab icons and the Back chevron are
+// decoration here.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 vi.mock('@/components/android-share-card-presentation', () => ({
   useAndroidNavigationIntent: () => () => undefined,
 }))

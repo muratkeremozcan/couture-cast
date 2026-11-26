@@ -14,9 +14,9 @@ const CHIP_CATEGORIES: ChipCategory[] = ['Personal', 'Community', 'Sponsored']
 
 /** Story CC-7.9 D9: the chip labels come from the catalogs; the category ids stay English. */
 const CHIP_LABEL_KEYS: Record<ChipCategory, string> = {
-  Personal: 'home.chips.personal',
-  Community: 'home.chips.community',
-  Sponsored: 'home.chips.sponsored',
+  Personal: 'landing.chips.personal',
+  Community: 'landing.chips.community',
+  Sponsored: 'landing.chips.sponsored',
 }
 
 export interface ChipNavigationProps {
@@ -92,14 +92,14 @@ export function ChipNavigation({
 
   return (
     <nav
-      aria-label={t('home.chips.navLabel')}
+      aria-label={t('landing.chips.navLabel')}
       data-testid="chip-navigation-bar"
       style={{ height: CHIP_NAVIGATION_HEIGHT_PX }}
       className="sticky top-0 z-20 flex flex-col gap-2 border-b border-line bg-page/95 py-3 backdrop-blur"
     >
       <div
         role="group"
-        aria-label={t('home.chips.groupLabel')}
+        aria-label={t('landing.chips.groupLabel')}
         className="flex items-center gap-2 overflow-x-auto snap-x snap-mandatory px-4 py-1 scrollbar-none"
       >
         {CHIP_CATEGORIES.map((category, index) => {
@@ -133,7 +133,7 @@ export function ChipNavigation({
       </div>
 
       <div aria-live="polite" role="status" className="sr-only">
-        {t('home.chips.showing', { category: t(CHIP_LABEL_KEYS[activeCategory]) })}
+        {t('landing.chips.showing', { category: t(CHIP_LABEL_KEYS[activeCategory]) })}
       </div>
     </nav>
   )

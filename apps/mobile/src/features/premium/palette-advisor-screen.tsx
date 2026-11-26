@@ -974,13 +974,8 @@ export function PaletteAdvisorScreen() {
       testID="palette-advisor-screen"
       accessibilityLabel={t('commerce.premium.palette.sectionTitle')}
     >
-      <Text
-        accessibilityRole="header"
-        style={styles.title}
-        testID="palette-advisor-title"
-      >
-        {t('commerce.premium.palette.sectionTitle')}
-      </Text>
+      {/* Story CC-7.9 D6: the stack's AppTopBar carries the title; the labeled scroll view keeps
+        the section name, and the body repeats it in no heading of its own. */}
       <Text style={styles.body} testID="palette-advisor-intro">
         {t('commerce.premium.palette.intro')}
       </Text>
@@ -1076,7 +1071,6 @@ export function PaletteAdvisorScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12 },
-  title: { fontSize: 24, fontWeight: '600' },
   panel: { gap: 8, paddingVertical: 8 },
   panelTitle: { fontSize: 18, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 20 },

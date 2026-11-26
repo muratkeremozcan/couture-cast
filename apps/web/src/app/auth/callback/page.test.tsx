@@ -4,7 +4,14 @@
 // is clean before the exchange starts), W-FAIL-NO-RAW-ERROR, L-G-PLAIN-SIGNIN and the door rule
 // (a failure started from /signup returns to /signup).
 // Plan: _bmad-output/test-artifacts/test-design/cc617-google-sign-in-test-design.md
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import {
   createGuestPreviewStore,
@@ -36,6 +43,8 @@ vi.mock('@supabase/supabase-js', () => ({ createClient: sdk.createClient }))
 const flow = vi.hoisted(() => ({
   urlAtCall: [] as string[],
   outcome: null as null | { kind: string },
+  /** The exchange itself throws, so the page shows its own failure line. */
+  rejects: false,
 }))
 vi.mock('../../../lib/web-session', async (importOriginal) => {
   const actual = await importOriginal<typeof WebSession>()
@@ -43,6 +52,7 @@ vi.mock('../../../lib/web-session', async (importOriginal) => {
     ...actual,
     completeWebOAuth: (params: URLSearchParams) => {
       flow.urlAtCall.push(`${window.location.search}${window.location.hash}`)
+      if (flow.rejects) return Promise.reject(new Error('synthetic exchange failure'))
       return flow.outcome
         ? Promise.resolve(flow.outcome as WebSession.WebOAuthOutcome)
         : actual.completeWebOAuth(params)
@@ -108,6 +118,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   flow.urlAtCall = []
   flow.outcome = null
+  flow.rejects = false
   vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'false')
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', 'http://localhost')
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://identity.synthetic.test')
@@ -164,6 +175,45 @@ describe('W-AWAITING-GUARDIAN: the callback sends a waiting teen to the finish s
     flow.outcome = { kind: 'awaiting_guardian' }
     await renderCallback()
     await waitFor(() => expect(replace).toHaveBeenCalledWith(destination))
+  })
+})
+
+// Story CC-7.9 D6: each visible callback state sits under the shared top bar, like /signin.
+describe('7.9 D6: the callback status and failure show the shared top bar', () => {
+  function expectSharedBar() {
+    const bar = screen.getByTestId('app-header')
+    expect(within(bar).getByRole('heading', { level: 1 })).toHaveTextContent(
+      strings.continueWithGoogle
+    )
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(within(bar).getByTestId('app-top-bar-back')).toHaveAttribute('href', '/')
+    expect(bar.closest('[data-surface="page"]')).not.toBeNull()
+  }
+
+  it('while the exchange runs', async () => {
+    at('/auth/callback?code=slow-code')
+    flow.outcome = { kind: 'member' }
+    await renderCallback()
+
+    expect(screen.getByTestId('oauth-callback-status')).toHaveTextContent(
+      strings.finishing
+    )
+    expectSharedBar()
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
+  })
+
+  it('after the exchange fails', async () => {
+    at('/auth/callback?code=failing-code')
+    flow.rejects = true
+    await renderCallback()
+
+    await waitFor(() =>
+      expect(screen.getByTestId('oauth-callback-status')).toHaveTextContent(
+        strings.unavailable
+      )
+    )
+    expectSharedBar()
+    expect(replace).not.toHaveBeenCalled()
   })
 })
 

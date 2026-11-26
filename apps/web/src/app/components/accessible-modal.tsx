@@ -2,6 +2,8 @@
 
 import React, { useId, useLayoutEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 import { nextModalOrder, registerModal, useModalCovered } from './modal-stack'
 
 export interface AccessibleModalProps {
@@ -25,6 +27,7 @@ export interface AccessibleModalProps {
   fallbackFocusSelector?: string | readonly string[]
   /** The last resort, tried after the element that was focused when the dialog opened. */
   finalFocusSelector?: string
+  /** The close button's name; without one it reads the catalog's `shell.close`. */
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
@@ -86,13 +89,14 @@ export function AccessibleModal({
   description,
   invokingElementRef,
   initialFocusRef,
-  closeLabel = 'Close modal',
+  closeLabel,
   fallbackFocusSelector,
   finalFocusSelector,
   children,
   ariaLiveMessage,
   errorMessage,
 }: AccessibleModalProps) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const resumeFocusRef = useRef<HTMLElement | null>(null)
@@ -268,7 +272,7 @@ export function AccessibleModal({
             ref={closeButtonRef}
             onClick={onClose}
             className={`flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg ${SURFACE_PARTS[surface].close}`}
-            aria-label={closeLabel}
+            aria-label={closeLabel ?? t('shell.close')}
           >
             ✕
           </button>

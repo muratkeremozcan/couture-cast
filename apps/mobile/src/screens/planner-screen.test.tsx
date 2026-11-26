@@ -8,7 +8,7 @@
 // would leave exactly the interesting half unproven.
 /* eslint-disable @typescript-eslint/await-thenable */
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -136,6 +136,19 @@ describe('PlannerScreen (Story 5.5)', () => {
 
     expect(screen.getByTestId('planner-loading')).toBeTruthy()
     await waitFor(() => expect(screen.queryByTestId('planner-loading')).toBeNull())
+  })
+
+  it('[7.9 D6] leaves the title to the top bar and keeps the section name', async () => {
+    restoreAccessTokenResolver?.()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    await render(<PlannerScreen />)
+    await screen.findByTestId('planner-locked')
+
+    const section = screen.getByTestId('planner-screen')
+    expect(section).toHaveAttribute('aria-label', '7-Day Planner')
+    // The stack's AppTopBar shows '7-Day Planner'; the body has no second copy of it.
+    expect(within(section).queryByText('7-Day Planner')).toBeNull()
+    expect(within(section).queryByRole('heading', { name: '7-Day Planner' })).toBeNull()
   })
 
   it('5.5-MOB-02 renders the locked panel with no session', async () => {

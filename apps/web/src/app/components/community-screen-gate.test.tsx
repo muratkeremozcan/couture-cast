@@ -48,10 +48,13 @@ import {
   screenSnapshot,
 } from '../../lib/screen-snapshot'
 import { currentWebSessionScope } from '../../lib/use-web-session'
+import CommunityPage from '../community/page'
 import { CommunityLookbookGrid } from './community-lookbook-grid'
 import { ScreenGate } from './screen-gate'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
+// The real Community page carries the shell top bar and bottom nav, which read the route.
+vi.mock('next/navigation', () => ({ usePathname: () => '/community' }))
 
 setupCommunityGridClock()
 
@@ -80,6 +83,7 @@ function renderCommunity(highlightedCardId?: string) {
       <CommunityLookbookGrid
         showFilterNav
         returnPath="/community"
+        newPostEmphasis="primary"
         highlightedCardId={highlightedCardId}
       />
     </ScreenGate>
@@ -137,6 +141,23 @@ describe('7.7 Community screen gate', () => {
     expect(screen.getByTestId('lookbook-card-post-1')).toBeVisible()
     expect(screen.queryByTestId('lookbook-card-skeleton')).toBeNull()
     expect(screen.getByTestId('screen-placeholder')).not.toBeVisible()
+  })
+
+  it('7.9 P2-10 the Community screen paints New post as its gold primary action', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    const reads = useHeldReads()
+    render(<CommunityPage />)
+    await act(async () => {
+      reads.feed.resolve()
+      reads.spotlight.resolve('ok')
+      await Promise.all([reads.feed.promise, reads.spotlight.promise])
+    })
+
+    const newPost = await screen.findByTestId('create-post-button')
+    expect(newPost).toHaveAttribute('data-gold', 'primary')
+    expect(newPost).toHaveClass('bg-primary', 'text-on-primary')
+    expect(newPost).not.toHaveClass('border-line-strong')
   })
 
   it('7.7-CMP-007 a failed Spotlight opens the gate with its error and Retry inside the body', async () => {

@@ -56,13 +56,15 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn: 'Navigate up'
                   - waitForAnimationToEnd
+            # CC-7.9 D6: Back is the shared top bar control; it replaced the native
+            # iOS `BackButton` header item on every root stack screen.
             - runFlow:
                 when:
                   visible:
-                    id: 'BackButton'
+                    id: 'app-top-bar-back'
                 commands:
                   - tapOn:
-                      id: 'BackButton'
+                      id: 'app-top-bar-back'
                   - waitForAnimationToEnd
             - runFlow:
                 when:

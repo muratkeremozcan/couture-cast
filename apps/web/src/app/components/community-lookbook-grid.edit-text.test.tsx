@@ -216,6 +216,18 @@ describe('Community look text editing', () => {
     expect(patch).not.toHaveBeenCalled()
   })
 
+  it('7.9 P2-9 outlines the title and description fields with the meaning-bearing boundary', async () => {
+    signIn()
+    const user = userEvent.setup()
+    const detail = await openDetail(user)
+    await user.click(detail.getByRole('button', { name: EDIT }))
+    for (const name of ['Title (optional)', 'Description (optional)']) {
+      const field = detail.getByRole('textbox', { name })
+      expect(field).toHaveClass('border-line-strong', 'bg-page')
+      expect(field).not.toHaveClass('border-theme-card-border')
+    }
+  })
+
   it('aborts an in-flight edit when the reader closes the detail', async () => {
     signIn()
     const user = userEvent.setup()

@@ -1942,7 +1942,17 @@ interface CommunityHeaderActionsProps {
   canShare: boolean
   onShare: () => void
   settingsLink: React.ReactNode
+  /** Story CC-7.9 D3: gold only where New post is the screen's main action. */
+  newPostEmphasis: NewPostEmphasis
   t: Translate
+}
+
+/** Story CC-7.9 D3: Community's main action is New post; on Home it is Open wardrobe. */
+export type NewPostEmphasis = 'primary' | 'neutral'
+
+const NEW_POST_EMPHASIS_CLASSES: Record<NewPostEmphasis, string> = {
+  primary: 'bg-primary text-on-primary',
+  neutral: 'border border-line-strong bg-page text-ink',
 }
 
 /**
@@ -1954,6 +1964,7 @@ function CommunityHeaderActions({
   canShare,
   onShare,
   settingsLink,
+  newPostEmphasis,
   t,
 }: CommunityHeaderActionsProps) {
   /*
@@ -1972,8 +1983,8 @@ function CommunityHeaderActions({
           data-testid="create-post-button"
           aria-disabled={canShare ? undefined : 'true'}
           onClick={canShare ? onShare : undefined}
-          data-gold="primary"
-          className="min-h-11 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-on-primary motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+          data-gold={newPostEmphasis === 'primary' ? 'primary' : undefined}
+          className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${NEW_POST_EMPHASIS_CLASSES[newPostEmphasis]}`}
         >
           {t('community.newPost')}
         </button>
@@ -2274,6 +2285,12 @@ export interface CommunityLookbookGridProps {
   filterNavStickyTop?: number
   /** The route hosting this grid, where the add-location flow returns after the save. */
   returnPath?: string
+  /**
+   * Story CC-7.9 D3: the Community screen passes `primary` (New post is its main action, gold);
+   * an embedding host such as Home keeps the neutral outline so its own primary stays the only
+   * gold action.
+   */
+  newPostEmphasis?: NewPostEmphasis
   /** Story 6.11: lifts the ban, so Home's spotlight teaser closes with the feed. */
   onBannedChange?: (banned: boolean) => void
   /**
@@ -2615,6 +2632,7 @@ export function CommunityLookbookGrid({
   showFilterNav = false,
   filterNavStickyTop,
   returnPath = '/',
+  newPostEmphasis = 'neutral',
   onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
@@ -4596,6 +4614,7 @@ export function CommunityLookbookGrid({
       showShare={shareSlotShown(memberSession, banned)}
       canShare={presentation.canAct}
       onShare={openCreateModal}
+      newPostEmphasis={newPostEmphasis}
       settingsLink={
         <CommunitySettingsLink
           banned={banned}

@@ -158,7 +158,8 @@ export const GOLD_ROLES = [
 export type PaintFinding = { node: string; property: string; value: string }
 
 /**
- * Every painted colour on visible elements, checked two ways (7.9-E2E-003 and E2E-006):
+ * Every painted colour on visible elements, checked two ways (7.9-E2E-003 and E2E-006), against
+ * the `--cc-*` names in `roles` resolved in the element's own palette scope:
  * - `offRole`: the channels match no `--cc-*` role in the current scheme;
  * - `strayGold`: the channels match a gold role on an element with no `data-gold` on itself or
  *   an ancestor.
@@ -181,13 +182,23 @@ export function paintFindings(
         return `${match[1]} ${match[2]} ${match[3]}`
       }
       const normal = (triple: string) => triple.replace(/\s+/g, ' ').trim()
-      const roleChannels = new Set(Object.values(roles).map(normal))
-      const gold = new Set(
-        goldRoles
-          .map((name) => roles[name])
-          .filter((triple): triple is string => typeof triple === 'string')
-          .map(normal)
-      )
+      // A premium palette scope (`[data-theme]`) redefines the roles for its subtree, so each
+      // element is checked against the role values where it sits (Codex P2-4).
+      const scopes = new Map<Element, { roleChannels: Set<string>; gold: Set<string> }>()
+      const scopeOf = (element: Element) => {
+        const scope = element.closest('[data-theme]') ?? document.documentElement
+        let values = scopes.get(scope)
+        if (!values) {
+          const style = getComputedStyle(scope)
+          const read = (name: string) => normal(style.getPropertyValue(name))
+          values = {
+            roleChannels: new Set(Object.keys(roles).map(read).filter(Boolean)),
+            gold: new Set(goldRoles.map(read).filter(Boolean)),
+          }
+          scopes.set(scope, values)
+        }
+        return values
+      }
       const describe = (element: Element) => {
         const id = element.getAttribute('data-testid')
         const text = (element.textContent ?? '').trim().slice(0, 40)
@@ -221,6 +232,7 @@ export function paintFindings(
         if (rect.width === 0 || rect.height === 0) continue
         const properties = painted(element)
         const allowedGold = element.closest('[data-gold]') !== null
+        const { roleChannels, gold } = scopeOf(element)
         for (const [property, value] of properties) {
           const triple = channels(value)
           if (!triple) continue

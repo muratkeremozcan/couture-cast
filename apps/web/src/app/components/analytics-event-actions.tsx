@@ -230,7 +230,7 @@ export function AnalyticsEventActions() {
         onClick={handleRitualCreated}
         className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong bg-page px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        {t('home.actions.previewOutfits')}
+        {t('landing.actions.previewOutfits')}
       </a>
       <a
         href="#wardrobe"
@@ -240,14 +240,14 @@ export function AnalyticsEventActions() {
         data-ph-cta-type="secondary"
         className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        {t('home.actions.seePlanner')}
+        {t('landing.actions.seePlanner')}
       </a>
       <label
         htmlFor="wardrobe-upload-input"
         data-testid="track-wardrobe-upload-started"
         className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        {t('home.actions.startUpload')}
+        {t('landing.actions.startUpload')}
       </label>
       <input
         id="wardrobe-upload-input"

@@ -8,7 +8,8 @@
 // antialiasing count as painted. The highest per-pixel WCAG ratio stands for the ink (a glyph's
 // stem reaches its full color), which holds only on a uniform background, so the background under
 // the changed pixels must be uniform or the measurement is refused. Ratios compare unrounded; no
-// changed pixel means nothing was painted. Used by playwright/tests/community-dark-mode.spec.ts.
+// changed pixel means nothing was painted. Used by community-dark-mode, community-reactions,
+// accessibility-hardening, commerce-affiliate-preferences and app-shell-visual-system specs.
 import { type Locator, type Page } from '@playwright/test'
 
 export type ContrastFailure = {
@@ -615,14 +616,68 @@ export async function surfacePixel(target: Locator, inset = 3): Promise<string> 
   }, png.toString('base64'))
 }
 
-/** The palette's card surface as computed on the root, as an rgb() string. */
-export function paletteCardSurface(page: Page): Promise<string> {
-  return page.evaluate(() => {
+/**
+ * The palette's card surface and card text as computed under the root, as rgb() strings. Story
+ * CC-7.9 D1 and D5: each palette field is a `--cc-theme-*` channel triple on `:root` (Default) or
+ * on `<html data-theme>`, in light and dark values, so the probe reads what the palette resolves to
+ * in the current scheme. An unresolved variable is refused: it would read as transparent black and
+ * an equality against it would only compare two failures.
+ */
+export async function paletteCardColors(
+  page: Page
+): Promise<{ surface: string; ink: string }> {
+  const colors = await page.evaluate(() => {
     const probe = document.createElement('div')
-    probe.style.background = 'var(--theme-card-bg)'
+    probe.style.background = 'rgb(var(--cc-theme-card-bg))'
+    probe.style.color = 'rgb(var(--cc-theme-card-text))'
     document.body.append(probe)
-    const color = getComputedStyle(probe).backgroundColor
+    const style = getComputedStyle(probe)
+    const read = { surface: style.backgroundColor, ink: style.color }
     probe.remove()
-    return color
+    const root = getComputedStyle(document.documentElement)
+    return {
+      ...read,
+      declared:
+        root.getPropertyValue('--cc-theme-card-bg').trim() !== '' &&
+        root.getPropertyValue('--cc-theme-card-text').trim() !== '',
+    }
   })
+  if (!colors.declared)
+    throw new Error(
+      'painted-contrast: --cc-theme-card-bg or --cc-theme-card-text is not set'
+    )
+  return { surface: colors.surface, ink: colors.ink }
+}
+
+/** The palette's card surface as computed under the root, as an rgb() string. */
+export async function paletteCardSurface(page: Page): Promise<string> {
+  return (await paletteCardColors(page)).surface
+}
+
+/**
+ * What a focus outline around `target` is drawn over: the background of its nearest ancestor that
+ * paints one (Story CC-7.9 D7: a card's `data-surface="card"`, else the `data-surface="page"`
+ * surface), with that ancestor's `data-surface`. A translucent fill (the sticky bars' `bg-page/95`)
+ * counts as its own color, since it sits over the same page color. No painted ancestor is refused.
+ */
+export async function focusBackdrop(
+  target: Locator
+): Promise<{ color: string; surface: string | null; node: string }> {
+  const backdrop = await target.evaluate((el) => {
+    for (let node = el.parentElement; node; node = node.parentElement) {
+      const color = getComputedStyle(node).backgroundColor
+      // rgb(r, g, b) or rgba(r, g, b, a): only a fourth channel of 0 is no fill.
+      const channels = color.match(/[\d.]+/g)?.map(Number) ?? []
+      if (color === 'transparent' || (channels.length === 4 && channels[3] === 0))
+        continue
+      return {
+        color,
+        surface: node.closest('[data-surface]')?.getAttribute('data-surface') ?? null,
+        node: `${node.tagName.toLowerCase()}[data-testid=${node.getAttribute('data-testid') ?? '-'}]`,
+      }
+    }
+    return null
+  })
+  if (!backdrop) throw new Error('painted-contrast: no painted surface behind the target')
+  return backdrop
 }
