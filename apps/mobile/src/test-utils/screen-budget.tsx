@@ -5,6 +5,10 @@
 // Chromium (spec D7, P9): `testID` becomes `data-testid` and RN styles computed CSS, so the same
 // `measureScreenBudget` and verdict as the web run here unchanged.
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
+//
+// `WithTopBar` renders AppTopBar, which imports `@expo/vector-icons/FontAwesome`: every suite
+// that uses it mocks that module (`vi.mock('@expo/vector-icons/FontAwesome', () => ({ default:
+// () => null }))`), as app-top-bar.test.tsx does.
 import {
   evaluateScreenBudget,
   measureScreenBudget,
@@ -258,11 +262,23 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
       await act(() => sleep(BASELINE_MS))
       const before = new Set(requested)
       const calls = options.outsideCalls()
+      // A real anchor would navigate the test frame away: the press is held here and counted as
+      // the navigation it is (an expo-router Link or ExternalLink renders one).
+      let linkFollowed = false
+      const holdLinks = (event: MouseEvent) => {
+        const link = (event.target as Element | null)?.closest?.('a[href]')
+        if (!link) return
+        event.preventDefault()
+        linkFollowed = true
+      }
+      document.addEventListener('click', holdLinks, true)
       pressed = true
       press(control)
       await act(() => sleep(OBSERVE_MS))
+      document.removeEventListener('click', holdLinks, true)
       observer.disconnect()
       const effects: string[] = []
+      if (linkFollowed) effects.push('link')
       if (options.outsideCalls() > calls) effects.push('outside call')
       // A read the screen already made (a poll, a refetch) is not evidence of the press.
       for (const request of requested)
