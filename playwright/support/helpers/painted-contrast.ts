@@ -41,10 +41,10 @@ export type Ink = {
   /** The two shots and a diff mask (changed pixels grey, the weakest group red), base64 PNG. */
   shots?: { bare: string; inked: string; diff: string }
   /**
-   * Focus rings only (WCAG 2.4.13 focus appearance): device pixels outside the border box whose
-   * own before/after contrast is at least 3:1, and the area a 2 CSS px perimeter of the
-   * unfocused control covers (twice its perimeter, corners rounded by its border radius), in
-   * device pixels.
+   * Focus rings only (WCAG 2.4.13 focus appearance): samples outside the border box whose own
+   * before/after contrast is at least 3:1, and the area a 2 CSS px perimeter of the unfocused
+   * control covers (twice its perimeter, corners rounded by its border radius, rounded up). The
+   * shots use `scale: 'css'`, so both are in CSS pixels, one sample per CSS pixel.
    */
   qualifying?: number
   required?: number
@@ -177,7 +177,8 @@ async function compare(
         0
       // Each glyph position (the mask's, or else every pixel the ink changed): the luminance
       // under it without the ink, and with it.
-      // A focus ring is read outside the element's border box only (see focusRing).
+      // A focus ring is read outside the element's border box only (see focusRing). The shots
+      // are at CSS resolution, so `scale` is 1; it stays for a shot taken at another scale.
       const scale = x ? width / x.clipWidth : 1
       const inside = (pixel: number) => {
         if (!x) return false
@@ -221,7 +222,7 @@ async function compare(
           ? {
               qualifying: changedPairs.filter(([u, i]) => contrast(u, i) >= 3).length,
               // Twice the control's perimeter, corners rounded by its border radius.
-              required: Math.round(
+              required: Math.ceil(
                 2 *
                   (2 * (x.width + x.height) -
                     (8 - 2 * Math.PI) * Math.min(x.radius, x.width / 2, x.height / 2)) *
@@ -559,8 +560,10 @@ export function inkOfPlaceholder(field: Locator): Promise<Ink | null> {
  * permanent shadow or border is no indicator. Only pixels outside the element's border box
  * count, where the outline and halo paint. `qualifying` counts those whose own before/after
  * contrast reaches 3:1; the ring passes when it covers `required`, the area of a 2 CSS px
- * perimeter of the control. CC-7.9 replaced a weakest-group rating here: every ring has a faint
- * antialiased fringe, and that fringe (60 px at 1.0092 on CI e5d4cfa5) decided the old ratio.
+ * perimeter of the control, both counted in CSS pixels (the shots use `scale: 'css'`). The
+ * target and the page must sit still between the two shots, or the measurement fails. CC-7.9
+ * replaced a weakest-group rating here: every ring has a faint antialiased fringe, and that
+ * fringe (60 px at 1.0092 on CI e5d4cfa5) decided the old ratio.
  */
 export async function focusRing(
   target: Locator,
@@ -595,6 +598,18 @@ export async function focusRing(
         await focusWithKeyboard()
         await nextFrames(page)
         await where('inked')
+        // Both shots must frame the same pixels: an element or page that moved between them
+        // compares two layouts, never a ring (Codex check 3). This fails loudly, before scoring.
+        const [bare, inked] = [positions.bare, positions.inked] as {
+          scroll: number[]
+          box: number[]
+        }[]
+        const same = (x: number[] = [], y: number[] = []) =>
+          x.length === y.length && x.every((value, index) => value === y[index])
+        if (!same(bare?.scroll, inked?.scroll) || !same(bare?.box, inked?.box))
+          throw new Error(
+            `painted-contrast: the focus ring target moved between the shots: ${JSON.stringify(positions)}`
+          )
       },
       withShots: true,
       outsideOnly: true,
@@ -690,14 +705,21 @@ function enumerate(root: Locator): Promise<Target[]> {
     // eyebrow under it (CI e5d4cfa5, community-live-region).
     // Only these shapes: text merely scrolled out of a row's overflow stays measured (the probe
     // scrolls it into view).
+    // Each branch is a complete clip as CSS applies it (Codex check 3): `clip` acts only on an
+    // absolutely or fixed positioned box; the 1 px box clips on both axes and is 1 px or less
+    // both ways, so nothing of the text inside it can show.
     const clippedAway = (el: Element) => {
       for (let node: Element | null = el; node; node = node.parentElement) {
         const style = getComputedStyle(node)
-        if (/^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip)) return true
+        const positioned = style.position === 'absolute' || style.position === 'fixed'
+        if (positioned && /^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip))
+          return true
         if (/^inset\(50%\)$/.test(style.clipPath)) return true
-        if (style.overflow === 'visible') continue
+        const clipsBoth =
+          ['hidden', 'clip'].includes(style.overflowX) &&
+          ['hidden', 'clip'].includes(style.overflowY)
         const own = node.getBoundingClientRect()
-        if (own.width <= 1 || own.height <= 1) return true
+        if (clipsBoth && own.width <= 1 && own.height <= 1) return true
       }
       return false
     }
