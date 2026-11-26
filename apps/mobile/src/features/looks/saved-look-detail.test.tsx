@@ -8,7 +8,7 @@
 // keeps the CC-7.2 rule (T3) and hands focus back (CC-7.11 D13). The behaviour moved here from
 // the deleted Closet row's suite (saved-looks-row.test.tsx, CC-7.2 and 7.11-NAT-030..033).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -16,6 +16,7 @@ import type {
   SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } from '@couture/utils'
+import type * as ReactNativeModule from 'react-native'
 import type * as SavedLooksModule from '@/src/lib/saved-looks'
 import type * as WardrobeModule from '@/src/lib/wardrobe'
 
@@ -23,6 +24,7 @@ const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
+  dismissTo: vi.fn(),
   navigate: vi.fn(),
   setParams: vi.fn(),
   canGoBack: vi.fn(() => true),
@@ -43,6 +45,30 @@ vi.mock('expo-router', async () => ({
   useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
+// CC-7.11 D13 native accessibility focus, as the deleted Closet row suite proved it.
+// react-native-web's findNodeHandle always throws, so each node gets a stable fake tag; on web
+// (every case but the native Reopen one) safeFindNodeHandle never asks for one.
+const a11y = vi.hoisted(() => {
+  const tags = new Map<unknown, number>()
+  return {
+    tagOf: (node: unknown) => {
+      if (!tags.has(node)) tags.set(node, 300 + tags.size)
+      return tags.get(node)!
+    },
+    setAccessibilityFocus: vi.fn(),
+  }
+})
+vi.mock('react-native', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactNativeModule>()
+  return {
+    ...actual,
+    findNodeHandle: (node: unknown) => (node ? a11y.tagOf(node) : null),
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: a11y.setAccessibilityFocus,
+    },
+  }
+})
 // The Style this piece editor Reopen opens reaches native Expo modules it never uses here.
 vi.mock('expo-image-picker', () => ({
   requestCameraPermissionsAsync: vi.fn(),
@@ -130,6 +156,7 @@ import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
+import { Platform } from 'react-native'
 import { MobileSavedLookRequestError } from '@/src/lib/saved-looks'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { AppThemeProvider } from '@/src/theme/theme-context'
@@ -137,6 +164,11 @@ import { SavedLookDetailScreen } from './saved-look-detail'
 
 const MEMBER = 'detail-member'
 const TOKEN = 'detail-token'
+/** A real 1x1 PNG: react-native-web's ImageLoader loads it with no network hop. */
+const PNG_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+/** Bytes that are no PNG: ImageLoader fails to decode them, with no network hop. */
+const BROKEN_PNG = 'data:image/png;base64,AAAA'
 
 const ACTIVE_GARMENT: GarmentItemContract = {
   id: 'garment-1',
@@ -327,7 +359,16 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
   )
 
   it('[P1] [7.12-NAT-021] a screen opened with no id reads as gone and sends no read', () => {
-    renderDetail(undefined)
+    // Not renderDetail(undefined): an undefined argument takes its 'sl-m1' default.
+    render(
+      <AccessibilityAnnouncerProvider>
+        <AppThemeProvider>
+          <SaveFeedbackProvider>
+            <SavedLookDetailScreen savedLookId={undefined} from={null} />
+          </SaveFeedbackProvider>
+        </AppThemeProvider>
+      </AccessibilityAnnouncerProvider>
+    )
     expect(screen.getByTestId('saved-look-detail-gone')).toHaveTextContent(
       'This look is no longer saved'
     )
@@ -419,10 +460,16 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
             itemId: 'garment-1',
             label: null,
             missing: false,
-            imageAccess: {
-              url: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-              expiresAt: '2099-01-01T00:00:00.000Z',
-            },
+            imageAccess: { url: PNG_PIXEL, expiresAt: '2099-01-01T00:00:00.000Z' },
+          },
+          {
+            slotIndex: 1,
+            category: 'bottom',
+            kind: 'garment',
+            itemId: 'garment-broken',
+            label: null,
+            missing: false,
+            imageAccess: { url: BROKEN_PNG, expiresAt: '2099-01-01T00:00:00.000Z' },
           },
         ],
       })
@@ -433,17 +480,18 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       i18n.t('savedLooks.needsReviewDetail')
     )
     expect(screen.queryByTestId('saved-look-detail-missing')).toBeNull()
-    // A live photo shows; when it fails to load, the placeholder takes its place.
-    expect(screen.queryAllByTestId('saved-look-photo-placeholder')).toHaveLength(0)
-    const img = document.querySelector('img')
-    expect(img).not.toBeNull()
-    fireEvent.error(img!)
+    // An unexpired photo that fails to load: react-native-web reports it through ImageLoader
+    // (no DOM event drives that), and the placeholder takes its place. The live photo stays.
+    const live = screen.getByTestId('saved-look-slot-0')
+    const broken = screen.getByTestId('saved-look-slot-1')
     await waitFor(() =>
-      expect(screen.getAllByTestId('saved-look-photo-placeholder')).toHaveLength(1)
+      expect(within(broken).getByTestId('saved-look-photo-placeholder')).toBeVisible()
     )
-    expect(screen.getByTestId('saved-look-slot-0')).toHaveTextContent(
-      i18n.t('savedLooks.photoUnavailable')
-    )
+    expect(broken).toHaveTextContent(i18n.t('savedLooks.photoUnavailable'))
+    expect(screen.getAllByTestId('saved-look-photo-placeholder')).toHaveLength(1)
+    expect(within(live).queryByTestId('saved-look-photo-placeholder')).toBeNull()
+    expect(live.querySelector('img')).not.toBeNull()
+    expect(live).not.toHaveTextContent(i18n.t('savedLooks.photoUnavailable'))
   })
 
   it.each([
@@ -453,12 +501,14 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       true,
       () => expect(routerMock.back).toHaveBeenCalledTimes(1),
     ],
+    // Fable review P3: with nothing to step back to, Remove dismisses to Looks; a root-stack
+    // replace would stack a second tab group.
     [
       'a Saved tile on a cold stack',
       'capsules' as const,
       false,
       () =>
-        expect(routerMock.replace).toHaveBeenCalledExactlyOnceWith({
+        expect(routerMock.dismissTo).toHaveBeenCalledExactlyOnceWith({
           pathname: '/looks',
           params: { segment: 'saved', filter: 'capsules' },
         }),
@@ -468,7 +518,7 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       null,
       true,
       () =>
-        expect(routerMock.replace).toHaveBeenCalledExactlyOnceWith({
+        expect(routerMock.dismissTo).toHaveBeenCalledExactlyOnceWith({
           pathname: '/looks',
           params: { segment: 'saved', filter: 'all' },
         }),
@@ -491,8 +541,9 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       // The Looks feed reads again, and Saved shows with the filter the look came from.
       expect(lib.notifyMobileSavedLooksChanged).toHaveBeenCalledExactlyOnceWith(MEMBER)
       expectNavigation()
+      expect(routerMock.replace).not.toHaveBeenCalled()
       if (from === null || !canGoBack) expect(routerMock.back).not.toHaveBeenCalled()
-      else expect(routerMock.replace).not.toHaveBeenCalled()
+      else expect(routerMock.dismissTo).not.toHaveBeenCalled()
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
         i18n.t('feedback.removed')
       )
@@ -565,12 +616,17 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
     expect(routerMock.back).toHaveBeenCalledTimes(1)
   })
 
-  it('[P1] [7.12-NAT-022] offline, Remove sends nothing and Undo says it is offline', async () => {
+  it('[P1] [7.12-NAT-022] offline, Undo sends nothing and says it is offline; the removed look offers no second Remove', async () => {
     renderDetail('sl-m1', 'all')
     await screen.findByTestId('saved-look-detail')
 
     await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
     const undo = await screen.findByTestId('status-bar-action-undo')
+    // The look is gone and the screen is leaving: its Remove stays disabled.
+    expect(screen.getByTestId('saved-look-detail-remove')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
     resetNetworkStatusForTests(false)
     await userEvent.click(undo)
     await waitFor(() =>
@@ -579,8 +635,14 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       )
     )
     expect(lib.restoreSavedLookFromMobile).not.toHaveBeenCalled()
+    expect(lib.deleteSavedLookFromMobile).toHaveBeenCalledTimes(1)
+  })
 
-    lib.deleteSavedLookFromMobile.mockClear()
+  it('[P1] [7.12-NAT-022] offline, Remove sends nothing, says so, and stays on the look', async () => {
+    renderDetail('sl-m1', 'all')
+    await screen.findByTestId('saved-look-detail')
+    resetNetworkStatusForTests(false)
+
     await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
     await waitFor(() =>
       expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
@@ -588,6 +650,12 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
       )
     )
     expect(lib.deleteSavedLookFromMobile).not.toHaveBeenCalled()
+    expect(routerMock.back).not.toHaveBeenCalled()
+    expect(screen.getByTestId('saved-look-detail')).toBeInTheDocument()
+    expect(screen.getByTestId('saved-look-detail-remove')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
   })
 
   it("[P0] [7.12-NAT-022] [CC-7.7 D5] a member switch fences the previous member's Undo and a late Remove", async () => {
@@ -596,9 +664,14 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
     await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
     const undo = await screen.findByTestId('status-bar-action-undo')
 
-    // The Undo bar outlives the screen; after a switch its action does nothing.
+    // The Undo bar outlives the screen. A switch takes A's notice off the shared bar (Codex TEA
+    // review #3), and a late click on the Undo that was visible at the switch does nothing.
     act(() => setMobileApplicationUserId('member-b'))
-    await userEvent.click(undo)
+    await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
+    expect(screen.queryByTestId('status-feedback-bar')?.textContent ?? '').not.toContain(
+      i18n.t('feedback.removed')
+    )
+    act(() => undo.click())
     expect(lib.restoreSavedLookFromMobile).not.toHaveBeenCalled()
 
     // A DELETE that settles after a switch reports nothing and navigates nowhere.
@@ -625,6 +698,38 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
     expect(lib.notifyMobileSavedLooksChanged).not.toHaveBeenCalled()
     expect(routerMock.back).not.toHaveBeenCalled()
     expect(routerMock.replace).not.toHaveBeenCalled()
+    expect(routerMock.dismissTo).not.toHaveBeenCalled()
+  })
+
+  it('[P1] [7.12-NAT-022] [Codex TEA review #3] the same member back on Saved keeps Undo, and it restores', async () => {
+    const view = renderDetail('sl-m1', 'all')
+    await screen.findByTestId('saved-look-detail')
+    await userEvent.click(screen.getByTestId('saved-look-detail-remove'))
+    await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+    await screen.findByTestId('status-bar-action-undo')
+
+    // Remove returned to Saved: the detail is gone and the shared bar stays.
+    view.rerender(
+      <AccessibilityAnnouncerProvider>
+        <AppThemeProvider>
+          <SaveFeedbackProvider>
+            <></>
+          </SaveFeedbackProvider>
+        </AppThemeProvider>
+      </AccessibilityAnnouncerProvider>
+    )
+    expect(screen.queryByTestId('saved-look-detail')).toBeNull()
+    // The same identity published again is no switch.
+    act(() => setMobileApplicationUserId(MEMBER))
+
+    const undo = screen.getByTestId('status-bar-action-undo')
+    expect(undo).toBeVisible()
+    await userEvent.click(undo)
+    await waitFor(() =>
+      expect(lib.restoreSavedLookFromMobile).toHaveBeenCalledExactlyOnceWith('sl-m1', {
+        accessToken: TOKEN,
+      })
+    )
   })
 
   it('[P1] [7.12-NAT-020] [TEA T3] an exact Style this piece look reopens in the editor, and focus returns to Reopen', async () => {
@@ -644,6 +749,29 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
     await userEvent.click(within(panel).getByTestId('style-piece-close'))
     await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
     await waitFor(() => expect(reopen).toHaveFocus())
+    // Web moves DOM focus; it never asks for a native handle.
+    expect(a11y.setAccessibilityFocus).not.toHaveBeenCalled()
+  })
+
+  it('[P1] [7.11-NAT-031] [TEA T3] on native, closing the reopened editor hands accessibility focus to the Reopen handle', async () => {
+    renderDetail('sl-m1', 'all')
+    await screen.findByTestId('saved-look-detail')
+    const reopen = await screen.findByTestId('saved-look-reopen')
+    await userEvent.click(reopen)
+    const panel = await screen.findByTestId('style-piece-panel')
+    a11y.setAccessibilityFocus.mockClear()
+
+    // focusStylePieceControl branches on the platform when it runs, after the editor is gone.
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    try {
+      await userEvent.click(within(panel).getByTestId('style-piece-close'))
+      await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
+      await waitFor(() =>
+        expect(a11y.setAccessibilityFocus).toHaveBeenLastCalledWith(a11y.tagOf(reopen))
+      )
+    } finally {
+      Object.defineProperty(Platform, 'OS', { value: 'web', configurable: true })
+    }
   })
 
   it('[P1] [7.12-NAT-020] [TEA T3] a look out of the editor order, or whose anchor left the closet, stays in its detail', async () => {

@@ -3,7 +3,8 @@
 // Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
 import { getGuestPreviewStrings } from '@couture/utils'
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
+import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../../i18n'
 import {
@@ -121,7 +122,9 @@ export default function WardrobeCapsulesPage() {
           titleKey="wardrobe.capsules.title"
           parentHref="/looks?segment=saved&filter=capsules"
         />
-        <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+        <Suspense fallback={null}>
+          <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+        </Suspense>
         {/* Story CC-7.11 (TEA e): the tab bar, as on every other sub-screen. */}
         <StickyBottomNav />
       </AppPage>
@@ -139,11 +142,9 @@ function CapsulesView({ session }: { session: MemberSession }) {
   )
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
   // Story CC-7.12 D6: the capsule a Looks tile opened, read once from the address.
-  const [focusCapsuleId] = useState<string | null>(() =>
-    typeof window === 'undefined'
-      ? null
-      : new URL(window.location.href).searchParams.get('capsule')
-  )
+  // Fable review P1: read through `useSearchParams`, since a client navigation renders this page
+  // before `window.location` holds its URL.
+  const focusCapsuleId = useSearchParams()?.get('capsule') || null
   // Codex #4: a capsule outside the first page is read on its own and shown first, so the tile
   // always lands on its card. It shows only while no search or filter narrows the list.
   const [pinnedCapsule, setPinnedCapsule] = useState<OutfitCapsuleContract | null>(null)

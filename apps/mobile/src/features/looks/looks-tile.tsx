@@ -131,23 +131,53 @@ function Cell({ cell }: { cell: LooksTileCell | null }) {
   )
 }
 
-/** The 2 x 2 collage. Decorative: the tile's label names the look. */
+/**
+ * The collage fills one square whatever the piece count: one piece fills it, two sit side by
+ * side, three put the first beside a stacked pair, four make a 2 x 2 grid. No empty cells.
+ * Decorative: the tile's label names the look.
+ */
 function Collage({ cells }: { cells: readonly LooksTileCell[] }) {
   const { colors, radius } = useTokens()
-  const at = (index: number) => cells[index] ?? null
+  const shown = cells.slice(0, 4)
+  const cell = (index: number) => (
+    <Cell key={shown[index]?.key ?? `empty-${index}`} cell={shown[index] ?? null} />
+  )
+  let body
+  if (shown.length <= 1) body = cell(0)
+  else if (shown.length === 2)
+    body = (
+      <View style={styles.collageRow}>
+        {cell(0)}
+        {cell(1)}
+      </View>
+    )
+  else if (shown.length === 3)
+    body = (
+      <View style={styles.collageRow}>
+        {cell(0)}
+        <View style={styles.collageColumn}>
+          {cell(1)}
+          {cell(2)}
+        </View>
+      </View>
+    )
+  else
+    body = [0, 2].map((row) => (
+      <View key={row} style={styles.collageRow}>
+        {cell(row)}
+        {cell(row + 1)}
+      </View>
+    ))
   return (
     <View
       accessible={false}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
+      // react-native-web reads aria-hidden; the native props above cover iOS and Android.
+      aria-hidden
       style={[styles.collage, { borderRadius: radius.md, backgroundColor: colors.line }]}
     >
-      {[0, 2].map((row) => (
-        <View key={row} style={styles.collageRow}>
-          <Cell key={at(row)?.key ?? `empty-${row}`} cell={at(row)} />
-          <Cell key={at(row + 1)?.key ?? `empty-${row + 1}`} cell={at(row + 1)} />
-        </View>
-      ))}
+      {body}
     </View>
   )
 }
@@ -307,6 +337,7 @@ const styles = StyleSheet.create({
   gridRow: { flexDirection: 'row' },
   collage: { aspectRatio: 1, gap: 2, overflow: 'hidden' },
   collageRow: { flex: 1, flexDirection: 'row', gap: 2 },
+  collageColumn: { flex: 1, gap: 2 },
   cell: { flex: 1, overflow: 'hidden' },
   center: { alignItems: 'center', justifyContent: 'center' },
   photo: { width: '100%', height: '100%' },

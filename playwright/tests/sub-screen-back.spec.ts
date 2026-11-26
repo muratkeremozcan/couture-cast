@@ -9,13 +9,17 @@
 // Story CC-7.12 (Step 69): capsules moved to /looks/capsules (back to Saved > Capsules), the saved
 // look detail /looks/saved/ID is a new row, and Plan is a Looks segment reached by redirect.
 import type { Page } from '@playwright/test'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { expect, RITUAL_RESPONSE_URL, test } from '../support/fixtures/merged-fixtures'
 import {
   openFixtureShell,
   SHELL_TABS,
   VISUAL_MEMBER_ID,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
+import {
+  guardExpectedError,
+  unexpectedRitualErrors,
+} from '../support/helpers/expected-error-guard'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
 import {
   bodies,
@@ -247,6 +251,35 @@ async function expectOwnContent(page: Page, sub: SubScreen, mode: ShellMode) {
 
 const scrollY = (page: Page) => page.evaluate(() => Math.round(window.scrollY))
 
+/**
+ * A guardian-pending teen has no saved look, so the one-look read answers 404 (CC-7.12 P6). The
+ * test opts out of the library monitor and the shared ritual guard for that one answer; this puts
+ * both back for everything else. The exact read must answer 404, every other 4xx or 5xx fails the
+ * test, and ritual errors keep the shared guard's rule. Entries read `METHOD STATUS /path`.
+ */
+function guardSavedLookRefusal(page: Page) {
+  const refusal = new RegExp(
+    `^GET 404 /api/v1/wardrobe/saved-looks/${SHELL_SAVED_LOOK_ID}$`
+  )
+  const refusals: string[] = []
+  const unexpected: string[] = []
+  page.context().on('response', (response) => {
+    // The ritual URL belongs to the ritual guard below, as it does in merged-fixtures.ts.
+    if (response.status() < 400 || RITUAL_RESPONSE_URL.test(response.url())) return
+    const entry = `${response.request().method()} ${response.status()} ${new URL(response.url()).pathname}`
+    ;(refusal.test(entry) ? refusals : unexpected).push(entry)
+  })
+  const ritual = guardExpectedError(page.context(), RITUAL_RESPONSE_URL)
+  return async () => {
+    expect(refusals.length, 'the saved look read answers 404').toBeGreaterThan(0)
+    expect(unexpected, 'unexpected HTTP errors').toEqual([])
+    expect(
+      unexpectedRitualErrors(await ritual.settle()),
+      'unexpected ritual HTTP errors'
+    ).toEqual([])
+  }
+}
+
 test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
   for (const sub of SUB_SCREENS.filter((row) => row.enter !== null)) {
     test(`[P0] [7.11-E2E-020] ${sub.name}: in-app from ${sub.parent}, top bar with back and title, back returns to ${sub.parent}`, async ({
@@ -282,12 +315,15 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
         page,
         interceptNetworkCall,
       }) => {
-        if (sub.name === 'saved look detail' && mode === 'guardian-pending')
+        const refusalScoped =
+          sub.name === 'saved look detail' && mode === 'guardian-pending'
+        if (refusalScoped)
           test.info().annotations.push({
             type: 'skipNetworkMonitoring',
             description:
-              'The teen has no saved look, so the one-look read answers 404 and the screen reads like a removed look (CC-7.12 P6).',
+              'The teen has no saved look, so the one-look read answers 404; guardSavedLookRefusal keeps every other answer guarded (CC-7.12 P6).',
           })
+        const verifyRefusalOnly = refusalScoped ? guardSavedLookRefusal(page) : null
         const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
         await page.goto(sub.path)
         await expectTopBar(page, sub.title)
@@ -305,6 +341,7 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
         )
         // A replace, not a push: the back arrow never grows history on a cold entry.
         expect(await page.evaluate(() => history.length)).toBe(entries)
+        await verifyRefusalOnly?.()
       })
     }
   }

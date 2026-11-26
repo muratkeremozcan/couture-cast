@@ -8,6 +8,7 @@
 import type { Page, Request, Route } from '@playwright/test'
 import {
   outfitCapsuleListResponseSchema,
+  outfitCapsuleResponseSchema,
   PREMIUM_REQUIRED_MESSAGE,
   savedLookListResponseSchema,
   savedLookResponseSchema,
@@ -42,11 +43,12 @@ export interface CapsuleSeed {
 }
 
 function lookContract(memberId: string, seed: LookSeed) {
+  // Real sample catalog ids (`sample:g:<slug>`), so tiles draw catalog art as members see it.
   const slots = [
-    ['top', 'oxford-shirt'],
-    ['bottom', 'dark-jeans'],
-    ['shoes', 'loafers'],
-    ['outerwear', 'wool-coat'],
+    ['top', 'sample:g:oxford-shirt'],
+    ['bottom', 'sample:g:dark-jeans'],
+    ['shoes', 'sample:g:loafers'],
+    ['outerwear', 'sample:g:wool-overcoat'],
   ] as const
   const missingIds = Array.from(
     { length: seed.missing ?? 0 },
@@ -263,8 +265,21 @@ export async function openLooksFixture(
 
   await page.route('**/api/v1/wardrobe/*/capsules**', async (route, request) => {
     const url = new URL(request.url())
-    if (request.method() !== 'GET' || !/\/capsules$/.test(url.pathname))
-      return route.fallback()
+    if (request.method() !== 'GET') return route.fallback()
+    // Codex 7.12 #4: the manager reads a tile's capsule on its own when its first page lacks it.
+    const one = /\/capsules\/([^/]+)$/.exec(url.pathname)
+    if (one) {
+      const id = decodeURIComponent(one[1]!)
+      detailReads.push(`capsule:${id}`)
+      const capsule = capsules.find((candidate) => candidate.id === id)
+      return capsule
+        ? route.fulfill({ json: outfitCapsuleResponseSchema.parse({ data: capsule }) })
+        : route.fulfill({
+            status: 404,
+            json: { statusCode: 404, message: 'CAPSULE_NOT_FOUND' },
+          })
+    }
+    if (!/\/capsules$/.test(url.pathname)) return route.fallback()
     listReads.push(`capsules?${url.searchParams.toString()}`)
     await waitGate('capsules')
     const limit = Number(url.searchParams.get('limit') ?? '20')

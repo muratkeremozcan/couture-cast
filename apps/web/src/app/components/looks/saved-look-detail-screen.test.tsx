@@ -11,6 +11,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useSyncExternalStore } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   GarmentItemContract,
@@ -50,7 +51,32 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
   usePathname: () => '/looks/saved/sl-1',
   useParams: () => params,
+  useSearchParams: () => useMockSearchParams(),
 }))
+
+/**
+ * The query `useSearchParams` answers. `openAt` moves it with the address; `clientNavigate` moves
+ * it alone, as a Next client navigation renders the new page before `window.location` holds it.
+ */
+const address = { search: '' }
+const ADDRESS_EVENT = 'test:saved-look-address'
+function useMockSearchParams() {
+  const search = useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener(ADDRESS_EVENT, onChange)
+      return () => window.removeEventListener(ADDRESS_EVENT, onChange)
+    },
+    () => address.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+function clientNavigate(search: string) {
+  act(() => {
+    address.search = search
+    window.dispatchEvent(new Event(ADDRESS_EVENT))
+  })
+}
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 
 const api = vi.hoisted(() => ({
@@ -177,6 +203,8 @@ const startUrl = window.location.href
 
 function openAt(url: string) {
   window.history.replaceState(null, '', url)
+  address.search = new URL(url, window.location.origin).search
+  window.dispatchEvent(new Event(ADDRESS_EVENT))
 }
 
 function renderDetail(savedLookId = 'sl-1') {
@@ -202,6 +230,7 @@ afterEach(() => {
   identity.owner = null
   window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
   window.history.replaceState(null, '', startUrl)
+  address.search = ''
   Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
 })
 
@@ -497,6 +526,68 @@ describe('7.12 saved look detail hardening (Codex 7.12 #3, #7, #10)', () => {
       }
     }
   )
+
+  // Codex TEA review #3: the Remove notice outlives the screen on the shared bar, so it belongs
+  // to the member who acted. Carries the deleted Closet row's "Undo dismissed and inert" case.
+  it("7.12-UNIT-040p2 a verified switch to member B takes A's Undo off the shared bar, and a late click on it restores nothing", async () => {
+    const user = userEvent.setup()
+    publishVerified('member-a')
+    renderDetail()
+
+    await user.click(await screen.findByTestId('saved-look-detail-remove'))
+    await waitFor(() =>
+      expect(api.remove).toHaveBeenCalledWith('sl-1', '"saved-look:sl-1:4"', {
+        accessToken: 'member-a',
+      })
+    )
+    const undo = await screen.findByTestId('status-bar-action-undo')
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+
+    publishVerified('member-b')
+
+    await waitFor(() => expect(screen.queryByTestId('status-bar-action-undo')).toBeNull())
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    expect(screen.queryByTestId('status-feedback-bar')?.textContent ?? '').not.toContain(
+      'Removed'
+    )
+    // A late click on the Undo that was visible at the switch.
+    await act(async () => {
+      undo.click()
+      await Promise.resolve()
+    })
+    expect(api.restore).not.toHaveBeenCalled()
+  })
+
+  it('7.12-UNIT-040p3 the same member back on Saved keeps Undo through a session event, and it restores with their bearer', async () => {
+    const user = userEvent.setup()
+    publishVerified('member-a')
+    const { rerender } = renderDetail()
+
+    await user.click(await screen.findByTestId('saved-look-detail-remove'))
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledExactlyOnceWith('/looks?segment=saved')
+    )
+    await screen.findByTestId('status-bar-action-undo')
+
+    // Remove returned to Saved: the detail is gone and the shared bar stays.
+    rerender(
+      <SaveFeedbackProvider>
+        <div data-testid="looks-saved-stand-in" />
+      </SaveFeedbackProvider>
+    )
+    expect(screen.queryByTestId('saved-look-detail')).toBeNull()
+    // A session event that still names member A (a token refresh, another tab) keeps the notice.
+    publishVerified('member-a')
+
+    const undo = screen.getByTestId('status-bar-action-undo')
+    expect(undo).toBeVisible()
+    await user.click(undo)
+    await waitFor(() =>
+      expect(api.restore).toHaveBeenCalledExactlyOnceWith('sl-1', {
+        accessToken: 'member-a',
+      })
+    )
+  })
 })
 
 describe('7.12 saved look detail back and parent (D5, P10, 7.12-UNIT-061)', () => {
@@ -538,6 +629,34 @@ describe('7.12 saved look detail back and parent (D5, P10, 7.12-UNIT-061)', () =
       expect(router.push).not.toHaveBeenCalled()
     }
   )
+
+  // Fable review P1: a tile opens the detail by a client navigation, which renders it before
+  // `window.location` holds the new address; `from` comes from the search params.
+  it('7.12-UNIT-061c a client navigation from a tile keeps its from before the address bar moves, and follows a later search params change without a reload', async () => {
+    signInFixtureMember()
+    openAt('/looks?segment=saved&filter=today')
+    clientNavigate('?from=today')
+
+    renderDetail()
+    await screen.findByTestId('saved-look-detail')
+    expect(window.location.search).toBe('?segment=saved&filter=today')
+    expect(screen.getByTestId('app-top-bar-back')).toHaveAttribute(
+      'href',
+      '/looks?segment=saved&filter=today'
+    )
+
+    clientNavigate('?from=capsules')
+    expect(screen.getByTestId('app-top-bar-back')).toHaveAttribute(
+      'href',
+      '/looks?segment=saved&filter=capsules'
+    )
+    expect(screen.getByTestId('saved-look-detail')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByTestId('app-top-bar-back'))
+    expect(router.replace).toHaveBeenCalledExactlyOnceWith(
+      '/looks?segment=saved&filter=capsules'
+    )
+  })
 
   it('7.12-UNIT-061 a cold entry replaces to its parent; an in-app entry steps back', async () => {
     signInFixtureMember()

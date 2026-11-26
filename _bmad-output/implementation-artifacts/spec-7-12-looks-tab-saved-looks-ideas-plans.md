@@ -278,6 +278,9 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
   - D8: the Closet page no longer reads saved looks, so its gate waits on the closet read only.
   - D6: the capsule manager reads `?capsule=` once on mount and focuses the matching card on its
     first load; a capsule beyond the manager's first page gets no focus.
+  - D2 (baseline review): the collage fills its square by piece count (one fills it, two side
+    by side, three as one beside a stacked pair, four as 2 x 2), so a short look shows no empty
+    cells.
   - D10: Profile's Premium section carries `id="premium"`; the planner's set-city return goes to
     `/looks?segment=plan`.
   - Analytics routes: web drops `/looks/plan` and `/wardrobe/capsules` and adds `/looks/capsules`
@@ -304,6 +307,18 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
   - #9 P2, TEA: stale native row test and Community dark-mode Plan assertions.
   - #10 P3, patch: the web route decodes safely; a malformed id reads as gone.
   - #11 P3, patch: the Ideas first-save line follows an empty All only.
+  - Codex TEA assertion review #3, patch (product): a saved look screen's notices are tied to
+    the acting member (`components/looks/owned-notices.ts` on web, `features/looks/
+owned-notices.ts` on native) and leave the bar when the session changes; Undo stays while the
+    same member returns to Saved. Findings #1, #2, #4 and #5 of that review are TEA's.
+- 2026-11-26, fable review standing in for CodeRabbit (PR #296 is 162 files), all patch:
+  - P1: web read `from` and `capsule` from `window.location` in a state initializer, which still
+    holds the previous URL during a client navigation; both now come from `useSearchParams`
+    under Suspense, which also removes a server and client mismatch of the back control.
+  - P2: native Looks latched on Ideas switches to Saved after a first save, while the tab is away
+    or as it comes back.
+  - P3: a web filter change shows a busy line until its read lands; native Remove from a View
+    entry dismisses to Looks instead of a root-stack replace.
   - Codex Security: one Medium (#3), 48 of 83 paths with full-file receipts, the rest in its
     coverage ledger.
 

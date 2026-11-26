@@ -18,9 +18,12 @@ import { test as webhookFixture } from '@seontechnologies/playwright-utils/webho
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
+import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import {
   guardExpectedError,
+  PLANNER_RESPONSE_URL,
   RITUAL_RESPONSE_URL,
+  unexpectedPlannerErrors,
   unexpectedRitualErrors,
 } from '../helpers/expected-error-guard'
 import {
@@ -72,13 +75,31 @@ const networkErrorMonitor = base
     createNetworkErrorMonitorFixture({
       excludePatterns: [
         RITUAL_RESPONSE_URL,
+        // Story CC-7.12 D10: guarded below by plannerErrorGuard instead.
+        PLANNER_RESPONSE_URL,
         ...(environment.name === 'local'
           ? []
           : [/\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/]),
       ],
     })
   )
-  .extend<{ ritualErrorGuard: void }>({
+  .extend<{ ritualErrorGuard: void; plannerErrorGuard: void }>({
+    // Story CC-7.12 (Step 69): Plan's free preview rests on the planner's Premium-required 403.
+    // The monitor stands aside for the planner URL; this guard fails on every other planner error.
+    plannerErrorGuard: [
+      async ({ context }, use, testInfo) => {
+        const guard = guardExpectedError(context, PLANNER_RESPONSE_URL)
+        await use()
+        if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
+          return
+        const unexpected = unexpectedPlannerErrors(
+          await guard.settle(),
+          PREMIUM_REQUIRED_MESSAGE
+        )
+        expect(unexpected, 'unexpected planner HTTP errors').toEqual([])
+      },
+      { auto: true },
+    ],
     ritualErrorGuard: [
       async ({ context }, use, testInfo) => {
         // The monitor filters by URL. Preserve monitoring of every ritual failure

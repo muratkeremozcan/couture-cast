@@ -466,6 +466,19 @@ function SavedPanel({
         />
       </nav>
     ) : null
+  // Fable review P3: a filter change paints a busy line until its first read lands, never an
+  // empty grid with a Load more that cannot load yet.
+  if (!feed.settled) {
+    return (
+      <p
+        data-testid="looks-first-content"
+        className="text-sm text-ink-muted"
+        aria-busy="true"
+      >
+        <span data-testid="looks-feed-loading">…</span>
+      </p>
+    )
+  }
   if (feed.entries.length === 0 && !feed.hasMore) {
     const line =
       filter === 'today'

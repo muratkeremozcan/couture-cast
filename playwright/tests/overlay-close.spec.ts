@@ -15,6 +15,7 @@ import {
   waitForShellSettled,
 } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
+import { openLooksFixture, type LookSeed } from '../support/helpers/looks-fixtures'
 import { SHELL_SAVED_LOOK_ID, type ShellScreen } from '../support/helpers/shell-fixtures'
 
 test.use({
@@ -215,6 +216,65 @@ test.describe('CC-7.12 a saved look opens its own screen @local-lane', () => {
       expect(await sameDocument(page), `${how} back: same document`).toBe(true)
     }
   })
+
+  // Enough saves that the oldest tile sits well below the first screen at 390 x 664.
+  const DEEP_LOOKS: LookSeed[] = Array.from({ length: 16 }, (_, index) => ({
+    id: `deep-look-${index + 1}`,
+    created: 100 - index,
+    title: `Deep look ${index + 1}`,
+  }))
+  const DEEP_TILE_IDS = DEEP_LOOKS.map((look) => `saved-look-card-${look.id}`)
+  const savedTileIds = (page: Page) =>
+    page
+      .getByTestId('looks-saved-grid')
+      .locator('[data-testid^="saved-look-card-"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid') ?? ''))
+  const windowScrollY = (page: Page) => page.evaluate(() => window.scrollY)
+
+  for (const how of ['arrow', 'browser'] as const) {
+    test(`[P0] [7.11-E2E-031] [7.12-E2E-012] Saved scrolled to a tile below the fold, ${how} back: the feed settles at the same offset with the tile in place`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      const fixture = await openLooksFixture(page, interceptNetworkCall, {
+        looks: DEEP_LOOKS,
+      })
+      await page.goto('/looks')
+      await waitForShellSettled(page, fixture.router)
+      await expect.poll(() => savedTileIds(page)).toEqual(DEEP_TILE_IDS)
+      const last = DEEP_LOOKS.at(-1)!
+      const tile = page.getByTestId(`saved-look-card-${last.id}`)
+      await expect(tile, 'the tile starts below the first screen').not.toBeInViewport()
+      await tile.scrollIntoViewIfNeeded()
+      const depth = await windowScrollY(page)
+      expect(depth, 'the feed is scrolled well past the top').toBeGreaterThan(300)
+      const tileTop = (await tile.boundingBox())!.y
+
+      await tile.click()
+      await expect(page).toHaveURL(new RegExp(`/looks/saved/${last.id}\\?from=all$`))
+      await expect(page.getByTestId('saved-look-detail')).toHaveAttribute(
+        'data-saved-look-id',
+        last.id
+      )
+
+      if (how === 'arrow') await page.getByTestId('app-top-bar-back').click()
+      else await page.goBack()
+      await expect(page).toHaveURL(/\/looks$/)
+      // The feed's reads settle and every tile is back before the offset is read.
+      await waitForShellSettled(page, fixture.router)
+      await expect.poll(() => savedTileIds(page)).toEqual(DEEP_TILE_IDS)
+      await expect
+        .poll(async () => Math.abs((await windowScrollY(page)) - depth), {
+          message: `${how} back restores the Saved offset within 1 px`,
+        })
+        .toBeLessThanOrEqual(1)
+      await expect(tile).toBeInViewport()
+      expect(
+        Math.abs((await tile.boundingBox())!.y - tileTop),
+        'the tile sits where it was'
+      ).toBeLessThanOrEqual(1)
+    })
+  }
 })
 
 test.describe('CC-7.11 swipe down closes a layer @local-lane', () => {

@@ -100,9 +100,29 @@ function MemberLooks({ epoch }: { epoch: number }) {
   // Tabs stay mounted, so a return to Looks is a focus: it reads the feed again in place, and
   // the tiles and the scroll offset stay (as the Closet does, CC-7.7 D5).
   const leftRef = useRef(false)
+  // Fable review P2: Looks latched on Ideas for a member with nothing saved switches to Saved
+  // once a first look exists, while the tab is away or as it comes back, never under the finger.
+  const firstSaveRef = useRef(false)
+  firstSaveRef.current =
+    defaultSegment === 'ideas' &&
+    addressSegment === null &&
+    filter === 'all' &&
+    owner !== null &&
+    feed.settled &&
+    !feed.failed &&
+    feed.hasItems
+  // TEA N2: the refetch a return starts can land after the tab is back; that read may switch
+  // too, unless the member picked a segment on this visit (the address then holds it).
+  const refocusReadRef = useRef(false)
+  useEffect(() => {
+    if (firstSaveRef.current && (leftRef.current || refocusReadRef.current))
+      setDefaultSegment('saved')
+  }, [feed.hasItems, feed.settled])
   useFocusEffect(
     useCallback(() => {
+      refocusReadRef.current = leftRef.current
       if (leftRef.current && epoch === mobileIdentityEpoch()) reload()
+      if (leftRef.current && firstSaveRef.current) setDefaultSegment('saved')
       leftRef.current = false
       return () => {
         leftRef.current = true

@@ -280,9 +280,9 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
     anchorGarmentId: null,
     anchorSnapshot: null,
     composition: [
-      ['top', 'oxford-shirt'],
-      ['bottom', 'dark-jeans'],
-      ['shoes', 'loafers'],
+      ['top', 'sample:g:oxford-shirt'],
+      ['bottom', 'sample:g:dark-jeans'],
+      ['shoes', 'sample:g:loafers'],
     ].map(([category, itemId], slotIndex) => ({
       slotIndex,
       category,

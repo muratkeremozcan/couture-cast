@@ -14,6 +14,26 @@ export type AllowedError = { method: string; status: number; code: string }
 
 export const RITUAL_RESPONSE_URL = /^https?:\/\/[^/]+\/api\/v1\/ritual(?:\?|$)/
 
+/**
+ * Story CC-7.12 D10: a free member's Plan reads the planner and gets the Premium-required 403,
+ * which the page turns into the free preview. Like the ritual's no-city 400, that one answer is
+ * expected anywhere Plan opens for a free member; every other planner error still fails.
+ */
+export const PLANNER_RESPONSE_URL =
+  /^https?:\/\/[^/]+\/api\/v1\/commerce\/premium\/planner(?:\?|$)/
+
+export function unexpectedPlannerErrors(
+  seen: readonly GuardedError[],
+  premiumRequiredMessage: string
+): GuardedError[] {
+  return seen.filter(
+    ({ method, status, code, bodyUnreadable }) =>
+      method !== 'GET' ||
+      status !== 403 ||
+      (code !== premiumRequiredMessage && !bodyUnreadable)
+  )
+}
+
 export function unexpectedRitualErrors(seen: readonly GuardedError[]): GuardedError[] {
   return seen.filter(
     ({ method, status, code, bodyUnreadable }) =>

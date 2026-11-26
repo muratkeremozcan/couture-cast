@@ -111,11 +111,11 @@ export function useSavedLookName(): (look: SavedLookContract) => string {
     look.title || sampleLookText({ id: look.lookId }, samples).name || look.lookId
 }
 
-function Cell({ cell }: { cell: LooksTileCell }) {
+function Cell({ cell, span = '' }: { cell: LooksTileCell; span?: string }) {
   // A failed photo swaps to the placeholder inside the same square, so nothing moves (P8).
   // Codex #7: a failure belongs to one signed URL, so a refreshed URL gets a fresh try.
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
-  const box = 'relative aspect-square overflow-hidden bg-card-muted'
+  const box = `relative h-full w-full overflow-hidden bg-card-muted ${span}`
   if (cell.kind === 'photo' && cell.url !== failedUrl) {
     const url = cell.url
     return (
@@ -147,20 +147,37 @@ function Cell({ cell }: { cell: LooksTileCell }) {
   )
 }
 
+/**
+ * The collage fills one square whatever the piece count: one piece fills it, two sit side by
+ * side, three put the first beside a stacked pair, four make a 2 x 2 grid. No empty cells.
+ */
+const COLLAGE_LAYOUT: Record<number, string> = {
+  0: 'grid-cols-1 grid-rows-1',
+  1: 'grid-cols-1 grid-rows-1',
+  2: 'grid-cols-2 grid-rows-1',
+  3: 'grid-cols-2 grid-rows-2',
+  4: 'grid-cols-2 grid-rows-2',
+}
+
 function Collage({ cells }: { cells: readonly LooksTileCell[] }) {
-  const filled: (LooksTileCell | null)[] = [...cells]
-  while (filled.length < 4) filled.push(null)
+  const shown = cells.slice(0, 4)
   return (
     <div
       aria-hidden="true"
-      className="grid grid-cols-2 gap-0.5 overflow-hidden rounded-lg bg-line"
+      className={`grid aspect-square gap-0.5 overflow-hidden rounded-lg bg-line ${
+        COLLAGE_LAYOUT[shown.length] ?? COLLAGE_LAYOUT[4]
+      }`}
     >
-      {filled.map((cell, index) =>
-        cell ? (
-          <Cell key={cell.key} cell={cell} />
-        ) : (
-          <div key={`empty-${index}`} className="aspect-square bg-card-muted" />
-        )
+      {shown.length === 0 ? (
+        <div className="h-full w-full bg-card-muted" />
+      ) : (
+        shown.map((cell, index) => (
+          <Cell
+            key={cell.key}
+            cell={cell}
+            span={shown.length === 3 && index === 0 ? 'row-span-2' : ''}
+          />
+        ))
       )}
     </div>
   )

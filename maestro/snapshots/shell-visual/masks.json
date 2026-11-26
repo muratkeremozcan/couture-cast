@@ -35,5 +35,15 @@
       "rect": [704, 160, 16, 960],
       "reason": "Android scroll indicator: a tab's scroll view flashes it on show or scroll restore and it fades on its own clock, so a capture may or may not hold it (CI 40ee2f90 light-profile, dark-community)"
     }
+  ],
+  "looks": [
+    {
+      "rect": [40, 814, 220, 36],
+      "reason": "CC-7.12 Saved tile state line: Saved <date> of the capsule run-maestro seeds at capture (Saved Nov 26 on 7194a7ca), new each day. The tile, its name and the collage stay compared"
+    },
+    {
+      "rect": [704, 160, 16, 960],
+      "reason": "Android scroll indicator: a tab's scroll view flashes it on show or scroll restore and it fades on its own clock, so a capture may or may not hold it (CI 40ee2f90 light-profile, dark-community)"
+    }
   ]
 }

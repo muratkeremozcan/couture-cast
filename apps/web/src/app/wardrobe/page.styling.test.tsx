@@ -1046,12 +1046,16 @@ describe('Wardrobe styling', () => {
     publishOwner(owner)
     render(<LooksPage />)
 
-    // Both of the member's own device looks land as Saved tiles, one of them Needs review.
-    const grid = await screen.findByTestId('looks-saved-grid')
+    // The import posts the member's two own device looks one after another (garments read,
+    // then one POST each, the tampered one refused), so it gets more than one default wait.
+    await waitFor(() => expect(savedLooksStore.items).toHaveLength(2), { timeout: 3000 })
+    // Its change notice reads Looks again, which can paint a new grid, so each check reads the
+    // grid that is on screen now. Both land as Saved tiles, one of them Needs review.
+    const grid = () => within(screen.getByTestId('looks-saved-grid'))
     await waitFor(() =>
-      expect(within(grid).getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+      expect(grid().getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
     )
-    expect(within(grid).getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+    expect(grid().getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
     expect(savedLooksStore.items).toHaveLength(2)
     await waitFor(() => {
       expect(localStorage.getItem(ownValidKey)).toBeNull()

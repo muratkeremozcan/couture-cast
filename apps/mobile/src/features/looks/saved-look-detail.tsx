@@ -52,6 +52,7 @@ import {
   subscribeMobileApplicationUser,
   resolveMobileAccessToken,
 } from '@/src/lib/mobile-auth'
+import { trackOwnedNotice } from './owned-notices'
 import {
   deleteSavedLookFromMobile,
   formatSavedLookIfMatch,
@@ -187,6 +188,22 @@ function MemberSavedLookDetail({
     return () => controller.abort()
   }, [attempt, epoch, owner, savedLookId])
 
+  // Codex TEA review #3: every notice is tied to the member who acted and leaves the bar when
+  // the identity changes, so the next member never sees it.
+  const showOwnedNotice = (
+    actionOwner: string | null,
+    actionEpoch: number,
+    notice: Parameters<typeof statusBarRef.current.showNotice>[0]
+  ) => {
+    const bar = statusBarRef.current
+    bar.showNotice(notice)
+    if (actionOwner) {
+      trackOwnedNotice(notice.id, actionOwner, actionEpoch, () =>
+        bar.dismissNotice(notice.id)
+      )
+    }
+  }
+
   // The Undo bar outlives this screen (Remove leaves it), so actions check the session only.
   const isLiveSession = (actionOwner: string | null, actionEpoch: number) =>
     Boolean(
@@ -211,7 +228,7 @@ function MemberSavedLookDetail({
     const seq = ++noticeSeqRef.current
     const offline = isOfflineError(error) || !getNetworkOnline()
     if (offline) reportNetworkOffline()
-    statusBarRef.current.showNotice({
+    showOwnedNotice(actionOwner, actionEpoch, {
       id: `${kind}-${offline ? 'offline' : 'failed'}-${seq}`,
       announcementId: createAnnouncementToken(
         `${kind}-${offline ? 'offline' : 'failed'}`,
@@ -251,7 +268,7 @@ function MemberSavedLookDetail({
       // The Looks feed reads again and the tile returns to its place.
       notifyMobileSavedLooksChanged(actionOwner)
       const undoSeq = ++noticeSeqRef.current
-      statusBarRef.current.showNotice({
+      showOwnedNotice(actionOwner, actionEpoch, {
         id: `mobile-saved-look-undo-${undoSeq}`,
         announcementId: createAnnouncementToken('mobile-saved-look-undo', undoSeq),
         message: t('feedback.undone'),
@@ -315,7 +332,7 @@ function MemberSavedLookDetail({
   ) => {
     let undoInFlight = false
     const seq = ++noticeSeqRef.current
-    statusBarRef.current.showNotice({
+    showOwnedNotice(actionOwner, actionEpoch, {
       id: `mobile-saved-look-remove-${seq}`,
       announcementId: createAnnouncementToken('mobile-saved-look-remove', seq),
       message: t('feedback.removed'),
@@ -371,7 +388,8 @@ function MemberSavedLookDetail({
     // P10, T2: opened from a Saved tile, the screen below is that Saved page, so back returns to
     // it; any other entry replaces this screen with Saved.
     if (from !== null && router.canGoBack()) router.back()
-    else router.replace(savedLooksRoute(from ?? 'all'))
+    // Fable review P3: a root-stack replace would stack a second tab group; dismiss to Looks.
+    else router.dismissTo(savedLooksRoute(from ?? 'all'))
   }
 
   const renderSlot = (lookId: string, slot: Slot) => {

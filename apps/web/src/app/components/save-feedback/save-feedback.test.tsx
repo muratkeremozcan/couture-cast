@@ -11,6 +11,7 @@ import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-
 import { SAVE_FEEDBACK_TIMINGS } from '@couture/utils'
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
+import type * as NextNavigation from 'next/navigation'
 import type * as WebSession from '../../../lib/web-session'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
 import { createSavedLooksMswHandlers } from '../../../test-utils/saved-looks-msw'
@@ -26,6 +27,19 @@ import {
   useStatusBar,
   type AnnouncementEntry,
 } from './index'
+
+// Story CC-7.12 D7: View on a Home or Style this piece save pushes the saved look's Looks detail
+// through the app router, so this suite stands in for it and asserts the address.
+const router = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  prefetch: vi.fn(),
+}))
+vi.mock('next/navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof NextNavigation>()),
+  useRouter: () => router,
+}))
 
 const sessionMock = vi.hoisted(() => ({ owner: null as string | null }))
 vi.mock('../../../lib/web-session', async (importOriginal) => ({
@@ -73,6 +87,7 @@ function setNavigatorOnline(value: boolean) {
 beforeEach(async () => {
   await getI18n().changeLanguage('en-US')
   setNavigatorOnline(true)
+  router.push.mockClear()
 })
 
 afterEach(() => {
@@ -1369,6 +1384,10 @@ describe('web save-feedback components', () => {
         )
       )
       await user.click(screen.getByTestId('status-bar-action-view'))
+      expect(store.items).toHaveLength(1)
+      expect(router.push).toHaveBeenCalledExactlyOnceWith(
+        `/looks/saved/${encodeURIComponent(store.items[0]!.id)}`
+      )
 
       // Re-saving an already-saved look is a non-destructive no-op (no Undo action)
       await user.click(saveBtn)
@@ -1586,6 +1605,10 @@ describe('web save-feedback components', () => {
       )
       expect(within(panel).getByTestId('status-bar-action-undo')).toBeInTheDocument()
       await user.click(within(panel).getByTestId('status-bar-action-view'))
+      expect(styleSavedStore.items).toHaveLength(1)
+      expect(router.push).toHaveBeenCalledExactlyOnceWith(
+        `/looks/saved/${encodeURIComponent(styleSavedStore.items[0]!.id)}`
+      )
 
       // Clicking Save again on an already-saved identical look does not offer Undo or duplicate the row.
       await user.click(firstSave)

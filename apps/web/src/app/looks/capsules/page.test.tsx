@@ -37,7 +37,35 @@ const router = vi.hoisted(() => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => router,
   usePathname: () => '/looks/capsules',
+  useSearchParams: () => useMockSearchParams(),
 }))
+
+/**
+ * The query `useSearchParams` answers: the address's, unless `clientNavigate` set one. A Next
+ * client navigation renders the new page before `window.location` holds its URL.
+ */
+const navigation = { search: null as string | null }
+const NAVIGATION_EVENT = 'test:capsules-address'
+function useMockSearchParams() {
+  const search = React.useSyncExternalStore(
+    (onChange) => {
+      window.addEventListener(NAVIGATION_EVENT, onChange)
+      return () => window.removeEventListener(NAVIGATION_EVENT, onChange)
+    },
+    () => navigation.search ?? window.location.search,
+    () => ''
+  )
+  return new URLSearchParams(search)
+}
+function clientNavigate(search: string) {
+  act(() => {
+    navigation.search = search
+    window.dispatchEvent(new Event(NAVIGATION_EVENT))
+  })
+}
+afterEach(() => {
+  navigation.search = null
+})
 
 vi.mock('../../../lib/wardrobe', () => ({
   listCapsulesFromWeb: vi.fn(),
@@ -289,6 +317,37 @@ describe('7.12 LooksCapsulesPage capsule focus (D6, P7)', () => {
     render(<LooksCapsulesPage />)
 
     await waitFor(() => expect(screen.getByTestId('capsule-card-cap-3')).toHaveFocus())
+    expect(wardrobeApi.getCapsuleFromWeb).not.toHaveBeenCalled()
+  })
+
+  // Fable review P1: a Looks tile opens the manager by a client navigation, which renders it
+  // before `window.location` holds `?capsule=`; the id comes from the search params.
+  it('7.12-UNIT-041f a client navigation from a Looks tile focuses its capsule before the address bar moves', async () => {
+    window.history.replaceState(null, '', '/looks?segment=saved&filter=capsules')
+    clientNavigate('?capsule=cap-2')
+    render(<LooksCapsulesPage />)
+
+    const card = await screen.findByTestId('capsule-card-cap-2')
+    await waitFor(() => expect(card).toHaveFocus())
+    expect(scrollIntoView.mock.contexts).toEqual([card])
+    expect(window.location.search).toBe('?segment=saved&filter=capsules')
+  })
+
+  it('7.12-UNIT-041g a capsule id that arrives by a client navigation after the first load focuses that card once', async () => {
+    window.history.replaceState(null, '', '/looks/capsules')
+    render(<LooksCapsulesPage />)
+    expect(await screen.findByTestId('capsule-card-cap-3')).toBeVisible()
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(document.body)
+
+    clientNavigate('?capsule=cap-3')
+
+    // The new id reads the list again, so each check takes the card on screen now.
+    await waitFor(() => expect(screen.getByTestId('capsule-card-cap-3')).toHaveFocus())
+    expect(scrollIntoView.mock.contexts).toEqual([
+      screen.getByTestId('capsule-card-cap-3'),
+    ])
+    expect(window.location.search).toBe('')
     expect(wardrobeApi.getCapsuleFromWeb).not.toHaveBeenCalled()
   })
 

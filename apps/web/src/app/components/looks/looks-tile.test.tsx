@@ -259,6 +259,53 @@ describe('7.12 Looks tile collage and link (D2, P8)', () => {
     expect(within(tile).getByTestId('looks-tile-placeholder')).toBeInTheDocument()
   })
 
+  it.each([
+    [1, 'grid-cols-1 grid-rows-1', []],
+    [2, 'grid-cols-2 grid-rows-1', []],
+    [3, 'grid-cols-2 grid-rows-2', [0]],
+    [4, 'grid-cols-2 grid-rows-2', []],
+    [6, 'grid-cols-2 grid-rows-2', []],
+  ] as const)(
+    '7.12-UNIT-031 %i pieces fill the square with no empty cells (builder collage review)',
+    (pieces, layout, spanning) => {
+      const catalogIds = [
+        'sample:g:oxford-shirt',
+        'sample:g:dark-jeans',
+        'sample:g:loafers',
+        'sample:g:wool-overcoat',
+        'sample:g:fleece-zip',
+        'sample:g:puffer-jacket',
+      ]
+      renderTile(
+        <SavedLookTile
+          look={look({
+            composition: catalogIds.slice(0, pieces).map((itemId, slotIndex) => ({
+              slotIndex,
+              category: 'top' as const,
+              kind: 'catalog' as const,
+              itemId,
+              label: null,
+              missing: false,
+              imageAccess: null,
+            })),
+          })}
+          href="/looks/saved/sl-1?from=all"
+        />
+      )
+      const collage = screen
+        .getByTestId('saved-look-card-sl-1')
+        .querySelector('[aria-hidden="true"]')!
+      expect(collage.children).toHaveLength(Math.min(pieces, 4))
+      expect(collage).toHaveClass(...layout.split(' '))
+      Array.from(collage.children).forEach((cell, index) => {
+        // Three pieces: the first spans the left column beside a stacked pair.
+        if ((spanning as readonly number[]).includes(index))
+          expect(cell).toHaveClass('row-span-2')
+        else expect(cell).not.toHaveClass('row-span-2')
+      })
+    }
+  )
+
   it('7.12-UNIT-031 a photo that fails swaps to the placeholder in the same cell, and a refreshed URL is tried again (Codex 7.12 #7)', () => {
     const href = '/looks/saved/sl-1?from=all'
     const first = look({
@@ -274,9 +321,10 @@ describe('7.12 Looks tile collage and link (D2, P8)', () => {
 
     expect(tile.querySelector('img')).toBeNull()
     expect(collage.children[0]).toHaveAttribute('data-testid', 'looks-tile-placeholder')
-    expect(collage.children).toHaveLength(4)
-    // The cell keeps its square: the placeholder carries the same aspect class as the photo cell.
-    expect(collage.children[0]).toHaveClass('aspect-square')
+    // One piece fills the square (no filler cells); the placeholder takes the photo cell's place.
+    expect(collage.children).toHaveLength(1)
+    expect(collage).toHaveClass('aspect-square')
+    expect(collage.children[0]).toHaveClass('h-full', 'w-full')
 
     // The feed hands the same piece a fresh signed URL while the tile stays mounted.
     view.rerender(

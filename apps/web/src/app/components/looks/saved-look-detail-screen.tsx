@@ -7,8 +7,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentWithColor,
@@ -48,6 +48,7 @@ import { StickyBottomNav } from '../sticky-bottom-nav'
 import { savedLooksHref } from './looks-address'
 import { StylePiecePanel } from '../../wardrobe/style-piece-panel'
 import { useSavedLookName } from './looks-tile'
+import { trackOwnedNotice } from './owned-notices'
 import { reopenAnchorFor } from './saved-look-reopen'
 
 const CATALOG_BY_ID = new Map(SAMPLE_CATALOG.garments.map((item) => [item.id, item]))
@@ -58,11 +59,14 @@ type DetailState =
   | { kind: 'gone' }
   | { kind: 'error' }
 
-/** The Saved filter a tile opened this look from, or null for any other entry (View, a link). */
-function readFrom(): LooksFilter | null {
-  if (typeof window === 'undefined') return null
-  const params = new URL(window.location.href).searchParams
-  return params.has('from') ? parseLooksFilter(params.get('from')) : null
+/**
+ * The Saved filter a tile opened this look from, or null for any other entry (View, a link).
+ * Fable review P1: read through `useSearchParams`, since a client navigation renders the new page
+ * before `window.location` holds its URL.
+ */
+function useFrom(): LooksFilter | null {
+  const params = useSearchParams()
+  return params?.has('from') ? parseLooksFilter(params.get('from')) : null
 }
 
 function SlotRow({
@@ -232,8 +236,12 @@ function DetailBody({
   ) => {
     if (!stillOwner()) return
     const seq = ++seqRef.current
-    statusBarRef.current.showNotice({
-      id: `looks-saved-look-${kind}-${seq}`,
+    const id = `looks-saved-look-${kind}-${seq}`
+    const bar = statusBarRef.current
+    // Codex TEA review #3: the notice leaves the bar once another member holds the session.
+    trackOwnedNotice(id, owner, () => bar.dismissNotice(id))
+    bar.showNotice({
+      id,
       announcementId: createAnnouncementToken(`looks-saved-look-${kind}`, seq),
       message,
       tone,
@@ -470,7 +478,7 @@ function SavedLookDetail({ savedLookId }: { savedLookId: string }) {
   const router = useRouter()
   const { state, reload } = useSavedLook(owner, savedLookId)
   const name = useSavedLookName()
-  const [from] = useState(readFrom)
+  const from = useFrom()
   const title =
     owner && state.kind === 'ready' ? name(state.look) : t('looks.segments.saved')
   return (
@@ -502,7 +510,9 @@ export function SavedLookDetailScreen({ savedLookId }: { savedLookId: string }) 
   const owner = useWebSessionOwner()
   return (
     <I18nextProvider i18n={getI18n()}>
-      <SavedLookDetail key={owner ?? 'signed-out'} savedLookId={savedLookId} />
+      <Suspense fallback={null}>
+        <SavedLookDetail key={owner ?? 'signed-out'} savedLookId={savedLookId} />
+      </Suspense>
     </I18nextProvider>
   )
 }

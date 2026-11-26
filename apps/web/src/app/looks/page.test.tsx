@@ -850,6 +850,47 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     expect(screen.queryByTestId('saved-look-card-sl-1')).toBeNull()
   })
 
+  /**
+   * Story CC-7.12 moved this from the Closet (was 7.5-CMP-016): a saved look's Ready or Needs
+   * review follows its anchor piece's live tags, which the API derives on each read. A return to
+   * Looks after a tag edit in the Closet shows the status the refresh read.
+   */
+  it('7.12-UNIT-022e a look whose anchor tags changed in the Closet shows Needs review on the return to Looks, and Ready after the Undo', async () => {
+    signInFixtureMember()
+    const anchored = (overrides: Partial<SavedLookContract> = {}) =>
+      look('sl-anchor', 'Blue top look', {
+        source: 'style_piece',
+        anchorGarmentId: 'blue-top',
+        ...overrides,
+      })
+    list.mockResolvedValueOnce(page([anchored()]))
+    moveAddress('/looks?segment=saved')
+    const first = render(<LooksPage />)
+    const readyTile = await screen.findByTestId('saved-look-card-sl-anchor')
+    expect(readyTile).not.toHaveTextContent('Needs review')
+    first.unmount()
+
+    // The member retagged the anchor in the Closet; the refresh reads the API's new status.
+    list.mockResolvedValueOnce(page([anchored({ availabilityStatus: 'needs_review' })]))
+    const second = render(<LooksPage />)
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-look-card-sl-anchor')).toHaveAccessibleName(
+        'Blue top look, Needs review'
+      )
+    )
+    second.unmount()
+
+    // Undo put the tags back: the next return reads Ready again.
+    list.mockResolvedValueOnce(page([anchored()]))
+    render(<LooksPage />)
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-look-card-sl-anchor')).not.toHaveTextContent(
+        'Needs review'
+      )
+    )
+    expect(list).toHaveBeenCalledTimes(3)
+  })
+
   it('[Codex 7.11 #12] 7.12-UNIT-022b a same-member return keeps every loaded page, and the refresh reads both pages back', async () => {
     signInFixtureMember()
     list.mockResolvedValueOnce(page(FIRST_PAGE, 51))

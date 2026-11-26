@@ -90,6 +90,21 @@ const PLANNER_ROUTE = '*/api/v1/commerce/premium/planner'
 const PNG_PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 const FAR = '2099-12-31T00:00:00.000Z'
+/**
+ * Bytes that are no PNG: react-native-web's ImageLoader fails to decode them with no network hop.
+ * It reports the failure to the Image's onError; no DOM event on the rendered <img> drives that.
+ */
+const BROKEN_PNG = 'data:image/png;base64,AAAA'
+
+/** A capsule whose first photo is unexpired but fails to load. */
+function capsuleWithBrokenPhoto(id: string, createdAt: string): OutfitCapsuleContract {
+  const base = capsule(id, createdAt)
+  const [first, ...rest] = base.garments
+  return {
+    ...base,
+    garments: [{ ...first!, imageAccess: { url: BROKEN_PNG, expiresAt: FAR } }, ...rest],
+  }
+}
 
 const at = (day: number, hour = 12) =>
   `2026-11-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:00:00.000Z`
@@ -439,6 +454,61 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       expectOpenSegment('saved')
     })
 
+    // Fable review P2: Looks latched on Ideas for a member with nothing saved opens Saved once a
+    // first look exists, while the tab is away or as it comes back; never under the finger.
+    it('[P0] [TEA P1] a first save made elsewhere while the tab is away opens Saved on return', async () => {
+      const reads = serveFeed({})
+      await openLooks()
+      expectOpenSegment('ideas')
+      expect(screen.getByTestId('looks-ideas-empty-line')).toBeVisible()
+
+      // The member leaves Looks and saves a look on Today, which tells the feed.
+      act(() => screenFocus.set(false))
+      serveFeed({ looks: [look('first-save', at(23))] }, reads)
+      const before = reads.looks.length
+      act(() => notifyMobileSavedLooksChanged(MEMBER))
+      await waitFor(() => expect(reads.looks.length).toBeGreaterThan(before))
+      act(() => screenFocus.set(true))
+
+      expect(await screen.findByTestId('saved-look-card-first-save')).toBeVisible()
+      expectOpenSegment('saved')
+      expect(routerMock.setParams).not.toHaveBeenCalled()
+    })
+
+    it('[P1] [TEA P1] a first save that lands while Looks is in view keeps Ideas under the finger', async () => {
+      const reads = serveFeed({})
+      await openLooks()
+      expectOpenSegment('ideas')
+
+      serveFeed({ looks: [look('first-save', at(23))] }, reads)
+      act(() => notifyMobileSavedLooksChanged(MEMBER))
+      // The refreshed read rendered: the Ideas line for an empty Saved is gone.
+      await waitFor(() =>
+        expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
+      )
+      expectOpenSegment('ideas')
+    })
+
+    it('[P1] [TEA P1] Ideas chosen in the address stays Ideas after a first save and a return', async () => {
+      tabParams.set({ segment: 'ideas' })
+      const reads = serveFeed({})
+      await openLooks()
+      expectOpenSegment('ideas')
+      expect(screen.getByTestId('looks-ideas-empty-line')).toBeVisible()
+
+      act(() => screenFocus.set(false))
+      serveFeed({ looks: [look('first-save', at(23))] }, reads)
+      const before = reads.looks.length
+      act(() => screenFocus.set(true))
+      await waitFor(() => expect(reads.looks.length).toBeGreaterThan(before))
+      // The refreshed read rendered: the Ideas line for an empty Saved is gone.
+      await waitFor(() =>
+        expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
+      )
+      expectOpenSegment('ideas')
+      expect(screen.queryByTestId('saved-look-card-first-save')).toBeNull()
+    })
+
     // Codex 7.12 #6 (AC1, P1): the gate's deadline may open Looks before the reads answer. Looks
     // then shows their progress and still picks the default once both lists settle.
     it.each<[string, SavedLookContract[], 'saved' | 'ideas']>([
@@ -653,7 +723,7 @@ describe('Native Looks tab (Story CC-7.12)', () => {
             ],
           }),
         ],
-        capsules: [capsule('cap-photo', at(20))],
+        capsules: [capsuleWithBrokenPhoto('cap-photo', at(20))],
       })
       await openLooks()
       const lookTile = await screen.findByTestId('saved-look-card-with-missing')
@@ -674,22 +744,23 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       // A missing piece is the dashed placeholder.
       expect(within(lookTile).getAllByTestId('looks-tile-placeholder')).toHaveLength(1)
 
-      // The capsule's two photos load; one fails and its cell turns placeholder, same size.
-      expect(within(capsuleTile).queryAllByTestId('looks-tile-placeholder')).toHaveLength(
-        0
-      )
-      const before = capsuleTile.getBoundingClientRect()
-      const img = capsuleTile.querySelector('img')
-      expect(img).not.toBeNull()
-      fireEvent.error(img!)
+      // The capsule's first photo fails to load: its cell turns placeholder in the same square
+      // as the photo beside it, which still shows.
       await waitFor(() =>
         expect(within(capsuleTile).getAllByTestId('looks-tile-placeholder')).toHaveLength(
           1
         )
       )
-      const after = capsuleTile.getBoundingClientRect()
-      expect(after.height).toBeCloseTo(before.height, 0)
-      expect(after.width).toBeCloseTo(before.width, 0)
+      const imgs = capsuleTile.querySelectorAll('img')
+      expect(imgs).toHaveLength(1)
+      // The photo cell: the cell box holds react-native-web's Image root, which holds the <img>.
+      const photoCell = imgs[0]!.parentElement!.parentElement!.getBoundingClientRect()
+      const failed = within(capsuleTile)
+        .getByTestId('looks-tile-placeholder')
+        .getBoundingClientRect()
+      expect(failed.top).toBeCloseTo(photoCell.top, 0)
+      expect(failed.height).toBeCloseTo(photoCell.height, 0)
+      expect(failed.width).toBeCloseTo(photoCell.width, 0)
     })
 
     it('[P0] [D5, D6, TEA T2] a look tile opens its screen with the origin filter; a capsule tile opens the manager on it', async () => {
@@ -885,39 +956,63 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       while (scroller && scroller.scrollHeight <= scroller.clientHeight + 1)
         scroller = scroller.parentElement
       expect(scroller, 'the Looks scroll view').not.toBeNull()
-      scroller!.scrollTop = 600
+      // Position the deep tile first, so the offset is the one the member left from and the
+      // click below cannot scroll the list itself.
+      const deep = screen.getByTestId('saved-look-card-look-51')
+      deep.scrollIntoView({ block: 'center' })
       fireEvent.scroll(scroller!)
       const offset = scroller!.scrollTop
-      expect(offset).toBeGreaterThan(0)
+      expect(offset, 'the list is scrolled down to the tile').toBeGreaterThan(0)
+      const tileTop = () =>
+        screen.getByTestId('saved-look-card-look-51').getBoundingClientRect().top -
+        scroller!.getBoundingClientRect().top
+      const top = tileTop()
+      expect(top, 'the tile is inside the scroll view').toBeGreaterThanOrEqual(0)
+      expect(top + deep.getBoundingClientRect().height).toBeLessThanOrEqual(
+        scroller!.clientHeight + 1
+      )
 
-      // The member opens a look below page one and comes back.
-      await userEvent.click(screen.getByTestId('saved-look-card-look-51'))
+      // The member opens a look below page one and comes back. The refresh renames the first
+      // look, so its title on screen proves the refreshed read committed and rendered.
+      await userEvent.click(deep)
+      expect(scroller!.scrollTop, 'opening the tile did not scroll').toBeCloseTo(
+        offset,
+        0
+      )
+      const refreshed = looks.map((item, index) =>
+        index === 0 ? { ...item, title: 'Look look-00 refreshed' } : item
+      )
+      serveFeed({ looks: refreshed }, reads)
       const before = reads.looks.length
       act(() => screenFocus.set(false))
       act(() => screenFocus.set(true))
       await waitFor(() => expect(reads.looks.length).toBeGreaterThan(before))
-      // The handlers answer at once; give the refresh time to land and render.
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      await waitFor(() =>
+        expect(screen.getByTestId('saved-look-card-look-00')).toHaveTextContent(
+          'Look look-00 refreshed'
+        )
+      )
 
       expect(gridOrder()).toEqual(looks.map((item) => `saved-look-card-${item.id}`))
-      expect(scroller!.scrollTop).toBeCloseTo(offset, 0)
+      expect(Math.abs(scroller!.scrollTop - offset)).toBeLessThanOrEqual(1)
+      expect(Math.abs(tileTop() - top), 'the tile sits where it was').toBeLessThanOrEqual(
+        1
+      )
     })
 
     // Codex 7.12 #7 (D2, P8): a photo that failed shows again when the feed brings a fresh
     // signed URL for the same piece while the tile stays mounted.
     it('[P1] [TEA P8] [Codex 7.12 #7] a failed photo comes back with a refreshed URL for the same piece', async () => {
       const store: { capsules: OutfitCapsuleContract[] } = {
-        capsules: [capsule('cap-photo', at(20))],
+        capsules: [capsuleWithBrokenPhoto('cap-photo', at(20))],
       }
       serveFeed(store)
       await openLooks()
       const tile = await screen.findByTestId('looks-capsule-card-cap-photo')
-      const img = tile.querySelector('img')
-      expect(img).not.toBeNull()
-      fireEvent.error(img!)
       await waitFor(() =>
         expect(within(tile).getAllByTestId('looks-tile-placeholder')).toHaveLength(1)
       )
+      expect(tile.querySelectorAll('img')).toHaveLength(1)
 
       const refreshed = `${PNG_PIXEL}#signed-again`
       const [first, second] = store.capsules[0]!.garments

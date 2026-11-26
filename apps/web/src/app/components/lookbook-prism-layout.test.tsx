@@ -32,8 +32,16 @@ vi.mock('posthog-js', () => ({
   },
 }))
 
+// Story CC-7.12 D7: the Home sample outfit's View pushes the saved look through the app router.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 // Story CC-7.11 D9: Home no longer imports the planner; this stand-in proves it never mounts.

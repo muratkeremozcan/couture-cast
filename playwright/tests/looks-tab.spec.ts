@@ -165,46 +165,43 @@ test.describe('CC-7.12 Looks segments and default @local-lane', () => {
 test.describe('CC-7.12 each segment opens within the fold @local-lane', () => {
   for (const mode of ['populated', 'empty'] as const) {
     for (const id of ['saved', 'ideas', 'plan'] as const) {
-      test(
-        `[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`,
-        {
-          // A free member: the planner read answers the Premium-required 403 by design.
-          annotation: [{ type: 'skipNetworkMonitoring' }],
-        },
-        async ({ page, interceptNetworkCall }) => {
-          const { router } = await openLooksFixture(page, interceptNetworkCall, {
-            looks: mode === 'populated' ? LOOKS : [],
-            capsules: mode === 'populated' ? CAPSULES : [],
-            planner: 'free',
-          })
-          await page.goto(`/looks?segment=${id}`)
-          await waitForShellSettled(page, router)
+      // A free member: the planner's Premium-required 403 is expected (plannerErrorGuard).
+      test(`[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`, async ({
+        page,
+        interceptNetworkCall,
+      }) => {
+        const { router } = await openLooksFixture(page, interceptNetworkCall, {
+          looks: mode === 'populated' ? LOOKS : [],
+          capsules: mode === 'populated' ? CAPSULES : [],
+          planner: 'free',
+        })
+        await page.goto(`/looks?segment=${id}`)
+        await waitForShellSettled(page, router)
 
-          const band = await foldBand(page)
-          const first = page.getByTestId('looks-first-content')
-          await expect(first).toBeVisible()
-          const { box } = await visibleInBand(first, band)
-          expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
-            band.top - 1
-          )
+        const band = await foldBand(page)
+        const first = page.getByTestId('looks-first-content')
+        await expect(first).toBeVisible()
+        const { box } = await visibleInBand(first, band)
+        expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
+          band.top - 1
+        )
 
-          // The first thing a member reads in each segment sits wholly inside the band.
-          const probe =
-            id === 'saved'
-              ? mode === 'populated'
-                ? page.getByTestId('saved-look-card-look-c')
-                : page.getByTestId('looks-filter-empty')
-              : id === 'ideas'
-                ? page.locator('[data-testid^="looks-idea-card-"]').first()
-                : page.getByTestId('plan-upgrade')
-          const probeBox = (await probe.boundingBox())!
-          expect(probeBox, `${id} first item`).not.toBeNull()
-          expect(
-            probeBox.y + probeBox.height,
-            `${id} first item bottom`
-          ).toBeLessThanOrEqual(band.bottom + 1)
-        }
-      )
+        // The first thing a member reads in each segment sits wholly inside the band.
+        const probe =
+          id === 'saved'
+            ? mode === 'populated'
+              ? page.getByTestId('saved-look-card-look-c')
+              : page.getByTestId('looks-filter-empty')
+            : id === 'ideas'
+              ? page.locator('[data-testid^="looks-idea-card-"]').first()
+              : page.getByTestId('plan-upgrade')
+        const probeBox = (await probe.boundingBox())!
+        expect(probeBox, `${id} first item`).not.toBeNull()
+        expect(
+          probeBox.y + probeBox.height,
+          `${id} first item bottom`
+        ).toBeLessThanOrEqual(band.bottom + 1)
+      })
     }
   }
 })
@@ -331,6 +328,8 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
     await page.getByTestId('looks-capsule-card-capsule-b').click()
     await expect(page).toHaveURL(/\/looks\/capsules\?capsule=capsule-b$/)
     await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
+    // A client navigation (no reload) still reads the capsule param and focuses its card.
+    await expect(page.getByTestId('capsule-card-capsule-b')).toBeFocused()
   })
 
   test('[P0] [7.12-E2E-013] filters read one list each and never show the previous filter tiles', async ({
@@ -375,6 +374,11 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
     await expect(page).toHaveURL(/filter=capsules/)
     await expect.poll(() => fixture.listReads().length).toBeGreaterThan(before)
     await expect(page.locator('[data-testid^="saved-look-card-"]')).toHaveCount(0)
+    // While the new filter read is out, Saved shows its loading line and no dead Load more.
+    await expect(
+      page.getByTestId('looks-first-content').getByTestId('looks-feed-loading')
+    ).toBeVisible()
+    await expect(page.getByTestId('saved-looks-load-more')).toHaveCount(0)
     release()
     await expect.poll(() => tileIds(page)).toEqual(['looks-capsule-card-capsule-b'])
     expect(
@@ -506,23 +510,41 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
     await expect(page).toHaveURL(/\/looks\?segment=saved&filter=capsules$/)
   })
 
-  test('[P1] [7.12-E2E-042] an unknown or hostile capsule id scrolls nowhere and breaks nothing (P7)', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
-    const errors: string[] = []
-    page.on('pageerror', (error) => errors.push(error.message))
-    const { router } = await openLooksFixture(page, interceptNetworkCall, {
-      capsules: CAPSULES,
-    })
-    for (const id of ['missing-capsule', '"]\';alert(1)//', 'a b']) {
-      await page.goto(`/looks/capsules?capsule=${encodeURIComponent(id)}`)
-      await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
-      await expect.poll(() => router.inflight()).toBe(0)
-      expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  test(
+    '[P1] [7.12-E2E-042] an unknown or hostile capsule id scrolls nowhere and breaks nothing (P7)',
+    // The one-capsule read answers 404 for each id by design; every other error still fails.
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page, interceptNetworkCall }) => {
+      const errors: string[] = []
+      const httpErrors: string[] = []
+      page.on('pageerror', (error) => errors.push(error.message))
+      page.on('response', (response) => {
+        if (response.status() < 400) return
+        const { pathname } = new URL(response.url())
+        httpErrors.push(`${response.request().method()} ${response.status()} ${pathname}`)
+      })
+      const fixture = await openLooksFixture(page, interceptNetworkCall, {
+        capsules: CAPSULES,
+      })
+      const ids = ['missing-capsule', '"]\';alert(1)//', 'a b']
+      for (const id of ids) {
+        await page.goto(`/looks/capsules?capsule=${encodeURIComponent(id)}`)
+        await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
+        await expect.poll(() => fixture.router.inflight()).toBe(0)
+        expect(await page.evaluate(() => window.scrollY)).toBe(0)
+        // The known capsule still lists; nothing is focused or pinned for an unknown id.
+        await expect(page.getByTestId('capsule-card-capsule-b')).toBeVisible()
+        await expect(page.getByTestId('capsule-card-capsule-b')).not.toBeFocused()
+      }
+      expect(errors).toEqual([])
+      // Each unknown id is read by equality (P7) and answers 404; nothing else errs.
+      expect([
+        ...new Set(fixture.detailReads().filter((read) => read.startsWith('capsule:'))),
+      ]).toEqual(ids.map((id) => `capsule:${id}`))
+      for (const entry of httpErrors)
+        expect(entry).toMatch(/^GET 404 \/api\/v1\/wardrobe\/[^/]+\/capsules\/[^/]+$/)
     }
-    expect(errors).toEqual([])
-  })
+  )
 
   test('[P0] [7.12-E2E-016] Closet shows no saved looks row for a member with saved looks', async ({
     page,

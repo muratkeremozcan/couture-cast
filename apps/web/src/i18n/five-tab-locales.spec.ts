@@ -76,10 +76,18 @@ const reference = newStrings(CATALOGS['en-US'])
 
 /**
  * Words a locale keeps from English because they are its own word: Plan in German, Spanish,
- * French and Turkish, Capsules in French, Silhouette in German, French and Italian, Ideas in
- * Spanish and Upgrade in German (CC-7.12).
+ * French and Turkish, Capsules in French, Silhouette in German, French and Italian.
  */
-const SHARED_WORDS = new Set(['Plan', 'Capsules', 'Silhouette', 'Ideas', 'Upgrade'])
+const SHARED_WORDS = new Set(['Plan', 'Capsules', 'Silhouette'])
+
+/**
+ * CC-7.12: two strings equal English in exactly one locale each, Ideas in es-419 and Upgrade in
+ * de-DE. Scoped to that locale and key, so every other locale must still translate them.
+ */
+const SHARED_KEYS: Readonly<Partial<Record<SupportedLocale, ReadonlySet<string>>>> = {
+  'es-419': new Set(['looks.segments.ideas']),
+  'de-DE': new Set(['looks.freePlan.upgrade']),
+}
 
 describe('7.11 Looks tab and Closet More menu strings (web)', () => {
   it('7.11-I18N-WEB-01 holds the exact en-US strings the tests and the spec name', () => {
@@ -140,6 +148,7 @@ describe('7.11 Looks tab and Closet More menu strings (web)', () => {
       const untranslated = [...reference]
         .filter(([key, english]) => strings.get(key) === english)
         .filter(([, english]) => !SHARED_WORDS.has(english))
+        .filter(([key]) => !SHARED_KEYS[locale]?.has(key))
         .map(([key]) => key)
       expect(untranslated).toEqual([])
     }
