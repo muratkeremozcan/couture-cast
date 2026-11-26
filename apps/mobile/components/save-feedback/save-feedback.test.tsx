@@ -1535,8 +1535,9 @@ describe('mobile save-feedback components', () => {
       expect(calls[0]?.[1]?.idempotencyKey).toBeTruthy()
       expect(calls[0]?.[1]?.idempotencyKey).toBe(calls[1]?.[1]?.idempotencyKey)
 
-      // Saving the same unchanged look again is a no-op without destructive Undo
-      fireEvent.click(saveBtn)
+      // Saving the same unchanged look again is a no-op without destructive Undo. A real click, as
+      // above: the Retry save ended busy in a promise, so the responder re-enables a task later.
+      await userEvent.click(saveBtn)
       await waitFor(() =>
         expect(
           within(panel).queryByTestId('status-bar-action-undo')
