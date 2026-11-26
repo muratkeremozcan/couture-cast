@@ -832,7 +832,8 @@ function MemberWardrobeHub({
               <ActivityIndicator accessibilityLabel={t('wardrobe.hub.loading')} />
             ) : visibleGarments.length === 0 ? (
               hasLoaded && !loadFailed ? (
-                <View style={styles.emptyState}>
+                // CC-7.10: the empty-closet anchor the screen budget measures Closet chrome to.
+                <View style={styles.emptyState} testID="wardrobe-empty-state">
                   <Text style={styles.emptyTitle}>{t('wardrobe.empty_title')}</Text>
                 </View>
               ) : null

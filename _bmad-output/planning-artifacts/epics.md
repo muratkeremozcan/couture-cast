@@ -7,6 +7,9 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-11-26: CC-7.8 formal usability studies dropped by owner decision; the owner
+reviews Epic 7 with her own account after it ships._
+
 _Updated: 2026-11-21: added Epic 7 from tester and owner feedback._
 
 _Updated: 2026-10-23: moved CC-6.7's sponsored CTA to new CC-6.7b; no post sponsorship model existed._
@@ -799,7 +802,7 @@ spec files under `_bmad-output/implementation-artifacts/`._
 Five tabs in this order on web and native: Today, Closet, Looks, Community, Profile. Today decides
 what to wear. Closet holds the member's pieces. Looks holds saved looks, capsules, ideas and the
 plan. Community holds the feed. Profile holds account, places, style, Premium and sign out. The
-Closet label is confirmed with teens in the CC-7.8 baseline; routes and test ids keep `wardrobe`.
+Closet label ships with CC-7.11 (CC-7.8 dropped, see its note); routes and test ids keep `wardrobe`.
 Wireframes: the UX review.
 
 **Stories**
@@ -946,6 +949,12 @@ wrong thing.
 ### Lane B: clarity
 
 **Story CC-7.8: Teen and adult usability studies**
+
+_Status: dropped (owner decision 2026-11-26, recorded in CC-7.10 D8). No formal study rounds
+run. The product owner uses her own account and comments after Epic 7 ships, and those comments
+become stories. The baseline, midpoint and exit gates below no longer block any story; the
+criteria stay for reference._
+
 As the product owner, I want proof that teens can use the app unaided, so that Epic 7 ends on
 evidence.
 **Acceptance Criteria**
@@ -1369,7 +1378,9 @@ As a member traveling, I want a packing list from my trip looks, so that I pack 
    and the palette advisor under Profile > Style. Deferred, because each adds a surface Epic 7
    removes: collage canvas, moodboards, outfit-selfie posts, inferred color season with closet
    compatibility, and shopping match scores.
-4. **Closet label.** The tab label changes from Wardrobe to Closet only if the CC-7.8 baseline
+4. **Closet label.** Superseded 2026-11-26: with CC-7.8 dropped, CC-7.11 ships the Closet label
+   and the owner's post-epic review confirms it. Original decision: the tab label changes from
+   Wardrobe to Closet only if the CC-7.8 baseline
    confirms it with teens.
 
 ---

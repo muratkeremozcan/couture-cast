@@ -298,7 +298,11 @@ function WardrobeEmptyState({
     )
   if (!hasLoaded || loadError) return null
   return (
-    <div className="mt-8 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-line py-12 text-center">
+    // CC-7.10: the empty-closet anchor the screen budget measures Closet chrome to.
+    <div
+      data-testid="closet-empty-state"
+      className="mt-8 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-line py-12 text-center"
+    >
       <div aria-hidden="true" className="text-3xl">
         🧥
       </div>
@@ -1363,7 +1367,11 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                     openCapture={openCapture}
                   />
                 ) : (
-                  <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+                  // CC-7.10: the grid top the screen budget measures Closet chrome to.
+                  <div
+                    data-testid="closet-garment-grid"
+                    className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4"
+                  >
                     {visibleGarments.map((garment) => (
                       <div
                         key={garment.id}

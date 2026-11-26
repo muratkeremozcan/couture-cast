@@ -1,0 +1,67 @@
+{
+  "description": "Story CC-7.10 D5: the screen budget both platforms enforce. limits are the epic AC values (scripts/check-screen-budget-decisions.mjs pins them; raising one needs a limitDecisions entry whose decision is recorded under '## Screen budget decisions' in the decidedIn story's spec). known is the ratchet: each entry is a violation the current app has, owned by the Epic 7 story that removes it; the guard fails on a new, larger, smaller or vanished one.",
+  "limits": {
+    "targets-above-fold": 7,
+    "primary-buttons": 1,
+    "chip-rows": 1,
+    "nested-cards": 0,
+    "paragraph-lines": 2,
+    "today-height": 1688,
+    "closet-chrome": 160,
+    "analytics-only": 0
+  },
+  "limitDecisions": [],
+  "measure": {
+    "viewport": { "width": 390, "height": 844 },
+    "minCardSizePx": 64
+  },
+  "platforms": ["web", "native"],
+  "screens": ["today", "closet", "community", "profile"],
+  "fixtures": ["empty", "populated", "guardian-pending"],
+  "tabBarSelectors": {
+    "web": ["[data-testid=\"sticky-bottom-nav\"]"],
+    "native": [
+      "[data-testid=\"tab-home\"]",
+      "[data-testid=\"tab-wardrobe\"]",
+      "[data-testid=\"tab-community\"]",
+      "[data-testid=\"tab-settings\"]"
+    ]
+  },
+  "tileSelectors": {
+    "web": [
+      "[data-testid^=\"garment-card-\"]",
+      "[data-testid^=\"saved-look-card-\"]",
+      "article[data-testid*=\"lookbook-card-\"]"
+    ],
+    "native": [
+      "[data-testid^=\"garment-card-\"]",
+      "[data-testid^=\"saved-look-card-\"]",
+      "[data-testid^=\"community-post-card-\"]",
+      "[data-testid^=\"highlighted-community-card-\"]"
+    ]
+  },
+  "selectors": {
+    "web": {
+      "todayHeight": null,
+      "closetAnchors": [
+        "[data-testid=\"closet-garment-grid\"]",
+        "[data-testid=\"closet-empty-state\"]"
+      ]
+    },
+    "native": {
+      "todayHeight": "[data-testid=\"hero-experience-scrollview\"]",
+      "closetAnchors": [
+        "[data-testid=\"wardrobe-garment-list\"]",
+        "[data-testid=\"wardrobe-empty-state\"]"
+      ]
+    }
+  },
+  "analyticsRequests": [
+    { "sameOrigin": true, "path": "/ingest/**" },
+    { "host": "*.posthog.com" },
+    { "path": "**/v1/traces" },
+    { "path": "**/v1/logs" },
+    { "path": "**/v1/metrics" }
+  ],
+  "known": []
+}
