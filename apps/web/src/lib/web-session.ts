@@ -303,11 +303,35 @@ export async function startWebSession() {
       if (!stopped && !localSignedOut) void accept(session).catch(() => undefined)
     }, 0)
   })
+  // Story CC-7.11 (WebKit real-session burn-in): another tab's sign-in or sign-out reaches this
+  // tab through a storage event, which WebKit and iOS Safari can deliver late or drop for a
+  // background or frozen page. A return to the tab compares the stored session's user with the
+  // one in memory and, only when they differ, settles it the way that event would have; an
+  // unchanged session asks nothing.
+  const resync = () => {
+    if (stopped || localSignedOut || storedAuthPrincipal() === principal) return
+    void auth
+      .getSession()
+      .then((restored) => {
+        if (!stopped && !localSignedOut && !restored.error)
+          return accept(restored.data.session)
+      })
+      .catch(() => undefined)
+  }
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') resync()
+  }
+  window.addEventListener('focus', resync)
+  window.addEventListener('pageshow', resync)
+  document.addEventListener('visibilitychange', onVisibility)
   const cleanup = () => {
     stopped = true
     generation++
     verification = undefined
     data.subscription.unsubscribe()
+    window.removeEventListener('focus', resync)
+    window.removeEventListener('pageshow', resync)
+    document.removeEventListener('visibilitychange', onVisibility)
   }
   try {
     const restored = await auth.getSession()
@@ -436,6 +460,19 @@ export async function signOutWebSession() {
     await webSupabase().auth.signOut({ scope: 'local' })
   } finally {
     removeStoredAuthSession()
+  }
+}
+
+/** The user id of the auth session stored for every tab, or null when none is stored. */
+function storedAuthPrincipal(): string | null {
+  const raw = readStorage('local', authStorageKey)
+  if (raw === null) return null
+  try {
+    const stored: unknown = JSON.parse(raw)
+    const user = (stored as { user?: { id?: unknown } } | null)?.user
+    return typeof user?.id === 'string' ? user.id : null
+  } catch {
+    return null
   }
 }
 
