@@ -42,30 +42,49 @@ const COPY = {
   none: "You don't have a Premium subscription yet.",
   feedDisabled: 'The community feed is temporarily unavailable.',
 }
+type FeedAnswer = { status: number; body: unknown }
+
 /**
- * The feed refusal a locked member's Home gets, from whichever feed read answers it. The
- * realtime channel is refused too, and that denial cancels the page read still in flight and
- * sends a one-row read that answers the same 403 (COMMUNITY-DENIED-RACE-01). Which read
- * answers is a race (run 45736490719: the page read was cancelled 29 ms in), so the refusal
- * is taken from the first feed answer whose body arrives, never from the first request.
+ * Every feed answer a locked member's Home gets. The realtime channel is refused too, and that
+ * denial cancels the page read still in flight and sends a one-row read that answers the same
+ * 403 (COMMUNITY-DENIED-RACE-01). Which read answers is a race (run 45736490719: the page read
+ * was cancelled 29 ms in), so no single request is awaited: every answer that arrives is kept,
+ * a read cancelled after its headers with its status alone, and the caller checks them all.
  */
-function watchFeedRefusal(page: Page) {
-  const answers: { status: number; body: unknown }[] = []
+function watchFeedAnswers(page: Page) {
+  const answers: Promise<FeedAnswer>[] = []
   const onResponse = (response: Response) => {
     const request = response.request()
     if (request.method() !== 'GET' || new URL(response.url()).pathname !== FEED_PATH)
       return
-    void response.json().then(
-      (body: unknown) => answers.push({ status: response.status(), body }),
-      // A read cancelled after its headers has no body; the other read carries the answer.
-      () => undefined
+    answers.push(
+      response.json().then(
+        (body: unknown) => ({ status: response.status(), body }),
+        () => ({ status: response.status(), body: undefined })
+      )
     )
   }
   page.on('response', onResponse)
-  return async () => {
-    await expect.poll(() => answers.length, { timeout: 15_000 }).toBeGreaterThan(0)
+  return async (): Promise<FeedAnswer[]> => {
+    await expect
+      .poll(async () => (await Promise.all(answers)).some(isFeedRefusal), {
+        timeout: 15_000,
+      })
+      .toBe(true)
     page.off('response', onResponse)
-    return answers[0]!
+    return Promise.all(answers)
+  }
+}
+
+const isFeedRefusal = ({ status, body }: FeedAnswer) =>
+  status === 403 && (body as { code?: unknown } | undefined)?.code === 'denied'
+
+/** At least one feed read was refused, and no feed read answered anything else. */
+function expectOnlyFeedRefusals(answers: FeedAnswer[]) {
+  expect(answers.some(isFeedRefusal), 'a delivered 403 denied feed answer').toBe(true)
+  for (const answer of answers) {
+    expect(answer.status, 'every feed answer is the refusal').toBe(403)
+    if (answer.body !== undefined) expect(answer.body).toMatchObject({ code: 'denied' })
   }
 }
 
@@ -331,15 +350,14 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
         await evidenceShot(page, `control-settings-${viewport.width}`)
       }
 
-      const refusal = watchFeedRefusal(page)
+      const feedAnswers = watchFeedAnswers(page)
       await page.goto('/')
-      const denied = await refusal()
-      expect(denied.status).toBe(403)
-      expect(denied.body).toMatchObject({ code: 'denied' })
       // The grid container renders for every signed-in reader; the denial is the status copy.
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()
+      // Read once the copy is up, so the page read has answered or been cancelled by then.
+      expectOnlyFeedRefusals(await feedAnswers())
 
       const headers = {
         Authorization: `Bearer ${commerceAccessToken(control.userId)}`,
@@ -402,14 +420,12 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await expect(page.getByTestId('premium-status-line')).toHaveText(COPY.none)
       await expect(page.getByTestId('premium-theme-gallery')).toHaveCount(0)
 
-      const refusal = watchFeedRefusal(page)
+      const feedAnswers = watchFeedAnswers(page)
       await page.goto('/')
-      const denied = await refusal()
-      expect(denied.status).toBe(403)
-      expect(denied.body).toMatchObject({ code: 'denied' })
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()
+      expectOnlyFeedRefusals(await feedAnswers())
     }
   )
 })
