@@ -54,11 +54,13 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
+  type RefObject,
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -74,7 +76,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   type CommunityBannedError,
@@ -97,7 +104,10 @@ import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
-import { CommunityFilterChips } from '@/components/community/community-filter-chips'
+import {
+  CommunityFilterChips,
+  CommunityFiltersExplainer,
+} from '@/components/community/community-filter-chips'
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
 import { CommunityCard } from '@/components/community/community-card'
 import { CommunityReportModal } from '@/components/community/community-report-modal'
@@ -202,6 +212,46 @@ function sheetPostId(
   focused: boolean
 ): string | null {
   return available && focused ? postId : null
+}
+
+/** Story CC-7.11 D16: the Community top bar's New post action, the screen's one primary. */
+function CommunityNewPostButton({
+  buttonRef,
+  onPress,
+}: {
+  buttonRef: RefObject<View | null>
+  onPress: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  return (
+    <View style={styles.topBarAction}>
+      <TouchableOpacity
+        ref={buttonRef}
+        testID="community-new-post-button"
+        style={[styles.primaryButton, { backgroundColor: palette.primary }]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={t('community.newPost')}
+      >
+        <Text
+          style={[styles.primaryButtonText, { color: palette.onPrimary }]}
+          testID="community-new-post-label"
+        >
+          {t('community.newPost')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+/** Story CC-7.11 D16: where the climate explainer sits; a banned member has no chips. */
+function explainerPlacement(
+  hasChips: boolean,
+  spotlightLeads: boolean
+): 'spotlight' | 'first-post' | null {
+  if (!hasChips) return null
+  return spotlightLeads ? 'spotlight' : 'first-post'
 }
 
 /** Story CC-7.11 D16: the Spotlight leads Community when it shows looks above the feed. */
@@ -1539,6 +1589,8 @@ export function CommunityScreen() {
   // Story CC-7.11 D16: whether the Spotlight shows looks above the feed, so it carries the
   // first-content anchor.
   const spotlightLeads = spotlightLeadsFeed(communityAvailable, spotlightItems)
+  // D16: the climate explainer follows the first content block, never precedes it.
+  const explainerAfter = explainerPlacement(bannedSanction === null, spotlightLeads)
   useEffect(() => {
     if (!retainedSpotlight.managed) return
     if (!retainedSpotlight.active || !retainedSpotlight.postId) {
@@ -1696,6 +1748,24 @@ export function CommunityScreen() {
   const closePostSheet = useCallback(() => {
     setIsPostSheetVisible(false)
   }, [])
+
+  // Story CC-7.11 D16: New post sits in the Community top bar's trailing slot, as the Closet's
+  // Add does, so no row above the first content holds a lone button. A banned member has
+  // nothing to post to (Story 6.11), so the slot stays empty.
+  const navigation = useNavigation()
+  const canPost = bannedSanction === null
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: canPost
+        ? () => (
+            <CommunityNewPostButton
+              buttonRef={newPostButtonRef}
+              onPress={() => openPostSheet(false)}
+            />
+          )
+        : undefined,
+    })
+  }, [canPost, navigation, openPostSheet])
 
   const handlePostPublished = useCallback(() => {
     setNoticeKey('community.compose.success')
@@ -2167,6 +2237,7 @@ export function CommunityScreen() {
    */
   const renderLeadNotices = () => (
     <View>
+      {explainerAfter === 'first-post' ? <CommunityFiltersExplainer /> : null}
       {bannerMessage ? (
         <InfoBanner
           ref={noticeRef}
@@ -2289,6 +2360,7 @@ export function CommunityScreen() {
           />
         </View>
       ) : null}
+      {explainerAfter === 'spotlight' ? <CommunityFiltersExplainer /> : null}
     </View>
   )
 
@@ -2352,24 +2424,6 @@ export function CommunityScreen() {
         <LiveFontMountMarker scope="community" />
         {/* Story 6.11: a banned member has nothing to post to or filter. */}
         <UnlessBanned banned={bannedSanction !== null}>
-          <View style={styles.header}>
-            <TouchableOpacity
-              ref={newPostButtonRef}
-              testID="community-new-post-button"
-              style={[styles.primaryButton, { backgroundColor: palette.primary }]}
-              onPress={() => openPostSheet(false)}
-              accessibilityRole="button"
-              accessibilityLabel={t('community.newPost')}
-            >
-              <Text
-                style={[styles.primaryButtonText, { color: palette.onPrimary }]}
-                testID="community-new-post-label"
-              >
-                {t('community.newPost')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
           <CommunityFilterChips
             selectedMode={servedMode}
             onSelectMode={handleSelectMode}
@@ -2603,14 +2657,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    paddingHorizontal: TAB_BODY_INSET,
-    paddingTop: 16,
-    paddingBottom: 8,
-    gap: 12,
+  topBarAction: {
+    paddingEnd: 8,
   },
   title: {
     fontSize: 24,

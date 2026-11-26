@@ -347,7 +347,10 @@ spec.ts:143-177`, `wardrobe-signed-out.spec.ts`; web unit `sticky-bottom-nav.tes
   Community's first own content is the City Spotlight when it shows looks, else the first feed
   card or the empty state, on web and native (`community-first-content` follows it); the New
   post row and filter chips stay above as Community's controls, and info, error, band and
-  challenge notices move after the first content (their removal is CC-7.15). The web top bar
+  challenge notices move after the first content (their removal is CC-7.15). Amended after the native
+  baseline review: native New post moves into the Community top bar's trailing slot (as Closet's
+  Add), and the climate explainer follows the first content block on native; web already
+  renders its filter nav after the Spotlight. The web top bar
   stays non-sticky (D14): returning to a Closet scrolled before opening More lands where the
   member was when they tapped More.
 
