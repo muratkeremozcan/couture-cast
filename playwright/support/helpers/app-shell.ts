@@ -13,6 +13,7 @@ import { expect, type Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { seedWebSession } from './commerce-session'
 import { localE2EAccessToken } from './local-e2e-token'
+import { placeholderContrastFailures, textContrastFailures } from './painted-contrast'
 import {
   closeCommunitySocket,
   createShellRouter,
@@ -350,4 +351,100 @@ export async function measureThroughOverlays(page: Page) {
         (media as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
     }
   })
+}
+
+export const TOP_BAR_HEIGHT = 56
+
+export async function expectOneTopBar(page: Page, label: string) {
+  const header = page.getByTestId('app-header')
+  await expect(header, label).toHaveCount(1)
+  const box = await header.boundingBox()
+  expect(box?.height, `${label}: top bar height`).toBe(TOP_BAR_HEIGHT)
+  // One row: every visible child sits inside the bar's 56 px.
+  const overflow = await header.evaluate((bar) => {
+    const top = bar.getBoundingClientRect().top
+    return Array.from(bar.querySelectorAll('*'))
+      .map((child) => child.getBoundingClientRect())
+      .filter(
+        (rect) => rect.height > 0 && (rect.top < top - 0.5 || rect.bottom > top + 56.5)
+      ).length
+  })
+  expect(overflow, `${label}: top bar children outside one 56 px row`).toBe(0)
+  await expect(header.locator('h1'), `${label}: one h1 title`).toHaveCount(1)
+  await expect(header.locator('h1'), `${label}: title text`).not.toBeEmpty()
+}
+
+export async function expectOneSurface(page: Page, label: string) {
+  const roles = await tokenTriples(page)
+  const surface = await surfaceFindings(page)
+  expect(surface.pageCount, `${label}: page surfaces`).toBe(1)
+  expect(surface.pageBackground, `${label}: page surface colour`).toBe(
+    rgbOf(roles['--cc-page'] ?? '')
+  )
+  expect(surface.nestedCards, `${label}: cards inside cards`).toEqual([])
+  return surface
+}
+
+/**
+ * 7.9-E2E-001..006 for one tab in one scheme: the top bar, one page surface, token colours, gold
+ * only by role, and painted contrast of every text run. The two scheme spec files call it, one
+ * file per scheme so the burn-in shards can spread the full-page scans (CI 46f09ae8: in one file
+ * they filled a 20-minute burn-in shard).
+ */
+export async function checkShellTab(
+  page: Page,
+  interceptNetworkCall: InterceptNetworkCallFn,
+  screen: ShellScreen,
+  scheme: 'light' | 'dark'
+) {
+  await page.emulateMedia({ colorScheme: scheme })
+  const { router } = await openFixtureShell(page, interceptNetworkCall, {
+    mode: 'populated',
+    screen,
+  })
+  await page.goto(SHELL_TABS[screen].path)
+  await waitForShellSettled(page, router)
+  await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
+
+  // E2E-001: the bar, with the tab label as its title (D6).
+  await expectOneTopBar(page, screen)
+  await expect(page.getByTestId('app-header').locator('h1')).toHaveText(
+    SHELL_TABS[screen].title
+  )
+
+  // E2E-002 and E2E-004: one page surface, one card level; no inset light card in dark.
+  const surface = await expectOneSurface(page, `${screen} ${scheme}`)
+  if (scheme === 'dark') {
+    expect(surface.largeLightFills, 'light fills over 40% of the screen').toEqual([])
+    expect(surface.gradients, 'page-sized gradients').toEqual([])
+  }
+
+  // E2E-003 and E2E-006: every painted colour is a role; gold only where data-gold says.
+  const roles = await tokenTriples(page)
+  expect(Object.keys(roles).length, 'emitted --cc-* roles').toBeGreaterThan(10)
+  const paint = await paintFindings(page, roles)
+  expect(paint.offRole, 'colours that are not a token role').toEqual([])
+  expect(
+    paint.strayGold,
+    'gold outside the primary action, focus, tab and Premium'
+  ).toEqual([])
+
+  // E2E-005: painted contrast in this scheme. Empty fields (Profile's city search) are
+  // measured by their placeholder first, then hold a typed value for the text scan; the
+  // value is set on the element only, so no search request starts.
+  const main = page.locator('main').first()
+  expect(await placeholderContrastFailures(main), 'placeholders').toEqual([])
+  await main.evaluate((root) => {
+    // Text-like fields only: a file, checkbox or range input holds no typed value.
+    const textLike =
+      'textarea, input:not([type]), input[type="text"], input[type="search"], input[type="email"], input[type="tel"], input[type="url"], input[type="number"]'
+    for (const field of Array.from(root.querySelectorAll(textLike))) {
+      const input = field as HTMLInputElement
+      const rect = input.getBoundingClientRect()
+      if (rect.width > 0 && !input.value && !input.disabled && input.type !== 'hidden')
+        input.value = 'Chicago'
+    }
+  })
+  await measureThroughOverlays(page)
+  expect(await textContrastFailures(main)).toEqual([])
 }
