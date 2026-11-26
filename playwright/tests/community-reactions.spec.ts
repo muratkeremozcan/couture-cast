@@ -22,8 +22,10 @@ const hex = (rgb: string) =>
     .map((part) => Number(part).toString(16).padStart(2, '0'))
     .join('')
 const emojis = ['👏', '❤️', '✨'] as const
+// Story CC-7.11 D12: post detail is a full-height layer whose header is the top bar with back,
+// in place of the X that read "Close this look".
 const modalHeaderClose = (page: Page) =>
-  page.getByRole('dialog').getByLabel('Close this look', { exact: true })
+  page.getByRole('dialog').getByTestId('app-top-bar-back')
 async function visibleCounts(controls: Locator) {
   const counts = await Promise.all(
     labels.map(async (label) => {

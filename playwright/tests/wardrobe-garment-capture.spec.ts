@@ -72,9 +72,8 @@ captureTest.describe('Wardrobe Garment Capture Flow @local-lane', () => {
 
       const mainLandmark = page.locator('#main-content')
       await expect(mainLandmark).toBeVisible()
-      await expect(
-        page.getByRole('heading', { level: 1, name: 'Wardrobe' })
-      ).toBeVisible()
+      // Story CC-7.11 D1: the tab title reads Closet.
+      await expect(page.getByRole('heading', { level: 1, name: 'Closet' })).toBeVisible()
 
       const addGarmentButton = page.getByRole('button', {
         name: /\+ Add Garment|Add Garment/i,

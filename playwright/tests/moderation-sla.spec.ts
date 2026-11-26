@@ -606,10 +606,12 @@ test.describe('P-SLA: the page', () => {
       order.push(focused.label)
     }
     // CC-7.9 D6: Back is the shared top bar control; from 768 px the bar's tab links follow it.
-    expect(order.slice(0, 8)).toEqual([
+    // Story CC-7.11 D1: five tabs, Today, Closet, Looks, Community, Profile.
+    expect(order.slice(0, 9)).toEqual([
       'Back',
-      'Home',
-      'Wardrobe',
+      'Today',
+      'Closet',
+      'Looks',
       'Community',
       'Profile',
       'Refresh',

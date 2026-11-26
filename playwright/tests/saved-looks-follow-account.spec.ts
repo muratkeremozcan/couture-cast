@@ -193,7 +193,8 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           stubReadyGarmentWithPhoto(secondPage, garmentId)
           await secondPage.goto(`${baseURL}/wardrobe`)
 
-          // Member opens the Saved looks row at the top of Closet in Context 2 (blocked storage).
+          // Member opens the Saved looks row in Closet in Context 2 (blocked storage). Story
+          // CC-7.11 D4: the row now sits below the garment grid.
           const savedLooksRow = secondPage.getByTestId('closet-saved-looks-row')
           await expect(savedLooksRow).toBeVisible()
           await savedLooksRow.click()

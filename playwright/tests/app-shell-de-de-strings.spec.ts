@@ -48,21 +48,44 @@ const flatten = (value: unknown, prefix = ''): Record<string, string> =>
 test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
   test.use({ locale: 'de-DE' })
 
+  // Story CC-7.11 D1, D8: the Wardrobe tab reads Closet, and Looks (saved looks plus the
+  // capsules and Plan rows) is a new tab under the same no-English rule.
   for (const screen of [
-    { name: 'Wardrobe', path: '/wardrobe' },
-    { name: 'capsules', path: '/wardrobe/capsules' },
-  ]) {
+    {
+      name: 'Closet',
+      path: '/wardrobe',
+      fixture: 'closet',
+      title: deDE.nav.closet,
+    },
+    {
+      name: 'Looks',
+      path: '/looks',
+      fixture: 'looks',
+      title: deDE.nav.looks,
+    },
+    {
+      name: 'capsules',
+      path: '/wardrobe/capsules',
+      fixture: 'closet',
+      title: null,
+    },
+  ] as const) {
     test(`[P1] [7.9-E2E-009] ${screen.name} in de-DE shows no English`, async ({
       page,
       interceptNetworkCall,
     }) => {
       await openFixtureShell(page, interceptNetworkCall, {
         mode: 'populated',
-        screen: 'closet',
+        screen: screen.fixture,
       })
       await page.goto(screen.path)
       await expect(page.getByTestId('app-header')).toBeVisible()
       await expect(page.locator('html')).toHaveAttribute('lang', /^de/)
+      // Story CC-7.11 D1, D15: a tab's top bar title is its de-DE tab label.
+      if (screen.title)
+        await expect(
+          page.getByTestId('app-header').getByRole('heading', { level: 1 })
+        ).toHaveText(screen.title)
       // The opened gate keeps its hidden placeholder in the DOM; only a visible busy node counts.
       await expect(page.locator('main [aria-busy="true"]:visible')).toHaveCount(0)
 

@@ -167,12 +167,13 @@ anonymousTest.describe('Story 5.4 palette advisor, signed out', () => {
   }
 
   /**
-   * Decision 14. `/palette` is a destination route that belongs to no bottom-nav
-   * tab, and the exact-equality active-tab match this story replaced highlighted
-   * Home here, telling the reader they were somewhere they are not.
+   * Decision 14. The exact-equality active-tab match this story replaced highlighted
+   * Home on `/palette`, telling the reader they were somewhere they are not. Story
+   * CC-7.11 D7, D10 made the palette a Profile > Style row, so Profile is now the tab
+   * it belongs to: Profile is current and no other tab is, Today least of all.
    */
   anonymousTest(
-    '[P1] 5.4-E2E-014 highlights no bottom-nav tab on /palette',
+    '[P1] 5.4-E2E-014 highlights the Profile tab, and only it, on /palette',
     async ({ page }) => {
       // The bottom nav is `min-[768px]:hidden`, so it exists in the DOM at every
       // width and is only VISIBLE on a phone viewport. Asserting it at the default
@@ -183,7 +184,12 @@ anonymousTest.describe('Story 5.4 palette advisor, signed out', () => {
       await waitForAccessibilityReady(page)
 
       await expect(page.getByTestId('sticky-bottom-nav')).toBeVisible()
-      for (const tab of ['home', 'wardrobe', 'community', 'settings']) {
+      // Story CC-7.11 D10: the palette's parent tab is Profile (`bottom-nav-settings`).
+      await expect(page.getByTestId('bottom-nav-settings')).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+      for (const tab of ['home', 'wardrobe', 'looks', 'community']) {
         await expect(page.getByTestId(`bottom-nav-${tab}`)).not.toHaveAttribute(
           'aria-current',
           'page'

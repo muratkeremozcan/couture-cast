@@ -1,31 +1,32 @@
-# Navigate from the wardrobe hub to the outfit capsule library.
+# Navigate to the outfit capsule library: Looks tab, then its Capsules row.
+#
+# Story CC-7.11 D8: Capsules left the Closet header (`wardrobe-capsules-link` is gone) and lives
+# on the Looks tab as `looks-capsules-row`. This subflow opens Looks itself, so callers no longer
+# open the wardrobe tab first.
 #
 # Same reasoning as `open-wardrobe-tab.yaml` and `open-settings.yaml`: pair the
 # tap with an assertion on the destination and retry the pair, rather than
-# asserting immediately and hoping the navigation has landed.
-#
-# `wardrobe-capsules-link` calls `router.push('/wardrobe-capsules')`, so the
-# screen has to mount and fetch its capsules before its toolbar paints. A bare
-# `assertVisible` on the next line races that and reports `create-capsule-button`
-# "not found" on a screen that renders it perfectly well a moment later.
-#
-# Callers must already be on the wardrobe hub — the link exists nowhere else.
+# asserting immediately and hoping the navigation has landed. The row pushes
+# `/wardrobe-capsules`, so the screen has to mount and fetch its capsules before
+# its toolbar paints. A bare `assertVisible` on the next line races that and
+# reports `create-capsule-button` "not found" on a screen that renders it a moment later.
 appId: ${MAESTRO_APP_ID}
 ---
+- runFlow: open-looks-tab.yaml
+
 - retry:
     maxRetries: 3
     commands:
-      # Wait for the link rather than tapping straight into the hub. The hub
-      # asserts `wardrobe-screen` as soon as its outer View mounts, which is
-      # before the header has painted, so tapping immediately can report the
-      # link "not found" on a screen that is merely still arriving.
-      - extendedWaitUntil:
-          visible:
-            id: 'wardrobe-capsules-link'
+      # Scroll rather than tap straight in: `looks-first-content` can mount before the rows
+      # below it paint, and the row sits after the saved looks list (D8).
+      - scrollUntilVisible:
+          element:
+            id: 'looks-capsules-row'
+          direction: DOWN
           timeout: 15000
-          label: 'Wardrobe hub header has painted'
+          label: 'Looks Capsules row is on screen'
       - tapOn:
-          id: 'wardrobe-capsules-link'
+          id: 'looks-capsules-row'
           label: 'Open the outfit capsule library'
       - extendedWaitUntil:
           visible:

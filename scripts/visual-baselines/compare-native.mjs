@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Story CC-7.9 (TEA, 7.9-NVIS-001..008): compares the eight native shell screens the visual shard
+ * Story CC-7.9 (TEA, 7.9-NVIS-001..008): compares the ten native shell screens (five tabs since CC-7.11) the visual shard
  * captured against the committed baselines, after the flow has captured all of them.
  *
  * The Maestro flow (`maestro/shell-visual-snapshots.yaml`) only captures: comparing inside the
@@ -19,7 +19,8 @@ import sharp from 'sharp'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 export const NATIVE_SCREENS = ['light', 'dark'].flatMap((scheme) =>
-  ['home', 'wardrobe', 'community', 'profile'].map((tab) => `${scheme}-${tab}`)
+  // Story CC-7.11 D1: the Looks tab joins the native shell snapshots.
+  ['home', 'wardrobe', 'looks', 'community', 'profile'].map((tab) => `${scheme}-${tab}`)
 )
 /** A channel moving by this much or less is antialiasing noise, not a change. */
 export const CHANNEL_TOLERANCE = 16

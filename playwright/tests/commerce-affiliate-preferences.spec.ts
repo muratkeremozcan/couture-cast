@@ -213,16 +213,17 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     )
 
     await log.step('Tab from the top of the document to the control')
-    // Story CC-7.9 D6: from 768 px the four tab links sit in the top bar
-    // (`primary-nav`), ahead of main, so the desktop path reaches the toggle in eight
-    // presses via Skip, the four tab links and the two city controls. Check each stop
+    // Story CC-7.9 D6: from 768 px the tab links sit in the top bar (`primary-nav`), ahead
+    // of main. Story CC-7.11 D1 made them five, so the desktop path reaches the toggle in
+    // nine presses via Skip, the five tab links and the two city controls. Check each stop
     // to catch extra focus targets.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
     const primaryNav = page.getByTestId('primary-nav')
-    // Each stop is a link with its tab name, Home first, as the old named Home link lookup
-    // required (Codex replaced-assertions check).
-    for (const name of ['Home', 'Wardrobe', 'Community', 'Profile']) {
+    // Each stop is a link with its tab name, Today first (Story CC-7.11 D1: Home reads Today,
+    // Wardrobe reads Closet, Looks is new), as the old named Home link lookup required (Codex
+    // replaced-assertions check).
+    for (const name of ['Today', 'Closet', 'Looks', 'Community', 'Profile']) {
       await page.keyboard.press('Tab')
       await expect(primaryNav.getByRole('link', { name, exact: true })).toBeFocused()
     }

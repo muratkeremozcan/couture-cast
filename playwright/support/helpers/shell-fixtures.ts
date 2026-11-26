@@ -41,7 +41,7 @@ export type ShellMode =
   | 'late'
   | 'ritual-503'
   | 'guardian-pending'
-export type ShellScreen = 'home' | 'closet' | 'community' | 'profile'
+export type ShellScreen = 'home' | 'closet' | 'looks' | 'community' | 'profile'
 
 export const DELAY_MS = 3000
 /** The Community sync channel's slow answer: late, and half its ~2 s deadline. */
@@ -94,6 +94,8 @@ export const GATE_READS: Record<ShellScreen, string[]> = {
   // The ritual read counts as settled only once its city line (`locations`) answered too.
   home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
   closet: ['profile', 'onboarding', 'garments', 'saved-looks'],
+  // Story CC-7.11 D8: Looks opens on the saved looks list (moved out of the Closet header).
+  looks: ['saved-looks'],
   community: ['community-feed', 'community-spotlight'],
   // The account header's profile read shares the session check, so it is not a gate read.
   profile: [

@@ -1,0 +1,29 @@
+# Story CC-7.11 (TEA): open the Looks tab and prove it landed.
+#
+# Same tap-and-destination retry as `open-wardrobe-tab.yaml` and `open-community-tab.yaml`: in
+# Expo Go the developer sheet can cover the tab bar and swallow the tap, so the tap is paired with
+# the Looks screen's first own content and the pair is retried, relaunching on a retry.
+appId: ${MAESTRO_APP_ID}
+---
+- evalScript: ${output.looksTabAttempt = 0}
+- retry:
+    maxRetries: 3
+    commands:
+      - evalScript: ${output.looksTabAttempt = output.looksTabAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.looksTabAttempt > 1}
+          file: relaunch-app.yaml
+          label: 'A Looks tab tap was swallowed; relaunch the app before trying again'
+      - runFlow: absorb-expo-dev-sheet.yaml
+      - tapOn:
+          id: 'tab-looks'
+          retryTapIfNoChange: true
+          label: 'Open Looks'
+      - extendedWaitUntil:
+          visible:
+            id: 'looks-first-content'
+          timeout: 15000
+          label: 'Looks screen is the one on top'
+
+- waitForAnimationToEnd

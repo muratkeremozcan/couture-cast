@@ -26,47 +26,8 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         },
       })
 
-      /*
-       * The planner read is stubbed to keep this spec's scope. Signing in, which the
-       * community grid assertion below requires, also makes the planner rail's fetch
-       * real, and a fresh account has no Premium entitlement, so opening the drawer
-       * issues a genuine 403 that `networkErrorMonitor` correctly fails on. That 403
-       * is proven in `planner.spec.ts` and in the Pact planner interactions; here
-       * the rail is scenery for a LAYOUT assertion and renders its drawer either
-       * way.
-       *
-       * Seven `error` days: the smallest body the contract accepts, and this spec
-       * asserts nothing about day content.
-       */
-      const plannerWindow = [
-        '2026-07-16',
-        '2026-07-17',
-        '2026-07-18',
-        '2026-07-19',
-        '2026-07-20',
-        '2026-07-21',
-        '2026-07-22',
-      ]
-      void interceptNetworkCall({
-        url: '**/api/v1/commerce/premium/planner*',
-        fulfillResponse: {
-          status: 200,
-          body: {
-            data: {
-              locationId: 'loc-1',
-              timezone: 'America/Chicago',
-              anchorDate: plannerWindow[0],
-              daysReady: 0,
-              days: plannerWindow.map((planDate) => ({
-                status: 'error',
-                planDate,
-                errorCode: 'generation_failed',
-                retryable: true,
-              })),
-            },
-          },
-        },
-      })
+      // Story CC-7.11 D9: Today no longer holds the planner (Plan is the `/looks/plan` route),
+      // so this layout spec makes no planner read and needs no planner stub.
 
       await log.step('Set tablet viewport (1024x900) and verify stacked grid')
       await page.setViewportSize({ width: 1024, height: 900 })
@@ -112,25 +73,20 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         )
       }
       await expect.poll(() => evenColumns(1280)).toBe(true)
-      // Story 5.5 Decision 7: closed by default. Below 1440px the planner is
-      // reachable as a focus-trapped overlay drawer.
+      // Story CC-7.11 D9: the drawer that opened here is gone. Today carries no planner at any
+      // width, and its Plan week control is a link to the Plan route under Looks.
       const plannerRail = page.getByRole('complementary', { name: /planner rail/i })
       const openControl = page.getByTestId('planner-open-control')
-      await expect(plannerRail).toBeHidden()
-      await openControl.click()
-      await expect(plannerRail).toBeVisible()
-      await page.getByRole('button', { name: /close planner/i }).click()
-      await expect(plannerRail).toBeHidden()
+      await expect(plannerRail).toHaveCount(0)
+      await expect(openControl).toHaveAttribute('href', '/looks/plan')
 
-      await log.step(
-        'Set wide desktop viewport (1440x900) and verify planner rail visibility'
-      )
+      await log.step('Set wide desktop viewport (1440x900) and verify no planner column')
       await page.setViewportSize({ width: 1440, height: 900 })
-      await openControl.click()
-      await expect(plannerRail).toBeVisible()
+      // Story CC-7.11 D9: no third planner column at 1440 either; the rail lives on Plan.
+      await expect(plannerRail).toHaveCount(0)
       // CC-7.9 D7 (builder decision 2026-11-26): every tab sits on one shared main column,
       // max-w-6xl (1152 px) like the top bar, so at 1440 the lookbook fills that column less its
-      // 16 px gutters: 1120 px, centred, with the planner rail open beside it.
+      // 16 px gutters: 1120 px, centred.
       await expect
         .poll(async () => {
           const box = await container.boundingBox()

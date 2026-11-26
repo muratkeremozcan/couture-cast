@@ -1,10 +1,10 @@
-# Navigate to the Wardrobe tab and prove you actually landed there.
+# Navigate to the Closet tab (route and id `wardrobe`) and prove you actually landed there.
 #
 # Same reasoning as `subflows/open-settings.yaml`: in Expo Go the developer
 # sheet can rise over the tab bar after mount and silently eat the tap, so the
 # tap is paired with an assertion on the destination and the pair is retried.
 # Without it the failure surfaces much later as `wardrobe-garment-list` or
-# `wardrobe-capsules-link` "not found" on a screen that renders both.
+# `closet-more-menu` "not found" on a screen that renders both.
 #
 # `subflows/absorb-expo-dev-sheet.yaml` runs before the tap. PR #141 (story
 # 5.5) saw CI fail here with `tab-wardrobe` reporting COMPLETED on all four

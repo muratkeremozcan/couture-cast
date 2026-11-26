@@ -1,7 +1,7 @@
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
 // Story CC-7.10 test owner (TEA): opens a tab under a spec D1 fixture and runs the shared measure
-// and verdict, for screen-budget.spec.ts (7.10-E2E-001..014) and
+// and verdict, for screen-budget.spec.ts (7.10-E2E-001..017) and
 // screen-budget-home-actions.spec.ts (7.10-E2E-020..022).
 // Test design: _bmad-output/test-artifacts/test-design-7-10-screen-budget-guard.md.
 import {
@@ -25,11 +25,13 @@ import type { ShellScreen } from './shell-fixtures'
 export const BUDGET_SHELL: Record<ScreenBudgetScreen, ShellScreen> = {
   today: 'home',
   closet: 'closet',
+  // Story CC-7.11 D8: Looks joins the budget's screens.
+  looks: 'looks',
   community: 'community',
   profile: 'profile',
 }
 
-/** Every tab bar target the web shell renders (Home, Wardrobe, Community, Profile). */
+/** Every tab bar target the web shell renders (Today, Closet, Looks, Community, Profile). */
 const WEB_TAB_COUNT = Object.keys(SHELL_TABS).length
 
 /**

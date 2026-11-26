@@ -1,13 +1,18 @@
-# Story CC-7.9 (TEA): the four tabs' snapshots in one scheme. env: SCHEME (light or dark).
+# Story CC-7.9 (TEA): every tab's snapshot in one scheme. env: SCHEME (light or dark).
+# Story CC-7.11 D1: five tabs, Today, Closet, Looks, Community, Profile. NAME keeps the pre-7.11
+# capture names (home, wardrobe) that scripts/visual-baselines/compare-native.mjs compares.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow:
     file: shell-visual-tab.yaml
-    env: { TAB_ID: 'tab-home', TITLE: 'Home', NAME: 'home', SCHEME: '${SCHEME}' }
+    env: { TAB_ID: 'tab-home', TITLE: 'Today', NAME: 'home', SCHEME: '${SCHEME}' }
 - runFlow:
     file: shell-visual-tab.yaml
     env:
-      { TAB_ID: 'tab-wardrobe', TITLE: 'Wardrobe', NAME: 'wardrobe', SCHEME: '${SCHEME}' }
+      { TAB_ID: 'tab-wardrobe', TITLE: 'Closet', NAME: 'wardrobe', SCHEME: '${SCHEME}' }
+- runFlow:
+    file: shell-visual-tab.yaml
+    env: { TAB_ID: 'tab-looks', TITLE: 'Looks', NAME: 'looks', SCHEME: '${SCHEME}' }
 - runFlow:
     file: shell-visual-tab.yaml
     env:

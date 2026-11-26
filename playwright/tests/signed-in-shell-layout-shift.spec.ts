@@ -51,6 +51,8 @@ test.use({
 const TABS: Record<ShellScreen, { path: string; nav: string }> = {
   home: { path: '/', nav: 'bottom-nav-home' },
   closet: { path: '/wardrobe', nav: 'bottom-nav-wardrobe' },
+  // Story CC-7.11 D1: the Looks tab joins the CC-7.7 shift budget.
+  looks: { path: '/looks', nav: 'bottom-nav-looks' },
   community: { path: '/community', nav: 'bottom-nav-community' },
   profile: { path: '/settings', nav: 'bottom-nav-settings' },
 }
@@ -196,9 +198,15 @@ async function expectMemberContent(
       )
   }
   if (screen === 'closet') {
-    if (empty)
-      await expect(page.getByRole('link', { name: 'Set up your closet' })).toBeVisible()
+    // Story CC-7.11 D4: no setup banner above the grid; an empty closet opens on its Add.
+    if (empty) await expect(page.getByTestId('closet-empty-state')).toBeVisible()
     else await expect(page.getByTestId('garment-card-shell-garment-1')).toBeVisible()
+  }
+  if (screen === 'looks') {
+    // Story CC-7.11 D8: Looks opens on the saved looks list, or one line when there is none.
+    const first = page.getByTestId('looks-first-content')
+    if (empty) await expect(first).toContainText('Save a look to see it here')
+    else await expect(first).toBeVisible()
   }
   if (screen === 'community') {
     if (empty) await expect(page.getByTestId('community-feed-empty')).toBeVisible()
@@ -373,7 +381,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
   }
 
   for (const mode of ['empty', 'populated', 'delayed'] as const) {
-    test(`[P0] 7.7-E2E-006 member tab switches Home > Closet > Community > Profile > Home, ${mode}: each within ${BUDGET}`, async ({
+    test(`[P0] 7.7-E2E-006 member tab switches Today > Closet > Looks > Community > Profile > Today, ${mode}: each within ${BUDGET}`, async ({
       page,
       interceptNetworkCall,
     }) => {
@@ -399,7 +407,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         ;(window as unknown as { __ccSameDocument: boolean }).__ccSameDocument = true
       })
 
-      const route: ShellScreen[] = ['closet', 'community', 'profile', 'home']
+      const route: ShellScreen[] = ['closet', 'looks', 'community', 'profile', 'home']
       let previous: ShellScreen = 'home'
       for (const screen of route) {
         setScreen(screen)

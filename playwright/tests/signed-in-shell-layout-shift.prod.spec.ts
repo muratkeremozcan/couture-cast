@@ -32,6 +32,8 @@ const PHONE = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch:
 const TABS = [
   { screen: 'home', path: '/' },
   { screen: 'closet', path: '/wardrobe' },
+  // Story CC-7.11 D1, D8: Looks is a tab with its own gate, measured like the other four.
+  { screen: 'looks', path: '/looks' },
   { screen: 'community', path: '/community' },
   { screen: 'profile', path: '/settings' },
 ] as const

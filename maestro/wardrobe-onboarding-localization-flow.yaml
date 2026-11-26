@@ -46,36 +46,70 @@ tags:
 
 - runFlow:
     file: subflows/open-wardrobe.yaml
-    label: 'Open the Wardrobe tab'
+    label: 'Open the Closet tab'
 
-# wardrobe.onboarding.title / wardrobe.onboarding.permission_body
-#
-# Asserted as ONE composed string, because that is what exists on the device.
-# `wardrobe-onboarding-card` is a Pressable, so React Native marks it a single
-# accessibility element and merges both of its Text children into one name
-# joined with ", ". The two child strings therefore never appear as separate
-# nodes, and Maestro matches a text selector against a whole node, so asserting
-# either half alone could not pass against a correctly rendered, correctly
-# translated card. Measured from the hierarchy dump of a failing run.
-#
-# Asserting the composed name is also stricter than the two separate assertions
-# were: it pins title-before-body reading order, which is what a screen reader
-# announces.
+# tabs.closet, as the Closet top bar title (CC-7.11 D1). By id: Android reports
+# the bar's title beside app-top-bar, not under it (CI 3d7af2a2).
 - assertVisible:
-    id: 'wardrobe-onboarding-card'
-    label: 'Onboarding entry card is offered'
+    id: 'app-top-bar-title'
+    text: 'Dolap'
+    label: 'Closet title is localized'
 
+# CC-7.11 D5: Closet setup and Silhouette moved from the hub's card and header
+# link into the Closet More menu. wardrobe.menu.setup / wardrobe.menu.silhouette
+- tapOn:
+    id: 'closet-more-menu'
+    label: 'Open the Closet More menu'
+- extendedWaitUntil:
+    visible:
+      id: 'closet-more-setup'
+    timeout: 15000
 - assertVisible:
-    text: 'Gardırobunu oluştur, CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
-    label: 'Onboarding entry card title and body are localized, in reading order'
-
-# wardrobe.silhouette.title, on the hub's own entry-point link.
+    id: 'closet-more-setup'
+    text: 'Dolap kurulumu'
+    label: 'Closet setup row is localized'
 - assertVisible:
+    id: 'closet-more-silhouette'
     text: 'Silüet'
-    label: 'Silhouette entry-point link is localized'
+    label: 'Silhouette row is localized'
+
+# wardrobe.onboarding.title / wardrobe.onboarding.permission_body, now on the
+# setup screen itself: the title in its top bar, the body in its first step.
+- tapOn:
+    id: 'closet-more-setup'
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-onboarding-screen'
+    timeout: 15000
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Gardırobunu oluştur'
+    label: 'Setup screen title is localized'
+- extendedWaitUntil:
+    visible:
+      id: 'onboarding-permission-step'
+    timeout: 15000
+- assertVisible:
+    text: 'CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
+    label: 'Setup permission body is localized'
 
 - tapOn:
-    id: 'wardrobe-silhouette-link'
+    id: 'app-top-bar-back'
+    label: 'Back to Closet'
+- extendedWaitUntil:
+    visible:
+      id: 'wardrobe-screen'
+    timeout: 15000
+
+- tapOn:
+    id: 'closet-more-menu'
+    label: 'Reopen the Closet More menu'
+- extendedWaitUntil:
+    visible:
+      id: 'closet-more-silhouette'
+    timeout: 15000
+- tapOn:
+    id: 'closet-more-silhouette'
 
 - extendedWaitUntil:
     visible:

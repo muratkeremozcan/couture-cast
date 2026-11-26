@@ -1,6 +1,6 @@
 // Learning path Step 67: Screen budget guard.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-67-screen-budget-guard
-// Story CC-7.10 test owner (TEA): 7.10-E2E-001..014. Each web tab under each spec D1 fixture at
+// Story CC-7.10 test owner (TEA): 7.10-E2E-001..017. Each web tab under each spec D1 fixture at
 // 390 x 844 runs the shared measure and verdict (AC1, AC2); the limits and the `known` ratchet
 // live in packages/utils/src/screen-budget.json. The home actions probe (AC3) is in
 // screen-budget-home-actions.spec.ts, so smart sharding spreads the two (P10).
@@ -33,11 +33,16 @@ test.describe('CC-7.10 screen budget on web @local-lane', () => {
   // retry cannot change it and only triples a red run: a budget failure fails once.
   test.describe.configure({ retries: 0 })
 
-  let id = 0
-  for (const fixture of BUDGET_FIXTURES) {
+  // Story CC-7.11 D8: Looks joined the budget. The four CC-7.10 tabs keep their ids 001..012 (in
+  // fixture-major order) and Looks takes 015..017, after the two named cases 013 and 014.
+  const CC710_SCREENS: readonly string[] = ['today', 'closet', 'community', 'profile']
+  const auditId = (fixtureIndex: number, screen: string) =>
+    screen === 'looks'
+      ? 15 + fixtureIndex
+      : fixtureIndex * CC710_SCREENS.length + CC710_SCREENS.indexOf(screen) + 1
+  for (const [fixtureIndex, fixture] of BUDGET_FIXTURES.entries()) {
     for (const screen of BUDGET_SCREENS) {
-      id += 1
-      const testId = `7.10-E2E-${String(id).padStart(3, '0')}`
+      const testId = `7.10-E2E-${String(auditId(fixtureIndex, screen)).padStart(3, '0')}`
       test(`[P0] [${testId}] web ${screen} (${fixture}) is within the screen budget`, async ({
         page,
         interceptNetworkCall,
@@ -52,6 +57,9 @@ test.describe('CC-7.10 screen budget on web @local-lane', () => {
         // brings (Codex #9): the audit measures the screen production shows that member.
         if (screen === 'community' && fixture !== 'populated')
           await expect(page.getByTestId('community-add-location')).toBeVisible()
+        // Story CC-7.11 D8: Looks is audited on its first content, so the anchor must render.
+        if (screen === 'looks')
+          await expect(page.getByTestId('looks-first-content')).toBeVisible()
         const measurement = await measureWebScreen(page, screen)
         expectMeasureFloors(measurement, screen)
         expect(

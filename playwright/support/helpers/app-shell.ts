@@ -25,8 +25,10 @@ export const SHELL_TABS: Record<
   ShellScreen,
   { path: string; nav: string; title: RegExp }
 > = {
-  home: { path: '/', nav: 'bottom-nav-home', title: /^Home$/ },
-  closet: { path: '/wardrobe', nav: 'bottom-nav-wardrobe', title: /^Wardrobe$/ },
+  // Story CC-7.11 D1: Today, Closet, Looks, Community, Profile; routes and test ids stay.
+  home: { path: '/', nav: 'bottom-nav-home', title: /^Today$/ },
+  closet: { path: '/wardrobe', nav: 'bottom-nav-wardrobe', title: /^Closet$/ },
+  looks: { path: '/looks', nav: 'bottom-nav-looks', title: /^Looks$/ },
   community: { path: '/community', nav: 'bottom-nav-community', title: /^Community$/ },
   profile: { path: '/settings', nav: 'bottom-nav-settings', title: /^Profile$/ },
 }

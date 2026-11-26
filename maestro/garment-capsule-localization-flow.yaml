@@ -24,11 +24,7 @@ tags:
     env:
       LOCALE: tr-TR
 
-# `wardrobe-capsules-link` lives on the wardrobe hub, but the app opens on
-# Home, so this flow never had a step to get there and the tap could only
-# ever report the link "not found".
-- runFlow: subflows/open-wardrobe-tab.yaml
-
+# CC-7.11 D8: Capsules live on the Looks tab; the subflow opens Looks, then its Capsules row.
 - runFlow: subflows/open-capsules.yaml
 
 # Turkish strings come from the shared wardrobe.capsules key tree.
