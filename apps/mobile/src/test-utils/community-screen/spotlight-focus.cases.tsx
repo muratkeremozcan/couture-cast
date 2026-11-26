@@ -131,7 +131,7 @@ export function registerCommunitySpotlightFocusCases() {
     await frames(3)
     // Ready behind the closed gate: nothing is focused, announced or reported yet.
     expect(rank).not.toBeVisible()
-    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
     expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
     expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
     expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
@@ -171,7 +171,7 @@ export function registerCommunitySpotlightFocusCases() {
 
     await waitFor(() => expect(feedReads).toBe(1))
     await frames(3)
-    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
     expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
     expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
 
@@ -301,7 +301,7 @@ export function registerCommunitySpotlightFocusCases() {
       // hidden, and takes no focus.
       const notice = screen.getByTestId('deep-link-info-banner-message')
       expect(notice.getAttribute('aria-label')).toBe(DESTINATION_UNAVAILABLE)
-      await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+      expect(screen.getByTestId('screen-placeholder')).toBeVisible()
       expect(notice).not.toBeVisible()
       await frames(3)
       expect(findNodeHandle).not.toHaveBeenCalledWith(notice)

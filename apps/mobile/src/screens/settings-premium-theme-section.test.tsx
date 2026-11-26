@@ -545,7 +545,7 @@ describe('SettingsScreen interface palettes section', () => {
     expect(await screen.findByTestId('premium-unavailable')).not.toBeVisible()
     expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
     expect(screen.getByTestId('premium-theme-locked')).not.toBeVisible()
-    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
 
     act(() => releaseEntryRead())
 

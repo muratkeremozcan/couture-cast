@@ -429,7 +429,7 @@ describe('WardrobeHubScreen', () => {
     // The inventory answered (empty), the onboarding state has not: the placeholder holds.
     const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
     expect(emptyTitle).not.toBeVisible()
-    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
     expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
 
     act(() => releaseOnboarding())
@@ -491,7 +491,7 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(savedLookReads).toBe(1))
     expect(emptyTitle).not.toBeVisible()
     expect(setupCard).not.toBeVisible()
-    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
+    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
 
     act(() => releaseSavedLooks())
 
