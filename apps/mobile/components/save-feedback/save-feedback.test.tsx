@@ -5,6 +5,7 @@
 import { useRef } from 'react'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessibilityInfo, AppState, Platform, Text, View } from 'react-native'
 import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
@@ -756,7 +757,10 @@ describe('mobile save-feedback components', () => {
       expect(getNetworkOnline()).toBe(false)
 
       // Tapping Save again runs default EXPO_PUBLIC_API_BASE_URL probe -> recovers online -> saves!
-      fireEvent.click(firstSave)
+      // A real click: react-native-web reconfigures Pressable's responder in a passive effect, so a
+      // synchronous click in the commit's own task still meets the busy (disabled) responder. A
+      // member's tap cannot land that fast.
+      await userEvent.click(firstSave)
       await waitFor(() => expect(firstSave).toHaveTextContent('Saved'))
       expect(fetchSpy).toHaveBeenCalledWith(
         'https://api.couturecast.test/api/health',
@@ -1418,7 +1422,10 @@ describe('mobile save-feedback components', () => {
     )
     expect(getNetworkOnline()).toBe(false)
     // Browser still reports navigator.onLine === true, so explicit retry runs and recovers online!
-    fireEvent.click(screen.getByTestId('expo-web-save'))
+    // A real click: react-native-web reconfigures Pressable's responder in a passive effect, so a
+    // synchronous click in the commit's own task still meets the busy (disabled) responder. A
+    // member's tap cannot land that fast.
+    await userEvent.click(screen.getByTestId('expo-web-save'))
     await waitFor(() =>
       expect(screen.getByTestId('expo-web-save')).toHaveTextContent('Saved')
     )

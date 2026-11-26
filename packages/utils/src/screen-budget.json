@@ -52,7 +52,8 @@
     ],
     "native": [
       "[data-testid=\"mobile-chip-navigation\"]",
-      "[data-testid=\"community-sticky-filter-chips\"]"
+      "[data-testid=\"community-sticky-filter-chips\"]",
+      "[data-testid=\"sample-weather-choices\"]"
     ]
   },
   "selectors": {

@@ -96,7 +96,8 @@ export function SampleIdeaControls({
       {onWeather && (
         <View style={styles.group}>
           <Text style={{ color: palette.ink }}>{strings.preferences.weather}</Text>
-          <View style={styles.row}>
+          {/* CC-7.10: one exclusive weather choice; the screen budget probe skips the pressed one. */}
+          <View style={styles.row} testID="sample-weather-choices">
             {SAMPLE_WEATHER_KEYS.map((value) => (
               <PreviewButton
                 key={value}
