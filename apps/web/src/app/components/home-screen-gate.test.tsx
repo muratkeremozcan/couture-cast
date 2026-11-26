@@ -13,7 +13,8 @@
 // 7.7-CMP-044 the hero stays outside the gate (L-10). CodeRabbit round 2 on PR 292: 7.7-CMP-049
 // an expired remembered teaser holds its place (#7), 7.7-CMP-050 a refreshed outfit never settles
 // with the previous city line (#6). CI pw-e2e on d67800d2: 7.7-CMP-054 a fixture bearer switch
-// drops A's outfit and teaser in the first commit (7.7-E2E-009 swap-while-reading).
+// drops A's outfit and teaser in the first commit (7.7-E2E-009 swap-while-reading). CI pw-e2e on
+// b25999ca: 7.7-CMP-058 the chips stay hidden in place until the first feed answer (E2E-005).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
@@ -614,6 +615,61 @@ describe('7.7 Home screen gate', () => {
     const firstForB = commits.find((commit) => commit.scope?.endsWith('test-token-b'))
     expect(firstForB).toBeDefined()
     expect(firstForB).toMatchObject({ outfitA: false, teaser: false })
+  })
+
+  it('7.7-CMP-058 the community chips hold their row hidden until the first feed read answers, so the active chip never widens on screen (CI 7.7-E2E-005 member Home late)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    useAnsweredRitual()
+    const feedHeld = Promise.withResolvers<void>()
+    onTestFinished(() => feedHeld.resolve())
+    useMswHandlers(
+      http.get('/api/v1/community/feed', async () => {
+        await feedHeld.promise
+        return HttpResponse.json({
+          data: {
+            items: [],
+            authorStates: [],
+            nextCursor: null,
+            mode: 'auto',
+            viewerBand: 'temperate_dry',
+            bandResolved: true,
+            bandUnresolvedReason: null,
+            experimentVariant: 'auto',
+            activeChallenge: null,
+          },
+        })
+      })
+    )
+    const { answer } = useServedSpotlight()
+    renderHomeGate()
+    await answer(0, cityPage())
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+
+    // Home is shown and the feed is still out: the row keeps its place, hidden and unfocusable.
+    const row = screen.getByTestId('community-filter-chips')
+    const chips = within(row).getAllByRole('button', { hidden: true })
+    expect(row).toHaveClass('invisible')
+    expect(row).toHaveAttribute('aria-hidden', 'true')
+    expect(chips.every((chip) => chip.tabIndex === -1)).toBe(true)
+    expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
+      /^Your climate$/
+    )
+
+    // The feed answers with the band: the row shows, the active chip already names it.
+    await act(async () => {
+      feedHeld.resolve()
+      await feedHeld.promise
+    })
+    await waitFor(() => expect(row).not.toHaveClass('invisible'))
+    expect(row).not.toHaveAttribute('aria-hidden')
+    expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
+      'Your climate: Temperate and dry'
+    )
+    expect(screen.getByTestId('community-filter-chips')).toBe(row)
+    expect(within(row).getAllByRole('button')).toEqual(chips)
   })
 
   it('7.7-CMP-044 the hero stays outside the Home gate, so a session being verified shows it while the body waits (real-session L-10)', () => {

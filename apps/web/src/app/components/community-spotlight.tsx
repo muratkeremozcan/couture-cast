@@ -234,6 +234,9 @@ export function useCommunitySpotlight<Token = number>({
               level: page.level,
               label: page.label,
               items: [...kept, ...newEntries(previous.items, items)],
+              // The cursor of the pages the row showed stays; a row restored without one takes
+              // the fresh page's (CodeRabbit on PR 292).
+              nextCursor: previous.nextCursor ?? page.nextCursor,
               loadingMore: false,
               moreFailed: false,
               focusTargetId: null,

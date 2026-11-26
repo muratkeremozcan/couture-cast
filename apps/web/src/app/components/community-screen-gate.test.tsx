@@ -14,16 +14,20 @@
 // CodeRabbit round 2 on PR 292: 7.7-CMP-051 a refresh for another area replaces the kept row (#5).
 // CI pw-e2e on 3f1986d1 (7.7-E2E-006 delayed): 7.7-CMP-052 a socket failing before the first
 // catch-up keeps what other tabs kept, a return's restored rows until the catch-up decides, and
-// New post in its header slot (CI 7.7-E2E-005 late on d67800d2).
+// New post in its header slot (CI 7.7-E2E-005 late on d67800d2). CodeRabbit on PR 292 (post-cap):
+// 7.7-CMP-055 a withdrawn post leaves the restored rows, 7.7-CMP-056 and 7.7-CMP-057 a restored
+// row without a cursor takes the refresh's.
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
   POST_PATH,
+  WITHDRAW_PATH,
+  authorState,
   cursorFor,
   feed,
   feedBody,
@@ -750,5 +754,110 @@ describe('7.7 Community screen gate', () => {
     expect(
       screenSnapshot.recall(scope, 'community', COMMUNITY_GRID_SNAPSHOT_PART)
     ).toBeUndefined()
+  })
+
+  /** A first visit that settles and leaves a Community snapshot behind, then unmounts. */
+  async function visitAndLeave() {
+    const visit = renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall(
+          currentWebSessionScope(),
+          'community',
+          COMMUNITY_GRID_SNAPSHOT_PART
+        )
+      ).toBeDefined()
+    )
+    visit.unmount()
+  }
+
+  it('7.7-CMP-055 a post withdrawn on a return before the first refresh answers leaves the restored rows, and the other rows stay (CodeRabbit on PR 292)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    const selfPost = item({
+      id: 'self-post',
+      author: { displayName: 'You', isSelf: true },
+    })
+    let returning = false
+    let returnReads = 0
+    const firstRefresh = Promise.withResolvers<void>()
+    onTestFinished(() => firstRefresh.resolve())
+    useMswHandlers(
+      http.get(FEED_PATH, async () => {
+        if (!returning) return feedBody({ items: [selfPost, item()] })
+        returnReads += 1
+        // The return's own page-one refresh is still out when the member withdraws.
+        if (returnReads === 1) await firstRefresh.promise
+        return feedBody({
+          items: [item()],
+          authorStates: [authorState({ id: 'self-post', status: 'withdrawn' })],
+        })
+      }),
+      http.post(WITHDRAW_PATH, () => HttpResponse.json({ tracked: true })),
+      http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] }))
+    )
+    await visitAndLeave()
+
+    returning = true
+    renderCommunity()
+    const kept = screen.getByTestId('lookbook-card-post-1')
+    await waitFor(() => expect(returnReads).toBe(1))
+    fireEvent.click(screen.getByTestId('withdraw-button-self-post'))
+
+    expect(await screen.findByTestId('community-action-notice')).toHaveAttribute(
+      'data-tone',
+      'success'
+    )
+    await waitFor(() => expect(returnReads).toBe(2))
+    await waitFor(() =>
+      expect(screen.queryByTestId('lookbook-card-self-post')).toBeNull()
+    )
+    expect(screen.getByTestId('lookbook-card-post-1')).toBe(kept)
+  })
+
+  it('7.7-CMP-056 a return restored without a feed cursor takes the cursor its page-one refresh answers (CodeRabbit on PR 292)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    let returning = false
+    useMswHandlers(
+      http.get(FEED_PATH, () =>
+        feedBody({
+          items: [item()],
+          // More looks were published while the member was away: page one now has a next page.
+          nextCursor: returning ? cursorFor() : null,
+        })
+      ),
+      http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] }))
+    )
+    await visitAndLeave()
+
+    returning = true
+    renderCommunity()
+    expect(screen.queryByTestId('load-more-button')).toBeNull()
+    expect(await screen.findByTestId('load-more-button')).toBeVisible()
+  })
+
+  it('7.7-CMP-057 a return restored without a Spotlight cursor takes the cursor its page-one refresh answers (CodeRabbit on PR 292)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    let returning = false
+    useMswHandlers(
+      http.get(FEED_PATH, () => feedBody({ items: [item()] })),
+      http.get(SPOTLIGHT_PATH, () =>
+        spotlightBody({
+          items: [ranked(1)],
+          nextCursor: returning ? 'cursor-2' : null,
+        })
+      )
+    )
+    await visitAndLeave()
+
+    returning = true
+    renderCommunity()
+    expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
+    expect(await screen.findByTestId('community-spotlight-view-more')).toBeVisible()
   })
 })

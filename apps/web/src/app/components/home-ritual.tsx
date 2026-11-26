@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   garmentCategoryEnum,
@@ -818,7 +818,14 @@ type RitualSnapshot = {
 
 const RITUAL_SNAPSHOT_PART = 'ritual'
 
-function MemberRitual({ owner }: { owner: string }) {
+function MemberRitual({
+  owner,
+  onScopeLeft,
+}: {
+  owner: string
+  /** Re-reads the session scope above, whose key change remounts this section for it. */
+  onScopeLeft: () => void
+}) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
   const locale = i18n.language
   const strings = getGuestPreviewStrings(locale)
@@ -874,12 +881,13 @@ function MemberRitual({ owner }: { owner: string }) {
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     /**
      * Codex review P2-1: e2e fixture bearers share one owner, so the owner check alone would let
-     * an answer read with the last fixture bearer land for the next. Such an answer is dropped
-     * and the ritual is read again with the bearer the tab holds now.
+     * an answer read with the last fixture bearer land for the next. Such an answer is dropped,
+     * and the section keyed by the scope above remounts and reads with the bearer the tab holds
+     * now: one read for the new scope, never a retry here followed by the remount's own read.
      */
     const sameScope = () => {
       if (isLiveScope(scope)) return true
-      setAttempt((value) => value + 1)
+      onScopeLeft()
       return false
     }
     setBusy(true)
@@ -936,7 +944,7 @@ function MemberRitual({ owner }: { owner: string }) {
         if (current()) setBusy(false)
       })
     return () => controller.abort()
-  }, [attempt, locale, owner])
+  }, [attempt, locale, owner, onScopeLeft])
 
   const retry = (
     <button
@@ -1018,6 +1026,9 @@ function HomeRitualSession({
    * same render, before B's reads land; a verified member's token refresh keeps the scope.
    */
   const scope = useWebSessionScope()
+  // A bearer switch the bridge did not announce is found by the ritual read: it asks for a
+  // render here, which reads the new scope and remounts the section under it.
+  const [, rereadScope] = useReducer((tick: number) => tick + 1, 0)
   useEffect(() => {
     if (session.status === 'signed_in' || session.status === 'signed_out')
       resetSampleForOwner(session.owner)
@@ -1025,7 +1036,13 @@ function HomeRitualSession({
 
   if (session.status === 'signed_out') return <DemoOutfit demo={demo} />
   if (session.owner && isLiveOwner(session.owner))
-    return <MemberRitual key={scope ?? session.owner} owner={session.owner} />
+    return (
+      <MemberRitual
+        key={scope ?? session.owner}
+        owner={session.owner}
+        onScopeLeft={rereadScope}
+      />
+    )
   if (session.status === 'unavailable') {
     return (
       <div role="status">

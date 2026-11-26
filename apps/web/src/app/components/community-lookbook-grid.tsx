@@ -470,6 +470,12 @@ export interface LookbookFilterNavProps {
    * the heading row, so nothing floats between the chips and the feed.
    */
   actions?: React.ReactNode
+  /**
+   * CI 7.7-E2E-005 member Home late on b25999ca: the first feed read is still out, so the active
+   * `auto` chip does not know its band yet and would widen to name it when the feed answers,
+   * pushing every chip after it. The row keeps its place, hidden, until that answer.
+   */
+  chipsPending?: boolean
 }
 
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
@@ -486,6 +492,7 @@ export function LookbookFilterNav({
   closed = false,
   stickyTop = CHIP_NAVIGATION_HEIGHT_PX,
   actions,
+  chipsPending = false,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
   // Per instance, so a nav only ever points at its own explainer.
@@ -533,7 +540,11 @@ export function LookbookFilterNav({
       >
         {t('community.filters.explainer')}
       </p>
-      <div className={isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}>
+      <div
+        data-testid="community-filter-chips"
+        aria-hidden={chipsPending || undefined}
+        className={`${isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}${chipsPending ? ' invisible' : ''}`}
+      >
         {COMMUNITY_FEED_MODES.map((mode) => {
           const isActive = activeTab === mode
           const tabletStyles = isMobilePreview
@@ -554,6 +565,7 @@ export function LookbookFilterNav({
                 handleTabClick(mode)
               }}
               aria-pressed={isActive}
+              tabIndex={chipsPending ? -1 : undefined}
               className={`min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
             >
               {modeLabel(mode, viewerBand, t, isActive)}
@@ -3270,7 +3282,11 @@ export function CommunityLookbookGrid({
         setExperimentVariant(feed.experimentVariant)
         setAuthorStates(feed.authorStates)
         setActiveChallenge(feed.activeChallenge)
-        setNextCursor((cursor) => (inPlace ? cursor : feed.nextCursor))
+        // A restored row keeps the cursor of the pages it showed; one restored without a cursor
+        // takes the fresh page's (CodeRabbit on PR 292).
+        setNextCursor((cursor) =>
+          inPlace ? (cursor ?? feed.nextCursor) : feed.nextCursor
+        )
         setFeedError(null)
         setRefusedScope(undefined)
         setBannedSanction(null)
@@ -4300,6 +4316,17 @@ export function CommunityLookbookGrid({
     }
   }
 
+  /**
+   * CodeRabbit on PR 292: a return's first page-one refresh keeps every restored row its page
+   * lacks, so a post the server confirmed withdrawn before that refresh would stay. It leaves the
+   * restored rows now; the other restored rows stay where they are.
+   */
+  const dropRestoredRow = (postId: string) => {
+    if (!restoringRowsRef.current) return
+    itemsRef.current = itemsRef.current.filter((post) => post.id !== postId)
+    setItems((previous) => previous.filter((post) => post.id !== postId))
+  }
+
   const handleWithdrawPost = async (postId: string): Promise<void> => {
     if (!communityAvailable) return
     const action = beginAction()
@@ -4315,6 +4342,7 @@ export function CommunityLookbookGrid({
       // The spotlight ranks public posts only and never serves a withdrawn one
       // again, so its copy leaves now rather than on the next page-one read.
       applySpotlight((item) => (item?.id === postId ? null : item))
+      dropRestoredRow(postId)
       await loadFeed(modeRef.current)
     } catch (error: unknown) {
       if (action.signal.aborted) return
@@ -4668,6 +4696,7 @@ export function CommunityLookbookGrid({
             closed={banned}
             stickyTop={filterNavStickyTop}
             actions={headerActions}
+            chipsPending={!feedSettled}
           />
         )}
 
