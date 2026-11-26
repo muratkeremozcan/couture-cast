@@ -407,7 +407,7 @@ describe('WardrobeHubScreen', () => {
 
     const status = await screen.findByTestId('garment-status-awaiting_tags')
     expect(status).toHaveTextContent('Waiting for tags')
-    expect(screen.getByTestId('garment-capture-open')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-capture-open')).toBeVisible())
     // The tab's AppTopBar shows the Wardrobe title; the body has no second one.
     expect(screen.queryByText(i18n.t('wardrobe.title'))).toBeNull()
   })
@@ -429,7 +429,7 @@ describe('WardrobeHubScreen', () => {
     // The inventory answered (empty), the onboarding state has not: the placeholder holds.
     const emptyTitle = await screen.findByText(i18n.t('wardrobe.empty_title'))
     expect(emptyTitle).not.toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
     expect(screen.queryByTestId('wardrobe-onboarding-card')).toBeNull()
 
     act(() => releaseOnboarding())
@@ -459,8 +459,12 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(garmentReads).toBe(1))
 
     expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
-    expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
-    expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    )
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 
@@ -487,7 +491,7 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(savedLookReads).toBe(1))
     expect(emptyTitle).not.toBeVisible()
     expect(setupCard).not.toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
 
     act(() => releaseSavedLooks())
 
@@ -1191,7 +1195,9 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(within(panel).queryByRole('progressbar')).toBeNull())
       expect(screen.queryByTestId('garment-status-processing')).toBeNull()
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-      expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
+      )
 
       await browserUser.click(within(panel).getByTestId('style-piece-refresh'))
       await waitFor(() =>
@@ -1884,6 +1890,8 @@ describe('WardrobeHubScreen', () => {
       renderScreen()
 
       const open = await screen.findByTestId('garment-open-hub-blue-top')
+      // The closet gate keeps the grid mounted but hidden until every read settles (CC-7.7).
+      await waitFor(() => expect(open).toBeVisible())
       expect(colorHeaders.length).toBeGreaterThan(0)
       expect(colorHeaders.every((header) => header === '1')).toBe(true)
       expect(open).toHaveAccessibleName('Blue top')
@@ -1897,7 +1905,7 @@ describe('WardrobeHubScreen', () => {
       )
       // A garment still being tagged keeps its tagging button and opens no detail.
       expect(screen.queryByTestId('garment-open-hub-tagging')).toBeNull()
-      expect(screen.getByLabelText('Needs tags')).toBeVisible()
+      await waitFor(() => expect(screen.getByLabelText('Needs tags')).toBeVisible())
       // The raw garment id never shows (2026-11-19 tester report).
       for (const id of [blueTop.id, plainShoes.id, tagging.id]) {
         expect(screen.queryByText(id, { exact: false })).toBeNull()

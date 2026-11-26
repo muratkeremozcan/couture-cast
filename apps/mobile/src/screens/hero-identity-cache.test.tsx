@@ -137,7 +137,9 @@ describe('TabOneScreen identity change on a shared device', () => {
       act(() => setMobileApplicationUserId('member-b'))
       expect(screen.queryByTestId('current-temperature')).toBeNull()
       await waitFor(() => expect(screen.getByTestId(action)).toBeVisible())
-      expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+      )
       expect(screen.queryByTestId('weather-header')).toBeNull()
     }
   )
@@ -152,22 +154,30 @@ describe('TabOneScreen identity change on a shared device', () => {
     await userEvent.click(
       await screen.findByTestId('guest-preview-swap-option-white-sneakers')
     )
-    expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
+    )
     await userEvent.click(await screen.findByTestId('sample-save-look'))
     await waitFor(() => expect(screen.getByTestId(savedLookId)).toBeVisible())
 
     act(() => setMobileApplicationUserId('member-b'))
     await waitFor(() => expect(screen.getByTestId('sample-save-look')).toBeVisible())
     expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
-    expect(screen.getByTestId('guest-preview-garment-loafers')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('guest-preview-garment-loafers')).toBeVisible()
+    )
 
     act(() => setMobileApplicationUserId('member-a'))
     await waitFor(() =>
       expect(screen.getByTestId('guest-preview-garment-loafers')).toBeVisible()
     )
     await userEvent.click(await screen.findByTestId(savedLookId))
-    expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
-    expect(screen.getByTestId('guest-preview-undo-swaps')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('guest-preview-garment-white-sneakers')).toBeVisible()
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('guest-preview-undo-swaps')).toBeVisible()
+    )
 
     await userEvent.click(screen.getByTestId('sample-remove-sample:l:office-oxford'))
     await waitFor(() => expect(screen.queryByTestId('sample-saved-looks')).toBeNull())

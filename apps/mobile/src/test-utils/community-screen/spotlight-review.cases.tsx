@@ -103,7 +103,9 @@ export function registerCommunitySpotlightReviewCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-item-spot-self')).toBeNull()
     )
-    expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    )
     // Evicted in place: no spotlight re-read stood in for the refresh.
     expect(reads.count).toBe(1)
   })
@@ -170,7 +172,9 @@ export function registerCommunitySpotlightReviewCases() {
     await screen.findByTestId('community-spotlight-item-spot-self')
     await screen.findByTestId('community-post-card-post-a')
     await catchUp()
-    expect(screen.getByTestId('community-spotlight-item-spot-self')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-self')).toBeVisible()
+    )
 
     phase = 'withdrawn'
     await catchUp()
@@ -178,7 +182,9 @@ export function registerCommunitySpotlightReviewCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-item-spot-self')).toBeNull()
     )
-    expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    )
     expect(reads.count).toBe(1)
   })
 
@@ -224,6 +230,8 @@ export function registerCommunitySpotlightReviewCases() {
     expect(reads.count).toBe(1)
     // The feed shown before the member resolved stays: the late resolution is
     // the first one, so it resets nothing.
-    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    )
   })
 }

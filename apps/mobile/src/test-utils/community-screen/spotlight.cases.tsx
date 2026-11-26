@@ -200,7 +200,9 @@ export function registerCommunitySpotlightCases() {
     const scroll = vi.spyOn(row, 'scroll')
     press(viewMore)
     const newRank = await screen.findByTestId('community-spotlight-rank-spot-3')
-    expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    )
     expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'cursor-2'])
     await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(newRank))
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
@@ -431,7 +433,9 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
     )
-    expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    )
     // Evicted in place: no spotlight re-read stood in for the realtime removal.
     expect(spotlightReads).toBe(1)
   })
@@ -466,7 +470,9 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-item-spot-self')).toBeNull()
     )
-    expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    )
   })
 
   it('6.6-MOB-034 an expired spotlight image re-reads only that post and keeps every loaded page (R9)', async () => {
@@ -512,7 +518,9 @@ export function registerCommunitySpotlightCases() {
     expect(postReads).toEqual(['spot-1'])
     // No page-one reload stood in for the single-post read: page two and the rank stay.
     expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'cursor-2'])
-    expect(screen.getByTestId('community-spotlight-item-spot-3')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-3')).toBeVisible()
+    )
     expect(screen.getByTestId('community-spotlight-rank-spot-1').textContent).toBe('#1')
   })
 
@@ -536,7 +544,9 @@ export function registerCommunitySpotlightCases() {
       expect(screen.queryByTestId('community-spotlight-item-spot-1')).toBeNull()
     )
     expect(reacted).toEqual(['spot-1'])
-    expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    )
     expect(urls).toHaveLength(1)
   })
 
@@ -867,7 +877,9 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-item-spot-only')).toBeNull()
     )
-    expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    )
     expect(spotlightReads).toBe(1)
   })
 

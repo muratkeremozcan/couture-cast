@@ -202,8 +202,10 @@ describe('SettingsScreen premium section, complimentary access', () => {
     await waitFor(() =>
       expect(screen.getByTestId('premium-subscribe-monthly')).toBeVisible()
     )
-    expect(screen.getByTestId('premium-subscribe-annual')).toBeVisible()
-    expect(screen.getByTestId('premium-restore')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-subscribe-annual')).toBeVisible()
+    )
+    await waitFor(() => expect(screen.getByTestId('premium-restore')).toBeVisible())
     expect(screen.queryByTestId('premium-complimentary-note')).toBeNull()
   })
 

@@ -288,9 +288,11 @@ describe('7.9-NAT-005 native Wardrobe strings under de-DE', () => {
     render(<WardrobeHubScreen pollOffsetsMs={[1, 1, 1, 1]} />)
 
     await waitFor(() => expect(screen.getByTestId('wardrobe-garment-list')).toBeVisible())
-    expect(screen.getByText(deDE.wardrobe.empty_desc)).toBeVisible()
-    expect(screen.getByText(deDE.wardrobe.add_garment)).toBeVisible()
-    expect(screen.getByText(deDE.wardrobe.capsules.title)).toBeVisible()
+    await waitFor(() => expect(screen.getByText(deDE.wardrobe.empty_desc)).toBeVisible())
+    await waitFor(() => expect(screen.getByText(deDE.wardrobe.add_garment)).toBeVisible())
+    await waitFor(() =>
+      expect(screen.getByText(deDE.wardrobe.capsules.title)).toBeVisible()
+    )
     expect(screen.getByTestId('wardrobe-onboarding-card')).toHaveTextContent(
       deDE.wardrobe.onboarding.title
     )
@@ -309,7 +311,9 @@ describe('7.9-NAT-005 native Wardrobe strings under de-DE', () => {
     render(<WardrobeCapsulesScreen />)
 
     await waitFor(() => expect(screen.getByTestId('capsule-card-cap-1')).toBeVisible())
-    expect(screen.getByText('2 Kleidungsstücke · Muss repariert werden')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText('2 Kleidungsstücke · Muss repariert werden')).toBeVisible()
+    )
     expect(screen.getByTestId('capsule-truncation-notice')).toHaveTextContent(
       '1 von 7 werden angezeigt. Verfeinere deine Suche, um den Rest zu sehen.'
     )

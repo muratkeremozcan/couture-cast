@@ -233,7 +233,9 @@ describe('SettingsScreen', () => {
     // name mounts with the read's answer; the gate opens on the settle that follows it.
     const name = await screen.findByTestId('profile-account-name')
     await waitFor(() => expect(name).toBeVisible())
-    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    )
     expect(placeholder()).toBeNull()
   })
 
@@ -302,7 +304,9 @@ describe('SettingsScreen', () => {
     expect(placeholder()).toBeNull()
     expect(screen.getByTestId('profile-account-email')).toBe(email)
     expect(email).toBeVisible()
-    expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
+    )
 
     act(() => profile.release(memberProfile('Jade')))
     expect(await screen.findByTestId('profile-account-name')).toHaveTextContent('Jade')

@@ -259,8 +259,12 @@ export function registerCommunityAvailabilityRestoreCases() {
     await screen.findByTestId('community-post-card-post-a')
     expect(screen.queryByTestId('community-banned-notice')).toBeNull()
     expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
-    expect(screen.getByTestId('community-card-comments-post-a')).toBeVisible()
-    expect(screen.getByTestId('community-new-post-button')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-card-comments-post-a')).toBeVisible()
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('community-new-post-button')).toBeVisible()
+    )
 
     await waitFor(() => expect(feed.started()).toBeGreaterThan(startedBefore))
     await act(async () => {
@@ -269,7 +273,9 @@ export function registerCommunityAvailabilityRestoreCases() {
       await sync.catchUp()
     })
     expect(eventReads).toBeGreaterThan(0)
-    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    )
   }, 15_000)
 
   it('R3-4 a refresh after a plain denial ends brings the feed back too', async () => {

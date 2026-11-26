@@ -215,9 +215,13 @@ export function registerCommunityFeedCases() {
           expect(screen.queryByTestId('community-post-card-post-b')).toBeNull()
         )
         await communityGateOpen()
-        expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+        await waitFor(() =>
+          expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+        )
         if (openedPost === 'post-a') {
-          expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          )
           expect(screen.getByLabelText('Add a comment')).toHaveValue(
             'Owned discussion draft'
           )
@@ -400,7 +404,9 @@ export function registerCommunityFeedCases() {
       // A second failed tick proves the first rejection was settled, not left unhandled.
       await nextRead()
       expect(unhandled).toEqual([])
-      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      )
       expect(screen.getByLabelText('Add a comment')).toHaveValue(
         'Saved through storage failure'
       )

@@ -178,14 +178,14 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     expect(router.canGoBack()).toBe(true)
 
     await pressBack('/wardrobe')
-    expect(screen.getByText('wardrobe body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('wardrobe body')).toBeVisible())
   })
 
   it('a cold link to a Profile sub-screen goes back to Profile', async () => {
     await openApp('/planner')
 
     await pressBack('/settings')
-    expect(screen.getByText('profile body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('profile body')).toBeVisible())
   })
 
   it('a screen pushed from Home goes back to Home, its real caller', async () => {
@@ -194,7 +194,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await navigate(() => router.push('/planner'), '/planner')
 
     await pressBack('/')
-    expect(screen.getByText('home body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('home body')).toBeVisible())
     // Popped onto the same tab group: a replace would have mounted a new one on the parent tab.
     expect(tabGroupMounts.count).toBe(0)
   })
@@ -206,7 +206,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await navigate(() => router.push('/wardrobe-onboarding'), '/wardrobe-onboarding')
 
     await pressBack('/wardrobe')
-    expect(screen.getByText('wardrobe body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('wardrobe body')).toBeVisible())
     expect(tabGroupMounts.count).toBe(0)
   })
 
@@ -226,7 +226,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
       await openApp(name === 'wardrobe-garment' ? `/${name}?id=g1` : `/${name}`)
 
       await navigate(() => router.back(), '/wardrobe')
-      expect(screen.getByText('wardrobe body')).toBeVisible()
+      await waitFor(() => expect(screen.getByText('wardrobe body')).toBeVisible())
     }
   )
 
@@ -234,7 +234,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await openApp('/planner')
 
     await navigate(() => router.back(), '/settings')
-    expect(screen.getByText('profile body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('profile body')).toBeVisible())
   })
 
   it('a system back from a screen pushed from Home stays on Home, its real caller', async () => {
@@ -242,7 +242,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await navigate(() => router.push('/wardrobe-onboarding'), '/wardrobe-onboarding')
 
     await navigate(() => router.back(), '/')
-    expect(screen.getByText('home body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('home body')).toBeVisible())
   })
 
   // CI on 3d7af2a2 (Android): Home, Add location, Locations, Save landed on Profile. The launch's
@@ -255,7 +255,7 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
 
     // The guided save leaves with router.back().
     await navigate(() => router.back(), '/')
-    expect(screen.getByText('home body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('home body')).toBeVisible())
   })
 
   it('the top bar Back from Locations pushed by Home returns to Home after an unheard first focus', async () => {
@@ -264,6 +264,6 @@ describe('7.9-NAT-002 stack top bar Back through Expo Router', () => {
     await navigate(() => router.push('/locations?guided=1'), '/locations')
 
     await pressBack('/')
-    expect(screen.getByText('home body')).toBeVisible()
+    await waitFor(() => expect(screen.getByText('home body')).toBeVisible())
   })
 })

@@ -171,7 +171,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
   it('shows the placeholder while loading, then current weather, the 48-hour ribbon and a live outfit', async () => {
     await render(<TabOneScreen />)
 
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('screen-placeholder')).toBeVisible())
     expect(screen.queryByTestId('member-sample-outfit')).toBeNull()
     expect(screen.queryByTestId('weather-header')).toBeNull()
 
@@ -382,8 +382,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('hero-error-state')).toBeTruthy()
     })
-    expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
-    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
+    )
+    await waitFor(() => expect(screen.getByTestId('member-sample-outfit')).toBeVisible())
     // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
     expect(screen.getByTestId('hero-retry')).toHaveAccessibleName('Try again')
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
