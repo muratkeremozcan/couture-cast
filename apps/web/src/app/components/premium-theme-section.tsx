@@ -437,7 +437,9 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       saveGeneration !== saveGenerationRef.current || savePendingRef.current
     beginRead()
     setError(null)
-    if (!inPlace) setSectionState('loading')
+    // CodeRabbit r3 on #8: a read sent while a save is out is superseded by that save, so it never
+    // takes the section to loading; nothing would bring a ready section back when it is dropped.
+    if (!inPlace && !savePendingRef.current) setSectionState('loading')
 
     void (async () => {
       try {

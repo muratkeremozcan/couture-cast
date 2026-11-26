@@ -54,6 +54,7 @@ import {
   isLiveOwner,
   isLiveScope,
   MemberScope,
+  useWebSessionScope,
   type MemberSession,
 } from '../../lib/use-web-session'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
@@ -1010,6 +1011,13 @@ function HomeRitualSession({
   const { i18n } = useTranslation(undefined, { i18n: getI18n() })
   const strings = getGuestPreviewStrings(i18n.language)
   const guestFirstPaint = useGuestFirstPaint()
+  /*
+   * CI 7.7-E2E-009 swap-while-reading on d67800d2: e2e fixture bearers share one owner, so a key
+   * by owner kept member A's outfit through a switch to B. Keyed by the session scope (the owner
+   * for a verified member, owner and bearer for a fixture), the switch drops A's outfit in the
+   * same render, before B's reads land; a verified member's token refresh keeps the scope.
+   */
+  const scope = useWebSessionScope()
   useEffect(() => {
     if (session.status === 'signed_in' || session.status === 'signed_out')
       resetSampleForOwner(session.owner)
@@ -1017,7 +1025,7 @@ function HomeRitualSession({
 
   if (session.status === 'signed_out') return <DemoOutfit demo={demo} />
   if (session.owner && isLiveOwner(session.owner))
-    return <MemberRitual key={session.owner} owner={session.owner} />
+    return <MemberRitual key={scope ?? session.owner} owner={session.owner} />
   if (session.status === 'unavailable') {
     return (
       <div role="status">

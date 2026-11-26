@@ -1943,6 +1943,9 @@ function PostCreationModal({
 // ---------------------------------------------------------------------------
 
 interface CommunityHeaderActionsProps {
+  /** A member who is not banned: New post holds its place in the row. */
+  showShare: boolean
+  /** New post works now (Community access is verified). */
   canShare: boolean
   onShare: () => void
   settingsLink: React.ReactNode
@@ -1954,20 +1957,29 @@ interface CommunityHeaderActionsProps {
  * heading, and the notifications link floated alone above it, so both actions share one row.
  */
 function CommunityHeaderActions({
+  showShare,
   canShare,
   onShare,
   settingsLink,
   t,
 }: CommunityHeaderActionsProps) {
+  /*
+   * Story CC-7.7 (CI 7.7-E2E-005 late on d67800d2): while Community access is not verified (a
+   * socket that failed before the first catch-up) New post stays in its place, disabled, so the
+   * notifications link beside it never jumps. Only a signed-out, refused or banned reader loses
+   * it.
+   * `aria-disabled` keeps it in the focus order, like the commerce toggle's busy state.
+   */
   return (
     <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
       {settingsLink}
-      {canShare && (
+      {showShare && (
         <button
           type="button"
           data-testid="create-post-button"
-          onClick={onShare}
-          className="min-h-[44px] rounded-full bg-[#C9A14A] px-4 py-1.5 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+          aria-disabled={canShare ? undefined : 'true'}
+          onClick={canShare ? onShare : undefined}
+          className="min-h-[44px] rounded-full bg-[#C9A14A] px-4 py-1.5 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
         >
           {t('community.newPost')}
         </button>
@@ -2347,6 +2359,10 @@ function isMemberSession(
 
 /** A ban hides the feed, its author states and every action, like lost access does. */
 const feedVisible = (available: boolean, banned: unknown) => available && !banned
+
+/** New post holds its header slot for a member the API has not refused, unless banned. */
+const shareSlotShown = (memberSession: boolean, banned: boolean) =>
+  memberSession && !banned
 
 /** A stored session still being verified, or whose verification failed. */
 function isSessionPending(status: string): boolean {
@@ -4576,6 +4592,7 @@ export function CommunityLookbookGrid({
 
   const headerActions = (
     <CommunityHeaderActions
+      showShare={shareSlotShown(memberSession, banned)}
       canShare={presentation.canAct}
       onShare={openCreateModal}
       settingsLink={

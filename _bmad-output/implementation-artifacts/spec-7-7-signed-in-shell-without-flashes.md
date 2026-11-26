@@ -228,7 +228,8 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
 
 - 2026-11-25, CodeRabbit round 2 on 330e6966 (10 findings). Decision for native Home: a
   member's garment swap stays in place for the ritual it was made on (same saved location and
-  same anchor day, 08:00 local rollover); any read for that ritual, including one that began
+  same anchor day, 08:00 local rollover, read from when the shown ritual's read
+  began; an unchanged answer across the rollover is the next day's ritual); any read for that ritual, including one that began
   before the swap, keeps it, and a read for another day or location, a location or wardrobe
   change, or a member change replaces it. Return reads that overlap a save, purchase or restore
   are dropped on web and native.

@@ -24,6 +24,9 @@ import { http, HttpResponse } from 'msw'
 
 const ritualCache = vi.hoisted(() => ({
   cached: null as null | { data: unknown; timestamp: number },
+  // Every landed ritual read and every swap writes the cache once: an answer that changes
+  // nothing on screen is awaited by its write.
+  saves: 0,
 }))
 
 vi.mock('expo-router', async () => ({
@@ -45,7 +48,10 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
     withoutShopThisLook: actual.withoutShopThisLook,
     ritualCacheOwner: actual.ritualCacheOwner,
     readLatestRitualCache: () => Promise.resolve(ritualCache.cached),
-    saveRitualCache: () => Promise.resolve(undefined),
+    saveRitualCache: () => {
+      ritualCache.saves += 1
+      return Promise.resolve(undefined)
+    },
     clearRitualMemoryCache: () => undefined,
     forgetLatestRitual: () => Promise.resolve(undefined),
   }
@@ -211,6 +217,7 @@ describe('Home screen gate (native)', () => {
 
   beforeEach(async () => {
     ritualCache.cached = null
+    ritualCache.saves = 0
     restore = setMobileAccessTokenResolver(() => 'member-token')
     setMobileApplicationUserId('gate-member')
     await i18n.changeLanguage('en-US')
@@ -437,6 +444,40 @@ describe('Home screen gate (native)', () => {
     await ritual.release(2, HttpResponse.json(mockRitualResponse))
     await waitFor(() =>
       expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
+    )
+    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
+    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+  })
+
+  // CodeRabbit r3: an unchanged answer across the 08:00 rollover is the next day's ritual. A
+  // swap made after it belongs to that day and survives the next same-day read.
+  it('7.7-NAT-016 a swap made after an unchanged read across 08:00 stays through the next read that day', async () => {
+    // 07:30 in Los Angeles: before the 08:00 rollover, so the first ritual is today's.
+    pinClock('2026-07-22T14:30:00.000Z')
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    )
+
+    await waitFor(() => expect(ritualCache.saves).toBe(1))
+
+    // 08:30: the same payload comes back, now as tomorrow's ritual. Nothing on screen changes,
+    // so the swap waits for the read's cache write.
+    vi.setSystemTime(new Date('2026-07-22T15:30:00.000Z'))
+    leaveAndReturn()
+    await ritual.release(1, HttpResponse.json(mockRitualResponse))
+    await waitFor(() => expect(ritualCache.saves).toBe(2))
+    await swapTrenchForLeatherJacket()
+
+    // 10:30, the same day: a read with new weather keeps the swap.
+    vi.setSystemTime(new Date('2026-07-22T17:30:00.000Z'))
+    const temperature = screen.getByTestId('current-temperature').textContent
+    leaveAndReturn()
+    await ritual.release(2, HttpResponse.json(warmerRitual))
+    await waitFor(() =>
+      expect(screen.getByTestId('current-temperature').textContent).not.toBe(temperature)
     )
     expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
     expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()

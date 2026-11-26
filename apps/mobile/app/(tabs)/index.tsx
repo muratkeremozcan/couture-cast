@@ -588,10 +588,14 @@ export default function TabOneScreen() {
       // swaps for this ritual go back over it before it shows or enters the cache.
       const data = withMemberSwaps(fetched, now)
 
-      // A tab return re-reads in place; an unchanged answer keeps the state it already has, so
-      // the outfit card and the rest of Home do not render again for the same outfit.
+      // A tab return re-reads in place; an unchanged answer for the same ritual keeps the state
+      // it already has, so the outfit card and the rest of Home do not render again for the same
+      // outfit. An identical payload across the 08:00 rollover is the next day's ritual: it takes
+      // this read's time, or a swap made on it would be keyed to the previous day.
       setOwnedRitual((shown) =>
-        shown?.owner === applicationUserId && sameRitualAnswer(shown.data, data)
+        shown?.owner === applicationUserId &&
+        sameRitualAnswer(shown.data, data) &&
+        ritualIdentity(shown.data, shown.readAt) === ritualIdentity(data, now)
           ? shown
           : { owner: applicationUserId, data, readAt: now }
       )

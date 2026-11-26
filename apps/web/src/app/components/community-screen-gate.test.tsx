@@ -13,10 +13,11 @@
 // (7.7-E2E-013): 7.7-CMP-045 a return whose refresh answers the same data moves nothing.
 // CodeRabbit round 2 on PR 292: 7.7-CMP-051 a refresh for another area replaces the kept row (#5).
 // CI pw-e2e on 3f1986d1 (7.7-E2E-006 delayed): 7.7-CMP-052 a socket failing before the first
-// catch-up keeps what other tabs kept, and a return's restored rows until the catch-up decides.
+// catch-up keeps what other tabs kept, a return's restored rows until the catch-up decides, and
+// New post in its header slot (CI 7.7-E2E-005 late on d67800d2).
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -707,10 +708,27 @@ describe('7.7 Community screen gate', () => {
       rows: screenSnapshot.recall(scope, 'home', COMMUNITY_GRID_SNAPSHOT_PART),
     })
 
+    // The header row: the notifications link and New post.
+    const newPost = screen.getByTestId('create-post-button')
+    const headerRow = newPost.parentElement!
+    const headerNodes = [...headerRow.children]
+
     // A first visit's socket fails before any catch-up: nothing is known about access, so
     // nothing kept for another tab is dropped.
     act(() => sync().availability('recovering', false))
     expect(homeKept()).toEqual({ teaser: { value: 'teaser' }, rows: { rows: 'home' } })
+    // New post keeps its place in the row, disabled, so the link beside it never moves
+    // (CI 7.7-E2E-005 late on d67800d2); a press opens nothing.
+    expect(screen.getByTestId('create-post-button')).toBe(newPost)
+    expect([...headerRow.children]).toEqual(headerNodes)
+    expect(newPost).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(newPost)
+    expect(screen.queryByTestId('post-image-file-input')).toBeNull()
+
+    // The first catch-up verifies access: the same button works again.
+    act(() => sync().availability('connected', false))
+    expect(screen.getByTestId('create-post-button')).toBe(newPost)
+    expect(newPost).not.toHaveAttribute('aria-disabled')
     firstVisit.unmount()
 
     // The return restores its rows; its socket fails before its first catch-up too.

@@ -12,7 +12,8 @@
 // 7.7-CMP-043 an expired remembered teaser is never shown (#10). CI real-session on 61d7156e:
 // 7.7-CMP-044 the hero stays outside the gate (L-10). CodeRabbit round 2 on PR 292: 7.7-CMP-049
 // an expired remembered teaser holds its place (#7), 7.7-CMP-050 a refreshed outfit never settles
-// with the previous city line (#6).
+// with the previous city line (#6). CI pw-e2e on d67800d2: 7.7-CMP-054 a fixture bearer switch
+// drops A's outfit and teaser in the first commit (7.7-E2E-009 swap-while-reading).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
@@ -20,7 +21,7 @@ import { http, HttpResponse } from 'msw'
 import { useLayoutEffect } from 'react'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
-import { currentWebSessionScope } from '../../lib/use-web-session'
+import { currentWebSessionScope, useWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { settle } from '../../test-utils/request-barrier'
 import { signInFixtureMember } from '../../test-utils/member-session'
@@ -552,6 +553,67 @@ describe('7.7 Home screen gate', () => {
     expect(
       within(screen.getByTestId('home-live-outfit')).getByText('Denver home')
     ).toBeVisible()
+  })
+
+  it("7.7-CMP-054 a fixture bearer switch on a mounted Home drops member A's outfit and teaser in the first commit, with A's refresh still out (CI 7.7-E2E-009 swap-while-reading)", async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember('test-token-a')
+    let returning = false
+    const heldForA = Promise.withResolvers<void>()
+    onTestFinished(() => heldForA.resolve())
+    const ritualBearers: (string | null)[] = []
+    useMswHandlers(
+      http.get('/api/v1/ritual', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        ritualBearers.push(bearer)
+        if (bearer !== 'Bearer test-token-a')
+          return HttpResponse.json(memberRitual('fixture B'))
+        if (returning) await heldForA.promise
+        return HttpResponse.json(memberRitual('fixture A'))
+      }),
+      http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
+    )
+    const { answer } = useServedSpotlight()
+    const firstVisit = renderHomeGate()
+    await answer(0, cityPage())
+    expect(await screen.findByText('morning fixture A')).toBeVisible()
+    firstVisit.unmount()
+
+    // Back on Home from A's snapshot: A's teaser refresh answers, A's ritual refresh is held.
+    returning = true
+    const commits: { scope: string | null; outfitA: boolean; teaser: boolean }[] = []
+    function SwitchProbe() {
+      const scope = useWebSessionScope()
+      useLayoutEffect(() => {
+        commits.push({
+          scope,
+          outfitA: document.body.textContent?.includes('fixture A') ?? false,
+          teaser:
+            document.querySelector('[data-testid="home-spotlight-teaser-link"]') !== null,
+        })
+      }, [scope])
+      return null
+    }
+    render(
+      <ScreenGate screen="home" reads={HOME_READS}>
+        <LookbookPrismLayout />
+        <SwitchProbe />
+      </ScreenGate>
+    )
+    await answer(1, cityPage())
+    await waitFor(() => expect(ritualBearers).toHaveLength(2))
+    expect(screen.getByText('morning fixture A')).toBeVisible()
+    expect(screen.getByTestId('home-spotlight-teaser-link')).toBeVisible()
+
+    // The tab switches to fixture member B: same owner, another bearer.
+    act(() => {
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-b')
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    // The first commit for B's scope holds nothing of A's.
+    const firstForB = commits.find((commit) => commit.scope?.endsWith('test-token-b'))
+    expect(firstForB).toBeDefined()
+    expect(firstForB).toMatchObject({ outfitA: false, teaser: false })
   })
 
   it('7.7-CMP-044 the hero stays outside the Home gate, so a session being verified shows it while the body waits (real-session L-10)', () => {

@@ -16,7 +16,7 @@
 // on 61d7156e: 7.7-CMP-036 the gate never waits on the account read (PS-2), 7.7-CMP-037 no Sign
 // in hint is ever in a member's document (PS-1, PL-1 to PL-3). CodeRabbit round 2 on PR 292:
 // 7.7-CMP-046 a preference read overlapping a save never lands (#4), 7.7-CMP-047 a theme read
-// overlapping a save never lands (#8), 7.7-CMP-048 the account header keeps its footprint (#9).
+// overlapping a save never lands and never leaves the gallery loading (#8, r3), 7.7-CMP-048 the account header keeps its footprint (#9).
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
 // shape, the bearer header, and the contract parsing are all exercised by the
@@ -645,13 +645,16 @@ describe('Web settings page', () => {
 })
 
 describe('7.7 Profile without flashes', () => {
-  afterEach(() => {
+  afterEach(async () => {
     navigation.prerendering = false
     vi.unstubAllEnvs()
     window.sessionStorage.clear()
     document.documentElement.removeAttribute('data-session')
     screenSnapshot.clear()
     vi.restoreAllMocks()
+    // A case that switched languages (7.7-CMP-046, 7.7-CMP-047) and failed midway leaves none
+    // behind for the next.
+    await getI18n().changeLanguage('en-US')
   })
 
   it('7.7-CMP-010 a prerendered signed-out Profile already holds the Locations section above Shopping (Codex review P2-3)', () => {
@@ -1036,11 +1039,18 @@ describe('7.7 Profile without flashes', () => {
     await firstVisitSettles()
 
     // The member picks a palette; while that save is out, a language switch reads the theme again.
+    // This Profile mounted without a theme snapshot, so that read is not an in-place refresh, and
+    // the save supersedes it: the gallery never goes to loading (CodeRabbit r3 on #8).
     fireEvent.click(await screen.findByTestId('premium-theme-option-jewel_radiance'))
     await act(async () => {
       await getI18n().changeLanguage('de-DE')
     })
     await waitFor(() => expect(reads).toBe(2))
+    expect(screen.getByTestId('premium-theme-gallery')).toBeVisible()
+    expect(screen.getByTestId('premium-theme-section')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
 
     await act(async () => {
       putGate.resolve()
@@ -1057,6 +1067,12 @@ describe('7.7 Profile without flashes', () => {
     })
     await settle()
     expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
+    // The dropped read leaves the gallery ready, never stuck hidden behind loading.
+    expect(screen.getByTestId('premium-theme-gallery')).toBeVisible()
+    expect(screen.getByTestId('premium-theme-section')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
     expect(screen.getByTestId('premium-theme-option-jewel_radiance')).toHaveAttribute(
       'aria-pressed',
       'true'

@@ -179,9 +179,16 @@ export function useHomeSpotlightTeaser({
         retryAfterSeconds: communityRetryAfterSeconds,
       })
   )
-  const liveValue = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
+  const storedValue = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
   const sponsoredShown = useSponsoredShownRegistry()
   const member = useCommunityMember()
+  /*
+   * The member `state` reads for, set where `state.setMember` runs. Its value belongs to that
+   * member only: a member change (a fixture bearer switch keeps the owner) drops it in the same
+   * render, before the effect points `state` at the next member (CI 7.7-E2E-009 on d67800d2).
+   */
+  const [stateMember, setStateMember] = useState(member)
+  const liveValue = stateMember === member ? storedValue : null
   const visible = usePageVisible()
 
   // Story CC-7.7 D5: a return to Home shows the teaser it last showed this member (or none)
@@ -253,6 +260,7 @@ export function useHomeSpotlightTeaser({
   useEffect(() => {
     readingForRef.current = member
     state.setMember(member)
+    setStateMember(member)
   }, [member, state])
 
   useEffect(() => {
