@@ -142,6 +142,10 @@ inline garment detail, sign-in, not-found.
 | 7.9-PROBE-005     | Focus ring negative control: focus that moves the control is refused before scoring                                                                                                                                 | D3            |
 | 7.9-PROBE-006     | Focus ring negative control: a faint ring below 3:1 falls short of the area                                                                                                                                         | D3            |
 | 7.9-PROBE-007     | Focus ring: a layer over the top half of the control is refused as a cover, sampled on three rows (CI 48c7a01e applause pill)                                                                                       | D3            |
+| 7.9-PROBE-001f    | An absolutely positioned faint child escapes a 1 px wrapper below its containing block and is measured (Codex check 4)                                                                                              | D3            |
+| 7.9-PROBE-008     | Focus ring negative control: a strip in the clip margin that repaints on focus is not the ring (Codex check 4)                                                                                                      | D3            |
+| 7.9-PROBE-009     | Focus ring negative control: a control moved on blur that only repaints its own fill falls short (Codex check 4)                                                                                                    | D3            |
+| 7.9-PROBE-010a..b | One run over two backgrounds 1% apart, one a hair under the floor: fails at 4.5:1 and at 3:1 (Codex check 4)                                                                                                        | D3            |
 
 ### Coordinator add-ons in this PR (TEA)
 

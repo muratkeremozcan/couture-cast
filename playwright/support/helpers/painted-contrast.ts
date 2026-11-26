@@ -58,6 +58,9 @@ const FILL_OFF =
   '-webkit-text-fill-color: transparent !important; text-shadow: none !important;'
 // Descendants' glyphs stay hidden in both shots, so only the marked element's own text differs.
 const DESCENDANT_TEXT_OFF = `[${MARK}] * { ${FILL_OFF} }`
+// The focused target with its own indicator switched off: what focus changed that this does not
+// revert was painted by something other than the target's outline or shadow.
+const INDICATOR_OFF = `[${MARK}] { outline-style: none !important; box-shadow: none !important; }`
 const OWN_TEXT_OFF = `[${MARK}] { ${FILL_OFF} }`
 // The glyph mask: the same glyphs in an opaque magenta, to find where every letter sits.
 const MASK_FILL =
@@ -139,10 +142,11 @@ async function compare(
   inked: string,
   mask?: string,
   withShots = false,
-  exclude: Exclude | null = null
+  exclude: Exclude | null = null,
+  own?: string
 ): Promise<Ink> {
   const result = await page.evaluate(
-    async ({ a, b, m, w, x }) => {
+    async ({ a, b, m, w, x, o }) => {
       const pixels = async (base64: string) => {
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
         const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
@@ -153,11 +157,13 @@ async function compare(
         ctx.drawImage(bitmap, 0, 0)
         return ctx.getImageData(0, 0, bitmap.width, bitmap.height)
       }
-      const [inkedImage, bareImage, maskImage] = await Promise.all([
+      const [inkedImage, bareImage, maskImage, ownImage] = await Promise.all([
         pixels(a),
         pixels(b),
         m ? pixels(m) : Promise.resolve(null),
+        o ? pixels(o) : Promise.resolve(null),
       ])
+      const ownPx = ownImage?.data ?? null
       const inkedPx = inkedImage.data
       const barePx = bareImage.data
       const maskPx = maskImage?.data ?? null
@@ -220,7 +226,13 @@ async function compare(
       const appearance = () =>
         x
           ? {
-              qualifying: changedPairs.filter(([u, i]) => contrast(u, i) >= 3).length,
+              // A sample counts when focus changes it at 3:1 and the target's own indicator is
+              // what changed it: it reverts with the target's outline and shadow switched off
+              // (`own`). A strip elsewhere that repaints on focus is no ring (Codex check 4).
+              qualifying: changedPairs.filter(
+                ([u, i, pixel]) =>
+                  contrast(u, i) >= 3 && (!ownPx || differs(ownPx, inkedPx, pixel * 4))
+              ).length,
               // Twice the control's perimeter, corners rounded by its border radius.
               required: Math.ceil(
                 2 *
@@ -285,9 +297,13 @@ async function compare(
           Math.round(Math.log(under + 0.05) / Math.log(1.01))
         const exactKeys = new Set<number>()
         const rated: Rated[] = []
+        // Rated by its strongest stem against every background in it, the worst counting: the
+        // stem stands for the ink the whole region carries, and no background in the region can
+        // pass on a neighbour's behalf (Codex check 4: #747474 at 4.49 beside #757474 at 4.51
+        // read 4.51 when the region took its best local ratio).
         for (const group of groupBy(glyphs, region))
           if (group.count >= floor) {
-            rated.push({ value: group.strongest, group, kind: 'exact' })
+            rated.push({ value: worstOf(group), group, kind: 'exact' })
             exactKeys.add(region(group.unders[0]!))
           }
         const remainder = glyphs.filter(([under]) => !exactKeys.has(region(under)))
@@ -366,7 +382,7 @@ async function compare(
         ...appearance(),
       }
     },
-    { a: inked, b: bare, m: mask ?? null, w: withShots, x: exclude }
+    { a: inked, b: bare, m: mask ?? null, w: withShots, x: exclude, o: own ?? null }
   )
   const { diffPng, ...ink } = result
   return diffPng ? { ...ink, shots: { bare, inked, diff: diffPng } } : ink
@@ -473,9 +489,12 @@ async function takeShots(
   page: Page,
   clip: Clip,
   states: States,
-  exclude: Exclude | null = null
+  exclusionAtBare: () => Promise<Exclude | null> = () => Promise.resolve(null)
 ): Promise<Ink> {
   await states.bare()
+  // The excluded border box is read in the bare state, the one the shots compare from: a blur
+  // that moves the target would otherwise leave the exclusion where it was (Codex check 4).
+  const exclude = await exclusionAtBare()
   const bare = await shot(page, clip)
   await states.inked()
   const inked = await shot(page, clip)
@@ -484,8 +503,13 @@ async function takeShots(
     await states.mask()
     mask = await shot(page, clip)
   }
+  let own: string | undefined
+  if (states.outsideOnly) {
+    await setInkStyle(page, INDICATOR_OFF)
+    own = await shot(page, clip)
+  }
   await setInkStyle(page, '')
-  return compare(page, bare, inked, mask, states.withShots, exclude)
+  return compare(page, bare, inked, mask, states.withShots, exclude, own)
 }
 
 /**
@@ -511,23 +535,34 @@ async function measure(
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
       if (states.withShots) await settle(page)
-      const box = states.outsideOnly ? await handle.boundingBox() : null
-      const radius = box
-        ? await handle.evaluate(
-            (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+      const exclusionAtBare = async (): Promise<Exclude | null> => {
+        if (!states.outsideOnly) return null
+        const box = await handle.boundingBox()
+        if (!box) throw new Error('painted-contrast: the focus ring target has no box')
+        // The ring is read inside the clip taken before the bare state; a target that left it
+        // there cannot be measured.
+        if (
+          box.x < clip.x ||
+          box.y < clip.y ||
+          box.x + box.width > clip.x + clip.width ||
+          box.y + box.height > clip.y + clip.height
+        )
+          throw new Error(
+            'painted-contrast: the focus ring target moved out of its clip when it lost focus'
           )
-        : 0
-      const exclude = box
-        ? {
-            x: box.x - clip.x,
-            y: box.y - clip.y,
-            width: box.width,
-            height: box.height,
-            clipWidth: clip.width,
-            radius,
-          }
-        : null
-      const ink = await takeShots(page, clip, states, exclude)
+        const radius = await handle.evaluate(
+          (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+        )
+        return {
+          x: box.x - clip.x,
+          y: box.y - clip.y,
+          width: box.width,
+          height: box.height,
+          clipWidth: clip.width,
+          radius,
+        }
+      }
+      const ink = await takeShots(page, clip, states, exclusionAtBare)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
         MARK
@@ -725,18 +760,36 @@ function enumerate(root: Locator): Promise<Target[]> {
     // Each branch is a complete clip as CSS applies it (Codex check 3): `clip` acts only on an
     // absolutely or fixed positioned box; the 1 px box clips on both axes and is 1 px or less
     // both ways, so nothing of the text inside it can show.
+    // An ancestor's overflow clips only what is laid out inside it: an absolutely positioned box
+    // escapes every ancestor below its containing block, and a fixed one escapes them all, so a
+    // 1 px wrapper below that block hides nothing of it (Codex check 4).
+    // A clip that hides everything the node paints, its descendants included.
+    const clipsAll = (style: CSSStyleDeclaration) =>
+      (['absolute', 'fixed'].includes(style.position) &&
+        /^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip)) ||
+      /^inset\(50%\)$/.test(style.clipPath)
+    // A box 1 px or less both ways that clips both axes: nothing laid out inside it shows.
+    const onePixelClip = (node: Element, style: CSSStyleDeclaration) => {
+      if (!['hidden', 'clip'].includes(style.overflowX)) return false
+      if (!['hidden', 'clip'].includes(style.overflowY)) return false
+      const own = node.getBoundingClientRect()
+      return own.width <= 1 && own.height <= 1
+    }
+    // Where a positioned box's layout escapes to: its containing block, or the page when fixed.
+    const containingBlock = (node: Element, style: CSSStyleDeclaration) => {
+      if (style.position === 'fixed') return 'all' as const
+      if (style.position === 'absolute')
+        return (node as HTMLElement).offsetParent ?? 'all'
+      return null
+    }
     const clippedAway = (el: Element) => {
+      let escapeTo: Element | 'all' | null = null
       for (let node: Element | null = el; node; node = node.parentElement) {
         const style = getComputedStyle(node)
-        const positioned = style.position === 'absolute' || style.position === 'fixed'
-        if (positioned && /^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip))
-          return true
-        if (/^inset\(50%\)$/.test(style.clipPath)) return true
-        const clipsBoth =
-          ['hidden', 'clip'].includes(style.overflowX) &&
-          ['hidden', 'clip'].includes(style.overflowY)
-        const own = node.getBoundingClientRect()
-        if (clipsBoth && own.width <= 1 && own.height <= 1) return true
+        if (clipsAll(style)) return true
+        if (node === escapeTo) escapeTo = null
+        if ((escapeTo === null || node === el) && onePixelClip(node, style)) return true
+        escapeTo ??= containingBlock(node, style)
       }
       return false
     }

@@ -62,6 +62,42 @@ test.describe('painted-contrast probe @local-lane', () => {
     expect(await failingTexts(page)).toEqual(['Clip ignored here.'])
   })
 
+  // Codex check 4: a positioned child escapes the overflow of a wrapper below its containing
+  // block, so a 1 px wrapper hides nothing of it.
+  test('[P1] [7.9-PROBE-001f] an absolutely positioned child escapes a 1 px wrapper below its containing block and is measured', async ({
+    page,
+  }) => {
+    await page.setContent(
+      PAGE(
+        '<section data-testid="probe-root" style="height:120px"><div style="width:1px;height:1px;overflow:hidden"><span class="faint" style="position:absolute;left:24px;top:60px;white-space:nowrap">Escapes the wrapper.</span></div><span>City Spotlight</span></section>'
+      )
+    )
+    expect(await failingTexts(page)).toEqual(['Escapes the wrapper.'])
+  })
+
+  // Codex check 4: one run over two backgrounds 1% apart, one failing by a hair; the failing one
+  // decides at both floors.
+  for (const [id, label, size, left, right, floor] of [
+    ['7.9-PROBE-010a', 'normal text at 4.5:1', '16px', '#747474', '#757474', 4.5],
+    ['7.9-PROBE-010b', 'large text at 3:1', '24px', '#595959', '#59595a', 3],
+  ] as const) {
+    test(`[P1] [${id}] ${label}: a background just under the floor fails beside one just over it`, async ({
+      page,
+    }) => {
+      await page.setContent(
+        PAGE(
+          `<section data-testid="probe-root"><p style="font-size:${size};font-weight:700;color:#000000;background:linear-gradient(90deg, ${left} 50%, ${right} 50%);padding:8px 0;margin:0">HHHHHHHHHHHH MMMMMMMMMMMM</p></section>`
+        )
+      )
+      const failures = await textContrastFailures(root(page))
+      expect(failures.map((failure) => failure.text)).toEqual([
+        'HHHHHHHHHHHH MMMMMMMMMMMM',
+      ])
+      expect(failures[0]!.required).toBe(floor)
+      expect(failures[0]!.ratio).toBeLessThan(floor)
+    })
+  }
+
   test('[P1] [7.9-PROBE-002] text painted over by an opaque layer is still refused as covered', async ({
     page,
   }) => {
@@ -140,5 +176,33 @@ test.describe('painted-contrast probe @local-lane', () => {
         '<div class="band"></div>'
       )
     ).rejects.toThrow(/covered by div/)
+  })
+
+  // Codex check 4: a strip inside the clip margin that repaints when the button takes focus
+  // changes 640 samples at 21:1, more than the button's 517, while the button shows no ring.
+  test('[P1] [7.9-PROBE-008] paint elsewhere that changes on focus is not the control ring', async ({
+    page,
+  }) => {
+    const result = await ring(
+      page,
+      `.strip { position: absolute; left: 48px; top: 32px; width: 80px; height: 8px; background: #ffffff; }
+      body:has(button:focus-visible) .strip { background: #000000; }`,
+      '<div class="strip"></div>'
+    )
+    expect(result!.qualifying).toBeLessThan(result!.required!)
+  })
+
+  // Codex check 4: a blur that moves the control leaves the exclusion where the bare shot sees
+  // it; focus repainting the control's own fill is no ring either.
+  test('[P1] [7.9-PROBE-009] a control moved on blur that only repaints its own fill falls short', async ({
+    page,
+  }) => {
+    const result = await ring(
+      page,
+      `button.moved { transform: translateX(9px); }
+      button:focus-visible { background: #000000; color: #ffffff; }`,
+      "<script>document.querySelector('button').addEventListener('blur', (event) => event.target.classList.add('moved'))</script>"
+    )
+    expect(result!.qualifying).toBeLessThan(result!.required!)
   })
 })
