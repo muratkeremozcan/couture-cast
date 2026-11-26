@@ -381,7 +381,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
               key={occasion}
               onPress={() => setOccasionFilter(occasion)}
               accessibilityRole="radio"
-              accessibilityState={{ selected }}
+              aria-checked={selected}
               accessibilityLabel={
                 occasion === 'all'
                   ? t('wardrobe.capsules.filterAll')
@@ -411,7 +411,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
         <Pressable
           onPress={() => setFavoriteOnly((value) => !value)}
           accessibilityRole="checkbox"
-          accessibilityState={{ checked: favoriteOnly }}
+          aria-checked={favoriteOnly}
           accessibilityLabel={t('wardrobe.capsules.filterFavorites')}
           style={[
             styles.filterChip,
@@ -473,7 +473,10 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
                 <Pressable
                   onPress={() => void handleToggleFavorite(capsule)}
                   accessibilityRole="button"
+                  // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+                  // so the web side uses aria-pressed.
                   accessibilityState={{ selected: capsule.isFavorite }}
+                  aria-pressed={capsule.isFavorite}
                   accessibilityLabel={`${t('wardrobe.capsules.favoriteLabel')}: ${capsule.name}`}
                   style={styles.iconButton}
                   testID={`favorite-button-${capsule.id}`}

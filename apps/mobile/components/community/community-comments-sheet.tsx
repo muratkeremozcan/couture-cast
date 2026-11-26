@@ -223,7 +223,7 @@ export function CommunityCommentsSheet({
     <TouchableOpacity
       accessibilityRole="button"
       accessibilityLabel={accessibleLabel}
-      accessibilityState={{ disabled }}
+      aria-disabled={disabled}
       disabled={disabled}
       testID={testID}
       onPress={action}
@@ -368,7 +368,6 @@ export function CommunityCommentsSheet({
               <TouchableOpacity
                 key={option}
                 accessibilityRole="radio"
-                accessibilityState={{ checked: reason === option }}
                 aria-checked={reason === option}
                 accessibilityLabel={t(`community.report.reason.${option}`)}
                 style={[

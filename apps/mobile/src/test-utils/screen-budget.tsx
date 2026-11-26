@@ -252,19 +252,24 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
         continue
       }
       const churn = new WeakSet<Node>()
+      const childChurn = new WeakSet<Node>()
       const after: Node[] = []
       let pressed = false
       const observer = new MutationObserver((records) => {
         for (const record of records) {
-          // Inserted nodes are new, so a parent that also changes on its own cannot hide them.
-          const nodes =
-            record.type === 'childList' && record.addedNodes.length
-              ? Array.from(record.addedNodes)
-              : [record.target]
-          for (const node of nodes) {
-            if (pressed) after.push(node)
-            else churn.add(node)
+          const list = record.type === 'childList'
+          // Churn is kept per kind, as on web: children that change on their own hide later
+          // child changes there; attributes that change on their own do not hide an insert.
+          if (!pressed) {
+            ;(list ? childChurn : churn).add(record.target)
+            continue
           }
+          if (list ? childChurn.has(record.target) : churn.has(record.target)) continue
+          after.push(
+            ...(list && record.addedNodes.length
+              ? Array.from(record.addedNodes)
+              : [record.target])
+          )
         }
       })
       observer.observe(document.body, {

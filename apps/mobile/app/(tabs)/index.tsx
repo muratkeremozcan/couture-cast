@@ -199,7 +199,7 @@ function InvalidDeepLinkBanner({
  * every `default-*` placeholder a user with an empty wardrobe sees, which is
  * every new account -- was absent from its own swap modal. The modal declares
  * `accessibilityRole="radiogroup"` and marks the worn option
- * `accessibilityState.selected`, so in that state it rendered a radiogroup with
+ * `aria-checked`, so in that state it rendered a radiogroup with
  * no selected radio at all: a screen-reader user was offered five alternatives
  * with nothing indicating which one they are wearing now, and no way to return
  * to it once they moved off.
@@ -1307,7 +1307,7 @@ export default function TabOneScreen() {
                         testID={`swap-option-${option}`}
                         accessibilityRole="radio"
                         accessibilityLabel={optionTitle}
-                        accessibilityState={{ selected: isCurrent }}
+                        aria-checked={isCurrent}
                       >
                         <Text
                           style={[

@@ -355,7 +355,7 @@ export function CommunitySpotlightModule({
           disabled={isReplacing}
           accessibilityRole="button"
           accessibilityLabel={t('community.spotlight.viewMore')}
-          accessibilityState={{ disabled: isReplacing }}
+          aria-disabled={isReplacing}
         >
           <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
             {t('community.spotlight.viewMore')}

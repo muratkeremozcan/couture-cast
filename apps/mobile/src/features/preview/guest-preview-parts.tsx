@@ -127,7 +127,12 @@ export function PreviewButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled, expanded, selected }}
+      aria-disabled={disabled}
+      aria-expanded={expanded}
+      // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+      // so the web side uses aria-pressed.
+      accessibilityState={{ selected }}
+      aria-pressed={selected}
       disabled={disabled}
       onPress={onPress}
       style={[
@@ -179,7 +184,7 @@ export function ChoiceGroup<T extends string>({
               key={option.value}
               testID={`${testID}-${option.value}`}
               accessibilityRole="radio"
-              accessibilityState={{ checked }}
+              aria-checked={checked}
               onPress={() => onChange(option.value)}
               style={[
                 styles.chip,
@@ -620,7 +625,10 @@ export function PreviewFeedback({
                     testID={`guest-preview-vote-${choice}-${card.id.slice('sample:l:'.length)}`}
                     accessibilityRole="button"
                     accessibilityLabel={`${choice === 'like' ? strings.feedback.like : strings.feedback.dislike}: ${text.name}`}
+                    // ARIA allows aria-selected only on option/tab/row/gridcell/treeitem,
+                    // so the web side uses aria-pressed.
                     accessibilityState={{ selected }}
+                    aria-pressed={selected}
                     onPress={() => onVote(card.id, choice)}
                     style={[
                       styles.voteButton,
@@ -942,7 +950,7 @@ export function PreviewSwapSheet({
                 key={garment.id}
                 testID={`guest-preview-swap-option-${garment.id.slice('sample:g:'.length)}`}
                 accessibilityRole="radio"
-                accessibilityState={{ checked }}
+                aria-checked={checked}
                 accessibilityLabel={
                   checked ? `${text.name} (${strings.outfit.current})` : text.name
                 }

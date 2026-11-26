@@ -12,7 +12,10 @@
   },
   "limitDecisions": [],
   "measure": {
-    "viewport": { "width": 390, "height": 844 },
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
     "minCardSizePx": 64
   },
   "platforms": ["web", "native"],
@@ -58,11 +61,361 @@
     }
   },
   "analyticsRequests": [
-    { "sameOrigin": true, "path": "/ingest/**" },
-    { "host": "*.posthog.com" },
-    { "path": "**/v1/traces" },
-    { "path": "**/v1/logs" },
-    { "path": "**/v1/metrics" }
+    {
+      "sameOrigin": true,
+      "path": "/ingest/**"
+    },
+    {
+      "host": "*.posthog.com"
+    },
+    {
+      "path": "**/v1/traces"
+    },
+    {
+      "path": "**/v1/logs"
+    },
+    {
+      "path": "**/v1/metrics"
+    }
   ],
-  "known": []
+  "known": [
+    {
+      "platform": "native",
+      "screen": "closet",
+      "fixture": "empty",
+      "rule": "closet-chrome",
+      "value": 453,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "closet",
+      "fixture": "guardian-pending",
+      "rule": "closet-chrome",
+      "value": 453,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "closet",
+      "fixture": "populated",
+      "rule": "closet-chrome",
+      "value": 334,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "community",
+      "fixture": "empty",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["community-filters-explainer"],
+      "story": "7.15",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "community",
+      "fixture": "guardian-pending",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["community-filters-explainer"],
+      "story": "7.15",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "community",
+      "fixture": "populated",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["community-filters-explainer"],
+      "story": "7.15",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "empty",
+      "rule": "paragraph-lines",
+      "value": 3,
+      "elements": [
+        "commerce-settings-disclosure",
+        "premium-settings-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "empty",
+      "rule": "targets-above-fold",
+      "value": 13,
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "guardian-pending",
+      "rule": "paragraph-lines",
+      "value": 3,
+      "elements": [
+        "commerce-settings-disclosure",
+        "premium-settings-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "guardian-pending",
+      "rule": "targets-above-fold",
+      "value": 13,
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "populated",
+      "rule": "paragraph-lines",
+      "value": 3,
+      "elements": [
+        "commerce-settings-disclosure",
+        "premium-settings-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "profile",
+      "fixture": "populated",
+      "rule": "targets-above-fold",
+      "value": 13,
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "today",
+      "fixture": "empty",
+      "rule": "targets-above-fold",
+      "value": 9,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "today",
+      "fixture": "guardian-pending",
+      "rule": "targets-above-fold",
+      "value": 9,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "native",
+      "screen": "today",
+      "fixture": "populated",
+      "rule": "targets-above-fold",
+      "value": 11,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "closet",
+      "fixture": "empty",
+      "rule": "closet-chrome",
+      "value": 476,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "closet",
+      "fixture": "guardian-pending",
+      "rule": "closet-chrome",
+      "value": 476,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "closet",
+      "fixture": "populated",
+      "rule": "closet-chrome",
+      "value": 390,
+      "story": "7.11",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "profile",
+      "fixture": "empty",
+      "rule": "paragraph-lines",
+      "value": 4,
+      "elements": [
+        "commerce-disclosure",
+        "p \"Subscribe to Premium with the controls a\"",
+        "premium-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "profile",
+      "fixture": "guardian-pending",
+      "rule": "paragraph-lines",
+      "value": 4,
+      "elements": [
+        "commerce-disclosure",
+        "p \"Subscribe to Premium with the controls a\"",
+        "premium-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "profile",
+      "fixture": "populated",
+      "rule": "paragraph-lines",
+      "value": 3,
+      "elements": [
+        "commerce-disclosure",
+        "premium-disclosure",
+        "premium-theme-disclosure"
+      ],
+      "story": "7.16",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "empty",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["p \"CoutureCast blends hyperlocal weather, y\""],
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "empty",
+      "rule": "targets-above-fold",
+      "value": 9,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "empty",
+      "rule": "today-height",
+      "value": 3384,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "guardian-pending",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["p \"CoutureCast blends hyperlocal weather, y\""],
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "guardian-pending",
+      "rule": "targets-above-fold",
+      "value": 9,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "guardian-pending",
+      "rule": "today-height",
+      "value": 4247,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "populated",
+      "rule": "paragraph-lines",
+      "value": 1,
+      "elements": ["p \"CoutureCast blends hyperlocal weather, y\""],
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "populated",
+      "rule": "targets-above-fold",
+      "value": 9,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    },
+    {
+      "platform": "web",
+      "screen": "today",
+      "fixture": "populated",
+      "rule": "today-height",
+      "value": 3406,
+      "story": "7.13",
+      "decision": "D-KNOWN-7.10",
+      "decidedIn": "7.10"
+    }
+  ]
 }

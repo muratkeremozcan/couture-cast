@@ -46,7 +46,7 @@ export function ScenarioToggles({
               ]}
               testID={`scenario-toggle-${tab.key}`}
               accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
+              aria-selected={isActive}
             >
               <Text
                 numberOfLines={1}

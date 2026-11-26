@@ -185,7 +185,7 @@ function CommunityCardActions({
       testID={`community-card-report-${item.id}`}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: isReported }}
+      aria-disabled={isReported}
       disabled={isReported}
       style={({ pressed }) => [
         styles.secondaryButton,

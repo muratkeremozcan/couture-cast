@@ -691,10 +691,14 @@ export function registerCommunityFeedCases() {
       expect(chip.getAttribute('aria-disabled')).not.toBe('true')
     }
 
-    // `accessibilityState` is native-only and react-native-web drops it, so the
-    // active chip is identified here by its non-colour cue. The announced
-    // selection itself is asserted in `components/community/community-filter-chips.test.tsx`.
+    // The active chip carries aria-pressed in the DOM (Story CC-7.10) and a non-colour cue; the
+    // native selection itself is asserted in `components/community/community-filter-chips.test.tsx`.
     const autoChip = screen.getByTestId('community-filter-chip-auto')
+    expect(autoChip).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('community-filter-chip-all')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
     expect(autoChip.style.borderWidth).toBe('2px')
     // The resolved band rides on the `auto` chip's own label.
     expect(autoChip.textContent).toBe('Your climate: Temperate and dry')

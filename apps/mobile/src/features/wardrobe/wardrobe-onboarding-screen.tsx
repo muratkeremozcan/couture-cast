@@ -387,7 +387,7 @@ export function WardrobeOnboardingScreen() {
           {garments.length > 0 ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: !canContinueFromCapture || isAdvancing }}
+              aria-disabled={!canContinueFromCapture || isAdvancing}
               disabled={!canContinueFromCapture || isAdvancing}
               testID="onboarding-continue"
               style={[

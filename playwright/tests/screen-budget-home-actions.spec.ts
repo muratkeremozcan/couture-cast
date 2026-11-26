@@ -54,6 +54,10 @@ function knownForChunk(
 }
 
 test.describe('CC-7.10 Today controls with an effect @local-lane', () => {
+  // The verdict is deterministic (CI a45f15a1: identical values on all three attempts), so a
+  // retry cannot change it and only triples a red run: a budget failure fails once.
+  test.describe.configure({ retries: 0 })
+
   BUDGET_FIXTURES.forEach((fixture, fixtureIndex) => {
     const testId = `7.10-E2E-0${20 + fixtureIndex}`
     for (let chunk = 0; chunk < PROBE_CHUNKS; chunk += 1) {

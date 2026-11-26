@@ -201,7 +201,7 @@ export function CommunityPostTextEditor({
           ref={opener}
           accessibilityRole="button"
           disabled={!active}
-          accessibilityState={{ disabled: !active }}
+          aria-disabled={!active}
           testID="community-edit-text"
           style={[
             styles.opener,

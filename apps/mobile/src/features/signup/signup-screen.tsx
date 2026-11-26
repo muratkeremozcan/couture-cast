@@ -256,7 +256,7 @@ export function SignupScreen({
               <Pressable
                 accessibilityRole="radio"
                 accessibilityLabel={strings.readOnlyConsent}
-                accessibilityState={{ selected: consentLevel === 'read_only' }}
+                aria-checked={consentLevel === 'read_only'}
                 onPress={() => setConsentLevel('read_only')}
                 style={[
                   styles.segmentButton,
@@ -268,7 +268,7 @@ export function SignupScreen({
               <Pressable
                 accessibilityRole="radio"
                 accessibilityLabel={strings.fullAccessConsent}
-                accessibilityState={{ selected: consentLevel === 'full_access' }}
+                aria-checked={consentLevel === 'full_access'}
                 onPress={() => setConsentLevel('full_access')}
                 style={[
                   styles.segmentButton,

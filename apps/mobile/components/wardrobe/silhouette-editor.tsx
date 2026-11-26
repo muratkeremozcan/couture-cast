@@ -138,7 +138,7 @@ function SliderRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${label} -`}
-          accessibilityState={{ disabled: disabled || atMin }}
+          aria-disabled={disabled || atMin}
           disabled={disabled || atMin}
           testID={`${testIdPrefix}-decrement`}
           style={[
@@ -156,7 +156,7 @@ function SliderRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`${label} +`}
-          accessibilityState={{ disabled: disabled || atMax }}
+          aria-disabled={disabled || atMax}
           disabled={disabled || atMax}
           testID={`${testIdPrefix}-increment`}
           style={[
@@ -702,7 +702,7 @@ export function SilhouetteEditor({
       <View accessibilityRole="tablist" style={styles.tabRow}>
         <Pressable
           accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'default_mannequin' }}
+          aria-selected={activeTab === 'default_mannequin'}
           testID="silhouette-tab-default"
           style={[
             styles.tabButton,
@@ -721,7 +721,7 @@ export function SilhouetteEditor({
         </Pressable>
         <Pressable
           accessibilityRole="tab"
-          accessibilityState={{ selected: activeTab === 'my_form' }}
+          aria-selected={activeTab === 'my_form'}
           testID="silhouette-tab-my-form"
           style={[
             styles.tabButton,
@@ -795,7 +795,7 @@ export function SilhouetteEditor({
             <View style={styles.row}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ disabled: !guidanceConfirmed }}
+                aria-disabled={!guidanceConfirmed}
                 disabled={!guidanceConfirmed}
                 testID="silhouette-my-form-camera"
                 style={[
@@ -811,7 +811,7 @@ export function SilhouetteEditor({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                accessibilityState={{ disabled: !guidanceConfirmed }}
+                aria-disabled={!guidanceConfirmed}
                 disabled={!guidanceConfirmed}
                 testID="silhouette-my-form-library"
                 style={[
@@ -829,7 +829,7 @@ export function SilhouetteEditor({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Use deterministic My Form fixture"
-                  accessibilityState={{ disabled: !guidanceConfirmed }}
+                  aria-disabled={!guidanceConfirmed}
                   disabled={!guidanceConfirmed}
                   testID="silhouette-my-form-fixture-source"
                   style={[

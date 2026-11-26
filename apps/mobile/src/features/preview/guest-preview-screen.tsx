@@ -272,7 +272,7 @@ export function GuestPreviewScreen() {
               key={tab.view}
               testID={`guest-preview-nav-${tab.view}`}
               accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              aria-selected={selected}
               onPress={() => navigate(tab.view)}
               style={[
                 previewStyles.tab,

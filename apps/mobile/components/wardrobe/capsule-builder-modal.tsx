@@ -373,7 +373,7 @@ export function MobileCapsuleBuilderModal({
                     key={occ}
                     onPress={() => toggleOccasion(occ)}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isSelected }}
+                    aria-checked={isSelected}
                     accessibilityLabel={t(`wardrobe.capsules.occasions.${occ}`)}
                     style={[styles.chip, isSelected && styles.chipSelected]}
                     testID={`occasion-chip-${occ}`}
@@ -410,7 +410,7 @@ export function MobileCapsuleBuilderModal({
                     key={g.id}
                     onPress={() => toggleGarment(g.id)}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isSelected }}
+                    aria-checked={isSelected}
                     accessibilityLabel={garmentChoiceLabel(locale, g)}
                     style={styles.garmentRow}
                     testID={`garment-checkbox-${g.id}`}
@@ -459,7 +459,7 @@ export function MobileCapsuleBuilderModal({
                           disabled={isFirst}
                           accessibilityRole="button"
                           /** Announced as disabled so the boundary is perceivable. */
-                          accessibilityState={{ disabled: isFirst }}
+                          aria-disabled={isFirst}
                           accessibilityLabel={t('wardrobe.capsules.moveGarmentUp', {
                             garment: label,
                           })}
@@ -476,7 +476,7 @@ export function MobileCapsuleBuilderModal({
                           onPress={() => moveGarment(idx, 'down')}
                           disabled={isLast}
                           accessibilityRole="button"
-                          accessibilityState={{ disabled: isLast }}
+                          aria-disabled={isLast}
                           accessibilityLabel={t('wardrobe.capsules.moveGarmentDown', {
                             garment: label,
                           })}
@@ -495,7 +495,7 @@ export function MobileCapsuleBuilderModal({
             <TouchableOpacity
               onPress={() => setIsFavorite(!isFavorite)}
               accessibilityRole="checkbox"
-              accessibilityState={{ checked: isFavorite }}
+              aria-checked={isFavorite}
               accessibilityLabel={t('wardrobe.capsules.favoriteLabel')}
               style={styles.favoriteRow}
               testID="favorite-toggle"

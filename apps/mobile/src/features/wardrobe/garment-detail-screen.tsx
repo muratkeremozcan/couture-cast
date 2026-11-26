@@ -969,10 +969,8 @@ function GarmentTagPanel({
             <Pressable
               key={option.value}
               accessibilityRole="radio"
-              accessibilityState={{ checked: pressed, disabled: saving }}
-              // Without this the web target renders a radio with no checked state
-              // (community-post-sheet.tsx precedent).
               aria-checked={pressed}
+              aria-disabled={saving}
               disabled={saving}
               testID={`garment-tag-option-${name}-${option.value}`}
               onPress={() => onSelect(option.value)}
@@ -1065,7 +1063,8 @@ function GarmentTagPanel({
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ busy: saving, disabled: doneBlocked }}
+              aria-busy={saving}
+              aria-disabled={doneBlocked}
               disabled={doneBlocked}
               testID="garment-tag-done"
               onPress={() => void editor.handleDone()}
@@ -1097,7 +1096,7 @@ function GarmentTagPanel({
           <View style={styles.actions}>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: editDisabled }}
+              aria-disabled={editDisabled}
               disabled={editDisabled}
               testID="garment-edit-tags"
               onPress={editor.openEditor}
@@ -1110,11 +1109,9 @@ function GarmentTagPanel({
             {styleEntry}
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{
-                busy: remover.phase.kind === 'checking',
-                disabled: deleteBusy,
-                expanded: remover.phase.kind === 'confirm',
-              }}
+              aria-busy={remover.phase.kind === 'checking'}
+              aria-disabled={deleteBusy}
+              aria-expanded={remover.phase.kind === 'confirm'}
               disabled={deleteBusy}
               testID="garment-delete"
               onPress={remover.startDelete}

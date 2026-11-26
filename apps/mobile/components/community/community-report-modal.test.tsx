@@ -220,10 +220,12 @@ describe('CommunityReportModal (Story 6.1)', () => {
     for (const reason of communityReportReasonSchema.options) {
       const option = screen.getByTestId(`report-reason-${reason}`)
       expect(option.getAttribute('aria-label')).toBe(enUS.community.report.reason[reason])
+      // Story CC-7.10: a radio carries aria-checked (ARIA allows no aria-selected on it).
       expect(touchableSpy.props.get(`report-reason-${reason}`)).toMatchObject({
         accessibilityRole: 'radio',
-        accessibilityState: { selected: false, checked: false },
       })
+      expect(option).toHaveAttribute('aria-checked', 'false')
+      expect(option).not.toHaveAttribute('aria-selected')
       // Shape, not colour: an unselected option carries no check mark.
       expect(option.textContent).not.toContain('✓')
     }
@@ -231,9 +233,10 @@ describe('CommunityReportModal (Story 6.1)', () => {
     press(screen.getByTestId('report-reason-hate_speech'))
 
     expect(screen.getByTestId('report-reason-hate_speech').textContent).toContain('✓')
-    expect(touchableSpy.props.get('report-reason-hate_speech')).toMatchObject({
-      accessibilityState: { selected: true, checked: true },
-    })
+    expect(screen.getByTestId('report-reason-hate_speech')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
     expect(screen.getByTestId('report-reason-spam').textContent).not.toContain('✓')
   })
 
@@ -456,11 +459,10 @@ describe('R66 CommunityReportModal with the keyboard up', () => {
     act(() => keyboard.emit('keyboardDidHide'))
     expect(reasons()).toBeVisible()
     // The chosen reason survived the round trip.
-    expect(
-      touchableSpy.props.get('report-reason-spam')?.accessibilityState
-    ).toMatchObject({
-      checked: true,
-    })
+    expect(screen.getByTestId('report-reason-spam')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
   })
 
   it('keeps the reasons when the keyboard rises for another reason than the details', async () => {

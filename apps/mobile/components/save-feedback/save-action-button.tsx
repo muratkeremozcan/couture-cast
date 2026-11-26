@@ -838,7 +838,8 @@ export function SaveActionButton({
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
-        accessibilityState={{ disabled: disabled || busy, busy }}
+        aria-disabled={disabled || busy}
+        aria-busy={busy}
         disabled={disabled}
         style={[
           styles.button,

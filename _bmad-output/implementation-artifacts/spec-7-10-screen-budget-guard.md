@@ -250,6 +250,13 @@ known)`; `packages/utils/src/screen-budget.json` (new) -- D5; export both from t
   `aria-selected` and options count only as pills, so a segment control is not a chip row;
   switches and checkboxes never are chips. A row counts the chips on its first member's visual
   line. Web Community's underline filter row now reads one chip row, as native does.
+- 2026-11-26, TEA round 3: react-native-web drops `accessibilityState`, so native selection was
+  invisible in the DOM and selected toggles read as analytics-only. Native product code moves
+  to the ARIA props React Native supports (`aria-disabled`, `aria-checked`, `aria-expanded`,
+  `aria-busy`, `aria-selected` on tabs only); radios carry `aria-checked`; buttons with a
+  selected state keep `accessibilityState.selected` for native plus `aria-pressed` for the DOM
+  (the filter-chips pattern), since ARIA forbids `aria-selected` on buttons and radios.
+  `share-card-composer.tsx` is left as is: its blob SHA is pinned by the Story 6.9 iPad proof.
 
 ## Screen budget decisions
 

@@ -6,8 +6,7 @@
 // search, and switches primary in one tap, renames and deletes in place. Every
 // target is at least 44 points. Outcomes and search, save and list-action
 // errors are announced once through the shared announcer; only the list load
-// error uses the alert role. Busy actions set `aria-busy` beside
-// `accessibilityState.busy`, which react-native-web 0.21 no longer renders.
+// error uses the alert role. Busy actions set `aria-busy`.
 // Opened from a guided entry, a save returns to the originating screen, which
 // reloads on `onLocationsChanged`. Use my location asks for permission only
 // when tapped, rounds the position to two decimals and offers the cities the
@@ -638,7 +637,6 @@ function MemberLocationsScreen({
                   />
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ busy: busyId === location.id }}
                     aria-busy={busyId === location.id}
                     onPress={() => {
                       const next = renameValue.trim()
@@ -677,7 +675,6 @@ function MemberLocationsScreen({
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ busy: busyId === location.id }}
                     aria-busy={busyId === location.id}
                     onPress={() => {
                       void runListAction(
@@ -714,7 +711,6 @@ function MemberLocationsScreen({
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`${t('locations.makePrimary')}, ${location.label}`}
-                      accessibilityState={{ busy: busyId === location.id }}
                       aria-busy={busyId === location.id}
                       onPress={() => {
                         void runListAction(
@@ -843,7 +839,6 @@ function MemberLocationsScreen({
                   />
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityState={{ busy: isSaving }}
                     aria-busy={isSaving}
                     onPress={() => {
                       void save()
@@ -925,7 +920,6 @@ function UseMyLocationButton({
       accessibilityRole="button"
       accessibilityLabel={t('locations.useMyLocation')}
       accessibilityHint={t('locations.useMyLocationHint')}
-      accessibilityState={{ busy: isLocating }}
       aria-busy={isLocating}
       onPress={onPress}
       style={[

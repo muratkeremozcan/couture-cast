@@ -222,22 +222,24 @@ describe('MobileCapsuleBuilderModal', () => {
   })
 
   /**
-   * The component sets `accessibilityRole="checkbox"` and
-   * `accessibilityState={{ checked }}`, which is what VoiceOver and TalkBack
-   * consume. This suite renders through react-native-web, which maps the role
-   * to the DOM but not the checked state, so the selection is asserted through
-   * the user-visible indicator here and the native state is covered by the
-   * on-device accessibility pass.
+   * The component sets `accessibilityRole="checkbox"` and `aria-checked`, which VoiceOver and
+   * TalkBack read on device and react-native-web renders in the DOM (Story CC-7.10 moved it off
+   * the native-only `accessibilityState`), so both the state and the visible mark are asserted.
    */
   it('4.3-MOB-MODAL-07 exposes garment choices as checkboxes and reflects selection', () => {
     renderModal()
     const checkbox = screen.getByTestId('garment-checkbox-g-1')
 
     expect(checkbox).toHaveAttribute('role', 'checkbox')
+    expect(checkbox).toHaveAttribute('aria-checked', 'false')
     expect(checkbox.textContent ?? '').not.toContain('✓')
 
     fireEvent.click(checkbox)
 
+    expect(screen.getByTestId('garment-checkbox-g-1')).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
     expect(screen.getByTestId('garment-checkbox-g-1').textContent ?? '').toContain('✓')
   })
 

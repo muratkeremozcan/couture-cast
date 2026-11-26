@@ -180,21 +180,28 @@ export async function probeTarget(
   await page.evaluate(async (observeMs) => {
     const state = {
       churn: new WeakSet<Node>(),
+      childChurn: new WeakSet<Node>(),
       after: [] as Node[],
       clicked: false,
     }
     ;(window as unknown as { __budgetProbe: typeof state }).__budgetProbe = state
     new MutationObserver((records) => {
       for (const record of records) {
-        // Inserted nodes are new, so a parent that also changes on its own cannot hide them.
-        const nodes =
-          record.type === 'childList' && record.addedNodes.length
-            ? Array.from(record.addedNodes)
-            : [record.target]
-        for (const node of nodes) {
-          if (state.clicked) state.after.push(node)
-          else state.churn.add(node)
+        const list = record.type === 'childList'
+        // Churn is kept per kind: a parent whose children change on their own (a ticking
+        // clock) hides later child changes; a parent whose attributes change on its own does
+        // not hide a panel inserted into it (CI ffbd7e54: RULE-064 against RULE-068).
+        if (!state.clicked) {
+          ;(list ? state.childChurn : state.churn).add(record.target)
+          continue
         }
+        if (list ? state.childChurn.has(record.target) : state.churn.has(record.target))
+          continue
+        state.after.push(
+          ...(list && record.addedNodes.length
+            ? Array.from(record.addedNodes)
+            : [record.target])
+        )
       }
     }).observe(document, {
       subtree: true,

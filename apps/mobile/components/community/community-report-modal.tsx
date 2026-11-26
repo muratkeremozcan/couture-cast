@@ -147,12 +147,6 @@ export function CommunityReportModal({
                       key={reason}
                       testID={`report-reason-${reason}`}
                       accessibilityRole="radio"
-                      accessibilityState={{ selected: isSelected, checked: isSelected }}
-                      // `accessibilityState` is native-only: react-native-web's
-                      // forwardedProps table has no entry for the object form, so on
-                      // the web target (`app.json` ships one) this radio rendered with
-                      // no `aria-checked` at all and axe failed `aria-required-attr`.
-                      // RN 0.81 accepts the `aria-*` props directly on both platforms.
                       aria-checked={isSelected}
                       accessibilityLabel={label}
                       style={[
@@ -274,9 +268,7 @@ export function CommunityReportModal({
               accessibilityHint={
                 isSubmitDisabled ? t('community.report.reasonLabel') : undefined
               }
-              accessibilityState={{ disabled: isSubmitDisabled, busy: isSubmitting }}
-              // react-native-web 0.21 drops `accessibilityState.busy`; the aria
-              // mirror is what reaches the DOM.
+              aria-disabled={isSubmitDisabled}
               aria-busy={isSubmitting}
               style={[
                 styles.submitButton,

@@ -29,6 +29,10 @@ test.use({
 })
 
 test.describe('CC-7.10 screen budget on web @local-lane', () => {
+  // The verdict is deterministic (CI a45f15a1: identical values on all three attempts), so a
+  // retry cannot change it and only triples a red run: a budget failure fails once.
+  test.describe.configure({ retries: 0 })
+
   let id = 0
   for (const fixture of BUDGET_FIXTURES) {
     for (const screen of BUDGET_SCREENS) {

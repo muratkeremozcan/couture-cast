@@ -111,6 +111,16 @@ describe('CommunityFilterChips (Story 6.1)', () => {
     expect(
       touchableSpy.props.get('community-filter-chip-auto')?.accessibilityState
     ).toEqual({ selected: false })
+    // Story CC-7.10: the same selection reaches the DOM as aria-pressed (a button takes no
+    // aria-selected), which the screen budget probe and assistive tech on web read.
+    expect(screen.getByTestId('community-filter-chip-cold_wet')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByTestId('community-filter-chip-auto')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
 
     // Sighted readers get two non-colour cues as well: a doubled border and a
     // bolder label.

@@ -140,9 +140,6 @@ function ComposeCheckboxRow({
       style={styles.confirmationRow}
       testID={testID}
       accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      // Native-only on its own; see the note in `community-report-modal.tsx`.
-      // Without this the web target rendered a checkbox with no `aria-checked`.
       aria-checked={checked}
       accessibilityLabel={label}
       onPress={onToggle}
@@ -231,7 +228,7 @@ function ComposePhotoSection({
             onPress={onPick}
             disabled={isBusy}
             accessibilityRole="button"
-            accessibilityState={{ disabled: isBusy }}
+            aria-disabled={isBusy}
             accessibilityLabel={t('community.compose.changePhoto')}
           >
             <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
@@ -246,7 +243,7 @@ function ComposePhotoSection({
           onPress={onPick}
           disabled={isBusy}
           accessibilityRole="button"
-          accessibilityState={{ disabled: isBusy }}
+          aria-disabled={isBusy}
           accessibilityLabel={t('community.compose.choosePhoto')}
         >
           <Text style={[styles.pickImageButtonText, { color: palette.ink }]}>
@@ -882,7 +879,8 @@ function DraftDescriptionControl({
       {hasUpload && !hasCaption && (
         <TouchableOpacity
           accessibilityRole="button"
-          accessibilityState={{ disabled, busy: loading }}
+          aria-disabled={disabled}
+          aria-busy={loading}
           testID="community-suggest-description"
           disabled={disabled}
           onPress={onSuggest}
@@ -945,9 +943,7 @@ function ComposeActions({
         accessibilityLabel={t('community.compose.publish')}
         // Why the control is dead, spoken rather than implied by dimming.
         accessibilityHint={blocker ? t(blocker) : undefined}
-        accessibilityState={{ disabled: disabled, busy: busy }}
-        // react-native-web 0.21 drops `accessibilityState.busy`; the aria
-        // mirror is what reaches the DOM.
+        aria-disabled={disabled}
         aria-busy={busy}
       >
         {busy ? (
