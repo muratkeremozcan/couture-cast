@@ -702,7 +702,8 @@
       "loadMore": "Charger plus de looks",
       "loadingMore": "Chargement",
       "yourPostsTitle": "Vos looks en cours",
-      "yourPostsBody": "Vous êtes la seule personne à les voir tant que la vérification n’est pas terminée."
+      "yourPostsBody": "Vous êtes la seule personne à les voir tant que la vérification n’est pas terminée.",
+      "detailTitle": "Look partagé"
     },
     "spotlight": {
       "eyebrow": "Vedettes de la ville",
@@ -836,7 +837,11 @@
       "publishing": "Vérification et publication",
       "uploading": "Téléversement de votre photo",
       "cancel": "Annuler",
-      "success": "Votre look a été soumis pour examen."
+      "success": "Votre look a été soumis pour examen.",
+      "discardTitle": "Abandonner cette publication ?",
+      "discardMessage": "La photo et le texte de cette publication seront perdus.",
+      "discardKeep": "Continuer la modification",
+      "discard": "Abandonner"
     },
     "validation": {
       "photoRequired": "Choisissez une photo à partager.",

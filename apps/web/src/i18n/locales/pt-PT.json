@@ -702,7 +702,8 @@
       "loadMore": "Carregar mais visuais",
       "loadingMore": "A carregar",
       "yourPostsTitle": "Os seus visuais em curso",
-      "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar."
+      "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar.",
+      "detailTitle": "Visual partilhado"
     },
     "spotlight": {
       "eyebrow": "Destaques da cidade",
@@ -836,7 +837,11 @@
       "publishing": "A verificar e a publicar",
       "uploading": "A carregar a sua fotografia",
       "cancel": "Cancelar",
-      "success": "O seu visual foi enviado para análise."
+      "success": "O seu visual foi enviado para análise.",
+      "discardTitle": "Descartar esta publicação?",
+      "discardMessage": "A foto e o texto desta publicação serão perdidos.",
+      "discardKeep": "Continuar a editar",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Escolha uma fotografia para partilhar.",

@@ -702,7 +702,8 @@
       "loadMore": "Daha fazla kombin yükle",
       "loadingMore": "Yükleniyor",
       "yourPostsTitle": "Sürmekte olan kombinlerin",
-      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün."
+      "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün.",
+      "detailTitle": "Paylaşılan kombin"
     },
     "spotlight": {
       "eyebrow": "Şehir Vitrini",
@@ -836,7 +837,11 @@
       "publishing": "İnceleniyor ve yayımlanıyor",
       "uploading": "Fotoğrafın yükleniyor",
       "cancel": "İptal",
-      "success": "Kombinin incelenmek üzere gönderildi."
+      "success": "Kombinin incelenmek üzere gönderildi.",
+      "discardTitle": "Bu gönderiden vazgeçilsin mi?",
+      "discardMessage": "Bu gönderinin fotoğrafı ve metni silinecek.",
+      "discardKeep": "Düzenlemeye devam et",
+      "discard": "Vazgeç"
     },
     "validation": {
       "photoRequired": "Paylaşmak için bir fotoğraf seç.",

@@ -181,10 +181,10 @@
       "screen": "profile",
       "fixture": "empty",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",
@@ -225,10 +225,10 @@
       "screen": "profile",
       "fixture": "guardian-pending",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",
@@ -269,10 +269,10 @@
       "screen": "profile",
       "fixture": "populated",
       "rule": "targets-above-fold",
-      "value": 13,
+      "value": 14,
       "story": "7.16",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
+      "decision": "D-KNOWN-7.11",
+      "decidedIn": "7.11"
     },
     {
       "platform": "native",

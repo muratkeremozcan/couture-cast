@@ -702,7 +702,8 @@
       "loadMore": "Cargar más looks",
       "loadingMore": "Cargando",
       "yourPostsTitle": "Tus looks en proceso",
-      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión."
+      "yourPostsBody": "Solo tú puedes verlos hasta que termine la revisión.",
+      "detailTitle": "Look compartido"
     },
     "spotlight": {
       "eyebrow": "Destacados de la ciudad",
@@ -836,7 +837,11 @@
       "publishing": "Revisando y publicando",
       "uploading": "Subiendo tu foto",
       "cancel": "Cancelar",
-      "success": "Tu look se envió a revisión."
+      "success": "Tu look se envió a revisión.",
+      "discardTitle": "¿Descartar esta publicación?",
+      "discardMessage": "Se perderán la foto y el texto de esta publicación.",
+      "discardKeep": "Seguir editando",
+      "discard": "Descartar"
     },
     "validation": {
       "photoRequired": "Elige una foto para compartir.",

@@ -702,7 +702,8 @@
       "loadMore": "Carica altri look",
       "loadingMore": "Caricamento",
       "yourPostsTitle": "I tuoi look in corso",
-      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso."
+      "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso.",
+      "detailTitle": "Look condiviso"
     },
     "spotlight": {
       "eyebrow": "In evidenza in città",
@@ -836,7 +837,11 @@
       "publishing": "Controllo e pubblicazione",
       "uploading": "Caricamento della tua foto",
       "cancel": "Annulla",
-      "success": "Il tuo look è stato inviato per la revisione."
+      "success": "Il tuo look è stato inviato per la revisione.",
+      "discardTitle": "Scartare questo post?",
+      "discardMessage": "La foto e il testo di questo post andranno persi.",
+      "discardKeep": "Continua a modificare",
+      "discard": "Scarta"
     },
     "validation": {
       "photoRequired": "Scegli una foto da condividere.",

@@ -387,6 +387,15 @@ spec.ts:143-177`, `wardrobe-signed-out.spec.ts`; web unit `sticky-bottom-nav.tes
   signal; the onboarding read leaves the Closet gate; capsules renders the tab bar; post
   detail drops the unused close label; back records a replace of the current entry.
 
+## Screen budget decisions
+
+Term lines follow the format in spec-7-10 (`scripts/check-screen-budget-decisions.mjs`).
+
+- D-KNOWN-7.11 (owner delegated, 2026-11-26): AC3 puts a Style row on Profile, one more target
+  above the fold on native Profile, whose ten language buttons, opt-out toggle and setting links
+  CC-7.16 replaces with one-line rows. The CI-measured ceiling (run 45875580480, every fixture 14):
+- D-KNOWN-7.11: `rule=targets-above-fold scope=native/profile/* max=14`
+
 ## Design Notes
 
 One tab definition removes the second hand-kept list in `app-top-bar.tsx` and the native layout,

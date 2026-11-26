@@ -702,7 +702,8 @@
       "loadMore": "Load more looks",
       "loadingMore": "Loading",
       "yourPostsTitle": "Your looks in progress",
-      "yourPostsBody": "Only you can see these until screening finishes."
+      "yourPostsBody": "Only you can see these until screening finishes.",
+      "detailTitle": "Shared look"
     },
     "spotlight": {
       "eyebrow": "City Spotlight",
@@ -836,7 +837,11 @@
       "publishing": "Screening and publishing",
       "uploading": "Uploading your photo",
       "cancel": "Cancel",
-      "success": "Your look was submitted for review."
+      "success": "Your look was submitted for review.",
+      "discardTitle": "Discard this post?",
+      "discardMessage": "The photo and text in this post will be lost.",
+      "discardKeep": "Keep editing",
+      "discard": "Discard"
     },
     "validation": {
       "photoRequired": "Choose a photo to share.",

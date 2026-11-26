@@ -702,7 +702,8 @@
       "loadMore": "Mehr Looks laden",
       "loadingMore": "Wird geladen",
       "yourPostsTitle": "Deine Looks in Bearbeitung",
-      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie."
+      "yourPostsBody": "Bis die Prüfung abgeschlossen ist, siehst nur du sie.",
+      "detailTitle": "Geteilter Look"
     },
     "spotlight": {
       "eyebrow": "Stadt-Highlights",
@@ -836,7 +837,11 @@
       "publishing": "Wird geprüft und veröffentlicht",
       "uploading": "Dein Foto wird hochgeladen",
       "cancel": "Abbrechen",
-      "success": "Dein Look wurde zur Prüfung eingereicht."
+      "success": "Dein Look wurde zur Prüfung eingereicht.",
+      "discardTitle": "Diesen Beitrag verwerfen?",
+      "discardMessage": "Foto und Text dieses Beitrags gehen verloren.",
+      "discardKeep": "Weiter bearbeiten",
+      "discard": "Verwerfen"
     },
     "validation": {
       "photoRequired": "Wähle ein Foto zum Teilen aus.",
