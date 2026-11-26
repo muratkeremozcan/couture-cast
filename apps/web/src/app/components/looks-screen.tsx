@@ -10,6 +10,7 @@
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  startTransition,
   Suspense,
   useCallback,
   useEffect,
@@ -60,6 +61,14 @@ import { ScreenGate } from './screen-gate'
 import { StickyBottomNav } from './sticky-bottom-nav'
 
 const PAGE_SIZE = 50
+
+/** A read that started under a session scope the tab no longer holds. */
+class StaleSessionError extends Error {
+  constructor() {
+    super('stale session scope')
+    this.name = 'StaleSessionError'
+  }
+}
 /** The query the old Home drawer link carried; the redirect passes it through. */
 const LEGACY_PLANNER_QUERY = 'planner'
 
@@ -128,7 +137,11 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
   const profileId = useCallback(async () => {
     const scope = currentWebSessionScope()
     if (profileRef.current?.scope !== scope) {
-      profileRef.current = { scope, id: await resolveCurrentUserId() }
+      const id = await resolveCurrentUserId()
+      // Codex round 4 #2: a lookup that answers after the bearer changed belongs to the previous
+      // session; it is dropped before any read or import runs under the new bearer.
+      if (currentWebSessionScope() !== scope) throw new StaleSessionError()
+      profileRef.current = { scope, id }
     }
     userIdRef.current = profileRef.current.id
     return profileRef.current.id
@@ -209,11 +222,18 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
           return
         }
         const sources = { looks, capsules } as Sources
-        setState({ ...sources, error: null, settled: true })
+        // TEA (IMPORT-001): a read's answer is a background update. Inside a transition React
+        // keeps the mounted body on screen if anything below suspends, so a refresh after a
+        // save, Undo or import never swaps the grid for the gate and never drops focus or scroll.
+        startTransition(() => setState({ ...sources, error: null, settled: true }))
         screenSnapshot.remember(scope, 'looks', snapshotPart(filter), sources)
       })
       .catch((error: unknown) => {
         if (!current()) return
+        if (error instanceof StaleSessionError || scope !== currentWebSessionScope()) {
+          setAttempt((count) => count + 1)
+          return
+        }
         // TEA W2: a failed refresh keeps the tiles already shown; only a first read that fails
         // shows the error line.
         setState((previous) => {
@@ -237,7 +257,7 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
     if (!owner) return
     return subscribeSavedLooksChanged((changedOwner) => {
       if (changedOwner === owner || (changedOwner && changedOwner === userIdRef.current))
-        setAttempt((count) => count + 1)
+        startTransition(() => setAttempt((count) => count + 1))
     })
   }, [owner])
 

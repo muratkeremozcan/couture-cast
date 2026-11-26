@@ -1057,11 +1057,20 @@ describe('Wardrobe styling', () => {
         listReads += 1
       })
     )
-    // The import's change notice, and how many list reads were out when it came.
+    // The import's change notice, and how many list reads were out when it came. TEA round 4
+    // #4: at the notice the ready look gets a server-side title, so only a list response served
+    // after the notice names it; a tile with that name proves the import-triggered refresh
+    // committed before the focus refresh below starts.
+    const REFRESHED_TITLE = 'Import refresh check'
     let readsAtNotice: number | null = null
     onTestFinished(
       subscribeSavedLooksChanged((changed) => {
-        if (changed === owner && readsAtNotice === null) readsAtNotice = listReads
+        if (changed !== owner || readsAtNotice !== null) return
+        readsAtNotice = listReads
+        const readyLook = savedLooksStore.items.find(
+          (item) => item.availabilityStatus === 'ready'
+        )
+        if (readyLook) readyLook.title = REFRESHED_TITLE
       })
     )
     // TEA W2 no-vanish. The member and scope are set before the first render and the profile id
@@ -1096,6 +1105,37 @@ describe('Wardrobe styling', () => {
         `retry=${document.querySelector('[data-testid="saved-looks-retry"]') ? 'yes' : 'no'}`,
       ].join(' ')
     }
+    // TEA round 4 #4: the gate hides its body with a `hidden` attribute (screen-gate.tsx), so a
+    // hide and show that keeps the same nodes changes attributes only. Each attribute record on
+    // the grid, the gate body, the gate or any ancestor is replayed in order: the value after a
+    // record is the next record's old value for that element and attribute, else the live one.
+    const hides: string[] = []
+    const hidesBy = (name: string, value: string | null) => {
+      if (value === null) return false
+      if (name === 'hidden') return true
+      if (name === 'style')
+        return /display\s*:\s*none|visibility\s*:\s*hidden/.test(value)
+      if (name === 'class') return /(^|\s)(hidden|invisible)(\s|$)/.test(value)
+      return false
+    }
+    const checkHides = (records: MutationRecord[], grid: Element) => {
+      const attributeRecords = records.filter(
+        (mutation) =>
+          mutation.type === 'attributes' &&
+          mutation.target instanceof Element &&
+          mutation.target.contains(grid)
+      )
+      attributeRecords.forEach((mutation, index) => {
+        const target = mutation.target as Element
+        const name = mutation.attributeName!
+        const next = attributeRecords
+          .slice(index + 1)
+          .find((later) => later.target === target && later.attributeName === name)
+        const after = next ? next.oldValue : target.getAttribute(name)
+        if (hidesBy(name, after))
+          hides.push(`${label(target)} ${name}=${JSON.stringify(after)}; ${frame()}`)
+      })
+    }
     const checkGrid = (records: MutationRecord[]) => {
       if (!shownGrid) {
         const grid = gridNow()
@@ -1103,6 +1143,7 @@ describe('Wardrobe styling', () => {
         return
       }
       const grid = shownGrid
+      checkHides(records, grid)
       for (const mutation of records)
         for (const node of Array.from(mutation.removedNodes))
           if (node === grid || node.contains(grid))
@@ -1119,7 +1160,14 @@ describe('Wardrobe styling', () => {
       }
     }
     const observer = new MutationObserver(checkGrid)
-    observer.observe(document.body, { childList: true, subtree: true })
+    // From the root element, so the gate's ancestors up to <html> are watched too.
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'style', 'class'],
+      attributeOldValue: true,
+    })
     onTestFinished(() => observer.disconnect())
     window.history.replaceState(null, '', '/looks?segment=saved')
     publishOwner(owner)
@@ -1148,10 +1196,33 @@ describe('Wardrobe styling', () => {
 
     // The notice read Looks again, and the grid that showed both tiles is still the one on
     // screen, with no error line or Retry.
+    const originalTiles = within(screen.getByTestId('looks-saved-grid'))
+      .getAllByTestId(/^saved-look-card-/)
+      .map((tile) => tile.getAttribute('data-testid'))
+      .sort()
     await waitFor(() => {
       expect(readsAtNotice).not.toBeNull()
       expect(listReads).toBeGreaterThan(readsAtNotice ?? Infinity)
     })
+    // The import-triggered response has committed (its tile carries the title set at the
+    // notice) with both original tiles and exactly one Needs review, before the focus refresh.
+    await waitFor(() => {
+      const grid = within(screen.getByTestId('looks-saved-grid'))
+      expect(
+        grid.getByRole('link', { name: new RegExp(`^${REFRESHED_TITLE}, `) })
+      ).toBeVisible()
+      expect(
+        grid
+          .getAllByTestId(/^saved-look-card-/)
+          .map((tile) => tile.getAttribute('data-testid'))
+          .sort()
+      ).toEqual(originalTiles)
+      expect(grid.getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+    })
+    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
+    checkGrid(observer.takeRecords())
+    expect(hides, hides.join('\n')).toEqual([])
+    expect(gaps, gaps.join('\n')).toEqual([])
     // A focused tile keeps focus across a refresh: another save for this member is a third look
     // in the account, and its notice reads Looks again with the tile still focused.
     const focused = within(screen.getByTestId('looks-saved-grid')).getAllByRole(
@@ -1181,6 +1252,7 @@ describe('Wardrobe styling', () => {
     observer.disconnect()
     expect(gaps, gaps.join('\n')).toEqual([])
     expect(replaced, replaced.join('\n')).toEqual([])
+    expect(hides, hides.join('\n')).toEqual([])
     expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
     expect(document.activeElement).toBe(focused)
     expect(screen.queryByRole('alert')).toBeNull()

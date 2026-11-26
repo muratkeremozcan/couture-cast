@@ -73,13 +73,15 @@ function useAllEmpty(
   feed: { settled: boolean; failed: boolean; hasItems: boolean },
   filter: LooksFilter
 ): boolean | null {
-  const [allEmpty, setAllEmpty] = useState<boolean | null>(null)
+  // Codex round 4 #2: derived in render, so the first frame that shows the Ideas grid already
+  // knows whether the first-save line goes above it. An item seen in any filter rules it out.
+  const [seenItems, setSeenItems] = useState(false)
   useEffect(() => {
-    if (!feed.settled || feed.failed) return
-    if (feed.hasItems) setAllEmpty(false)
-    else if (filter === 'all') setAllEmpty(true)
-  }, [feed.failed, feed.hasItems, feed.settled, filter])
-  return allEmpty
+    if (feed.hasItems) setSeenItems(true)
+  }, [feed.hasItems])
+  if (feed.hasItems || seenItems) return false
+  if (filter === 'all' && feed.settled && !feed.failed) return true
+  return null
 }
 
 export function LooksScreen() {

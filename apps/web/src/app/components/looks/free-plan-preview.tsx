@@ -15,7 +15,10 @@ import { useWebSessionOwner } from '../../../lib/use-web-session'
 import { SampleGarmentArt } from '../guest-preview/sample-garment-art'
 
 export function FreePlanPreview() {
-  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', {
+    i18n: getI18n(),
+    useSuspense: false,
+  })
   const owner = useWebSessionOwner()
   const samples = getGuestPreviewStrings(i18n.language)
   const week = useMemo(() => sampleWeek(), [])

@@ -1114,6 +1114,105 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByTestId('saved-look-card-sl-2')).toBeNull()
   })
+
+  // TEA round 4 #2 (expected red until profileId drops a lookup that answers after the bearer
+  // changed): the first bearer's profile lookup is held across the switch to the second bearer.
+  // Its late answer must never reach the saved looks read, which starts the legacy device import
+  // for its owner (lib/saved-looks.ts listSavedLooksPageFromWeb, then
+  // ensureWebLegacySavedLooksMigration), nor the change notice owner.
+  it('7.12-UNIT-022e a profile lookup that answers after a bearer switch reads and imports nothing for the first bearer', async () => {
+    const FIRST_PROFILE_ID = 'profile-first'
+    const SECOND_PROFILE_ID = 'profile-second'
+    const bearer = () => window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    const firstLookup = deferred<string>()
+    userId.mockImplementation(() =>
+      bearer() === 'test-token-second'
+        ? Promise.resolve(SECOND_PROFILE_ID)
+        : firstLookup.promise
+    )
+    // The import boundary: each saved looks read, with the bearer the tab held when it was made.
+    const looksReads: {
+      owner: unknown
+      bearer: string | null
+      offset: unknown
+      skipLegacyImport: unknown
+    }[] = []
+    list.mockImplementation(
+      (options: { owner?: string; offset?: number; skipLegacyImport?: boolean }) => {
+        looksReads.push({
+          owner: options.owner,
+          bearer: bearer(),
+          offset: options.offset,
+          skipLegacyImport: options.skipLegacyImport,
+        })
+        return Promise.resolve(page([look('sl-2', 'Gallery night')]))
+      }
+    )
+    const capsuleReads: { owner: unknown; bearer: string | null }[] = []
+    capsules.mockImplementation((owner: string) => {
+      capsuleReads.push({ owner, bearer: bearer() })
+      return Promise.resolve(capsulePage([]))
+    })
+    signInFixtureMember('test-token-first')
+    moveAddress('/looks?segment=saved')
+
+    render(<LooksPage />)
+    // The first bearer's profile lookup is out, and nothing is read before it answers.
+    await waitFor(() => expect(userId).toHaveBeenCalled())
+    expect(looksReads).toEqual([])
+    expect(capsuleReads).toEqual([])
+
+    // The bearer changes while that lookup is held; the shared fixture owner stays the same.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-second')
+    await act(async () => {
+      firstLookup.resolve(FIRST_PROFILE_ID)
+      await firstLookup.promise
+    })
+    // A notice for the first profile, sent as its late answer lands, finds no owner ref holding
+    // that id: had the ref taken it, this would start another read.
+    act(() => notifySavedLooksChanged(FIRST_PROFILE_ID))
+
+    // The stale answer starts a fresh attempt for the second bearer, with no error line.
+    expect(await screen.findByTestId('saved-look-card-sl-2')).toBeVisible()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(
+      looksReads.filter((read) => read.owner === FIRST_PROFILE_ID),
+      'no saved looks read (and so no legacy import) for the first profile'
+    ).toEqual([])
+    expect(
+      capsuleReads.filter((read) => read.owner === FIRST_PROFILE_ID),
+      'no capsule read for the first profile'
+    ).toEqual([])
+    // Every read, the import-starting one included, pairs the second profile with its bearer.
+    expect(looksReads.length).toBeGreaterThan(0)
+    for (const read of looksReads) {
+      expect(read).toMatchObject({
+        owner: SECOND_PROFILE_ID,
+        bearer: 'test-token-second',
+      })
+    }
+    expect(looksReads[0]).toMatchObject({ offset: 0 })
+    expect(looksReads[0]?.skipLegacyImport).not.toBe(true)
+    expect(capsuleReads.length).toBeGreaterThan(0)
+    for (const read of capsuleReads) {
+      expect(read).toEqual({ owner: SECOND_PROFILE_ID, bearer: 'test-token-second' })
+    }
+
+    // Settled: the owner ref holds the second profile, never the first.
+    const readsBefore = looksReads.length
+    act(() => notifySavedLooksChanged(FIRST_PROFILE_ID))
+    // One task yield lets any read that notice started reach the list call.
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+    expect(looksReads).toHaveLength(readsBefore)
+    act(() => notifySavedLooksChanged(SECOND_PROFILE_ID))
+    await waitFor(() => expect(looksReads.length).toBeGreaterThan(readsBefore))
+    expect(looksReads.at(-1)).toMatchObject({
+      owner: SECOND_PROFILE_ID,
+      bearer: 'test-token-second',
+    })
+  })
 })
 
 describe('7.12 Looks Plan segment (D10, D11)', () => {

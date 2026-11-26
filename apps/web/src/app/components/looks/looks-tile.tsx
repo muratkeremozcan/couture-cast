@@ -25,6 +25,8 @@ import {
 import { getI18n } from '../../../i18n'
 import { SampleGarmentArt } from '../guest-preview/sample-garment-art'
 
+// The Looks components read their bundled catalog strings without suspending (TEA, IMPORT-001):
+// a suspending tile on a refresh swapped the whole Looks body for the screen gate.
 const CATALOG_BY_ID = new Map(SAMPLE_CATALOG.garments.map((item) => [item.id, item]))
 
 /** One collage cell: a member photo, catalog art or the dashed placeholder. */
@@ -91,7 +93,10 @@ export function capsuleCells(capsule: OutfitCapsuleContract): LooksTileCell[] {
 
 /** The state line's text (D2). */
 export function useLooksTileStateText(): (state: LooksTileState) => string {
-  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', {
+    i18n: getI18n(),
+    useSuspense: false,
+  })
   return (state) => {
     if (state.kind === 'missing') return t('looks.state.missing', { count: state.count })
     if (state.kind === 'needsReview') return t('looks.state.needsReview')
@@ -105,7 +110,7 @@ export function useLooksTileStateText(): (state: LooksTileState) => string {
 
 /** A saved look's name: its title, else the sample look's name, else its look id. */
 export function useSavedLookName(): (look: SavedLookContract) => string {
-  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { i18n } = useTranslation('translation', { i18n: getI18n(), useSuspense: false })
   const samples = getGuestPreviewStrings(i18n.language)
   return (look) =>
     look.title || sampleLookText({ id: look.lookId }, samples).name || look.lookId
@@ -260,7 +265,7 @@ export function CapsuleTile({
 
 /** An Ideas tile: a picture with the look's name and its one-line description. */
 export function IdeaTile({ idea }: { idea: LooksIdea }) {
-  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { i18n } = useTranslation('translation', { i18n: getI18n(), useSuspense: false })
   const samples = getGuestPreviewStrings(i18n.language)
   const text = sampleLookText(idea.look, samples)
   const cells: LooksTileCell[] = idea.garments

@@ -22,6 +22,7 @@ import {
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import { Profiler } from 'react'
 
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -237,8 +238,13 @@ function serveFeed(
   return reads
 }
 
-function renderLooks() {
-  return render(
+/**
+ * Renders the Looks tab. `onCommit`, when given, runs inside every React commit of the whole
+ * tree (a Profiler's onRender runs in the commit phase, after the DOM is mutated), so a probe
+ * reads each committed DOM state, intermediate ones included.
+ */
+function renderLooks(onCommit?: () => void) {
+  const tree = (
     <AccessibilityAnnouncerProvider>
       <AppThemeProvider>
         <SaveFeedbackProvider>
@@ -249,6 +255,66 @@ function renderLooks() {
       </AppThemeProvider>
     </AccessibilityAnnouncerProvider>
   )
+  return render(
+    onCommit ? (
+      <Profiler id="looks-commit-probe" onRender={onCommit}>
+        {tree}
+      </Profiler>
+    ) : (
+      tree
+    )
+  )
+}
+
+/** One committed DOM state that holds the Ideas grid. */
+type IdeasCommit = { line: boolean; laidOut: boolean; top: number; lineBottom: number }
+
+/**
+ * TEA round 4 #1: records, for every commit where `looks-ideas-grid` exists, whether
+ * `looks-ideas-empty-line` exists in that same commit and where the grid sits. A
+ * MutationObserver samples later and can miss an intermediate commit; this cannot.
+ */
+function ideasCommitProbe() {
+  const commits: IdeasCommit[] = []
+  const onCommit = () => {
+    const grid = document.querySelector('[data-testid="looks-ideas-grid"]')
+    if (!grid) return
+    const line = document.querySelector('[data-testid="looks-ideas-empty-line"]')
+    const rect = grid.getBoundingClientRect()
+    commits.push({
+      line: line !== null,
+      laidOut: rect.height > 0,
+      top: rect.top,
+      lineBottom: line ? line.getBoundingClientRect().bottom : Number.NaN,
+    })
+  }
+  /** On an empty feed: the line is in the first grid commit and every later one, and the grid
+   * never moves once laid out. */
+  const expectLineWithGridFromFirstCommit = () => {
+    expect(commits.length, 'a commit held the Ideas grid').toBeGreaterThan(0)
+    expect(
+      commits[0]!.line,
+      'the very first commit with the Ideas grid already holds the first-save line'
+    ).toBe(true)
+    expect(
+      commits.filter((commit) => !commit.line),
+      'no commit holds the Ideas grid without the first-save line'
+    ).toEqual([])
+    const laidOut = commits.filter((commit) => commit.laidOut)
+    expect(laidOut.length, 'the Ideas grid was laid out').toBeGreaterThan(0)
+    const firstTop = laidOut[0]!.top
+    for (const commit of laidOut) {
+      expect(
+        commit.top,
+        'the Ideas grid top stays where it was first laid out'
+      ).toBeCloseTo(firstTop, 0)
+      expect(commit.lineBottom, 'the line sits above the grid').toBeLessThanOrEqual(
+        commit.top
+      )
+    }
+    return firstTop
+  }
+  return { commits, onCommit, expectLineWithGridFromFirstCommit }
 }
 
 async function openLooks() {
@@ -538,28 +604,24 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           )
         })
       )
-      // The grid's top at the first commit that lays it out, whenever that commit comes.
-      let firstTop: number | null = null
-      const observer = new MutationObserver(() => {
-        const grid = screen.queryByTestId('looks-ideas-grid')
-        const rect = grid?.getBoundingClientRect()
-        if (firstTop === null && rect && rect.height > 0) firstTop = rect.top
-      })
-      observer.observe(document.body, { childList: true, subtree: true })
+      // Every commit that holds the Ideas grid, intermediate ones included (TEA round 4 #1).
+      const probe = ideasCommitProbe()
       try {
-        renderLooks()
+        renderLooks(probe.onCommit)
         await waitFor(() => expect(looksReadSeen).toBe(true))
+        expect(probe.commits, 'no Ideas grid committed while the read is held').toEqual(
+          []
+        )
 
         release()
         // The All feed settled empty: the line for an empty Saved shows.
         expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
         expectOpenSegment('ideas')
-        expect(firstTop, 'the Ideas grid painted').not.toBeNull()
+        const firstTop = probe.expectLineWithGridFromFirstCommit()
         expect(
           screen.getByTestId('looks-ideas-grid').getBoundingClientRect().top
-        ).toBeCloseTo(firstTop!, 0)
+        ).toBeCloseTo(firstTop, 0)
       } finally {
-        observer.disconnect()
         release()
       }
     })
@@ -589,18 +651,12 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           )
         })
       )
-      // The grid's top at the first commit that lays it out, whenever that commit comes.
-      let firstTop: number | null = null
-      const observer = new MutationObserver(() => {
-        const grid = screen.queryByTestId('looks-ideas-grid')
-        const rect = grid?.getBoundingClientRect()
-        if (firstTop === null && rect && rect.height > 0) firstTop = rect.top
-      })
-      observer.observe(document.body, { childList: true, subtree: true })
+      // Every commit that holds the Ideas grid, intermediate ones included (TEA round 4 #1).
+      const probe = ideasCommitProbe()
       // Only the timers are faked, so the gate's deadline is reached without a real 10 s wait.
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
       try {
-        renderLooks()
+        renderLooks(probe.onCommit)
         // RTL's waitFor would run on the faked timers, so the read is awaited on real frames.
         for (let frames = 0; frames < 600 && !looksReadSeen; frames += 1) {
           await act(async () => {
@@ -628,23 +684,25 @@ describe('Native Looks tab (Story CC-7.12)', () => {
             Node.DOCUMENT_POSITION_FOLLOWING,
           'progress sits below the segment tabs'
         ).toBeTruthy()
-        expect(firstTop, 'no Ideas grid painted while the read is held').toBeNull()
+        expect(probe.commits, 'no Ideas grid committed while the read is held').toEqual(
+          []
+        )
 
         release()
         // The All feed settled empty: the line for an empty Saved shows above the grid.
         expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
         expect(screen.queryByTestId('looks-feed-loading')).toBeNull()
         expectOpenSegment('ideas')
-        expect(firstTop, 'the Ideas grid painted').not.toBeNull()
+        // The first commit with the grid already holds the line, and the grid never moves.
+        const firstTop = probe.expectLineWithGridFromFirstCommit()
         const grid = screen.getByTestId('looks-ideas-grid')
         expect(grid).toBeVisible()
-        expect(grid.getBoundingClientRect().top).toBeCloseTo(firstTop!, 0)
+        expect(grid.getBoundingClientRect().top).toBeCloseTo(firstTop, 0)
         expect(
           screen.getByTestId('looks-ideas-empty-line').getBoundingClientRect().bottom
         ).toBeLessThanOrEqual(grid.getBoundingClientRect().top)
       } finally {
         vi.useRealTimers()
-        observer.disconnect()
         release()
       }
     })

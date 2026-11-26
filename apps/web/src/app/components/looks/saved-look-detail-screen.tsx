@@ -76,7 +76,10 @@ function SlotRow({
   look: SavedLookContract
   slot: SavedLookContract['composition'][number]
 }) {
-  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', {
+    i18n: getI18n(),
+    useSuspense: false,
+  })
   const samples = getGuestPreviewStrings(i18n.language)
   // Codex #7: a failure belongs to one signed URL, so a refreshed URL gets a fresh try.
   const [failedUrl, setFailedUrl] = useState<string | null>(null)
@@ -156,7 +159,10 @@ function DetailBody({
   from: LooksFilter | null
   onLookChanged: () => void
 }) {
-  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', {
+    i18n: getI18n(),
+    useSuspense: false,
+  })
   const samples = getGuestPreviewStrings(i18n.language)
   const router = useRouter()
   const statusBar = useStatusBar()
@@ -473,7 +479,7 @@ function useSavedLook(
 }
 
 function SavedLookDetail({ savedLookId }: { savedLookId: string }) {
-  const { t } = useTranslation('translation', { i18n: getI18n() })
+  const { t } = useTranslation('translation', { i18n: getI18n(), useSuspense: false })
   const owner = useWebSessionOwner()
   const router = useRouter()
   const { state, reload } = useSavedLook(owner, savedLookId)

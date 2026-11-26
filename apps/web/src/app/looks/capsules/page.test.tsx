@@ -21,6 +21,10 @@ import type { OutfitCapsuleContract } from '@couture/api-client/contracts/http'
 import LooksCapsulesPage from './page'
 import * as wardrobeApi from '../../../lib/wardrobe'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
+import {
+  currentWebSessionOwner,
+  UNVERIFIED_BEARER_OWNER,
+} from '../../../lib/use-web-session'
 import type * as WebSession from '../../../lib/web-session'
 import { getI18n } from '../../../i18n'
 import { clearAppHistory } from '../../../lib/app-history'
@@ -90,6 +94,13 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
 function publishCapsuleOwner(owner: string) {
   session.owner = owner
   window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, `test-token-${owner}`)
+  window.dispatchEvent(new Event('couture:session'))
+}
+
+/** An e2e fixture bearer: every one reads as the shared fixture owner; only the token differs. */
+function publishFixtureBearer(token: string) {
+  session.owner = UNVERIFIED_BEARER_OWNER
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
   window.dispatchEvent(new Event('couture:session'))
 }
 
@@ -211,6 +222,93 @@ describe('LooksCapsulesPage account switch', () => {
     ).toHaveLength(1)
     expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: memberA.name })).not.toBeInTheDocument()
+  })
+
+  // TEA round 4 #3: two fixture bearers share the fixture owner, so the outer MemberScope keeps
+  // its key across the switch; only the inner session scope key (ScopedCapsulesView) drops the
+  // first bearer's grid and its late answer.
+  it('fixture bearer switch under the shared owner discards the first bearer’s grid and late read', async () => {
+    const FIRST_BEARER = 'test-token-fixture-first'
+    const SECOND_BEARER = 'test-token-fixture-second'
+    const FIRST_PROFILE = 'profile-first'
+    const SECOND_PROFILE = 'profile-second'
+    const firstCapsule = buildCapsule({
+      id: 'cap-first',
+      ownerUserId: FIRST_PROFILE,
+      name: 'First bearer weekend capsule',
+    })
+    const secondCapsule = buildCapsule({
+      id: 'cap-second',
+      ownerUserId: SECOND_PROFILE,
+      name: 'Second bearer travel capsule',
+    })
+    const delayed = buildCapsule({
+      id: 'late-first',
+      ownerUserId: FIRST_PROFILE,
+      name: 'First bearer private capsule',
+    })
+    vi.mocked(wardrobeApi.resolveCurrentUserId).mockImplementation(() =>
+      Promise.resolve(
+        window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY) === SECOND_BEARER
+          ? SECOND_PROFILE
+          : FIRST_PROFILE
+      )
+    )
+    const secondFirstRead = Promise.withResolvers<ReturnType<typeof mockPage>>()
+    const list = vi.mocked(wardrobeApi.listCapsulesFromWeb)
+    list.mockImplementation((owner) =>
+      owner === SECOND_PROFILE
+        ? secondFirstRead.promise
+        : Promise.resolve(mockPage([firstCapsule]))
+    )
+    publishFixtureBearer(FIRST_BEARER)
+    expect(currentWebSessionOwner()).toBe(UNVERIFIED_BEARER_OWNER)
+
+    render(<LooksCapsulesPage />)
+    expect(await screen.findByRole('heading', { name: firstCapsule.name })).toBeVisible()
+    // The first bearer's refresh is held, so it answers after the switch.
+    const oldRefresh = Promise.withResolvers<ReturnType<typeof mockPage>>()
+    list.mockReturnValueOnce(oldRefresh.promise)
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    expect(list.mock.calls.at(-1)?.[0]).toBe(FIRST_PROFILE)
+
+    act(() => publishFixtureBearer(SECOND_BEARER))
+    // The owner is unchanged, so the outer MemberScope did not remount.
+    expect(currentWebSessionOwner()).toBe(UNVERIFIED_BEARER_OWNER)
+    // The first bearer's grid goes at the switch itself, while the second bearer's read is held.
+    expect(
+      screen.queryByRole('heading', { name: firstCapsule.name })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId('capsule-grid')).not.toBeInTheDocument()
+    await waitFor(() => expect(list.mock.calls.at(-1)?.[0]).toBe(SECOND_PROFILE))
+    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+
+    // The first bearer's late refresh answers while the second is held: it stays absent.
+    await act(async () => {
+      oldRefresh.resolve(mockPage([delayed]))
+      await oldRefresh.promise
+    })
+    expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: firstCapsule.name })
+    ).not.toBeInTheDocument()
+    expect(screen.queryByTestId('capsule-grid')).not.toBeInTheDocument()
+    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+
+    await act(async () => {
+      secondFirstRead.resolve(mockPage([secondCapsule]))
+      await secondFirstRead.promise
+    })
+    expect(await screen.findByRole('heading', { name: secondCapsule.name })).toBeVisible()
+    expect(
+      within(screen.getByTestId('capsule-grid')).getAllByRole('heading')
+    ).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: firstCapsule.name })
+    ).not.toBeInTheDocument()
   })
 
   it('account switch prevents confirmation of a prior member’s delete dialog', async () => {
