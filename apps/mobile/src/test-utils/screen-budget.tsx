@@ -183,6 +183,8 @@ const TARGET_SELECTOR = [
   '[role="radio"]',
   '[role="switch"]',
   '[role="menuitem"]',
+  '[role="menuitemradio"]',
+  '[role="menuitemcheckbox"]',
   '[role="option"]',
   '[tabindex]:not([tabindex^="-"])',
 ].join(', ')
@@ -194,15 +196,17 @@ function visible(el: Element) {
   return el.checkVisibility({ opacityProperty: true, visibilityProperty: true })
 }
 
+const EXCLUSIVE_CONTAINERS = '[role="radiogroup"], [role="tablist"], [role="listbox"]'
+
 /**
  * The current choice of an exclusive set, which does nothing when chosen again by design: the
- * selected tab or option, the current page, the checked radio, and the pressed chip of a group
- * (exactly one pressed among two or more `aria-pressed` siblings, an exclusive filter or chip
- * row; two pressed siblings are independent toggles).
- * Everything that can still be turned off is probed: a standalone pressed toggle, a checked
- * checkbox, an on switch.
+ * selected tab or option, the current page, the checked radio, and the pressed chip of a
+ * single-select group. A pressed button is exclusive only with explicit evidence, as on web: a
+ * radiogroup, tablist or listbox around it, or a container named in `exclusiveGroups` (the
+ * budget file's `exclusiveGroupSelectors`). Everything that can still be turned off is probed:
+ * a pressed toggle beside an unpressed one, a checked checkbox, an on switch (CodeRabbit r1).
  */
-function currentChoice(el: Element) {
+function currentChoice(el: Element, exclusiveGroups: readonly string[]) {
   if (el.getAttribute('aria-selected') === 'true') return true
   if (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
     return true
@@ -214,12 +218,9 @@ function currentChoice(el: Element) {
     return true
   if (el instanceof HTMLInputElement && el.type === 'radio' && el.checked) return true
   if (el.getAttribute('aria-pressed') !== 'true') return false
-  const siblings = Array.from(el.parentElement?.children ?? []).filter(
-    (other) => other.hasAttribute('aria-pressed') && other.matches(TARGET_SELECTOR)
-  )
   return (
-    siblings.length >= 2 &&
-    siblings.filter((other) => other.getAttribute('aria-pressed') === 'true').length === 1
+    el.closest(EXCLUSIVE_CONTAINERS) !== null ||
+    exclusiveGroups.some((group) => el.closest(group) !== null)
   )
 }
 
@@ -232,7 +233,9 @@ const textEntry = (el: Element) =>
     ))
 
 /** Every visible outermost target in document order, each with its element. */
-function collectTargets(): { target: NativeProbeTarget; el: HTMLElement }[] {
+function collectTargets(
+  exclusiveGroups: readonly string[]
+): { target: NativeProbeTarget; el: HTMLElement }[] {
   const found = Array.from(document.body.querySelectorAll(TARGET_SELECTOR)).filter(
     (el) => !textEntry(el) && visible(el)
   )
@@ -263,20 +266,25 @@ function collectTargets(): { target: NativeProbeTarget; el: HTMLElement }[] {
         testId,
         name,
         index,
-        skip: currentChoice(el),
+        skip: currentChoice(el, exclusiveGroups),
       }
       return { target, el: el as HTMLElement }
     })
 }
 
 /** The same target in a fresh render: same identity, same position among its twins. */
-function find(target: NativeProbeTarget): HTMLElement | null {
+function find(
+  target: NativeProbeTarget,
+  exclusiveGroups: readonly string[]
+): HTMLElement | null {
   const same = (other: NativeProbeTarget) =>
     other.index === target.index &&
     (target.testId
       ? other.testId === target.testId
       : !other.testId && other.name === target.name)
-  return collectTargets().find(({ target: other }) => same(other))?.el ?? null
+  return (
+    collectTargets(exclusiveGroups).find(({ target: other }) => same(other))?.el ?? null
+  )
 }
 
 export interface NativeProbeOptions {
@@ -287,6 +295,8 @@ export interface NativeProbeOptions {
    * setParams, back), Linking and the in-app browser. A count that grows is an effect.
    */
   readonly outsideCalls: () => number
+  /** Containers whose pressed control is the one current choice (`exclusiveGroupSelectors`). */
+  readonly exclusiveGroups: readonly string[]
 }
 
 export interface NativeProbeResult {
@@ -364,7 +374,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
   const unmountFirst = await options.mount()
   let targets: NativeProbeTarget[]
   try {
-    targets = collectTargets()
+    targets = collectTargets(options.exclusiveGroups)
       .map(({ target }) => target)
       .filter((target) => !target.skip)
   } finally {
@@ -411,7 +421,7 @@ export async function probeNativeScreen(options: NativeProbeOptions) {
     })
     let observer: MutationObserver | undefined
     try {
-      const control = find(target)
+      const control = find(target, options.exclusiveGroups)
       if (!control) {
         results.push({ target, effects: [], error: 'not found in a fresh render' })
         continue

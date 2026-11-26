@@ -55,11 +55,10 @@ test.describe('CC-7.10 Today controls with an effect @local-lane', () => {
           'today',
           fixture
         )
-        const { targets, results } = await probeScreen(
-          page,
-          reopen,
-          screenBudget.tabBarSelectors.web
-        )
+        const { targets, results } = await probeScreen(page, reopen, {
+          exclude: screenBudget.tabBarSelectors.web,
+          exclusiveGroups: screenBudget.exclusiveGroupSelectors.web,
+        })
         expect(targets.length, 'Today controls probed').toBeGreaterThan(0)
         await testInfo.attach(`screen-budget-probe-web-today-${fixture}.json`, {
           body: JSON.stringify(results, null, 2),

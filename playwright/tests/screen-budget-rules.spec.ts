@@ -718,7 +718,7 @@ const SYNTHETIC_TAB_BAR = ['[data-testid="tab-bar"]']
 async function probeHtml(
   page: Page,
   body: string,
-  options: { allowErrors?: boolean } = {}
+  options: { allowErrors?: boolean; exclusiveGroups?: readonly string[] } = {}
 ) {
   await page.context().route(`${ORIGIN}/**`, async (route) => {
     const { pathname } = new URL(route.request().url())
@@ -736,7 +736,10 @@ async function probeHtml(
     await page.goto(`${ORIGIN}/`)
     await page.evaluate(() => document.fonts.ready.then(() => undefined))
   }
-  const { results } = await probeScreen(page, open, SYNTHETIC_TAB_BAR)
+  const { results } = await probeScreen(page, open, {
+    exclude: SYNTHETIC_TAB_BAR,
+    exclusiveGroups: options.exclusiveGroups ?? [],
+  })
   // A click the probe could not land reads as "no effect": that must never pass as a result.
   if (!options.allowErrors) expect(probeErrors(results), 'probe errors').toEqual([])
   return results
@@ -848,17 +851,18 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
     expect(byKey(results, 'self').effects).toEqual([])
   })
 
-  test('[P1] [7.10-RULE-067] an option that is already selected is not probed; its unselected twins keep their positions', async ({
+  test('[P1] [7.10-RULE-067] the pressed chip of a named exclusive group and the current page are not probed; unselected twins keep their positions', async ({
     page,
   }) => {
     const results = await probeHtml(
       page,
-      `<div role="group">
+      `<div role="group" data-testid="chips">
          <button data-testid="chip" aria-pressed="true" onclick="${CAPTURE}">Personal</button>
          <button data-testid="chip" aria-pressed="false" onclick="document.getElementById('out').textContent = 'community'">Community</button>
        </div>
        <a href="/next" aria-current="page" data-testid="current">Here</a>
-       <p id="out"></p>`
+       <p id="out"></p>`,
+      { exclusiveGroups: ['[data-testid="chips"]'] }
     )
     expect(results.map((result) => result.target.key)).toEqual(['chip #2'])
     expect(byKey(results, 'chip #2').effects.join(' ')).toMatch(/dom \d+ change/)
@@ -967,6 +971,30 @@ test.describe('CC-7.10 analytics-only probe rules @local-lane', () => {
        <script>setTimeout(() => document.getElementById('group').insertAdjacentHTML('beforeend', '<p>Saved looks</p>'), 250)</script>`
     )
     expect(byKey(results, 'expander').effects.join(' ')).toMatch(/dom \d+ change/)
+  })
+
+  test('[P0] [7.10-RULE-074] a pressed toggle beside an unpressed one is probed without exclusive evidence; a radiogroup or a named group skips it (CodeRabbit r1)', async ({
+    page,
+  }) => {
+    const pair = (id: string, role = '') =>
+      `<div ${role} data-testid="${id}">
+         <button data-testid="${id}-on" aria-pressed="true" onclick="${CAPTURE}">Alerts</button>
+         <button data-testid="${id}-off" aria-pressed="false" onclick="document.getElementById('out').textContent = '${id}'">Digest</button>
+       </div>`
+    const results = await probeHtml(
+      page,
+      `${pair('independent')}${pair('radios', 'role="radiogroup"')}${pair('named')}
+       <p id="out"></p>`,
+      { exclusiveGroups: ['[data-testid="named"]'] }
+    )
+    expect(results.map((result) => result.target.key)).toEqual([
+      'independent-on',
+      'independent-off',
+      'radios-off',
+      'named-off',
+    ])
+    // The independent pressed toggle only captures on its off path: analytics-only.
+    expect(analyticsOnly(results)).toEqual([{ key: 'independent-on' }])
   })
 
   test('[P1] [7.10-RULE-066] a target that is not found in its fresh load is a probe error, never a silent skip', async ({

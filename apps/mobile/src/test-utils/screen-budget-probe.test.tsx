@@ -24,7 +24,11 @@ import {
 } from './screen-budget'
 
 /** Probes `ui` fresh for each target, as the screen suites do, with `outsideCalls` counted. */
-async function probe(ui: () => ReactNode, outsideCalls: () => number = () => 0) {
+async function probe(
+  ui: () => ReactNode,
+  outsideCalls: () => number = () => 0,
+  exclusiveGroups: readonly string[] = []
+) {
   const frame = window.location.href
   const run = await probeNativeScreen({
     mount: () => {
@@ -32,6 +36,7 @@ async function probe(ui: () => ReactNode, outsideCalls: () => number = () => 0) 
       return Promise.resolve(view.unmount)
     },
     outsideCalls,
+    exclusiveGroups,
   })
   // Every navigation was held: the test frame never left its page or its fragment.
   expect(window.location.href, 'the test frame stayed put').toBe(frame)
@@ -253,13 +258,13 @@ describe('the native probe: links, focus and current choices', () => {
     expect(keysOf(results)).toEqual(['toggle-pressed', 'style-bold', 'style-italic'])
   }, 30_000)
 
-  it('[P0] [7.10-NAT-022] skips only the current choice of a chip group and a radio group', async () => {
+  it('[P0] [7.10-NAT-022] skips only the current choice of a named chip group and a radio group', async () => {
     function Choices() {
       const [chip, setChip] = useState('all')
       const [size, setSize] = useState('m')
       return (
         <div>
-          <div>
+          <div data-testid="chip-group">
             {['all', 'rain', 'sun'].map((name) => (
               <button
                 key={name}
@@ -292,7 +297,9 @@ describe('the native probe: links, focus and current choices', () => {
       )
     }
 
-    const { targets, results } = await probe(() => <Choices />)
+    const { targets, results } = await probe(() => <Choices />, undefined, [
+      '[data-testid="chip-group"]',
+    ])
 
     expect(targets.map((target) => target.key)).toEqual([
       'chip-rain',
@@ -300,6 +307,57 @@ describe('the native probe: links, focus and current choices', () => {
       'size-l',
     ])
     expect(keysOf(results)).toEqual([])
+  }, 30_000)
+
+  it('[P0] [7.10-NAT-025] probes a pressed toggle beside an unpressed one without exclusive evidence', async () => {
+    const track = vi.fn()
+    function Pairs() {
+      const [note, setNote] = useState('')
+      const pair = (id: string, role?: 'radiogroup') => (
+        <div role={role} data-testid={id}>
+          <button
+            type="button"
+            aria-pressed="true"
+            data-testid={`${id}-on`}
+            onClick={() => {
+              track(id)
+            }}
+          >
+            Alerts
+          </button>
+          <button
+            type="button"
+            aria-pressed="false"
+            data-testid={`${id}-off`}
+            onClick={() => setNote(id)}
+          >
+            Digest
+          </button>
+        </div>
+      )
+      return (
+        <div>
+          {pair('independent')}
+          {pair('radios', 'radiogroup')}
+          {pair('named')}
+          <p data-testid="pair-note">{note}</p>
+        </div>
+      )
+    }
+
+    const { targets, results } = await probe(() => <Pairs />, undefined, [
+      '[data-testid="named"]',
+    ])
+
+    expect(targets.map((target) => target.key)).toEqual([
+      'independent-on',
+      'independent-off',
+      'radios-off',
+      'named-off',
+    ])
+    // The independent pressed toggle only tracks on its off path: analytics-only.
+    expect(track).toHaveBeenCalledWith('independent')
+    expect(keysOf(results)).toEqual(['independent-on'])
   }, 30_000)
 
   it('[P0] [7.10-NAT-023] counts a write request, hands a Request body on unread and flags a press whose only request is a read', async () => {

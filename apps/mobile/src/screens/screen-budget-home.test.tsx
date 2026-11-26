@@ -108,6 +108,7 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
 import { Linking } from 'react-native'
 import TabLayout from '@/app/(tabs)/_layout'
 import TabOneScreen from '@/app/(tabs)/index'
+import { screenBudget } from '@couture/utils'
 import { SaveFeedbackProvider } from '@/components/save-feedback'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -251,6 +252,7 @@ describe('Screen budget: native Today', () => {
           return view.unmount
         },
         outsideCalls,
+        exclusiveGroups: screenBudget.exclusiveGroupSelectors.native,
       })
 
       expect(targets.length, 'Today targets the probe pressed').toBeGreaterThan(0)

@@ -51,10 +51,15 @@ const PNG = Buffer.from(
 )
 
 /**
- * Every visible, outermost interactive target on the page outside `excludeSelectors` (the tab
- * bar), in document order, with what it takes to find it again. A visually hidden control
- * counts as its rendered label, as in the measure.
+ * Where the probe looks. `exclude`: regions it never presses (the tab bar). `exclusiveGroups`:
+ * containers whose pressed control is the one current choice of a single-select set (the
+ * budget file's `exclusiveGroupSelectors`), reviewed like the tile selectors.
  */
+export interface ProbeScope {
+  readonly exclude: readonly string[]
+  readonly exclusiveGroups: readonly string[]
+}
+
 /** The attribute that marks the one element a fresh load resolves a target to (Codex #6). */
 const MARK = 'data-budget-probe-target'
 /** The rendered label that stands in for a covered control. */
@@ -69,10 +74,12 @@ const STAND_IN = 'data-budget-probe-stand-in'
  */
 function inventory({
   exclude,
+  exclusiveGroups,
   mark,
   attribute,
 }: {
   exclude: readonly string[]
+  exclusiveGroups: readonly string[]
   mark: { identity: string; index: number } | null
   attribute: string
 }) {
@@ -90,6 +97,8 @@ function inventory({
     '[role="radio"]',
     '[role="switch"]',
     '[role="menuitem"]',
+    '[role="menuitemradio"]',
+    '[role="menuitemcheckbox"]',
     '[role="option"]',
     '[tabindex]:not([tabindex^="-"])',
   ].join(', ')
@@ -134,10 +143,13 @@ function inventory({
     (el.tagName === 'INPUT' && !BUTTON_INPUTS.includes((el as HTMLInputElement).type))
   // The current choice of an exclusive set does nothing when chosen again, by design: the
   // selected tab or option, the current page, the checked radio, and the pressed chip of a
-  // group of pressable chips (CI a45f15a1 flagged the active chip). A toggle that can be turned
-  // off (a standalone pressed button, a checked checkbox, an on switch) is still probed
-  // (Codex #5).
+  // single-select group (CI a45f15a1 flagged the active chip). A pressed button is exclusive
+  // only with explicit evidence: a radiogroup, tablist or listbox around it, or a container
+  // named in `exclusiveGroups`. Every other toggle that can be turned off (a pressed button
+  // beside an unpressed one, a checked checkbox, an on switch) is probed (Codex #5,
+  // CodeRabbit r1: sibling counts cannot tell a chip row from independent toggles).
   const RADIOS = ['radio', 'menuitemradio']
+  const EXCLUSIVE_CONTAINERS = '[role="radiogroup"], [role="tablist"], [role="listbox"]'
   const currentChoice = (el: Element) => {
     if (el.getAttribute('aria-selected') === 'true') return true
     if (el.hasAttribute('aria-current') && el.getAttribute('aria-current') !== 'false')
@@ -151,16 +163,9 @@ function inventory({
     )
       return true
     if (el.getAttribute('aria-pressed') !== 'true') return false
-    // Exclusive only when it is the one pressed control among two or more pressable siblings
-    // (a chip row): two pressed siblings are independent toggles and both are probed
-    // (CodeRabbit r1).
-    const siblings = Array.from(el.parentElement?.children ?? []).filter((other) =>
-      other.hasAttribute('aria-pressed')
-    )
     return (
-      siblings.length >= 2 &&
-      siblings.filter((other) => other.getAttribute('aria-pressed') === 'true').length ===
-        1
+      el.closest(EXCLUSIVE_CONTAINERS) !== null ||
+      exclusiveGroups.some((group) => el.closest(group) !== null)
     )
   }
   const excluded = (el: Element) =>
@@ -212,10 +217,10 @@ function inventory({
 
 export async function listProbeTargets(
   page: Page,
-  excludeSelectors: readonly string[]
+  scope: ProbeScope
 ): Promise<ProbeTarget[]> {
   const { targets } = await page.evaluate(inventory, {
-    exclude: excludeSelectors,
+    ...scope,
     mark: null,
     attribute: MARK,
   })
@@ -230,11 +235,11 @@ export async function probeTarget(
   page: Page,
   open: () => Promise<void>,
   target: ProbeTarget,
-  excludeSelectors: readonly string[]
+  scope: ProbeScope
 ): Promise<ProbeResult> {
   await open()
   const { marked } = await page.evaluate(inventory, {
-    exclude: excludeSelectors,
+    ...scope,
     mark: { identity: target.identity, index: target.index },
     attribute: MARK,
   })
@@ -494,13 +499,12 @@ export async function probeTarget(
 export async function probeScreen(
   page: Page,
   open: () => Promise<void>,
-  excludeSelectors: readonly string[]
+  scope: ProbeScope
 ): Promise<{ targets: ProbeTarget[]; results: ProbeResult[] }> {
   await open()
-  const targets = await listProbeTargets(page, excludeSelectors)
+  const targets = await listProbeTargets(page, scope)
   const results: ProbeResult[] = []
-  for (const target of targets)
-    results.push(await probeTarget(page, open, target, excludeSelectors))
+  for (const target of targets) results.push(await probeTarget(page, open, target, scope))
   return { targets, results }
 }
 

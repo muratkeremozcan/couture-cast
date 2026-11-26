@@ -129,6 +129,14 @@ export interface ScreenBudgetFile {
   readonly fixtures: readonly ScreenBudgetFixture[]
   readonly tabBarSelectors: Readonly<Record<ScreenBudgetPlatform, readonly string[]>>
   readonly tileSelectors: Readonly<Record<ScreenBudgetPlatform, readonly string[]>>
+  /**
+   * Groups whose pressed member is the one current choice (the Home and Community chip rows):
+   * the analytics-only probes skip that member. A pressed toggle outside these, a radio, tab,
+   * option or `aria-current` choice is probed, so its off action is tested.
+   */
+  readonly exclusiveGroupSelectors: Readonly<
+    Record<ScreenBudgetPlatform, readonly string[]>
+  >
   readonly selectors: Readonly<
     Record<ScreenBudgetPlatform, ScreenBudgetPlatformSelectors>
   >

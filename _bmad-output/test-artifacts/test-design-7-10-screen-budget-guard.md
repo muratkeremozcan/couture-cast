@@ -144,12 +144,14 @@ Each rule gets a passing control and a failing one, so a measure that sees nothi
 | 7.10-RULE-072 | A read alone is no effect; a bare # link below the fold that jumps to the top is analytics-only                                                                                                          | D4     |
 | 7.10-RULE-067 | An already selected option (aria-pressed, aria-selected, aria-checked true, aria-current) is not probed; twins keep their positions (CI a45f15a1: the active chip and the current scenario were flagged) | D4     |
 | 7.10-RULE-068 | A panel inserted under a parent that churns on its own is still an effect (inserted nodes are new)                                                                                                       | P6     |
+| 7.10-RULE-074 | CodeRabbit r1: a pressed toggle beside an unpressed one is probed without exclusive evidence; a radiogroup or a named `exclusiveGroupSelectors` container skips its pressed control                      | D4     |
 
 Probe scope as built: text entry (fields, text areas, selects, editable regions) is typed into,
 not clicked, so it is not probed; a label handing focus to its own control is the click landing,
 not an effect; GET requests to a path the page already requested before the click (polls) are
 not effects. An option that is already selected is not probed: choosing the current state again
-does nothing by design. The web probe is one test per fixture, so the analytics-only limit is judged
+does nothing by design. A pressed button is a current choice only with explicit evidence: a
+radiogroup, tablist or listbox around it, or a container in `exclusiveGroupSelectors`. The web probe is one test per fixture, so the analytics-only limit is judged
 per screen (Codex #10); about 80 s a fixture once the baseline passes (CI 61701d25). A read
 alone (GET or HEAD) is no effect: polls and link prefetches arrive after any click, and a read
 that matters changes the DOM or the URL. A jump to a fragment with no target is no scroll effect.
@@ -193,6 +195,7 @@ at least one primary on the screens whose CC-7.9 one gold action is present (Hom
 | 7.10-UNIT-013b    | CodeRabbit r1: a 30-day moderation link stays live past one timer step and expires on time                                                                                                                               | D1     |
 | 7.10-NAT-017..023 | Native probe proofs on synthetic screens: links, dead fragments, prior focus, toggles, independent pressed siblings, exclusive groups, write vs read requests, a Request body handed on unread                           | 3, D4  |
 | 7.10-NAT-024      | CodeRabbit r1: a busy SaveActionButton reads disabled and ignores presses                                                                                                                                                | D1     |
+| 7.10-NAT-025      | CodeRabbit r1: the same explicit exclusivity on native (independent pair probed, radiogroup and named group skipped)                                                                                                     | 3, D4  |
 
 ### Decisions check (builder, TEA reviews)
 

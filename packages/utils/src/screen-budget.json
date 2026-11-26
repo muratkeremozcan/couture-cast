@@ -44,6 +44,17 @@
       "[data-testid^=\"highlighted-community-card-\"]"
     ]
   },
+  "exclusiveGroupSelectors": {
+    "web": [
+      "[data-testid=\"chip-navigation-bar\"]",
+      "[data-testid=\"home-scenario-choices\"]",
+      "[data-testid=\"community-chip-row\"]"
+    ],
+    "native": [
+      "[data-testid=\"mobile-chip-navigation\"]",
+      "[data-testid=\"community-sticky-filter-chips\"]"
+    ]
+  },
   "selectors": {
     "web": {
       "todayHeight": null,

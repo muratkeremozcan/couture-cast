@@ -764,7 +764,8 @@ function LiveOutfit({
           <p className="text-sm">{t('commerce.premium.planner.starterWardrobe')}</p>
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
+      {/* CC-7.10: one exclusive scenario choice; the screen budget probe skips the pressed one. */}
+      <div data-testid="home-scenario-choices" className="flex flex-wrap gap-2">
         {available.map((item) => (
           <button
             key={item.scenario}
