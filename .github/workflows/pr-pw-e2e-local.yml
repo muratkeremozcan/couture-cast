@@ -71,8 +71,10 @@ jobs:
     # lanes 14 to 16 minutes after the push (scripts/ci/pr-pipeline-shape.test.mjs).
     needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
-    # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
-    # Supabase start stops at its own 10 minute step limit.
+    # 11.3 minutes at p50, 12.4 at p95 on two shards (40 shard runs, 2026-11-11 to 12). CC-7.9
+    # grew the suite past two: the second shard's Playwright step took 16.75 minutes after a
+    # 3.5 minute setup and hit this limit (CI fd692390), so it runs on three. The Supabase start
+    # stops at its own 10 minute step limit.
     timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
@@ -91,8 +93,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2]
-        shardTotal: [2]
+        shardIndex: [1, 2, 3]
+        shardTotal: [3]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -679,7 +681,7 @@ jobs:
         with:
           environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
-          shards: '2'
+          shards: '3'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createMemberSampleOutfit, getGuestPreviewStrings } from '@couture/utils'
 import { SampleGarmentArt } from './sample-garment-art'
@@ -62,10 +63,28 @@ export function GuestPreviewEntry() {
   )
 }
 
+const noSubscription = () => () => undefined
+
+/**
+ * False in the server HTML and through hydration, true once React owns the page. The head
+ * script shows the member actions from first paint (lib/landing-session.ts), before the
+ * bundle has hydrated them, and a tap on the server-rendered Sign out then does nothing: CI
+ * real-session L-4 on webkit (fd692390, 40ee2f90) clicked it while hydrating and the page stayed
+ * signed in, with the member ritual and community actions still rendered.
+ */
+function useHydrated() {
+  return useSyncExternalStore(
+    noSubscription,
+    () => true,
+    () => false
+  )
+}
+
 // The document's pre-paint session marker also keeps member actions out of the guest UI.
 export function MemberWardrobeActions() {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getGuestPreviewStrings(i18n.language)
+  const hydrated = useHydrated()
   return (
     <>
       <Link
@@ -82,6 +101,9 @@ export function MemberWardrobeActions() {
         type="button"
         data-testid="landing-sign-out"
         data-landing="member"
+        // Sign out is the one landing action that needs script; until hydration it is disabled,
+        // so a tap waits for a control that works (Open wardrobe is a plain link).
+        disabled={!hydrated}
         onClick={() => void signOutWebSession().catch(() => undefined)}
         className="inline-flex min-h-11 items-center rounded-full px-0 py-3 sm:px-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-ink underline underline-offset-4"
       >

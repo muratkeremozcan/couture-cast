@@ -266,28 +266,106 @@ test('L-3: an expired access token with a valid refresh token still opens on the
   expect((await landingActionsSeen(page)).guest).toEqual([])
 })
 
+/**
+ * CC-7.9 TEA diagnostic for L-4 and L-4b (webkit L-4 on CI fd692390: the signed-out actions
+ * stayed hidden after Sign out). An init script records every change of <html data-session> and
+ * every couture:session event, each with its time and whether the stored session and this tab's
+ * bearer are present. Booleans only: no token or session value is read out. On failure the trace,
+ * the final state and the same two booleans go on the report. The assertions are unchanged.
+ */
+async function traceLandingSession(page: Page) {
+  await page.addInitScript(
+    ([sessionKey, bearerKey]) => {
+      type Entry = {
+        at: number
+        what: string
+        value: string | null
+        stored: boolean
+        bearer: boolean
+      }
+      const trace: Entry[] = []
+      ;(window as unknown as { __teaSessionTrace: Entry[] }).__teaSessionTrace = trace
+      const record = (what: string, value: string | null) => {
+        let stored = false
+        let bearer = false
+        try {
+          stored = window.localStorage.getItem(sessionKey) !== null
+          bearer = window.sessionStorage.getItem(bearerKey) !== null
+        } catch {
+          // Storage refused: both stay false.
+        }
+        trace.push({ at: Math.round(performance.now()), what, value, stored, bearer })
+      }
+      new MutationObserver((mutations) => {
+        for (const mutation of mutations)
+          if (mutation.target === document.documentElement)
+            record('data-session', document.documentElement.getAttribute('data-session'))
+      }).observe(document, {
+        attributes: true,
+        subtree: true,
+        attributeFilter: ['data-session'],
+      })
+      window.addEventListener('couture:session', () => record('couture:session', null))
+      window.addEventListener('pageshow', (event) =>
+        record('pageshow', event.persisted ? 'persisted' : 'fresh')
+      )
+    },
+    [SESSION_KEY, 'couturecast.access-token'] as const
+  )
+}
+
+/** Runs `check`; on failure attaches the session trace and the final state, then fails. */
+async function withLandingSessionTrace(page: Page, check: () => Promise<void>) {
+  try {
+    await check()
+  } catch (error) {
+    const state = await page
+      .evaluate(
+        ([sessionKey, bearerKey]) => ({
+          url: window.location.pathname,
+          dataSession: document.documentElement.getAttribute('data-session'),
+          storedSession: window.localStorage.getItem(sessionKey) !== null,
+          bearer: window.sessionStorage.getItem(bearerKey) !== null,
+          trace:
+            (window as unknown as { __teaSessionTrace?: unknown[] }).__teaSessionTrace ??
+            [],
+        }),
+        [SESSION_KEY, 'couturecast.access-token'] as const
+      )
+      .catch((readError: unknown) => ({ unreadable: String(readError) }))
+    await test.info().attach('landing-session-trace.json', {
+      body: JSON.stringify(state, null, 2),
+      contentType: 'application/json',
+    })
+    throw error
+  }
+}
+
 test('L-4: after Sign out, going back to the landing shows the signed-out actions', async ({
   page,
   apiRequest,
 }) => {
+  await traceLandingSession(page)
   const account = await member(apiRequest)
   await signInWithCode(page, account)
   await page.goto('/wardrobe')
   await page.goto('/')
   await expectMemberLanding(page)
 
-  await page.getByTestId('landing-sign-out').click()
-  await expectGuestLanding(page)
-  // The landing turns over at the sign-out event; the stored session goes once the SDK finishes.
-  await expect
-    .poll(() => page.evaluate((key) => window.localStorage.getItem(key), SESSION_KEY))
-    .toBeNull()
-  // Back through history, Safari's back-forward cache included: the page restored from before
-  // the sign-out must not show the member landing.
-  await page.goBack()
-  await page.goForward()
-  await expect(page).toHaveURL(`${WEB}/`)
-  await expectGuestLanding(page)
+  await withLandingSessionTrace(page, async () => {
+    await page.getByTestId('landing-sign-out').click()
+    await expectGuestLanding(page)
+    // The landing turns over at the sign-out event; the stored session goes once the SDK finishes.
+    await expect
+      .poll(() => page.evaluate((key) => window.localStorage.getItem(key), SESSION_KEY))
+      .toBeNull()
+    // Back through history, Safari's back-forward cache included: the page restored from before
+    // the sign-out must not show the member landing.
+    await page.goBack()
+    await page.goForward()
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expectGuestLanding(page)
+  })
 })
 
 // CC-7.9 TEA (burn-in, webkit, CI 40ee2f90): a Sign out before this page's session start settles
@@ -299,6 +377,7 @@ test('L-4b: Sign out while the session check is still out shows the signed-out a
   page,
   apiRequest,
 }) => {
+  await traceLandingSession(page)
   const account = await member(apiRequest)
   await signInWithCode(page, account)
   await page.goto('/wardrobe')
@@ -316,11 +395,13 @@ test('L-4b: Sign out while the session check is still out shows the signed-out a
   await expectMemberLanding(page)
   await expect.poll(() => profileHeld).toBe(true)
 
-  await page.getByTestId('landing-sign-out').click()
-  await expect(page.locator('html')).toHaveAttribute('data-session', 'none', {
-    timeout: 2_000,
+  await withLandingSessionTrace(page, async () => {
+    await page.getByTestId('landing-sign-out').click()
+    await expect(page.locator('html')).toHaveAttribute('data-session', 'none', {
+      timeout: 2_000,
+    })
+    await expectGuestLanding(page)
   })
-  await expectGuestLanding(page)
   releaseProfile()
   await page.unroute('**/api/v1/user/profile')
 })

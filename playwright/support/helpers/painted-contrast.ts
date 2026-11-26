@@ -111,6 +111,8 @@ async function settle(page: Page) {
 }
 
 type Clip = { x: number; y: number; width: number; height: number }
+/** The element's border box inside the clip (CSS pixels), whose pixels a focus ring skips. */
+type Exclude = Clip & { clipWidth: number }
 
 async function shot(page: Page, clip: Clip) {
   return (
@@ -128,10 +130,11 @@ async function compare(
   bare: string,
   inked: string,
   mask?: string,
-  withShots = false
+  withShots = false,
+  exclude: Exclude | null = null
 ): Promise<Ink> {
   const result = await page.evaluate(
-    async ({ a, b, m, w }) => {
+    async ({ a, b, m, w, x }) => {
       const pixels = async (base64: string) => {
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
         const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
@@ -166,10 +169,19 @@ async function compare(
         0
       // Each glyph position (the mask's, or else every pixel the ink changed): the luminance
       // under it without the ink, and with it.
+      // A focus ring is read outside the element's border box only (see focusRing).
+      const scale = x ? width / x.clipWidth : 1
+      const inside = (pixel: number) => {
+        if (!x) return false
+        const px = (pixel % width) / scale
+        const py = Math.floor(pixel / width) / scale
+        return px >= x.x && px < x.x + x.width && py >= x.y && py < x.y + x.height
+      }
       const collect = () => {
         const changed: [number, number, number][] = []
         const masked: [number, number, number][] = []
         for (let i = 0; i < inkedPx.length; i += 4) {
+          if (inside(i / 4)) continue
           const pair: [number, number, number] = [
             luminance(barePx, i),
             luminance(inkedPx, i),
@@ -323,7 +335,7 @@ async function compare(
         diffPng: low && w ? diffMask(low) : '',
       }
     },
-    { a: inked, b: bare, m: mask ?? null, w: withShots }
+    { a: inked, b: bare, m: mask ?? null, w: withShots, x: exclude }
   )
   const { diffPng, ...ink } = result
   return diffPng ? { ...ink, shots: { bare, inked, diff: diffPng } } : ink
@@ -339,6 +351,13 @@ type States = {
    * text scan on 2e5b5628 and pushed pw-e2e (2, 2) past its 20-minute job limit.
    */
   withShots?: boolean
+  /**
+   * Focus rings only: rate the pixels focus changes outside the element's border box, where
+   * the outline and halo paint. Inside, focus re-rasterises the label under the new layer: on
+   * CI fd692390 80 label pixels moved 1.5% in luminance and, as the weakest group, read 1.0069
+   * while the ring around the button held well over 3:1 (reactions, default light).
+   */
+  outsideOnly?: boolean
 }
 
 /**
@@ -377,8 +396,14 @@ async function clipFor(
       for (const fx of [0.5, 0.15, 0.85]) {
         const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
         if (hit && !el.contains(hit) && !hit.contains(el)) {
+          // Both sides named, so a cover reads from the log (CI fd692390, span in spotlight).
           const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
-          return `${hit.tagName.toLowerCase()} in ${id}`
+          const describe = (node: Element) => {
+            const box = node.getBoundingClientRect()
+            return `${node.outerHTML.slice(0, 160)} text "${(node.textContent ?? '').trim().slice(0, 40)}" box [${[box.x, box.y, box.width, box.height].map(Math.round).join(', ')}]`
+          }
+          const point = [r.left + r.width * fx, r.top + r.height / 2].map(Math.round)
+          return `${hit.tagName.toLowerCase()} in ${id}\n  cover: ${describe(hit)}\n  target: ${describe(el)}\n  at [${point.join(', ')}], scroll [${window.scrollX}, ${window.scrollY}]`
         }
       }
       return null
@@ -404,7 +429,12 @@ async function clipFor(
 }
 
 /** The bare, inked and (when given) mask shots of `clip`, compared. */
-async function takeShots(page: Page, clip: Clip, states: States): Promise<Ink> {
+async function takeShots(
+  page: Page,
+  clip: Clip,
+  states: States,
+  exclude: Exclude | null = null
+): Promise<Ink> {
   await states.bare()
   const bare = await shot(page, clip)
   await states.inked()
@@ -415,7 +445,7 @@ async function takeShots(page: Page, clip: Clip, states: States): Promise<Ink> {
     mask = await shot(page, clip)
   }
   await setInkStyle(page, '')
-  return compare(page, bare, inked, mask, states.withShots)
+  return compare(page, bare, inked, mask, states.withShots, exclude)
 }
 
 /**
@@ -441,7 +471,17 @@ async function measure(
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
       if (states.withShots) await settle(page)
-      const ink = await takeShots(page, clip, states)
+      const box = states.outsideOnly ? await handle.boundingBox() : null
+      const exclude = box
+        ? {
+            x: box.x - clip.x,
+            y: box.y - clip.y,
+            width: box.width,
+            height: box.height,
+            clipWidth: clip.width,
+          }
+        : null
+      const ink = await takeShots(page, clip, states, exclude)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
         MARK
@@ -523,9 +563,15 @@ export async function focusRing(
         await where('inked')
       },
       withShots: true,
+      outsideOnly: true,
     },
     { margin: 10 }
   )
+  // Every ring's deciding group goes to the log, so a pass shows it passed on the ring itself.
+  if (ink)
+    console.log(
+      `[painted-contrast] focus ring ${JSON.stringify({ ratio: ink.ratio, painted: ink.painted, weakest: ink.weakest })}`
+    )
   // Below the 3:1 floor the evidence goes on the report: both shots, the diff mask with the
   // weakest group in red, and the group and positions in words (CC-7.9 reactions ring).
   if (ink && ink.ratio < 3 && ink.shots) {
@@ -551,9 +597,6 @@ export async function focusRing(
       ),
       contentType: 'application/json',
     })
-    console.log(
-      `[painted-contrast] focus ring below 3:1: ${JSON.stringify({ ratio: ink.ratio, weakest: ink.weakest, positions })}`
-    )
   }
   return ink
 }
