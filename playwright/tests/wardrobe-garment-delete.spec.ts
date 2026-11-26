@@ -475,16 +475,18 @@ test.describe('Garment delete on a phone (mocked wardrobe)', () => {
     interceptNetworkCall,
     page,
   }) => {
-    const cards: GarmentWithColor[] = Array.from({ length: 8 }, (_, index) => ({
+    // Story CC-7.11 D4: four 4:3 tiles fit the fold now, so the grid needs more rows for the
+    // target to sit below it.
+    const cards: GarmentWithColor[] = Array.from({ length: 14 }, (_, index) => ({
       ...photographedGarment(baseURL!, `delete-card-${index + 1}`),
       colorFamily: 'gray',
     }))
     const inventory = { [memberA]: cards }
     await mockStyleWardrobe(page, baseURL!, interceptNetworkCall, inventory)
     // The cards in the order the closet lists them; the target sits low in the grid.
-    const target = cards[5]!
-    const next = cards[6]!
-    const used = cards[6]!
+    const target = cards[11]!
+    const next = cards[12]!
+    const used = cards[12]!
     const usage: Record<string, { savedLookCount: number; capsuleCount: number }> = {
       [used.id]: { savedLookCount: 1, capsuleCount: 1 },
     }

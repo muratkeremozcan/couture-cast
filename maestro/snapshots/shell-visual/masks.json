@@ -2,10 +2,6 @@
   "_comment": "CC-7.9 native snapshot masks: regions that change every run by design, ignored by scripts/visual-baselines/compare-native.mjs in both schemes. Pixels on the 720 x 1280 small_phone capture: [x, y, width, height]. Keep each one as small as what it covers.",
   "home": [
     {
-      "rect": [56, 858, 664, 44],
-      "reason": "hourly card labels: the forecast names hours from the device clock at capture, so they move with the run (7 AM on 40ee2f90, 8 AM on 2e5b5628); icons and temperatures stay compared"
-    },
-    {
       "rect": [704, 160, 16, 960],
       "reason": "Android scroll indicator: a tab's scroll view flashes it on show or scroll restore and it fades on its own clock, so a capture may or may not hold it (CI 40ee2f90 light-profile, dark-community)"
     }
@@ -18,8 +14,8 @@
   ],
   "community": [
     {
-      "rect": [140, 836, 450, 52],
-      "reason": "spotlight author alias: Style Explorer <8 hex of a seeded user id>, new each run"
+      "rect": [140, 566, 450, 52],
+      "reason": "spotlight author alias: Style Explorer <8 hex of a seeded user id>, new each run (CC-7.11: New post moved into the top bar, so the Spotlight sits 270 px higher)"
     },
     {
       "rect": [704, 160, 16, 960],

@@ -25,8 +25,11 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
+# Story CC-7.11 D16: Today opens on the weather header and the outfit card (the scenario
+# toggles moved below the card), so the card is the ready signal.
 - extendedWaitUntil:
-    visible: 'Morning commute'
+    visible:
+      id: 'outfit-recommendation-card'
     timeout: 30000
 
 # --- AC 1: the CTA renders, disclosed, on an eligible card -------------------
@@ -159,8 +162,11 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
+# Story CC-7.11 D16: Today opens on the weather header and the outfit card (the scenario
+# toggles moved below the card), so the card is the ready signal.
 - extendedWaitUntil:
-    visible: 'Morning commute'
+    visible:
+      id: 'outfit-recommendation-card'
     timeout: 30000
 
 # Scroll to where the block would be before asserting it is not there.
@@ -191,8 +197,11 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
+# Story CC-7.11 D16: Today opens on the weather header and the outfit card (the scenario
+# toggles moved below the card), so the card is the ready signal.
 - extendedWaitUntil:
-    visible: 'Morning commute'
+    visible:
+      id: 'outfit-recommendation-card'
     timeout: 30000
 
 - runFlow: subflows/scroll-to-card-bottom.yaml

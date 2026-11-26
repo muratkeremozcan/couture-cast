@@ -45,18 +45,38 @@ tags:
     id: 'outfit-comfort-notes'
 
 # Toggle Midday scenario
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggle-midday'
+    direction: DOWN
+    visibilityPercentage: 100
 - tapOn:
     id: 'scenario-toggle-midday'
     retryTapIfNoChange: true
+# The notes live in the card above the toggles (D16).
+- scrollUntilVisible:
+    element:
+      id: 'outfit-comfort-notes'
+    direction: UP
 - assertVisible:
     id: 'outfit-comfort-notes'
 - takeScreenshot:
     path: maestro/artifacts/hero-midday-scenario
 
 # Toggle Evening plans scenario
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggle-evening'
+    direction: DOWN
+    visibilityPercentage: 100
 - tapOn:
     id: 'scenario-toggle-evening'
     retryTapIfNoChange: true
+# The notes live in the card above the toggles (D16).
+- scrollUntilVisible:
+    element:
+      id: 'outfit-comfort-notes'
+    direction: UP
 - assertVisible:
     id: 'outfit-comfort-notes'
 - takeScreenshot:

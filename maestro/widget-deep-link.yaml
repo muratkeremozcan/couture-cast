@@ -32,7 +32,11 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-# Verify default state
+# Verify default state. Story CC-7.11 D16: the toggles follow the outfit card.
+- scrollUntilVisible:
+    element: 'Morning commute'
+    direction: DOWN
+    visibilityPercentage: 100
 - assertVisible: 'Morning commute'
 
 # Assert what the link DID, not that the screen it landed on still exists.
@@ -56,6 +60,13 @@ tags:
     env:
       LINK: ${WIDGET_MORNING_URL}
 
+# The link reopens Today at its top; the toggles sit below the outfit card (D16).
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggle-morning'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: 'scenario-toggle-morning'
@@ -72,6 +83,13 @@ tags:
     env:
       LINK: ${WIDGET_EVENING_URL}
 
+# The link reopens Today at its top; the toggles sit below the outfit card (D16).
+- scrollUntilVisible:
+    element:
+      id: 'scenario-toggle-evening'
+    direction: DOWN
+    visibilityPercentage: 100
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: 'scenario-toggle-evening'

@@ -125,8 +125,8 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
   assert.deepEqual(masksFor('dark-profile', masks), masksFor('light-profile', masks))
   // Every tab hides only the scroll indicator strip in the right gutter; generated text adds more.
   const strip = [704, 160, 16, 960]
-  assert.equal(masksFor('light-home', masks).length, 2)
-  assert.deepEqual(masksFor('light-home', masks).at(-1), strip)
+  // Story CC-7.11 D16: the hourly ribbon left Today's first screen, so its label mask went with it.
+  assert.deepEqual(masksFor('light-home', masks), [strip])
   assert.deepEqual(masksFor('dark-wardrobe', masks), [strip])
   assert.equal(masksFor('light-profile', masks).length, 2)
   assert.equal(masksFor('light-community', masks).length, 2)
