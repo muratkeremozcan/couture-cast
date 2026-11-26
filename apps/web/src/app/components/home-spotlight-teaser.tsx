@@ -96,15 +96,43 @@ export interface HomeSpotlightTeaserLifecycle {
    * so the teaser is in place when the body appears instead of pushing the page down later.
    */
   settled: boolean
+  /**
+   * CodeRabbit r2 #7: the height a return holds for the teaser while it has none to show,
+   * because the one it remembered expired and the fresh read is still out. Null otherwise.
+   */
+  reservedHeight: number | null
+  /** Reports the rendered teaser's height, kept with the snapshot for `reservedHeight`. */
+  measure: (height: number) => void
   /** Story 6.7b: shown blocks for this Home visit, kept across the teaser's unmount. */
   sponsoredShown: SponsoredShownRegistry
 }
 
-/** The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5). */
-type TeaserSnapshot = { memberId: string; value: SpotlightTeaserValue | null }
+/**
+ * The teaser a member last saw on Home, for a return in the same session (CC-7.7 D5), with the
+ * height it rendered at.
+ */
+type TeaserSnapshot = {
+  memberId: string
+  value: SpotlightTeaserValue | null
+  height?: number
+}
 
 function snapshotValueExpired(value: SpotlightTeaserValue | null, now: number): boolean {
   return value !== null && value.completedAt + SPOTLIGHT_TEASER_EXPIRY_MS <= now
+}
+
+/**
+ * CodeRabbit r2 #7: the height a return holds for a remembered teaser that expired, until the
+ * fresh read answers (`live` ends then) or a live value takes the place.
+ */
+function reservedTeaserHeight(
+  snapshot: TeaserSnapshot | undefined,
+  live: boolean,
+  expired: boolean,
+  liveValue: SpotlightTeaserValue | null
+): number | null {
+  if (!live || !expired || liveValue !== null) return null
+  return snapshot?.height ?? null
 }
 
 /**
@@ -189,6 +217,23 @@ export function useHomeSpotlightTeaser({
   const value =
     liveValue ?? (snapshotLive && !snapshotExpired ? (snapshot?.value ?? null) : null)
   const settled = member === null || visible === false || memberSettled || snapshotLive
+  /*
+   * CodeRabbit r2 #7: a return whose remembered teaser expired shows none, and a return opens
+   * Home's gate from its snapshot at once, so the fresh teaser would land later and push the
+   * feed down. The expired teaser's place is held at its last height until the fresh read
+   * answers (`snapshotLive` ends then), and the answer takes that place.
+   */
+  const reservedHeight = reservedTeaserHeight(
+    snapshot,
+    snapshotLive,
+    snapshotExpired,
+    liveValue
+  )
+  /** The rendered teaser's height, once it is laid out (a closed gate lays out nothing). */
+  const [height, setHeight] = useState<number | undefined>(undefined)
+  const measure = useCallback((next: number) => {
+    if (next > 0) setHeight(next)
+  }, [])
   const removeValue = useCallback(() => {
     setSnapshotDropped(true)
     state.removeValue()
@@ -201,8 +246,9 @@ export function useHomeSpotlightTeaser({
     screenSnapshot.remember(shownScopeRef.current, screen, HOME_TEASER_SNAPSHOT_PART, {
       memberId: member,
       value: liveValue,
+      height: liveValue ? height : undefined,
     } satisfies TeaserSnapshot)
-  }, [liveValue, member, memberSettled, scope, screen])
+  }, [height, liveValue, member, memberSettled, scope, screen])
 
   useEffect(() => {
     readingForRef.current = member
@@ -221,7 +267,7 @@ export function useHomeSpotlightTeaser({
     [state]
   )
 
-  return { value, removeValue, sponsoredShown, settled }
+  return { value, removeValue, sponsoredShown, settled, reservedHeight, measure }
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
@@ -277,6 +323,8 @@ export interface HomeSpotlightTeaserProps {
   onImageError: () => void
   /** Called when the teaser leaves while its link holds focus. */
   onLeaveWhileFocused: () => void
+  /** Called after each commit with the teaser's laid-out height (CodeRabbit r2 #7). */
+  onMeasure?: (height: number) => void
 }
 
 export function HomeSpotlightTeaser({
@@ -286,6 +334,7 @@ export function HomeSpotlightTeaser({
   onOpen,
   onImageError,
   onLeaveWhileFocused,
+  onMeasure,
 }: HomeSpotlightTeaserProps) {
   const rootRef = useRef<HTMLDivElement>(null)
   const leaveRef = useRef(onLeaveWhileFocused)
@@ -308,6 +357,12 @@ export function HomeSpotlightTeaser({
       if (root?.contains(document.activeElement)) leaveRef.current()
     }
   }, [])
+
+  // Every commit, so the height read once the gate shows the body (and after a wrap change)
+  // is the one kept. A hidden body measures 0, which `measure` ignores.
+  useLayoutEffect(() => {
+    if (rootRef.current) onMeasure?.(rootRef.current.offsetHeight)
+  })
 
   return (
     <div
@@ -417,8 +472,8 @@ export function HomeSpotlightTeaser({
 }
 
 /**
- * Mounted only while the layout is stacked and the value is valid; anything
- * else renders nothing and reserves no space.
+ * Mounted only while the layout is stacked and the value is valid. Without a value it
+ * renders nothing, except the held place of an expired teaser on a return (CodeRabbit r2 #7).
  */
 export function HomeSpotlightTeaserSlot({
   stacked,
@@ -431,7 +486,15 @@ export function HomeSpotlightTeaserSlot({
   t: Translate
   onLeaveWhileFocused: () => void
 }) {
-  if (!stacked || !teaser.value) return null
+  if (!stacked) return null
+  if (!teaser.value)
+    return teaser.reservedHeight ? (
+      <div
+        aria-hidden="true"
+        data-testid="home-spotlight-teaser-reserved"
+        style={{ height: teaser.reservedHeight }}
+      />
+    ) : null
   return (
     <HomeSpotlightTeaser
       value={teaser.value}
@@ -440,6 +503,7 @@ export function HomeSpotlightTeaserSlot({
       onOpen={teaser.open}
       onImageError={teaser.removeValue}
       onLeaveWhileFocused={onLeaveWhileFocused}
+      onMeasure={teaser.measure}
     />
   )
 }

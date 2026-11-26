@@ -3582,12 +3582,34 @@ export function CommunityLookbookGrid({
       message: { key: 'community.realtime.unavailable' },
       tone: 'info',
     }
+    /** This mount heard `connected` at least once: a later loss of access is a lapse. */
+    let verifiedOnce = false
     // D3: shown content outlives a reconnect only while access was verified recently.
     // Once that lapses, the content hides and the outage is announced (D9).
-    const hideContent = () => {
+    const hideContent = (accessLost: boolean) => {
       captureScroll(renderedItemsRef.current)
       setCommunityAvailable(false)
-      revokeSnapshot()
+      /*
+       * Only a loss of access drops what every tab keeps (P3-1). A fresh mount whose socket
+       * fails before its first catch-up answers (`recovering`, a slow or flaky connection)
+       * has learned nothing about access: it hides its own content until a catch-up verifies,
+       * and Home's teaser and rows stay for the next return (CI 7.7-E2E-006 delayed on
+       * 3f1986d1: opening Community dropped them, so the return to Home painted without them).
+       */
+      if (accessLost) revokeSnapshot()
+    }
+    /** Content this mount may not show (D3/D9): hidden, and revoked when access was lost. */
+    const hideUnverified = (state: string) => {
+      const unknown = !verifiedOnce && state === 'recovering'
+      /*
+       * A return that restored its rows from the snapshot keeps them (and Home's teaser) while
+       * nothing is known about access: those rows were authorized earlier in this session, and a
+       * ban or denial seen since already revoked them (P3-1). Hiding them here would show them
+       * and then hide them on a slow catch-up (CI 7.7-E2E-006 delayed). The first catch-up
+       * decides: `connected` keeps them, a denial, a ban or `unavailable` hides and revokes.
+       */
+      if (unknown && restored) return
+      hideContent(!unknown)
     }
     /**
      * Codex review P1-1: realtime cancelled the feed read in flight. Before the first page
@@ -3598,7 +3620,7 @@ export function CommunityLookbookGrid({
     }
     const verification = new CommunityVerification(() => {
       if (!active) return
-      hideContent()
+      hideContent(true)
       setNotice(outage)
     })
     const sync = new CommunitySyncState(communitySyncFromWeb(), currentMode, {
@@ -3683,8 +3705,10 @@ export function CommunityLookbookGrid({
         // reconnect is not announced as an outage. Content hidden as unverified stays
         // hidden until a catch-up reports 'connected'.
         const { visible, verify } = verification.update(state, realtime)
-        if (state === 'connected') setCommunityAvailable(true)
-        else if (!visible) hideContent()
+        if (state === 'connected') {
+          setCommunityAvailable(true)
+          verifiedOnce = true
+        } else if (!visible) hideUnverified(state)
         if (verify) void realtimeSyncRef.current?.catchUp()
         // The outage notice clears only once verified content is visible again.
         if (state === 'connected')
@@ -3811,6 +3835,7 @@ export function CommunityLookbookGrid({
     realtimeEpoch,
     markFeedSettled,
     revokeSnapshot,
+    restored,
   ])
 
   useEffect(

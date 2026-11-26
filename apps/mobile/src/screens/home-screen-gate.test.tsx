@@ -1,13 +1,14 @@
 // Learning path Step 65: Signed-in shell without flashes.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-65-signed-in-shell-without-flashes
-// Story CC-7.7 builder tests: 7.7-NAT-002, 7.7-NAT-003 and the Home half of 7.7-NAT-004.
+// Story CC-7.7 builder tests: 7.7-NAT-002, 7.7-NAT-003, 7.7-NAT-016 and the Home half of
+// 7.7-NAT-004.
 // Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md.
 // Home shows the gate's placeholder until the ritual read (which carries the weather) settles:
 // the member sample never shows first (D2), the stale and alert banners arrive with the body
 // (D4), and a refresh with the outfit on screen never returns to the loading state (D5).
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import React from 'react'
-import { act, configure, screen, waitFor } from '@testing-library/react'
+import { act, configure, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import {
   afterEach,
@@ -161,6 +162,39 @@ const warmerRitual = {
       },
     },
   },
+}
+
+/** The same ritual answered for another saved location. */
+const otherLocationRitual = {
+  ...mockRitualResponse,
+  data: {
+    ...mockRitualResponse.data,
+    weather: { ...mockRitualResponse.data.weather, locationKey: 'other-location-key' },
+  },
+}
+
+/**
+ * Pins the clock the ritual's day is read from (the fixture's zone is America/Los_Angeles, UTC-7
+ * in July). Only `Date` is faked, and it keeps moving with real time from there, so anything
+ * timed by `Date.now()` still runs; timers and animation frames stay real.
+ */
+function pinClock(iso: string) {
+  vi.useFakeTimers({ toFake: ['Date'], shouldAdvanceTime: true })
+  vi.setSystemTime(new Date(iso))
+  onTestFinished(() => {
+    vi.useRealTimers()
+  })
+}
+
+/** Swaps the morning outfit's trench coat for the leather jacket in the garment swap modal. */
+async function swapTrenchForLeatherJacket() {
+  fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+  fireEvent.click(await screen.findByTestId('swap-option-leather-jacket'))
+  await waitFor(() =>
+    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
+  )
+  expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+  await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
 }
 
 const placeholder = () => screen.queryByTestId('screen-placeholder')
@@ -370,5 +404,71 @@ describe('Home screen gate (native)', () => {
 
     await userEvent.click(screen.getByTestId('status-bar-action-retry'))
     await waitFor(() => expect(ritual.requests()).toBe(3))
+  })
+
+  // CodeRabbit r2: a member's swap stays for the ritual it was made on, the same location and
+  // day. A return read that began before the swap and lands after it keeps it too.
+  it('7.7-NAT-016 a swap stays through return reads for the same ritual, one begun before it included', async () => {
+    // 09:00 in Los Angeles: past the 08:00 rollover, so every read here is tomorrow's ritual.
+    pinClock('2026-07-22T16:00:00.000Z')
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    )
+    const temperature = screen.getByTestId('current-temperature').textContent
+
+    leaveAndReturn()
+    await waitFor(() => expect(ritual.requests()).toBe(2))
+    await swapTrenchForLeatherJacket()
+
+    // The read begun before the swap lands with new weather and the server's unswapped outfit.
+    await ritual.release(1, HttpResponse.json(warmerRitual))
+    await waitFor(() =>
+      expect(screen.getByTestId('current-temperature').textContent).not.toBe(temperature)
+    )
+    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
+    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+
+    // Two hours later, same day: a read begun after the swap keeps it as well.
+    vi.setSystemTime(new Date('2026-07-22T18:00:00.000Z'))
+    leaveAndReturn()
+    await ritual.release(2, HttpResponse.json(mockRitualResponse))
+    await waitFor(() =>
+      expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
+    )
+    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
+    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+  })
+
+  it('7.7-NAT-016 a return read for another day or another location replaces the swap', async () => {
+    // 07:30 in Los Angeles: before the 08:00 rollover, so the first ritual is today's.
+    pinClock('2026-07-22T14:30:00.000Z')
+    const ritual = heldRitualAnswers()
+    await renderHome()
+    await ritual.release(0, HttpResponse.json(mockRitualResponse))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    )
+    await swapTrenchForLeatherJacket()
+
+    // 08:30: the ritual rolled to tomorrow, so the swap made on today's goes.
+    vi.setSystemTime(new Date('2026-07-22T15:30:00.000Z'))
+    leaveAndReturn()
+    await ritual.release(1, HttpResponse.json(mockRitualResponse))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    )
+    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
+
+    // A swap on tomorrow's ritual, then a read for another saved location: the swap goes.
+    await swapTrenchForLeatherJacket()
+    leaveAndReturn()
+    await ritual.release(2, HttpResponse.json(otherLocationRitual))
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    )
+    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
   })
 })

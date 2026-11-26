@@ -433,6 +433,47 @@ describe('WardrobePage onboarding entry card', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  // CodeRabbit round 2 on PR 292 (#10): the automatic read and Retry share one request sequence.
+  it('7.7-CMP-053 an automatic onboarding read that is older than a Retry never overwrites its answer', async () => {
+    const user = userEvent.setup()
+    verifiedSession.owner = 'onboarding-member'
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'test-token-onboarding-member'
+    )
+    onTestFinished(() => {
+      verifiedSession.owner = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    })
+    const automatic = Promise.withResolvers<WardrobeOnboardingStateContract>()
+    getOnboardingStateFromWeb
+      // The mount's read fails, so the page reads again once the session is verified.
+      .mockRejectedValueOnce(new Error('network down'))
+      // That automatic read is slow.
+      .mockReturnValueOnce(automatic.promise)
+      // The member's Retry, sent after it, answers first.
+      .mockResolvedValueOnce(onboardingState({ status: 'in_progress' }))
+    render(<WardrobePage />)
+    await screen.findByRole('alert')
+
+    // The same member is verified again: the automatic read goes out, and Retry is still offered.
+    act(() => {
+      window.dispatchEvent(new Event('couture:session'))
+    })
+    await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(2))
+    await user.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByRole('link', { name: 'Set up your closet' })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    // The older automatic read fails late: the Retry's answer stays, with no error.
+    await act(async () => {
+      automatic.reject(new Error('late onboarding failure'))
+      await automatic.promise.catch(() => undefined)
+    })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Set up your closet' })).toBeInTheDocument()
+  })
+
   it('opens the silhouette settings in an accessible modal and restores focus on close', async () => {
     const user = userEvent.setup()
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))

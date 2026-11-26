@@ -10,7 +10,9 @@
 // frame (P2-4), 7.7-CMP-018 a fixture bearer switch while the ritual read is out (P2-1).
 // CodeRabbit round 1 on PR 292: 7.7-CMP-042 the ritual snapshot waits for the city line (#9),
 // 7.7-CMP-043 an expired remembered teaser is never shown (#10). CI real-session on 61d7156e:
-// 7.7-CMP-044 the hero stays outside the gate (L-10).
+// 7.7-CMP-044 the hero stays outside the gate (L-10). CodeRabbit round 2 on PR 292: 7.7-CMP-049
+// an expired remembered teaser holds its place (#7), 7.7-CMP-050 a refreshed outfit never settles
+// with the previous city line (#6).
 import type { RitualResponse, SavedLocation } from '@couture/api-client/contracts/http'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
@@ -20,6 +22,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import { currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import {
   SPOTLIGHT_PATH,
@@ -432,6 +435,123 @@ describe('7.7 Home screen gate', () => {
 
     await answer(1, cityPage())
     expect(await screen.findByTestId('home-spotlight-teaser-link')).toBeVisible()
+  })
+
+  it('7.7-CMP-049 a return whose remembered teaser expired holds its height until the fresh teaser takes the place (CodeRabbit r2 #7)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    useAnsweredRitual()
+    // jsdom lays nothing out: the teaser reports the height a browser would give it.
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.dataset.testid === 'home-spotlight-teaser' ? 132 : 0
+    })
+    const { answer } = useServedSpotlight()
+    const firstVisit = renderHomeGate()
+    await answer(0, cityPage())
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    const scope = currentWebSessionScope()
+    type Kept = { memberId: string; value: { completedAt: number }; height?: number }
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall<Kept>(scope, 'home', HOME_TEASER_SNAPSHOT_PART)?.height
+      ).toBe(132)
+    )
+    firstVisit.unmount()
+
+    // The remembered teaser was read longer ago than a teaser lives.
+    const kept = screenSnapshot.recall<Kept>(scope, 'home', HOME_TEASER_SNAPSHOT_PART)!
+    screenSnapshot.remember(scope, 'home', HOME_TEASER_SNAPSHOT_PART, {
+      ...kept,
+      value: { ...kept.value, completedAt: Date.now() - SPOTLIGHT_TEASER_EXPIRY_MS - 1 },
+    })
+    renderHomeGate()
+
+    // The gate opens from the snapshot with no teaser, and its place is held at its height.
+    expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    expect(screen.queryByTestId('home-spotlight-teaser-link')).toBeNull()
+    const reserved = screen.getByTestId('home-spotlight-teaser-reserved')
+    expect(reserved).toHaveAttribute('aria-hidden', 'true')
+    expect(reserved).toHaveStyle({ height: '132px' })
+
+    // The fresh read answers: the teaser takes the held place.
+    await answer(1, cityPage())
+    expect(await screen.findByTestId('home-spotlight-teaser-link')).toBeVisible()
+    expect(screen.queryByTestId('home-spotlight-teaser-reserved')).toBeNull()
+  })
+
+  it('7.7-CMP-050 a refreshed outfit never settles with the previous city line: the snapshot keeps the last coherent pair until the new city answers (CodeRabbit r2 #6)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signInFixtureMember()
+    const denver: SavedLocation = {
+      ...chicagoHome,
+      id: 'saved-denver',
+      label: 'Denver home',
+      locationKey: 'denver',
+    }
+    const ritualAt = (locationKey: string): RitualResponse => {
+      const base = memberRitual()
+      return {
+        data: { ...base.data, weather: { ...base.data.weather, locationKey } },
+      }
+    }
+    let returning = false
+    let ritualReads = 0
+    const cityLine = Promise.withResolvers<void>()
+    onTestFinished(() => cityLine.resolve())
+    useMswHandlers(
+      // The member moved between visits: the return's outfit is for another location.
+      http.get('/api/v1/ritual', () => {
+        ritualReads += 1
+        return HttpResponse.json(ritualAt(returning ? 'denver' : 'chicago'))
+      }),
+      http.get('/api/v1/locations', async () => {
+        if (returning) await cityLine.promise
+        return HttpResponse.json({ data: [chicagoHome, denver] })
+      })
+    )
+    const { answer } = useServedSpotlight()
+    type KeptRitual = {
+      ritual: { weather: { locationKey: string } } | null
+      city: string | undefined
+    }
+    const keptRitual = () =>
+      screenSnapshot.recall<KeptRitual>(currentWebSessionScope(), 'home', 'ritual')
+    const firstVisit = renderHomeGate()
+    await answer(0, cityPage())
+    await waitFor(() => expect(keptRitual()?.city).toBe('Chicago home'))
+    firstVisit.unmount()
+
+    // The return's outfit answers for Denver while its city line is still out.
+    returning = true
+    renderHomeGate()
+    await waitFor(() => expect(ritualReads).toBe(2))
+    await settle()
+    expect(keptRitual()).toMatchObject({
+      ritual: { weather: { locationKey: 'chicago' } },
+      city: 'Chicago home',
+    })
+    // The Chicago line never sits over the Denver outfit.
+    expect(
+      within(screen.getByTestId('home-live-outfit')).queryByText('Chicago home')
+    ).toBeNull()
+
+    await act(async () => {
+      cityLine.resolve()
+      await cityLine.promise
+    })
+    await waitFor(() =>
+      expect(keptRitual()).toMatchObject({
+        ritual: { weather: { locationKey: 'denver' } },
+        city: 'Denver home',
+      })
+    )
+    expect(
+      within(screen.getByTestId('home-live-outfit')).getByText('Denver home')
+    ).toBeVisible()
   })
 
   it('7.7-CMP-044 the hero stays outside the Home gate, so a session being verified shows it while the body waits (real-session L-10)', () => {

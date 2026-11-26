@@ -226,6 +226,12 @@ five-tab rework or back pattern (CC-7.11); Today, Community, Closet calm-down co
 
 ## Review Triage Log
 
+- 2026-11-25, CodeRabbit round 2 on 330e6966 (10 findings). Decision for native Home: a
+  member's garment swap stays in place for the ritual it was made on (same saved location and
+  same anchor day, 08:00 local rollover); any read for that ritual, including one that began
+  before the swap, keeps it, and a read for another day or location, a location or wardrobe
+  change, or a member change replaces it. Return reads that overlap a save, purchase or restore
+  are dropped on web and native.
 - 2026-11-25, CodeRabbit round 1 on 61d7156e (30 findings: 29 fixed, #16 handled in
   EdgeToEdgeModal) plus CI reds. Decisions: the Home marketing hero and legal links sit outside
   the Home gate and the Home placeholder is `min-h-screen`, so a pending session that ends

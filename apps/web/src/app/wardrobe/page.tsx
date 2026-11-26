@@ -483,6 +483,12 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
   const [confirmedGarment, setConfirmedGarment] = useState(false)
   const [onboardingStatus, setOnboardingStatus] =
     useState<WardrobeOnboardingStatus | null>(start.onboardingStatus)
+  /**
+   * CodeRabbit r2 #10: one sequence for the automatic onboarding read and Retry. Each read takes
+   * the next number when it starts, and only the latest one may set the onboarding state, so an
+   * older answer (or failure) never overwrites a newer one.
+   */
+  const onboardingRequestRef = useRef(0)
   const [onboardingStatusError, setOnboardingStatusError] = useState(
     start.onboardingStatusError
   )
@@ -674,15 +680,17 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
         setUserIdError(true)
         missedSession()
       })
+    const onboardingRequest = ++onboardingRequestRef.current
+    const latestOnboarding = () => onboardingRequest === onboardingRequestRef.current
     void getOnboardingStateFromWeb(controller.signal)
       .then((state) => {
-        if (!controller.signal.aborted && sameScope()) {
+        if (!controller.signal.aborted && latestOnboarding() && sameScope()) {
           setOnboardingStatus(state.status)
           setOnboardingStatusError(false)
         }
       })
       .catch(() => {
-        if (controller.signal.aborted || !sameScope()) return
+        if (controller.signal.aborted || !latestOnboarding() || !sameScope()) return
         setOnboardingStatusError(true)
         missedSession()
       })
@@ -691,13 +699,17 @@ function WardrobeHubView({ owner }: { owner: string | null }) {
 
   const retryOnboardingStatus = () => {
     const scope = currentWebSessionScope()
+    const request = ++onboardingRequestRef.current
+    const latest = () => request === onboardingRequestRef.current
     setOnboardingStatusError(false)
     void getOnboardingStateFromWeb()
       .then((state) => {
+        if (!latest()) return
         if (scope === currentWebSessionScope()) setOnboardingStatus(state.status)
         else setAccountReadAttempt((attempt) => attempt + 1)
       })
       .catch(() => {
+        if (!latest()) return
         if (scope === currentWebSessionScope()) setOnboardingStatusError(true)
         else setAccountReadAttempt((attempt) => attempt + 1)
       })

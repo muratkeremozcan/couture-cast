@@ -145,6 +145,31 @@ describe('R52 EdgeToEdgeModal', () => {
     }
   })
 
+  it('7.7-NAT-005 an opening uses the setting as it is at that render, even when it changed while hidden (CodeRabbit r2 #3)', () => {
+    motion.reduced = true
+    try {
+      const sheet = (visible: boolean) => (
+        <EdgeToEdgeModal visible={visible} animationType="fade">
+          <Text>Sheet</Text>
+        </EdgeToEdgeModal>
+      )
+      const view = render(sheet(false))
+      expect(lastModalProps()).toMatchObject({ animationType: 'none', visible: false })
+
+      // The setting resolves and the sheet opens in the same render: this opening fades.
+      motion.reduced = false
+      view.rerender(sheet(true))
+      expect(lastModalProps()).toMatchObject({ animationType: 'fade', visible: true })
+
+      // It keeps that animation for the rest of the presentation.
+      motion.reduced = true
+      view.rerender(sheet(true))
+      expect(lastModalProps()).toMatchObject({ animationType: 'fade', visible: true })
+    } finally {
+      motion.reduced = false
+    }
+  })
+
   it('keeps both translucent flags for an opaque full-screen page', () => {
     render(
       <EdgeToEdgeModal visible transparent={false}>

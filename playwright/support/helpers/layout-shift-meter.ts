@@ -115,13 +115,30 @@ export function installShellMeter(config: MeterConfig) {
         const entry = raw as PerformanceEntry & {
           value: number
           hadRecentInput: boolean
-          sources?: { node?: Node | null }[]
+          sources?: {
+            node?: Node | null
+            previousRect?: DOMRectReadOnly
+            currentRect?: DOMRectReadOnly
+          }[]
         }
         state.shifts.push({
           value: entry.value,
           startTime: entry.startTime,
           hadRecentInput: entry.hadRecentInput,
-          sources: (entry.sources ?? []).map((source) => describe(source.node)),
+          // What moved and by how much: the named ancestor, the node itself (tag, classes, first
+          // words) and its rect before and after, so a failure names the element, not a region.
+          sources: (entry.sources ?? []).map((source) => {
+            const node = source.node
+            const element = node instanceof Element ? node : (node?.parentElement ?? null)
+            const excerpt = element
+              ? `<${element.tagName.toLowerCase()} class="${String(element.getAttribute('class') ?? '').slice(0, 60)}">${(element.textContent ?? '').trim().slice(0, 40)}`
+              : ''
+            const rect = (r?: DOMRectReadOnly) =>
+              r
+                ? `${Math.round(r.x)},${Math.round(r.y)} ${Math.round(r.width)}x${Math.round(r.height)}`
+                : '-'
+            return `${describe(node)} ${excerpt} [${rect(source.previousRect)} -> ${rect(source.currentRect)}]`
+          }),
         })
       }
     }).observe({ type: 'layout-shift', buffered: true })

@@ -218,7 +218,9 @@ export function useCommunitySpotlight<Token = number>({
         restoringRef.current = false
         setState((previous) => {
           const previousById = new Map(previous.items.map((item) => [item.id, item]))
-          if (inPlace) {
+          // CodeRabbit r2 #5: only a row for the same area is kept. A refresh that answers for
+          // another level or label (the member moved) replaces it, cards and cursor alike.
+          if (inPlace && previous.level === page.level && previous.label === page.label) {
             // The remembered row keeps every page it showed and its cursor: the looks on this
             // page take its answer where they are, and any new one joins at the end of the row.
             const pageById = new Map(items.map((item) => [item.id, item]))

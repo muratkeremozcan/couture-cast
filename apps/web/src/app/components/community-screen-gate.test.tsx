@@ -11,6 +11,9 @@
 // CodeRabbit round 1 on PR 292: 7.7-CMP-030 a return's Spotlight refresh keeps every page it showed
 // (#1), 7.7-CMP-031 a failed filter switch never relabels the kept rows (#28). CI pw-e2e on 3d4b5c96
 // (7.7-E2E-013): 7.7-CMP-045 a return whose refresh answers the same data moves nothing.
+// CodeRabbit round 2 on PR 292: 7.7-CMP-051 a refresh for another area replaces the kept row (#5).
+// CI pw-e2e on 3f1986d1 (7.7-E2E-006 delayed): 7.7-CMP-052 a socket failing before the first
+// catch-up keeps what other tabs kept, and a return's restored rows until the catch-up decides.
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
@@ -615,5 +618,119 @@ describe('7.7 Community screen gate', () => {
     expect(refreshed.loadMore).toBe(restored.loadMore)
     expect(refreshed.viewMore).toBe(restored.viewMore)
     expect(screen.queryByTestId('community-spotlight-loading')).toBeNull()
+  })
+
+  it('7.7-CMP-051 a return whose Spotlight refresh answers for another area replaces the kept row and its cursor (CodeRabbit r2 #5)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    let returning = false
+    const refresh = Promise.withResolvers<void>()
+    const cursors: (string | null)[] = []
+    useMswHandlers(
+      http.get(FEED_PATH, () => feedBody({ items: [item()] })),
+      http.get(SPOTLIGHT_PATH, async ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        cursors.push(cursor)
+        if (cursor === 'cursor-2')
+          return spotlightBody({ items: [ranked(3), ranked(4)], nextCursor: 'cursor-3' })
+        if (!returning)
+          return spotlightBody({ items: [ranked(1), ranked(2)], nextCursor: 'cursor-2' })
+        await refresh.promise
+        // The member moved since they left: page one is another city's.
+        return spotlightBody({ label: 'Porto', items: [ranked(7)], nextCursor: null })
+      })
+    )
+    const user = userEvent.setup()
+    const ranks = () =>
+      within(screen.getByTestId('community-spotlight-list'))
+        .getAllByRole('listitem')
+        .map((entry) => entry.getAttribute('data-rank'))
+
+    // First visit: the member pages the Lisbon Spotlight to its second page.
+    const firstVisit = renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    await user.click(await screen.findByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('spotlight-lookbook-card-spot-4')
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall<{ spotlight: { items: unknown[] } }>(
+          currentWebSessionScope(),
+          'community',
+          COMMUNITY_GRID_SNAPSHOT_PART
+        )?.spotlight.items
+      ).toHaveLength(4)
+    )
+    firstVisit.unmount()
+
+    // The return starts from the Lisbon row; its refresh answers for Porto.
+    returning = true
+    renderCommunity()
+    expect(ranks()).toEqual(['1', '2', '3', '4'])
+    await waitFor(() => expect(cursors.at(-1)).toBeNull())
+    await act(async () => {
+      refresh.resolve()
+      await refresh.promise
+    })
+
+    // The Porto page replaces the row: no Lisbon card, and no Lisbon cursor behind View more.
+    await waitFor(() => expect(ranks()).toEqual(['7']))
+    expect(screen.getByTestId('community-spotlight-heading')).toHaveTextContent('Porto')
+    expect(screen.queryByTestId('spotlight-lookbook-card-spot-3')).toBeNull()
+    expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
+  })
+
+  it('7.7-CMP-052 a socket failing before the first catch-up never drops what other tabs kept, and a return keeps its restored rows until the catch-up decides (CI 7.7-E2E-006 delayed)', async () => {
+    document.documentElement.setAttribute('data-session', 'member')
+    signIn()
+    const sync = useCapturedSync()
+    useMswHandlers(
+      http.get(FEED_PATH, () => feedBody({ items: [item()] })),
+      http.get(SPOTLIGHT_PATH, () => spotlightBody({ items: [ranked(1)] }))
+    )
+    const firstVisit = renderCommunity()
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    const scope = currentWebSessionScope()
+    await waitFor(() =>
+      expect(
+        screenSnapshot.recall(scope, 'community', COMMUNITY_GRID_SNAPSHOT_PART)
+      ).toBeDefined()
+    )
+    // Home's teaser and rows, kept earlier in the session.
+    screenSnapshot.remember(scope, 'home', HOME_TEASER_SNAPSHOT_PART, { value: 'teaser' })
+    screenSnapshot.remember(scope, 'home', COMMUNITY_GRID_SNAPSHOT_PART, { rows: 'home' })
+    const homeKept = () => ({
+      teaser: screenSnapshot.recall(scope, 'home', HOME_TEASER_SNAPSHOT_PART),
+      rows: screenSnapshot.recall(scope, 'home', COMMUNITY_GRID_SNAPSHOT_PART),
+    })
+
+    // A first visit's socket fails before any catch-up: nothing is known about access, so
+    // nothing kept for another tab is dropped.
+    act(() => sync().availability('recovering', false))
+    expect(homeKept()).toEqual({ teaser: { value: 'teaser' }, rows: { rows: 'home' } })
+    firstVisit.unmount()
+
+    // The return restores its rows; its socket fails before its first catch-up too.
+    renderCommunity()
+    const restored = screen.getByTestId('lookbook-card-post-1')
+    expect(restored).toBeVisible()
+    act(() => sync().availability('recovering', false))
+    expect(screen.getByTestId('lookbook-card-post-1')).toBe(restored)
+    expect(restored).toBeVisible()
+    expect(homeKept()).toEqual({ teaser: { value: 'teaser' }, rows: { rows: 'home' } })
+    expect(
+      screenSnapshot.recall(scope, 'community', COMMUNITY_GRID_SNAPSHOT_PART)
+    ).toBeDefined()
+
+    // The catch-up is denied: the rows go, and so does everything kept for a return.
+    act(() => sync().availability('denied'))
+    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+    expect(homeKept()).toEqual({ teaser: undefined, rows: undefined })
+    expect(
+      screenSnapshot.recall(scope, 'community', COMMUNITY_GRID_SNAPSHOT_PART)
+    ).toBeUndefined()
   })
 })

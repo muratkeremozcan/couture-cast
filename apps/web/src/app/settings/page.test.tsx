@@ -14,7 +14,9 @@
 // 292: 7.7-CMP-033 a theme save outranks a return's refresh (#12), 7.7-CMP-034 a preference save
 // outranks it (#13), 7.7-CMP-035 the snapshot keeps the confirmed preference (#27). CI real-session
 // on 61d7156e: 7.7-CMP-036 the gate never waits on the account read (PS-2), 7.7-CMP-037 no Sign
-// in hint is ever in a member's document (PS-1, PL-1 to PL-3).
+// in hint is ever in a member's document (PS-1, PL-1 to PL-3). CodeRabbit round 2 on PR 292:
+// 7.7-CMP-046 a preference read overlapping a save never lands (#4), 7.7-CMP-047 a theme read
+// overlapping a save never lands (#8), 7.7-CMP-048 the account header keeps its footprint (#9).
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
 // shape, the bearer header, and the contract parsing are all exercised by the
@@ -944,6 +946,180 @@ describe('7.7 Profile without flashes', () => {
     expect(await screen.findByTestId('profile-account-name')).toHaveTextContent(
       'Jade Rivers'
     )
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+  })
+
+  it('7.7-CMP-046 a preference read sent while a save is out never replaces the saved value, and a read sent after the save does (CodeRabbit r2 #4)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    let stored = true
+    let reads = 0
+    const overlapping = deferred<void>()
+    const putGate = deferred<void>()
+    useMswHandlers(
+      http.get(PREFERENCES_PATH, async () => {
+        reads += 1
+        // The value the server holds when the read is served, before any later save commits.
+        const answer = stored
+        if (reads === 2) await overlapping.promise
+        return HttpResponse.json({ data: { affiliateCtasEnabled: answer } })
+      }),
+      http.put(PREFERENCES_PATH, async ({ request }) => {
+        const body = (await request.json()) as { affiliateCtasEnabled: boolean }
+        await putGate.promise
+        stored = body.affiliateCtasEnabled
+        return HttpResponse.json({ data: body })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+    await firstVisitSettles()
+    expect(toggle()).toBeChecked()
+
+    // The member opts out; while that save is out, a language switch reads the setting again.
+    fireEvent.click(toggle())
+    await act(async () => {
+      await getI18n().changeLanguage('de-DE')
+    })
+    await waitFor(() => expect(reads).toBe(2))
+
+    await act(async () => {
+      putGate.resolve()
+      await putGate.promise
+    })
+    await waitFor(() => expect(kept('commerce')).toEqual({ enabled: false }))
+
+    // The read sent during the save answers with the value the save replaced.
+    await act(async () => {
+      overlapping.resolve()
+      await overlapping.promise
+    })
+    await settle()
+    expect(toggle()).not.toBeChecked()
+    expect(kept('commerce')).toEqual({ enabled: false })
+
+    // Another device opts back in; a read sent after the save settled is current and lands.
+    stored = true
+    await act(async () => {
+      await getI18n().changeLanguage('en-US')
+    })
+    await waitFor(() => expect(toggle()).toBeChecked())
+    expect(reads).toBe(3)
+    await waitFor(() => expect(kept('commerce')).toEqual({ enabled: true }))
+  })
+
+  it('7.7-CMP-047 a palette read sent while a save is out never replaces the saved palette, and a read sent after the save does (CodeRabbit r2 #8)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    onTestFinished(() => document.documentElement.removeAttribute('data-theme'))
+    let stored: string | null = null
+    let reads = 0
+    const overlapping = deferred<void>()
+    const putGate = deferred<void>()
+    useMswHandlers(
+      http.get(THEME_PATH, async () => {
+        reads += 1
+        const answer = stored
+        if (reads === 2) await overlapping.promise
+        return HttpResponse.json({
+          data: { theme: answer, isEntitled: true, themesEnabled: true },
+        })
+      }),
+      http.put(THEME_PATH, async () => {
+        await putGate.promise
+        stored = 'jewel_radiance'
+        return HttpResponse.json({
+          data: { theme: 'jewel_radiance', isEntitled: true, themesEnabled: true },
+        })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: true })
+    )
+    await firstVisitSettles()
+
+    // The member picks a palette; while that save is out, a language switch reads the theme again.
+    fireEvent.click(await screen.findByTestId('premium-theme-option-jewel_radiance'))
+    await act(async () => {
+      await getI18n().changeLanguage('de-DE')
+    })
+    await waitFor(() => expect(reads).toBe(2))
+
+    await act(async () => {
+      putGate.resolve()
+      await putGate.promise
+    })
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
+    )
+
+    // The read sent during the save answers with the palette the save replaced.
+    await act(async () => {
+      overlapping.resolve()
+      await overlapping.promise
+    })
+    await settle()
+    expect(document.documentElement.getAttribute('data-theme')).toBe('jewel_radiance')
+    expect(screen.getByTestId('premium-theme-option-jewel_radiance')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(kept<{ theme: string | null }>('theme')?.theme).toBe('jewel_radiance')
+
+    // Another device picks a different palette; a read sent after the save settled lands.
+    stored = 'autumn_umber'
+    await act(async () => {
+      await getI18n().changeLanguage('en-US')
+    })
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute('data-theme')).toBe('autumn_umber')
+    )
+    expect(reads).toBe(3)
+  })
+
+  it('7.7-CMP-048 the account header keeps its two lines after its read settles: when the read fails, and for an account without a display name (CodeRabbit r2 #9)', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    let fails = true
+    let profileReads = 0
+    useMswHandlers(
+      http.get(PROFILE_PATH, () => {
+        profileReads += 1
+        if (fails)
+          return HttpResponse.json(
+            { statusCode: 500, message: 'Unavailable', error: 'Internal Server Error' },
+            { status: 500 }
+          )
+        return HttpResponse.json({
+          user: {
+            id: 'member-1',
+            birthdate: null,
+            role: 'guardian',
+            displayName: null,
+            email: 'jade@example.test',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+
+    // The read fails: the header's two lines stay held above the sections.
+    const failed = render(<SettingsPage />)
+    await waitFor(() => expect(profileReads).toBe(1))
+    await settle()
+    const reserved = screen.getByTestId('profile-account-reserved')
+    expect(reserved).toHaveAttribute('aria-hidden', 'true')
+    expect(reserved).toHaveClass('min-h-12')
+    failed.unmount()
+    screenSnapshot.clear()
+
+    // The read answers an account with no display name: the email line keeps the same footprint.
+    fails = false
+    render(<SettingsPage />)
+    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
+      'jade@example.test'
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.getByTestId('profile-account')).toHaveClass('min-h-12')
     expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
   })
 

@@ -267,7 +267,59 @@ function homeGateReady(
   return session === 'signed-out' || session === 'unavailable' || settled
 }
 
-type OwnedRitual = { owner: string | null; data: RitualResponse }
+/** `readAt`: when the read that produced `data` began, which fixes the ritual's day. */
+type OwnedRitual = { owner: string | null; data: RitualResponse; readAt: number }
+
+/** Story 5.5 Decision 2: from 08:00 local the server's ritual is the next day's. */
+const ritualRolloverHour = 8
+const dayMs = 24 * 60 * 60 * 1000
+
+function localDateAndHour(at: number, timeZone: string) {
+  const format = (zone: string) =>
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(at))
+  let parts: Intl.DateTimeFormatPart[]
+  try {
+    parts = format(timeZone)
+  } catch {
+    // An unknown zone name: UTC still separates one day from the next.
+    parts = format('UTC')
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((entry) => entry.type === type)?.value ?? ''
+  return {
+    date: `${part('year')}-${part('month')}-${part('day')}`,
+    hour: Number(part('hour')),
+  }
+}
+
+/**
+ * Story CC-7.7: which ritual a read answered. The server keys a ritual by the saved location and
+ * its anchor day in that location's zone (before 08:00 local today's, from 08:00 the next
+ * day's), taken when the read began. A member's garment swap belongs to one such ritual.
+ */
+function ritualIdentity(ritual: RitualResponse, readAt: number): string {
+  const { locationKey, timezone } = ritual.data.weather
+  const { hour } = localDateAndHour(readAt, timezone)
+  const anchorAt = hour >= ritualRolloverHour ? readAt + dayMs : readAt
+  return `${locationKey}|${localDateAndHour(anchorAt, timezone).date}`
+}
+
+/** The garments a member swapped on one ritual, per scenario, as the swap left them. */
+type MemberSwaps = {
+  owner: string | null
+  ritual: string
+  outfits: Map<
+    string,
+    Pick<RitualResponse['data']['outfits'][number], 'garmentIds' | 'displayGarments'>
+  >
+}
 
 function ritualForOwner(record: OwnedRitual | null, owner: string | null) {
   return record?.owner === owner ? record.data : null
@@ -357,6 +409,10 @@ export default function TabOneScreen() {
   const ritual = ritualForOwner(ownedRitual, applicationUserId)
   const ritualRef = useRef(ritual)
   ritualRef.current = ritual
+  // Story CC-7.7: a member's garment swaps stay in place for the ritual they were made on. Any
+  // ritual read that lands for the same location and day, one that began before the swap
+  // included, carries them; a ritual for another day or location replaces them.
+  const memberSwapsRef = useRef<MemberSwaps | null>(null)
   // Story CC-7.7: the member whose first ritual read settled (success, empty or error). Keyed
   // by member, so the next member's first render is unsettled before any effect runs.
   const [settledOwner, setSettledOwner] = useState<string | null | undefined>(undefined)
@@ -389,6 +445,7 @@ export default function TabOneScreen() {
     setShareCardSource(null)
     setShareCardOpen(false)
     setOwnedRitual(null)
+    memberSwapsRef.current = null
     // Cleared when the member leaves, so the same member returning (A, signed out, A) is
     // unsettled until their new ritual read settles: no sample outfit before it.
     setSettledOwner(undefined)
@@ -463,6 +520,26 @@ export default function TabOneScreen() {
     })
   }
 
+  /** A ritual read's answer with the member's swaps for that same ritual laid over it. */
+  const withMemberSwaps = (data: RitualResponse, readAt: number): RitualResponse => {
+    const swaps = memberSwapsRef.current
+    if (!swaps || swaps.owner !== applicationUserId) return data
+    if (swaps.ritual !== ritualIdentity(data, readAt)) {
+      memberSwapsRef.current = null
+      return data
+    }
+    return {
+      ...data,
+      data: {
+        ...data.data,
+        outfits: data.data.outfits.map((outfit) => {
+          const swapped = swaps.outfits.get(outfit.scenario)
+          return swapped ? { ...outfit, ...swapped } : outfit
+        }),
+      },
+    }
+  }
+
   const loadData = async (
     forceRefresh = false,
     allowCacheFallback = true,
@@ -490,7 +567,11 @@ export default function TabOneScreen() {
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
-      setOwnedRitual({ owner: applicationUserId, data: cached.data })
+      setOwnedRitual({
+        owner: applicationUserId,
+        data: withMemberSwaps(cached.data, cached.timestamp),
+        readAt: cached.timestamp,
+      })
       setAlertPreferences(cached.alertPreferences)
       setIsCacheServed(true)
       setError(null)
@@ -501,15 +582,18 @@ export default function TabOneScreen() {
     }
 
     try {
-      const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
+      const { data: fetched, alertPreferences: fetchedPreferences } = await fetchRitual()
       if (!isCurrent()) return
+      // The server never stores a swap, so its answer comes back without one; the member's
+      // swaps for this ritual go back over it before it shows or enters the cache.
+      const data = withMemberSwaps(fetched, now)
 
       // A tab return re-reads in place; an unchanged answer keeps the state it already has, so
       // the outfit card and the rest of Home do not render again for the same outfit.
       setOwnedRitual((shown) =>
         shown?.owner === applicationUserId && sameRitualAnswer(shown.data, data)
           ? shown
-          : { owner: applicationUserId, data }
+          : { owner: applicationUserId, data, readAt: now }
       )
       setAlertPreferences((shown) =>
         sameRitualAnswer(shown, fetchedPreferences) ? shown : fetchedPreferences
@@ -540,7 +624,11 @@ export default function TabOneScreen() {
       }
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
-        setOwnedRitual({ owner: applicationUserId, data: cached.data })
+        setOwnedRitual({
+          owner: applicationUserId,
+          data: withMemberSwaps(cached.data, cached.timestamp),
+          readAt: cached.timestamp,
+        })
         setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
         setIsCacheServed(true)
@@ -571,6 +659,9 @@ export default function TabOneScreen() {
     latestLoadId.current += 1
     setIsLoading(true)
     setOwnedRitual(null)
+    // A wardrobe change can remove a swapped-in garment, and a location change is another
+    // ritual: the swaps go with the previous ritual.
+    memberSwapsRef.current = null
     // The previous ritual is gone, so the reload below is not a refresh in place.
     ritualRef.current = null
     setIsCacheServed(false)
@@ -837,7 +928,7 @@ export default function TabOneScreen() {
   }
 
   const performSwap = (newGarmentId: string) => {
-    if (!ritual || !swappingGarmentId) return
+    if (!ritual || !ownedRitual || !swappingGarmentId) return
 
     // Update state local model copy
     const nextOutfits = ritual.data.outfits.map((outfit) => {
@@ -860,7 +951,25 @@ export default function TabOneScreen() {
       },
     }
 
-    setOwnedRitual({ owner: applicationUserId, data: updatedRitual })
+    setOwnedRitual({
+      owner: applicationUserId,
+      data: updatedRitual,
+      readAt: ownedRitual.readAt,
+    })
+    const swappedOutfit = nextOutfits.find((outfit) => outfit.scenario === activeScenario)
+    if (swappedOutfit) {
+      const identity = ritualIdentity(ritual, ownedRitual.readAt)
+      const current = memberSwapsRef.current
+      const swaps: MemberSwaps =
+        current?.owner === applicationUserId && current.ritual === identity
+          ? current
+          : { owner: applicationUserId, ritual: identity, outfits: new Map() }
+      swaps.outfits.set(activeScenario, {
+        garmentIds: swappedOutfit.garmentIds,
+        displayGarments: swappedOutfit.displayGarments,
+      })
+      memberSwapsRef.current = swaps
+    }
 
     void saveRitualCache(cacheOwner, activeLocale, {
       // A swap rewrites a network payload, so this write can carry a commerce

@@ -224,9 +224,15 @@ export function EdgeToEdgeModal({
   // One presentation keeps the animation it opened with (CodeRabbit r1 #16): the setting can
   // resolve while the modal is up, and react-native-web replays the fade from opacity 0 when the
   // type changes on an open modal. The next opening uses the resolved setting.
-  const [presented, setPresented] = useState(requested)
-  if (!visible && presented !== requested) setPresented(requested)
-  const animationType = visible ? presented : requested
+  const [presentation, setPresentation] = useState({
+    open: visible,
+    animation: requested,
+  })
+  if (presentation.open !== visible || (!visible && presentation.animation !== requested))
+    setPresentation({ open: visible, animation: requested })
+  // The opening render takes the setting as it is now (CodeRabbit r2 #3); every later render of
+  // that presentation keeps it.
+  const animationType = visible && presentation.open ? presentation.animation : requested
   useEffect(() => {
     if (!visible) return
     setOpenModals(1)

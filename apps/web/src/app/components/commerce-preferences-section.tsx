@@ -83,10 +83,13 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
    */
   const [confirmed, setConfirmed] = useState(() => snapshot.restored?.enabled ?? true)
   /**
-   * Advances when a save starts. A read started before it (a return's in-place refresh) answers
-   * for an older value, so it never replaces the one the save commits.
+   * Advances when a save starts and again when it settles, and `savePendingRef` marks the time
+   * between. A read that overlaps a save in any way (sent before it, or sent while it was out)
+   * may answer for the value the save replaced, so it never touches the control, the confirmed
+   * value or the snapshot. A read sent after the save settled is current.
    */
   const saveGenerationRef = useRef(0)
+  const savePendingRef = useRef(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmation, setConfirmation] = useState<string | null>(null)
@@ -138,6 +141,8 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
     const saveGeneration = saveGenerationRef.current
+    const overlapsSave = () =>
+      saveGeneration !== saveGenerationRef.current || savePendingRef.current
     beginRead()
     setError(null)
     if (!inPlace) setSectionState('loading')
@@ -154,8 +159,8 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         if (!current()) {
           return
         }
-        if (saveGeneration !== saveGenerationRef.current) {
-          // A save started while this read was out: its answer is the newer value.
+        if (overlapsSave()) {
+          // A save overlapped this read: its answer is the newer value.
           setSectionState('ready')
           return
         }
@@ -182,7 +187,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         }
         // A restored setting stays on screen when its refresh fails, and a save started since
         // owns the control.
-        if (inPlace || saveGeneration !== saveGenerationRef.current) return
+        if (inPlace || overlapsSave()) return
         /*
          * The catalog string, unconditionally — the server's own message is
          * deliberately NOT shown.
@@ -243,6 +248,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
 
     const previous = enabled
     saveGenerationRef.current++
+    savePendingRef.current = true
     setEnabled(nextEnabled)
     setIsSaving(true)
     setError(null)
@@ -262,6 +268,9 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       // Catalog copy, not the server's English. See the read path above.
       setError(genericErrorMessage)
     } finally {
+      // Every read sent while this save was out is now older than the value it settled on.
+      savePendingRef.current = false
+      saveGenerationRef.current++
       if (isLiveOwner(owner)) setIsSaving(false)
     }
   }

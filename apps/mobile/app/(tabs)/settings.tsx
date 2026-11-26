@@ -869,6 +869,10 @@ function PremiumSettingsSection({
   const [purchasesSettled, setPurchasesSettled] = useState(false)
   const [premiumFlow, setPremiumFlow] = useState<PremiumFlowState>('idle')
   const premiumFlowInFlight = useRef(false)
+  // Story CC-7.7: bumped when a purchase or restore starts and again when it ends. A return
+  // re-read captures it before its request; an answer that comes back after a store round trip
+  // started or ended predates that flow's own subscription read and is dropped.
+  const premiumFlowGeneration = useRef(0)
   const premiumPollAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -948,9 +952,10 @@ function PremiumSettingsSection({
     const identity = mobileIdentityEpoch()
     const stillCurrent = () =>
       !controller.signal.aborted && isSameMember(identity, signedInRef.current)
+    const flowGeneration = premiumFlowGeneration.current
     void getSubscriptionFromMobile(controller.signal)
       .then((refreshed) => {
-        if (!stillCurrent() || premiumFlowInFlight.current) return
+        if (!stillCurrent() || flowGeneration !== premiumFlowGeneration.current) return
         setSubscription(refreshed)
         setSubscriptionLoadFailed(false)
       })
@@ -1013,6 +1018,7 @@ function PremiumSettingsSection({
       return
     }
     premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
     setPremiumFlow('purchasing')
     trackMobilePremiumSubscribeTapped(
       analytics,
@@ -1044,6 +1050,7 @@ function PremiumSettingsSection({
       }
     } finally {
       premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
     }
   }
 
@@ -1052,6 +1059,7 @@ function PremiumSettingsSection({
       return
     }
     premiumFlowInFlight.current = true
+    premiumFlowGeneration.current += 1
     setPremiumFlow('restoring')
 
     try {
@@ -1074,6 +1082,7 @@ function PremiumSettingsSection({
       }
     } finally {
       premiumFlowInFlight.current = false
+      premiumFlowGeneration.current += 1
     }
   }
 

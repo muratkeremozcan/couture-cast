@@ -11,6 +11,14 @@ import { useWebSession } from '../../lib/use-web-session'
 import { getSignedInUserProfileFromWeb } from '../../lib/user'
 import { useGuestFirstPaint, useSectionSnapshot } from './screen-gate'
 
+/**
+ * The header's footprint: its two lines (an 18px name line on a 28px line box and a 14px email
+ * line on a 20px one, 48px together) are held from the first frame until the member leaves, so
+ * an account without a display name, or a read that failed, never shrinks it and pulls the
+ * sections below up after the reveal (CodeRabbit r2 #9).
+ */
+const ACCOUNT_FOOTPRINT = 'mt-4 min-h-12 max-w-2xl'
+
 interface Account {
   displayName: string | null
   email: string
@@ -25,20 +33,16 @@ export function ProfileAccount() {
   const snapshot = useSectionSnapshot<Account>('account', owner)
   const restoredFor = snapshot.restoredFor
   const [account, setAccount] = useState<Account | null>(() => snapshot.restored ?? null)
-  // The member whose profile read answered, with an account or without one.
-  const [answeredFor, setAnsweredFor] = useState<string | null>(restoredFor)
   /*
    * Story CC-7.7: the account sits at the top of Profile, above every section. Its read is the
    * same request the session's own verification makes, so Profile's gate does not wait for it
    * (CI real-session PS-2 on 61d7156e: a reload held the whole page behind a verification still
-   * out). Instead the header keeps its two lines while a member's read is out, or while a page
-   * painted for a stored session is still checked, so the account never pushes the sections
-   * below it when it lands.
+   * out). Instead the header keeps its two lines for a signed-in member (while the read is out,
+   * and after it fails) and while a page painted for a stored session is still checked, so the
+   * account never pushes the sections below it when it lands and never pulls them up after.
    */
   const guestFirstPaint = useGuestFirstPaint()
-  const reserved =
-    (owner !== null && answeredFor !== owner) ||
-    (session.status === 'checking' && !guestFirstPaint)
+  const reserved = owner !== null || (session.status === 'checking' && !guestFirstPaint)
 
   const { beginRead, remember } = snapshot
   // One profile request per member, like the Locations list. The restored member's account
@@ -53,12 +57,11 @@ export function ProfileAccount() {
         if (controller.signal.aborted) return
         const next = { displayName: user.displayName?.trim() || null, email: user.email }
         setAccount(next)
-        setAnsweredFor(owner)
         remember(next)
       })
       .catch(() => {
-        // The header is a courtesy: every section below reports its own failures.
-        if (!controller.signal.aborted) setAnsweredFor(owner)
+        // The header is a courtesy: every section below reports its own failures, and the
+        // header keeps its reserved lines.
       })
     return () => controller.abort()
   }, [owner, restoredFor, beginRead, remember])
@@ -68,7 +71,7 @@ export function ProfileAccount() {
       <div
         aria-hidden="true"
         data-testid="profile-account-reserved"
-        className="mt-4 max-w-2xl"
+        className={ACCOUNT_FOOTPRINT}
       >
         <p className="text-lg font-semibold">&nbsp;</p>
         <p className="text-sm">&nbsp;</p>
@@ -79,7 +82,7 @@ export function ProfileAccount() {
     <section
       aria-label={t('settings.account')}
       data-testid="profile-account"
-      className="mt-4 max-w-2xl"
+      className={ACCOUNT_FOOTPRINT}
     >
       {account.displayName && (
         <p

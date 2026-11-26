@@ -388,10 +388,13 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
    */
   const saveControllerRef = useRef<AbortController | null>(null)
   /**
-   * Advances when a save starts. A read started before it (a return's in-place refresh) answers
-   * for an older palette, so it never replaces the one the save commits.
+   * Advances when a save starts and again when it settles, and `savePendingRef` marks the time
+   * between. A read that overlaps a save in any way (sent before it, or sent while it was out)
+   * may answer for the palette the save replaced, so it never replaces the one the save commits.
+   * A read sent after the save settled is current.
    */
   const saveGenerationRef = useRef(0)
+  const savePendingRef = useRef(false)
 
   useEffect(() => () => saveControllerRef.current?.abort(), [])
 
@@ -430,7 +433,8 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     const inPlace = restoredFor === owner && sectionStateRef.current === 'ready'
     const saveGeneration = saveGenerationRef.current
-    const superseded = () => saveGeneration !== saveGenerationRef.current
+    const superseded = () =>
+      saveGeneration !== saveGenerationRef.current || savePendingRef.current
     beginRead()
     setError(null)
     if (!inPlace) setSectionState('loading')
@@ -523,6 +527,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     const controller = new AbortController()
     saveControllerRef.current = controller
     saveGenerationRef.current++
+    savePendingRef.current = true
     setSavingTheme(option.dataTheme)
     setError(null)
 
@@ -539,6 +544,9 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       }
       applySaveFailure(saveError)
     } finally {
+      // Every read sent while this save was out is now older than the palette it settled on.
+      savePendingRef.current = false
+      saveGenerationRef.current++
       if (saveControllerRef.current === controller) {
         saveControllerRef.current = null
       }

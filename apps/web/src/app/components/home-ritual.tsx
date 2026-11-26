@@ -844,6 +844,9 @@ function MemberRitual({ owner }: { owner: string }) {
    * it too, so the city never lands in the visible outfit's header after the reveal.
    */
   const [cityRead, setCityRead] = useState(snapshot !== undefined)
+  /** The outfit and city line on screen now, for a refresh whose city line cannot be read. */
+  const shownRef = useRef({ ritual, city })
+  shownRef.current = { ritual, city }
   // Story CC-7.7 D2: the ritual read has answered (an outfit, none, or a failure). Until then
   // nothing renders here, never the sample outfit: a member sees the sample only once their
   // own read settled without a usable outfit.
@@ -882,14 +885,27 @@ function MemberRitual({ owner }: { owner: string }) {
     void getRitualFromWeb(token, locale, controller.signal)
       .then((data) => {
         if (!current() || !sameScope()) return
+        /*
+         * CodeRabbit r2 #6: a refreshed outfit counts as settled only with its own city line.
+         * The city read starts pending again, so neither the gate nor the snapshot takes the
+         * new outfit with the previous one's city; the snapshot keeps the last coherent pair
+         * until this one settles. The shown city line stays only for the same location.
+         */
+        const shown = shownRef.current
+        const keptCity =
+          shown.ritual?.weather.locationKey === data.weather.locationKey
+            ? shown.city
+            : undefined
         shownScopeRef.current = scope
         setRitual(data)
+        setCity(keptCity)
         setFailure(null)
         const credentials = captureLocationCredentials()
         if (!credentials) {
           setCityRead(true)
           return
         }
+        setCityRead(false)
         void listLocationsFromWeb(controller.signal, credentials)
           .then((locations) => {
             if (!current() || !sameScope()) return
@@ -901,7 +917,7 @@ function MemberRitual({ owner }: { owner: string }) {
             setCityRead(true)
           })
           .catch(() => {
-            // No city line: the outfit shows without it, as before.
+            // No city line: the outfit shows without a new one, as before.
             if (current()) setCityRead(true)
           })
       })
