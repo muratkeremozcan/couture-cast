@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { APIRequestContext, Page, Response } from '@playwright/test'
+import type { APIRequestContext, Page, Request } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import pg from 'pg'
@@ -42,49 +42,82 @@ const COPY = {
   none: "You don't have a Premium subscription yet.",
   feedDisabled: 'The community feed is temporarily unavailable.',
 }
-type FeedAnswer = { status: number; body: unknown }
+/** How one feed read on the page ended. */
+type FeedRead =
+  | { outcome: 'pending' }
+  | { outcome: 'cancelled' }
+  | { outcome: 'answered'; status: number; body: unknown }
+  | { outcome: 'unreadable'; status: number }
 
 /**
- * Every feed answer a locked member's Home gets. The realtime channel is refused too, and that
- * denial cancels the page read still in flight and sends a one-row read that answers the same
- * 403 (COMMUNITY-DENIED-RACE-01). Which read answers is a race (run 45736490719: the page read
- * was cancelled 29 ms in), so no single request is awaited: every answer that arrives is kept,
- * a read cancelled after its headers with its status alone, and the caller checks them all.
+ * Every feed read a locked member's Home starts, followed to its end. The realtime channel is
+ * refused too, and that denial cancels the page read still in flight and sends a one-row feed
+ * read that answers the same 403 (COMMUNITY-DENIED-RACE-01). Which read answers is a race
+ * (run 45736490719: the page read was cancelled 29 ms in), so no single request is awaited.
+ * A read the page cancelled ends in `requestfailed` and says nothing; a read that finished
+ * carries its status and its parsed body, and a finished body that does not parse is kept as
+ * unreadable so the verdict fails on it.
  */
-function watchFeedAnswers(page: Page) {
-  const answers: Promise<FeedAnswer>[] = []
-  const onResponse = (response: Response) => {
-    const request = response.request()
-    if (request.method() !== 'GET' || new URL(response.url()).pathname !== FEED_PATH)
-      return
-    answers.push(
-      response.json().then(
-        (body: unknown) => ({ status: response.status(), body }),
-        () => ({ status: response.status(), body: undefined })
-      )
+function watchFeedReads(page: Page) {
+  const reads = new Map<Request, FeedRead>()
+  const isFeedRead = (request: Request) =>
+    request.method() === 'GET' && new URL(request.url()).pathname === FEED_PATH
+  const pending: Promise<void>[] = []
+  const onRequest = (request: Request) => {
+    if (isFeedRead(request)) reads.set(request, { outcome: 'pending' })
+  }
+  const onFinished = (request: Request) => {
+    if (!reads.has(request)) return
+    pending.push(
+      (async () => {
+        const response = await request.response()
+        const status = response?.status() ?? 0
+        try {
+          reads.set(request, {
+            outcome: 'answered',
+            status,
+            body: await response?.json(),
+          })
+        } catch {
+          reads.set(request, { outcome: 'unreadable', status })
+        }
+      })()
     )
   }
-  page.on('response', onResponse)
-  return async (): Promise<FeedAnswer[]> => {
+  const onFailed = (request: Request) => {
+    if (reads.has(request)) reads.set(request, { outcome: 'cancelled' })
+  }
+  page.on('request', onRequest)
+  page.on('requestfinished', onFinished)
+  page.on('requestfailed', onFailed)
+  /** Waits until every started feed read has ended, then stops watching and returns them. */
+  return async (): Promise<FeedRead[]> => {
     await expect
-      .poll(async () => (await Promise.all(answers)).some(isFeedRefusal), {
-        timeout: 15_000,
-      })
-      .toBe(true)
-    page.off('response', onResponse)
-    return Promise.all(answers)
+      .poll(
+        async () => {
+          await Promise.all(pending)
+          return [...reads.values()].filter((read) => read.outcome === 'pending').length
+        },
+        { message: 'every started feed read finished or was cancelled', timeout: 15_000 }
+      )
+      .toBe(0)
+    page.off('request', onRequest)
+    page.off('requestfinished', onFinished)
+    page.off('requestfailed', onFailed)
+    return [...reads.values()]
   }
 }
 
-const isFeedRefusal = ({ status, body }: FeedAnswer) =>
-  status === 403 && (body as { code?: unknown } | undefined)?.code === 'denied'
-
-/** At least one feed read was refused, and no feed read answered anything else. */
-function expectOnlyFeedRefusals(answers: FeedAnswer[]) {
-  expect(answers.some(isFeedRefusal), 'a delivered 403 denied feed answer').toBe(true)
-  for (const answer of answers) {
-    expect(answer.status, 'every feed answer is the refusal').toBe(403)
-    if (answer.body !== undefined) expect(answer.body).toMatchObject({ code: 'denied' })
+/** At least one feed read was refused, and every read that finished was that refusal. */
+function expectOnlyFeedRefusals(reads: FeedRead[]) {
+  const finished = reads.filter((read) => read.outcome !== 'cancelled')
+  expect(finished.length, 'a feed read that finished').toBeGreaterThan(0)
+  for (const read of finished) {
+    expect(read, 'every finished feed read is the 403 denied refusal').toMatchObject({
+      outcome: 'answered',
+      status: 403,
+      body: { code: 'denied' },
+    })
   }
 }
 
@@ -350,14 +383,14 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
         await evidenceShot(page, `control-settings-${viewport.width}`)
       }
 
-      const feedAnswers = watchFeedAnswers(page)
+      const feedReads = watchFeedReads(page)
       await page.goto('/')
       // The grid container renders for every signed-in reader; the denial is the status copy.
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()
-      // Read once the copy is up, so the page read has answered or been cancelled by then.
-      expectOnlyFeedRefusals(await feedAnswers())
+      // Checked once the copy is up; the verdict still waits for every started read to end.
+      expectOnlyFeedRefusals(await feedReads())
 
       const headers = {
         Authorization: `Bearer ${commerceAccessToken(control.userId)}`,
@@ -420,12 +453,12 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await expect(page.getByTestId('premium-status-line')).toHaveText(COPY.none)
       await expect(page.getByTestId('premium-theme-gallery')).toHaveCount(0)
 
-      const feedAnswers = watchFeedAnswers(page)
+      const feedReads = watchFeedReads(page)
       await page.goto('/')
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()
-      expectOnlyFeedRefusals(await feedAnswers())
+      expectOnlyFeedRefusals(await feedReads())
     }
   )
 })
