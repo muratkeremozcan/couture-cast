@@ -607,8 +607,8 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
           await expect(home).toBeFocused()
         })
         // Focus changes pixels around the tab, and they reach 3:1 against what was there.
-        expect(ring!.painted).toBeGreaterThan(20)
-        expect(ring!.ratio).toBeGreaterThanOrEqual(3)
+        // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the link.
+        expect(ring!.qualifying).toBeGreaterThanOrEqual(ring!.required!)
         // Story CC-7.9 D3: the ring is the scheme's `focusEssential` outline over the surface the
         // tab bar paints (the `page` role, D7), whatever palette the member chose.
         const outline = await home.evaluate((link) => getComputedStyle(link).outlineColor)

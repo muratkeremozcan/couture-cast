@@ -308,13 +308,13 @@ test.describe('Story 6.3 curated reactions', () => {
           contrastRatio(hex(colors.focus), hex(backdrop.color)),
           `${label} on ${backdrop.node}`
         ).toBeGreaterThanOrEqual(3)
-        // Painted: the pixels focus changes around the button reach 3:1 against what was there.
+        // Painted: the pixels focus changes around the button, each at 3:1 against what was there.
         const ring = await focusRing(applause, async () => {
           await applause.focus()
           await expect(applause).toBeFocused()
         })
-        expect(ring!.painted, label).toBeGreaterThan(20)
-        expect(ring!.ratio, label).toBeGreaterThanOrEqual(3)
+        // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the button.
+        expect(ring!.qualifying, label).toBeGreaterThanOrEqual(ring!.required!)
       }
     }
     await page.getByTestId('lookbook-open-lookbook-5').click()

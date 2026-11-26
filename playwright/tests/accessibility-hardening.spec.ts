@@ -166,8 +166,10 @@ async function expectVisibleFocusRing(target: Locator, label: string) {
     await target.focus()
     await expect(target).toBeFocused()
   })
-  expect(ring!.painted, `${label}: painted ring pixels`).toBeGreaterThan(20)
-  expect(ring!.ratio, `${label}: painted ring contrast`).toBeGreaterThanOrEqual(3)
+  // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the control.
+  expect(ring!.qualifying, `${label}: ring pixels at 3:1`).toBeGreaterThanOrEqual(
+    ring!.required!
+  )
   const focused = await target.evaluate((element) => {
     const styles = getComputedStyle(element)
     return {

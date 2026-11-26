@@ -269,8 +269,8 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
       await optOutToggle(page).focus()
       await expect(optOutToggle(page)).toBeFocused()
     })
-    expect(painted!.painted).toBeGreaterThan(20)
-    expect(painted!.ratio).toBeGreaterThanOrEqual(MIN_FOCUS_CONTRAST)
+    // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the toggle.
+    expect(painted!.qualifying).toBeGreaterThanOrEqual(painted!.required!)
 
     await log.step('Toggle with Space and assert the request went out')
     const save = watchPreferenceCall(interceptNetworkCall, 'PUT')

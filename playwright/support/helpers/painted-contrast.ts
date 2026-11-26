@@ -40,6 +40,14 @@ export type Ink = {
   weakest?: Weakest
   /** The two shots and a diff mask (changed pixels grey, the weakest group red), base64 PNG. */
   shots?: { bare: string; inked: string; diff: string }
+  /**
+   * Focus rings only (WCAG 2.4.13 focus appearance): device pixels outside the border box whose
+   * own before/after contrast is at least 3:1, and the area a 2 CSS px perimeter of the
+   * unfocused control covers (twice its perimeter, corners rounded by its border radius), in
+   * device pixels.
+   */
+  qualifying?: number
+  required?: number
 }
 
 const MARK = 'data-tea-ink'
@@ -112,7 +120,7 @@ async function settle(page: Page) {
 
 type Clip = { x: number; y: number; width: number; height: number }
 /** The element's border box inside the clip (CSS pixels), whose pixels a focus ring skips. */
-type Exclude = Clip & { clipWidth: number }
+type Exclude = Clip & { clipWidth: number; radius: number }
 
 async function shot(page: Page, clip: Clip) {
   return (
@@ -207,6 +215,21 @@ async function compare(
       const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
       const contrast = (x: number, y: number) =>
         (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+      // Focus appearance: the changed pixels outside the border box that reach 3:1 themselves.
+      const appearance = () =>
+        x
+          ? {
+              qualifying: changedPairs.filter(([u, i]) => contrast(u, i) >= 3).length,
+              // Twice the control's perimeter, corners rounded by its border radius.
+              required: Math.round(
+                2 *
+                  (2 * (x.width + x.height) -
+                    (8 - 2 * Math.PI) * Math.min(x.radius, x.width / 2, x.height / 2)) *
+                  scale *
+                  scale
+              ),
+            }
+          : {}
       const rate = (glyphs: [number, number, number][]): Rated[] => {
         // Each background region is rated on its own. Glyph pixels are grouped by the exact
         // luminance under them, and each group by its strongest stem (the pixel whose ink differs
@@ -333,6 +356,7 @@ async function compare(
         uniform,
         weakest: low && locate(low),
         diffPng: low && w ? diffMask(low) : '',
+        ...appearance(),
       }
     },
     { a: inked, b: bare, m: mask ?? null, w: withShots, x: exclude }
@@ -472,6 +496,11 @@ async function measure(
     try {
       if (states.withShots) await settle(page)
       const box = states.outsideOnly ? await handle.boundingBox() : null
+      const radius = box
+        ? await handle.evaluate(
+            (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
+          )
+        : 0
       const exclude = box
         ? {
             x: box.x - clip.x,
@@ -479,6 +508,7 @@ async function measure(
             width: box.width,
             height: box.height,
             clipWidth: clip.width,
+            radius,
           }
         : null
       const ink = await takeShots(page, clip, states, exclude)
@@ -524,9 +554,13 @@ export function inkOfPlaceholder(field: Locator): Promise<Ink | null> {
 }
 
 /**
- * A keyboard focus indicator as a reader sees it appear: the element's area before focus and
- * after `focusWithKeyboard`, with every normal decoration in both shots, so a permanent shadow or
- * border is no indicator. `painted` counts the pixels focus changes.
+ * A keyboard focus indicator as WCAG 2.4.13 (focus appearance) measures it: the element's area
+ * before focus and after `focusWithKeyboard`, with every normal decoration in both shots, so a
+ * permanent shadow or border is no indicator. Only pixels outside the element's border box
+ * count, where the outline and halo paint. `qualifying` counts those whose own before/after
+ * contrast reaches 3:1; the ring passes when it covers `required`, the area of a 2 CSS px
+ * perimeter of the control. CC-7.9 replaced a weakest-group rating here: every ring has a faint
+ * antialiased fringe, and that fringe (60 px at 1.0092 on CI e5d4cfa5) decided the old ratio.
  */
 export async function focusRing(
   target: Locator,
@@ -567,14 +601,15 @@ export async function focusRing(
     },
     { margin: 10 }
   )
-  // Every ring's deciding group goes to the log, so a pass shows it passed on the ring itself.
+  // Every ring's area goes to the log, so a pass shows how far it cleared the minimum.
+  const area = ink?.required ? (ink.qualifying ?? 0) / ink.required : 0
   if (ink)
     console.log(
-      `[painted-contrast] focus ring ${JSON.stringify({ ratio: ink.ratio, painted: ink.painted, weakest: ink.weakest })}`
+      `[painted-contrast] focus ring ${JSON.stringify({ qualifying: ink.qualifying, required: ink.required, area, painted: ink.painted, weakest: ink.weakest })}`
     )
-  // Below the 3:1 floor the evidence goes on the report: both shots, the diff mask with the
-  // weakest group in red, and the group and positions in words (CC-7.9 reactions ring).
-  if (ink && ink.ratio < 3 && ink.shots) {
+  // Short of the area the evidence goes on the report: both shots, the diff mask, and the
+  // numbers and positions in words (CC-7.9 reactions ring).
+  if (ink && area < 1 && ink.shots) {
     const info = test.info()
     const name = `focus-ring-${info.attachments.length}`
     await info.attach(`${name}-bare.png`, {
@@ -591,7 +626,14 @@ export async function focusRing(
     })
     await info.attach(`${name}.json`, {
       body: JSON.stringify(
-        { ratio: ink.ratio, painted: ink.painted, weakest: ink.weakest, positions },
+        {
+          qualifying: ink.qualifying,
+          required: ink.required,
+          area,
+          painted: ink.painted,
+          weakest: ink.weakest,
+          positions,
+        },
         null,
         2
       ),
@@ -642,6 +684,23 @@ type Target = { index: number; text: string; fontSize: string; fontWeight: strin
 function enumerate(root: Locator): Promise<Target[]> {
   return root.evaluate((scope, tag) => {
     const found: Target[] = []
+    // Text clipped away by itself or an ancestor paints nothing: the sr-only pattern (a 1 px
+    // box with overflow hidden, clip rect(0 0 0 0) or clip-path inset(50%)) keeps the child's
+    // own layout box, so a live region read 428 x 19 and its hit test landed on the visible
+    // eyebrow under it (CI e5d4cfa5, community-live-region).
+    // Only these shapes: text merely scrolled out of a row's overflow stays measured (the probe
+    // scrolls it into view).
+    const clippedAway = (el: Element) => {
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const style = getComputedStyle(node)
+        if (/^rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)$/.test(style.clip)) return true
+        if (/^inset\(50%\)$/.test(style.clipPath)) return true
+        if (style.overflow === 'visible') continue
+        const own = node.getBoundingClientRect()
+        if (own.width <= 1 || own.height <= 1) return true
+      }
+      return false
+    }
     const measurable = (el: Element) => {
       const box = el.getBoundingClientRect()
       const style = getComputedStyle(el)
@@ -651,7 +710,8 @@ function enumerate(root: Locator): Promise<Target[]> {
         style.visibility !== 'hidden' &&
         style.display !== 'none' &&
         !el.closest(':disabled') &&
-        !(el instanceof HTMLOptionElement)
+        !(el instanceof HTMLOptionElement) &&
+        !clippedAway(el)
       )
     }
     // '' means nothing to measure; null marks an empty field the caller must fill.
@@ -756,8 +816,8 @@ async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailur
  * Every visible text run, filled field and closed select inside `root` whose painted text is
  * below its WCAG minimum, not painted at all, or painted over a background that is not uniform
  * (refused: the best pixel would not stand for the run). Disabled controls are skipped (WCAG 1.4.3
- * exempts an inactive control), and so is visually hidden text that keeps only a 1 px box
- * (`sr-only`). An empty field is refused: the caller fills it, and measures its placeholder with
+ * exempts an inactive control), and so is visually hidden text: a 1 px box (`sr-only`), or
+ * text inside one, clipped by clip rect(0 0 0 0), clip-path inset(50%) or a 1 px overflow box. An empty field is refused: the caller fills it, and measures its placeholder with
  * `placeholderContrastFailures` first. A target re-rendered mid-measurement is found again by
  * enumerating `root` once more; a changed list of targets restarts the scan. A root that is not
  * shown, or that holds text none of which renders, fails.
