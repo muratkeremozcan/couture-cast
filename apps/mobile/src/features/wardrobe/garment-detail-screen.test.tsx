@@ -998,11 +998,13 @@ describe('GarmentDetailScreen', () => {
     )
     renderDetail()
 
-    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText('Could not load this piece. Try again.')).toBeVisible()
+    )
     expect(screen.queryByTestId('garment-detail-missing')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-detail')).toBeVisible())
     expect(reads).toBe(2)
   })
 
@@ -1017,12 +1019,14 @@ describe('GarmentDetailScreen', () => {
     const restoreSignedOut = setMobileAccessTokenResolver(() => undefined)
     renderDetail()
 
-    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText('Could not load this piece. Try again.')).toBeVisible()
+    )
     expect(reads).toBe(0)
 
     restoreSignedOut()
     await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-detail')).toBeVisible())
     expect(reads).toBe(1)
   })
 

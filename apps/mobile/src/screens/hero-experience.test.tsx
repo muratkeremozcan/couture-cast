@@ -99,7 +99,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     try {
       await render(<TabOneScreen />)
       await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() => expect(setFocus).toHaveBeenCalledWith(77))
@@ -144,7 +144,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       )
       const opener = await screen.findByTestId('outfit-share-card-open')
       await userEvent.click(opener)
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() =>

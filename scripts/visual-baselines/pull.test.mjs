@@ -12,6 +12,7 @@ import { parse } from 'yaml'
 import {
   missingBaselines,
   NATIVE_BASELINES,
+  NATIVE_CAPTURE_FOLDER,
   nativeBaselineName,
   placeBaselines,
   planBaselines,
@@ -57,6 +58,28 @@ test('[7.9-VIS-U02] only files in the named folder are planned, across shard fol
     fs.readFileSync(path.join(targetDir, 'home-light-chromium-linux.png'), 'utf8'),
     'blob-report-1/visual-actuals'
   )
+})
+
+test('[7.9-VIS-U02b] native captures come from Maestro debug output, never the bundled baselines', () => {
+  const downloaded = path.join(tmp, 'download-native')
+  const capture =
+    'android-test-results-shard-11-attempt-1/2026-11-26_072614/flow/takeScreenshot/maestro/artifacts/shell-visual'
+  const bundled =
+    'android-test-results-shard-11-attempt-1/android-flows/snapshots/shell-visual'
+  for (const dir of [bundled, capture]) {
+    fs.mkdirSync(path.join(downloaded, dir), { recursive: true })
+    fs.writeFileSync(path.join(downloaded, dir, 'dark-home.png'), dir)
+  }
+  const plan = planBaselines({
+    downloaded,
+    folder: NATIVE_CAPTURE_FOLDER,
+    nameOf: nativeBaselineName,
+  })
+  assert.deepEqual(
+    plan.map((entry) => entry.name),
+    ['dark-home.png']
+  )
+  assert.equal(fs.readFileSync(plan[0].source, 'utf8'), capture)
 })
 
 test('[7.9-VIS-U04] a short set is reported by name (Codex P1-1): eight per platform', () => {

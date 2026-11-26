@@ -10,7 +10,7 @@
 // the changed pixels must be uniform or the measurement is refused. Ratios compare unrounded; no
 // changed pixel means nothing was painted. Used by community-dark-mode, community-reactions,
 // accessibility-hardening, commerce-affiliate-preferences and app-shell-visual-system specs.
-import { type Locator, type Page } from '@playwright/test'
+import { type Locator, type Page, test } from '@playwright/test'
 
 export type ContrastFailure = {
   text: string
@@ -20,7 +20,27 @@ export type ContrastFailure = {
 }
 
 /** `uniform`: the background under the changed pixels varies by under 15% in contrast terms. */
-export type Ink = { painted: number; ratio: number; uniform: boolean }
+/**
+ * Where the ratio came from: the pixel group that rated lowest, by how it was rated (`exact`: one
+ * background luminance and its strongest stem; `step`: a 2% luminance step held at its worst;
+ * `small`: a glyph under both floors), its size, luminances and box in the shot (CSS pixels).
+ */
+export type Weakest = {
+  kind: 'exact' | 'step' | 'small'
+  ratio: number
+  count: number
+  under: number
+  ink: number
+  box: [number, number, number, number]
+}
+export type Ink = {
+  painted: number
+  ratio: number
+  uniform: boolean
+  weakest?: Weakest
+  /** The two shots and a diff mask (changed pixels grey, the weakest group red), base64 PNG. */
+  shots?: { bare: string; inked: string; diff: string }
+}
 
 const MARK = 'data-tea-ink'
 const TARGET = 'data-tea-target'
@@ -67,7 +87,7 @@ const nextFrames = (page: Page) =>
 
 /**
  * Puts the page at rest before a pair of shots: the pointer parked at the top-left corner, then
- * every finite animation and transition finished (at most a second; spinners never finish and are
+ * every finite animation and transition finished (at most 400 ms; spinners never finish and are
  * left alone). Centring the target scrolls the page, and the element that lands under a resting
  * pointer turns hover a moment later; its colour transition running between the bare and inked
  * shots made a near-invisible group of changed pixels decide the ratio (CC-7.9 reactions ring,
@@ -81,9 +101,10 @@ async function settle(page: Page) {
       const end = animation.effect?.getComputedTiming().endTime
       return animation.playState === 'running' && Number.isFinite(Number(end))
     })
+    if (finite.length === 0) return
     await Promise.race([
       Promise.all(finite.map((animation) => animation.finished.catch(() => undefined))),
-      new Promise((resolve) => setTimeout(resolve, 1000)),
+      new Promise((resolve) => setTimeout(resolve, 400)),
     ])
   })
   await nextFrames(page)
@@ -102,9 +123,15 @@ async function shot(page: Page, clip: Clip) {
  * when given, is the same glyphs painted magenta: every glyph position, including letters whose
  * real ink equals the background and so changes nothing, is then sampled.
  */
-function compare(page: Page, bare: string, inked: string, mask?: string): Promise<Ink> {
-  return page.evaluate(
-    async ({ a, b, m }) => {
+async function compare(
+  page: Page,
+  bare: string,
+  inked: string,
+  mask?: string,
+  withShots = false
+): Promise<Ink> {
+  const result = await page.evaluate(
+    async ({ a, b, m, w }) => {
       const pixels = async (base64: string) => {
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
         const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
@@ -113,13 +140,17 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
         canvas.height = bitmap.height
         const ctx = canvas.getContext('2d', { willReadFrequently: true })!
         ctx.drawImage(bitmap, 0, 0)
-        return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data
+        return ctx.getImageData(0, 0, bitmap.width, bitmap.height)
       }
-      const [inkedPx, barePx, maskPx] = await Promise.all([
+      const [inkedImage, bareImage, maskImage] = await Promise.all([
         pixels(a),
         pixels(b),
         m ? pixels(m) : Promise.resolve(null),
       ])
+      const inkedPx = inkedImage.data
+      const barePx = bareImage.data
+      const maskPx = maskImage?.data ?? null
+      const { width, height } = bareImage
       const channel = (v: number) => {
         const s = v / 255
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
@@ -135,17 +166,22 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
         0
       // Each glyph position (the mask's, or else every pixel the ink changed): the luminance
       // under it without the ink, and with it.
-      let painted = 0
-      const changedPairs: [number, number][] = []
-      const maskPairs: [number, number][] = []
-      for (let i = 0; i < inkedPx.length; i += 4) {
-        const pair: [number, number] = [luminance(barePx, i), luminance(inkedPx, i)]
-        if (differs(inkedPx, barePx, i)) {
-          painted += 1
-          changedPairs.push(pair)
+      const collect = () => {
+        const changed: [number, number, number][] = []
+        const masked: [number, number, number][] = []
+        for (let i = 0; i < inkedPx.length; i += 4) {
+          const pair: [number, number, number] = [
+            luminance(barePx, i),
+            luminance(inkedPx, i),
+            i / 4,
+          ]
+          if (differs(inkedPx, barePx, i)) changed.push(pair)
+          if (maskPx && differs(maskPx, barePx, i)) masked.push(pair)
         }
-        if (maskPx && differs(maskPx, barePx, i)) maskPairs.push(pair)
+        return { changedPairs: changed, maskPairs: masked }
       }
+      const { changedPairs, maskPairs } = collect()
+      const painted = changedPairs.length
       const pairs = maskPairs.length > 0 ? maskPairs : changedPairs
       // The background is the median under the ink; uniform when 95% of the ink sits within
       // 15% of it (an antialiased edge over a 1 px border is allowed, a background that changes
@@ -159,7 +195,7 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
       const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
       const contrast = (x: number, y: number) =>
         (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
-      const rate = (glyphs: [number, number][]): number[] => {
+      const rate = (glyphs: [number, number, number][]): Rated[] => {
         // Each background region is rated on its own. Glyph pixels are grouped by the exact
         // luminance under them, and each group by its strongest stem (the pixel whose ink differs
         // most from its own background, which is where a translucent text color is painted over
@@ -168,21 +204,28 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
         // pixels left outside every counted group (a gradient beside a flat region, or a gradient
         // alone) are rated too once they reach 5% of the label: in 2% steps, each step's stem held
         // against every background in it.
-        type Group = { count: number; strongest: number; ink: number; unders: number[] }
+        type Group = {
+          count: number
+          strongest: number
+          ink: number
+          unders: number[]
+          pixels: number[]
+        }
         const groupBy = (
-          sample: [number, number][],
+          sample: [number, number, number][],
           keyOf: (under: number) => number
         ) => {
           const groups = new Map<number, Group>()
-          for (const [under, inked] of sample) {
+          for (const [under, inked, pixel] of sample) {
             const key = keyOf(under)
             let group = groups.get(key)
             if (!group) {
-              group = { count: 0, strongest: 1, ink: inked, unders: [] }
+              group = { count: 0, strongest: 1, ink: inked, unders: [], pixels: [] }
               groups.set(key, group)
             }
             group.count += 1
             group.unders.push(under)
+            group.pixels.push(pixel)
             const local = contrast(under, inked)
             if (local > group.strongest) {
               group.strongest = local
@@ -199,10 +242,10 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
           return worst
         }
         const exactKeys = new Set<number>()
-        const rated: number[] = []
+        const rated: Rated[] = []
         for (const group of groupBy(glyphs, (under) => under))
           if (group.count >= floor) {
-            rated.push(group.strongest)
+            rated.push({ value: group.strongest, group, kind: 'exact' })
             exactKeys.add(group.unders[0]!)
           }
         const remainder = glyphs.filter(([under]) => !exactKeys.has(under))
@@ -212,28 +255,90 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
           )
           const counted = steps.filter((group) => group.count >= floor)
           for (const group of counted.length > 0 ? counted : steps)
-            rated.push(worstOf(group))
+            rated.push({ value: worstOf(group), group, kind: 'step' })
         }
         // A glyph too small for either floor (a period paints a few pixels) is still rated: each
         // exact background under it by its own strongest stem.
         if (rated.length === 0)
           for (const group of groupBy(glyphs, (under) => under))
-            rated.push(group.strongest)
+            rated.push({ value: group.strongest, group, kind: 'small' })
         return rated
+      }
+      type Rated = {
+        value: number
+        group: { count: number; ink: number; unders: number[]; pixels: number[] }
+        kind: 'exact' | 'step' | 'small'
       }
       const rated = rate(onBackground)
       let ratio = rated.length > 0 ? Infinity : 1
-      for (const value of rated) ratio = Math.min(ratio, value)
-      return { painted, ratio, uniform }
+      let low: Rated | undefined
+      for (const entry of rated)
+        if (entry.value < ratio) {
+          ratio = entry.value
+          low = entry
+        }
+      // The weakest group, located: its box and a diff mask of the shot (CC-7.9 reactions ring).
+      const locate = (entry: Rated) => {
+        let [x0, y0, x1, y1] = [width, height, 0, 0]
+        for (const pixel of entry.group.pixels) {
+          const x = pixel % width
+          const y = Math.floor(pixel / width)
+          x0 = Math.min(x0, x)
+          y0 = Math.min(y0, y)
+          x1 = Math.max(x1, x)
+          y1 = Math.max(y1, y)
+        }
+        const sortedUnders = [...entry.group.unders].sort((x, y) => x - y)
+        return {
+          kind: entry.kind,
+          ratio: entry.value,
+          count: entry.group.count,
+          under: sortedUnders[Math.floor(sortedUnders.length / 2)] ?? 0,
+          ink: entry.group.ink,
+          box: [x0, y0, x1, y1] as [number, number, number, number],
+        }
+      }
+      const diffMask = (entry: Rated) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')!
+        const diff = ctx.createImageData(width, height)
+        for (let i = 0; i < barePx.length; i += 4) {
+          const grey = Math.round(
+            (barePx[i]! + barePx[i + 1]! + barePx[i + 2]!) / 9 + 170
+          )
+          const shade = differs(inkedPx, barePx, i) ? 90 : grey
+          diff.data.set([shade, shade, shade, 255], i)
+        }
+        for (const pixel of entry.group.pixels) diff.data.set([255, 0, 0, 255], pixel * 4)
+        ctx.putImageData(diff, 0, 0)
+        return canvas.toDataURL('image/png').split(',')[1] ?? ''
+      }
+      return {
+        painted,
+        ratio,
+        uniform,
+        weakest: low && locate(low),
+        diffPng: low && w ? diffMask(low) : '',
+      }
     },
-    { a: inked, b: bare, m: mask ?? null }
+    { a: inked, b: bare, m: mask ?? null, w: withShots }
   )
+  const { diffPng, ...ink } = result
+  return diffPng ? { ...ink, shots: { bare, inked, diff: diffPng } } : ink
 }
 
 type States = {
   bare: () => Promise<void>
   inked: () => Promise<void>
   mask?: () => Promise<void>
+  /**
+   * Focus rings only: settle the page first (pointer parked, finite transitions done) and keep
+   * both shots and a diff mask of the weakest group on the result. The settle ran before every
+   * text scan on 2e5b5628 and pushed pw-e2e (2, 2) past its 20-minute job limit.
+   */
+  withShots?: boolean
 }
 
 /**
@@ -253,8 +358,12 @@ async function clipFor(
   }
   const cover = await target.evaluate((el) => {
     // Centred first: scrolled only into view, text at the bottom edge lands under a fixed tab
-    // bar (CC-7.9 shell spec, CI c9614d98) and would be refused as covered.
-    el.scrollIntoView({ block: 'center', inline: 'nearest' })
+    // bar (CC-7.9 shell spec, CI c9614d98) and would be refused as covered. Only the window
+    // scrolls: scrollIntoView centres the element in every scrolling ancestor too, and a
+    // horizontal row (overflow-x auto also scrolls vertically) moved its content up under its
+    // own clip, so the hit landed on the section text above (CI 2e5b5628, spotlight row).
+    const before = el.getBoundingClientRect()
+    window.scrollBy(0, before.top + before.height / 2 - window.innerHeight / 2)
     const r = el.getBoundingClientRect()
     // The measured element takes hit tests for the check, whatever its own or an ancestor's
     // pointer-events say: a decorative label (the spotlight rank pill, a badge row) is
@@ -306,7 +415,7 @@ async function takeShots(page: Page, clip: Clip, states: States): Promise<Ink> {
     mask = await shot(page, clip)
   }
   await setInkStyle(page, '')
-  return compare(page, bare, inked, mask)
+  return compare(page, bare, inked, mask, states.withShots)
 }
 
 /**
@@ -331,7 +440,7 @@ async function measure(
     const handle = await target.elementHandle()
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
-      await settle(page)
+      if (states.withShots) await settle(page)
       const ink = await takeShots(page, clip, states)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
@@ -379,25 +488,74 @@ export function inkOfPlaceholder(field: Locator): Promise<Ink | null> {
  * after `focusWithKeyboard`, with every normal decoration in both shots, so a permanent shadow or
  * border is no indicator. `painted` counts the pixels focus changes.
  */
-export function focusRing(
+export async function focusRing(
   target: Locator,
   focusWithKeyboard: () => Promise<void>
 ): Promise<Ink | null> {
   const page = target.page()
-  return measure(
+  // Where the page and the target sat at each shot: a scroll between them shifts the clip.
+  const positions: Record<string, unknown> = {}
+  const where = (label: string) =>
+    target
+      .evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        return {
+          scroll: [window.scrollX, window.scrollY],
+          box: [r.x, r.y, r.width, r.height],
+          focused: document.activeElement === el,
+          focusVisible: el.matches(':focus-visible'),
+        }
+      })
+      .then((value) => {
+        positions[label] = value
+      })
+  const ink = await measure(
     target,
     {
       bare: async () => {
         await target.evaluate((el) => (el as HTMLElement).blur())
         await nextFrames(page)
+        await where('bare')
       },
       inked: async () => {
         await focusWithKeyboard()
         await nextFrames(page)
+        await where('inked')
       },
+      withShots: true,
     },
     { margin: 10 }
   )
+  // Below the 3:1 floor the evidence goes on the report: both shots, the diff mask with the
+  // weakest group in red, and the group and positions in words (CC-7.9 reactions ring).
+  if (ink && ink.ratio < 3 && ink.shots) {
+    const info = test.info()
+    const name = `focus-ring-${info.attachments.length}`
+    await info.attach(`${name}-bare.png`, {
+      body: Buffer.from(ink.shots.bare, 'base64'),
+      contentType: 'image/png',
+    })
+    await info.attach(`${name}-inked.png`, {
+      body: Buffer.from(ink.shots.inked, 'base64'),
+      contentType: 'image/png',
+    })
+    await info.attach(`${name}-diff.png`, {
+      body: Buffer.from(ink.shots.diff, 'base64'),
+      contentType: 'image/png',
+    })
+    await info.attach(`${name}.json`, {
+      body: JSON.stringify(
+        { ratio: ink.ratio, painted: ink.painted, weakest: ink.weakest, positions },
+        null,
+        2
+      ),
+      contentType: 'application/json',
+    })
+    console.log(
+      `[painted-contrast] focus ring below 3:1: ${JSON.stringify({ ratio: ink.ratio, weakest: ink.weakest, positions })}`
+    )
+  }
+  return ink
 }
 
 const UNCLIP = 'data-tea-unclip'

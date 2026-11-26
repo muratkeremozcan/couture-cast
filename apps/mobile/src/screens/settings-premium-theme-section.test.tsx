@@ -549,7 +549,7 @@ describe('SettingsScreen interface palettes section', () => {
 
     act(() => releaseEntryRead())
 
-    expect(await screen.findByTestId('premium-theme-gallery')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('premium-theme-gallery')).toBeVisible())
     expect(screen.queryByTestId('premium-theme-locked')).toBeNull()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })

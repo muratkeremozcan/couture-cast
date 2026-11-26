@@ -61,9 +61,13 @@ export function registerCommunityFeedCases() {
     )
     await render(<CommunityScreen />)
     await communityGateOpen()
-    expect(await screen.findByTestId('community-example-inspiration')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-example-inspiration')).toBeVisible()
+    )
     press(screen.getByTestId('community-feed-load-more'))
-    expect(await screen.findByTestId('community-post-card-post-peer')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-peer')).toBeVisible()
+    )
     expect(screen.queryByTestId('community-example-inspiration')).toBeNull()
   })
 
@@ -124,7 +128,7 @@ export function registerCommunityFeedCases() {
       await browserUser.click(
         await screen.findByTestId('community-share-card-open-post-a')
       )
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await browserUser.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() => expect(setFocus).toHaveBeenCalledWith(88))

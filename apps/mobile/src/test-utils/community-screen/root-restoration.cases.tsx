@@ -118,7 +118,7 @@ export function registerCommunityRootRestorationCases() {
     render(<Harness />)
     const opener = await screen.findByTestId('community-share-card-open-post-a')
     press(opener)
-    expect(await screen.findByTestId('share-card-title')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
     press(screen.getByTestId('share-card-cancel'))
     await waitFor(() =>
       expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()

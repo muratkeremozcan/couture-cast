@@ -435,7 +435,9 @@ describe('WardrobeHubScreen', () => {
     act(() => releaseOnboarding())
 
     // The setup card is in place when the closet appears: nothing is inserted above it later.
-    expect(await screen.findByTestId('wardrobe-onboarding-card')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    )
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
 
@@ -490,7 +492,7 @@ describe('WardrobeHubScreen', () => {
     act(() => releaseSavedLooks())
 
     // The row's error and Retry arrive with the closet in one commit, above nothing shown yet.
-    expect(await screen.findByTestId('saved-looks-retry')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('saved-looks-retry')).toBeVisible())
     expect(setupCard).toBeVisible()
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
@@ -922,7 +924,7 @@ describe('WardrobeHubScreen', () => {
 
     nativeStyleRuntime.focus.mockClear()
     await browserUser.click(within(panel).getByTestId('style-piece-close'))
-    expect(await screen.findByTestId('style-piece-refresh')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('style-piece-refresh')).toBeVisible())
     await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(82))
   })
 
@@ -1129,7 +1131,9 @@ describe('WardrobeHubScreen', () => {
         expect(nativeStyleRuntime.finishDismissal).toBeTypeOf('function')
       )
       act(() => nativeStyleRuntime.finishDismissal?.())
-      expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('garment-tagging-modal')).toBeVisible()
+      )
     } finally {
       releasePoll()
     }
@@ -1268,7 +1272,7 @@ describe('WardrobeHubScreen', () => {
     )
     await browserUser.click(retry)
 
-    expect(await screen.findByText(empty)).toBeVisible()
+    await waitFor(() => expect(screen.getByText(empty)).toBeVisible())
     expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
   })
 
@@ -1285,7 +1289,7 @@ describe('WardrobeHubScreen', () => {
 
     render(<WardrobeHubScreen addEntry />)
 
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
   })
@@ -1308,10 +1312,12 @@ describe('WardrobeHubScreen', () => {
 
     render(<WardrobeHubScreen addEntry pollOffsetsMs={[1]} />)
 
-    expect(await screen.findByTestId('garment-status-processing')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-status-processing')).toBeVisible()
+    )
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
   })
 
@@ -1652,7 +1658,7 @@ describe('WardrobeHubScreen', () => {
       )
     )
     await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
   })
 
   it('4.4-MOB-HUB-14 surfaces a wardrobe read failure that happens mid-poll', async () => {

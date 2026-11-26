@@ -199,7 +199,9 @@ describe('SettingsScreen premium section, complimentary access', () => {
     act(() => screenFocus.set(true))
 
     await waitFor(() => expect(ensurePurchasesConfiguredMock).toHaveBeenCalledTimes(1))
-    expect(await screen.findByTestId('premium-subscribe-monthly')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('premium-subscribe-monthly')).toBeVisible()
+    )
     expect(screen.getByTestId('premium-subscribe-annual')).toBeVisible()
     expect(screen.getByTestId('premium-restore')).toBeVisible()
     expect(screen.queryByTestId('premium-complimentary-note')).toBeNull()

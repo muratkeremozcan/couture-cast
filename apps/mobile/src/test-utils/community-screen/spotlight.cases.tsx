@@ -245,7 +245,9 @@ export function registerCommunitySpotlightCases() {
       'stale',
       null,
     ])
-    expect(await screen.findByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    )
     expect(screen.queryByTestId('community-spotlight-more-error')).toBeNull()
   })
 
@@ -549,7 +551,9 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
     act(() => refreshEvents.onRefresh!())
 
-    expect(await screen.findByTestId('community-spotlight-item-after-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-after-1')).toBeVisible()
+    )
     expect(screen.queryByTestId('community-spotlight-item-before-1')).toBeNull()
     expect(reads).toBe(2)
   })
@@ -583,7 +587,9 @@ export function registerCommunitySpotlightCases() {
 
     press(screen.getByTestId('status-bar-action-retry'))
 
-    expect(await screen.findByTestId('community-spotlight-item-after-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-after-1')).toBeVisible()
+    )
     expect(reads).toBe(3)
   })
 
@@ -762,7 +768,9 @@ export function registerCommunitySpotlightCases() {
     const viewMore = await screen.findByTestId('community-spotlight-view-more')
     expect(screen.queryByTestId('community-spotlight-empty')).toBeNull()
     press(viewMore)
-    expect(await screen.findByTestId('community-spotlight-item-spot-7')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-spot-7')).toBeVisible()
+    )
     expect(screen.queryByTestId('community-spotlight-empty')).toBeNull()
   })
 

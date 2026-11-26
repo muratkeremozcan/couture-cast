@@ -13,6 +13,7 @@ import { parse } from 'yaml'
 import {
   compareAll,
   compareRaw,
+  findCaptureDir,
   masksFor,
   MAX_CHANGED_RATIO,
   NATIVE_SCREENS,
@@ -124,7 +125,8 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
   assert.deepEqual(masksFor('dark-profile', masks), masksFor('light-profile', masks))
   // Every tab hides only the scroll indicator strip in the right gutter; generated text adds more.
   const strip = [704, 160, 16, 960]
-  assert.deepEqual(masksFor('light-home', masks), [strip])
+  assert.equal(masksFor('light-home', masks).length, 2)
+  assert.deepEqual(masksFor('light-home', masks).at(-1), strip)
   assert.deepEqual(masksFor('dark-wardrobe', masks), [strip])
   assert.equal(masksFor('light-profile', masks).length, 2)
   assert.equal(masksFor('light-community', masks).length, 2)
@@ -137,4 +139,25 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
       )
       assert.ok(reason.length > 10, 'every mask says why')
     }
+})
+
+test('[7.9-NVIS-U15] the compare finds the captures under Maestro debug output, newest run first', () => {
+  const artifacts = path.join(tmp, 'artifacts')
+  const capture = (run) =>
+    path.join(
+      artifacts,
+      run,
+      'CC-7.9 shell snapshots in light and dark on the smallest phone',
+      'takeScreenshot/maestro/artifacts/shell-visual'
+    )
+  assert.equal(findCaptureDir(path.join(tmp, 'missing')), null)
+  fs.mkdirSync(path.join(artifacts, 'android-flows/snapshots/shell-visual'), {
+    recursive: true,
+  })
+  assert.equal(findCaptureDir(artifacts), null, 'the bundled baselines are no capture')
+  fs.mkdirSync(capture('2026-11-26_072614'), { recursive: true })
+  fs.mkdirSync(capture('2026-11-26_081500'), { recursive: true })
+  const later = new Date(Date.now() + 60_000)
+  fs.utimesSync(capture('2026-11-26_081500'), later, later)
+  assert.equal(findCaptureDir(artifacts), capture('2026-11-26_081500'))
 })

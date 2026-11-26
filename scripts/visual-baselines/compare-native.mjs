@@ -116,6 +116,27 @@ export async function compareAll(dirs) {
   return verdicts.filter(Boolean)
 }
 
+/**
+ * The folder holding this run's captures: the newest `takeScreenshot/maestro/artifacts/shell-visual`
+ * under Maestro's debug output (`artifactRoot`), where Maestro puts the flow's relative capture
+ * path. null when the flow captured nothing.
+ */
+export function findCaptureDir(artifactRoot) {
+  if (!fs.existsSync(artifactRoot)) return null
+  const found = fs
+    .readdirSync(artifactRoot, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(entry.parentPath ?? entry.path, entry.name))
+    .filter((dir) =>
+      dir
+        .split(path.sep)
+        .join('/')
+        .endsWith('/takeScreenshot/maestro/artifacts/shell-visual')
+    )
+  found.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+  return found[0] ?? null
+}
+
 const readArg = (name, fallback) => {
   const index = process.argv.indexOf(`--${name}`)
   return index === -1 ? fallback : path.resolve(process.argv[index + 1])
@@ -126,8 +147,14 @@ if (
   process.argv[1] &&
   fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
+  const artifactRoot = path.join(root, 'maestro/artifacts')
+  const actualDir = readArg(
+    'actual',
+    findCaptureDir(artifactRoot) ?? path.join(artifactRoot, 'shell-visual')
+  )
+  console.log(`Comparing the captures in ${path.relative(root, actualDir)}`)
   const problems = await compareAll({
-    actualDir: readArg('actual', path.join(root, 'maestro/artifacts/shell-visual')),
+    actualDir,
     baselineDir: readArg('baseline', path.join(root, 'maestro/snapshots/shell-visual')),
   })
   if (problems.length) {

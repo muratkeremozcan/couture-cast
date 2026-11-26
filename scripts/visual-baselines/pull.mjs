@@ -27,6 +27,12 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const WEB_SNAPSHOT_DIR =
   'playwright/tests/app-shell-visual-snapshots.spec.ts-snapshots'
 export const NATIVE_SNAPSHOT_DIR = 'maestro/snapshots/shell-visual'
+/**
+ * Where a native capture lands: Maestro writes the flow's relative takeScreenshot path under its
+ * debug output (maestro/artifacts/<run>/<flow>/takeScreenshot/), never at the repository path the
+ * flow names (CI 2e5b5628: the compare read maestro/artifacts/shell-visual and found nothing).
+ */
+export const NATIVE_CAPTURE_FOLDER = 'takeScreenshot/maestro/artifacts/shell-visual'
 export const VISUAL_SHARD = 11
 
 /** `home-dark-actual.png` (Playwright's actual) to `home-dark-chromium-linux.png`. */
@@ -66,7 +72,10 @@ export const NATIVE_BASELINES = ['light', 'dark'].flatMap((scheme) =>
 export function planBaselines({ downloaded, folder, nameOf }) {
   const byName = new Map()
   for (const file of filesUnder(downloaded)) {
-    if (path.basename(path.dirname(file)) !== folder) continue
+    // `folder` may name several trailing segments: the native captures sit under Maestro's
+    // debug output, beside the bundled copy of the committed baselines (snapshots/shell-visual).
+    const dir = path.dirname(file).split(path.sep).join('/')
+    if (dir !== folder && !dir.endsWith(`/${folder}`)) continue
     const name = nameOf(path.basename(file))
     if (name && !byName.has(name)) byName.set(name, file)
   }
@@ -143,7 +152,7 @@ if (
           native,
           `android-test-results-shard-${VISUAL_SHARD}-attempt-*`
         ),
-        folder: 'shell-visual',
+        folder: NATIVE_CAPTURE_FOLDER,
         nameOf: nativeBaselineName,
       }),
       targetDir: path.join(root, NATIVE_SNAPSHOT_DIR),
