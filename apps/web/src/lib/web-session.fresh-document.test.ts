@@ -310,6 +310,51 @@ describe('Step 58 follow-up: a fresh document keeps the verified session of the 
     expect(sessionStorage.getItem(bearerKey)).toBeNull()
   })
 
+  // CC-7.9 real-session L-4 (webkit, 5f2043f2): after Sign out the page still showed the member.
+  // Every path that could name a member again is held open across the sign-out here: the page's
+  // session start (its getSession and its profile check), an SDK auth event delivered late, and
+  // a page's own bearer read. None may store a bearer or name a member once the sign-out ran.
+  it('7.9-L4-RACE-001 keeps a sign-out against every verification still in flight on the page', async () => {
+    seedTab('principal-a', 'member-a', 'bearer-a')
+    seedBrowserSession(session('principal-a', 'bearer-a'))
+    const restored = gate()
+    sdk.getSession.mockImplementation(async () => {
+      await restored.promise
+      return {
+        data: { session: session('principal-a', 'bearer-a-refreshed') },
+        error: null,
+      }
+    })
+    const profileHeld = gate()
+    answerProfiles(async () => {
+      await profileHeld.promise
+      return HttpResponse.json(profile('member-a'))
+    })
+    const auth = await import('./web-session')
+    // Restored for the same user at module start, as the member landing painted it.
+    expect(auth.webSessionIdentity()).toBe('member-a')
+    const start = auth.startWebSession()
+    const read = auth.resolveWebSessionToken().catch(() => undefined)
+
+    await auth.signOutWebSession()
+    expect(auth.webSessionIdentity()).toBeNull()
+
+    // Everything held answers after the sign-out, the SDK's refresh event included.
+    restored.release()
+    sdk.listener?.('TOKEN_REFRESHED', session('principal-a', 'bearer-a-refreshed'))
+    profileHeld.release()
+    cleanups.push(await start)
+    await read
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await vi.waitFor(() => expect(sdk.getSession).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    expect(auth.webSessionIdentity()).toBeNull()
+    expect(sessionStorage.getItem(bearerKey)).toBeNull()
+    expect(storedPrincipal()).toBeNull()
+    expect(await auth.resolveWebSessionToken()).toBeUndefined()
+  })
+
   it('leaves the local E2E fixture bearer, which has no stored principal, untouched', async () => {
     vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
     sessionStorage.setItem(bearerKey, 'test-token-fixture')
