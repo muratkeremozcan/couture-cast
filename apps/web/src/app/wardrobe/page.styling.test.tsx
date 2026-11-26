@@ -37,9 +37,11 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
 import {
+  notifySavedLooksChanged,
   resetWebLegacySavedLooksImportState,
   subscribeSavedLooksChanged,
 } from '../../lib/saved-looks'
+import { currentWebSessionOwner, currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   createSavedLooksMswHandlers,
@@ -1062,21 +1064,59 @@ describe('Wardrobe styling', () => {
         if (changed === owner && readsAtNotice === null) readsAtNotice = listReads
       })
     )
-    // TEA W2 no-vanish: once the grid has shown both tiles it stays the same element. Every DOM
-    // change is checked, so a grid that leaves and comes back between two waits still counts.
+    // TEA W2 no-vanish. The member and scope are set before the first render and the profile id
+    // is the member, so no owner settles here: once the grid has shown both tiles, every DOM
+    // change keeps that same grid on screen, visible, with both tiles and no error line. Each
+    // break is traced with the session owner and scope, the address, the gates and the segment,
+    // so a failure names whether the body, the segment or the panel branch remounted.
     let shownGrid: Element | null = null
-    const vanished: string[] = []
+    const gaps: string[] = []
+    const replaced: string[] = []
+    const label = (node: Node) => {
+      if (!(node instanceof Element)) return node.nodeName
+      const id = node.getAttribute('data-testid')
+      const body = node.hasAttribute('data-screen-body') ? '[data-screen-body]' : ''
+      return `${node.tagName.toLowerCase()}${id ? `[${id}]` : ''}${body}`
+    }
+    const gridNow = () => document.querySelector('[data-testid="looks-saved-grid"]')
+    const tileCount = (grid: Element | null) =>
+      grid?.querySelectorAll('[data-testid^="saved-look-card-"]').length ?? 0
+    const frame = () => {
+      const grid = gridNow()
+      return [
+        `owner=${currentWebSessionOwner()}`,
+        `scope=${currentWebSessionScope()}`,
+        `search=${window.location.search}`,
+        `gates=${document.querySelectorAll('[data-testid="screen-gate"]').length}`,
+        `segment=${document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? 'none'}`,
+        `grid=${grid ? (grid === shownGrid ? 'same' : 'new') : 'none'}`,
+        `hidden=${grid?.closest('[hidden], [style*="display: none"]') ? 'yes' : 'no'}`,
+        `tiles=${tileCount(grid)}`,
+        `first=${label(document.querySelector('[data-testid="looks-first-content"]') ?? document)}`,
+        `retry=${document.querySelector('[data-testid="saved-looks-retry"]') ? 'yes' : 'no'}`,
+      ].join(' ')
+    }
     const checkGrid = (records: MutationRecord[]) => {
+      if (!shownGrid) {
+        const grid = gridNow()
+        if (tileCount(grid) === 2) shownGrid = grid
+        return
+      }
+      const grid = shownGrid
       for (const mutation of records)
         for (const node of Array.from(mutation.removedNodes))
-          if (shownGrid && (node === shownGrid || node.contains(shownGrid)))
-            vanished.push(node.nodeName)
-      const grid = document.querySelector('[data-testid="looks-saved-grid"]')
+          if (node === grid || node.contains(grid))
+            replaced.push(`${label(node)} left ${label(mutation.target)}; ${frame()}`)
+      const now = gridNow()
       if (
-        !shownGrid &&
-        grid?.querySelectorAll('[data-testid^="saved-look-card-"]').length === 2
-      )
-        shownGrid = grid
+        now !== grid ||
+        tileCount(now) < 2 ||
+        now.closest('[hidden], [style*="display: none"]') ||
+        document.querySelector('[data-testid="saved-looks-retry"]')
+      ) {
+        const state = frame()
+        if (gaps.at(-1) !== state) gaps.push(state)
+      }
     }
     const observer = new MutationObserver(checkGrid)
     observer.observe(document.body, { childList: true, subtree: true })
@@ -1112,17 +1152,37 @@ describe('Wardrobe styling', () => {
       expect(readsAtNotice).not.toBeNull()
       expect(listReads).toBeGreaterThan(readsAtNotice ?? Infinity)
     })
-    await waitFor(() => {
-      const grid = screen.getByTestId('looks-saved-grid')
-      expect(grid).toBe(shownGrid)
-      expect(within(grid).getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
-      expect(within(grid).getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(
-        1
-      )
+    // A focused tile keeps focus across a refresh: another save for this member is a third look
+    // in the account, and its notice reads Looks again with the tile still focused.
+    const focused = within(screen.getByTestId('looks-saved-grid')).getAllByRole(
+      'link'
+    )[0]!
+    act(() => focused.focus())
+    const ready = savedLooksStore.items.find(
+      (item) => item.availabilityStatus === 'ready'
+    )!
+    savedLooksStore.items.push({
+      ...ready,
+      id: 'saved-look-third',
+      createdAt: new Date(Date.parse(ready.createdAt) + 60_000).toISOString(),
     })
+    act(() => notifySavedLooksChanged(owner))
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('looks-saved-grid')).getAllByTestId(/^saved-look-card-/)
+      ).toHaveLength(3)
+    )
+    expect(
+      within(screen.getByTestId('looks-saved-grid')).getAllByRole('link', {
+        name: /, Needs review$/,
+      })
+    ).toHaveLength(1)
     checkGrid(observer.takeRecords())
     observer.disconnect()
-    expect(vanished).toEqual([])
+    expect(gaps, gaps.join('\n')).toEqual([])
+    expect(replaced, replaced.join('\n')).toEqual([])
+    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
+    expect(document.activeElement).toBe(focused)
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
   })

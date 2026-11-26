@@ -176,14 +176,40 @@ describe('LooksCapsulesPage account switch', () => {
     expect(screen.getByRole('heading', { name: memberA.name })).toBeVisible()
     expect(screen.queryByTestId('capsule-loading-state')).toBeNull()
 
+    // Codex round 3 #1: B's first read is held, so the switch is observed before B's data lands.
+    const memberBFirstRead = Promise.withResolvers<ReturnType<typeof mockPage>>()
+    list.mockImplementation((owner) =>
+      owner === memberB.ownerUserId
+        ? memberBFirstRead.promise
+        : Promise.resolve(mockPage([memberA]))
+    )
+
     act(() => publishCapsuleOwner(memberB.ownerUserId))
+    // A's grid goes at the identity change itself, while B's read has not answered.
+    expect(screen.queryByRole('heading', { name: memberA.name })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('capsule-grid')).not.toBeInTheDocument()
+    await waitFor(() => expect(list.mock.calls.at(-1)?.[0]).toBe(memberB.ownerUserId))
+    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+
+    // A's old refresh answers while B is still held: its card must not appear for B.
     await act(async () => {
       oldRefresh.resolve(mockPage([delayed]))
       await oldRefresh.promise
     })
-
     expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: memberA.name })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('capsule-grid')).not.toBeInTheDocument()
+    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+
+    await act(async () => {
+      memberBFirstRead.resolve(mockPage([memberB]))
+      await memberBFirstRead.promise
+    })
     expect(await screen.findByRole('heading', { name: memberB.name })).toBeVisible()
+    expect(
+      within(screen.getByTestId('capsule-grid')).getAllByRole('heading')
+    ).toHaveLength(1)
+    expect(screen.queryByRole('heading', { name: delayed.name })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: memberA.name })).not.toBeInTheDocument()
   })
 

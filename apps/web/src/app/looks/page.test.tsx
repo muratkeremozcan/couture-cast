@@ -725,14 +725,18 @@ describe('7.12 Looks Saved grid and paging (D2, D3)', () => {
     expect(list).toHaveBeenCalledTimes(1)
     fireEvent.click(more)
     expect(more).toBeDisabled()
-    expect(list).toHaveBeenLastCalledWith({
-      owner: FIXTURE_PROFILE_ID,
-      sort: 'created_desc',
-      source: undefined,
-      limit: 50,
-      offset: 50,
-      signal: expect.any(AbortSignal) as unknown,
-    })
+    // The fixture bearer's profile id resolves asynchronously, so the page read starts a
+    // microtask after the click.
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith({
+        owner: FIXTURE_PROFILE_ID,
+        sort: 'created_desc',
+        source: undefined,
+        limit: 50,
+        offset: 50,
+        signal: expect.any(AbortSignal) as unknown,
+      })
+    )
     expect(capsules).toHaveBeenCalledTimes(1)
 
     await act(async () => {
@@ -1036,6 +1040,17 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
   })
 
   it('7.12-UNIT-022d drops an answer from a session the tab no longer holds: a new bearer reads again, a sign-out drops it', async () => {
+    // Codex round 3 #3: each fixture bearer resolves its own profile, as the server answers it.
+    const FIRST_PROFILE_ID = 'profile-first'
+    const SECOND_PROFILE_ID = 'profile-second'
+    userId.mockImplementation(() =>
+      Promise.resolve(
+        window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY) ===
+          'test-token-second'
+          ? SECOND_PROFILE_ID
+          : FIRST_PROFILE_ID
+      )
+    )
     signInFixtureMember('test-token-first')
     const stale = deferred<SavedLookPageResult>()
     list.mockReturnValueOnce(stale.promise)
@@ -1054,12 +1069,39 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     expect(await screen.findByTestId('saved-look-card-sl-2')).toBeVisible()
     expect(screen.queryByTestId('saved-look-card-sl-1')).toBeNull()
     expect(list).toHaveBeenCalledTimes(2)
+    expect(list).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ owner: FIRST_PROFILE_ID, offset: 0 })
+    )
+    // The retry is made for the second bearer's own profile, and so is the legacy device import
+    // the read starts for that owner (lib/saved-looks.ts), never the first bearer's.
+    expect(list).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ owner: SECOND_PROFILE_ID, offset: 0 })
+    )
+    expect(list.mock.calls[1]?.[0]).not.toHaveProperty('skipLegacyImport', true)
+    expect(capsules.mock.calls.map((call) => call[0] as string)).toEqual([
+      FIRST_PROFILE_ID,
+      SECOND_PROFILE_ID,
+    ])
+    // A change notice for the first bearer's profile reads nothing for the second.
+    act(() => notifySavedLooksChanged(FIRST_PROFILE_ID))
+    // One task yield lets any read that notice started reach the list call.
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    })
+    expect(list).toHaveBeenCalledTimes(2)
 
     // A read still out when the member signs out never lands on the signed-out tab.
     const late = deferred<SavedLookPageResult>()
     list.mockReturnValueOnce(late.promise)
     act(() => notifySavedLooksChanged(FIXTURE_OWNER))
-    expect(list).toHaveBeenCalledTimes(3)
+    // The read starts once the cached profile id resolves, a microtask later.
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(3))
+    expect(list).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ owner: SECOND_PROFILE_ID, offset: 0 })
+    )
     act(() => {
       window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
       window.dispatchEvent(new Event('couture:session'))

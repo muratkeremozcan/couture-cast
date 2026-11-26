@@ -11,6 +11,7 @@ import {
   isLiveOwner,
   MemberScope,
   useMountSignal,
+  useWebSessionScope,
   type MemberSession,
 } from '../../../lib/use-web-session'
 import {
@@ -123,13 +124,24 @@ export default function WardrobeCapsulesPage() {
           parentHref="/looks?segment=saved&filter=capsules"
         />
         <Suspense fallback={null}>
-          <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+          <MemberScope>
+            {(session) => <ScopedCapsulesView session={session} />}
+          </MemberScope>
         </Suspense>
         {/* Story CC-7.11 (TEA e): the tab bar, as on every other sub-screen. */}
         <StickyBottomNav />
       </AppPage>
     </I18nextProvider>
   )
+}
+
+/**
+ * Story CC-7.12 (TEA, Codex round 3 #1): the manager is keyed by session scope, so any identity
+ * change, a fixture bearer switch included, drops the previous member's grid at once.
+ */
+function ScopedCapsulesView({ session }: { session: MemberSession }) {
+  const scope = useWebSessionScope()
+  return <CapsulesView key={scope ?? 'no-scope'} session={session} />
 }
 
 function CapsulesView({ session }: { session: MemberSession }) {

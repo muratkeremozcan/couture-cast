@@ -163,45 +163,48 @@ test.describe('CC-7.12 Looks segments and default @local-lane', () => {
 })
 
 test.describe('CC-7.12 each segment opens within the fold @local-lane', () => {
-  // Free member: Plan shows the free preview on the planner's exact Premium-required 403.
-  test.use({ allowPremiumPlannerRefusal: true })
   for (const mode of ['populated', 'empty'] as const) {
     for (const id of ['saved', 'ideas', 'plan'] as const) {
-      test(`[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`, async ({
-        page,
-        interceptNetworkCall,
-      }) => {
-        const { router } = await openLooksFixture(page, interceptNetworkCall, {
-          looks: mode === 'populated' ? LOOKS : [],
-          capsules: mode === 'populated' ? CAPSULES : [],
-          planner: 'free',
+      test.describe(`${id}, ${mode}`, () => {
+        // Codex round 3 #4: only Plan expects the free preview's exact Premium-required 403;
+        // Saved and Ideas keep every planner error fatal.
+        if (id === 'plan') test.use({ allowPremiumPlannerRefusal: true })
+        test(`[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`, async ({
+          page,
+          interceptNetworkCall,
+        }) => {
+          const { router } = await openLooksFixture(page, interceptNetworkCall, {
+            looks: mode === 'populated' ? LOOKS : [],
+            capsules: mode === 'populated' ? CAPSULES : [],
+            ...(id === 'plan' ? { planner: 'free' as const } : {}),
+          })
+          await page.goto(`/looks?segment=${id}`)
+          await waitForShellSettled(page, router)
+
+          const band = await foldBand(page)
+          const first = page.getByTestId('looks-first-content')
+          await expect(first).toBeVisible()
+          const { box } = await visibleInBand(first, band)
+          expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
+            band.top - 1
+          )
+
+          // The first thing a member reads in each segment sits wholly inside the band.
+          const probe =
+            id === 'saved'
+              ? mode === 'populated'
+                ? page.getByTestId('saved-look-card-look-c')
+                : page.getByTestId('looks-filter-empty')
+              : id === 'ideas'
+                ? page.locator('[data-testid^="looks-idea-card-"]').first()
+                : page.getByTestId('plan-upgrade')
+          const probeBox = (await probe.boundingBox())!
+          expect(probeBox, `${id} first item`).not.toBeNull()
+          expect(
+            probeBox.y + probeBox.height,
+            `${id} first item bottom`
+          ).toBeLessThanOrEqual(band.bottom + 1)
         })
-        await page.goto(`/looks?segment=${id}`)
-        await waitForShellSettled(page, router)
-
-        const band = await foldBand(page)
-        const first = page.getByTestId('looks-first-content')
-        await expect(first).toBeVisible()
-        const { box } = await visibleInBand(first, band)
-        expect(box.y, 'first content starts below the top bar').toBeGreaterThanOrEqual(
-          band.top - 1
-        )
-
-        // The first thing a member reads in each segment sits wholly inside the band.
-        const probe =
-          id === 'saved'
-            ? mode === 'populated'
-              ? page.getByTestId('saved-look-card-look-c')
-              : page.getByTestId('looks-filter-empty')
-            : id === 'ideas'
-              ? page.locator('[data-testid^="looks-idea-card-"]').first()
-              : page.getByTestId('plan-upgrade')
-        const probeBox = (await probe.boundingBox())!
-        expect(probeBox, `${id} first item`).not.toBeNull()
-        expect(
-          probeBox.y + probeBox.height,
-          `${id} first item bottom`
-        ).toBeLessThanOrEqual(band.bottom + 1)
       })
     }
   }
@@ -528,8 +531,18 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
         capsules: CAPSULES,
       })
       const ids = ['missing-capsule', '"]\';alert(1)//', 'a b']
+      const refusalFor = (id: string) =>
+        `/api/v1/wardrobe/${fixture.memberId}/capsules/${encodeURIComponent(id)}`
       for (const id of ids) {
+        // Codex round 3 #5: each navigation must itself answer the 404 for its own id.
+        const refused = page.waitForResponse(
+          (response) =>
+            response.status() === 404 &&
+            response.request().method() === 'GET' &&
+            new URL(response.url()).pathname === refusalFor(id)
+        )
         await page.goto(`/looks/capsules?capsule=${encodeURIComponent(id)}`)
+        await refused
         await expect(page.getByTestId('app-top-bar-title')).toHaveText('Outfit capsules')
         await expect.poll(() => fixture.router.inflight()).toBe(0)
         expect(await page.evaluate(() => window.scrollY)).toBe(0)
@@ -541,12 +554,7 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
       // Each navigation answers a 404 for its own id on the fixture member (a list refresh may
       // read it again), and nothing else errs (P7: the id is read by equality, URL-encoded).
       expect([...new Set(httpErrors)].sort()).toEqual(
-        ids
-          .map(
-            (id) =>
-              `GET 404 /api/v1/wardrobe/${fixture.memberId}/capsules/${encodeURIComponent(id)}`
-          )
-          .sort()
+        ids.map((id) => `GET 404 ${refusalFor(id)}`).sort()
       )
     }
   )

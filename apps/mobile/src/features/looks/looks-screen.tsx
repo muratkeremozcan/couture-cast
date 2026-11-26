@@ -52,6 +52,36 @@ import { useLooksFeed, type LooksFeedState } from './use-looks-feed'
  * One member's Looks tab; a sign-in, sign-out or account switch mounts a fresh one, so the
  * first paint after a member change holds no tile of the previous member (CC-7.7 D5, TEA P9).
  */
+/** A member latched on Ideas now has a first look in the All feed (fable review P2). */
+function isFirstSave(state: {
+  defaultSegment: LooksSegment | null
+  addressSegment: LooksSegment | null
+  filter: LooksFilter
+  owner: string | null
+  feed: { settled: boolean; failed: boolean; hasItems: boolean }
+}): boolean {
+  const latchedOnIdeas =
+    state.defaultSegment === 'ideas' &&
+    state.addressSegment === null &&
+    state.filter === 'all'
+  const firstLook = state.feed.settled && !state.feed.failed && state.feed.hasItems
+  return latchedOnIdeas && state.owner !== null && firstLook
+}
+
+/** Codex #11: whether Saved holds nothing at all, known from the All feed (or any item seen). */
+function useAllEmpty(
+  feed: { settled: boolean; failed: boolean; hasItems: boolean },
+  filter: LooksFilter
+): boolean | null {
+  const [allEmpty, setAllEmpty] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!feed.settled || feed.failed) return
+    if (feed.hasItems) setAllEmpty(false)
+    else if (filter === 'all') setAllEmpty(true)
+  }, [feed.failed, feed.hasItems, feed.settled, filter])
+  return allEmpty
+}
+
 export function LooksScreen() {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
   return <MemberLooks key={epoch} epoch={epoch} />
@@ -76,13 +106,7 @@ function MemberLooks({ epoch }: { epoch: number }) {
     setDefaultSegment(feed.failed || feed.hasItems ? 'saved' : 'ideas')
   }, [addressSegment, defaultSegment, filter, feed.failed, feed.hasItems, feed.settled])
 
-  // Codex #11: whether Saved holds nothing at all, known from the All feed (or any item seen).
-  const [allEmpty, setAllEmpty] = useState<boolean | null>(null)
-  useEffect(() => {
-    if (!feed.settled || feed.failed) return
-    if (feed.hasItems) setAllEmpty(false)
-    else if (filter === 'all') setAllEmpty(true)
-  }, [feed.failed, feed.hasItems, feed.settled, filter])
+  const allEmpty = useAllEmpty(feed, filter)
 
   const segment = addressSegment ?? defaultSegment
   // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
@@ -105,14 +129,13 @@ function MemberLooks({ epoch }: { epoch: number }) {
   // Fable review P2: Looks latched on Ideas for a member with nothing saved switches to Saved
   // once a first look exists, while the tab is away or as it comes back, never under the finger.
   const firstSaveRef = useRef(false)
-  firstSaveRef.current =
-    defaultSegment === 'ideas' &&
-    addressSegment === null &&
-    filter === 'all' &&
-    owner !== null &&
-    feed.settled &&
-    !feed.failed &&
-    feed.hasItems
+  firstSaveRef.current = isFirstSave({
+    defaultSegment,
+    addressSegment,
+    filter,
+    owner,
+    feed,
+  })
   // TEA N2: the refetch a return starts can land after the tab is back; that read may switch
   // too, unless the member picked a segment on this visit (the address then holds it).
   const refocusReadRef = useRef(false)
@@ -165,7 +188,10 @@ function MemberLooks({ epoch }: { epoch: number }) {
                 />
               ) : null}
               {segment === 'ideas' ? (
-                <IdeasPanel showEmptyLine={!owner || allEmpty === true} />
+                <IdeasSegment
+                  pending={owner !== null && !feed.settled}
+                  showEmptyLine={!owner || allEmpty === true}
+                />
               ) : null}
               {segment === 'plan' ? (
                 <View testID="looks-first-content" style={{ gap: space[3] }}>
@@ -182,6 +208,26 @@ function MemberLooks({ epoch }: { epoch: number }) {
           )}
         </ScrollView>
       </ScreenGate>
+    </View>
+  )
+}
+
+/**
+ * Codex round 3 #2: when the gate's deadline opens Ideas before the first reads answer, it shows
+ * progress, so the first-save line never lands above a grid already on screen.
+ */
+function IdeasSegment({
+  pending,
+  showEmptyLine,
+}: {
+  pending: boolean
+  showEmptyLine: boolean
+}) {
+  const { colors, space } = useTokens()
+  if (!pending) return <IdeasPanel showEmptyLine={showEmptyLine} />
+  return (
+    <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
+      <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
     </View>
   )
 }

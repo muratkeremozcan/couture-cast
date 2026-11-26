@@ -73,6 +73,7 @@ import {
 import LooksRoute from '@/app/(tabs)/looks'
 import { SaveFeedbackProvider } from '@/components/save-feedback'
 import { AppTopBar } from '@/src/components/app-top-bar'
+import { SCREEN_GATE_DEADLINE_MS } from '@/src/components/screen-gate'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import {
@@ -558,6 +559,91 @@ describe('Native Looks tab (Story CC-7.12)', () => {
           screen.getByTestId('looks-ideas-grid').getBoundingClientRect().top
         ).toBeCloseTo(firstTop!, 0)
       } finally {
+        observer.disconnect()
+        release()
+      }
+    })
+
+    // Codex round 3 #2: the gate's deadline (SCREEN_GATE_DEADLINE_MS) can open an explicit Ideas
+    // before the saved looks read answers. Ideas then shows progress in its first block, and the
+    // grid it paints once the reads settle stays where it first painted.
+    it('[P1] [TEA P1] [M2] [Codex r3 #2] Ideas in the address past the gate deadline: progress, then a grid that does not move', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let looksReadSeen = false
+      server.use(
+        http.get('*/api/v1/wardrobe/saved-looks', async () => {
+          looksReadSeen = true
+          await held
+          return HttpResponse.json(
+            savedLookListResponseSchema.parse({
+              data: [],
+              total: 0,
+              limit: 50,
+              offset: 0,
+            }) as unknown as Record<string, unknown>
+          )
+        })
+      )
+      // The grid's top at the first commit that lays it out, whenever that commit comes.
+      let firstTop: number | null = null
+      const observer = new MutationObserver(() => {
+        const grid = screen.queryByTestId('looks-ideas-grid')
+        const rect = grid?.getBoundingClientRect()
+        if (firstTop === null && rect && rect.height > 0) firstTop = rect.top
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      // Only the timers are faked, so the gate's deadline is reached without a real 10 s wait.
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        renderLooks()
+        // RTL's waitFor would run on the faked timers, so the read is awaited on real frames.
+        for (let frames = 0; frames < 600 && !looksReadSeen; frames += 1) {
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(0)
+          })
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        }
+        expect(looksReadSeen, 'the saved looks read started').toBe(true)
+        expect(screen.getByTestId('screen-gate')).not.toHaveAttribute('data-ready')
+
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(SCREEN_GATE_DEADLINE_MS)
+        })
+        vi.useRealTimers()
+
+        // The deadline opened Ideas with the read still held: the tabs, then progress alone.
+        expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+        expectOpenSegment('ideas')
+        const pending = screen.getByTestId('looks-first-content')
+        expect(within(pending).getByTestId('looks-feed-loading')).toBeVisible()
+        expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
+        expect(screen.queryByTestId('looks-ideas-empty-line')).toBeNull()
+        expect(
+          screen.getByTestId('looks-segments').compareDocumentPosition(pending) &
+            Node.DOCUMENT_POSITION_FOLLOWING,
+          'progress sits below the segment tabs'
+        ).toBeTruthy()
+        expect(firstTop, 'no Ideas grid painted while the read is held').toBeNull()
+
+        release()
+        // The All feed settled empty: the line for an empty Saved shows above the grid.
+        expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
+        expect(screen.queryByTestId('looks-feed-loading')).toBeNull()
+        expectOpenSegment('ideas')
+        expect(firstTop, 'the Ideas grid painted').not.toBeNull()
+        const grid = screen.getByTestId('looks-ideas-grid')
+        expect(grid).toBeVisible()
+        expect(grid.getBoundingClientRect().top).toBeCloseTo(firstTop!, 0)
+        expect(
+          screen.getByTestId('looks-ideas-empty-line').getBoundingClientRect().bottom
+        ).toBeLessThanOrEqual(grid.getBoundingClientRect().top)
+      } finally {
+        vi.useRealTimers()
         observer.disconnect()
         release()
       }

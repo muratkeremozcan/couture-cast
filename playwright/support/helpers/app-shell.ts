@@ -246,12 +246,14 @@ export function paintFindings(
         if (rect.width === 0 || rect.height === 0) continue
         // Story CC-7.12 (Step 69): a sample garment illustration paints the garment's own colours,
         // which are content like a photo's pixels, never chrome. Its frame and text stay checked.
-        if (
+        // Codex round 3 #6: only the illustration's fill and stroke are skipped; background,
+        // border, outline and text colour on the SVG and inside it stay checked.
+        const illustration =
           element instanceof SVGElement &&
-          element.closest('[data-testid="sample-garment-art"]')
+          element.closest('[data-testid="sample-garment-art"]') !== null
+        const properties = painted(element).filter(
+          ([property]) => !illustration || (property !== 'fill' && property !== 'stroke')
         )
-          continue
-        const properties = painted(element)
         const allowedGold = element.closest('[data-gold]') !== null
         const { roleChannels, gold } = scopeOf(element)
         for (const [property, value] of properties) {

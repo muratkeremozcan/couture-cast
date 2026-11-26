@@ -121,7 +121,18 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
     setLoadingMore(false)
   }
   const epochRef = useRef(0)
+  // The profile id, cached per session scope: a fixture bearer switch keeps the shared owner,
+  // so the scope tells a new bearer apart (Codex round 3 #3).
+  const profileRef = useRef<{ scope: string | null; id: string } | null>(null)
   const userIdRef = useRef<string | null>(null)
+  const profileId = useCallback(async () => {
+    const scope = currentWebSessionScope()
+    if (profileRef.current?.scope !== scope) {
+      profileRef.current = { scope, id: await resolveCurrentUserId() }
+    }
+    userIdRef.current = profileRef.current.id
+    return profileRef.current.id
+  }, [])
   const stateRef = useRef(state)
   stateRef.current = state
 
@@ -139,10 +150,7 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
         // device-saved looks import (CC-7.3) and the change events reach this member (as the
         // Closet did before CC-7.12 D8).
         const page = await listSavedLooksPageFromWeb({
-          owner:
-            owner === UNVERIFIED_BEARER_OWNER
-              ? (userIdRef.current ??= await resolveCurrentUserId())
-              : owner,
+          owner: owner === UNVERIFIED_BEARER_OWNER ? await profileId() : owner,
           sort: 'created_desc',
           source: filter === 'today' ? 'home_sample' : undefined,
           limit: PAGE_SIZE,
@@ -151,15 +159,14 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
         })
         return { items: page.data, total: page.total }
       }
-      userIdRef.current ??= await resolveCurrentUserId()
       const page = await listCapsulesFromWeb(
-        userIdRef.current,
+        await profileId(),
         { sort: 'created_desc', limit: PAGE_SIZE, offset },
         signal
       )
       return { items: page.items, total: page.total }
     },
-    [owner, filter]
+    [owner, filter, profileId]
   )
 
   useEffect(() => {
