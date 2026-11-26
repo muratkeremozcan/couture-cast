@@ -40,6 +40,7 @@ import { underModalAccessibility } from '@/components/edge-to-edge-modal'
 import { ScreenGate } from '@/src/components/screen-gate'
 import { useStatusBar } from '@/components/save-feedback'
 import { Text, View, useSchemeColors } from '@/components/themed'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -712,12 +713,14 @@ function MemberWardrobeHub({
                 ref={addGarmentButtonRef}
                 accessibilityRole="button"
                 testID="garment-capture-open"
-                style={[styles.primaryButton, { backgroundColor: colors.inverse }]}
+                // D3: the screen's one main action takes the primary role (gold), as on web;
+                // Outfit capsules and Silhouette stay neutral.
+                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
                 onPress={() =>
                   visitor ? router.push('/signin') : setIsCaptureOpen(true)
                 }
               >
-                <Text style={[styles.primaryButtonText, { color: colors.onInverse }]}>
+                <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
                   {t('wardrobe.add_garment')}
                 </Text>
               </Pressable>
@@ -1019,7 +1022,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
-  content: { padding: 20, gap: 24 },
+  content: { paddingHorizontal: TAB_BODY_INSET, paddingVertical: 20, gap: 24 },
   gatedBody: { gap: 24 },
   header: { gap: 16 },
   // Story 6.15 F-00i: at iOS XXXL and the accessibility sizes the three actions are wider than

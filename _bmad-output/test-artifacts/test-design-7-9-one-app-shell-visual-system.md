@@ -181,7 +181,7 @@ Each tab waits for its top bar title (`id: app-top-bar-title` with the tab label
 next step, `node scripts/visual-baselines/compare-native.mjs`, compares all eight captures with
 `maestro/snapshots/shell-visual/<scheme>-<tab>.png` (channel tolerance 16, at most 1% of pixels
 changed), names every missing capture, missing baseline, size change and pixel change in one run,
-and writes `<name>-diff.png` beside each changed capture (Codex P1-1). Baselines:
+and writes `<name>-diff.png` beside each changed capture (Codex P1-1). Text that changes every run by design (the run-maestro member email on Profile, the seeded spotlight alias on Community) is ignored through committed rectangles in `maestro/snapshots/shell-visual/masks.json`, each with its reason (7.9-NVIS-U14b). Baselines:
 `npm run visual:pull-baselines -- --native <run-id>` from the visual shard's artifact. iPhone SE stays on the nightly and
 manual iOS lanes without pixel baselines: 360 x 640 dp is the smallest supported phone (D11).
 

@@ -695,7 +695,8 @@
           "unchanged": "Non erano disponibili altri outfit per questo giorno.",
           "conflict": "Questo giorno è cambiato dall'ultima volta che lo hai visto. Aggiornamento…",
           "error": "Impossibile rimescolare questo giorno. Riprova."
-        }
+        },
+        "openControl": "Pianifica la settimana"
       },
       "plannerLocked": {
         "title": "Il pianificatore di 7 giorni è una funzione Premium",

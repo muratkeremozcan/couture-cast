@@ -327,8 +327,10 @@ export const roleRgb = (scheme: Scheme, role: keyof (typeof colorRoles)['light']
  * with no fill of its own, laid over a whole tile (garment-open, spotlight-lookbook-open) so the
  * tile is one tap target. Its own label (a "View look" pill) may sit inside it. During the scan
  * the overlay stops taking hit tests and its children keep theirs, so the badges under it and
- * the pill inside it are each measured where they paint. A sticky bar or anything with a fill
- * still covers and still fails the probe.
+ * the pill inside it are each measured where they paint. The tile's own image paints under its
+ * badges, so it stops taking hit tests too: a badge whose row is pointer-events none would
+ * otherwise hit the photo beneath it and be refused as covered (CI 7c284e60, spotlight tile).
+ * A sticky bar or anything with a fill still covers and still fails the probe.
  */
 export async function measureThroughOverlays(page: Page) {
   await page.evaluate(() => {
@@ -344,6 +346,8 @@ export async function measureThroughOverlays(page: Page) {
       ;(control as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
       for (const child of Array.from(control.children))
         (child as HTMLElement).style.setProperty('pointer-events', 'auto', 'important')
+      for (const media of Array.from(parent.querySelectorAll('img, picture, video')))
+        (media as HTMLElement).style.setProperty('pointer-events', 'none', 'important')
     }
   })
 }

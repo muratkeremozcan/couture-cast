@@ -96,8 +96,9 @@ const plannerReference = flatten(subtree(enUS as Catalog, 'planner'))
 const plannerLockedReference = flatten(subtree(enUS as Catalog, 'plannerLocked'))
 
 describe('5.5 mobile planner locale parity', () => {
-  it('5.5-I18N-MOB-01 ships 35 planner keys and 2 plannerLocked keys in the reference catalog', () => {
-    expect(plannerReference.size).toBe(35)
+  it('5.5-I18N-MOB-01 ships 36 planner keys and 2 plannerLocked keys in the reference catalog', () => {
+    // CC-7.9: `openControl` joined the tree for the Home planner button.
+    expect(plannerReference.size).toBe(36)
     expect(plannerLockedReference.size).toBe(2)
   })
 
@@ -177,6 +178,29 @@ describe('5.5 mobile planner locale parity', () => {
       const unavailable = planner.get('weather.confidence.unavailable')
       const labels = new Set([hourly, daily, unavailable])
       expect(labels.size, `${locale} weather confidence labels`).toBe(3)
+    }
+  })
+
+  // CC-7.9 small-phone CI capture: the Home planner button showed the raw key
+  // `commerce.premium.planner.openControl` because no mobile catalog had it. Each locale reads
+  // the same words as web's catalog (apps/web/src/i18n/locales).
+  it('7.9-I18N-MOB-PLAN-001 names the Home planner button in every locale with the web words', () => {
+    const webWords: Record<SupportedLocale, string> = {
+      'en-US': 'Plan week',
+      'en-CA': 'Plan week',
+      'de-DE': 'Woche planen',
+      'es-419': 'Planificar la semana',
+      'fr-CA': 'Planifier la semaine',
+      'fr-FR': 'Planifier la semaine',
+      'it-IT': 'Pianifica la settimana',
+      'pt-BR': 'Planejar a semana',
+      'pt-PT': 'Planear a semana',
+      'tr-TR': 'Haftayı planla',
+    }
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(subtree(CATALOGS[locale], 'planner').openControl, locale).toBe(
+        webWords[locale]
+      )
     }
   })
 })

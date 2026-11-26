@@ -265,6 +265,10 @@ test.describe('Story 6.3 curated reactions', () => {
     await applause.focus()
     await page.keyboard.press('Space')
     await expect(applause).toHaveAttribute('aria-pressed', 'true')
+    // The save settles before any ring is measured: while it is out the controls are aria-busy
+    // and show a pending line, and that line leaving between the probe's bare and focused shots
+    // made the first case (default light) compare two different layouts (CI 7c284e60).
+    await expect(controls).toHaveAttribute('aria-busy', 'false')
     await expect(applause).toBeFocused()
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme })

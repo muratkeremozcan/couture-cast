@@ -96,6 +96,7 @@ import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import { CommunityFilterChips } from '@/components/community/community-filter-chips'
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
 import { CommunityCard } from '@/components/community/community-card'
@@ -2489,7 +2490,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     paddingTop: 16,
     paddingBottom: 8,
     gap: 12,
@@ -2546,14 +2547,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   infoPanel: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
   },
   errorPanel: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
     padding: 16,
     borderRadius: 12,
@@ -2564,7 +2565,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   authorStates: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
     padding: 16,
     borderRadius: 12,
@@ -2586,7 +2587,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   skeletonsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     gap: 16,
     marginTop: 12,
   },

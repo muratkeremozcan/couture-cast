@@ -11,6 +11,7 @@
 // Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in apps/mobile/src/screens/tab-two-screen.test.tsx
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
@@ -234,6 +235,28 @@ describe('SettingsScreen', () => {
     await waitFor(() => expect(name).toBeVisible())
     expect(screen.getByTestId('commerce-opt-out-toggle')).toBeVisible()
     expect(placeholder()).toBeNull()
+  })
+
+  it('7.9-NAT-INSET-001 insets the Profile body once, 16 from each edge like every tab body', async () => {
+    getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
+    await render(<SettingsScreen />)
+    const body = await screen.findByTestId('settings-screen')
+    await waitFor(() =>
+      expect(screen.getByTestId('commerce-settings-section')).toBeVisible()
+    )
+
+    // CC-7.9 small-phone capture: 16 in the container plus a centered 90% section put the
+    // body about 33 from the edge. Every tab body now shares TAB_BODY_INSET (web's px-4).
+    expect(TAB_BODY_INSET).toBe(16)
+    const style = getComputedStyle(body)
+    expect(style.paddingLeft).toBe('16px')
+    expect(style.paddingRight).toBe('16px')
+    const frame = body.getBoundingClientRect()
+    const section = screen
+      .getByTestId('commerce-settings-section')
+      .getBoundingClientRect()
+    expect(section.left - frame.left).toBeCloseTo(16, 0)
+    expect(frame.right - section.right).toBeCloseTo(16, 0)
   })
 
   it('7.7-NAT-004 the Profile gate waits for the store to answer whether purchases are available', async () => {

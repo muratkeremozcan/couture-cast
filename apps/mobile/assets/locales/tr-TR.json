@@ -695,7 +695,8 @@
           "unchanged": "Bu gün için başka kombin bulunamadı.",
           "conflict": "Bu gün son görüntülemenizden bu yana değişti. Yenileniyor…",
           "error": "Bu gün yeniden karıştırılamadı. Tekrar deneyin."
-        }
+        },
+        "openControl": "Haftayı planla"
       },
       "plannerLocked": {
         "title": "7 günlük planlayıcı bir Premium özelliğidir",

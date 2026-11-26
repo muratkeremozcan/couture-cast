@@ -695,7 +695,8 @@
           "unchanged": "Für diesen Tag waren keine anderen Outfits verfügbar.",
           "conflict": "Dieser Tag hat sich geändert, seit du ihn zuletzt gesehen hast. Wird aktualisiert …",
           "error": "Dieser Tag konnte nicht neu gemischt werden. Versuche es erneut."
-        }
+        },
+        "openControl": "Woche planen"
       },
       "plannerLocked": {
         "title": "Der 7-Tage-Planer ist eine Premium-Funktion",

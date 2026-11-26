@@ -167,6 +167,9 @@ describe('MemberSampleOutfit (mobile)', () => {
     const retryRemove = await screen.findByTestId('status-bar-action-retry')
     fireEvent.click(retryRemove)
     await waitFor(() => expect(store.items).toHaveLength(0))
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+    )
 
     // Undo Remove restores via /restore, and failed Undo Remove shows error notice.
     let failRestoreOnce = true
@@ -202,7 +205,13 @@ describe('MemberSampleOutfit (mobile)', () => {
     // Remove while online, then click Undo while offline -> offline notice.
     fireEvent.click(removeOfflineBtn)
     await waitFor(() => expect(store.items).toHaveLength(0))
-    const undoRemove2 = await screen.findByTestId('status-bar-action-undo')
+    // The store empties when the request lands, before the app reads the reply: until the bar
+    // says Removed, its Undo is still the earlier Save's, and clicking that one raced the
+    // Remove reply (CI 7c284e60, received "RemovedUndo").
+    await waitFor(() =>
+      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
+    )
+    const undoRemove2 = screen.getByTestId('status-bar-action-undo')
     reportNetworkOffline()
     fireEvent.click(undoRemove2)
     await waitFor(() =>

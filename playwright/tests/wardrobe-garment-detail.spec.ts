@@ -269,7 +269,11 @@ test.describe('Garment detail states on a phone (mocked wardrobe)', () => {
       'naturalWidth',
       256
     )
-    await expect(detail.getByRole('heading', { name: 'Blue top' })).toBeVisible()
+    // CC-7.9: the shell top bar carries the screen title, and it names the detail region.
+    await expect(
+      page.getByRole('banner').getByRole('heading', { level: 1, name: 'Blue top' })
+    ).toBeVisible()
+    await expect(detail).toHaveAccessibleName('Blue top')
 
     await page.getByTestId('garment-edit-tags').click()
     await page.getByTestId('garment-tag-done').click()

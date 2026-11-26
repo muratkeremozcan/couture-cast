@@ -49,6 +49,12 @@ const TOKENS: Readonly<Record<ColorScheme, Tokens>> = Object.freeze({
   dark: buildTokens('dark'),
 })
 
+/**
+ * The horizontal inset of every tab body (Home, Wardrobe, Community, Profile): D4 `space[4]`,
+ * the same 16 as web's `px-4` page gutter. One value, so the four tabs line up.
+ */
+export const TAB_BODY_INSET = space[4]
+
 /** The tokens for a scheme, for code that is not a component (a stylesheet factory). */
 export function tokensFor(scheme: ColorScheme): Tokens {
   return TOKENS[scheme]

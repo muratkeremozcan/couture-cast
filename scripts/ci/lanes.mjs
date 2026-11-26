@@ -214,7 +214,12 @@ export const LANES = {
   'web-e2e': {
     title: 'Playwright end-to-end (local)',
     workflow: 'pr-pw-e2e-local.yml',
-    jobs: ['pw-e2e', 'real-session-e2e', 'complimentary-access-e2e'],
+    jobs: [
+      'pw-e2e',
+      'real-session-e2e',
+      'real-session-burn-in',
+      'complimentary-access-e2e',
+    ],
     workspaces: ['web', 'api'],
     inputs: [SUPABASE, 'playwright/**'],
   },
@@ -268,8 +273,10 @@ export const LANES = {
       'playwright/support/**',
       // real-session-burn-in.test.mjs holds its repeat count to this config's.
       'playwright/config/.burn-in.config.ts',
-      // scripts/visual-baselines/pull.test.mjs holds its baseline names to this spec's (CC-7.9).
+      // scripts/visual-baselines/pull.test.mjs holds its baseline names to this spec's and reads
+      // the committed baselines (CC-7.9); the native ones sit under maestro/** above.
       'playwright/tests/app-shell-visual-snapshots.spec.ts',
+      'playwright/tests/app-shell-visual-snapshots.spec.ts-snapshots/**',
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },

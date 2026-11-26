@@ -13,8 +13,10 @@ import { parse } from 'yaml'
 import {
   compareAll,
   compareRaw,
+  masksFor,
   MAX_CHANGED_RATIO,
   NATIVE_SCREENS,
+  readMasks,
 } from './compare-native.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -99,4 +101,30 @@ test('[7.9-NVIS-U13] the flow only captures, and the visual row compares after i
       names.indexOf('Check Maestro artifacts for secret values'),
     'diffs exist before the artifact scan and upload'
   )
+})
+
+test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and every mask names its reason', () => {
+  const base = Buffer.alloc(4 * 4 * 4, 100)
+  const actual = Buffer.from(base)
+  actual.set([255, 0, 0, 255], (1 * 4 + 1) * 4) // pixel (1, 1) moved
+  assert.equal(compareRaw(base, actual, { width: 4, height: 4 }).ratio, 1 / 16)
+  assert.equal(compareRaw(base, actual, { width: 4, height: 4 }, [[1, 1, 1, 1]]).ratio, 0)
+  assert.equal(
+    compareRaw(base, actual, { width: 4, height: 4 }, [[2, 2, 2, 2]]).ratio,
+    1 / 16
+  )
+
+  const masks = readMasks(path.join(root, 'maestro/snapshots/shell-visual'))
+  assert.deepEqual(Object.keys(masks).sort(), ['community', 'profile'])
+  assert.deepEqual(masksFor('dark-profile', masks), masksFor('light-profile', masks))
+  assert.deepEqual(masksFor('light-home', masks), [])
+  for (const entries of Object.values(masks))
+    for (const { rect, reason } of entries) {
+      assert.equal(rect.length, 4)
+      assert.ok(
+        rect[2] * rect[3] <= 720 * 1280 * 0.1,
+        'a mask covers at most a tenth of the screen'
+      )
+      assert.ok(reason.length > 10, 'every mask says why')
+    }
 })

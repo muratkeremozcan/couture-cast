@@ -63,6 +63,7 @@ test('burn-in still runs on pull requests, fails its own job and feeds the repor
     'complimentary-access-e2e',
     'merge-reports',
     'pw-e2e',
+    'real-session-burn-in',
     'real-session-e2e',
   ])
   for (const [id, command] of installs) assert.equal(command, 'npm ci', id)

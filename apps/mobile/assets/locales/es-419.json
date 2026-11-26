@@ -695,7 +695,8 @@
           "unchanged": "No había otros looks disponibles para este día.",
           "conflict": "Este día cambió desde la última vez que lo viste. Actualizando…",
           "error": "No se pudo reorganizar este día. Inténtalo de nuevo."
-        }
+        },
+        "openControl": "Planificar la semana"
       },
       "plannerLocked": {
         "title": "El planificador de 7 días es una función Premium",

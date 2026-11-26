@@ -27,13 +27,41 @@ export const CHANNEL_TOLERANCE = 16
 export const MAX_CHANGED_RATIO = 0.01
 
 /**
+ * The committed masks (`maestro/snapshots/shell-visual/masks.json`): per tab, the rectangles whose
+ * text changes every run by design (a generated email or alias). Both schemes use them.
+ */
+export function readMasks(baselineDir) {
+  const file = path.join(baselineDir, 'masks.json')
+  if (!fs.existsSync(file)) return {}
+  const masks = JSON.parse(fs.readFileSync(file, 'utf8'))
+  delete masks._comment
+  return masks
+}
+
+/** The masks of one screen (`dark-profile` uses the `profile` entry). */
+export const masksFor = (name, masks) =>
+  (masks[name.split('-').slice(1).join('-')] ?? []).map((mask) => mask.rect)
+
+/** True when pixel (x, y) sits in one of `rects`. */
+const masked = (x, y, rects) =>
+  rects.some(
+    ([left, top, width, height]) =>
+      x >= left && x < left + width && y >= top && y < top + height
+  )
+
+/**
  * Compares two RGBA buffers of equal size. Returns the changed share and a diff mask (changed
  * pixels red over a dimmed copy of the baseline).
  */
-export function compareRaw(baseline, actual, { width, height }) {
+export function compareRaw(baseline, actual, { width, height }, rects = []) {
   const diff = Buffer.alloc(width * height * 4)
   let changed = 0
   for (let offset = 0; offset < baseline.length; offset += 4) {
+    const pixel = offset / 4
+    if (rects.length && masked(pixel % width, Math.floor(pixel / width), rects)) {
+      diff.set([0, 0, 255, 255], offset)
+      continue
+    }
     const moved = [0, 1, 2, 3].some(
       (channel) =>
         Math.abs(baseline[offset + channel] - actual[offset + channel]) >
@@ -67,7 +95,12 @@ export async function compareScreen(name, { actualDir, baselineDir }) {
   const { width, height } = baseline.info
   if (actual.info.width !== width || actual.info.height !== height)
     return `${name}: size ${actual.info.width}x${actual.info.height}, baseline ${width}x${height}`
-  const { ratio, diff } = compareRaw(baseline.data, actual.data, { width, height })
+  const { ratio, diff } = compareRaw(
+    baseline.data,
+    actual.data,
+    { width, height },
+    masksFor(name, readMasks(baselineDir))
+  )
   if (ratio <= MAX_CHANGED_RATIO) return null
   const diffFile = path.join(actualDir, `${name}-diff.png`)
   await sharp(diff, { raw: { width, height, channels: 4 } })

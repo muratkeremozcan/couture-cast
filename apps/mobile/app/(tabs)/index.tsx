@@ -81,7 +81,7 @@ import {
 } from '@/components/hero/garment-item-tile'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
-import { useTokens, withAlpha } from '@/src/theme/tokens'
+import { TAB_BODY_INSET, useTokens, withAlpha } from '@/src/theme/tokens'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
@@ -1378,7 +1378,7 @@ const styles = StyleSheet.create({
   staleBanner: {
     borderBottomWidth: 1,
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     alignItems: 'center',
   },
   staleText: {
@@ -1387,7 +1387,7 @@ const styles = StyleSheet.create({
   },
   errorState: {
     minHeight: 320,
-    marginHorizontal: 20,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 24,
     paddingHorizontal: 24,
     paddingVertical: 32,
@@ -1467,7 +1467,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   focusedAlertCard: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,

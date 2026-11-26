@@ -203,8 +203,8 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await expect(
           page
             .getByTestId(`garment-card-${awaitingGarment.id}`)
-            .getByText('ready', { exact: true })
-        ).toBeVisible()
+            .getByTestId('garment-status-ready')
+        ).toHaveText('Ready') // CC-7.9: chip labels come from the catalog, raw code in the testid
       })
 
       await test.step('Verify persistence after a browser reload', async () => {
@@ -212,8 +212,8 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
         await expect(
           page
             .getByTestId(`garment-card-${awaitingGarment.id}`)
-            .getByText('ready', { exact: true })
-        ).toBeVisible()
+            .getByTestId('garment-status-ready')
+        ).toHaveText('Ready')
         await expect(page.getByRole('button', { name: 'Needs tags' })).toHaveCount(0)
       })
 

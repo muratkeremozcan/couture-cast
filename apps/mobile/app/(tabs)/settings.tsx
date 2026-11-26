@@ -71,7 +71,7 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useAppTheme, useAppThemeSettled } from '@/src/theme/theme-context'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
-import { useTokens } from '@/src/theme/tokens'
+import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { ScreenGate } from '@/src/components/screen-gate'
 
@@ -1911,15 +1911,18 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  // CC-7.9 small-phone capture: the body sat 16 inside the container and again inside a
+  // centered 90% section, about 33 from the edge. One inset now, the shared tab body inset.
   container: {
     flexGrow: 1,
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'flex-start',
-    padding: 16,
+    paddingHorizontal: TAB_BODY_INSET,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   settingsSection: {
-    width: '90%',
+    width: '100%',
     marginTop: 8,
     marginBottom: 16,
     alignItems: 'stretch',

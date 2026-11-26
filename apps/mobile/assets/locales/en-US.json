@@ -695,7 +695,8 @@
           "unchanged": "No different outfits were available for this day.",
           "conflict": "This day changed since you last viewed it. Refreshing…",
           "error": "Unable to reshuffle this day. Try again."
-        }
+        },
+        "openControl": "Plan week"
       },
       "plannerLocked": {
         "title": "The 7-Day Planner is a Premium feature",

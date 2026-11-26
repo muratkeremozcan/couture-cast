@@ -1,0 +1,15 @@
+{
+  "_comment": "CC-7.9 native snapshot masks: regions whose text changes every run by design, ignored by scripts/visual-baselines/compare-native.mjs in both schemes. Pixels on the 720 x 1280 small_phone capture: [x, y, width, height]. Keep each one as small as the text it covers.",
+  "profile": [
+    {
+      "rect": [56, 244, 640, 136],
+      "reason": "account email: run-maestro signs up mobile-e2e-<uuid>@example.com each run"
+    }
+  ],
+  "community": [
+    {
+      "rect": [140, 836, 450, 52],
+      "reason": "spotlight author alias: Style Explorer <8 hex of a seeded user id>, new each run"
+    }
+  ]
+}

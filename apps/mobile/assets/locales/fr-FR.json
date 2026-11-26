@@ -695,7 +695,8 @@
           "unchanged": "Aucune autre tenue n'était disponible pour ce jour.",
           "conflict": "Ce jour a changé depuis votre dernière consultation. Actualisation…",
           "error": "Impossible de remélanger ce jour. Réessayez."
-        }
+        },
+        "openControl": "Planifier la semaine"
       },
       "plannerLocked": {
         "title": "Le planificateur sur 7 jours est une fonctionnalité Premium",

@@ -219,6 +219,14 @@ import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
+import { colorRoles } from '@couture/utils'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
+
+/** A `#RRGGBB` token as the browser's computed `rgb(r, g, b)`. */
+const rgb = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16))
+  return `rgb(${r}, ${g}, ${b})`
+}
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it
@@ -554,6 +562,32 @@ describe('WardrobeHubScreen', () => {
     )
     expect(rowContainer).toBeDefined()
     expect(rowContainer!.getBoundingClientRect().top - cardBottom).toBeCloseTo(24, 0)
+  })
+
+  it('7.9-NAT-PRIMARY-001 fills Add Garment with the primary gold and keeps the two links neutral', async () => {
+    renderScreen()
+    const add = await screen.findByTestId('garment-capture-open')
+    const light = colorRoles.light
+    // D3: the screen's one main action takes the primary role, as web's Add Garment does.
+    expect(getComputedStyle(add).backgroundColor).toBe(rgb(light.primary))
+    expect(getComputedStyle(add.firstElementChild ?? add).color).toBe(
+      rgb(light.onPrimary)
+    )
+    for (const id of ['wardrobe-capsules-link', 'wardrobe-silhouette-link']) {
+      expect(getComputedStyle(screen.getByTestId(id)).backgroundColor).not.toBe(
+        rgb(light.primary)
+      )
+    }
+  })
+
+  it('7.9-NAT-INSET-002 insets the Wardrobe body 16 from each edge, the shared tab body inset', async () => {
+    renderScreen()
+    const frame = (await screen.findByTestId('wardrobe-screen')).getBoundingClientRect()
+    const add = screen.getByTestId('garment-capture-open').getBoundingClientRect()
+    const capsules = screen.getByTestId('wardrobe-capsules-link').getBoundingClientRect()
+    // The header actions open the body at its left edge (Add Garment wraps to its own row on
+    // a phone, so either may lead).
+    expect(Math.min(add.left, capsules.left) - frame.left).toBeCloseTo(16, 0)
   })
 
   it('4.4-MOB-HUB-01 renders the wardrobe hub header and empty state (regression)', async () => {
@@ -1692,9 +1726,9 @@ describe('WardrobeHubScreen', () => {
       const add = await waitFor(() => screen.getByTestId('garment-capture-open'))
       const screenBox = screen.getByTestId('wardrobe-screen').getBoundingClientRect()
       const addBox = add.getBoundingClientRect()
-      // The content is padded 20 on each side.
-      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - 20 + 0.5)
-      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + 20 - 0.5)
+      // The content is padded by the shared tab body inset (16, CC-7.9) on each side.
+      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - TAB_BODY_INSET + 0.5)
+      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + TAB_BODY_INSET - 0.5)
     } finally {
       await setViewport(414, 896)
     }

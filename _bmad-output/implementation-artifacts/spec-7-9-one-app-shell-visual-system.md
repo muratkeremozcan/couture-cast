@@ -277,6 +277,12 @@ changes to the rendered share-card image.
   px at a 1440 px viewport (before: full bleed, 1300 px or more). Intended; lookbook-prism.spec
   asserts the new width and keeps its no-overflow and rail checks.
 
+- 2026-11-26, builder, D4 inset: every native tab body uses one horizontal inset, 16
+  (`TAB_BODY_INSET = space[4]`, web `px-4`); Wardrobe moves from 20 and Profile drops its doubled
+  inset (container padding plus 90 percent sections). Native Wardrobe Add Garment is the primary
+  role, like web. 6.15-MOB-WRAP-03 now reads the shared inset (the value moved from 20 to 16 by
+  this decision; the wrap check itself is unchanged).
+
 ## Review Triage Log
 
 - 2026-11-26, Codex review of c8d1fcd6 (2 P1, 12 P2, 3 P3; epic7-coord/7.9-codex-review.md).
