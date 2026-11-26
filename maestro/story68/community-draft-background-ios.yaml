@@ -97,6 +97,6 @@ appId: ${MAESTRO_APP_ID}
 # Story CC-7.11 D13: the kept draft is dirty, so X asks before it drops it.
 - extendedWaitUntil:
     visible: 'Discard this post\?'
-    timeout: 10000
+    timeout: 5000
 - tapOn:
     text: '(?i)^discard$'

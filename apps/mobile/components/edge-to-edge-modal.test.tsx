@@ -715,10 +715,18 @@ describe('[7.11-NAT-034] every EdgeToEdgeModal caller', () => {
   })
 
   it('passes onRequestClose and returnFocusRef at every usage, and says who refocuses where the ref is null', () => {
+    // The one exemption (spec Plan Change Log, builder 08fb51ce): the share-card composer is
+    // pinned byte for byte by the iPad anchor proof, so it keeps its CC-7.9 shape: system back
+    // through onRequestClose and its own focus restore in onDismiss, no returnFocusRef.
+    const PINNED = ['./share-card-composer.tsx']
+    expect(usages.some(({ where }) => where.startsWith(PINNED[0]!))).toBe(true)
     const missing = usages
-      .filter(
-        ({ tag }) => !/\bonRequestClose=\{/.test(tag) || !/\breturnFocusRef=\{/.test(tag)
-      )
+      .filter(({ where, tag }) => {
+        if (!/\bonRequestClose=\{/.test(tag)) return true
+        if (PINNED.some((file) => where.startsWith(file)))
+          return !/\bonDismiss=\{/.test(tag)
+        return !/\breturnFocusRef=\{/.test(tag)
+      })
       .map(({ where }) => where)
     expect(missing).toEqual([])
 
