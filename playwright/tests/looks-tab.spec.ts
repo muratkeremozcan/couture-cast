@@ -163,9 +163,10 @@ test.describe('CC-7.12 Looks segments and default @local-lane', () => {
 })
 
 test.describe('CC-7.12 each segment opens within the fold @local-lane', () => {
+  // Free member: Plan shows the free preview on the planner's exact Premium-required 403.
+  test.use({ allowPremiumPlannerRefusal: true })
   for (const mode of ['populated', 'empty'] as const) {
     for (const id of ['saved', 'ideas', 'plan'] as const) {
-      // A free member: the planner's Premium-required 403 is expected (plannerErrorGuard).
       test(`[P0] [7.12-E2E-001] ${id}, ${mode}: first content inside the fold at 390 x 664`, async ({
         page,
         interceptNetworkCall,
@@ -537,12 +538,16 @@ test.describe('CC-7.12 capsules move and Closet row removal @local-lane', () => 
         await expect(page.getByTestId('capsule-card-capsule-b')).not.toBeFocused()
       }
       expect(errors).toEqual([])
-      // Each unknown id is read by equality (P7) and answers 404; nothing else errs.
-      expect([
-        ...new Set(fixture.detailReads().filter((read) => read.startsWith('capsule:'))),
-      ]).toEqual(ids.map((id) => `capsule:${id}`))
-      for (const entry of httpErrors)
-        expect(entry).toMatch(/^GET 404 \/api\/v1\/wardrobe\/[^/]+\/capsules\/[^/]+$/)
+      // Each navigation answers a 404 for its own id on the fixture member (a list refresh may
+      // read it again), and nothing else errs (P7: the id is read by equality, URL-encoded).
+      expect([...new Set(httpErrors)].sort()).toEqual(
+        ids
+          .map(
+            (id) =>
+              `GET 404 /api/v1/wardrobe/${fixture.memberId}/capsules/${encodeURIComponent(id)}`
+          )
+          .sort()
+      )
     }
   )
 

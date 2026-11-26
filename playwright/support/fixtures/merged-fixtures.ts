@@ -83,18 +83,25 @@ const networkErrorMonitor = base
       ],
     })
   )
-  .extend<{ ritualErrorGuard: void; plannerErrorGuard: void }>({
+  .extend<{
+    ritualErrorGuard: void
+    plannerErrorGuard: void
+    allowPremiumPlannerRefusal: boolean
+  }>({
     // Story CC-7.12 (Step 69): Plan's free preview rests on the planner's Premium-required 403.
-    // The monitor stands aside for the planner URL; this guard fails on every other planner error.
+    // A test that expects the preview opts in with test.use({ allowPremiumPlannerRefusal: true });
+    // everywhere else every planner error stays fatal (Codex round 2 #2).
+    allowPremiumPlannerRefusal: [false, { option: true }],
+    // The monitor stands aside for the planner URL; this guard holds it to the same bar.
     plannerErrorGuard: [
-      async ({ context }, use, testInfo) => {
+      async ({ context, allowPremiumPlannerRefusal }, use, testInfo) => {
         const guard = guardExpectedError(context, PLANNER_RESPONSE_URL)
         await use()
         if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
           return
         const unexpected = unexpectedPlannerErrors(
           await guard.settle(),
-          PREMIUM_REQUIRED_MESSAGE
+          allowPremiumPlannerRefusal ? PREMIUM_REQUIRED_MESSAGE : null
         )
         expect(unexpected, 'unexpected planner HTTP errors').toEqual([])
       },

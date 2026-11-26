@@ -281,6 +281,14 @@ member-sample-outfit.tsx:157,422`, `app/(tabs)/settings.tsx:1889` -- View and Pl
   - D2 (baseline review): the collage fills its square by piece count (one fills it, two side
     by side, three as one beside a stacked pair, four as 2 x 2), so a short look shows no empty
     cells.
+  - D1 (baseline review): the web segment control matches native: an outlined track with the
+    selected segment filled in the inverse role and a heavier label; a card surface read as
+    sunken in dark. The pressed filter chip uses the same inverse role.
+  - TEA W1 to W3, patch: the capsule manager focuses each tile's id once, after the read made
+    for it, and keeps its grid during refetches; a failed Looks refresh keeps the shown tiles;
+    Looks reads its address in the first render, so a return from a saved look renders the grid
+    at once and the gate restores the scroll offset (CC-7.11 AC4). A fixture bearer session uses
+    its profile id for the device-saved looks import.
   - D10: Profile's Premium section carries `id="premium"`; the planner's set-city return goes to
     `/looks?segment=plan`.
   - Analytics routes: web drops `/looks/plan` and `/wardrobe/capsules` and adds `/looks/capsules`

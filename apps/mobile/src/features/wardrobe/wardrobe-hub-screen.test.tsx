@@ -2345,27 +2345,40 @@ describe('WardrobeHubScreen', () => {
       }
     })
 
-    it('[P1] [7.5-NAT-011] a detail save refreshes saved looks so their status follows the tags (Codex P2.7)', async () => {
+    // CC-7.12 D8: saved looks left the Closet for the Looks tab, which rereads its own feed on a
+    // wardrobe change; a detail save on the Closet rereads garments and never saved looks.
+    it('[P1] [7.5-NAT-011] [CC-7.12 D8] a detail save rereads the Closet and sends no saved looks read', async () => {
       setMobileApplicationUserId('hub-detail-owner')
       const { handlers: savedLooksHandlers, store } = createSavedLooksMswHandlers()
       let savedLookReads = 0
       store.onGet = () => {
         savedLookReads += 1
       }
+      let garmentReads = 0
       server.use(
-        http.get('*/api/v1/wardrobe/garments', () =>
-          HttpResponse.json({ data: [blueTop] })
-        ),
+        http.get('*/api/v1/wardrobe/garments', () => {
+          garmentReads += 1
+          return HttpResponse.json({
+            data: [garmentReads === 1 ? blueTop : { ...blueTop, material: 'wool' }],
+          })
+        }),
         ...savedLooksHandlers
       )
       renderScreen()
       await screen.findByTestId('garment-card-hub-blue-top')
-      await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
-      const before = savedLookReads
 
       act(() => notifyWardrobeChanged())
 
-      await waitFor(() => expect(savedLookReads).toBe(before + 1))
+      // The save was handled: the reread garment rendered its new tags.
+      await waitFor(() =>
+        expect(
+          within(screen.getByTestId('garment-card-hub-blue-top')).getByTestId(
+            'garment-card-label'
+          ).textContent
+        ).toBe('Top · Wool')
+      )
+      expect(garmentReads).toBe(2)
+      expect(savedLookReads).toBe(0)
     })
 
     it('[P0] [7.5-NAT-006] reloads in place when the detail saves tags', async () => {

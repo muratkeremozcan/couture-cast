@@ -311,38 +311,44 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
 
   for (const mode of ['populated', 'guardian-pending'] as const) {
     for (const sub of SUB_SCREENS) {
-      test(`[P0] [7.11-E2E-021/036/060] ${sub.name}, ${mode}: direct entry, back replaces to ${sub.parent}`, async ({
-        page,
-        interceptNetworkCall,
-      }) => {
-        const refusalScoped =
-          sub.name === 'saved look detail' && mode === 'guardian-pending'
-        if (refusalScoped)
-          test.info().annotations.push({
-            type: 'skipNetworkMonitoring',
-            description:
-              'The teen has no saved look, so the one-look read answers 404; guardSavedLookRefusal keeps every other answer guarded (CC-7.12 P6).',
-          })
-        const verifyRefusalOnly = refusalScoped ? guardSavedLookRefusal(page) : null
-        const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
-        await page.goto(sub.path)
-        await expectTopBar(page, sub.title)
-        await expectOwnContent(page, sub, mode)
-        const entries = await page.evaluate(() => history.length)
+      const refusalScoped =
+        sub.name === 'saved look detail' && mode === 'guardian-pending'
+      // The monitor reads annotations when the test is declared, so the opt-out is static here.
+      test(
+        `[P0] [7.11-E2E-021/036/060] ${sub.name}, ${mode}: direct entry, back replaces to ${sub.parent}`,
+        refusalScoped
+          ? {
+              annotation: [
+                {
+                  type: 'skipNetworkMonitoring',
+                  description:
+                    'The teen has no saved look, so the one-look read answers 404; guardSavedLookRefusal keeps every other answer guarded (CC-7.12 P6).',
+                },
+              ],
+            }
+          : {},
+        async ({ page, interceptNetworkCall }) => {
+          const verifyRefusalOnly = refusalScoped ? guardSavedLookRefusal(page) : null
+          const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
+          await page.goto(sub.path)
+          await expectTopBar(page, sub.title)
+          await expectOwnContent(page, sub, mode)
+          const entries = await page.evaluate(() => history.length)
 
-        await page.getByTestId('app-top-bar-back').click()
-        await expect(page).toHaveURL(
-          sub.backTo?.direct ?? new RegExp(`${SHELL_TABS[sub.parent].path}$`)
-        )
-        await waitForShellSettled(page, router)
-        await expect(page.getByTestId(SHELL_TABS[sub.parent].nav)).toHaveAttribute(
-          'aria-current',
-          'page'
-        )
-        // A replace, not a push: the back arrow never grows history on a cold entry.
-        expect(await page.evaluate(() => history.length)).toBe(entries)
-        await verifyRefusalOnly?.()
-      })
+          await page.getByTestId('app-top-bar-back').click()
+          await expect(page).toHaveURL(
+            sub.backTo?.direct ?? new RegExp(`${SHELL_TABS[sub.parent].path}$`)
+          )
+          await waitForShellSettled(page, router)
+          await expect(page.getByTestId(SHELL_TABS[sub.parent].nav)).toHaveAttribute(
+            'aria-current',
+            'page'
+          )
+          // A replace, not a push: the back arrow never grows history on a cold entry.
+          expect(await page.evaluate(() => history.length)).toBe(entries)
+          await verifyRefusalOnly?.()
+        }
+      )
     }
   }
 

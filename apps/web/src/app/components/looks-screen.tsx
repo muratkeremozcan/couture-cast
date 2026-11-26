@@ -44,6 +44,7 @@ import { listCapsulesFromWeb, resolveCurrentUserId } from '../../lib/wardrobe'
 import {
   currentWebSessionOwner,
   currentWebSessionScope,
+  UNVERIFIED_BEARER_OWNER,
   useHydrating,
   useWebSessionOwner,
 } from '../../lib/use-web-session'
@@ -134,8 +135,14 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
       total: number
     }> => {
       if (kind === 'looks') {
+        // A fixture bearer session has no verified owner; its profile id stands in, so the
+        // device-saved looks import (CC-7.3) and the change events reach this member (as the
+        // Closet did before CC-7.12 D8).
         const page = await listSavedLooksPageFromWeb({
-          owner,
+          owner:
+            owner === UNVERIFIED_BEARER_OWNER
+              ? (userIdRef.current ??= await resolveCurrentUserId())
+              : owner,
           sort: 'created_desc',
           source: filter === 'today' ? 'home_sample' : undefined,
           limit: PAGE_SIZE,
@@ -200,12 +207,20 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
       })
       .catch((error: unknown) => {
         if (!current()) return
-        setState((previous) => ({
-          ...previous,
-          error:
-            error instanceof Error ? error.message : 'Unable to load your saved looks.',
-          settled: true,
-        }))
+        // TEA W2: a failed refresh keeps the tiles already shown; only a first read that fails
+        // shows the error line.
+        setState((previous) => {
+          const shown = previous.looks.items.length + previous.capsules.items.length > 0
+          return {
+            ...previous,
+            error: shown
+              ? previous.error
+              : error instanceof Error
+                ? error.message
+                : 'Unable to load your saved looks.',
+            settled: true,
+          }
+        })
         missed()
       })
     return () => controller.abort()
@@ -214,7 +229,8 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
   useEffect(() => {
     if (!owner) return
     return subscribeSavedLooksChanged((changedOwner) => {
-      if (changedOwner === owner) setAttempt((count) => count + 1)
+      if (changedOwner === owner || (changedOwner && changedOwner === userIdRef.current))
+        setAttempt((count) => count + 1)
     })
   }, [owner])
 
@@ -273,30 +289,6 @@ function useLooksFeed(owner: string | null, filter: LooksFilter, enabled: boolea
   }
 }
 
-/** Reports the address's segment and filter; `useSearchParams` needs its own Suspense. */
-function LooksParamSync({
-  onChange,
-}: {
-  onChange: (params: {
-    segment: LooksSegment | null
-    filter: LooksFilter
-    legacy: boolean
-  }) => void
-}) {
-  const params = useSearchParams()
-  const segment = parseLooksSegment(params?.get('segment'))
-  const filter = parseLooksFilter(params?.get('filter'))
-  const filterGiven = params?.has('filter') ?? false
-  const legacy = params?.has(LEGACY_PLANNER_QUERY) ?? false
-  useEffect(
-    // A filter in the address implies Saved (the capsules redirect always names both).
-    () =>
-      onChange({ segment: segment ?? (filterGiven ? 'saved' : null), filter, legacy }),
-    [segment, filter, filterGiven, legacy, onChange]
-  )
-  return null
-}
-
 function SegmentControl({
   segment,
   onSelect,
@@ -339,7 +331,7 @@ function SegmentControl({
       role="tablist"
       aria-label={t('looks.segments.label')}
       data-testid="looks-segments"
-      className="grid grid-cols-3 gap-1 rounded-md bg-card-muted p-1"
+      className="grid grid-cols-3 gap-1 rounded-md border border-line-strong bg-page p-0.5"
     >
       {LOOKS_SEGMENTS.map((id) => {
         const selected = id === segment
@@ -358,11 +350,12 @@ function SegmentControl({
             data-testid={`looks-segment-${id}`}
             onClick={() => onSelect(id)}
             onKeyDown={onKeyDown}
-            // Selected: a raised surface, a heavier label and an underline, not color alone.
+            // Selected: a filled inverse segment and a heavier label, as on native, in both
+            // themes (baseline review: a card surface read as sunken in dark).
             className={`min-h-touch rounded-sm px-2 text-sm ${
               selected
-                ? 'bg-card font-semibold text-ink underline decoration-2 underline-offset-4 shadow-card'
-                : 'font-medium text-ink-soft'
+                ? 'bg-inverse font-semibold text-on-inverse'
+                : 'font-medium text-ink'
             }`}
           >
             {t(`looks.segments.${id}`)}
@@ -399,7 +392,7 @@ function FilterChips({
             onClick={() => onSelect(id)}
             className={`min-h-touch rounded-full border px-4 text-sm ${
               pressed
-                ? 'border-ink bg-ink font-semibold text-page'
+                ? 'border-inverse bg-inverse font-semibold text-on-inverse'
                 : 'border-line-strong bg-page font-medium text-ink'
             }`}
           >
@@ -550,57 +543,64 @@ function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
   )
 }
 
+/** The segment Looks opens on without one in the address, or null until the reads answer. */
+function decideDefaultSegment(
+  owner: string | null,
+  feed: { settled: boolean; error: string | null; hasAny: boolean }
+): LooksSegment | null {
+  if (!owner) return 'ideas'
+  if (!feed.settled) return null
+  return feed.error || feed.hasAny ? 'saved' : 'ideas'
+}
+
+/** The address's segment and filter; a filter implies Saved (the capsules redirect names both). */
+function useLooksAddress(): {
+  segment: LooksSegment | null
+  filter: LooksFilter
+  legacy: boolean
+} {
+  const params = useSearchParams()
+  const filterGiven = params?.has('filter') ?? false
+  return {
+    segment: parseLooksSegment(params?.get('segment')) ?? (filterGiven ? 'saved' : null),
+    filter: parseLooksFilter(params?.get('filter')),
+    legacy: params?.has(LEGACY_PLANNER_QUERY) ?? false,
+  }
+}
+
 function LooksBody({ owner }: { owner: string | null }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const [address, setAddress] = useState<{
-    segment: LooksSegment | null
-    filter: LooksFilter
-  } | null>(null)
-  const onParams = useCallback(
-    ({
-      segment,
-      filter,
-      legacy,
-    }: {
-      segment: LooksSegment | null
-      filter: LooksFilter
-      legacy: boolean
-    }) => {
-      setAddress({ segment, filter })
-      if (legacy) {
-        const url = new URL(window.location.href)
-        url.searchParams.delete(LEGACY_PLANNER_QUERY)
-        router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
-      }
-    },
-    [router]
-  )
-  const filter = address?.filter ?? 'all'
-  const feed = useLooksFeed(owner, filter, address !== null)
-  // P1: the default segment is decided once per entry, after the first reads answer.
-  const [defaultSegment, setDefaultSegment] = useState<LooksSegment | null>(null)
+  // The address is read in the first render (this body sits under Suspense), so a return from a
+  // saved look renders its grid at once and the gate can restore the scroll offset (TEA W3).
+  const { segment: addressSegment, filter, legacy } = useLooksAddress()
   useEffect(() => {
-    if (defaultSegment || !address || address.segment) return
-    if (!owner) {
-      setDefaultSegment('ideas')
-      return
-    }
-    if (!feed.settled) return
-    setDefaultSegment(feed.error || feed.hasAny ? 'saved' : 'ideas')
-  }, [defaultSegment, address, owner, feed.settled, feed.error, feed.hasAny])
+    if (!legacy) return
+    const url = new URL(window.location.href)
+    url.searchParams.delete(LEGACY_PLANNER_QUERY)
+    router.replace(`${url.pathname}${url.search}${url.hash}`, { scroll: false })
+  }, [legacy, router])
+  const feed = useLooksFeed(owner, filter, true)
+  // P1: the default segment is decided once per entry, after the first reads answer. A return
+  // with this member's snapshot has them already, so it is decided in the first render.
+  const decided = decideDefaultSegment(owner, feed)
+  const [defaultSegment, setDefaultSegment] = useState<LooksSegment | null>(() =>
+    addressSegment ? null : decided
+  )
+  useEffect(() => {
+    if (!defaultSegment && !addressSegment && decided) setDefaultSegment(decided)
+  }, [defaultSegment, addressSegment, decided])
 
-  const segment = address?.segment ?? defaultSegment
-  const ready = segment !== null && (segment !== 'saved' || feed.settled)
+  const segment = addressSegment ?? defaultSegment
+  // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
+  // lands above a grid already on screen (a CC-7.7 shift).
+  const ready = segment !== null && (segment === 'plan' || feed.settled)
   const select = (next: { segment: LooksSegment; filter?: LooksFilter }) => {
     router.replace(looksHref(next.segment, next.filter ?? filter), { scroll: false })
   }
 
   return (
     <>
-      <Suspense fallback={null}>
-        <LooksParamSync onChange={onParams} />
-      </Suspense>
       <ScreenGate screen="looks" ready={ready}>
         {segment && (
           <div className="space-y-4">
@@ -655,7 +655,16 @@ export function LooksScreen() {
       <AppPage>
         <AppTopBar titleKey="nav.looks" />
         <main id="main-content" tabIndex={-1} className={APP_MAIN_NARROW_CLASS}>
-          <LooksBody key={owner} owner={owner} />
+          {/* `useSearchParams` needs a Suspense boundary; its fallback is the closed gate. */}
+          <Suspense
+            fallback={
+              <ScreenGate screen="looks" ready={false}>
+                {null}
+              </ScreenGate>
+            }
+          >
+            <LooksBody key={owner} owner={owner} />
+          </Suspense>
         </main>
         <StickyBottomNav />
       </AppPage>

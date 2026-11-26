@@ -24,13 +24,16 @@ export const PLANNER_RESPONSE_URL =
 
 export function unexpectedPlannerErrors(
   seen: readonly GuardedError[],
-  premiumRequiredMessage: string
+  premiumRequiredMessage: string | null
 ): GuardedError[] {
+  // Codex round 2 #2: only a test that expects the free preview passes the message, and only the
+  // exact Premium-required body counts; an unreadable 403 could be an aborted auth refusal.
   return seen.filter(
-    ({ method, status, code, bodyUnreadable }) =>
+    ({ method, status, code }) =>
+      premiumRequiredMessage === null ||
       method !== 'GET' ||
       status !== 403 ||
-      (code !== premiumRequiredMessage && !bodyUnreadable)
+      code !== premiumRequiredMessage
   )
 }
 

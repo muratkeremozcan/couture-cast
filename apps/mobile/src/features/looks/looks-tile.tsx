@@ -124,10 +124,17 @@ function Cell({ cell }: { cell: LooksTileCell | null }) {
     )
   }
   return (
-    <View
-      testID="looks-tile-placeholder"
-      style={[box, styles.placeholder, { borderColor: colors.lineStrong }]}
-    />
+    // TEA M1: the dashed border sits on an absolute-fill child, so the cell keeps its flex share
+    // and a failed photo moves nothing.
+    <View testID="looks-tile-placeholder" style={box}>
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          styles.placeholder,
+          { borderColor: colors.lineStrong },
+        ]}
+      />
+    </View>
   )
 }
 

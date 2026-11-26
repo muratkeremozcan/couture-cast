@@ -1,7 +1,8 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 // Story CC-7.12 test owner (TEA): 7.12-UNIT-IMPORT-001 (D8: the device-saved looks import moved
-// with the saved looks read from the Closet to Looks) and 7.12-UNIT-VIEW-001 (D7, Codex 7.12 #1).
+// with the saved looks read from the Closet to Looks; TEA W2: the grid that showed both tiles
+// never leaves) and 7.12-UNIT-VIEW-001 (D7, Codex 7.12 #1).
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
@@ -25,7 +26,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import type * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
 import { I18nextProvider } from 'react-i18next'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import {
   createCompletedOnboardingStateFixture,
@@ -35,6 +36,10 @@ import { stylePieceStorageKey, type StylePieceRecipe } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
+import {
+  resetWebLegacySavedLooksImportState,
+  subscribeSavedLooksChanged,
+} from '../../lib/saved-looks'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   createSavedLooksMswHandlers,
@@ -994,6 +999,9 @@ describe('Wardrobe styling', () => {
         expiresAt: '2090-01-01T00:00:00.000Z',
       },
     })
+    // The import keeps its acknowledged entries and the run in flight per member in module
+    // memory, and earlier tests here read saved looks for this member, so it starts clean.
+    resetWebLegacySavedLooksImportState()
     inventory.mockImplementation(() => list(garment, changedGarment))
     savedLooksStore.unownedGarmentIds.add('tampered-other-garment')
 
@@ -1037,25 +1045,58 @@ describe('Wardrobe styling', () => {
       ])
     )
 
+    // Every saved looks list read is counted, then answered by the store's handler.
+    let listReads = 0
     useMswHandlers(
       http.get(`${api}/wardrobe/:ownerUserId/capsules`, () =>
         HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
-      )
+      ),
+      http.get(`${api}/wardrobe/saved-looks`, () => {
+        listReads += 1
+      })
     )
+    // The import's change notice, and how many list reads were out when it came.
+    let readsAtNotice: number | null = null
+    onTestFinished(
+      subscribeSavedLooksChanged((changed) => {
+        if (changed === owner && readsAtNotice === null) readsAtNotice = listReads
+      })
+    )
+    // TEA W2 no-vanish: once the grid has shown both tiles it stays the same element. Every DOM
+    // change is checked, so a grid that leaves and comes back between two waits still counts.
+    let shownGrid: Element | null = null
+    const vanished: string[] = []
+    const checkGrid = (records: MutationRecord[]) => {
+      for (const mutation of records)
+        for (const node of Array.from(mutation.removedNodes))
+          if (shownGrid && (node === shownGrid || node.contains(shownGrid)))
+            vanished.push(node.nodeName)
+      const grid = document.querySelector('[data-testid="looks-saved-grid"]')
+      if (
+        !shownGrid &&
+        grid?.querySelectorAll('[data-testid^="saved-look-card-"]').length === 2
+      )
+        shownGrid = grid
+    }
+    const observer = new MutationObserver(checkGrid)
+    observer.observe(document.body, { childList: true, subtree: true })
+    onTestFinished(() => observer.disconnect())
     window.history.replaceState(null, '', '/looks?segment=saved')
     publishOwner(owner)
     render(<LooksPage />)
 
-    // The import posts the member's two own device looks one after another (garments read,
-    // then one POST each, the tampered one refused), so it gets more than one default wait.
-    await waitFor(() => expect(savedLooksStore.items).toHaveLength(2), { timeout: 3000 })
-    // Its change notice reads Looks again, which can paint a new grid, so each check reads the
-    // grid that is on screen now. Both land as Saved tiles, one of them Needs review.
-    const grid = () => within(screen.getByTestId('looks-saved-grid'))
-    await waitFor(() =>
-      expect(grid().getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+    // Both of the member's own device looks land as Saved tiles without a reload, one of them
+    // Needs review. The import posts them one after another (garments read, one POST each, the
+    // tampered one refused) and its change notice reads Looks again. The deadline is longer than
+    // the default because the import is several requests long; it is a ceiling, never a sleep.
+    await waitFor(
+      () => {
+        const grid = within(screen.getByTestId('looks-saved-grid'))
+        expect(grid.getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+        expect(grid.getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+      },
+      { timeout: 3000 }
     )
-    expect(grid().getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
     expect(savedLooksStore.items).toHaveLength(2)
     await waitFor(() => {
       expect(localStorage.getItem(ownValidKey)).toBeNull()
@@ -1064,5 +1105,25 @@ describe('Wardrobe styling', () => {
     })
     expect(localStorage.getItem('couturecast.guest-preview.v1')).toBe(guestState)
     expect(localStorage.getItem(otherOwnerKey)).not.toBeNull()
+
+    // The notice read Looks again, and the grid that showed both tiles is still the one on
+    // screen, with no error line or Retry.
+    await waitFor(() => {
+      expect(readsAtNotice).not.toBeNull()
+      expect(listReads).toBeGreaterThan(readsAtNotice ?? Infinity)
+    })
+    await waitFor(() => {
+      const grid = screen.getByTestId('looks-saved-grid')
+      expect(grid).toBe(shownGrid)
+      expect(within(grid).getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+      expect(within(grid).getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(
+        1
+      )
+    })
+    checkGrid(observer.takeRecords())
+    observer.disconnect()
+    expect(vanished).toEqual([])
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
   })
 })

@@ -244,6 +244,13 @@ export function paintFindings(
       for (const element of Array.from(document.body.querySelectorAll('*'))) {
         const rect = element.getBoundingClientRect()
         if (rect.width === 0 || rect.height === 0) continue
+        // Story CC-7.12 (Step 69): a sample garment illustration paints the garment's own colours,
+        // which are content like a photo's pixels, never chrome. Its frame and text stay checked.
+        if (
+          element instanceof SVGElement &&
+          element.closest('[data-testid="sample-garment-art"]')
+        )
+          continue
         const properties = painted(element)
         const allowedGold = element.closest('[data-gold]') !== null
         const { roleChannels, gold } = scopeOf(element)

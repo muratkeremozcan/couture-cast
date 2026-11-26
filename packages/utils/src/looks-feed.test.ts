@@ -6,10 +6,16 @@
 import { describe, expect, it } from 'vitest'
 import {
   EMPTY_LOOKS_FEED_SOURCE,
+  LOOKS_FILTERS,
+  LOOKS_SEGMENTS,
+  capsuleTileState,
   compareLooksFeedEntries,
   looksIdeas,
   mergeLooksFeed,
+  parseLooksFilter,
+  parseLooksSegment,
   sampleWeek,
+  savedLookTileState,
   type LooksFeedKind,
   type LooksFeedRecord,
   type LooksFeedSource,
@@ -330,5 +336,68 @@ describe('7.12-UNIT-007 Ideas and the sample week come from the shared catalog (
     expect(sampleWeek().map((day) => day.idea.look.id)).toEqual(
       sampleWeek().map((day) => day.idea.look.id)
     )
+  })
+})
+
+describe('7.12-UNIT-030 tile state line, first match wins (AC2, D2)', () => {
+  const at = '2026-11-20T12:00:00.000Z'
+
+  it('a saved look: missing pieces, then needs review, else its saved date', () => {
+    const base = {
+      availabilityStatus: 'ready' as const,
+      missingGarmentIds: [],
+      createdAt: at,
+    }
+    expect(savedLookTileState(base)).toEqual({ kind: 'saved', createdAt: at })
+    expect(savedLookTileState({ ...base, availabilityStatus: 'needs_review' })).toEqual({
+      kind: 'needsReview',
+    })
+    expect(
+      savedLookTileState({
+        ...base,
+        availabilityStatus: 'needs_review',
+        missingGarmentIds: ['g1', 'g2'],
+      })
+    ).toEqual({ kind: 'missing', count: 2 })
+    // A missing status without ids still reads one piece missing, never zero.
+    expect(
+      savedLookTileState({ ...base, availabilityStatus: 'missing_garment' })
+    ).toEqual({
+      kind: 'missing',
+      count: 1,
+    })
+  })
+
+  it('a capsule: unavailable pieces, else its saved date', () => {
+    const base = {
+      availabilityStatus: 'ready' as const,
+      unavailableGarmentCount: 0,
+      createdAt: at,
+    }
+    expect(capsuleTileState(base)).toEqual({ kind: 'saved', createdAt: at })
+    expect(capsuleTileState({ ...base, unavailableGarmentCount: 3 })).toEqual({
+      kind: 'missing',
+      count: 3,
+    })
+    expect(capsuleTileState({ ...base, availabilityStatus: 'needs_repair' })).toEqual({
+      kind: 'missing',
+      count: 1,
+    })
+  })
+})
+
+describe('7.12-UNIT-023 address segment and filter parsing (D1, D4)', () => {
+  it('accepts each known value and nothing else', () => {
+    for (const segment of LOOKS_SEGMENTS) expect(parseLooksSegment(segment)).toBe(segment)
+    for (const filter of LOOKS_FILTERS) expect(parseLooksFilter(filter)).toBe(filter)
+    expect(LOOKS_SEGMENTS).toEqual(['saved', 'ideas', 'plan'])
+    expect(LOOKS_FILTERS).toEqual(['all', 'today', 'capsules'])
+  })
+
+  it('an unknown, cased or non-string value falls back (segment none, filter all)', () => {
+    for (const value of ['Saved', 'lookbook', '', null, undefined, 1, ['saved']]) {
+      expect(parseLooksSegment(value)).toBeNull()
+      expect(parseLooksFilter(value)).toBe('all')
+    }
   })
 })

@@ -85,7 +85,9 @@ function MemberLooks({ epoch }: { epoch: number }) {
   }, [feed.failed, feed.hasItems, feed.settled, filter])
 
   const segment = addressSegment ?? defaultSegment
-  const ready = segment !== null && (segment !== 'saved' || feed.settled)
+  // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
+  // lands above a grid already on screen (a CC-7.7 shift).
+  const ready = segment !== null && (segment === 'plan' || feed.settled)
 
   // A tag edit or a garment delete elsewhere changes a look's state line.
   const { reload } = feed

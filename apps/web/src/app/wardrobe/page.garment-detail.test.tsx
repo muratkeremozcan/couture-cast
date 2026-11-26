@@ -354,8 +354,8 @@ describe('Closet garment detail', () => {
 
   /**
    * Story CC-7.12 moved saved looks to Looks: the Closet shows no saved looks and reads none
-   * around a tag edit. The anchored look's Ready or Needs review now follows its tags on Looks
-   * (looks/page.test.tsx 7.12-UNIT-022e).
+   * around a tag edit. The anchored look's saved date or Needs review now follows the edit and
+   * its Undo on Looks (looks/page.anchor-tags.test.tsx 7.12-UNIT-022e).
    */
   it('[P1] [7.5-CMP-016] [7.12] a tag edit and its Undo send no saved looks read from the Closet', async () => {
     const user = userEvent.setup()

@@ -1,7 +1,8 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 // Story CC-7.12 test owner (TEA): 7.12-UNIT-041 (D6, P7: `?capsule=` focuses a loaded card matched
-// by equality; an unknown or hostile id does nothing) and 7.12-UNIT-061 (the manager's parent is
+// by equality; an unknown or hostile id does nothing; 041i TEA W1: a refetch keeps the shown
+// grid mounted) and 7.12-UNIT-061 (the manager's parent is
 // Looks Saved with the Capsules filter). Moved from app/wardrobe/capsules/page.test.tsx with every
 // case kept; the route is now /looks/capsules.
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
@@ -171,7 +172,9 @@ describe('LooksCapsulesPage account switch', () => {
       window.dispatchEvent(new Event('focus'))
     })
     expect(list.mock.calls.at(-1)?.[0]).toBe(memberA.ownerUserId)
-    expect(screen.getByTestId('capsule-loading-state')).toBeVisible()
+    // TEA W1: a refetch keeps the shown grid; only a first read shows the loading line.
+    expect(screen.getByRole('heading', { name: memberA.name })).toBeVisible()
+    expect(screen.queryByTestId('capsule-loading-state')).toBeNull()
 
     act(() => publishCapsuleOwner(memberB.ownerUserId))
     await act(async () => {
@@ -342,13 +345,86 @@ describe('7.12 LooksCapsulesPage capsule focus (D6, P7)', () => {
 
     clientNavigate('?capsule=cap-3')
 
-    // The new id reads the list again, so each check takes the card on screen now.
+    // The new id reads the list again; the card that list paints is the one focused and
+    // scrolled, so each check takes the card on screen now (toBe, never a look-alike node).
+    await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(screen.getByTestId('capsule-card-cap-3')).toHaveFocus())
-    expect(scrollIntoView.mock.contexts).toEqual([
-      screen.getByTestId('capsule-card-cap-3'),
-    ])
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toBe(screen.getByTestId('capsule-card-cap-3'))
     expect(window.location.search).toBe('')
     expect(wardrobeApi.getCapsuleFromWeb).not.toHaveBeenCalled()
+
+    // Once: a later refetch (window focus) for the same id neither moves focus nor scrolls.
+    screen.getByTestId('create-capsule-button').focus()
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(3))
+    await screen.findByTestId('capsule-card-cap-3')
+    expect(screen.getByTestId('create-capsule-button')).toHaveFocus()
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('7.12-UNIT-041h a new capsule id by a client navigation after a first load that focused another focuses the new card once', async () => {
+    window.history.replaceState(null, '', '/looks/capsules?capsule=cap-2')
+    render(<LooksCapsulesPage />)
+    await waitFor(() => expect(screen.getByTestId('capsule-card-cap-2')).toHaveFocus())
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+
+    clientNavigate('?capsule=cap-3')
+
+    await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.getByTestId('capsule-card-cap-3')).toHaveFocus())
+    expect(scrollIntoView).toHaveBeenCalledTimes(2)
+    expect(scrollIntoView.mock.contexts[1]).toBe(screen.getByTestId('capsule-card-cap-3'))
+    // Only the new target takes programmatic focus.
+    expect(screen.getByTestId('capsule-card-cap-3')).toHaveAttribute('tabindex', '-1')
+    expect(screen.getByTestId('capsule-card-cap-2')).not.toHaveAttribute('tabindex')
+    expect(wardrobeApi.getCapsuleFromWeb).not.toHaveBeenCalled()
+  })
+
+  // TEA W1: once a first read showed the grid, a refetch (here a new tile's capsule id) keeps the
+  // same grid and cards mounted while its read is out; only the first read shows the loading line.
+  it('7.12-UNIT-041i a refetch for a new capsule id keeps the shown grid mounted while the read is held, then focuses the new card', async () => {
+    window.history.replaceState(null, '', '/looks/capsules')
+    render(<LooksCapsulesPage />)
+    const grid = await screen.findByTestId('capsule-grid')
+    const cards = ['cap-1', 'cap-2', 'cap-3'].map((id) =>
+      screen.getByTestId(`capsule-card-${id}`)
+    )
+    const held = Promise.withResolvers<ReturnType<typeof mockPage>>()
+    vi.mocked(wardrobeApi.listCapsulesFromWeb).mockReturnValueOnce(held.promise)
+
+    clientNavigate('?capsule=cap-3')
+
+    await waitFor(() => expect(wardrobeApi.listCapsulesFromWeb).toHaveBeenCalledTimes(2))
+    // The same nodes: a grid that unmounted and came back would be new elements.
+    expect(screen.getByTestId('capsule-grid')).toBe(grid)
+    const shown = within(grid).getAllByTestId(/^capsule-card-/)
+    expect(shown).toHaveLength(cards.length)
+    shown.forEach((card, index) => expect(card).toBe(cards[index]))
+    expect(screen.queryByTestId('capsule-loading-state')).toBeNull()
+    // Focus waits for the read made for the new id.
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(document.body)
+
+    await act(async () => {
+      held.resolve(
+        mockPage([
+          buildCapsule(),
+          buildCapsule({ id: 'cap-2', name: 'Winter Layers' }),
+          buildCapsule({ id: 'cap-3', name: 'Office Week' }),
+        ])
+      )
+      await held.promise
+    })
+
+    await waitFor(() => expect(cards[2]).toHaveFocus())
+    expect(screen.getByTestId('capsule-grid')).toBe(grid)
+    expect(screen.getByTestId('capsule-card-cap-3')).toBe(cards[2])
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(scrollIntoView.mock.contexts[0]).toBe(cards[2])
+    expect(screen.queryByTestId('capsule-loading-state')).toBeNull()
   })
 
   it.each([

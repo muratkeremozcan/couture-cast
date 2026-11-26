@@ -148,6 +148,10 @@ function CapsulesView({ session }: { session: MemberSession }) {
   // Codex #4: a capsule outside the first page is read on its own and shown first, so the tile
   // always lands on its card. It shows only while no search or filter narrows the list.
   const [pinnedCapsule, setPinnedCapsule] = useState<OutfitCapsuleContract | null>(null)
+  /** The `capsule` id the last landed read was made for (TEA W1). */
+  const [loadedForCapsule, setLoadedForCapsule] = useState<string | null>(null)
+  /** A first read has landed, so later reads keep the grid on screen. */
+  const [hasShownCapsules, setHasShownCapsules] = useState(false)
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
@@ -235,6 +239,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
         return
       }
       setCapsules(page.items)
+      setHasShownCapsules(true)
       setTotal(page.total)
       // Every read refreshes the pinned capsule too, so an edit, favorite or delete shows.
       const unfilteredRead = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
@@ -244,7 +249,10 @@ function CapsulesView({ session }: { session: MemberSession }) {
         page.items,
         controller.signal
       )
-      if (reading()) setPinnedCapsule(pinned)
+      if (reading()) {
+        setPinnedCapsule(pinned)
+        setLoadedForCapsule(focusCapsuleId)
+      }
       setGarments(garmentList)
     } catch (err: unknown) {
       if (!reading()) {
@@ -274,8 +282,9 @@ function CapsulesView({ session }: { session: MemberSession }) {
   useEffect(() => () => inFlightRef.current?.abort(), [])
 
   // Story CC-7.12 D6: a Looks capsule tile opens the manager on its card. The id is matched by
-  // equality against the loaded capsules (TEA P7), and only the first load moves focus.
-  const focusedCapsuleRef = useRef(false)
+  // equality against the loaded capsules (TEA P7). TEA W1: focus waits for the read made for
+  // that id, and each id is focused once, so a second tile's id gets its own focus.
+  const focusedCapsuleRef = useRef<string | null>(null)
   const cardRefs = useRef(new Map<string, HTMLDivElement>())
   const unfiltered = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
   const shownCapsules = useMemo(() => {
@@ -284,14 +293,15 @@ function CapsulesView({ session }: { session: MemberSession }) {
     return fresh ? capsules : [pinnedCapsule, ...capsules]
   }, [capsules, pinnedCapsule, unfiltered])
   useEffect(() => {
-    if (!focusCapsuleId || focusedCapsuleRef.current || isLoading) return
+    if (!focusCapsuleId || focusedCapsuleRef.current === focusCapsuleId) return
+    if (isLoading || loadedForCapsule !== focusCapsuleId) return
     const match = shownCapsules.find((capsule) => capsule.id === focusCapsuleId)
     if (!match) return
-    focusedCapsuleRef.current = true
+    focusedCapsuleRef.current = focusCapsuleId
     const card = cardRefs.current.get(match.id)
     card?.scrollIntoView({ block: 'center' })
     card?.focus({ preventScroll: true })
-  }, [focusCapsuleId, shownCapsules, isLoading])
+  }, [focusCapsuleId, shownCapsules, isLoading, loadedForCapsule])
 
   /**
    * Another client's committed changes appear on refocus, which is the
@@ -376,7 +386,10 @@ function CapsulesView({ session }: { session: MemberSession }) {
     () => Math.max(0, total - capsules.length),
     [total, capsules]
   )
-  const loading = status === 'checking' || (status === 'signed_in' && isLoading)
+  // A refetch (a new tile id, a mutation) keeps the shown grid in place; only the first read
+  // shows the loading line (TEA W1).
+  const loading =
+    status === 'checking' || (status === 'signed_in' && isLoading && !hasShownCapsules)
 
   return (
     /*

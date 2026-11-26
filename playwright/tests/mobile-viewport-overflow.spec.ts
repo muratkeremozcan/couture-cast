@@ -281,26 +281,32 @@ for (const locale of ['en-US', 'de-DE']) {
         'The signed-in fixture session exists only on the local stack.'
       )
       for (const route of MEMBER_ROUTES)
-        test(`O-1 ${route} fits a phone, signed in`, async ({
-          page,
-          authToken,
-        }, testInfo) => {
-          // TEA F3: the app's own bearer, so the landing really is the member landing.
-          await seedWebSession(page, authToken)
-          await open(page, route)
-          await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
-          await expectNoOverflow(page, route)
-          // TEA opens these before sign-off: the header the owner reported, at 393 px.
-          if (route === '/wardrobe')
-            for (const colorScheme of SCHEMES) {
-              await page.setViewportSize({ width: 393, height: 852 })
-              await page.emulateMedia({ colorScheme })
-              await settle(page)
-              await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
-                body: await page.locator('header').first().screenshot(),
-                contentType: 'image/png',
-              })
-            }
+        test.describe(route, () => {
+          // Story CC-7.12 D10: a free member's Plan rests on the planner's exact Premium-required
+          // 403 (the free preview); every other planner error stays fatal.
+          if (route === '/looks?segment=plan')
+            test.use({ allowPremiumPlannerRefusal: true })
+          test(`O-1 ${route} fits a phone, signed in`, async ({
+            page,
+            authToken,
+          }, testInfo) => {
+            // TEA F3: the app's own bearer, so the landing really is the member landing.
+            await seedWebSession(page, authToken)
+            await open(page, route)
+            await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
+            await expectNoOverflow(page, route)
+            // TEA opens these before sign-off: the header the owner reported, at 393 px.
+            if (route === '/wardrobe')
+              for (const colorScheme of SCHEMES) {
+                await page.setViewportSize({ width: 393, height: 852 })
+                await page.emulateMedia({ colorScheme })
+                await settle(page)
+                await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
+                  body: await page.locator('header').first().screenshot(),
+                  contentType: 'image/png',
+                })
+              }
+          })
         })
     })
 

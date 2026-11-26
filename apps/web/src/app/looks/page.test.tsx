@@ -1,7 +1,8 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 // Story CC-7.12 test owner (TEA): 7.12-UNIT-020 (default segment, P1), 7.12-UNIT-021 (Load more
-// reads the source looks-feed names), 7.12-UNIT-022 (member switch, P9), 7.12-UNIT-023 (segment
+// reads the source looks-feed names; 021f-g TEA W2: a failed refresh keeps the shown tiles, a
+// failed first read shows Retry), 7.12-UNIT-022 (member switch, P9), 7.12-UNIT-023 (segment
 // and filter in the address), 7.12-UNIT-024 (filters read the server, P2; TEA T1) and the Plan
 // segment (D10, D11: the free preview and the legacy `planner` key). The CC-7.11 cases
 // 7.11-CMP-LOOKS-01..11 and 7.11-CMP-PLAN-01..06 (app/looks/plan/page.test.tsx, route removed)
@@ -19,7 +20,11 @@ import {
 } from '@couture/api-client/contracts/http'
 import type * as SavedLooksModule from '../../lib/saved-looks'
 import type * as WardrobeModule from '../../lib/wardrobe'
-import { notifySavedLooksChanged, type SavedLookPageResult } from '../../lib/saved-looks'
+import {
+  notifySavedLooksChanged,
+  SavedLookRequestError,
+  type SavedLookPageResult,
+} from '../../lib/saved-looks'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { signInFixtureMember } from '../../test-utils/member-session'
@@ -77,6 +82,11 @@ vi.mock('../../lib/wardrobe', async (importOriginal) => ({
 
 /** The owner every e2e fixture bearer reads as (lib/use-web-session.ts). */
 const FIXTURE_OWNER = 'bearer'
+/**
+ * The profile id `resolveCurrentUserId` answers for the fixture member. A fixture bearer has no
+ * verified owner, so the saved looks read is made for this id (looks-screen.tsx).
+ */
+const FIXTURE_PROFILE_ID = 'member-1'
 const PLANNER_PATH = '/api/v1/commerce/premium/planner'
 const BASE = Date.parse('2026-11-22T12:00:00.000Z')
 
@@ -263,7 +273,7 @@ describe('7.12 Looks tab default segment (D1, P1)', () => {
     expect(screen.queryByTestId('looks-ideas-grid')).toBeNull()
     expect(list).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
-        owner: FIXTURE_OWNER,
+        owner: FIXTURE_PROFILE_ID,
         sort: 'created_desc',
         source: undefined,
         limit: 50,
@@ -575,7 +585,8 @@ describe('7.12 Looks Saved filters (D4, P2, T1)', () => {
       })
     )
     expect(capsules).not.toHaveBeenCalled()
-    expect(userId).not.toHaveBeenCalled()
+    // The fixture bearer's profile id stands in for its owner on the saved looks read.
+    expect(userId).toHaveBeenCalledTimes(1)
     expect(screen.queryByTestId('looks-manage-capsules')).toBeNull()
   })
 
@@ -715,7 +726,7 @@ describe('7.12 Looks Saved grid and paging (D2, D3)', () => {
     fireEvent.click(more)
     expect(more).toBeDisabled()
     expect(list).toHaveBeenLastCalledWith({
-      owner: FIXTURE_OWNER,
+      owner: FIXTURE_PROFILE_ID,
       sort: 'created_desc',
       source: undefined,
       limit: 50,
@@ -821,6 +832,95 @@ describe('7.12 Looks Saved grid and paging (D2, D3)', () => {
   })
 })
 
+/**
+ * Records every removal of a watched node, or of an ancestor that takes it along, from the moment
+ * it is called. A node that leaves and comes back between two assertions still counts, which a
+ * check of the final DOM would miss.
+ */
+function watchRemovals(watched: readonly HTMLElement[]) {
+  const removed: string[] = []
+  const record = (records: MutationRecord[]) => {
+    for (const mutation of records)
+      for (const node of Array.from(mutation.removedNodes))
+        for (const element of watched)
+          if (node === element || node.contains(element))
+            removed.push(element.getAttribute('data-testid') ?? element.tagName)
+  }
+  const observer = new MutationObserver(record)
+  observer.observe(document.body, { childList: true, subtree: true })
+  return {
+    /** Stops watching and returns what was removed, the records still queued included. */
+    stop() {
+      record(observer.takeRecords())
+      observer.disconnect()
+      return removed
+    },
+  }
+}
+
+// TEA W2: a saved-looks change notice (a save, an Undo, a device import) reads the same filter
+// again. That refresh can fail; the tiles already on screen stay, and only a first read that
+// fails shows the error line with Retry.
+describe('7.12 Looks failed refresh (TEA W2)', () => {
+  it('7.12-UNIT-021f a refresh that fails after a change notice keeps both tiles on screen through the refresh, with no error line or Retry', async () => {
+    signInFixtureMember()
+    list.mockResolvedValueOnce(
+      page([
+        look('sl-2', 'Weekend market', { createdAt: ago(1) }),
+        look('sl-1', 'Rainy commute', { createdAt: ago(2) }),
+      ])
+    )
+    const refresh = deferred<SavedLookPageResult>()
+    list.mockReturnValueOnce(refresh.promise)
+    moveAddress('/looks?segment=saved')
+
+    render(<LooksPage />)
+    const newer = await screen.findByTestId('saved-look-card-sl-2')
+    const older = screen.getByTestId('saved-look-card-sl-1')
+    const grid = screen.getByTestId('looks-saved-grid')
+    const watch = watchRemovals([grid, newer, older])
+
+    act(() => notifySavedLooksChanged(FIXTURE_OWNER))
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+    // While the refresh is out the tiles stay.
+    expect(screen.getByTestId('looks-saved-grid')).toBe(grid)
+    await act(async () => {
+      refresh.reject(
+        new SavedLookRequestError('Saved looks request failed with status 500', 500)
+      )
+      await refresh.promise.catch(() => undefined)
+    })
+
+    expect(watch.stop()).toEqual([])
+    expect(screen.getByTestId('looks-saved-grid')).toBe(grid)
+    expect(screen.getByTestId('saved-look-card-sl-2')).toBe(newer)
+    expect(screen.getByTestId('saved-look-card-sl-1')).toBe(older)
+    expect(tileIds()).toEqual(['saved-look-card-sl-2', 'saved-look-card-sl-1'])
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+    expect(screen.queryByText('Could not load your saved looks.')).toBeNull()
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('7.12-UNIT-021g control: the same failure on the first read shows the error line with Retry and no grid', async () => {
+    signInFixtureMember()
+    list.mockRejectedValueOnce(
+      new SavedLookRequestError('Saved looks request failed with status 500', 500)
+    )
+    moveAddress('/looks?segment=saved')
+
+    render(<LooksPage />)
+
+    const retry = await screen.findByTestId('saved-looks-retry')
+    const first = screen.getByTestId('looks-first-content')
+    expect(first).toHaveAttribute('role', 'alert')
+    expect(first).toHaveTextContent('Could not load your saved looks.')
+    expect(first).toContainElement(retry)
+    expect(screen.queryByTestId('looks-saved-grid')).toBeNull()
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
   it('7.12-UNIT-022a a return to Looks opens on its last tiles in the first frame while the reads refresh', async () => {
     signInFixtureMember()
@@ -850,47 +950,6 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     expect(screen.queryByTestId('saved-look-card-sl-1')).toBeNull()
   })
 
-  /**
-   * Story CC-7.12 moved this from the Closet (was 7.5-CMP-016): a saved look's Ready or Needs
-   * review follows its anchor piece's live tags, which the API derives on each read. A return to
-   * Looks after a tag edit in the Closet shows the status the refresh read.
-   */
-  it('7.12-UNIT-022e a look whose anchor tags changed in the Closet shows Needs review on the return to Looks, and Ready after the Undo', async () => {
-    signInFixtureMember()
-    const anchored = (overrides: Partial<SavedLookContract> = {}) =>
-      look('sl-anchor', 'Blue top look', {
-        source: 'style_piece',
-        anchorGarmentId: 'blue-top',
-        ...overrides,
-      })
-    list.mockResolvedValueOnce(page([anchored()]))
-    moveAddress('/looks?segment=saved')
-    const first = render(<LooksPage />)
-    const readyTile = await screen.findByTestId('saved-look-card-sl-anchor')
-    expect(readyTile).not.toHaveTextContent('Needs review')
-    first.unmount()
-
-    // The member retagged the anchor in the Closet; the refresh reads the API's new status.
-    list.mockResolvedValueOnce(page([anchored({ availabilityStatus: 'needs_review' })]))
-    const second = render(<LooksPage />)
-    await waitFor(() =>
-      expect(screen.getByTestId('saved-look-card-sl-anchor')).toHaveAccessibleName(
-        'Blue top look, Needs review'
-      )
-    )
-    second.unmount()
-
-    // Undo put the tags back: the next return reads Ready again.
-    list.mockResolvedValueOnce(page([anchored()]))
-    render(<LooksPage />)
-    await waitFor(() =>
-      expect(screen.getByTestId('saved-look-card-sl-anchor')).not.toHaveTextContent(
-        'Needs review'
-      )
-    )
-    expect(list).toHaveBeenCalledTimes(3)
-  })
-
   it('[Codex 7.11 #12] 7.12-UNIT-022b a same-member return keeps every loaded page, and the refresh reads both pages back', async () => {
     signInFixtureMember()
     list.mockResolvedValueOnce(page(FIRST_PAGE, 51))
@@ -913,9 +972,12 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     const first = screen.getByTestId('looks-first-content')
     expect(first).toContainElement(screen.getByTestId('saved-look-card-sl-1'))
     expect(first).toContainElement(screen.getByTestId('saved-look-card-sl-51'))
-    expect(list).toHaveBeenNthCalledWith(
-      3,
-      expect.objectContaining({ owner: FIXTURE_OWNER, limit: 50, offset: 0 })
+    // The refresh is sent once the profile id for the fixture bearer has answered.
+    await waitFor(() =>
+      expect(list).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ owner: FIXTURE_PROFILE_ID, limit: 50, offset: 0 })
+      )
     )
 
     await act(async () => {
@@ -927,7 +989,7 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     await waitFor(() => expect(list).toHaveBeenCalledTimes(4))
     expect(list).toHaveBeenNthCalledWith(
       4,
-      expect.objectContaining({ owner: FIXTURE_OWNER, limit: 50, offset: 50 })
+      expect.objectContaining({ owner: FIXTURE_PROFILE_ID, limit: 50, offset: 50 })
     )
 
     await act(async () => {
@@ -981,7 +1043,7 @@ describe('7.12 Looks snapshot and member switch (CC-7.7 D5, P9)', () => {
     moveAddress('/looks?segment=saved')
 
     render(<LooksPage />)
-    expect(list).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1))
 
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-second')
     await act(async () => {

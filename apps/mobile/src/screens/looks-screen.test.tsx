@@ -80,6 +80,7 @@ import {
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
 import { notifyMobileSavedLooksChanged } from '@/src/lib/saved-looks'
+import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { server } from '@/src/test-utils/msw/server'
 import { WithTabHeader, setBudgetViewport } from '@/src/test-utils/screen-budget'
@@ -494,7 +495,10 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       const reads = serveFeed({})
       await openLooks()
       expectOpenSegment('ideas')
-      expect(screen.getByTestId('looks-ideas-empty-line')).toBeVisible()
+      expect(screen.getByTestId('looks-ideas-grid')).toBeVisible()
+      // Ideas from the address opens without waiting on the reads; the line for an empty Saved
+      // comes once the All feed settles empty (Codex #11), so it is awaited here.
+      expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
 
       act(() => screenFocus.set(false))
       serveFeed({ looks: [look('first-save', at(23))] }, reads)
@@ -507,6 +511,56 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       )
       expectOpenSegment('ideas')
       expect(screen.queryByTestId('saved-look-card-first-save')).toBeNull()
+    })
+
+    // Fable review M2 (expected red until the Ideas panel waits on the first reads): Ideas from
+    // the address opens before the reads settle, and the empty line then lands above the grid.
+    it('[P1] [TEA P1] [M2] Ideas in the address: the Ideas grid does not move between its first paint and the first reads settling', async () => {
+      tabParams.set({ segment: 'ideas' })
+      serveFeed({})
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let looksReadSeen = false
+      server.use(
+        http.get('*/api/v1/wardrobe/saved-looks', async () => {
+          looksReadSeen = true
+          await held
+          return HttpResponse.json(
+            savedLookListResponseSchema.parse({
+              data: [],
+              total: 0,
+              limit: 50,
+              offset: 0,
+            }) as unknown as Record<string, unknown>
+          )
+        })
+      )
+      // The grid's top at the first commit that lays it out, whenever that commit comes.
+      let firstTop: number | null = null
+      const observer = new MutationObserver(() => {
+        const grid = screen.queryByTestId('looks-ideas-grid')
+        const rect = grid?.getBoundingClientRect()
+        if (firstTop === null && rect && rect.height > 0) firstTop = rect.top
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      try {
+        renderLooks()
+        await waitFor(() => expect(looksReadSeen).toBe(true))
+
+        release()
+        // The All feed settled empty: the line for an empty Saved shows.
+        expect(await screen.findByTestId('looks-ideas-empty-line')).toBeVisible()
+        expectOpenSegment('ideas')
+        expect(firstTop, 'the Ideas grid painted').not.toBeNull()
+        expect(
+          screen.getByTestId('looks-ideas-grid').getBoundingClientRect().top
+        ).toBeCloseTo(firstTop!, 0)
+      } finally {
+        observer.disconnect()
+        release()
+      }
     })
 
     // Codex 7.12 #6 (AC1, P1): the gate's deadline may open Looks before the reads answer. Looks
@@ -689,6 +743,74 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       )
     })
 
+    // looks-screen.tsx onWardrobeChanged: a tag edit or a garment delete on the Closet changes a
+    // look's state line, so Looks rereads its feed (CC-7.12 D8 moved this off the Closet).
+    it('[P1] [D2] [D8] a wardrobe change rereads saved looks; a look whose anchor tags changed shows Needs review', async () => {
+      const anchored = look('anchored', at(22), {
+        source: 'style_piece',
+        anchorGarmentId: 'anchor-top',
+        anchorSnapshot: {
+          garmentId: 'anchor-top',
+          category: 'top',
+          comfortRange: 'mild',
+        },
+        composition: [
+          {
+            slotIndex: 0,
+            category: 'top',
+            kind: 'garment',
+            itemId: 'anchor-top',
+            label: null,
+            missing: false,
+            imageAccess: { url: PNG_PIXEL, expiresAt: FAR },
+          },
+          {
+            slotIndex: 1,
+            category: 'bottom',
+            kind: 'catalog',
+            itemId: 'dark-jeans',
+            label: null,
+            missing: false,
+            imageAccess: null,
+          },
+        ],
+      })
+      const reads = serveFeed({ looks: [anchored] })
+      await openLooks()
+      const tile = await screen.findByTestId('saved-look-card-anchored')
+      expect(tile).toHaveAttribute('aria-label', 'Look anchored, Saved Nov 22')
+
+      // The member changes the anchor garment's comfort tag on the Closet; the server now
+      // reports the look for review.
+      serveFeed(
+        {
+          looks: [
+            {
+              ...anchored,
+              availabilityStatus: 'needs_review',
+              needsReviewReasons: ['comfort_range_changed'],
+              revision: 1,
+            },
+          ],
+        },
+        reads
+      )
+      const before = reads.looks.length
+      act(() => notifyWardrobeChanged())
+
+      await waitFor(() => expect(reads.looks.length).toBeGreaterThan(before))
+      await waitFor(() =>
+        expect(screen.getByTestId('saved-look-card-anchored')).toHaveAttribute(
+          'aria-label',
+          `Look anchored, ${i18n.t('looks.state.needsReview')}`
+        )
+      )
+      expect(screen.getByTestId('saved-look-card-anchored')).toHaveTextContent(
+        i18n.t('looks.state.needsReview')
+      )
+      expectOpenSegment('saved')
+    })
+
     it('[P1] [D2] the saved date follows the locale (de-DE)', async () => {
       await i18n.changeLanguage('de-DE')
       serveFeed({ looks: [look('ready', at(20))] })
@@ -758,9 +880,30 @@ describe('Native Looks tab (Story CC-7.12)', () => {
       const failed = within(capsuleTile)
         .getByTestId('looks-tile-placeholder')
         .getBoundingClientRect()
-      expect(failed.top).toBeCloseTo(photoCell.top, 0)
-      expect(failed.height).toBeCloseTo(photoCell.height, 0)
-      expect(failed.width).toBeCloseTo(photoCell.width, 0)
+      // Two pieces sit side by side and split the square evenly before the swap, so the failed
+      // cell kept its slot only if it still covers the left half and the photo the right half.
+      const collage = capsuleTile
+        .querySelector('[aria-hidden="true"]')!
+        .getBoundingClientRect()
+      const gap = photoCell.left - failed.right
+      expect(gap).toBeGreaterThanOrEqual(0)
+      const half = (collage.width - gap) / 2
+      for (const [name, cell] of [
+        ['failed cell', failed],
+        ['photo cell', photoCell],
+      ] as const) {
+        expect(cell.top, name).toBeCloseTo(collage.top, 0)
+        expect(cell.height, name).toBeCloseTo(collage.height, 0)
+        expect(cell.width, name).toBeCloseTo(half, 0)
+      }
+      expect(failed.left).toBeCloseTo(collage.left, 0)
+      expect(photoCell.right).toBeCloseTo(collage.right, 0)
+      // The tile itself does not shift: its collage stays a square as wide as the look tile's.
+      const lookCollage = lookTile
+        .querySelector('[aria-hidden="true"]')!
+        .getBoundingClientRect()
+      expect(collage.height).toBeCloseTo(collage.width, 0)
+      expect(collage.width).toBeCloseTo(lookCollage.width, 0)
     })
 
     it('[P0] [D5, D6, TEA T2] a look tile opens its screen with the origin filter; a capsule tile opens the manager on it', async () => {
