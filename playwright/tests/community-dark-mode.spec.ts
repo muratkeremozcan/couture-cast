@@ -7,14 +7,18 @@
 // feed. The lookbook now reads surface tokens with dark values for the Default system, and the
 // feed's actions (New post and a bell for members, Sign in for guests) sit in the heading row.
 import { type Locator, type Page } from '@playwright/test'
+import { hexToChannels, premiumPalettes } from '@couture/utils'
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import es419 from '../../apps/web/src/i18n/locales/es-419.json'
 import frFR from '../../apps/web/src/i18n/locales/fr-FR.json'
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
+import { rgbOf, roleRgb } from '../support/helpers/app-shell'
 import {
+  focusBackdrop,
   focusRing,
   inkCoverage,
   inkOfText,
+  paletteCardColors,
   paletteCardSurface,
   placeholderContrastFailures,
   resolved,
@@ -33,8 +37,9 @@ import {
   waitForTerminalAuthorState,
 } from '../support/helpers/community-session'
 
-const DARK_SURFACE = 'rgb(18, 18, 20)'
-const LIGHT_SURFACE = 'rgb(255, 255, 255)'
+// Story CC-7.9 D2 and D7: the one page surface is the `page` role, read from the token source.
+const DARK_SURFACE = roleRgb('dark', 'page')
+const LIGHT_SURFACE = roleRgb('light', 'page')
 
 const filtersOf = (page: Page) =>
   page
@@ -44,19 +49,26 @@ const filtersOf = (page: Page) =>
 const heading = (page: Page) =>
   filtersOf(page).getByRole('heading', { name: enUS.community.heading, exact: true })
 
-/** The lookbook surface the community page paints, and the color its heading is drawn in. */
+/**
+ * The page surface Community sits on and the color its heading is drawn in. Story CC-7.9 D7: the
+ * inset lookbook card (`.lookbook-body`) is gone and `main` paints nothing, so the surface is the
+ * one `data-surface="page"` around it. A missing surface or heading is refused, never read as ''.
+ */
 async function surfaceAndInk(page: Page) {
-  return page.getByTestId('community-page').evaluate((section) => {
-    const surface = section.querySelector('.lookbook-body') ?? section
+  const read = await page.getByTestId('community-page').evaluate((section) => {
+    const surface = section.closest('[data-surface="page"]')
     const title = section.querySelector('nav h2')
+    if (!surface || !title) return { missing: !surface ? 'page surface' : 'nav h2' }
     return {
       surface: getComputedStyle(surface).backgroundColor,
-      ink: title ? getComputedStyle(title).color : '',
+      ink: getComputedStyle(title).color,
       scheme: window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light',
     }
   })
+  if ('missing' in read) throw new Error(`Community has no ${read.missing}`)
+  return read
 }
 
 /**
@@ -165,7 +177,7 @@ test.describe('Community lookbook under the system color scheme (production foll
     await checkA11y(page)
   })
 
-  test('3.6-E2E-011: a light system setting keeps the light lookbook, and a premium palette stays light under a dark one', async ({
+  test('3.6-E2E-011: a light system setting keeps the light lookbook, and a premium palette turns to its dark variant under a dark one', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 })
@@ -178,16 +190,24 @@ test.describe('Community lookbook under the system color scheme (production foll
     expect(contrastRatio(light.ink, light.surface)).toBeGreaterThanOrEqual(4.5)
     await checkA11y(page)
 
-    // A premium palette is a light design its member chose. Its `data-theme` on the root keeps
-    // the light surface whatever the system setting says; the Default system turns dark.
+    // Story CC-7.9 D5: a premium palette follows the system setting too. Under a dark one the
+    // page stays the dark `page` role (D7) and each palette's card turns to its dark variant, its
+    // own card text readable on it; the light variant would be a light card on a dark page.
     await page.emulateMedia({ colorScheme: 'dark' })
     expect((await surfaceAndInk(page)).surface).toBe(DARK_SURFACE)
-    for (const palette of ['jewel_radiance', 'autumn_umber', 'winter_metallic']) {
-      await page.evaluate(
-        (value) => document.documentElement.setAttribute('data-theme', value),
-        palette
+    for (const palette of PREMIUM_PALETTES) {
+      await setPalette(page, palette)
+      expect((await surfaceAndInk(page)).surface, palette).toBe(DARK_SURFACE)
+      const card = await paletteCardColors(page)
+      expect(card.surface, palette).toBe(
+        rgbOf(hexToChannels(premiumPalettes[palette].dark.cardBg))
       )
-      expect((await surfaceAndInk(page)).surface, palette).toBe(LIGHT_SURFACE)
+      expect(card.surface, palette).not.toBe(
+        rgbOf(hexToChannels(premiumPalettes[palette].light.cardBg))
+      )
+      expect(contrastRatio(card.ink, card.surface), palette).toBeGreaterThanOrEqual(4.5)
+      // Painted, not only declared: a run of the palette's card text on its card surface.
+      expect(await textContrastFailures(await paletteProbe(page)), palette).toEqual([])
     }
   })
 })
@@ -200,6 +220,26 @@ const setPalette = (page: Page, palette: string | null) =>
     if (value) document.documentElement.setAttribute('data-theme', value)
     else document.documentElement.removeAttribute('data-theme')
   }, palette)
+
+/**
+ * A card-sized run of text painted only from the palette tokens (`--cc-theme-card-bg` under
+ * `--cc-theme-card-text`), at the top of Community's main column, so the palette pairing is
+ * measured as painted on a reader who has no card on screen (Story CC-7.9 D5).
+ */
+async function paletteProbe(page: Page) {
+  await page.getByTestId('community-page').evaluate((main) => {
+    if (main.querySelector('[data-testid="tea-palette-probe"]')) return
+    const probe = document.createElement('div')
+    probe.dataset.testid = 'tea-palette-probe'
+    probe.setAttribute(
+      'style',
+      'padding:16px;font-size:14px;background:rgb(var(--cc-theme-card-bg));color:rgb(var(--cc-theme-card-text))'
+    )
+    probe.textContent = 'Synthetic palette card text'
+    main.prepend(probe)
+  })
+  return page.getByTestId('tea-palette-probe')
+}
 
 const MERLOT_LIGHT = 'rgb(122, 31, 45)'
 const MERLOT_DARK = 'rgb(240, 163, 174)'
@@ -306,9 +346,13 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       expect((await feed).status).toBe(200)
       await expectCommunityFeedLoaded(page)
       await setPalette(page, palette)
-      // The member chose a light palette: its card surface, as computed on the root. The dialog
-      // role sits on the dimming overlay; the panel is its first child, sampled as rendered.
+      // Story CC-7.9 D5: the member's palette in its dark variant under a dark system setting,
+      // as computed on the root from the `--cc-theme-*` tokens. The dialog role sits on the
+      // dimming overlay; the panel is its first child, sampled as rendered.
       const paletteSurface = await paletteCardSurface(page)
+      expect(paletteSurface).toBe(
+        rgbOf(hexToChannels(premiumPalettes[palette].dark.cardBg))
+      )
       const panelSurface = (dialog: Locator) =>
         surfacePixel(dialog.locator(':scope > div').first())
 
@@ -374,7 +418,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       await page.goto('/community')
       expect((await feed).status).toBe(200)
       await setPalette(page, palette)
+      // Story CC-7.9 D5: the dark variant of the palette (Default included) under a dark setting.
       const cardSurface = await paletteCardSurface(page)
+      expect(cardSurface).toBe(
+        rgbOf(hexToChannels(premiumPalettes[palette ?? 'default'].dark.cardBg))
+      )
 
       await page
         .locator(`[data-testid$="lookbook-card-${published.postId}"]`)
@@ -559,8 +607,14 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
           await expect(home).toBeFocused()
         })
         // Focus changes pixels around the tab, and they reach 3:1 against what was there.
-        expect(ring!.painted).toBeGreaterThan(20)
-        expect(ring!.ratio).toBeGreaterThanOrEqual(3)
+        // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the link.
+        expect(ring!.qualifying).toBeGreaterThanOrEqual(ring!.required!)
+        // Story CC-7.9 D3: the ring is the scheme's `focusEssential` outline over the surface the
+        // tab bar paints (the `page` role, D7), whatever palette the member chose.
+        const outline = await home.evaluate((link) => getComputedStyle(link).outlineColor)
+        expect(outline).toBe(roleRgb(scheme, 'focusEssential'))
+        const backdrop = await focusBackdrop(home)
+        expect(contrastRatio(outline, backdrop.color)).toBeGreaterThanOrEqual(3)
       })
     }
   }

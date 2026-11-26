@@ -174,7 +174,7 @@ describe('6.7 web Home spotlight teaser', () => {
     expect(link).toHaveAccessibleName(
       'Standout look in Lisbon by Ana, 3 reactions. Opens the City Spotlight.'
     )
-    expect(link).toHaveClass('min-h-[44px]')
+    expect(link).toHaveClass('min-h-11')
     const image = screen.getByTestId('home-spotlight-teaser-image')
     expect(image.getAttribute('alt')).toBe('')
     expect(within(link).queryAllByRole('img')).toHaveLength(0)

@@ -1,3 +1,5 @@
+import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
+import { AppTopBar } from '../../components/app-top-bar'
 import { GuardianAcceptView } from './guardian-accept-view'
 
 type GuardianAcceptPageProps = {
@@ -15,13 +17,12 @@ export default async function GuardianAcceptPage({
     : resolvedSearchParams.token
 
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      data-focus-surface="dark"
-      className="min-h-screen bg-neutral-950 outline-none"
-    >
-      <GuardianAcceptView initialToken={token ?? null} />
-    </main>
+    // Story CC-7.9 D6, D7: the shared top bar and page surface; the always-dark page is gone.
+    <AppPage>
+      <AppTopBar titleKey="guardian.accept.title" backHref="/" />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <GuardianAcceptView initialToken={token ?? null} />
+      </main>
+    </AppPage>
   )
 }

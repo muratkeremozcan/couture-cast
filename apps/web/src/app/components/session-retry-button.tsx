@@ -15,12 +15,12 @@ export function SessionRetryButton({
   session,
   testId,
   recheck = null,
-  className = 'mt-2 min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-sm text-white',
+  className = 'mt-2 min-h-11 self-start rounded-md border border-line-strong px-4 text-sm text-ink',
 }: {
   session: MemberSession
   testId: string
   recheck?: (() => void) | null
-  /** The dark Settings style by default; a light surface passes its own. */
+  /** A neutral outline button on the page or card surface by default. */
   className?: string
 }) {
   const { t } = useTranslation()

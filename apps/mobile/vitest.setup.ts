@@ -23,6 +23,16 @@ declare global {
   const __VITEST_WATCH__: boolean
 }
 
+// A browser worker runs many test files in one page, and localStorage outlives each file: a file
+// that switched the language saved it in `couture-cast-settings.json`, and the next file's
+// initI18n read it back as its locale, so community-post-text-editor read Keine Änderungen for
+// No changes (CI 5f2043f2). Each file starts with no saved settings. Nothing here imports
+// i18next: loading it in setup put the real module in front of a file's vi.mock('i18next')
+// (i18n-init-fallback, CI 1518849d); each file gets its own module instances anyway.
+beforeAll(() => {
+  globalThis.localStorage?.removeItem('couture-cast-settings.json')
+})
+
 beforeAll(async () => {
   // The browser shim forwards worker options. Request traces contain Authorization;
   // quiet leaves handler errors and assertions observable without logging bearers.

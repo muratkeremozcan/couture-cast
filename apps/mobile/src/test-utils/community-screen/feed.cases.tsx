@@ -61,9 +61,13 @@ export function registerCommunityFeedCases() {
     )
     await render(<CommunityScreen />)
     await communityGateOpen()
-    expect(await screen.findByTestId('community-example-inspiration')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-example-inspiration')).toBeVisible()
+    )
     press(screen.getByTestId('community-feed-load-more'))
-    expect(await screen.findByTestId('community-post-card-post-peer')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-peer')).toBeVisible()
+    )
     expect(screen.queryByTestId('community-example-inspiration')).toBeNull()
   })
 
@@ -124,7 +128,7 @@ export function registerCommunityFeedCases() {
       await browserUser.click(
         await screen.findByTestId('community-share-card-open-post-a')
       )
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await browserUser.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() => expect(setFocus).toHaveBeenCalledWith(88))
@@ -211,9 +215,13 @@ export function registerCommunityFeedCases() {
           expect(screen.queryByTestId('community-post-card-post-b')).toBeNull()
         )
         await communityGateOpen()
-        expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+        await waitFor(() =>
+          expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+        )
         if (openedPost === 'post-a') {
-          expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          )
           expect(screen.getByLabelText('Add a comment')).toHaveValue(
             'Owned discussion draft'
           )
@@ -396,7 +404,9 @@ export function registerCommunityFeedCases() {
       // A second failed tick proves the first rejection was settled, not left unhandled.
       await nextRead()
       expect(unhandled).toEqual([])
-      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      )
       expect(screen.getByLabelText('Add a comment')).toHaveValue(
         'Saved through storage failure'
       )

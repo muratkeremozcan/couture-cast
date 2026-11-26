@@ -3,12 +3,21 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import posthog from 'posthog-js'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 
 export type ChipCategory = 'Personal' | 'Community' | 'Sponsored'
 
 export const CHIP_NAVIGATION_HEIGHT_PX = 77
 
 const CHIP_CATEGORIES: ChipCategory[] = ['Personal', 'Community', 'Sponsored']
+
+/** Story CC-7.9 D9: the chip labels come from the catalogs; the category ids stay English. */
+const CHIP_LABEL_KEYS: Record<ChipCategory, string> = {
+  Personal: 'landing.chips.personal',
+  Community: 'landing.chips.community',
+  Sponsored: 'landing.chips.sponsored',
+}
 
 export interface ChipNavigationProps {
   activeCategory: ChipCategory
@@ -21,6 +30,7 @@ export function ChipNavigation({
   onCategoryChange,
   surface = 'web',
 }: ChipNavigationProps) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([])
   const activeIndex = CHIP_CATEGORIES.indexOf(activeCategory)
   const [focusIndex, setFocusIndex] = useState(activeIndex)
@@ -82,14 +92,14 @@ export function ChipNavigation({
 
   return (
     <nav
-      aria-label="Filter recommendations by category"
+      aria-label={t('landing.chips.navLabel')}
       data-testid="chip-navigation-bar"
       style={{ height: CHIP_NAVIGATION_HEIGHT_PX }}
-      className="sticky top-0 z-20 flex flex-col gap-2 border-b border-[color:var(--lookbook-line)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur"
+      className="sticky top-0 z-20 flex flex-col gap-2 border-b border-line bg-page/95 py-3 backdrop-blur"
     >
       <div
         role="group"
-        aria-label="Category filters"
+        aria-label={t('landing.chips.groupLabel')}
         className="flex items-center gap-2 overflow-x-auto snap-x snap-mandatory px-4 py-1 scrollbar-none"
       >
         {CHIP_CATEGORIES.map((category, index) => {
@@ -110,20 +120,20 @@ export function ChipNavigation({
               }}
               onKeyDown={(e) => handleKeyDown(e, index)}
               data-testid={`chip-${category.toLowerCase()}`}
-              className={`snap-start shrink-0 min-h-[44px] whitespace-nowrap rounded-full border px-5 py-2.5 text-xs font-semibold uppercase tracking-wider motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+              className={`snap-start shrink-0 min-h-11 whitespace-nowrap rounded-full border px-5 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-all motion-safe:duration-200 motion-reduce:transition-none ${
                 isActive
-                  ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111] shadow-sm'
-                  : 'border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] text-[color:var(--lookbook-ink-muted)] hover:border-[#C9A14A]/60 hover:text-[color:var(--lookbook-ink)]'
+                  ? 'border-inverse bg-inverse text-on-inverse'
+                  : 'border-line-strong bg-card text-ink-muted hover:text-ink'
               }`}
             >
-              {category}
+              {t(CHIP_LABEL_KEYS[category])}
             </button>
           )
         })}
       </div>
 
       <div aria-live="polite" role="status" className="sr-only">
-        Showing {activeCategory} recommendations
+        {t('landing.chips.showing', { category: t(CHIP_LABEL_KEYS[activeCategory]) })}
       </div>
     </nav>
   )

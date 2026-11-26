@@ -114,7 +114,8 @@
           "opened": "Kombin planlayıcı açıldı.",
           "ready": "7 günlük planınız hazır.",
           "dayFailed": "{{day}} için kombin oluşturulamadı."
-        }
+        },
+        "railLabel": "Planlayıcı paneli"
       },
       "theme": {
         "sectionTitle": "Arayüz paletleri",
@@ -352,7 +353,53 @@
         "evening": "Akşam",
         "outdoor": "Açık hava",
         "home": "Ev"
-      }
+      },
+      "signIn": "Kapsülleri yönetmek için giriş yap.",
+      "subtitle": "Kendi kıyafet kombinlerini oluştur ve yönet.",
+      "filterOccasionLabel": "Duruma göre filtrele",
+      "loading": "Kıyafet kapsülleri yükleniyor…",
+      "favoriteCapsule": "{{name}} kapsülünü favorilere ekle",
+      "garmentCount_one": "{{count}} parça",
+      "garmentCount_other": "{{count}} parça",
+      "status": {
+        "ready": "Hazır",
+        "needsRepair": "Onarılmalı"
+      },
+      "editAction": "Düzenle",
+      "deleteAction": "Sil",
+      "truncation": "{{total}} kapsülden {{shown}} tanesi gösteriliyor. Kalanları görmek için aramanı daralt.",
+      "cancelDeletion": "Silmeyi iptal et",
+      "cancel": "İptal",
+      "builderDescription": "Gardırobundan uyumlu bir kıyafet kapsülü oluştur.",
+      "repairRemoved_one": "{{count}} parça artık kullanılamıyor ve kaldırıldı. Kaydetmeden önce yerine bir parça seç.",
+      "repairRemoved_other": "{{count}} parça artık kullanılamıyor ve kaldırıldı. Kaydetmeden önce yerlerine parça seç.",
+      "reloadLatest": "En son sürümü yükle",
+      "garmentFallback": "Kıyafet {{position}}",
+      "garmentNoun": "kıyafet",
+      "untagged": "Kıyafet",
+      "garmentLabel": "{{category}} ({{position}}. sıra)",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} ({{position}}. sıra)",
+      "category": {
+        "top": "üst",
+        "bottom": "alt",
+        "outerwear": "dış giyim",
+        "dress": "elbise",
+        "shoes": "ayakkabı",
+        "accessory": "aksesuar"
+      },
+      "comfort": {
+        "cold": "soğuk",
+        "cool": "serin",
+        "mild": "ılık",
+        "warm": "sıcak",
+        "hot": "çok sıcak"
+      },
+      "garmentAtPosition": "{{garment}} ({{position}}. sıra)",
+      "garmentNumber": "Parça {{position}}",
+      "closeBuilder": "Kapsül oluşturucuyu kapat",
+      "favoriteMarked": "Favori kapsül",
+      "markFavorite": "Favori olarak işaretle",
+      "saving": "Kaydediliyor..."
     },
     "onboarding": {
       "title": "Gardırobunu oluştur",
@@ -492,6 +539,103 @@
       "deleteUndone": "Silme geri alındı",
       "deleteFailed": "Bu parça silinemedi.",
       "deleteUsageFailed": "Bu parçanın nerede kullanıldığı kontrol edilemedi. Tekrar dene."
+    },
+    "hub": {
+      "loading": "Gardırobun yükleniyor...",
+      "emptyTitle": "Henüz kıyafet eklenmedi",
+      "emptyBody": "Başlamak için en sevdiğin ceketin, üstün ya da elbisenin fotoğrafını çek.",
+      "emptyAction": "Kıyafet çek veya içe aktar",
+      "accountFailed": "Hesabın yüklenemedi, bu yüzden Silüet ayarları şu anda kullanılamıyor. Tekrar denemek için sayfayı yenile.",
+      "accountFailedShort": "Hesabın yüklenemedi. Tekrar denemek için sayfayı yenile.",
+      "setupFailed": "Dolap kurulumu ilerlemen kontrol edilemedi.",
+      "addGarment": "+ Kıyafet ekle",
+      "closetTitle": "Dijital dolabın",
+      "closetBody": "Kişisel hava durumu önerileri için kıyafetlerinin fotoğrafını çek veya yükle.",
+      "needsTags": "Etiket gerekli",
+      "taggingSlow": "Akıllı etiketleme beklenenden uzun sürüyor. İşleme devam ederken kıyafet görünür kalacak.",
+      "statusRefreshFailed": "Kıyafet durumu yenilenemedi.",
+      "refreshFailed": "Gardırobun yenilenemedi.",
+      "silhouetteSaving": "Değişiklikler kaydediliyor. Lütfen bekle.",
+      "status": {
+        "pending_upload": "Yükleniyor",
+        "bytes_uploaded": "Yüklendi",
+        "processing": "İşleniyor",
+        "awaiting_tags": "Etiket bekliyor",
+        "ready": "Hazır",
+        "failed": "Başarısız",
+        "unknown": "Devam ediyor"
+      },
+      "detailTitle": "Parça ayrıntıları"
+    },
+    "tagEditor": {
+      "title": "Kıyafet etiketlerini düzenle",
+      "suggestedDescription": "Günlük kıyafet önerilerini kişiselleştirmek için yapay zekâ önerilerini incele veya düzenle.",
+      "savingAnnouncement": "Kıyafet etiketleri kaydediliyor",
+      "retrySuggestions": "Akıllı önerileri yeniden dene",
+      "categoryLegend": "Kıyafet kategorisi",
+      "materialLegend": "Kumaş",
+      "optional": "(İsteğe bağlı)",
+      "comfortLegend": "Konfor aralığı",
+      "suggestedConfident": "(Yapay zekâ önerisi: {{value}})",
+      "suggestedReview": "(Kontrol et, öneri: {{value}})",
+      "materialClear": "Emin değilim / Temizle",
+      "cancel": "İptal",
+      "save": "Onayla ve etiketleri kaydet",
+      "saving": "Kaydediliyor...",
+      "errors": {
+        "suggestionUnavailable": "Öneri kullanılamıyor",
+        "analysisPending": "Kıyafet analizi hâlâ sürüyor. Birazdan yeniden dene.",
+        "inferenceUnavailable": "Akıllı öneriler kullanılamıyor. Etiketleri kendin seç.",
+        "suggestionsFailed": "Akıllı öneriler yüklenemedi.",
+        "selectionRequired": "Kaydetmeden önce bir kategori ve konfor aralığı seç.",
+        "saveFailed": "Etiketler kaydedilemedi. Yeniden dene."
+      },
+      "category": {
+        "top": "Üst",
+        "bottom": "Alt",
+        "outerwear": "Dış giyim",
+        "dress": "Elbise",
+        "shoes": "Ayakkabı",
+        "accessory": "Aksesuar"
+      },
+      "material": {
+        "cotton": "Pamuk",
+        "wool": "Yün",
+        "linen": "Keten",
+        "leather": "Deri",
+        "denim": "Kot",
+        "fleece": "Polar",
+        "synthetic": "Sentetik",
+        "down": "Kaz tüyü",
+        "silk": "İpek"
+      },
+      "comfort": {
+        "cold": {
+          "label": "Soğuk (< 10 °C / 50 °F)",
+          "desc": "Kalın ve katmanlı giyim",
+          "name": "Soğuk"
+        },
+        "cool": {
+          "label": "Serin (10–16 °C / 50–60 °F)",
+          "desc": "Dış giyim veya ince kazak",
+          "name": "Serin"
+        },
+        "mild": {
+          "label": "Ilık (16–22 °C / 60–72 °F)",
+          "desc": "Rahat, ince bir katman",
+          "name": "Ilık"
+        },
+        "warm": {
+          "label": "Sıcak (22–28 °C / 72–82 °F)",
+          "desc": "Standart yazlık üst/alt",
+          "name": "Sıcak"
+        },
+        "hot": {
+          "label": "Çok sıcak (> 28 °C / 82 °F)",
+          "desc": "Nefes alan, sıcak hava için",
+          "name": "Çok sıcak"
+        }
+      }
     }
   },
   "community": {
@@ -887,6 +1031,85 @@
       "cta": "Şehir Vitrininde gör"
     }
   },
+  "landing": {
+    "tagline": "Her yolculuk için hava durumuna uygun gardırop planları",
+    "hero": {
+      "eyebrow": "Günlük ritüel",
+      "headline": "90 saniyeden kısa sürede kendinden emin kombinler planla.",
+      "body": "CoutureCast, yerel hava durumunu, gardırop arşivini ve topluluk görüşlerini birleştirerek yola, toplantıya ve havana uygun kombinler önerir."
+    },
+    "lookbook": {
+      "eyebrow": "Lookbook Prism",
+      "title": "Hava durumuna duyarlı gardırop ve topluluk",
+      "heroLabel": "Günlük ritüel alanı",
+      "communityLabel": "Topluluk bölümü",
+      "alert": {
+        "label": "Şiddetli hava uyarısı ayrıntıları",
+        "severity": "Hava uyarısı: {{severity}}",
+        "advisory": "Duyuru: {{type}}",
+        "adjustOutfit": "Kıyafeti ayarla"
+      },
+      "demo": {
+        "heading": "Günlük ritüel",
+        "timeCity": "08:30 • NYC",
+        "temperature": "18 °C",
+        "humidity": "Ilık nem • %65",
+        "change": "Dünkü yolculuğa göre +3 °C",
+        "primaryLook": "Önerilen ana kombin",
+        "matchScore": "Uyum puanı: {{score}}",
+        "garments": {
+          "blazer": "Oniks blazer",
+          "scarf": "Bordo ipek eşarp",
+          "loafers": "Deri loafer"
+        },
+        "lookA": {
+          "label": "KOMBİN A (ana)",
+          "title": "Blazer ve ipek triko",
+          "body": "Serin sabah rüzgârına göre ayarlanmış sıcaklık düzeyi."
+        },
+        "lookB": {
+          "label": "KOMBİN B (alternatif)",
+          "title": "Trençkot ve merinos hırka",
+          "body": "Su itici dış katmanla daha fazla rüzgâr koruması."
+        }
+      },
+      "recommendations": {
+        "personal": {
+          "eyebrow": "Yolculuğa hazır",
+          "title": "Kruvaze blazer ve ipek triko",
+          "description": "18 °C sabah tren yolculuğundan klimalı ofise geçiş için ayarlandı."
+        },
+        "community": {
+          "eyebrow": "Toplulukta gündemde",
+          "title": "Paris usulü ipek ve kaşmir karışımı",
+          "description": "Topluluğun favorileri, rüzgârlı hava tahmini için hafif kaşmiri pliseli midi etekle birleştiriyor."
+        },
+        "brands": {
+          "eyebrow": "Marka seçkileri",
+          "title": "Couture House arşiv takımı",
+          "description": "Geri dönüştürülmüş yün ve imza altın detaylar etrafında kurulan marka odaklı kombinler."
+        }
+      }
+    },
+    "chips": {
+      "navLabel": "Önerileri kategoriye göre filtrele",
+      "groupLabel": "Kategori filtreleri",
+      "personal": "Kişisel",
+      "community": "Topluluk",
+      "sponsored": "Sponsorlu",
+      "showing": "Gösterilen öneriler: {{category}}"
+    },
+    "layoutControls": {
+      "label": "Düzen kontrolleri",
+      "comparison": "Karşılaştırma modu",
+      "mobilePreview": "Mobil önizleme"
+    },
+    "actions": {
+      "previewOutfits": "Kombinlere göz at",
+      "seePlanner": "Planlayıcıyı gör",
+      "startUpload": "Gardırop yüklemeyi başlat"
+    }
+  },
   "shareCard": {
     "launcher": "Kombin kartımı oluştur",
     "sourceOutfit": "Kombin",
@@ -1141,7 +1364,8 @@
       "firstDecision": "İlk karar: {{when}}",
       "escalated": "Bu vaka bir yöneticiyi bekliyor. Yalnızca bir yönetici kapatabilir.",
       "reporterScreening": "Otomatik tarama",
-      "reasonRemoved": "Gerekçe silme işlemiyle kaldırıldı"
+      "reasonRemoved": "Gerekçe silme işlemiyle kaldırıldı",
+      "screenTitle": "Vaka incelemesi"
     },
     "action": {
       "flagged": "Tarama tarafından işaretlendi",
@@ -1318,6 +1542,7 @@
   },
   "nav": {
     "label": "Alt gezinme",
+    "primaryLabel": "Ana gezinme",
     "home": "Ana Sayfa",
     "wardrobe": "Gardırop",
     "community": "Topluluk",
@@ -1368,5 +1593,72 @@
     "close": "Kapat",
     "showList": "Kaydedilen kombinleri göster",
     "hideList": "Kaydedilen kombinleri gizle"
+  },
+  "shell": {
+    "back": "Geri",
+    "goHome": "Ana sayfaya dön",
+    "notFound": {
+      "title": "Sayfa bulunamadı",
+      "body": "Aradığın sayfa yok. Devam etmek için ana ekrana dön."
+    },
+    "error": {
+      "title": "Bir şeyler ters gitti",
+      "retry": "Tekrar dene"
+    },
+    "dismissBanner": "Bildirimi kapat",
+    "skipToContent": "Ana içeriğe geç",
+    "close": "Pencereyi kapat",
+    "legal": {
+      "label": "Yasal",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Hizmet Şartları"
+    }
+  },
+  "guardian": {
+    "accept": {
+      "title": "Veli onayı",
+      "heading": "Genç gardırop erişimini kabul et",
+      "intro": "Veli hesabını bağlamak ve genç gardırobunu açmak için bu daveti onayla.",
+      "tokenMissing": "Bu bağlantıda davet kodu eksik.",
+      "success": "{{teenEmail}} için onay kaydedildi. {{guardianEmail}} veli hesabı artık bağlı.",
+      "failed": "Veli daveti kabul edilemedi",
+      "accepting": "Kabul ediliyor…",
+      "accept": "Daveti kabul et"
+    },
+    "dashboard": {
+      "title": "Veli paneli",
+      "intro": "Bağlı genç hesaplarını incele ve erişim bitmesi gerektiğinde onayı geri çek.",
+      "loading": "Bağlı gençler yükleniyor...",
+      "loadFailed": "Panel yüklenemedi",
+      "revokeFailed": "Onay geri çekilemedi",
+      "revoked": "{{teenId}} için onay geri çekildi. Genç oturumu kapatıldı: {{invalidated}}.",
+      "yes": "evet",
+      "no": "hayır",
+      "linkedTeens": "Bağlı gençler",
+      "revokeLabel": "{{teenId}} için onayı geri çek",
+      "revoking": "Geri çekiliyor...",
+      "revoke": "Geri çek",
+      "empty": "Henüz bağlı genç hesabı yok."
+    },
+    "consent": {
+      "awaiting": "Onay bekleniyor",
+      "status": {
+        "granted": "verildi",
+        "pending": "bekliyor",
+        "revoked": "geri çekildi"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Genç paneli",
+      "loading": "Veli onayı durumu yükleniyor...",
+      "loadFailed": "Panel yüklenemedi",
+      "granted": "Veli onayı verildi",
+      "revoked": "Veli onayı geri çekildi",
+      "pending": "Veli onayı bekleniyor",
+      "linkedGuardians": "Bağlı veliler",
+      "empty": "Henüz hiçbir veli onay vermedi."
+    }
   }
 }

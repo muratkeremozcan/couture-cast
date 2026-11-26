@@ -126,33 +126,65 @@ describe('MemberSampleOutfit (mobile)', () => {
       }
     }
 
+    // Every step below waits for the screen, never only for the fake API: the store changes
+    // when a request lands, before the app has read the reply and rendered it, so a step that
+    // acted on the store alone raced the render (CI 7c284e60 and e5d4cfa5, two steps of this case).
+    const bar = () => screen.getByTestId('status-feedback-bar')
+    const barSays = (text: string) => waitFor(() => expect(bar()).toHaveTextContent(text))
+    const removeButtons = () =>
+      within(screen.getByTestId('sample-saved-looks')).getAllByRole('button', {
+        name: /^Remove /,
+      })
+    const savedLooksShown = (count: number) =>
+      waitFor(() => {
+        if (count === 0) expect(screen.queryByTestId('sample-saved-looks')).toBeNull()
+        else expect(removeButtons()).toHaveLength(count)
+      })
+    const saved = async (count: number) => {
+      await waitFor(() => expect(store.items).toHaveLength(count))
+      await savedLooksShown(count)
+    }
+    // A save has settled when the bar holds its success notice, with Undo for a new look and
+    // without it for a confirmed re-save. Mid-save the bar shows neither (Codex check 3), so
+    // "no Undo" alone can pass before the save finishes.
+    const saveSettled = (undoable: boolean) =>
+      waitFor(() => {
+        expect(bar()).toHaveTextContent('Saved to your looks.')
+        if (undoable)
+          expect(screen.getByTestId('status-bar-action-undo')).toBeInTheDocument()
+        else
+          expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
+      })
+
     // Save look -> persisted to API -> re-save is non-destructive no-op without Undo.
     const saveBtn = await screen.findByTestId('sample-save-look')
     fireEvent.click(saveBtn)
-    await waitFor(() => expect(store.items).toHaveLength(1))
-    await screen.findByTestId('status-bar-action-undo')
+    await saved(1)
+    await saveSettled(true)
 
     // Re-save confirmed against server (GET /:id 200) omits Undo.
     fireEvent.click(saveBtn)
-    await waitFor(() =>
-      expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
-    )
+    await saveSettled(false)
     expect(store.items).toHaveLength(1)
+    await savedLooksShown(1)
 
     // Remote delete on another device -> re-saving revalidates (404) and recreates look.
     store.items = []
     fireEvent.click(saveBtn)
-    await waitFor(() => expect(store.items).toHaveLength(1))
+    await saved(1)
+    // The recreated look brings its own Undo; the bar showed none since the confirmed re-save.
+    await saveSettled(true)
+    const undoSave = screen.getByTestId('status-bar-action-undo')
 
     // Undo Save deletes the created look cleanly.
-    const undoSave = await screen.findByTestId('status-bar-action-undo')
     fireEvent.click(undoSave)
-    await waitFor(() => expect(store.items).toHaveLength(0))
+    await saved(0)
 
     // Save again, then open saved look, then Remove failure -> Retry -> Undo Remove -> failed Undo.
     fireEvent.click(saveBtn)
-    await waitFor(() => expect(store.items).toHaveLength(1))
-    const savedRegion = await screen.findByTestId('sample-saved-looks')
+    await saved(1)
+    await saveSettled(true)
+    const savedRegion = screen.getByTestId('sample-saved-looks')
     const savedButtons = within(savedRegion).getAllByRole('button')
     fireEvent.click(savedButtons[0]!)
 
@@ -162,11 +194,11 @@ describe('MemberSampleOutfit (mobile)', () => {
       failDeleteOnce = false
       return HttpResponse.json({ message: 'Transient error' }, { status: 503 })
     }
-    const removeBtn = within(savedRegion).getByRole('button', { name: /^Remove / })
-    fireEvent.click(removeBtn)
+    fireEvent.click(removeButtons()[0]!)
     const retryRemove = await screen.findByTestId('status-bar-action-retry')
     fireEvent.click(retryRemove)
-    await waitFor(() => expect(store.items).toHaveLength(0))
+    await saved(0)
+    await barSays('Removed')
 
     // Undo Remove restores via /restore, and failed Undo Remove shows error notice.
     let failRestoreOnce = true
@@ -175,55 +207,41 @@ describe('MemberSampleOutfit (mobile)', () => {
       failRestoreOnce = false
       return HttpResponse.json({ message: 'Restore error' }, { status: 503 })
     }
-    const undoRemove = await screen.findByTestId('status-bar-action-undo')
-    fireEvent.click(undoRemove)
-    await waitFor(() =>
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'Could not save. Try again.'
-      )
-    )
+    fireEvent.click(screen.getByTestId('status-bar-action-undo'))
+    await barSays('Could not save. Try again.')
 
     // Save one more look, then test offline Remove, online Remove + offline Undo, and 404 stale delete.
     fireEvent.click(saveBtn)
-    await waitFor(() => expect(store.items).toHaveLength(1))
+    await saved(1)
+    await saveSettled(true)
 
     reportNetworkOffline()
-    const removeOfflineBtn = within(
-      await screen.findByTestId('sample-saved-looks')
-    ).getByRole('button', { name: /^Remove / })
-    fireEvent.click(removeOfflineBtn)
-    await waitFor(() =>
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'You are offline. Save when you reconnect.'
-      )
-    )
+    fireEvent.click(removeButtons()[0]!)
+    await barSays('You are offline. Save when you reconnect.')
+    // Offline, nothing was sent: the look is still saved and still listed.
+    expect(store.items).toHaveLength(1)
+    await savedLooksShown(1)
     reportNetworkOnline()
 
     // Remove while online, then click Undo while offline -> offline notice.
-    fireEvent.click(removeOfflineBtn)
-    await waitFor(() => expect(store.items).toHaveLength(0))
-    const undoRemove2 = await screen.findByTestId('status-bar-action-undo')
+    fireEvent.click(removeButtons()[0]!)
+    await saved(0)
+    // Until the bar says Removed, its Undo is still the earlier Save's (CI 7c284e60).
+    await barSays('Removed')
+    const undoRemove2 = screen.getByTestId('status-bar-action-undo')
     reportNetworkOffline()
     fireEvent.click(undoRemove2)
-    await waitFor(() =>
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent(
-        'You are offline. Save when you reconnect.'
-      )
-    )
+    await barSays('You are offline. Save when you reconnect.')
     reportNetworkOnline()
 
     // Re-save when online, then 404 stale delete cleans up without offering Undo.
     fireEvent.click(saveBtn)
-    await waitFor(() => expect(store.items).toHaveLength(1))
+    await saved(1)
+    await saveSettled(true)
     store.items = []
-    const removeBtn2 = within(screen.getByTestId('sample-saved-looks')).getByRole(
-      'button',
-      { name: /^Remove / }
-    )
-    fireEvent.click(removeBtn2)
-    await waitFor(() =>
-      expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Removed')
-    )
+    fireEvent.click(removeButtons()[0]!)
+    await barSays('Removed')
+    await savedLooksShown(0)
     expect(screen.queryByTestId('status-bar-action-undo')).not.toBeInTheDocument()
 
     // Generic error banner invokes onRetry; switching to null owner clears saved looks.

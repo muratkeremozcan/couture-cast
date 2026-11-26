@@ -132,6 +132,12 @@ jobs:
           # exit 134). The hosted runner has 16 GB.
           NODE_OPTIONS: --max-old-space-size=6144
 
+      # Story CC-7.9 D10: no raw color, palette class or off-scale value outside the design
+      # tokens (packages/utils/src/design-tokens.ts). Names file:line for each.
+      - name: Check design tokens
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node scripts/check-design-tokens.mjs
+
   lighthouse:
     name: Lighthouse accessibility gate
     needs: lanes

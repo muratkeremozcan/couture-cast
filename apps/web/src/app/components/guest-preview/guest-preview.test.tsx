@@ -24,6 +24,8 @@ const navigation = vi.hoisted(() => {
 vi.mock('next/navigation', () => ({
   useRouter: () => navigation.router,
   useSearchParams: () => navigation.params,
+  // Story CC-7.9 D6: the shared top bar reads the path to mark the active tab.
+  usePathname: () => '/preview',
 }))
 
 const session = vi.hoisted(() => ({ resolve: vi.fn() }))

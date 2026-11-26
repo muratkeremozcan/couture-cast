@@ -110,7 +110,16 @@ appId: ${MAESTRO_APP_ID}
       #
       # Guarded on `tab-home`, so this is a no-op whenever the app is already on
       # a tab screen and never fires a stray gesture at the home screen.
-      # Tapping the native `BackButton` rather than issuing `back`.
+      # Tapping the app's top bar Back rather than issuing `back`.
+      #
+      # CC-7.9 D6: Back is the shared top bar control. Every root stack screen
+      # renders `app-top-bar-back` (apps/mobile/src/components/app-top-bar.tsx)
+      # in place of the native header, so the iOS-only `BackButton` described
+      # below no longer exists. The control is the app's own Pressable on both
+      # platforms, so the tap is guarded on it being visible, and the Android
+      # system `back` only stands in when no top bar Back is showing (a screen
+      # without the bar). Pressing both would pop twice: the second BACK lands
+      # on a tab root and sends Expo Go's task to the background.
       #
       # Maestro's `back` does nothing at all on iOS. The command is documented
       # as Android and Web only, and `IOSDriver.backPress()` is an empty method
@@ -183,10 +192,16 @@ appId: ${MAESTRO_APP_ID}
             notVisible:
               id: 'tab-home'
           commands:
-            - tapOn:
-                id: 'BackButton'
-                optional: true
-                label: 'Pop a pushed route left behind by the previous flow'
+            # CC-7.9 D6: Back is the shared top bar control.
+            - runFlow:
+                when:
+                  visible:
+                    id: 'app-top-bar-back'
+                commands:
+                  - tapOn:
+                      id: 'app-top-bar-back'
+                      label: 'Pop a pushed route left behind by the previous flow'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   platform: Android
@@ -194,16 +209,23 @@ appId: ${MAESTRO_APP_ID}
                     text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
                   # Asked again at the last moment. The block's own question
-                  # was answered before the optional BackButton lookup, which
-                  # can take seconds, and an app that finished mounting in
-                  # between is now on a tab: BACK there moves Expo Go's task to
-                  # the background and the wait below fails on Expo Go's home.
+                  # was answered before the top bar Back lookup, which can take
+                  # seconds, and an app that finished mounting in between is now
+                  # on a tab: BACK there moves Expo Go's task to the background
+                  # and the wait below fails on Expo Go's home.
                   - runFlow:
                       when:
                         notVisible:
                           id: 'tab-home'
                       commands:
-                        - back
+                        # CC-7.9 D6: Back is the shared top bar control; system
+                        # BACK only pops a screen that shows no top bar Back.
+                        - runFlow:
+                            when:
+                              notVisible:
+                                id: 'app-top-bar-back'
+                            commands:
+                              - back
             # Let the pop finish before the second block asks the same question.
             # The two blocks are independent evaluations of `notVisible:
             # tab-home`, and a stack transition still animating answers with the
@@ -215,10 +237,16 @@ appId: ${MAESTRO_APP_ID}
             notVisible:
               id: 'tab-home'
           commands:
-            - tapOn:
-                id: 'BackButton'
-                optional: true
-                label: 'Pop a second pushed route'
+            # CC-7.9 D6: Back is the shared top bar control.
+            - runFlow:
+                when:
+                  visible:
+                    id: 'app-top-bar-back'
+                commands:
+                  - tapOn:
+                      id: 'app-top-bar-back'
+                      label: 'Pop a second pushed route'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   platform: Android
@@ -226,16 +254,23 @@ appId: ${MAESTRO_APP_ID}
                     text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
                   # Asked again at the last moment. The block's own question
-                  # was answered before the optional BackButton lookup, which
-                  # can take seconds, and an app that finished mounting in
-                  # between is now on a tab: BACK there moves Expo Go's task to
-                  # the background and the wait below fails on Expo Go's home.
+                  # was answered before the top bar Back lookup, which can take
+                  # seconds, and an app that finished mounting in between is now
+                  # on a tab: BACK there moves Expo Go's task to the background
+                  # and the wait below fails on Expo Go's home.
                   - runFlow:
                       when:
                         notVisible:
                           id: 'tab-home'
                       commands:
-                        - back
+                        # CC-7.9 D6: Back is the shared top bar control; system
+                        # BACK only pops a screen that shows no top bar Back.
+                        - runFlow:
+                            when:
+                              notVisible:
+                                id: 'app-top-bar-back'
+                            commands:
+                              - back
 
       # The tab bar is the app's own first painted chrome, so a failure to mount
       # is reported here, at the launch step, rather than as a confusing

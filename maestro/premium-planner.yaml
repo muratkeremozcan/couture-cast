@@ -82,10 +82,12 @@ tags:
 
 # --- AC 7: the screen renders from the locale catalogs, not from literals -----
 
+# CC-7.9 D6: the stack's shared top bar carries the localized title; the body heading is gone.
+# By id: Android reports the bar's title beside app-top-bar, not under it, so childOf never matches.
 - assertVisible:
-    id: 'planner-title'
+    id: 'app-top-bar-title'
     text: '7-Day Planner'
-    label: 'Localized screen title'
+    label: 'Localized screen title in the top bar'
 
 - assertVisible:
     text: "See a starter outfit for each of the next seven days, built from your saved location's weather and wardrobe."

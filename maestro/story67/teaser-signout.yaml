@@ -25,13 +25,16 @@ appId: ${MAESTRO_APP_ID}
             visible: 'Navigate up'
           commands:
             - tapOn: 'Navigate up'
+      # CC-7.9 D6: Back is the shared top bar control; it replaced the native
+      # iOS `BackButton` header item on notification settings.
       - runFlow:
           when:
             visible:
-              id: 'BackButton'
+              id: 'app-top-bar-back'
           commands:
             - tapOn:
-                id: 'BackButton'
+                id: 'app-top-bar-back'
+            - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: 'settings-screen'

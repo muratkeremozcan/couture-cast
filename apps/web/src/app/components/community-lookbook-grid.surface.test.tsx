@@ -14,8 +14,12 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   captureSync,
   eventsBody,
+  ranked,
+  reactionFeedBody,
   resolveBody,
   resolvedTarget,
+  SPOTLIGHT_PATH,
+  spotlightBody,
   ZERO,
 } from '../../test-utils/community-spotlight'
 import { CommunityLookbookGrid } from './community-lookbook-grid'
@@ -60,6 +64,49 @@ const TARGETS_PATH = '/api/v1/community/targets/resolve'
 
 describe('CommunityLookbookGrid (Story 6.1)', () => {
   setupCommunityGridSurface()
+
+  it('7.9-CMP-CARD-001 closes the feed card and the Spotlight card with Comments beside Report, after the author, words and reactions', async () => {
+    signIn()
+    useMswHandlers(
+      http.get(FEED_PATH, () =>
+        reactionFeedBody([
+          { ...item({ title: 'Rain layers', caption: 'A cool day.' }), reactions: ZERO },
+        ])
+      ),
+      http.get(SPOTLIGHT_PATH, () =>
+        spotlightBody({
+          items: [ranked(1, { title: 'Spotlight layers', reactions: ZERO })],
+        })
+      )
+    )
+    renderGrid()
+
+    /** The card's parts top to bottom: Comments follows the reaction row and shares Report's row. */
+    const expectCardOrder = async (scope: string, id: string) => {
+      const card = await screen.findByTestId(`${scope}lookbook-card-${id}`)
+      const order = [
+        `${scope}author-name-${id}`,
+        `${scope}title-${id}`,
+        `${scope}caption-${id}`,
+        `${scope}community-reactions-${id}`,
+        `${scope}comments-button-${id}`,
+        `${scope}report-button-${id}`,
+      ].map((testId) => within(card).getByTestId(testId))
+      // CI snapshot on 3d7af2a2: Comments sat alone above the author line.
+      order.slice(1).forEach((node, index) => {
+        expect(
+          order[index]!.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+      })
+      const comments = within(card).getByTestId(`${scope}comments-button-${id}`)
+      const report = within(card).getByTestId(`${scope}report-button-${id}`)
+      expect(comments.parentElement).not.toBeNull()
+      expect(comments.parentElement).toBe(report.parentElement)
+    }
+
+    await expectCardOrder('', 'post-1')
+    await expectCardOrder('spotlight-', 'spot-1')
+  })
 
   describe('weekly challenge', () => {
     let restoreObjectUrl = () => undefined as void

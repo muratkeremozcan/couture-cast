@@ -38,11 +38,9 @@ export function CommunityExampleInspiration({
     <section
       aria-label={strings.styleIdeas.inspiration}
       data-testid="community-example-inspiration"
-      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-[color:var(--theme-card-text)]"
+      className="space-y-3 rounded-lg border border-theme-card-border bg-theme-card-bg p-4 text-theme-card-text"
     >
-      <h2 className="lookbook-display text-lg font-semibold">
-        {strings.styleIdeas.inspiration}
-      </h2>
+      <h2 className="text-lg font-semibold">{strings.styleIdeas.inspiration}</h2>
       <p className="text-xs">{strings.styleIdeas.illustrations}</p>
       <ul className="grid gap-3 md:grid-cols-3">
         {communitySampleOutfits(band).map((result) => {
@@ -51,7 +49,7 @@ export function CommunityExampleInspiration({
           return (
             <li
               key={result.look.id}
-              className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] p-3"
+              className="space-y-2 rounded-lg border border-theme-card-border p-3"
             >
               <h3 className="text-sm font-semibold">{look.name}</h3>
               <div aria-hidden="true" className="flex flex-wrap gap-1">
@@ -59,7 +57,7 @@ export function CommunityExampleInspiration({
                   <SampleGarmentArt
                     key={garment.id}
                     garment={garment}
-                    className="h-11 w-11 rounded bg-[#F5F5F7]"
+                    className="h-11 w-11 rounded-md bg-card-muted"
                   />
                 ))}
               </div>

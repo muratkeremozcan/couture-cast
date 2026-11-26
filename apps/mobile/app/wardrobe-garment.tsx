@@ -1,5 +1,5 @@
 // Story CC-7.5 D3: the garment detail route, `/wardrobe-garment?id=<garment id>`. The screen
-// sets its own header title and back control; see garment-detail-screen.tsx.
+// sets its own header title; the root stack AppTopBar draws it with the back control.
 import { useCallback } from 'react'
 import { useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { getMobileTabBarHeight, setMobileTabBarHeight } from '@/components/save-feedback'

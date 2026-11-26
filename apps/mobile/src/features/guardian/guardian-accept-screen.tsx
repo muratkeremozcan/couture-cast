@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet } from 'react-native'
+import { Pressable } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import type {
   GuardianInvitationAcceptInput,
   GuardianInvitationAcceptResponse,
 } from '@couture/api-client/contracts/http'
-import { Text, View } from '@/components/themed'
+import { createSchemeStyles, Text, View } from '@/components/themed'
 import { acceptGuardianInvitationFromMobile } from '@/src/lib/guardian'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
@@ -19,6 +20,8 @@ export function GuardianAcceptScreen({
   token,
   acceptInvitation = acceptGuardianInvitationFromMobile,
 }: GuardianAcceptScreenProps) {
+  const { t } = useTranslation()
+  const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
@@ -34,7 +37,7 @@ export function GuardianAcceptScreen({
 
   async function handleAccept() {
     if (!token) {
-      setErrorMessage('Invitation token is missing from this link.')
+      setErrorMessage(t('guardian.accept.tokenMissing'))
       return
     }
 
@@ -45,11 +48,14 @@ export function GuardianAcceptScreen({
     try {
       const response = await acceptInvitation({ token })
       setSuccessMessage(
-        `Consent recorded for ${response.teenEmail}. Guardian account ${response.guardianEmail} is now linked.`
+        t('guardian.accept.success', {
+          teenEmail: response.teenEmail,
+          guardianEmail: response.guardianEmail,
+        })
       )
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : 'Unable to accept guardian invitation'
+        error instanceof Error ? error.message : t('guardian.accept.failed')
       )
     } finally {
       setIsSubmitting(false)
@@ -58,14 +64,11 @@ export function GuardianAcceptScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>Guardian consent</Text>
+      <Text style={styles.eyebrow}>{t('guardian.accept.title')}</Text>
       <Text style={styles.title} accessibilityRole="header">
-        Accept teen wardrobe access
+        {t('guardian.accept.heading')}
       </Text>
-      <Text style={styles.description}>
-        Confirm this invitation to link the guardian account and unlock the teen wardrobe
-        journey.
-      </Text>
+      <Text style={styles.description}>{t('guardian.accept.intro')}</Text>
 
       {errorMessage ? (
         <Text
@@ -90,7 +93,9 @@ export function GuardianAcceptScreen({
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={isSubmitting ? 'Accepting invitation' : 'Accept invitation'}
+        accessibilityLabel={
+          isSubmitting ? t('guardian.accept.acceptingLabel') : t('guardian.accept.accept')
+        }
         style={[styles.button, isSubmitting ? styles.buttonDisabled : null]}
         onPress={() => {
           void handleAccept()
@@ -98,14 +103,15 @@ export function GuardianAcceptScreen({
         disabled={isSubmitting}
       >
         <Text style={styles.buttonText}>
-          {isSubmitting ? 'Accepting…' : 'Accept invitation'}
+          {isSubmitting ? t('guardian.accept.accepting') : t('guardian.accept.accept')}
         </Text>
       </Pressable>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
+// Story CC-7.9 D2, D3: colors follow the OS scheme; Accept is the screen's main action.
+const useStyles = createSchemeStyles((colors) => ({
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -116,42 +122,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
-    color: '#fcd34d',
+    color: colors.inkMuted,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    lineHeight: 34,
+    lineHeight: 32,
   },
   description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#a3a3a3',
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.inkMuted,
   },
   errorMessage: {
-    fontSize: 13,
-    color: '#fecaca',
+    fontSize: 14,
+    color: colors.dangerInk,
   },
   successMessage: {
-    fontSize: 13,
-    color: '#bbf7d0',
+    fontSize: 14,
+    color: colors.successInk,
   },
   button: {
     minHeight: 44,
     marginTop: 8,
-    borderRadius: 999,
-    backgroundColor: '#fcd34d',
-    paddingVertical: 14,
+    borderRadius: 9999,
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   buttonText: {
-    color: '#111827',
-    fontSize: 13,
+    color: colors.onPrimary,
+    fontSize: 14,
     fontWeight: '700',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-})
+}))

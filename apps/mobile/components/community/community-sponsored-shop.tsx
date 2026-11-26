@@ -146,10 +146,10 @@ export const CommunitySponsoredShop = forwardRef<View, CommunitySponsoredShopPro
           }}
           style={({ pressed }) => [
             styles.button,
-            { backgroundColor: palette.text, opacity: pressed ? 0.85 : 1 },
+            { backgroundColor: palette.inverse, opacity: pressed ? 0.85 : 1 },
           ]}
         >
-          <Text style={[styles.buttonLabel, { color: palette.background }]}>
+          <Text style={[styles.buttonLabel, { color: palette.onInverse }]}>
             {ctaLabel}
           </Text>
         </Pressable>
@@ -160,14 +160,14 @@ export const CommunitySponsoredShop = forwardRef<View, CommunitySponsoredShopPro
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
           aria-hidden
-          style={[styles.opens, { color: palette.mutedText }]}
+          style={[styles.opens, { color: palette.inkMuted }]}
         >
           {opensInBrowser}
         </Text>
         {status === 'error' ? (
           // Announced once by the handler above; a live region here would speak
           // it a second time on Android.
-          <Text testID={errorTestID} style={[styles.error, { color: palette.danger }]}>
+          <Text testID={errorTestID} style={[styles.error, { color: palette.dangerInk }]}>
             {t('commerce.shopThisLook.error')}
           </Text>
         ) : null}
@@ -178,13 +178,13 @@ export const CommunitySponsoredShop = forwardRef<View, CommunitySponsoredShopPro
 
 const styles = StyleSheet.create({
   container: {
-    gap: 6,
+    gap: 8,
   },
   button: {
     // At least 44 by 44 points, the same floor as the hero CTA.
     minHeight: 44,
     minWidth: 44,
-    borderRadius: 999,
+    borderRadius: 9999,
     paddingVertical: 12,
     paddingHorizontal: 20,
     alignItems: 'center',
@@ -200,8 +200,8 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   error: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
   },
 })

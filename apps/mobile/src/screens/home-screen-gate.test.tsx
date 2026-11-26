@@ -256,7 +256,7 @@ describe('Home screen gate (native)', () => {
 
     await ritual.release(0, HttpResponse.json(emptyOutfitRitual))
 
-    expect(await screen.findByTestId('member-sample-outfit')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('member-sample-outfit')).toBeVisible())
     expect(placeholder()).toBeNull()
   })
 
@@ -271,7 +271,9 @@ describe('Home screen gate (native)', () => {
     // Sign out: the device has no token and no member.
     const signOut = setMobileAccessTokenResolver(() => undefined)
     act(() => setMobileApplicationUserId(null))
-    expect(await screen.findByTestId('home-signed-out-welcome')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('home-signed-out-welcome')).toBeVisible()
+    )
 
     // The same member signs back in; their new ritual read is held.
     signOut()

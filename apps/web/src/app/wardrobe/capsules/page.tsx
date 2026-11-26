@@ -1,7 +1,6 @@
 'use client'
 // Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
-import Link from 'next/link'
 import { getGuestPreviewStrings } from '@couture/utils'
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
@@ -22,6 +21,8 @@ import {
   resolveCurrentUserId,
 } from '../../../lib/wardrobe'
 import { AccessibleModal } from '../../components/accessible-modal'
+import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
+import { AppTopBar } from '../../components/app-top-bar'
 import {
   CapsuleBuilderModal,
   type CapsuleSaveOptions,
@@ -35,6 +36,17 @@ import type {
 
 const PAGE_SIZE = 50
 const SEARCH_DEBOUNCE_MS = 250
+/** The occasion filter's choices, in the order the builder lists them. */
+const CAPSULE_OCCASIONS: readonly CapsuleOccasion[] = [
+  'work',
+  'casual',
+  'formal',
+  'sport',
+  'travel',
+  'evening',
+  'outdoor',
+  'home',
+]
 
 /** The strong entity tag the API issues and requires back on every mutation. */
 function capsuleETag(capsule: OutfitCapsuleContract): string {
@@ -51,7 +63,7 @@ function CapsuleErrorBanner({
   const { t, i18n } = useTranslation()
   const message =
     session.status === 'signed_out'
-      ? 'Sign in to manage capsules.'
+      ? t('wardrobe.capsules.signIn')
       : session.status === 'unavailable'
         ? t('wardrobe.capsules.errors.load')
         : error
@@ -60,7 +72,7 @@ function CapsuleErrorBanner({
   return (
     <div
       role="alert"
-      className="mt-4 rounded-lg bg-red-50 p-4 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300"
+      className="mt-4 rounded-lg border border-danger-line bg-danger-surface p-4 text-xs font-medium text-danger-ink"
       data-testid="capsule-error-banner"
     >
       {message}
@@ -80,7 +92,12 @@ function CapsuleErrorBanner({
 export default function WardrobeCapsulesPage() {
   return (
     <I18nextProvider i18n={getI18n()}>
-      <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+      {/* Story CC-7.9 D6, D7, D8: the shared top bar and page surface render outside the
+          member scope, so the bar sits in its final place while the session is read. */}
+      <AppPage>
+        <AppTopBar titleKey="wardrobe.capsules.title" backHref="/wardrobe" />
+        <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+      </AppPage>
     </I18nextProvider>
   )
 }
@@ -132,7 +149,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
         if (cancelled || !current(signal)) {
           return
         }
-        setError(err instanceof Error ? err.message : 'Sign in to manage capsules.')
+        setError(err instanceof Error ? err.message : i18n.t('wardrobe.capsules.signIn'))
         setIsLoading(false)
       }
     })()
@@ -140,7 +157,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
     return () => {
       cancelled = true
     }
-  }, [current, mountSignal])
+  }, [current, mountSignal, i18n])
 
   /** Debounce keystrokes into a single query rather than one request per key. */
   useEffect(() => {
@@ -292,27 +309,16 @@ function CapsulesView({ session }: { session: MemberSession }) {
      * needs the landmark like every other route. Without it the skip link is a
      * dead anchor and the page exposes no main landmark to assistive tech.
      */
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl p-6 outline-none">
+    <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
       {/* Success announcements are polite so they do not interrupt a screen reader. */}
       <p aria-live="polite" className="sr-only" data-testid="capsule-status-region">
         {statusMessage ?? ''}
       </p>
 
-      <Link
-        href="/wardrobe"
-        className="inline-flex min-h-11 items-center text-sm font-semibold underline"
-      >
-        {getGuestPreviewStrings(i18n.language).firstUse.backToWardrobe}
-      </Link>
-      <div className="flex items-center justify-between border-b border-zinc-200 pb-6 dark:border-zinc-800">
-        <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-            {t('wardrobe.capsules.title')}
-          </h1>
-          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-            Curate and manage your custom outfit combinations.
-          </p>
-        </div>
+      {/* Story CC-7.9 D6: the top bar owns the title and the back control; the screen's one
+          main action opens the body. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line pb-6">
+        <p className="text-sm text-ink-muted">{t('wardrobe.capsules.subtitle')}</p>
         <button
           ref={createButtonRef}
           type="button"
@@ -321,7 +327,8 @@ function CapsulesView({ session }: { session: MemberSession }) {
             setEditingCapsule(null)
             setIsModalOpen(true)
           }}
-          className="flex min-h-[44px] min-w-[44px] items-center rounded-lg bg-zinc-900 px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+          data-gold="primary"
+          className="flex min-h-11 min-w-11 items-center rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary hover:bg-primary/90 disabled:opacity-60"
           data-testid="create-capsule-button"
         >
           {t('wardrobe.capsules.create')}
@@ -338,12 +345,12 @@ function CapsulesView({ session }: { session: MemberSession }) {
           placeholder={t('wardrobe.capsules.searchPlaceholder')}
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 py-2 text-xs focus:ring-2 focus:ring-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-3 py-2 text-xs text-ink placeholder:text-ink-muted"
           data-testid="capsule-search-input"
         />
 
         <label htmlFor="capsule-occasion" className="sr-only">
-          Filter by occasion
+          {t('wardrobe.capsules.filterOccasionLabel')}
         </label>
         <select
           id="capsule-occasion"
@@ -351,26 +358,23 @@ function CapsulesView({ session }: { session: MemberSession }) {
           onChange={(event) =>
             setSelectedOccasion(event.target.value as CapsuleOccasion | 'all')
           }
-          className="min-h-[44px] rounded-lg border border-zinc-300 px-3 py-2 text-xs focus:ring-2 focus:ring-black dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-3 py-2 text-xs text-ink"
           data-testid="capsule-occasion-filter"
         >
           <option value="all">{t('wardrobe.capsules.filterAll')}</option>
-          <option value="work">Work</option>
-          <option value="casual">Casual</option>
-          <option value="formal">Formal</option>
-          <option value="sport">Sport</option>
-          <option value="travel">Travel</option>
-          <option value="evening">Evening</option>
-          <option value="outdoor">Outdoor</option>
-          <option value="home">Home</option>
+          {CAPSULE_OCCASIONS.map((occasion) => (
+            <option key={occasion} value={occasion}>
+              {t(`wardrobe.capsules.occasions.${occasion}`)}
+            </option>
+          ))}
         </select>
 
-        <label className="flex min-h-[44px] cursor-pointer items-center space-x-2 text-xs text-zinc-700 dark:text-zinc-300">
+        <label className="flex min-h-11 cursor-pointer items-center space-x-2 text-xs text-ink-soft">
           <input
             type="checkbox"
             checked={favoriteOnly}
             onChange={(event) => setFavoriteOnly(event.target.checked)}
-            className="h-5 w-5 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-black focus:ring-offset-2"
+            className="h-5 w-5 rounded-md border-line-strong accent-ink"
             data-testid="capsule-favorite-filter"
           />
           <span>{t('wardrobe.capsules.filterFavorites')}</span>
@@ -381,14 +385,14 @@ function CapsulesView({ session }: { session: MemberSession }) {
 
       {loading ? (
         <div
-          className="mt-12 text-center text-sm text-zinc-500"
+          className="mt-12 text-center text-sm text-ink-muted"
           data-testid="capsule-loading-state"
         >
-          Loading outfit capsules…
+          {t('wardrobe.capsules.loading')}
         </div>
       ) : !owner ? null : capsules.length === 0 ? (
         <div
-          className="mt-12 text-center text-sm text-zinc-500"
+          className="mt-12 text-center text-sm text-ink-muted"
           data-testid="capsule-empty-state"
         >
           <p className="font-medium">{t('wardrobe.capsules.emptyTitle')}</p>
@@ -403,22 +407,23 @@ function CapsulesView({ session }: { session: MemberSession }) {
             {capsules.map((capsule) => (
               <div
                 key={capsule.id}
-                className="flex flex-col justify-between rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+                data-surface="card"
+                className="flex flex-col justify-between rounded-xl border border-line bg-card p-5 shadow-card"
                 data-testid={`capsule-card-${capsule.id}`}
               >
                 <div>
                   <div className="flex items-start justify-between">
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                      {capsule.name}
-                    </h2>
+                    <h2 className="text-lg font-semibold text-ink">{capsule.name}</h2>
                     <button
                       type="button"
                       onClick={() => {
                         void handleToggleFavorite(capsule)
                       }}
-                      className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-lg text-yellow-500 focus:ring-2 focus:ring-black focus:ring-offset-1"
+                      className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-lg text-ink"
                       aria-pressed={capsule.isFavorite}
-                      aria-label={`Favorite capsule ${capsule.name}`}
+                      aria-label={t('wardrobe.capsules.favoriteCapsule', {
+                        name: capsule.name,
+                      })}
                       data-testid={`favorite-button-${capsule.id}`}
                     >
                       {capsule.isFavorite ? '★' : '☆'}
@@ -426,73 +431,71 @@ function CapsulesView({ session }: { session: MemberSession }) {
                   </div>
 
                   {capsule.description && (
-                    <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-                      {capsule.description}
-                    </p>
+                    <p className="mt-2 text-xs text-ink-muted">{capsule.description}</p>
                   )}
 
                   <div className="mt-3 flex flex-wrap gap-1">
                     {capsule.occasions.map((occasion) => (
                       <span
                         key={occasion}
-                        className="rounded bg-zinc-100 px-2 py-0.5 text-[10px] font-medium capitalize text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        className="rounded-md bg-card-muted px-2 py-0.5 text-xs font-medium text-ink-soft"
                       >
-                        {occasion}
+                        {t(`wardrobe.capsules.occasions.${occasion}`)}
                       </span>
                     ))}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-zinc-800">
-                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                      {capsule.garments.length} garments
+                  <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+                    <span className="text-xs font-medium text-ink-muted">
+                      {t('wardrobe.capsules.garmentCount', {
+                        count: capsule.garments.length,
+                      })}
                     </span>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         capsule.availabilityStatus === 'ready'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
-                          : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'
+                          ? 'bg-page text-success-ink'
+                          : 'bg-notice-surface text-notice-ink'
                       }`}
                       data-testid={`capsule-status-badge-${capsule.id}`}
                     >
-                      {capsule.availabilityStatus === 'ready' ? 'Ready' : 'Needs repair'}
+                      {capsule.availabilityStatus === 'ready'
+                        ? t('wardrobe.capsules.status.ready')
+                        : t('wardrobe.capsules.status.needsRepair')}
                     </span>
                   </div>
 
                   {capsule.unavailableGarmentCount > 0 && (
                     <p
-                      className="mt-2 text-[11px] text-amber-700 dark:text-amber-300"
+                      className="mt-2 text-xs text-notice-ink"
                       data-testid={`capsule-unavailable-count-${capsule.id}`}
                     >
-                      {capsule.unavailableGarmentCount === 1
-                        ? t('wardrobe.capsules.unavailableCount', {
-                            count: capsule.unavailableGarmentCount,
-                          })
-                        : t('wardrobe.capsules.unavailableCount', {
-                            count: capsule.unavailableGarmentCount,
-                          })}
+                      {t('wardrobe.capsules.unavailableCount', {
+                        count: capsule.unavailableGarmentCount,
+                      })}
                     </p>
                   )}
                 </div>
 
-                <div className="mt-4 flex items-center justify-end space-x-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+                <div className="mt-4 flex items-center justify-end space-x-2 border-t border-line pt-3">
                   <button
                     type="button"
                     onClick={() => {
                       setEditingCapsule(capsule)
                       setIsModalOpen(true)
                     }}
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-1 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-line-strong bg-page px-3 py-2 text-xs font-medium text-ink hover:bg-card-muted"
                     data-testid={`edit-capsule-button-${capsule.id}`}
                   >
-                    Edit
+                    {t('wardrobe.capsules.editAction')}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeletingCapsule(capsule)}
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 focus:ring-2 focus:ring-black focus:ring-offset-1 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded-md border border-danger-line bg-page px-3 py-2 text-xs font-medium text-danger-ink hover:bg-danger-surface"
                     data-testid={`delete-capsule-button-${capsule.id}`}
                   >
-                    Delete
+                    {t('wardrobe.capsules.deleteAction')}
                   </button>
                 </div>
               </div>
@@ -501,10 +504,10 @@ function CapsulesView({ session }: { session: MemberSession }) {
 
           {hiddenCount > 0 && (
             <p
-              className="mt-4 text-center text-xs text-zinc-500"
+              className="mt-4 text-center text-xs text-ink-muted"
               data-testid="capsule-truncation-notice"
             >
-              Showing {capsules.length} of {total}. Refine your search to see the rest.
+              {t('wardrobe.capsules.truncation', { shown: capsules.length, total })}
             </p>
           )}
         </>
@@ -537,16 +540,16 @@ function CapsulesView({ session }: { session: MemberSession }) {
           descriptionId="capsule-delete-description"
           description={t('wardrobe.capsules.deleteConfirmBody')}
           initialFocusRef={deleteConfirmRef}
-          closeLabel="Cancel deletion"
+          closeLabel={t('wardrobe.capsules.cancelDeletion')}
         >
           <div className="mt-5 flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setDeletingCapsule(null)}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-zinc-300 px-4 py-2 text-xs font-medium focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-line-strong bg-page px-4 py-2 text-xs font-medium text-ink"
               data-testid="cancel-delete-capsule-button"
             >
-              {t('common.cancel', 'Cancel')}
+              {t('wardrobe.capsules.cancel')}
             </button>
             <button
               ref={deleteConfirmRef}
@@ -554,7 +557,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
               onClick={() => {
                 void handleDeleteConfirm()
               }}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-xs font-medium text-white hover:bg-red-700 focus:ring-2 focus:ring-black focus:ring-offset-2"
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-lg bg-danger px-4 py-2 text-xs font-medium text-on-danger hover:bg-danger/90"
               data-testid="confirm-delete-capsule-button"
             >
               {t('wardrobe.capsules.delete')}

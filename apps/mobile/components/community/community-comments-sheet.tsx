@@ -31,6 +31,7 @@ import {
   useModalInsets,
 } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useTokens } from '@/src/theme/tokens'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type {
   CommunityCommentDraft,
@@ -114,6 +115,7 @@ export function CommunityCommentsSheet({
   const modalAnimation = useModalAnimation('slide')
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
   const threadVersion = useSyncExternalStore(
     state.subscribe,
     state.getVersion,
@@ -227,14 +229,17 @@ export function CommunityCommentsSheet({
       onPress={action}
       style={[
         styles.button,
-        { borderColor: palette.divider, opacity: disabled ? 0.6 : 1 },
+        { borderColor: palette.line, opacity: disabled ? 0.6 : 1 },
+        // Story CC-7.9 D3: Send is the sheet's one main action, so it alone is `primary`.
         testID === 'comment-submit' && {
-          backgroundColor: '#C9A14A',
-          borderColor: '#C9A14A',
+          backgroundColor: palette.primary,
+          borderColor: palette.primary,
         },
       ]}
     >
-      <Text style={{ color: testID === 'comment-submit' ? '#000000' : palette.text }}>
+      <Text
+        style={{ color: testID === 'comment-submit' ? palette.onPrimary : palette.ink }}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -298,11 +303,11 @@ export function CommunityCommentsSheet({
           entries.current.set(item.id, node)
         }}
         accessibilityLabel={[author, item.body].filter(Boolean).join('. ')}
-        style={[styles.entry, { borderColor: palette.divider }]}
+        style={[styles.entry, { borderColor: palette.line }]}
         accessible={Boolean(target && target.commentId === item.id)}
       >
-        {author && <Text style={[styles.author, { color: palette.text }]}>{author}</Text>}
-        <Text style={{ color: palette.text }}>
+        {author && <Text style={[styles.author, { color: palette.ink }]}>{author}</Text>}
+        <Text style={{ color: palette.ink }}>
           {item.unavailable ? t('community.comments.unavailable') : item.body}
         </Text>
         <View style={styles.row} accessible={false}>
@@ -356,7 +361,7 @@ export function CommunityCommentsSheet({
         </View>
         {reporting === item.id && (
           <View accessible={false}>
-            <Text style={{ color: palette.text }}>
+            <Text style={{ color: palette.ink }}>
               {t('community.report.reasonLabel')}
             </Text>
             {communityReportReasonSchema.options.map((option) => (
@@ -368,11 +373,11 @@ export function CommunityCommentsSheet({
                 accessibilityLabel={t(`community.report.reason.${option}`)}
                 style={[
                   styles.button,
-                  { borderColor: reason === option ? '#C9A14A' : palette.divider },
+                  { borderColor: reason === option ? palette.inverse : palette.line },
                 ]}
                 onPress={() => setReason(option)}
               >
-                <Text style={{ color: palette.text }}>
+                <Text style={{ color: palette.ink }}>
                   {t(`community.report.reason.${option}`)}
                 </Text>
               </TouchableOpacity>
@@ -400,7 +405,7 @@ export function CommunityCommentsSheet({
     <EdgeToEdgeModal
       visible
       animationType={modalAnimation}
-      scrim="rgba(0,0,0,0.5)"
+      scrim={scrim}
       scrimTestID="comments-scrim"
       onRequestClose={() => {
         // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
@@ -423,7 +428,7 @@ export function CommunityCommentsSheet({
           testID="comments-sheet"
           style={[
             styles.sheet,
-            { backgroundColor: palette.surface, paddingBottom: 32 + insets.bottom },
+            { backgroundColor: palette.page, paddingBottom: 32 + insets.bottom },
           ]}
           accessibilityViewIsModal
           accessible={false}
@@ -440,7 +445,7 @@ export function CommunityCommentsSheet({
             <Text
               ref={titleRef}
               accessibilityRole="header"
-              style={[styles.title, { color: palette.text }]}
+              style={[styles.title, { color: palette.ink }]}
             >
               {t('community.comments.title')}
             </Text>
@@ -467,15 +472,15 @@ export function CommunityCommentsSheet({
               thread.loading
             )}
             {thread.roots?.hasNewer && (
-              <Text style={{ color: palette.text }}>{t('community.comments.newer')}</Text>
+              <Text style={{ color: palette.ink }}>{t('community.comments.newer')}</Text>
             )}
             {thread.loading && (
-              <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
+              <Text accessibilityLiveRegion="polite" style={{ color: palette.ink }}>
                 {t('community.comments.loading')}
               </Text>
             )}
             {thread.roots?.items.length === 0 && (
-              <Text style={{ color: palette.text }}>{t('community.comments.empty')}</Text>
+              <Text style={{ color: palette.ink }}>{t('community.comments.empty')}</Text>
             )}
             {thread.roots?.items.map((root) => (
               <View key={root.id} accessible={false}>
@@ -509,7 +514,7 @@ export function CommunityCommentsSheet({
                   ref={statusRef}
                   accessible={true}
                   accessibilityRole="header"
-                  style={[styles.author, { color: palette.text }]}
+                  style={[styles.author, { color: palette.ink }]}
                 >
                   {t('community.comments.private')}
                 </Text>
@@ -518,13 +523,13 @@ export function CommunityCommentsSheet({
                 <View
                   key={item.id}
                   testID={`comment-submission-${item.id}`}
-                  style={[styles.entry, { borderColor: palette.divider }]}
+                  style={[styles.entry, { borderColor: palette.line }]}
                   accessible={false}
                 >
-                  <Text style={{ color: palette.text }}>
+                  <Text style={{ color: palette.ink }}>
                     {t(`community.comments.status.${item.status}`)}
                   </Text>
-                  {item.body && <Text style={{ color: palette.text }}>{item.body}</Text>}
+                  {item.body && <Text style={{ color: palette.ink }}>{item.body}</Text>}
                   {!['author_deleted', 'erased'].includes(item.status) &&
                     button(t('community.comments.delete'), () => {
                       void state.delete(postId, item.id)
@@ -535,7 +540,7 @@ export function CommunityCommentsSheet({
                     'screening_failed',
                     'consent_suspended',
                   ].includes(item.status) && (
-                    <Text style={{ color: palette.text }}>
+                    <Text style={{ color: palette.ink }}>
                       {t('community.comments.recovery')}
                     </Text>
                   )}
@@ -556,14 +561,14 @@ export function CommunityCommentsSheet({
                   accessibilityLabel={replying()}
                   numberOfLines={3}
                   ellipsizeMode="tail"
-                  style={{ color: palette.text }}
+                  style={{ color: palette.ink }}
                 >
                   {replying()}
                 </Text>
                 {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
               </View>
             )}
-            <Text style={[styles.author, { color: palette.text }]}>
+            <Text style={[styles.author, { color: palette.ink }]}>
               {t('community.comments.compose')}
             </Text>
             <ComposerUnmount
@@ -596,17 +601,17 @@ export function CommunityCommentsSheet({
                 onSubmitEditing={submit}
                 style={[
                   styles.input,
-                  { color: palette.text, borderColor: palette.mutedText },
+                  { color: palette.ink, borderColor: palette.inkMuted },
                 ]}
               />
             </ComposerUnmount>
-            <Text style={{ color: palette.text }}>
+            <Text style={{ color: palette.ink }}>
               {t('community.comments.count', {
                 count: thread.draft.body.normalize('NFC').trim().length,
               })}
             </Text>
             {thread.unresolved && (
-              <Text style={{ color: palette.text }}>
+              <Text style={{ color: palette.ink }}>
                 {t('community.comments.unresolved')}
               </Text>
             )}
@@ -623,7 +628,7 @@ export function CommunityCommentsSheet({
               'comment-submit'
             )}
             {thread.error && (
-              <Text style={{ color: palette.text }}>{t(thread.error)}</Text>
+              <Text style={{ color: palette.ink }}>{t(thread.error)}</Text>
             )}
           </View>
         </View>
@@ -637,8 +642,8 @@ const styles = StyleSheet.create({
   sheet: {
     maxHeight: '90%',
     padding: 16,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
   },
   discussion: { flexShrink: 1 },
   hidden: { display: 'none' },
@@ -653,7 +658,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
   },
-  title: { fontSize: 22, fontWeight: '600', flexGrow: 1 },
+  title: { fontSize: 20, fontWeight: '600', flexGrow: 1 },
   author: { fontSize: 14, fontWeight: '600', marginBottom: 4 },
   entry: { borderWidth: 1, borderRadius: 8, padding: 12, marginVertical: 4, gap: 8 },
   replies: { marginLeft: 16, paddingLeft: 8 },

@@ -196,13 +196,10 @@ const FEED_PAGE_SIZE = 12
 const MINIMUM_TARGET_ATTEMPT_MS = 250
 
 /**
- * Deep merlot. A semantic state colour for errors, destructive actions and
- * flagged content, so it stays a literal while the theme colours come from the
- * custom properties in `globals.css`.
+ * Deep merlot marks errors and flagged content (`text-merlot-ink border-merlot-ink`, a D2 role
+ * with a dark value of its own); a destructive fill uses the `danger` role.
  */
-const MERLOT = '#7A1F2D'
-/** Merlot as text or a border: globals.css gives it a dark-mode value that reads on the dark surface. */
-const MERLOT_INK = 'var(--lookbook-merlot-ink)'
+const MERLOT_CLASS = 'border-merlot-ink text-merlot-ink'
 
 /**
  * Every reason the community wrappers can throw, mapped onto catalog copy.
@@ -478,6 +475,49 @@ export interface LookbookFilterNavProps {
   chipsPending?: boolean
 }
 
+/**
+ * WCAG 2.4.11 (technique C43): the sticky stack (Home's chip bar, then this nav once it sticks)
+ * covers the top of the page, so the page's scroll padding names how far down it reaches. A
+ * focus scroll, keyboard or `focus()`, then never leaves a control under the stack: CI 48c7a01e
+ * (community-reactions, 1280x720) focused a reaction button the stuck nav covered to its middle,
+ * with half its focus ring hidden. Until the nav sticks, only the bar above it (`stickyTop`) is
+ * in the way.
+ */
+function useStickyStackScrollPadding(
+  navRef: React.RefObject<HTMLElement | null>,
+  stickyTop: number,
+  active: boolean
+) {
+  useEffect(() => {
+    const nav = navRef.current
+    if (!active || !nav) return
+    const root = document.documentElement
+    let frame = 0
+    const update = () => {
+      frame = 0
+      const box = nav.getBoundingClientRect()
+      const stuck = box.top <= stickyTop + 0.5 && box.bottom > stickyTop
+      root.style.scrollPaddingTop = `${Math.ceil(stuck ? box.bottom : stickyTop)}px`
+    }
+    const schedule = () => {
+      if (frame === 0) frame = requestAnimationFrame(update)
+    }
+    update()
+    window.addEventListener('scroll', schedule, { passive: true })
+    window.addEventListener('resize', schedule)
+    const resize =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
+    resize?.observe(nav)
+    return () => {
+      window.removeEventListener('scroll', schedule)
+      window.removeEventListener('resize', schedule)
+      resize?.disconnect()
+      if (frame !== 0) cancelAnimationFrame(frame)
+      root.style.scrollPaddingTop = ''
+    }
+  }, [navRef, stickyTop, active])
+}
+
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
 // to. From 768 pixels the column has room for whole chips, so they wrap.
 const CHIP_ROW_SCROLL =
@@ -497,6 +537,8 @@ export function LookbookFilterNav({
   const { t } = useCommunityTranslation()
   // Per instance, so a nav only ever points at its own explainer.
   const explainerId = useId()
+  const navRef = useRef<HTMLElement | null>(null)
+  useStickyStackScrollPadding(navRef, stickyTop, !closed)
   if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
@@ -515,17 +557,18 @@ export function LookbookFilterNav({
 
   return (
     <nav
+      ref={navRef}
       aria-label={t('community.filters.label')}
       aria-describedby={explainerId}
       style={{ top: stickyTop }}
-      className="flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur min-[360px]:sticky min-[360px]:z-10"
+      className="flex flex-col gap-3 border-b border-line bg-page/95 py-3 backdrop-blur min-[360px]:sticky min-[360px]:z-10"
     >
       {/* Translated actions can outgrow a 320 px row, so they wrap below the heading as a group. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2
           tabIndex={-1}
           data-share-card-focus-fallback="community"
-          className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+          className="text-2xl font-semibold text-ink"
         >
           {t('community.heading')}
         </h2>
@@ -536,7 +579,7 @@ export function LookbookFilterNav({
       <p
         id={explainerId}
         data-testid="community-filters-explainer"
-        className="-mt-1 text-xs leading-snug text-[color:var(--lookbook-ink-muted)]"
+        className="-mt-1 text-xs leading-snug text-ink-muted"
       >
         {t('community.filters.explainer')}
       </p>
@@ -553,8 +596,10 @@ export function LookbookFilterNav({
           // Selection is carried by weight and border thickness as well as
           // colour, so it survives a monochrome or high-contrast rendering.
           const activeStyles = isActive
-            ? 'border-[color:var(--theme-secondary)] font-bold text-[color:var(--theme-card-text)] underline underline-offset-4'
-            : 'border-transparent font-medium text-[color:var(--lookbook-ink-muted)] min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
+            ? 'border-inverse font-bold text-ink underline underline-offset-4'
+            : // CC-7.9: ink-soft, not ink-muted. Muted 12 px uppercase paints below 4.5:1 on the dark
+              // page once antialiased (measured 4.45 in CI); selection still reads by weight and border.
+              'border-transparent font-medium text-ink-soft min-[768px]:border-line-strong min-[768px]:bg-page'
 
           return (
             <button
@@ -566,7 +611,7 @@ export function LookbookFilterNav({
               }}
               aria-pressed={isActive}
               tabIndex={chipsPending ? -1 : undefined}
-              className={`min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
+              className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none ${tabletStyles} ${activeStyles}`}
             >
               {modeLabel(mode, viewerBand, t, isActive)}
             </button>
@@ -616,37 +661,34 @@ function WeeklyChallengeBanner({
     <aside
       data-testid="weekly-challenge-banner"
       aria-labelledby="weekly-challenge-title"
-      className="flex flex-col gap-3 rounded-[8px] border border-[color:var(--theme-secondary)] bg-[var(--theme-card-bg)] p-5 shadow-sm motion-safe:transition-all"
+      data-surface="card"
+      className="flex flex-col gap-3 rounded-xl border border-theme-card-border bg-theme-card-bg p-5 text-theme-card-text shadow-card motion-safe:transition-all"
     >
       <div className="flex items-center justify-between">
-        <span className="lookbook-metrics text-[11px] font-bold uppercase tracking-wider text-[color:var(--theme-card-text)]">
+        <span className="text-xs font-bold uppercase tracking-wider text-theme-card-text">
           {t('community.challenge.eyebrow')}
         </span>
         <div className="flex items-center gap-2">
           <span
             data-testid="challenge-climate-band"
-            className="lookbook-metrics rounded bg-[#C9A14A] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#111111]"
+            className="rounded-md bg-inverse px-2 py-0.5 text-xs font-semibold uppercase text-on-inverse"
           >
             {challenge.climateBand
               ? bandLabel(challenge.climateBand, t)
               : t('community.challenge.allClimates')}
           </span>
-          <span className="lookbook-metrics text-[11px] text-[color:var(--lookbook-ink-muted)]">
-            {formattedDates}
-          </span>
+          <span className="text-xs text-ink-muted">{formattedDates}</span>
         </div>
       </div>
 
       <div className="space-y-1">
         <h3
           id="weekly-challenge-title"
-          className="lookbook-display text-lg font-semibold text-[color:var(--theme-card-text)]"
+          className="text-lg font-semibold text-theme-card-text"
         >
           {challenge.title}
         </h3>
-        <p className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]">
-          {challenge.body}
-        </p>
+        <p className="text-xs leading-relaxed text-ink-muted">{challenge.body}</p>
       </div>
 
       {canParticipate && (
@@ -660,7 +702,7 @@ function WeeklyChallengeBanner({
             onClick={() => {
               onParticipate(challenge)
             }}
-            className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+            className="min-h-11 rounded-full border border-line-strong bg-page text-ink px-5 py-2 text-xs font-semibold motion-safe:transition-colors"
           >
             {t('community.challenge.participate')}
           </button>
@@ -705,14 +747,14 @@ function LookbookCardImageSurface({
   return (
     <div
       data-testid={`${scope}lookbook-image-${item.id}`}
-      className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-[var(--theme-card-bg)]"
+      className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-theme-card-bg"
     >
       {isFailedImage ? (
         <div
           data-testid={`${scope}image-unavailable-${item.id}`}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--theme-card-bg)] p-4 text-center"
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-theme-card-bg p-4 text-center"
         >
-          <span className="text-xs font-medium text-[color:var(--lookbook-ink-muted)]">
+          <span className="text-xs font-medium text-ink-muted">
             {t('community.card.imageUnavailable')}
           </span>
           <button
@@ -721,7 +763,7 @@ function LookbookCardImageSurface({
             onClick={() => {
               onImageRetry(item)
             }}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-1.5 text-xs font-semibold text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-11 rounded-full border border-theme-card-border px-4 py-2 text-xs font-semibold text-theme-card-text"
           >
             {t('community.card.imageRetry')}
           </button>
@@ -756,11 +798,11 @@ function LookbookCardImageSurface({
           onClick={() => {
             onOpen(item)
           }}
-          className="absolute inset-0 flex items-end justify-end p-3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--theme-secondary)]"
+          className="absolute inset-0 flex items-end justify-end p-3"
         >
           <span
             aria-hidden="true"
-            className="lookbook-metrics rounded-full bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
+            className="rounded-full bg-page/95 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-ink shadow-card motion-safe:transition-colors"
           >
             {t('community.card.open')}
           </span>
@@ -785,14 +827,14 @@ function LookbookCardImageSurface({
          */}
         <span
           data-testid={`${scope}climate-badge-${item.id}`}
-          className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]"
+          className="rounded-md bg-inverse px-3 py-1 text-xs font-semibold uppercase text-on-inverse"
         >
           {bandLabel(item.climateBand, t)}
         </span>
         {item.status !== 'published' && (
           <span
             data-testid={`${scope}status-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
+            className="rounded-md border border-line-strong bg-page/95 px-2 py-0.5 text-xs font-medium uppercase text-ink"
           >
             {t(`community.status.${item.status}`)}
           </span>
@@ -805,7 +847,7 @@ function LookbookCardImageSurface({
         {item.sponsorship && (
           <span
             data-testid={`${scope}sponsored-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
+            className="rounded-md border border-line-strong bg-page/95 px-2 py-0.5 text-xs font-semibold uppercase text-ink"
           >
             <span aria-hidden="true">{t('community.card.sponsored')}</span>
             <span id={sponsoredDisclosureId(scope, item.id)} className="sr-only">
@@ -827,6 +869,7 @@ interface LookbookCardContentProps {
   isReported: boolean
   canAct: boolean
   t: Translate
+  onComments: (item: CommunityFeedItem) => void
   onReport: (postId: string) => void
   onWithdraw: (postId: string) => void
 }
@@ -844,6 +887,7 @@ function LookbookCardContent({
   isReported,
   canAct,
   t,
+  onComments,
   onReport,
   onWithdraw,
 }: LookbookCardContentProps) {
@@ -858,14 +902,14 @@ function LookbookCardContent({
         <div className="flex flex-wrap items-center gap-2">
           <span
             data-testid={`${scope}author-name-${item.id}`}
-            className="lookbook-metrics block text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="block text-xs font-semibold text-theme-card-text"
           >
             {authorName}
           </span>
           {(item.textRevision ?? 0) > 0 && (
             <span
               data-testid={`${scope}edited-badge-${item.id}`}
-              className="lookbook-metrics text-[11px] font-medium text-[color:var(--lookbook-ink-muted)]"
+              className="text-xs font-medium text-ink-muted"
             >
               {t('community.card.edited')}
             </span>
@@ -883,7 +927,7 @@ function LookbookCardContent({
         {item.caption && (
           <p
             data-testid={`${scope}caption-${item.id}`}
-            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-3"
+            className="text-xs leading-relaxed text-ink-muted line-clamp-3"
           >
             {item.caption}
           </p>
@@ -899,17 +943,27 @@ function LookbookCardContent({
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
-      {canAct && (
-        <div className="flex items-center gap-3 border-t border-[color:var(--theme-card-border)] pt-3 text-xs">
-          {item.author.isSelf ? (
+      {/* Story CC-7.9 (CI snapshot): the comments affordance closes the card with its moderation
+          action, after the look it belongs to. Above the author line it read as a stray label
+          with a blank band under it. Signed out, it opens the read-only thread on its own. */}
+      <div className="flex items-center gap-3 border-t border-theme-card-border pt-3 text-xs">
+        <button
+          type="button"
+          className="min-h-11 text-sm font-medium"
+          data-testid={`${scope}comments-button-${item.id}`}
+          onClick={() => onComments(item)}
+        >
+          {t('community.comments.title')}
+        </button>
+        {canAct &&
+          (item.author.isSelf ? (
             <button
               type="button"
               data-testid={`${scope}withdraw-button-${item.id}`}
               onClick={() => {
                 onWithdraw(item.id)
               }}
-              style={{ color: MERLOT_INK }}
-              className="min-h-[44px] font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="min-h-11 font-medium text-merlot-ink hover:underline"
             >
               {t('community.card.withdraw')}
             </button>
@@ -921,17 +975,16 @@ function LookbookCardContent({
               onClick={() => {
                 onReport(item.id)
               }}
-              className={`min-h-[44px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
+              className={`min-h-11 font-medium transition-colors ${
                 isReported
-                  ? 'cursor-default text-[color:var(--theme-card-text)]'
-                  : 'text-[color:var(--lookbook-ink-muted)] hover:underline'
+                  ? 'cursor-default text-theme-card-text'
+                  : 'text-ink-muted hover:underline'
               }`}
             >
               {isReported ? t('community.card.reported') : t('community.card.report')}
             </button>
-          )}
-        </div>
-      )}
+          ))}
+      </div>
     </div>
   )
 }
@@ -1017,7 +1070,6 @@ function LookbookCard({
   const titleId = `${scope}lookbook-card-title-${item.id}`
   return (
     <article
-      data-focus-surface="light"
       id={`${scope}lookbook-card-${item.id}`}
       data-testid={`${scope}lookbook-card-${item.id}`}
       tabIndex={-1}
@@ -1025,10 +1077,11 @@ function LookbookCard({
         item.sponsorship ? `${titleId} ${sponsoredDisclosureId(scope, item.id)}` : titleId
       }
       data-highlighted={isHighlighted ? 'true' : 'false'}
-      className={`flex flex-col overflow-hidden rounded-[8px] border bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
+      data-surface="card"
+      className={`flex flex-col overflow-hidden rounded-xl border bg-theme-card-bg text-theme-card-text shadow-card motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
         isHighlighted
-          ? 'border-[color:var(--theme-secondary)] outline outline-2 outline-[color:var(--theme-primary)] ring-2 ring-[color:var(--theme-secondary)] ring-offset-2 shadow-lg'
-          : 'border-[color:var(--theme-card-border)]'
+          ? 'border-inverse outline outline-2 outline-inverse ring-2 ring-line-strong ring-offset-2 shadow-overlay'
+          : 'border-theme-card-border'
       }`}
     >
       <LookbookCardImageSurface
@@ -1047,14 +1100,6 @@ function LookbookCard({
         t={t}
         host={sponsored}
       />
-      <button
-        type="button"
-        className="min-h-[44px] px-5 text-left text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
-        data-testid={`${scope}comments-button-${item.id}`}
-        onClick={() => onComments(item)}
-      >
-        {t('community.comments.title')}
-      </button>
       <LookbookCardContent
         scope={scope}
         reactionControls={reactionControls}
@@ -1062,6 +1107,7 @@ function LookbookCard({
         isReported={isReported}
         canAct={canAct}
         t={t}
+        onComments={onComments}
         onReport={onReport}
         onWithdraw={onWithdraw}
       />
@@ -1167,7 +1213,7 @@ function LookbookDetailDialog({
             {reactionFeedback ? t(reactionFeedback.key) : null}
           </span>
         </div>
-        <div className="relative h-80 w-full overflow-hidden rounded-[8px] bg-[var(--theme-card-bg)]">
+        <div className="relative h-80 w-full overflow-hidden rounded-md bg-theme-card-bg">
           <Image
             src={item.imageAccess.url}
             alt={altTextOf(item, authorName, t)}
@@ -1181,20 +1227,20 @@ function LookbookDetailDialog({
         <div className="flex flex-wrap items-center gap-2">
           <span
             data-testid={`community-detail-band-${item.id}`}
-            className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]"
+            className="rounded-md bg-inverse px-3 py-1 text-xs font-semibold uppercase text-on-inverse"
           >
             {bandLabel(item.climateBand, t)}
           </span>
           <span
             data-testid="community-detail-author"
-            className="lookbook-metrics text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {authorName}
           </span>
           {(item.textRevision ?? 0) > 0 && (
             <span
               data-testid="community-detail-edited"
-              className="lookbook-metrics text-[11px] font-medium text-[color:var(--lookbook-ink-muted)]"
+              className="text-xs font-medium text-ink-muted"
             >
               {t('community.card.edited')}
             </span>
@@ -1202,7 +1248,7 @@ function LookbookDetailDialog({
           {item.sponsorship && (
             <span
               data-testid={`community-detail-sponsored-${item.id}`}
-              className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
+              className="rounded-md border border-theme-card-border px-2 py-0.5 text-xs font-semibold uppercase text-theme-card-text"
             >
               <span aria-hidden="true">{t('community.card.sponsored')}</span>
               <span className="sr-only">
@@ -1217,7 +1263,7 @@ function LookbookDetailDialog({
         {item.caption && (
           <p
             data-testid="community-detail-caption"
-            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]"
+            className="text-xs leading-relaxed text-ink-muted"
           >
             {item.caption}
           </p>
@@ -1296,18 +1342,17 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
     <section
       data-testid="community-author-states"
       aria-labelledby="community-author-states-title"
-      className="flex flex-col gap-3 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-5"
+      data-surface="card"
+      className="flex flex-col gap-3 rounded-xl border border-theme-card-border bg-theme-card-bg p-5 text-theme-card-text"
     >
       <div className="space-y-1">
         <h3
           id="community-author-states-title"
-          className="lookbook-display text-base font-semibold text-[color:var(--theme-card-text)]"
+          className="text-base font-semibold text-theme-card-text"
         >
           {t('community.feed.yourPostsTitle')}
         </h3>
-        <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
-          {t('community.feed.yourPostsBody')}
-        </p>
+        <p className="text-xs text-ink-muted">{t('community.feed.yourPostsBody')}</p>
       </div>
 
       <ul className="flex flex-col gap-3">
@@ -1317,17 +1362,14 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
             <li
               key={state.id}
               data-testid={`author-state-${state.id}`}
-              className="space-y-1 border-t border-[color:var(--theme-card-border)] pt-3 first:border-t-0 first:pt-0"
+              className="space-y-1 border-t border-theme-card-border pt-3 first:border-t-0 first:pt-0"
             >
               <span
                 data-testid={`status-badge-${state.id}`}
-                style={
-                  isFlagged ? { color: MERLOT_INK, borderColor: MERLOT_INK } : undefined
-                }
-                className={`lookbook-metrics inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                className={`inline-block rounded-md border px-2 py-0.5 text-xs font-semibold uppercase ${
                   isFlagged
-                    ? ''
-                    : 'border-[color:var(--theme-card-border)] text-[color:var(--theme-card-text)]'
+                    ? MERLOT_CLASS
+                    : 'border-theme-card-border text-theme-card-text'
                 }`}
               >
                 {t(`community.status.${state.status}`)}
@@ -1335,8 +1377,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {REMOVED_STATUSES.has(state.status) && (
                 <p
                   data-testid={`author-state-explanation-${state.id}`}
-                  style={isFlagged ? { color: MERLOT_INK } : undefined}
-                  className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-[color:var(--lookbook-ink-muted)]'}`}
+                  className={`text-xs leading-relaxed ${isFlagged ? 'text-merlot-ink' : 'text-ink-muted'}`}
                 >
                   {t(`community.removed.${state.status}`)}
                 </p>
@@ -1344,7 +1385,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.moderationReason && (
                 <p
                   data-testid={`author-state-reason-${state.id}`}
-                  className="text-xs text-[color:var(--lookbook-ink-muted)]"
+                  className="text-xs text-ink-muted"
                 >
                   {moderationReasonText(state.moderationReason, t)}
                 </p>
@@ -1360,7 +1401,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.caption && (
                 <p
                   data-testid={`author-state-caption-${state.id}`}
-                  className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-2"
+                  className="text-xs leading-relaxed text-ink-muted line-clamp-2"
                 >
                   {state.caption}
                 </p>
@@ -1422,8 +1463,7 @@ function CommunityReportModal({
           <div
             role="alert"
             data-testid="report-error-message"
-            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
-            className="rounded-md border p-3 text-xs"
+            className={`rounded-md border p-3 text-xs ${MERLOT_CLASS}`}
           >
             {errorMessage}
           </div>
@@ -1432,7 +1472,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-reason-select"
-            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {t('community.report.reasonLabel')}
           </label>
@@ -1443,7 +1483,7 @@ function CommunityReportModal({
             onChange={(event) => {
               setReason(event.target.value as CommunityReportReason)
             }}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-line-strong bg-page px-3 py-2 text-xs text-ink"
           >
             {communityReportReasonSchema.options.map((option) => (
               <option key={option} value={option}>
@@ -1456,7 +1496,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-details-input"
-            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {t('community.report.detailsLabel')}
           </label>
@@ -1470,9 +1510,9 @@ function CommunityReportModal({
             maxLength={500}
             rows={3}
             placeholder={t('community.report.detailsPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-line-strong bg-page p-3 text-xs text-ink placeholder:text-ink-muted"
           />
-          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
+          <span className="text-xs text-ink-muted">
             {t('community.report.detailsCount', { count: details.length })}
           </span>
         </div>
@@ -1482,7 +1522,7 @@ function CommunityReportModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-11 rounded-full border border-theme-card-border px-4 py-2 text-xs font-medium text-ink-muted"
           >
             {t('community.report.cancel')}
           </button>
@@ -1490,8 +1530,7 @@ function CommunityReportModal({
             type="submit"
             data-testid="report-submit-button"
             disabled={isSubmitting}
-            style={{ backgroundColor: MERLOT }}
-            className="min-h-[44px] rounded-full px-5 py-2 text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:opacity-50"
+            className="min-h-11 rounded-full bg-danger px-5 py-2 text-xs font-semibold text-on-danger disabled:opacity-50"
           >
             {isSubmitting
               ? t('community.report.submitting')
@@ -1526,7 +1565,7 @@ function PostTitleField({
     <div className="space-y-2">
       <label
         htmlFor="post-title-input"
-        className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+        className="text-xs font-semibold text-theme-card-text"
       >
         {t('community.compose.titleLabel')}
       </label>
@@ -1536,7 +1575,7 @@ function PostTitleField({
         value={title}
         maxLength={COMMUNITY_POST_TITLE_MAX_LENGTH}
         onChange={(event) => onChange(event.target.value)}
-        className="min-h-11 w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-sm text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        className="min-h-11 w-full rounded-md border border-line-strong bg-page p-3 text-sm text-ink"
       />
       {titleInvalid && (
         <p role="alert" className="text-sm">
@@ -1570,7 +1609,7 @@ function DraftDescriptionControl({
         <button
           type="button"
           data-testid="community-suggest-description"
-          className="block min-h-11 rounded-md border border-[color:var(--theme-card-border)] px-3 text-sm font-semibold text-[color:var(--theme-card-text)] disabled:opacity-60"
+          className="block min-h-11 rounded-md border border-theme-card-border px-3 text-sm font-semibold text-theme-card-text disabled:opacity-60"
           disabled={suspended || isPublishing || status === 'loading'}
           onClick={onSuggest}
         >
@@ -1582,7 +1621,7 @@ function DraftDescriptionControl({
         </button>
       )}
       {status === 'failed' && (
-        <p role="status" className="text-xs text-[color:var(--theme-card-text)]">
+        <p role="status" className="text-xs text-theme-card-text">
           {t('community.compose.descriptionFailed')}
         </p>
       )}
@@ -1753,8 +1792,7 @@ function PostCreationModal({
           <div
             role="alert"
             data-testid="create-post-error"
-            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
-            className="rounded-md border p-3 text-xs"
+            className={`rounded-md border p-3 text-xs ${MERLOT_CLASS}`}
           >
             {errorMessage ?? (validationKey ? t(validationKey) : '')}
           </div>
@@ -1763,7 +1801,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-image-file"
-            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {t('community.compose.photoLabel')}
           </label>
@@ -1784,11 +1822,9 @@ function PostCreationModal({
                 onSelectPhoto(file)
               }
             }}
-            className="w-full text-xs text-[color:var(--lookbook-ink-muted)] file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full text-xs text-ink-muted file:mr-3 file:min-h-11 file:rounded-full file:border file:border-solid file:border-line-strong file:bg-page file:px-4 file:py-2 file:text-xs file:font-semibold file:text-ink"
           />
-          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
-            {t('community.compose.photoHint')}
-          </p>
+          <p className="text-xs text-ink-muted">{t('community.compose.photoHint')}</p>
           {photoPreview && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -1799,10 +1835,7 @@ function PostCreationModal({
             />
           )}
           {isPreparing && (
-            <p
-              data-testid="create-post-progress"
-              className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
-            >
+            <p data-testid="create-post-progress" className="text-xs text-ink-muted">
               {t('community.compose.uploading')}
             </p>
           )}
@@ -1811,7 +1844,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-alt-text"
-            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {t('community.compose.altLabel')}
           </label>
@@ -1826,9 +1859,9 @@ function PostCreationModal({
             maxLength={200}
             rows={2}
             placeholder={t('community.compose.altPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-line-strong bg-page p-3 text-xs text-ink placeholder:text-ink-muted"
           />
-          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
+          <p className="text-xs text-ink-muted">
             {altTextSuggestion
               ? t('community.compose.altSuggested')
               : t('community.compose.altHint')}
@@ -1842,11 +1875,11 @@ function PostCreationModal({
               onChange={(event) => {
                 setIsAltTextConfirmed(event.target.checked)
               }}
-              className="h-4 w-4 rounded border-[color:var(--theme-card-border)]"
+              className="h-4 w-4 rounded-sm border-theme-card-border accent-ink"
             />
             <label
               htmlFor="confirm-alt-text"
-              className="text-xs font-medium text-[color:var(--theme-card-text)]"
+              className="text-xs font-medium text-theme-card-text"
             >
               {t('community.compose.altConfirm')}
             </label>
@@ -1863,7 +1896,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-caption-input"
-            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+            className="text-xs font-semibold text-theme-card-text"
           >
             {t('community.compose.captionLabel')}
           </label>
@@ -1881,9 +1914,9 @@ function PostCreationModal({
             maxLength={280}
             rows={3}
             placeholder={t('community.compose.captionPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-line-strong bg-page p-3 text-xs text-ink placeholder:text-ink-muted"
           />
-          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
+          <span className="text-xs text-ink-muted">
             {t('community.compose.captionCount', { count: caption.length })}
           </span>
           <DraftDescriptionControl
@@ -1901,7 +1934,7 @@ function PostCreationModal({
           <div className="space-y-2">
             <label
               htmlFor="post-challenge-select"
-              className="text-xs font-semibold text-[color:var(--theme-card-text)]"
+              className="text-xs font-semibold text-theme-card-text"
             >
               {t('community.compose.challengeLabel')}
             </label>
@@ -1912,7 +1945,7 @@ function PostCreationModal({
               onChange={(event) => {
                 setSelectedChallengeId(event.target.value || null)
               }}
-              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="w-full rounded-md border border-line-strong bg-page px-3 py-2 text-xs text-ink"
             >
               <option value="">{t('community.compose.challengeNone')}</option>
               <option value={activeChallenge.id}>{activeChallenge.title}</option>
@@ -1925,15 +1958,16 @@ function PostCreationModal({
             type="button"
             onClick={onClose}
             disabled={isPublishing}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-11 rounded-full border border-theme-card-border px-4 py-2 text-xs font-medium text-ink-muted"
           >
             {t('community.compose.cancel')}
           </button>
           <button
             type="submit"
             data-testid="post-publish-submit"
+            data-gold="primary"
             disabled={isPublishBlocked}
-            className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isPublishing
               ? t('community.compose.publishing')
@@ -1961,7 +1995,17 @@ interface CommunityHeaderActionsProps {
   canShare: boolean
   onShare: () => void
   settingsLink: React.ReactNode
+  /** Story CC-7.9 D3: gold only where New post is the screen's main action. */
+  newPostEmphasis: NewPostEmphasis
   t: Translate
+}
+
+/** Story CC-7.9 D3: Community's main action is New post; on Home it is Open wardrobe. */
+export type NewPostEmphasis = 'primary' | 'neutral'
+
+const NEW_POST_EMPHASIS_CLASSES: Record<NewPostEmphasis, string> = {
+  primary: 'bg-primary text-on-primary',
+  neutral: 'border border-line-strong bg-page text-ink',
 }
 
 /**
@@ -1973,6 +2017,7 @@ function CommunityHeaderActions({
   canShare,
   onShare,
   settingsLink,
+  newPostEmphasis,
   t,
 }: CommunityHeaderActionsProps) {
   /*
@@ -1991,7 +2036,8 @@ function CommunityHeaderActions({
           data-testid="create-post-button"
           aria-disabled={canShare ? undefined : 'true'}
           onClick={canShare ? onShare : undefined}
-          className="min-h-[44px] rounded-full bg-[#C9A14A] px-4 py-1.5 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+          data-gold={newPostEmphasis === 'primary' ? 'primary' : undefined}
+          className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${NEW_POST_EMPHASIS_CLASSES[newPostEmphasis]}`}
         >
           {t('community.newPost')}
         </button>
@@ -2001,11 +2047,10 @@ function CommunityHeaderActions({
 }
 
 const NOTICE_CLASSES: Record<NoticeTone, string> = {
-  // Gold accents a success, per the premium accent system.
-  success:
-    'border-[color:var(--theme-secondary)] bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]',
-  info: 'border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]',
-  error: '',
+  // Story CC-7.9 D3: a success no longer wears gold; it reads in the success ink.
+  success: 'border-line bg-card text-success-ink',
+  info: 'border-line bg-card text-ink',
+  error: MERLOT_CLASS,
 }
 
 /**
@@ -2045,13 +2090,13 @@ function CommunityNotices({
       {bandUnresolvedReason && (
         <div
           data-testid="community-band-unresolved"
-          className="flex flex-col gap-2 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-3 text-xs text-[color:var(--theme-card-text)]"
+          className="flex flex-col gap-2 rounded-md border border-line bg-card p-3 text-xs text-ink"
         >
           <p>{t(`community.band.unresolved.${bandUnresolvedReason}`)}</p>
           {bandUnresolvedReason === 'no_location' && canAddLocation && (
             <Link
               href={communityAddLocationHref(returnPath)}
-              className="inline-flex min-h-[44px] items-center self-start font-semibold underline"
+              className="inline-flex min-h-11 items-center self-start font-semibold underline"
               data-testid="community-add-location"
             >
               {t('locations.guided.add')}
@@ -2063,12 +2108,7 @@ function CommunityNotices({
         <p
           data-testid="community-action-notice"
           data-tone={notice.tone}
-          style={
-            notice.tone === 'error'
-              ? { color: MERLOT_INK, borderColor: MERLOT_INK }
-              : undefined
-          }
-          className={`rounded-[8px] border p-3 text-xs ${NOTICE_CLASSES[notice.tone]}`}
+          className={`rounded-md border p-3 text-xs ${NOTICE_CLASSES[notice.tone]}`}
         >
           {noticeText}
         </p>
@@ -2118,7 +2158,7 @@ function CommunityFeedStates({
       {errorText !== null && !retryable && (
         <p
           data-testid="community-feed-signed-out"
-          className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-xs text-[color:var(--theme-card-text)]"
+          className="rounded-md border border-line bg-card p-4 text-xs text-ink"
         >
           {errorText}
         </p>
@@ -2128,16 +2168,14 @@ function CommunityFeedStates({
         <div
           role="alert"
           data-testid="community-feed-error"
-          style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
-          className="flex items-center justify-between gap-3 rounded-[8px] border p-4 text-xs"
+          className={`flex items-center justify-between gap-3 rounded-md border p-4 text-xs ${MERLOT_CLASS}`}
         >
           <span>{errorText}</span>
           <button
             type="button"
             data-testid="community-feed-retry-button"
             onClick={onRetry}
-            style={{ backgroundColor: MERLOT }}
-            className="min-h-[44px] rounded-md px-3 py-1 text-xs font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3 py-1 text-xs font-semibold"
           >
             {t('community.feed.retry')}
           </button>
@@ -2157,7 +2195,7 @@ function CommunityFeedStates({
             <div
               key={n}
               data-testid="lookbook-card-skeleton"
-              className="h-72 animate-pulse rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-5"
+              className="h-72 animate-pulse rounded-xl border border-theme-card-border bg-theme-card-bg p-5"
             />
           ))}
         </div>
@@ -2166,14 +2204,13 @@ function CommunityFeedStates({
       {!isLoading && errorText === null && itemCount === 0 && (
         <div
           data-testid="community-feed-empty"
-          className="flex flex-col items-center justify-center rounded-[8px] border border-dashed border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-10 text-center"
+          data-surface="card"
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-10 text-center"
         >
-          <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
+          <p className="text-sm font-semibold text-theme-card-text">
             {t('community.feed.emptyTitle')}
           </p>
-          <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
-            {t('community.feed.emptyBody')}
-          </p>
+          <p className="mt-1 text-xs text-ink-muted">{t('community.feed.emptyBody')}</p>
           {onClearFilters && (
             <button
               type="button"
@@ -2189,7 +2226,7 @@ function CommunityFeedStates({
               type="button"
               data-testid="community-feed-empty-share-button"
               onClick={onShare}
-              className="mt-4 min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="mt-4 min-h-11 rounded-full border border-line-strong bg-page text-ink px-5 py-2 text-xs font-semibold"
             >
               {t('community.share')}
             </button>
@@ -2231,7 +2268,7 @@ function LoadMoreControl({
         data-testid="load-more-button"
         disabled={isLoadingMore || isRefreshing}
         onClick={onLoadMore}
-        className="min-h-[44px] rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:opacity-50"
+        className="min-h-11 rounded-full border border-line-strong bg-page text-ink px-6 py-2 text-xs font-semibold uppercase tracking-wider disabled:opacity-50"
       >
         {isLoadingMore ? t('community.feed.loadingMore') : t('community.feed.loadMore')}
       </button>
@@ -2301,6 +2338,12 @@ export interface CommunityLookbookGridProps {
   filterNavStickyTop?: number
   /** The route hosting this grid, where the add-location flow returns after the save. */
   returnPath?: string
+  /**
+   * Story CC-7.9 D3: the Community screen passes `primary` (New post is its main action, gold);
+   * an embedding host such as Home keeps the neutral outline so its own primary stays the only
+   * gold action.
+   */
+  newPostEmphasis?: NewPostEmphasis
   /** Story 6.11: lifts the ban, so Home's spotlight teaser closes with the feed. */
   onBannedChange?: (banned: boolean) => void
   /**
@@ -2349,7 +2392,7 @@ function SpotlightFocusNotice({
       ref={ref}
       tabIndex={-1}
       data-testid="community-spotlight-notice"
-      className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-3 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+      className="rounded-md border border-line bg-card p-3 text-xs text-ink"
     >
       {t(notice.key)}
     </p>
@@ -2459,7 +2502,7 @@ function CommunitySettingsLink({
         // A refused stored session keeps the link while the landing reads it as a member, and
         // hides it with the guest link while the landing is still pending (globals.css).
         data-landing={guestOnly ? 'guest-inline' : 'refused-inline'}
-        className="flex min-h-[44px] items-center px-2 text-sm font-medium text-[color:var(--theme-card-text)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        className="flex min-h-11 items-center px-2 text-sm font-medium text-ink underline underline-offset-4"
       >
         {label}
       </Link>
@@ -2472,7 +2515,7 @@ function CommunitySettingsLink({
       href={href}
       aria-label={label}
       title={label}
-      className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--theme-card-border)] text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors hover:border-[color:var(--theme-secondary)]"
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-ink motion-safe:transition-colors hover:border-inverse"
     >
       <svg
         aria-hidden="true"
@@ -2642,6 +2685,7 @@ export function CommunityLookbookGrid({
   showFilterNav = false,
   filterNavStickyTop,
   returnPath = '/',
+  newPostEmphasis = 'neutral',
   onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
@@ -4623,6 +4667,7 @@ export function CommunityLookbookGrid({
       showShare={shareSlotShown(memberSession, banned)}
       canShare={presentation.canAct}
       onShare={openCreateModal}
+      newPostEmphasis={newPostEmphasis}
       settingsLink={
         <CommunitySettingsLink
           banned={banned}
@@ -4708,7 +4753,7 @@ export function CommunityLookbookGrid({
         <SessionRetryButton
           session={sessionState}
           testId="community-session-retry"
-          className="min-h-[44px] self-start rounded-md border border-[color:var(--theme-card-border)] px-4 text-sm font-semibold text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+          className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4 text-sm font-semibold"
         />
 
         <CommunityNotices
@@ -4761,7 +4806,7 @@ export function CommunityLookbookGrid({
                 <button
                   type="button"
                   data-testid="community-new-looks-pill"
-                  className="pointer-events-auto rounded-full border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] px-4 py-3 text-[color:var(--theme-card-text)] shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+                  className="pointer-events-auto rounded-full border border-line-strong bg-page px-4 py-3 text-ink shadow-overlay"
                   disabled={isInsertingLooks}
                   onClick={() => {
                     void insertNewLooks()

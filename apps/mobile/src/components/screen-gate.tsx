@@ -186,7 +186,7 @@ function GateFrame({
           accessibilityLabel={t('common.loading')}
           accessibilityState={{ busy: true }}
           aria-busy
-          style={[styles.placeholder, { backgroundColor: colors.surface }]}
+          style={[styles.placeholder, { backgroundColor: colors.cardMuted }]}
         />
       )}
       <View

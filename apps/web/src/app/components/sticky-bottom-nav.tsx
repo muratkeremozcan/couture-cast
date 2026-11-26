@@ -120,14 +120,13 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
     <nav
       aria-label={t('nav.label')}
       data-testid="sticky-bottom-nav"
-      // The nav paints the lookbook surface, light unless the Default system is dark, so it names
-      // that surface for its focus ring instead of inheriting a dark page's white one.
-      data-focus-surface="light"
-      className={`bottom-0 left-0 right-0 z-30 border-t border-[color:var(--lookbook-line)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] pt-2 backdrop-blur pb-[env(safe-area-inset-bottom,0.75rem)] ${
+      // Story CC-7.9 D1, D6: the tab bar sits on the page surface at the shell's 56 px plus the
+      // device's bottom safe area.
+      className={`bottom-0 left-0 right-0 z-30 border-t border-line bg-page/95 pb-safe backdrop-blur ${
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
       }`}
     >
-      <div className="mx-auto flex w-full max-w-md items-center justify-around px-2">
+      <div className="mx-auto flex h-tab-bar w-full max-w-md items-center justify-around px-2">
         {NAV_TABS.map((tab) => {
           const isActive = activeTab === tab.id
 
@@ -141,16 +140,17 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               data-testid={`bottom-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
-              className="relative flex min-h-[44px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 sm:px-3 text-xs font-medium text-[color:var(--lookbook-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+              className="relative flex h-full min-h-touch min-w-16 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-xs font-medium text-ink sm:px-3"
             >
-              <span aria-hidden="true" className="text-base">
+              <span aria-hidden="true" className="text-base leading-none">
                 {tab.icon}
               </span>
+              {/* D4 has no 10 px step, so the label keeps text-xs in sentence case, as the
+                  native tab bar does: uppercase with wide tracking cut the German labels at
+                  320 px (O-1). One line, so a two-word label never stacks. */}
               <span
-                className={`text-[10px] uppercase tracking-wider ${
-                  isActive
-                    ? 'font-semibold text-[color:var(--lookbook-ink)]'
-                    : 'text-[color:var(--lookbook-ink-muted)]'
+                className={`whitespace-nowrap text-xs ${
+                  isActive ? 'font-semibold text-ink' : 'text-ink-muted'
                 }`}
               >
                 {t(tab.labelKey)}
@@ -158,7 +158,8 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               {isActive && (
                 <span
                   data-testid="gold-active-indicator"
-                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-[#C9A14A]"
+                  data-gold="tab"
+                  className="absolute bottom-0 left-2 right-2 h-1 rounded-full bg-tab-active"
                 />
               )}
             </Link>

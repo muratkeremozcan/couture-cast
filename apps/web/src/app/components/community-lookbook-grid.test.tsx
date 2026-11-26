@@ -16,7 +16,7 @@ import {
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
-  MERLOT_INK,
+  MERLOT_INK_CLASS,
   cursorFor,
   item,
   feedBody,
@@ -114,7 +114,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const banner = await screen.findByTestId('community-feed-error')
       expect(banner).toHaveTextContent('We could not load the community feed.')
       expect(banner).not.toHaveTextContent('ECONNRESET')
-      expect(banner).toHaveStyle({ color: MERLOT_INK })
+      expect(banner).toHaveClass(MERLOT_INK_CLASS)
 
       await userEvent.click(screen.getByTestId('community-feed-retry-button'))
 

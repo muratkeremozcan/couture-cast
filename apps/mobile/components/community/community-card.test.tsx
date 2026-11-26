@@ -369,8 +369,8 @@ describe('CommunityCard (Story 6.1)', () => {
         onWithdraw={vi.fn()}
       />
     )
-    // Border weight, not the gold alone: the emphasis has to survive a reader who
-    // cannot separate the accent from the divider.
+    // Border weight, not the inverse marker color alone: the emphasis has to survive a
+    // reader who cannot separate the marker from the divider.
     expect(getComputedStyle(card).borderWidth).toBe('2px')
   })
 

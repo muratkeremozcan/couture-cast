@@ -27,6 +27,12 @@ import {
 import { ModerationCaseDetailView } from './moderation-case-detail'
 import { ModerationQueueView } from './moderation-queue'
 
+/**
+ * Story CC-7.9 D6: the route's top bar owns the h1, so a loaded case is the article its title
+ * (now the first h2) names. The wait holds in every locale.
+ */
+const loadedCase = () => screen.findByRole('article')
+
 const CANARY_URL = '/test-only/request-canary'
 // The opt-in test latency can give a canary a shorter wait than an earlier request, so it also waits the longest one.
 const longestTestLatencyMs = () =>
@@ -80,7 +86,7 @@ async function openCase(
     mutationHandler<ModerationAppealInput>(APPEAL_PATH, respond, bodies)
   )
   const view = render(<ModerationCaseDetailView caseId="post.p1" />)
-  await screen.findByRole('heading', { level: 1 })
+  await loadedCase()
   return { reads, bodies, ...view }
 }
 
@@ -335,7 +341,7 @@ describe('C-WEB-D-STANDING: appeal controls per role', () => {
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     typeNote()
     await userEvent.dblClick(
       within(section()).getByRole('button', { name: 'Record an appeal' })

@@ -223,6 +223,26 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     expect(community).toHaveAttribute('tabindex', '-1')
   })
 
+  it('7.9 P2-10 keeps the embedded feed New post neutral so Open wardrobe stays Home gold primary', async () => {
+    signIn()
+    useMswHandlers(
+      communityFeedHandler(),
+      http.get('/api/v1/ritual', () =>
+        HttpResponse.json(
+          { message: 'No location preferences found for user' },
+          { status: 400 }
+        )
+      )
+    )
+    render(<LookbookPrismLayout />)
+    await screen.findByTestId(`lookbook-card-${COMMUNITY_POST_ID}`)
+
+    const newPost = await screen.findByTestId('create-post-button')
+    expect(newPost).not.toHaveAttribute('data-gold')
+    expect(newPost).toHaveClass('border-line-strong', 'bg-page', 'text-ink')
+    expect(newPost).not.toHaveClass('bg-primary')
+  })
+
   /**
    * Story 5.5 Decision 7: the rail defaults closed and opens only from the
    * "Plan week" control, so every planner test opens it first. Signed out,

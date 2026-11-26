@@ -16,11 +16,12 @@ import {
   useModerationTranslation,
   type ModerationEvidenceFailure,
 } from '../../lib/moderation'
-import { moderationControl } from './moderation-failure-notice'
+import { moderationControl, moderationPrimaryControl } from './moderation-failure-notice'
 
-const card = 'rounded-lg border border-neutral-400 p-4 dark:border-neutral-600'
+/** Story CC-7.9 D7: a console card; its container carries `data-surface="card"`. */
+const card = 'rounded-xl border border-line bg-card p-4 text-ink'
 const input =
-  'min-h-[44px] rounded border border-neutral-500 bg-white px-3 py-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100 dark:[color-scheme:dark]'
+  'min-h-[44px] rounded-md border border-line-strong bg-page px-3 py-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
 
 type Availability = 'loading' | 'off' | 'case' | 'range'
 
@@ -84,7 +85,7 @@ function ExportStatus({ state }: { state: ExportState }) {
       <p
         role="status"
         aria-live="polite"
-        className="rounded border border-red-800 p-3 text-sm dark:border-red-400"
+        className="rounded-md border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
       >
         {t(`moderation.evidence.failure.${state.failure}`)}
       </p>
@@ -94,7 +95,7 @@ function ExportStatus({ state }: { state: ExportState }) {
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-col gap-1 rounded border border-green-800 p-3 text-sm dark:border-green-500"
+      className="flex flex-col gap-1 rounded-md border border-line-strong p-3 text-sm text-success-ink"
     >
       <p className="font-medium">
         {t('moderation.evidence.done', {
@@ -122,7 +123,11 @@ export function ModerationEvidenceExport({ caseId }: { caseId: string }) {
   if (availability === 'loading' || availability === 'off') return null
   const working = state.phase === 'working'
   return (
-    <section aria-labelledby="evidence-heading" className={`${card} flex flex-col gap-3`}>
+    <section
+      aria-labelledby="evidence-heading"
+      data-surface="card"
+      className={`${card} flex flex-col gap-3`}
+    >
       <h2 id="evidence-heading" className="text-lg font-semibold">
         {t('moderation.evidence.caseTitle')}
       </h2>
@@ -185,31 +190,26 @@ export function ModerationEvidenceRange() {
   }
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <header className="flex flex-col gap-3">
-        <Link
-          href="/moderation"
-          className="inline-flex min-h-[44px] items-center self-start rounded underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
-        >
-          {t('moderation.backToQueue')}
-        </Link>
-        <h1 className="text-3xl font-semibold">{t('moderation.evidence.title')}</h1>
-        <p className="text-sm text-neutral-700 dark:text-neutral-300">
-          {t('moderation.evidence.subtitle')}
-        </p>
-      </header>
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+      {/* Story CC-7.9 D6: the top bar holds the title and the way back to the queue. */}
+      <p className="text-sm text-ink-soft">{t('moderation.evidence.subtitle')}</p>
       {availability === 'loading' ? (
         <p aria-busy="true">{t('moderation.state.loading')}</p>
       ) : availability === 'off' ? (
-        <p role="alert" className="rounded border border-neutral-500 p-4">
+        <p role="alert" className="rounded-md border border-line-strong p-4">
           {t('moderation.evidence.failure.moderation_history_disabled')}
         </p>
       ) : availability === 'case' ? (
-        <p role="alert" className="rounded border border-neutral-500 p-4">
+        <p role="alert" className="rounded-md border border-line-strong p-4">
           {t('moderation.evidence.failure.admin_required')}
         </p>
       ) : (
-        <form onSubmit={submit} noValidate className={`${card} flex flex-col gap-4`}>
+        <form
+          onSubmit={submit}
+          noValidate
+          data-surface="card"
+          className={`${card} flex flex-col gap-4`}
+        >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1">
               <label htmlFor={fromId} className="text-sm font-medium">
@@ -240,7 +240,8 @@ export function ModerationEvidenceRange() {
           <div>
             <button
               type="submit"
-              className={moderationControl}
+              data-gold="primary"
+              className={moderationPrimaryControl}
               aria-disabled={working}
               aria-busy={working}
             >

@@ -2,7 +2,7 @@
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import React, { type ComponentRef, useRef, useState } from 'react'
-import { StyleSheet, Platform, Pressable } from 'react-native'
+import { StyleSheet, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
 import type { ScenarioOutfit } from '@couture/api-client/contracts/http'
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/src/lib/commerce'
 import { GarmentItemTile } from './garment-item-tile'
 import { useHeroPalette } from './hero-theme'
+import { elevationStyle } from '@/src/theme/tokens'
 import { useTranslation } from 'react-i18next'
 
 type OutfitRecommendationCardProps = {
@@ -58,13 +59,13 @@ export function OutfitRecommendationCard({
   if (isLoading) {
     return (
       <View style={styles.skeletonContainer} testID="outfit-recommendation-card-skeleton">
-        <View style={[styles.skeletonNotes, { backgroundColor: palette.skeleton }]} />
+        <View style={[styles.skeletonNotes, { backgroundColor: palette.cardMuted }]} />
         <View style={styles.skeletonBadgeRow}>
-          <View style={[styles.skeletonBadge, { backgroundColor: palette.skeleton }]} />
-          <View style={[styles.skeletonBadge, { backgroundColor: palette.skeleton }]} />
+          <View style={[styles.skeletonBadge, { backgroundColor: palette.cardMuted }]} />
+          <View style={[styles.skeletonBadge, { backgroundColor: palette.cardMuted }]} />
         </View>
-        <View style={[styles.skeletonTile, { backgroundColor: palette.skeleton }]} />
-        <View style={[styles.skeletonTile, { backgroundColor: palette.skeleton }]} />
+        <View style={[styles.skeletonTile, { backgroundColor: palette.cardMuted }]} />
+        <View style={[styles.skeletonTile, { backgroundColor: palette.cardMuted }]} />
       </View>
     )
   }
@@ -131,7 +132,7 @@ export function OutfitRecommendationCard({
           accessibilityLabel={t('shareCard.launcher')}
           testID="outfit-share-card-open"
           ref={shareOpener}
-          style={styles.shareLauncher}
+          style={[styles.shareLauncher, { borderColor: palette.lineStrong }]}
           onPressIn={() => traceShareCardOpener('opener-press-in')}
           onTouchCancel={() => traceShareCardOpener('opener-touch-cancel')}
           onPress={() => {
@@ -139,18 +140,18 @@ export function OutfitRecommendationCard({
             onExport(outfit.id, () => safeFindNodeHandle(shareOpener.current))
           }}
         >
-          <Text>{t('shareCard.launcher')}</Text>
+          <Text style={{ color: palette.ink }}>{t('shareCard.launcher')}</Text>
         </Pressable>
       )}
       {/* Comfort Notes */}
       <View
         style={[
           styles.notesContainer,
-          { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+          { backgroundColor: palette.card, borderColor: palette.line },
         ]}
       >
         <Text
-          style={[styles.comfortNotes, { color: palette.text }]}
+          style={[styles.comfortNotes, { color: palette.ink }]}
           testID="outfit-comfort-notes"
         >
           {outfit.comfortNotes}
@@ -169,8 +170,12 @@ export function OutfitRecommendationCard({
                   onPress={() => handleBadgePress(badge.key)}
                   style={[
                     styles.badge,
-                    { backgroundColor: palette.surface, borderColor: palette.divider },
-                    isSelected && styles.badgeSelected,
+                    { backgroundColor: palette.page, borderColor: palette.lineStrong },
+                    // A selected chip is ink, never gold (Story CC-7.9 D3).
+                    isSelected && {
+                      backgroundColor: palette.inverse,
+                      borderColor: palette.inverse,
+                    },
                   ]}
                   testID={`reasoning-badge-${badge.key}`}
                   accessibilityRole="button"
@@ -179,8 +184,7 @@ export function OutfitRecommendationCard({
                   <Text
                     style={[
                       styles.badgeLabel,
-                      { color: palette.text },
-                      isSelected && styles.badgeLabelSelected,
+                      { color: isSelected ? palette.onInverse : palette.ink },
                     ]}
                   >
                     {badge.label}
@@ -195,18 +199,18 @@ export function OutfitRecommendationCard({
             <View
               style={[
                 styles.badgeDetails,
-                { backgroundColor: palette.surface, borderColor: palette.divider },
+                { backgroundColor: palette.card, borderColor: palette.line },
               ]}
               testID="badge-details-panel"
             >
-              <Text style={[styles.detailsTitle, { color: palette.accentText }]}>
+              <Text style={[styles.detailsTitle, { color: palette.inkMuted }]}>
                 {t('hero.badge_justification', {
                   label: activeBadgeInfo.label,
                   defaultValue: `${activeBadgeInfo.label} justification:`,
                 })}
               </Text>
               {activeBadgeInfo.bullets.map((bullet, idx) => (
-                <Text key={idx} style={[styles.bulletText, { color: palette.text }]}>
+                <Text key={idx} style={[styles.bulletText, { color: palette.ink }]}>
                   • {bullet}
                 </Text>
               ))}
@@ -240,30 +244,30 @@ export function OutfitRecommendationCard({
         <View
           style={[
             styles.shopThisLook,
-            { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+            { backgroundColor: palette.card, borderColor: palette.line },
           ]}
           testID="shop-this-look-block"
         >
           <Text
-            style={[styles.shopThisLookDisclosure, { color: palette.text }]}
+            style={[styles.shopThisLookDisclosure, { color: palette.ink }]}
             testID="shop-this-look-disclosure"
           >
             {t('commerce.shopThisLook.disclosure')}
           </Text>
           <Text
-            style={[styles.shopThisLookPartner, { color: palette.mutedText }]}
+            style={[styles.shopThisLookPartner, { color: palette.inkMuted }]}
             testID="shop-this-look-partner"
           >
             {partnerLabel}
           </Text>
           <Text
-            style={[styles.shopThisLookOfferTitle, { color: palette.text }]}
+            style={[styles.shopThisLookOfferTitle, { color: palette.ink }]}
             testID="shop-this-look-offer-title"
           >
             {shopThisLook.offerTitle}
           </Text>
           <Pressable
-            style={[styles.shopThisLookCta, { backgroundColor: palette.text }]}
+            style={[styles.shopThisLookCta, { backgroundColor: palette.inverse }]}
             onPress={() => {
               void handleShopThisLookPress()
             }}
@@ -280,19 +284,19 @@ export function OutfitRecommendationCard({
             accessibilityState={{ busy: isActivatingCta }}
             aria-busy={isActivatingCta}
           >
-            <Text style={[styles.shopThisLookCtaLabel, { color: palette.background }]}>
+            <Text style={[styles.shopThisLookCtaLabel, { color: palette.onInverse }]}>
               {ctaLabel}
             </Text>
           </Pressable>
           <Text
-            style={[styles.shopThisLookOpensInBrowser, { color: palette.mutedText }]}
+            style={[styles.shopThisLookOpensInBrowser, { color: palette.inkMuted }]}
             testID="shop-this-look-opens-in-browser"
           >
             {opensInBrowserLabel}
           </Text>
           {ctaError ? (
             <Text
-              style={[styles.shopThisLookError, { color: palette.danger }]}
+              style={[styles.shopThisLookError, { color: palette.dangerInk }]}
               testID="shop-this-look-error"
               accessibilityRole="alert"
               accessibilityLiveRegion="assertive"
@@ -317,29 +321,21 @@ const styles = StyleSheet.create({
   shareLauncher: {
     minHeight: 48,
     padding: 12,
-    borderColor: '#B28D46',
     borderWidth: 1,
     borderRadius: 8,
     marginBottom: 16,
   },
   notesContainer: {
-    backgroundColor: 'rgba(0,0,0,0.02)',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E6E6ED',
-    padding: 14,
+    padding: 12,
     marginBottom: 16,
   },
   comfortNotes: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#111111',
-    // The italic face loaded as its own family (app/_layout.tsx). fontStyle italic on the regular
-    // face drew upright Playfair on iOS and a synthetic italic sans on Android.
-    fontFamily: Platform.select({
-      web: '"Playfair Display Italic", serif',
-      default: 'Playfair Display Italic',
-    }),
+    // Story CC-7.9 D4: native text uses the system font, which has a true italic face.
+    fontStyle: 'italic',
   },
   badgesSection: {
     marginBottom: 16,
@@ -353,52 +349,21 @@ const styles = StyleSheet.create({
   },
   badge: {
     borderWidth: 1,
-    borderColor: '#E6E6ED',
     borderRadius: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  badgeSelected: {
-    backgroundColor: '#C9A14A', // gold color
-    borderColor: '#C9A14A',
   },
   badgeLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#111111',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
-  },
-  badgeLabelSelected: {
-    color: '#111111',
   },
   badgeDetails: {
     marginTop: 8,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E6E6ED',
     borderRadius: 8,
     padding: 12,
     gap: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-      },
-    }),
+    ...elevationStyle('card'),
   },
   detailsTitle: {
     fontSize: 12,
@@ -408,9 +373,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   bulletText: {
-    fontSize: 13,
-    color: '#111111',
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   garmentsList: {
     backgroundColor: 'transparent',
@@ -418,7 +382,7 @@ const styles = StyleSheet.create({
   },
   shopThisLook: {
     marginTop: 16,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderRadius: 8,
     gap: 8,
@@ -442,7 +406,7 @@ const styles = StyleSheet.create({
     // stays operable by touch and by switch input.
     minHeight: 44,
     minWidth: 44,
-    borderRadius: 999,
+    borderRadius: 9999,
     paddingVertical: 12,
     paddingHorizontal: 24,
     alignItems: 'center',
@@ -457,8 +421,8 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   shopThisLookError: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '600',
   },
   skeletonContainer: {
@@ -469,7 +433,6 @@ const styles = StyleSheet.create({
   },
   skeletonNotes: {
     height: 60,
-    backgroundColor: '#E6E6ED',
     borderRadius: 8,
   },
   skeletonBadgeRow: {
@@ -480,12 +443,10 @@ const styles = StyleSheet.create({
   skeletonBadge: {
     width: 80,
     height: 28,
-    backgroundColor: '#E6E6ED',
-    borderRadius: 14,
+    borderRadius: 9999,
   },
   skeletonTile: {
     height: 60,
-    backgroundColor: '#E6E6ED',
     borderRadius: 8,
   },
 })

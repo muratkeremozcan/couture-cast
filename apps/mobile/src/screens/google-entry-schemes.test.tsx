@@ -61,13 +61,13 @@ describe('signup Google entry in both schemes', () => {
         rgb(GOOGLE_BUTTON_THEME[name].text)
       )
 
-      const page = Colors[name].background
+      const page = Colors[name].page
       const rule = screen.getAllByTestId('sign-in-divider-rule')[0]!
       expect(getComputedStyle(rule).backgroundColor).toBe(rgb(SIGN_IN_DIVIDER_LINE[name]))
       expect(contrastRatio(SIGN_IN_DIVIDER_LINE[name], page)).toBeGreaterThanOrEqual(3)
       expect(getComputedStyle(screen.getByText('or')).color).toBe(
-        rgb(Colors[name].mutedText)
+        rgb(Colors[name].inkMuted)
       )
-      expect(contrastRatio(Colors[name].mutedText, page)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(Colors[name].inkMuted, page)).toBeGreaterThanOrEqual(4.5)
     })
 })

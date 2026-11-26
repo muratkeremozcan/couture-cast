@@ -81,6 +81,7 @@ import {
 } from '@/components/hero/garment-item-tile'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { TAB_BODY_INSET, useTokens, withAlpha } from '@/src/theme/tokens'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
@@ -383,6 +384,7 @@ export default function TabOneScreen() {
   const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale = activeHomeLocale(i18n)
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
   const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const statusBar = useStatusBar()
@@ -1046,20 +1048,20 @@ export default function TabOneScreen() {
       <View
         style={[
           styles.errorState,
-          { backgroundColor: palette.surface, borderColor: palette.divider },
+          { backgroundColor: palette.card, borderColor: palette.line },
         ]}
         testID="home-session-unavailable"
       >
-        <Text style={[styles.errorText, { color: palette.text }]}>
+        <Text style={[styles.errorText, { color: palette.ink }]}>
           {getGuestPreviewStrings(i18n.language).chrome.sessionUnavailable}
         </Text>
         <Pressable
-          style={[styles.retryButton, { backgroundColor: palette.text }]}
+          style={[styles.retryButton, { backgroundColor: palette.inverse }]}
           onPress={retrySession}
           accessibilityRole="button"
           testID="home-session-retry"
         >
-          <Text style={[styles.retryText, { color: palette.background }]}>
+          <Text style={[styles.retryText, { color: palette.onInverse }]}>
             {getGuestPreviewStrings(i18n.language).chrome.retry}
           </Text>
         </Pressable>
@@ -1138,7 +1140,7 @@ export default function TabOneScreen() {
     // Side insets only: the native header and the tab bar already cover top and bottom,
     // and a second top inset left an empty band above the chips.
     <SafeAreaView
-      style={[styles.safeContainer, { backgroundColor: palette.background }]}
+      style={[styles.safeContainer, { backgroundColor: palette.page }]}
       edges={['left', 'right']}
     >
       <LiveFontMountMarker scope="home" />
@@ -1146,7 +1148,7 @@ export default function TabOneScreen() {
         ref={scrollViewRef}
         // React Native's typings predate React 19's nullable RefObject.
         innerViewRef={scrollContentRef as RefObject<NativeView>}
-        style={[styles.container, { backgroundColor: palette.background }]}
+        style={[styles.container, { backgroundColor: palette.page }]}
         contentContainerStyle={styles.contentContainer}
         stickyHeaderIndices={[0]}
         testID="hero-experience-scrollview"
@@ -1175,16 +1177,24 @@ export default function TabOneScreen() {
             accessibilityLiveRegion="assertive"
             accessibilityRole="alert"
             focusable
-            style={styles.focusedAlertCard}
+            style={[
+              styles.focusedAlertCard,
+              { backgroundColor: palette.dangerSurface, borderColor: palette.dangerLine },
+            ]}
           >
-            <Text style={styles.focusedAlertBadge}>
-              ⚠️ {focusedWeatherAlert.event.data.severity} weather alert
+            <Text style={[styles.focusedAlertBadge, { color: palette.dangerInk }]}>
+              ⚠️{' '}
+              {t('hero.alert.focused_badge', {
+                severity: t(
+                  `hero.alert.severity.${focusedWeatherAlert.event.data.severity}`
+                ),
+              })}
               {` (#${focusedWeatherAlert.id})`}
             </Text>
-            <Text style={styles.focusedAlertTitle}>
+            <Text style={[styles.focusedAlertTitle, { color: palette.dangerInk }]}>
               {focusedWeatherAlert.event.data.location}
             </Text>
-            <Text style={styles.focusedAlertText}>
+            <Text style={[styles.focusedAlertText, { color: palette.dangerInk }]}>
               {focusedWeatherAlert.event.data.message}
             </Text>
           </NativeView>
@@ -1199,8 +1209,17 @@ export default function TabOneScreen() {
         >
           {/* Stale Cache Banner */}
           {isStale && (
-            <View style={styles.staleBanner} testID="stale-cache-banner">
-              <Text style={styles.staleText}>
+            <View
+              style={[
+                styles.staleBanner,
+                {
+                  backgroundColor: palette.noticeSurface,
+                  borderBottomColor: palette.noticeLine,
+                },
+              ]}
+              testID="stale-cache-banner"
+            >
+              <Text style={[styles.staleText, { color: palette.noticeInk }]}>
                 {t('hero.offline_toast', {
                   defaultValue: 'Using recently cached weather data',
                 })}
@@ -1227,7 +1246,7 @@ export default function TabOneScreen() {
         animationType={swapModalAnimation}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
-        scrim="rgba(0,0,0,0.5)"
+        scrim={scrim}
       >
         <View style={styles.modalOverlay}>
           {(() => {
@@ -1238,7 +1257,7 @@ export default function TabOneScreen() {
                 style={[
                   styles.modalContent,
                   {
-                    backgroundColor: palette.surface,
+                    backgroundColor: palette.page,
                     paddingBottom: 20 + modalInsets.bottom,
                   },
                 ]}
@@ -1253,7 +1272,7 @@ export default function TabOneScreen() {
               >
                 <Text
                   nativeID="garment-swap-title"
-                  style={[styles.modalTitle, { color: palette.text }]}
+                  style={[styles.modalTitle, { color: palette.ink }]}
                   accessibilityRole="header"
                 >
                   {t('hero.garment_swap_title', {
@@ -1280,8 +1299,9 @@ export default function TabOneScreen() {
                         key={option}
                         style={[
                           styles.modalItem,
-                          { borderBottomColor: palette.divider },
-                          isCurrent && styles.modalItemCurrent,
+                          { borderBottomColor: palette.line },
+                          // The current option is marked in ink, never gold (Story CC-7.9 D3).
+                          isCurrent && { backgroundColor: withAlpha(palette.ink, 0.08) },
                         ]}
                         onPress={() => performSwap(option)}
                         testID={`swap-option-${option}`}
@@ -1292,16 +1312,14 @@ export default function TabOneScreen() {
                         <Text
                           style={[
                             styles.modalItemText,
-                            { color: isCurrent ? palette.accentText : palette.text },
+                            { color: palette.ink },
                             isCurrent && styles.modalItemTextCurrent,
                           ]}
                         >
                           {optionTitle}
                         </Text>
                         {isCurrent && (
-                          <Text
-                            style={[styles.modalItemCheck, { color: palette.accentText }]}
-                          >
+                          <Text style={[styles.modalItemCheck, { color: palette.ink }]}>
                             ✓
                           </Text>
                         )}
@@ -1310,12 +1328,12 @@ export default function TabOneScreen() {
                   })}
                 </ScrollView>
                 <Pressable
-                  style={[styles.closeButton, { backgroundColor: palette.text }]}
+                  style={[styles.closeButton, { backgroundColor: palette.inverse }]}
                   onPress={closeSwapModal}
                   accessibilityRole="button"
                   accessibilityLabel={t('common.cancel')}
                 >
-                  <Text style={[styles.closeButtonText, { color: palette.background }]}>
+                  <Text style={[styles.closeButtonText, { color: palette.onInverse }]}>
                     {t('common.cancel', { defaultValue: 'Cancel' })}
                   </Text>
                 </Pressable>
@@ -1347,57 +1365,48 @@ export default function TabOneScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Colors follow the OS scheme at render time; this sheet keeps layout only.
   safeContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   contentContainer: {
     paddingBottom: 24,
   },
   staleBanner: {
-    backgroundColor: '#FFFBEB',
     borderBottomWidth: 1,
-    borderBottomColor: '#FDE68A',
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     alignItems: 'center',
   },
   staleText: {
-    color: '#92400E',
     fontSize: 12,
     fontWeight: '600',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, -apple-system, sans-serif',
-    }),
   },
   errorState: {
     minHeight: 320,
-    marginHorizontal: 20,
-    marginTop: 28,
-    paddingHorizontal: 28,
-    paddingVertical: 36,
+    marginHorizontal: TAB_BODY_INSET,
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     borderWidth: 1,
-    borderRadius: 20,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 17,
+    fontSize: 18,
     fontWeight: '700',
-    lineHeight: 24,
+    lineHeight: 28,
     textAlign: 'center',
   },
   retryButton: {
     minWidth: 120,
     minHeight: 44,
     justifyContent: 'center',
-    borderRadius: 999,
+    borderRadius: 9999,
     paddingVertical: 12,
     paddingHorizontal: 24,
     marginTop: 24,
@@ -1423,28 +1432,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 16,
     textAlign: 'center',
-    fontFamily: Platform.select({
-      ios: 'Playfair Display Bold',
-      android: 'Playfair Display Bold',
-      web: 'Playfair Display, serif',
-    }),
   },
   modalScroll: {
     marginBottom: 16,
   },
   modalItem: {
-    paddingVertical: 14,
+    minHeight: 44,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  modalItemCurrent: {
-    backgroundColor: 'rgba(201, 161, 74, 0.05)',
-  },
   modalItemText: {
-    fontSize: 15,
+    fontSize: 16,
   },
   modalItemTextCurrent: {
     fontWeight: '700',
@@ -1453,7 +1455,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   closeButton: {
-    borderRadius: 999, // Pill corner radius
+    borderRadius: 9999, // Pill corner radius
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1465,18 +1467,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   focusedAlertCard: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#361F1F',
     borderWidth: 2,
-    borderColor: '#C9A14A',
   },
   focusedAlertBadge: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
     marginBottom: 4,
@@ -1484,11 +1483,9 @@ const styles = StyleSheet.create({
   focusedAlertTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#FFFFFF',
     marginBottom: 4,
   },
   focusedAlertText: {
-    fontSize: 13,
-    color: '#E6E6ED',
+    fontSize: 14,
   },
 })

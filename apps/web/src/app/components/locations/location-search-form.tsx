@@ -422,7 +422,7 @@ export function LocationSearchForm({
         void save()
       }}
     >
-      <label htmlFor={inputId} className="text-base font-medium text-white">
+      <label htmlFor={inputId} className="text-base font-medium text-ink">
         {t('locations.searchLabel')}
       </label>
       <div className="relative">
@@ -446,7 +446,7 @@ export function LocationSearchForm({
             setSelected(null)
           }}
           onKeyDown={handleKeyDown}
-          className="w-full rounded-md border border-neutral-600 bg-neutral-900 px-3 text-white"
+          className="w-full rounded-md border border-line-strong bg-page px-3 text-ink"
           data-testid="location-search-input"
         />
         <ul
@@ -454,7 +454,7 @@ export function LocationSearchForm({
           role="listbox"
           aria-label={t('locations.searchLabel')}
           hidden={!isOpen}
-          className="mt-1 max-h-72 overflow-y-auto rounded-md border border-neutral-700 bg-neutral-900"
+          className="mt-1 max-h-72 overflow-y-auto rounded-md border border-line-strong bg-page shadow-overlay"
           data-testid="location-search-results"
         >
           {candidates.map((candidate, index) => (
@@ -465,8 +465,8 @@ export function LocationSearchForm({
               aria-selected={index === activeIndex}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => choose(candidate)}
-              className={`flex min-h-[44px] cursor-pointer items-center px-3 text-sm text-white ${
-                index === activeIndex ? 'bg-neutral-700' : ''
+              className={`flex min-h-11 cursor-pointer items-center px-3 text-sm text-ink ${
+                index === activeIndex ? 'bg-card-muted' : ''
               }`}
               data-testid="location-search-option"
             >
@@ -475,7 +475,7 @@ export function LocationSearchForm({
           ))}
         </ul>
       </div>
-      <p id={hintId} className="text-sm text-neutral-300">
+      <p id={hintId} className="text-sm text-ink-soft">
         {isLocating
           ? t('locations.locating')
           : searchState === 'searching'
@@ -489,7 +489,7 @@ export function LocationSearchForm({
         onClick={() => {
           void locateMe()
         }}
-        className="min-h-[44px] self-start rounded-md border border-[#c9a14a] px-4 text-white disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4 disabled:cursor-not-allowed disabled:opacity-60"
         data-testid="location-use-my-location"
       >
         {t('locations.useMyLocation')}
@@ -497,10 +497,10 @@ export function LocationSearchForm({
 
       {selected && (
         <div className="flex flex-col gap-3" data-testid="location-selected">
-          <p className="text-sm text-neutral-100">
+          <p className="text-sm text-ink">
             {t('locations.selected', { place: selected.displayLabel })}
           </p>
-          <label htmlFor={labelInputId} className="text-base font-medium text-white">
+          <label htmlFor={labelInputId} className="text-base font-medium text-ink">
             {t('locations.labelField')}
           </label>
           <input
@@ -510,13 +510,13 @@ export function LocationSearchForm({
             maxLength={80}
             value={label}
             onChange={(event) => setLabel(event.target.value)}
-            className="rounded-md border border-neutral-600 bg-neutral-900 px-3 text-white"
+            className="rounded-md border border-line-strong bg-page px-3 text-ink"
             data-testid="location-label-input"
           />
           <button
             type="submit"
             aria-busy={isSaving}
-            className="min-h-[44px] self-start rounded-md bg-[#c9a14a] px-4 font-semibold text-neutral-950"
+            className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4 font-semibold"
             data-testid="location-save-button"
           >
             {isSaving ? t('locations.saving') : t('locations.save')}
@@ -526,14 +526,18 @@ export function LocationSearchForm({
 
       {error && (
         <div className="flex flex-col gap-2">
-          <p role="alert" className="text-sm text-red-300" data-testid="location-error">
+          <p
+            role="alert"
+            className="text-sm text-danger-ink"
+            data-testid="location-error"
+          >
             {t(formErrorKey(error))}
           </p>
           {canRetry && (
             <button
               type={selected ? 'submit' : 'button'}
               onClick={selected ? undefined : retry}
-              className="min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-white"
+              className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4"
               data-testid="location-retry-button"
             >
               {t('locations.retry')}

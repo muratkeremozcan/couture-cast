@@ -7,11 +7,12 @@ import {
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
+import { Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 
-import Colors from '@/constants/colors'
+import { renderTabTopBar } from '@/src/components/app-top-bar'
+import { useTokens } from '@/src/theme/tokens'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
 import { TabBarLabel, useTabBarSizing } from '@/components/tab-bar-label'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
@@ -47,8 +48,7 @@ function TabBarIcon(props: {
 
 export default function TabLayout() {
   const navigationIntent = useAndroidNavigationIntent()
-  const colorScheme = useColorScheme()
-  const palette = colorScheme === 'dark' ? Colors.dark : Colors.light
+  const { colors, shell } = useTokens()
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
@@ -84,12 +84,14 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: palette.text,
-        tabBarInactiveTintColor: palette.mutedText,
+        // Story CC-7.9 D3: the active tab is gold (`tabActive`) with its existing label weight
+        // change and underline, so the state never relies on color alone.
+        tabBarActiveTintColor: colors.tabActive,
+        tabBarInactiveTintColor: colors.inkMuted,
         tabBarStyle: {
-          borderTopColor: palette.border,
-          backgroundColor: palette.background,
-          height: 56 + growth + insets.bottom,
+          borderTopColor: colors.line,
+          backgroundColor: colors.page,
+          height: shell.tabBarHeight + growth + insets.bottom,
           paddingBottom: insets.bottom,
         },
         tabBarLabel: ({
@@ -110,6 +112,9 @@ export default function TabLayout() {
             {children}
           </TabBarLabel>
         ),
+        // Story CC-7.9 D6: the one app top bar is every tab's header.
+        header: renderTabTopBar,
+        sceneStyle: { backgroundColor: colors.page },
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -143,8 +148,8 @@ export default function TabLayout() {
                   <FontAwesome
                     name="info-circle"
                     size={25}
-                    color={palette.text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
+                    color={colors.ink}
+                    style={{ marginRight: 16, opacity: pressed ? 0.5 : 1 }}
                   />
                 )}
               </Pressable>
@@ -241,7 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    marginBottom: -3,
+    marginBottom: -4,
   },
   activeIndicator: {
     position: 'absolute',

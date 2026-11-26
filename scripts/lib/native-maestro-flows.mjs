@@ -5,6 +5,14 @@ import path from 'node:path'
 export const NATIVE_MAESTRO_FLOWS = new Set(['share-card-export.yaml'])
 
 /**
+ * Story CC-7.9: pixel snapshot flows. Their baselines are taken on the Android `small_phone`
+ * of the visual shard (pr-mobile-e2e.yml), so a suite run on any other device never discovers
+ * them; they run when named, or through `resolve-maestro-shard.mjs --lane visual`.
+ */
+export const VISUAL_MAESTRO_FLOWS = new Set(['shell-visual-snapshots.yaml'])
+export const isVisualMaestroFlow = (flow) => VISUAL_MAESTRO_FLOWS.has(path.basename(flow))
+
+/**
  * Root flows the generic Maestro runner may run, sorted. `subflows/` and the story
  * folders are fragments reached through `runFlow`, and native-only flows belong to
  * their own harness.
@@ -14,6 +22,7 @@ export const discoverRunnableMaestroFlows = (projectRoot) =>
     .readdirSync(path.join(projectRoot, 'maestro'), { withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
     .filter((entry) => !NATIVE_MAESTRO_FLOWS.has(entry.name))
+    .filter((entry) => !VISUAL_MAESTRO_FLOWS.has(entry.name))
     .map((entry) => `maestro/${entry.name}`)
     .sort()
 

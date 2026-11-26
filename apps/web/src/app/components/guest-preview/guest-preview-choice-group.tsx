@@ -21,21 +21,23 @@ export function GuestPreviewChoiceGroup<T extends string>({
   const id = useId()
   return (
     <fieldset data-testid={testId} className="min-w-0 space-y-2">
-      <legend className="lookbook-metrics mb-2 text-xs uppercase tracking-[0.12em] text-[#5C5C66]">
+      <legend className="mb-2 text-xs uppercase tracking-[0.12em] text-ink-muted">
         {legend}
       </legend>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => {
           const optionId = `${id}-${option.value}`
           const checked = option.value === value
+          // The radio is visually hidden, so its label draws the same ring the global
+          // `*:focus-visible` rule would (Story CC-7.9 D3).
           return (
             <label
               key={option.value}
               htmlFor={optionId}
-              className={`flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#C9A14A] ${
+              className={`flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus-essential has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-focus ${
                 checked
-                  ? 'border-[#111111] bg-[#111111] text-[#FFFFFF]'
-                  : 'border-[#C9C9D1] bg-[#FFFFFF] text-[#111111] hover:border-[#C9A14A]'
+                  ? 'border-inverse bg-inverse text-on-inverse'
+                  : 'border-line-strong bg-page text-ink hover:border-ink'
               }`}
             >
               <input

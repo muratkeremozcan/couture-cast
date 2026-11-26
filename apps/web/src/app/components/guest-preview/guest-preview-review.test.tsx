@@ -24,7 +24,11 @@ const navigation = vi.hoisted(() => {
   const replace = vi.fn()
   return { push, replace, router: { push, replace } }
 })
-vi.mock('next/navigation', () => ({ useRouter: () => navigation.router }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => navigation.router,
+  // Story CC-7.9 D6: the shared top bar reads the path to mark the active tab.
+  usePathname: () => '/preview/continue',
+}))
 
 const member = vi.hoisted(() => ({ id: 'member-a' as string | null, token: 'token-a' }))
 vi.mock('../../../lib/web-session', () => ({

@@ -140,24 +140,34 @@ async function settle(page: Page) {
 }
 
 /**
- * TEA P4: below the sm breakpoint the Wardrobe Hub's two secondary actions share the first row
- * in equal halves and + Add Garment takes the whole second row.
+ * TEA P4: below the sm breakpoint the Wardrobe's two secondary actions share the first row in
+ * equal halves and + Add Garment takes the whole second row. CC-7.9 D6 moved the three actions
+ * out of the top bar into the first row of the body, so the bar stays one 56 px row.
  */
 async function wardrobeHeaderProblems(page: Page): Promise<Problem[]> {
   return page.evaluate(() => {
     const box = (element: Element | null) => element?.getBoundingClientRect()
-    const capsules = box(document.querySelector('[data-testid="wardrobe-capsules-link"]'))
-    const header = document.querySelector('header')
-    const buttons = Array.from(header?.querySelectorAll('button') ?? [])
-    const silhouette = box(
-      buttons.find((button) => !button.textContent?.includes('Add')) ?? null
+    const actions = document.querySelector('[data-testid="wardrobe-actions"]')
+    const capsules = box(
+      actions?.querySelector('[data-testid="wardrobe-capsules-link"]') ?? null
     )
     const add = box(
-      buttons.find((button) => button.textContent?.includes('Add Garment')) ?? null
+      actions?.querySelector('[data-testid="garment-capture-open"]') ?? null
     )
-    if (!capsules || !silhouette || !add) return ['a Wardrobe Hub action is missing']
+    const silhouette = box(
+      Array.from(actions?.querySelectorAll('button') ?? []).find(
+        (button) => button.getAttribute('data-testid') !== 'garment-capture-open'
+      ) ?? null
+    )
+    if (!capsules || !silhouette || !add) return ['a Wardrobe action is missing']
     const near = (a: number, b: number) => Math.abs(a - b) <= 1
     const problems: string[] = []
+    if (
+      document.querySelector(
+        '[data-testid="app-header"] [data-testid="wardrobe-actions"]'
+      )
+    )
+      problems.push('the actions are inside the top bar')
     if (!near(capsules.top, silhouette.top))
       problems.push('the secondaries are not on one row')
     if (!near(capsules.width, silhouette.width))

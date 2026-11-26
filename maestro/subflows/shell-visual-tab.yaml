@@ -1,0 +1,23 @@
+# Story CC-7.9 (TEA): one tab's snapshot for maestro/shell-visual-snapshots.yaml.
+# env: TAB_ID (tab-home ...), TITLE (top bar title), NAME (home ...), SCHEME (light or dark).
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: ${TAB_ID}
+# By id: Android reports the bar's title beside app-top-bar, not under it (CI 3d7af2a2).
+- extendedWaitUntil:
+    visible:
+      id: 'app-top-bar-title'
+      text: ${TITLE}
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: 'screen-placeholder'
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
+# Capture only. scripts/visual-baselines/compare-native.mjs compares all eight screens after the
+# flow, so a missing or changed screen never stops the other captures (Codex P1-1). The captures
+# are the artifacts a baseline is reviewed and committed from (npm run visual:pull-baselines).
+- takeScreenshot:
+    path: maestro/artifacts/shell-visual/${SCHEME}-${NAME}

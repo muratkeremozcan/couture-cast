@@ -14,6 +14,9 @@ paths = [
   '''packages/k6-utils/src/jwt\.ts''',
 ]
 regexes = [
+  # Story CC-7.9: a React Navigation route key ("wardrobe-garment-1") in the native garment
+  # detail test's stack header mock (garment-detail-screen.test.tsx); a route name, no secret.
+  '''^wardrobe-garment-1$''',
   # A fake Supabase secret key shape that share-card-audit-screens.test.mjs (PR 237) places in PNG
   # metadata to prove the public evidence refuses it; it was never a key.
   '''^sb_secret_0123456789$''',

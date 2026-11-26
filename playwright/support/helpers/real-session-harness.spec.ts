@@ -342,10 +342,12 @@ describe('the run fails unless the specs ran (R56)', () => {
   it('R56-RS-01 passes a complete real-session report with no failure, error or skip', () => {
     expect(
       junitOutcome(
-        junit('tests="61" failures="0" skipped="0" errors="0"'),
+        junit(
+          `tests="${EXPECTED_REAL_SESSION_TESTS}" failures="0" skipped="0" errors="0"`
+        ),
         EXPECTED_REAL_SESSION_TESTS
       )
-    ).toEqual({ ok: true, tests: 61 })
+    ).toEqual({ ok: true, tests: EXPECTED_REAL_SESSION_TESTS })
   })
 
   it('R56-RS-02 fails a report with skips even though Playwright exited 0', () => {
@@ -609,8 +611,8 @@ describe('the lane runs the tests of its guardian consent policy', () => {
     ).toBe('required_13_15')
   })
 
-  it('expects sixty-one tests under off and five under required_13_15', () => {
-    expect(expectedRealSessionTests('off')).toBe(61)
+  it('expects sixty-three tests under off and five under required_13_15', () => {
+    expect(expectedRealSessionTests('off')).toBe(63)
     expect(expectedRealSessionTests('required_13_15')).toBe(5)
     expect(EXPECTED_CONSENT_REQUIRED_TESTS).toBe(5)
   })

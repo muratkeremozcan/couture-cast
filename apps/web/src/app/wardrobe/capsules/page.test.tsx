@@ -9,6 +9,10 @@ import WardrobeCapsulesPage from './page'
 import * as wardrobeApi from '../../../lib/wardrobe'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/browser-persistence'
 import type * as WebSession from '../../../lib/web-session'
+import { getI18n } from '../../../i18n'
+
+// Story CC-7.9 D6: the shared top bar reads the route to mark the active desktop tab.
+vi.mock('next/navigation', () => ({ usePathname: () => '/wardrobe/capsules' }))
 
 vi.mock('../../../lib/wardrobe', () => ({
   listCapsulesFromWeb: vi.fn(),
@@ -36,6 +40,10 @@ function publishCapsuleOwner(owner: string) {
 
 beforeEach(() => publishCapsuleOwner(SIGNED_IN_USER))
 afterEach(() => window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY))
+// A test that renders another locale must not leak it into the next one.
+afterEach(async () => {
+  await getI18n().changeLanguage('en-US')
+})
 
 function buildCapsule(overrides: Partial<OutfitCapsuleContract> = {}) {
   return {
@@ -164,6 +172,48 @@ describe('WardrobeCapsulesPage', () => {
       expect(screen.getByText('Summer Basics')).toBeInTheDocument()
     })
     expect(screen.getByTestId('capsule-status-badge-cap-1')).toHaveTextContent('Ready')
+  })
+
+  it('7.9-WEB-CAPSULES-01 sits on the shared shell: one page surface, top bar with back, one card level', async () => {
+    const { container } = render(<WardrobeCapsulesPage />)
+
+    const header = screen.getByTestId('app-header')
+    expect(within(header).getByRole('heading', { level: 1 })).toHaveTextContent(
+      'Outfit capsules'
+    )
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(within(header).getByTestId('app-top-bar-back')).toHaveAttribute(
+      'href',
+      '/wardrobe'
+    )
+    expect(container.querySelectorAll('[data-surface="page"]')).toHaveLength(1)
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
+
+    const card = await screen.findByTestId('capsule-card-cap-1')
+    expect(card).toHaveAttribute('data-surface', 'card')
+    expect(card.querySelector('[data-surface="card"]')).toBeNull()
+    expect(within(card).getByText('2 garments')).toBeInTheDocument()
+    expect(screen.getByTestId('create-capsule-button')).toHaveAttribute(
+      'data-gold',
+      'primary'
+    )
+  })
+
+  it('7.9-WEB-CAPSULES-02 renders the capsules screen from the de-DE catalog', async () => {
+    await getI18n().changeLanguage('de-DE')
+    render(<WardrobeCapsulesPage />)
+
+    expect(
+      within(screen.getByTestId('app-header')).getByRole('heading', { level: 1 })
+    ).toHaveTextContent('Outfit-Kapseln')
+    expect(screen.getByTestId('app-top-bar-back')).toHaveTextContent('Zurück')
+    const card = await screen.findByTestId('capsule-card-cap-1')
+    expect(within(card).getByText('Freizeit')).toBeInTheDocument()
+    expect(within(card).getByText('2 Kleidungsstücke')).toBeInTheDocument()
+    expect(screen.getByTestId('capsule-status-badge-cap-1')).toHaveTextContent('Bereit')
+    expect(within(card).getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument()
+    expect(within(card).getByRole('button', { name: 'Löschen' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Arbeit' })).toBeInTheDocument()
   })
 
   /**

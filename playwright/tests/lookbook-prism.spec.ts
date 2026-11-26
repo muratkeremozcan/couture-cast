@@ -128,12 +128,15 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
       await page.setViewportSize({ width: 1440, height: 900 })
       await openControl.click()
       await expect(plannerRail).toBeVisible()
+      // CC-7.9 D7 (builder decision 2026-11-26): every tab sits on one shared main column,
+      // max-w-6xl (1152 px) like the top bar, so at 1440 the lookbook fills that column less its
+      // 16 px gutters: 1120 px, centred, with the planner rail open beside it.
       await expect
         .poll(async () => {
           const box = await container.boundingBox()
           return box?.width ?? 0
         })
-        .toBeGreaterThanOrEqual(1300)
+        .toBe(1120)
       await expect.poll(() => evenColumns(1440)).toBe(true)
 
       await expect(page.getByRole('button', { name: /comparison mode/i })).toBeHidden()

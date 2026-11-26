@@ -42,7 +42,7 @@ export function WardrobeSilhouetteScreen() {
       ) : accessToken ? (
         <SilhouetteEditor />
       ) : (
-        <Text accessibilityRole="alert">Sign in to edit your silhouette.</Text>
+        <Text accessibilityRole="alert">{t('wardrobe.silhouette.sign_in_required')}</Text>
       )}
     </View>
   )

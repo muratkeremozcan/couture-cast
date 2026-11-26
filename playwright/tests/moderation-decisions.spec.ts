@@ -911,7 +911,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       }
       await link.click()
       await expect(
-        page.getByRole('heading', { level: 1, name: 'Post case' })
+        page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
       ).toBeVisible()
 
       // A published target with open reports offers exactly these, and the panel starts idle.
@@ -989,7 +989,13 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       })
 
       // The case left the open queue. The list is left out at zero items, so an empty queue also answers.
-      await page.getByRole('link', { name: 'Back to queue' }).click()
+      // CC-7.9 D6: Back is the shared top bar control
+      // A link named Back (Codex replaced-assertions check).
+      const back = page
+        .getByTestId('app-header')
+        .getByRole('link', { name: 'Back', exact: true })
+      await expect(back).toHaveAccessibleName('Back')
+      await back.click()
       await expect(page).toHaveURL(/\/moderation$/)
       await expect(list.or(page.getByText('No open cases.'))).toBeVisible()
       await expect(link).toHaveCount(0)

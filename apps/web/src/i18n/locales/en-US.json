@@ -114,7 +114,8 @@
           "opened": "Outfit planner opened.",
           "ready": "Your 7-day plan is ready.",
           "dayFailed": "{{day}} could not be generated."
-        }
+        },
+        "railLabel": "Planner Rail"
       },
       "theme": {
         "sectionTitle": "Interface palettes",
@@ -352,7 +353,53 @@
         "evening": "Evening",
         "outdoor": "Outdoor",
         "home": "Home"
-      }
+      },
+      "signIn": "Sign in to manage capsules.",
+      "subtitle": "Curate and manage your custom outfit combinations.",
+      "filterOccasionLabel": "Filter by occasion",
+      "loading": "Loading outfit capsules…",
+      "favoriteCapsule": "Favorite capsule {{name}}",
+      "garmentCount_one": "{{count}} garment",
+      "garmentCount_other": "{{count}} garments",
+      "status": {
+        "ready": "Ready",
+        "needsRepair": "Needs repair"
+      },
+      "editAction": "Edit",
+      "deleteAction": "Delete",
+      "truncation": "Showing {{shown}} of {{total}}. Refine your search to see the rest.",
+      "cancelDeletion": "Cancel deletion",
+      "cancel": "Cancel",
+      "builderDescription": "Build a cohesive outfit capsule from your wardrobe.",
+      "repairRemoved_one": "{{count}} garment is no longer available and has been removed. Choose a replacement before saving.",
+      "repairRemoved_other": "{{count}} garments are no longer available and have been removed. Choose replacements before saving.",
+      "reloadLatest": "Reload the latest version",
+      "garmentFallback": "Garment {{position}}",
+      "garmentNoun": "garment",
+      "untagged": "Garment",
+      "garmentLabel": "{{category}} (position {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (position {{position}})",
+      "category": {
+        "top": "top",
+        "bottom": "bottom",
+        "outerwear": "outerwear",
+        "dress": "dress",
+        "shoes": "shoes",
+        "accessory": "accessory"
+      },
+      "comfort": {
+        "cold": "cold",
+        "cool": "cool",
+        "mild": "mild",
+        "warm": "warm",
+        "hot": "hot"
+      },
+      "garmentAtPosition": "{{garment}} (position {{position}})",
+      "garmentNumber": "Garment {{position}}",
+      "closeBuilder": "Close capsule builder",
+      "favoriteMarked": "Favorite Capsule",
+      "markFavorite": "Mark as Favorite",
+      "saving": "Saving..."
     },
     "onboarding": {
       "title": "Set up your closet",
@@ -492,6 +539,103 @@
       "deleteUndone": "Undone",
       "deleteFailed": "Could not delete this piece.",
       "deleteUsageFailed": "Could not check where this piece is used. Try again."
+    },
+    "hub": {
+      "loading": "Loading your wardrobe...",
+      "emptyTitle": "No garments added yet",
+      "emptyBody": "Snap a photo of your favorite jacket, top, or dress to get started.",
+      "emptyAction": "Snap or Import Garment",
+      "accountFailed": "Unable to load your account, so Silhouette settings are unavailable right now. Reload the page to try again.",
+      "accountFailedShort": "Unable to load your account. Reload the page to try again.",
+      "setupFailed": "Unable to check your closet setup progress.",
+      "addGarment": "+ Add Garment",
+      "closetTitle": "Your Digital Closet",
+      "closetBody": "Photograph or upload clothing items to power personalized weather guidance.",
+      "needsTags": "Needs tags",
+      "taggingSlow": "Smart tagging is taking longer than expected. The garment will remain visible while processing continues.",
+      "statusRefreshFailed": "Unable to refresh garment status.",
+      "refreshFailed": "Unable to refresh your wardrobe.",
+      "silhouetteSaving": "Saving changes. Please wait.",
+      "status": {
+        "pending_upload": "Uploading",
+        "bytes_uploaded": "Uploaded",
+        "processing": "Processing",
+        "awaiting_tags": "Awaiting tags",
+        "ready": "Ready",
+        "failed": "Failed",
+        "unknown": "In progress"
+      },
+      "detailTitle": "Piece details"
+    },
+    "tagEditor": {
+      "title": "Organize Garment Tags",
+      "suggestedDescription": "Review or customize AI suggestions to personalize your daily outfit recommendations.",
+      "savingAnnouncement": "Saving garment tags",
+      "retrySuggestions": "Retry smart suggestions",
+      "categoryLegend": "Garment Category",
+      "materialLegend": "Fabric Material",
+      "optional": "(Optional)",
+      "comfortLegend": "Target Comfort Range",
+      "suggestedConfident": "(AI suggested: {{value}})",
+      "suggestedReview": "(Needs review suggested: {{value}})",
+      "materialClear": "Not sure / Clear",
+      "cancel": "Cancel",
+      "save": "Confirm & Save Tags",
+      "saving": "Saving...",
+      "errors": {
+        "suggestionUnavailable": "Suggestion unavailable",
+        "analysisPending": "Garment analysis is still pending. Please retry shortly.",
+        "inferenceUnavailable": "Smart suggestion inference is unavailable. Please select tags manually.",
+        "suggestionsFailed": "Unable to load smart suggestions.",
+        "selectionRequired": "Please select a category and comfort range before saving.",
+        "saveFailed": "Failed to save tags. Please try again."
+      },
+      "category": {
+        "top": "Top",
+        "bottom": "Bottom",
+        "outerwear": "Outerwear",
+        "dress": "Dress",
+        "shoes": "Shoes",
+        "accessory": "Accessory"
+      },
+      "material": {
+        "cotton": "Cotton",
+        "wool": "Wool",
+        "linen": "Linen",
+        "leather": "Leather",
+        "denim": "Denim",
+        "fleece": "Fleece",
+        "synthetic": "Synthetic",
+        "down": "Down",
+        "silk": "Silk"
+      },
+      "comfort": {
+        "cold": {
+          "label": "Cold (< 10°C / 50°F)",
+          "desc": "Heavy warmth & layering",
+          "name": "Cold"
+        },
+        "cool": {
+          "label": "Cool (10-16°C / 50-60°F)",
+          "desc": "Outerwear or light sweater",
+          "name": "Cool"
+        },
+        "mild": {
+          "label": "Mild (16-22°C / 60-72°F)",
+          "desc": "Comfortable light layer",
+          "name": "Mild"
+        },
+        "warm": {
+          "label": "Warm (22-28°C / 72-82°F)",
+          "desc": "Standard summer top/bottom",
+          "name": "Warm"
+        },
+        "hot": {
+          "label": "Hot (> 28°C / 82°F)",
+          "desc": "Breathable, hot weather",
+          "name": "Hot"
+        }
+      }
     }
   },
   "community": {
@@ -887,6 +1031,85 @@
       "cta": "See it in the City Spotlight"
     }
   },
+  "landing": {
+    "tagline": "Weather-aware wardrobe plans for every commute",
+    "hero": {
+      "eyebrow": "Daily ritual",
+      "headline": "Plan confident outfits in under 90 seconds.",
+      "body": "CoutureCast blends hyperlocal weather, your wardrobe archive, and community insight to recommend looks that respect the commute, the meeting, and the vibe."
+    },
+    "lookbook": {
+      "eyebrow": "Lookbook Prism",
+      "title": "Weather-Aware Wardrobe & Community",
+      "heroLabel": "Hero Ritual Canvas",
+      "communityLabel": "Community Section",
+      "alert": {
+        "label": "Severe Weather Alert Details",
+        "severity": "{{severity}} weather alert",
+        "advisory": "{{type}} advisory",
+        "adjustOutfit": "Adjust outfit"
+      },
+      "demo": {
+        "heading": "Daily Hero Ritual",
+        "timeCity": "08:30 AM • NYC",
+        "temperature": "18°C",
+        "humidity": "Mild Humidity • 65%",
+        "change": "+3°C from yesterday commute",
+        "primaryLook": "Primary Recommended Look",
+        "matchScore": "Match Score: {{score}}",
+        "garments": {
+          "blazer": "Onyx Blazer",
+          "scarf": "Merlot Silk Scarf",
+          "loafers": "Leather Loafers"
+        },
+        "lookA": {
+          "label": "LOOK A (Primary)",
+          "title": "Blazer & Silk Knit",
+          "body": "Warmth level tuned for brisk morning wind."
+        },
+        "lookB": {
+          "label": "LOOK B (Alternative)",
+          "title": "Trench & Merino Cardigan",
+          "body": "Higher wind protection with water-resistant shell."
+        }
+      },
+      "recommendations": {
+        "personal": {
+          "eyebrow": "Commute Ready",
+          "title": "Double-Breasted Blazer & Silk Knit",
+          "description": "Optimized for 18°C morning train commute transitioning into air-conditioned office."
+        },
+        "community": {
+          "eyebrow": "Community Trending",
+          "title": "Parisian Silk & Cashmere Blend",
+          "description": "Community favorites pair light cashmere with a pleated midi skirt for the breezy forecast."
+        },
+        "brands": {
+          "eyebrow": "Brand Picks",
+          "title": "Couture House Archive Ensemble",
+          "description": "Brand-forward pairings built around recycled wool and signature gold details."
+        }
+      }
+    },
+    "chips": {
+      "navLabel": "Filter recommendations by category",
+      "groupLabel": "Category filters",
+      "personal": "Personal",
+      "community": "Community",
+      "sponsored": "Sponsored",
+      "showing": "Showing {{category}} recommendations"
+    },
+    "layoutControls": {
+      "label": "Layout Controls",
+      "comparison": "Comparison Mode",
+      "mobilePreview": "Mobile Preview"
+    },
+    "actions": {
+      "previewOutfits": "Preview outfits",
+      "seePlanner": "See the planner",
+      "startUpload": "Start wardrobe upload"
+    }
+  },
   "shareCard": {
     "launcher": "Create my outfit card",
     "sourceOutfit": "Outfit",
@@ -1141,7 +1364,8 @@
       "firstDecision": "First decision {{when}}",
       "escalated": "This case is waiting for an admin. Only an admin can close it.",
       "reporterScreening": "Automated screening",
-      "reasonRemoved": "Reason removed by erasure"
+      "reasonRemoved": "Reason removed by erasure",
+      "screenTitle": "Case review"
     },
     "action": {
       "flagged": "Flagged by screening",
@@ -1318,6 +1542,7 @@
   },
   "nav": {
     "label": "Bottom navigation",
+    "primaryLabel": "Main navigation",
     "home": "Home",
     "wardrobe": "Wardrobe",
     "community": "Community",
@@ -1368,5 +1593,72 @@
     "close": "Close",
     "showList": "Show saved looks",
     "hideList": "Hide saved looks"
+  },
+  "shell": {
+    "back": "Back",
+    "goHome": "Go home",
+    "notFound": {
+      "title": "Page not found",
+      "body": "The page you were looking for doesn't exist. Head back to the home screen to continue."
+    },
+    "error": {
+      "title": "Something went wrong",
+      "retry": "Retry"
+    },
+    "dismissBanner": "Dismiss banner",
+    "skipToContent": "Skip to main content",
+    "close": "Close modal",
+    "legal": {
+      "label": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service"
+    }
+  },
+  "guardian": {
+    "accept": {
+      "title": "Guardian consent",
+      "heading": "Accept teen wardrobe access",
+      "intro": "Confirm this invitation to link the guardian account and unlock the teen wardrobe journey.",
+      "tokenMissing": "Invitation token is missing from this link.",
+      "success": "Consent recorded for {{teenEmail}}. Guardian account {{guardianEmail}} is now linked.",
+      "failed": "Unable to accept guardian invitation",
+      "accepting": "Accepting…",
+      "accept": "Accept invitation"
+    },
+    "dashboard": {
+      "title": "Guardian dashboard",
+      "intro": "Review linked teen accounts and revoke consent when access should stop.",
+      "loading": "Loading linked teens...",
+      "loadFailed": "Unable to load dashboard",
+      "revokeFailed": "Unable to revoke consent",
+      "revoked": "Consent revoked for {{teenId}}. Teen session invalidated: {{invalidated}}.",
+      "yes": "yes",
+      "no": "no",
+      "linkedTeens": "Linked teens",
+      "revokeLabel": "Revoke consent for {{teenId}}",
+      "revoking": "Revoking...",
+      "revoke": "Revoke",
+      "empty": "No linked teen accounts yet."
+    },
+    "consent": {
+      "awaiting": "Awaiting consent",
+      "status": {
+        "granted": "granted",
+        "pending": "pending",
+        "revoked": "revoked"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Teen dashboard",
+      "loading": "Loading guardian consent status...",
+      "loadFailed": "Unable to load dashboard",
+      "granted": "Guardian consent granted",
+      "revoked": "Guardian consent revoked",
+      "pending": "Guardian consent pending",
+      "linkedGuardians": "Linked guardians",
+      "empty": "No guardian has accepted consent yet."
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import i18n, { initI18n } from '@/src/lib/i18n'
 import type {
   GuardianConsentRevokeResponse,
   UserProfileResponse,
@@ -28,6 +29,16 @@ function guardianProfile(overrides: Partial<UserProfileResponse> = {}) {
 }
 
 describe('GuardianDashboardScreen', () => {
+  // Story CC-7.9 D9: the screen's copy comes from the locale catalog.
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en-US')
+  })
+
   it('shows linked teens and lets a guardian revoke consent', async () => {
     const profile: UserProfileResponse = {
       user: {

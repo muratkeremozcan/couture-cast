@@ -361,7 +361,7 @@ export function MemberSampleOutfit({
 
   return (
     <View testID="member-sample-outfit" style={styles.sample}>
-      <Text style={{ color: palette.mutedText }}>{strings.chrome.sampleLabel}</Text>
+      <Text style={{ color: palette.inkMuted }}>{strings.chrome.sampleLabel}</Text>
       <PreviewOutfit
         result={result}
         strings={strings}
@@ -383,7 +383,7 @@ export function MemberSampleOutfit({
             )}
             {error === 'generic' && (
               <View testID="hero-error-state">
-                <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
+                <Text accessibilityLiveRegion="polite" style={{ color: palette.ink }}>
                   {strings.firstUse.outfitFailed}
                 </Text>
                 <PreviewButton

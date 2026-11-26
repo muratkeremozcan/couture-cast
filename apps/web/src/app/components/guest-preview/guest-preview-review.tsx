@@ -13,6 +13,8 @@ import {
   type SampleComfort,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
+import { AppPage, APP_MAIN_BASE_CLASS } from '../app-page'
+import { AppTopBar } from '../app-top-bar'
 import {
   isConsentRejection,
   resolveWebNextStep,
@@ -47,15 +49,16 @@ function ComfortColumn({
   return (
     <div
       data-testid={testId}
-      className="space-y-2 rounded-[8px] border border-[#E6E6ED] p-4"
+      data-surface="card"
+      className="space-y-2 rounded-xl border border-line bg-card p-4"
     >
-      <h2 className="text-sm font-semibold text-[#111111]">{heading}</h2>
+      <h2 className="text-sm font-semibold text-ink">{heading}</h2>
       <dl className="space-y-1 text-sm">
-        <dt className="text-[#5C5C66]">{strings.preferences.thermal}</dt>
+        <dt className="text-ink-muted">{strings.preferences.thermal}</dt>
         <dd>{v.runsColdWarm[values.runsColdWarm]}</dd>
-        <dt className="text-[#5C5C66]">{strings.preferences.wind}</dt>
+        <dt className="text-ink-muted">{strings.preferences.wind}</dt>
         <dd>{v.windTolerance[values.windTolerance]}</dd>
-        <dt className="text-[#5C5C66]">{strings.preferences.rain}</dt>
+        <dt className="text-ink-muted">{strings.preferences.rain}</dt>
         <dd>{v.precipPreparedness[values.precipPreparedness]}</dd>
       </dl>
     </div>
@@ -213,16 +216,16 @@ export function GuestPreviewReview() {
   }
 
   return (
-    <div className="lookbook-body min-h-screen bg-[#FAFAFB] text-[#111111]">
+    // Story CC-7.9 D6, D7: the shared top bar carries the review question as the screen's only
+    // h1; back returns Home, where a declined review leaves the member.
+    <AppPage>
+      <AppTopBar title={strings.review.heading} backHref="/" />
       <main
         id="main-content"
         tabIndex={-1}
         data-testid="guest-preview-review"
-        className="mx-auto max-w-2xl space-y-6 px-4 py-10 outline-none sm:px-6"
+        className={`${APP_MAIN_BASE_CLASS} max-w-2xl gap-6`}
       >
-        <h1 className="lookbook-display text-3xl font-semibold">
-          {strings.review.heading}
-        </h1>
         {status.kind === 'loading' ? (
           <p role="status">{strings.chrome.checkingSession}</p>
         ) : null}
@@ -235,7 +238,7 @@ export function GuestPreviewReview() {
                 setStatus({ kind: 'loading' })
                 setLoadAttempt((attempt) => attempt + 1)
               }}
-              className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+              className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
             >
               {strings.chrome.retry}
             </button>
@@ -271,7 +274,7 @@ export function GuestPreviewReview() {
                 aria-busy={status.kind === 'saving'}
                 onClick={() => void applyProposal(status.account, status.proposal)}
                 data-testid="guest-preview-review-use"
-                className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF] disabled:opacity-60"
+                className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse disabled:opacity-60"
               >
                 {status.kind === 'saving' ? strings.review.saving : strings.review.use}
               </button>
@@ -280,7 +283,7 @@ export function GuestPreviewReview() {
                 disabled={status.kind === 'saving'}
                 onClick={keepAccount}
                 data-testid="guest-preview-review-keep"
-                className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold disabled:opacity-60"
+                className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink disabled:opacity-60"
               >
                 {strings.review.keep}
               </button>
@@ -302,13 +305,13 @@ export function GuestPreviewReview() {
               type="button"
               onClick={() => void continueToNextStep()}
               data-testid="guest-preview-review-continue"
-              className="min-h-11 rounded-lg bg-[#111111] px-4 text-sm font-semibold text-[#FFFFFF]"
+              className="min-h-11 rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse"
             >
               {strings.review.continue}
             </button>
           </div>
         ) : null}
       </main>
-    </div>
+    </AppPage>
   )
 }

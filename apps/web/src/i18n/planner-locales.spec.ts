@@ -131,6 +131,8 @@ describe('5.5 planner locale parity (web)', () => {
         'garmentCategory.top',
         'loading',
         'openControl',
+        // Story CC-7.9 D9: the rail's landmark name, from the catalog.
+        'railLabel',
         'reshuffle.action',
         'reshuffle.conflict',
         'reshuffle.error',

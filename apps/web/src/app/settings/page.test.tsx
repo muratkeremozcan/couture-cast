@@ -16,7 +16,7 @@
 // on 61d7156e: 7.7-CMP-036 the gate never waits on the account read (PS-2), 7.7-CMP-037 no Sign
 // in hint is ever in a member's document (PS-1, PL-1 to PL-3). CodeRabbit round 2 on PR 292:
 // 7.7-CMP-046 a preference read overlapping a save never lands (#4), 7.7-CMP-047 a theme read
-// overlapping a save never lands and never leaves the gallery loading (#8, r3), 7.7-CMP-048 the account header keeps its footprint (#9).
+// overlapping a save never lands and never leaves the gallery loading (#8, r3), 7.7-CMP-048 the account header keeps its footprint after a failed read (#9).
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
 // shape, the bearer header, and the contract parsing are all exercised by the
@@ -244,7 +244,10 @@ describe('Web settings page', () => {
     const landmarks = document.querySelectorAll('main#main-content')
     expect(landmarks).toHaveLength(1)
     expect(landmarks[0]).toHaveAttribute('tabindex', '-1')
-    expect(landmarks[0]).toHaveAttribute('data-focus-surface', 'dark')
+    // Story CC-7.9 D3, D7: the page surface replaced the always-dark page and its
+    // `data-focus-surface="dark"` switch; the focus ring tokens follow the scheme instead.
+    expect(landmarks[0]?.closest('[data-surface="page"]')).not.toBeNull()
+    expect(document.querySelector('[data-focus-surface]')).toBeNull()
     expect(screen.getByTestId('sticky-bottom-nav')).toBeInTheDocument()
   })
 
@@ -952,6 +955,79 @@ describe('7.7 Profile without flashes', () => {
     expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
   })
 
+  it('7.9-CMP-SNAP-001 an email-only account that answered behind the closed gate takes only its line', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    const preferences = deferred<void>()
+    useMswHandlers(
+      // The shopping read holds the gate closed until the account has answered.
+      http.get(PREFERENCES_PATH, async () => {
+        await preferences.promise
+        return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
+      }),
+      profileHandler({ displayName: null, email: 'jade@example.test' }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+    render(<SettingsPage />)
+
+    const account = await screen.findByTestId('profile-account')
+    expect(screen.getByTestId('screen-gate')).not.toHaveAttribute('data-ready')
+    await act(async () => {
+      preferences.resolve()
+      await preferences.promise
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    // CI snapshot on 3d7af2a2: the held name line left 28 px of blank page under the email.
+    expect(account).not.toHaveClass('min-h-12')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      /^jade@example\.test$/
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+  })
+
+  it('7.9-CMP-SNAP-002 an email-only account that lands after the reveal keeps the two lines it held', async () => {
+    signIn()
+    document.documentElement.setAttribute('data-session', 'member')
+    const account = deferred<void>()
+    useMswHandlers(
+      http.get(PROFILE_PATH, async () => {
+        await account.promise
+        return HttpResponse.json({
+          user: {
+            id: 'member-1',
+            birthdate: null,
+            role: 'guardian',
+            displayName: null,
+            email: 'jade@example.test',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      }),
+      ...memberProfileReads({ theme: null, isEntitled: false })
+    )
+    render(<SettingsPage />)
+    await waitFor(() =>
+      expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+    )
+    expect(screen.getByTestId('profile-account-reserved')).toHaveClass('min-h-12')
+
+    await act(async () => {
+      account.resolve()
+      await account.promise
+    })
+    // The sections below were already on screen, so the header never shrinks under them.
+    expect(await screen.findByTestId('profile-account')).toHaveClass('min-h-12')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      /^jade@example\.test$/
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+  })
+
   it('7.7-CMP-046 a preference read sent while a save is out never replaces the saved value, and a read sent after the save does (CodeRabbit r2 #4)', async () => {
     signIn()
     document.documentElement.setAttribute('data-session', 'member')
@@ -1090,53 +1166,31 @@ describe('7.7 Profile without flashes', () => {
     expect(reads).toBe(3)
   })
 
-  it('7.7-CMP-048 the account header keeps its two lines after its read settles: when the read fails, and for an account without a display name (CodeRabbit r2 #9)', async () => {
+  it('7.7-CMP-048 the account header keeps its two lines after its read fails (CodeRabbit r2 #9)', async () => {
     signIn()
     document.documentElement.setAttribute('data-session', 'member')
-    let fails = true
     let profileReads = 0
     useMswHandlers(
       http.get(PROFILE_PATH, () => {
         profileReads += 1
-        if (fails)
-          return HttpResponse.json(
-            { statusCode: 500, message: 'Unavailable', error: 'Internal Server Error' },
-            { status: 500 }
-          )
-        return HttpResponse.json({
-          user: {
-            id: 'member-1',
-            birthdate: null,
-            role: 'guardian',
-            displayName: null,
-            email: 'jade@example.test',
-          },
-          linkedGuardians: [],
-          linkedTeens: [],
-        })
+        return HttpResponse.json(
+          { statusCode: 500, message: 'Unavailable', error: 'Internal Server Error' },
+          { status: 500 }
+        )
       }),
       ...memberProfileReads({ theme: null, isEntitled: false })
     )
 
     // The read fails: the header's two lines stay held above the sections.
-    const failed = render(<SettingsPage />)
+    render(<SettingsPage />)
     await waitFor(() => expect(profileReads).toBe(1))
     await settle()
     const reserved = screen.getByTestId('profile-account-reserved')
     expect(reserved).toHaveAttribute('aria-hidden', 'true')
     expect(reserved).toHaveClass('min-h-12')
-    failed.unmount()
-    screenSnapshot.clear()
-
-    // The read answers an account with no display name: the email line keeps the same footprint.
-    fails = false
-    render(<SettingsPage />)
-    expect(await screen.findByTestId('profile-account-email')).toHaveTextContent(
-      'jade@example.test'
-    )
-    expect(screen.queryByTestId('profile-account-name')).toBeNull()
-    expect(screen.getByTestId('profile-account')).toHaveClass('min-h-12')
-    expect(screen.queryByTestId('profile-account-reserved')).toBeNull()
+    // An account with no display name keeps the footprint only once its reserved lines were on
+    // screen (7.9-CMP-SNAP-002); one that answered behind the closed gate takes only its email
+    // line (7.9-CMP-SNAP-001).
   })
 
   const SIGN_IN_HINTS = [

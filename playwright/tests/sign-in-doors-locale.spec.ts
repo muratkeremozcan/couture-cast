@@ -16,9 +16,16 @@ test.describe('the sign-in doors in a French browser', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr-FR')
     await expect(page.getByTestId('google-sign-in')).toHaveText('Continuer avec Google')
     await expect(page.getByRole('separator')).toHaveAttribute('aria-label', 'ou')
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-      "Commencez par la vérification de l'âge avant d'accéder à la garde-robe."
-    )
+    // CC-7.9 D6: the top bar owns the page's one h1; the page's own heading is an h2.
+    await expect(
+      page.getByTestId('app-header').getByRole('heading', { level: 1 })
+    ).toHaveText('Créer le compte')
+    await expect(
+      page.getByRole('heading', {
+        level: 2,
+        name: "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
+      })
+    ).toBeVisible()
     await expect(page.getByLabel('Adresse e-mail')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Créer le compte' })).toBeVisible()
   })

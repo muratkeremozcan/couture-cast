@@ -2,15 +2,17 @@
 'use client'
 
 import React from 'react'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 
 export function SkipToContent(): React.JSX.Element {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   return (
     <a
       href="#main-content"
-      data-focus-surface="light"
-      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-[#C9A14A] focus:px-4 focus:py-2 focus:font-semibold focus:text-[#000000] focus:shadow-lg"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-inverse focus:px-4 focus:py-2 focus:font-semibold focus:text-on-inverse focus:shadow-overlay"
     >
-      Skip to main content
+      {t('shell.skipToContent')}
     </a>
   )
 }

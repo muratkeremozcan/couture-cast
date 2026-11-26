@@ -40,10 +40,19 @@ appId: ${MAESTRO_APP_ID}
             notVisible:
               id: 'tab-settings'
           commands:
-            - tapOn:
-                id: 'BackButton'
-                optional: true
-                label: 'Leave a pushed route so the tab bar is reachable'
+            # CC-7.9 D6: Back is the shared top bar control. Every root stack
+            # screen renders `app-top-bar-back` on both platforms in place of
+            # the native header, so the tap is guarded on it being visible.
+            - runFlow:
+                when:
+                  visible:
+                    id: 'app-top-bar-back'
+                commands:
+                  - tapOn:
+                      id: 'app-top-bar-back'
+                      label: 'Leave a pushed route so the tab bar is reachable'
+                  - waitForAnimationToEnd
+            # Before CC-7.9 the header back was the native iOS `BackButton`.
             # `BackButton` is an iOS identity and does not exist on Android, so
             # the optional tap above is a silent no-op there and the pushed
             # route stays on top. Confirmed from a failure hierarchy: the
@@ -59,11 +68,23 @@ appId: ${MAESTRO_APP_ID}
             # implementation is an empty method, so on iOS it would be a no-op
             # that still reported COMPLETED.
             # https://docs.maestro.dev/reference/commands-available/back
+            #
+            # CC-7.9 D6: Back is the shared top bar control, so system back now
+            # only stands in for a screen without a top bar Back, and only while
+            # the tab bar is still covered. After the top bar tap it would pop
+            # the tab root and send Expo Go's task to the background.
             - runFlow:
                 when:
                   platform: Android
+                  notVisible:
+                    id: 'tab-settings'
                 commands:
-                  - back
+                  - runFlow:
+                      when:
+                        notVisible:
+                          id: 'app-top-bar-back'
+                      commands:
+                        - back
       - tapOn:
           id: 'tab-settings'
           retryTapIfNoChange: true

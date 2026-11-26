@@ -38,21 +38,15 @@ import {
 } from '@/src/lib/community'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useTokens } from '@/src/theme/tokens'
 import { useGlyphBox } from '@/components/glyph-box'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useComposeFieldReveal } from './compose-field-reveal'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 
-/**
- * `hero-theme.ts` carries neither the premium gold accent nor the community
- * surface's merlot destructive colour, and this task may not extend it, so both
- * are derived here once and reported as a palette gap. Merlot is a fill with
- * white ink (10.2:1); as text on a dark ground it computes to 2.1:1 and fails.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
-const DESTRUCTIVE_MERLOT = '#7A1F2D'
-const ON_DESTRUCTIVE = '#FFFFFF'
+// Story CC-7.9 D2, D3: every color is a role. The main action is `primary` (gold), a checked
+// box is `inverse` with `onInverse`, and an error is the danger panel (`dangerSurface`,
+// `dangerLine`, `dangerInk`), which meets 4.5:1 in both schemes.
 
 /**
  * The reason travels and the words do not: every message the community client can
@@ -158,17 +152,17 @@ function ComposeCheckboxRow({
           styles.checkbox,
           checkboxBox,
           {
-            borderColor: checked ? palette.text : palette.mutedText,
-            backgroundColor: checked ? ACCENT_GOLD : 'transparent',
+            borderColor: checked ? palette.ink : palette.inkMuted,
+            backgroundColor: checked ? palette.inverse : 'transparent',
           },
         ]}
       >
         {/* Shape, not colour: the check mark is what says confirmed. */}
         {checked ? (
-          <Text style={[styles.checkboxMark, { color: ON_ACCENT }]}>✓</Text>
+          <Text style={[styles.checkboxMark, { color: palette.onInverse }]}>✓</Text>
         ) : null}
       </View>
-      <Text style={[styles.confirmationText, { color: palette.text }]}>{label}</Text>
+      <Text style={[styles.confirmationText, { color: palette.ink }]}>{label}</Text>
     </TouchableOpacity>
   )
 }
@@ -180,14 +174,18 @@ interface ComposeErrorPanelProps {
 }
 
 function ComposeErrorPanel({ testID, message, isAlert = false }: ComposeErrorPanelProps) {
+  const palette = useHeroPalette()
   return (
     <View
       testID={testID}
       accessibilityRole={isAlert ? 'alert' : undefined}
       accessibilityLiveRegion={isAlert ? 'assertive' : 'none'}
-      style={[styles.errorPanel, { backgroundColor: DESTRUCTIVE_MERLOT }]}
+      style={[
+        styles.errorPanel,
+        { backgroundColor: palette.dangerSurface, borderColor: palette.dangerLine },
+      ]}
     >
-      <Text style={[styles.errorText, { color: ON_DESTRUCTIVE }]}>{message}</Text>
+      <Text style={[styles.errorText, { color: palette.dangerInk }]}>{message}</Text>
     </View>
   )
 }
@@ -211,17 +209,17 @@ function ComposePhotoSection({
 
   return (
     <View style={styles.section} onLayout={onLayout}>
-      <Text style={[styles.sectionLabel, { color: palette.text }]}>
+      <Text style={[styles.sectionLabel, { color: palette.ink }]}>
         {t('community.compose.photoLabel')}
       </Text>
-      <Text style={[styles.helperText, { color: palette.mutedText }]}>
+      <Text style={[styles.helperText, { color: palette.inkMuted }]}>
         {t('community.compose.photoHint')}
       </Text>
       {asset ? (
         <View style={styles.previewContainer}>
           <Image
             source={{ uri: asset.uri }}
-            style={[styles.previewImage, { backgroundColor: palette.skeleton }]}
+            style={[styles.previewImage, { backgroundColor: palette.cardMuted }]}
             testID="community-post-preview-image"
             accessible
             accessibilityRole="image"
@@ -229,14 +227,14 @@ function ComposePhotoSection({
           />
           <TouchableOpacity
             testID="community-change-image-button"
-            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
             onPress={onPick}
             disabled={isBusy}
             accessibilityRole="button"
             accessibilityState={{ disabled: isBusy }}
             accessibilityLabel={t('community.compose.changePhoto')}
           >
-            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
               {t('community.compose.changePhoto')}
             </Text>
           </TouchableOpacity>
@@ -244,14 +242,14 @@ function ComposePhotoSection({
       ) : (
         <TouchableOpacity
           testID="community-pick-image-button"
-          style={[styles.pickImageButton, { borderColor: palette.mutedText }]}
+          style={[styles.pickImageButton, { borderColor: palette.inkMuted }]}
           onPress={onPick}
           disabled={isBusy}
           accessibilityRole="button"
           accessibilityState={{ disabled: isBusy }}
           accessibilityLabel={t('community.compose.choosePhoto')}
         >
-          <Text style={[styles.pickImageButtonText, { color: palette.text }]}>
+          <Text style={[styles.pickImageButtonText, { color: palette.ink }]}>
             {t('community.compose.choosePhoto')}
           </Text>
         </TouchableOpacity>
@@ -283,6 +281,7 @@ export function CommunityPostSheet({
   const modalAnimation = useModalAnimation('slide')
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
   const insets = useModalInsets()
   // Multilingual moderation screening needs the reader's real locale; the first
   // draft hardcoded 'en-US' and screened every non-English caption as English.
@@ -628,7 +627,7 @@ export function CommunityPostSheet({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={handleClose}
-      scrim="rgba(0, 0, 0, 0.6)"
+      scrim={scrim}
     >
       <View style={styles.overlay}>
         <View
@@ -639,14 +638,14 @@ export function CommunityPostSheet({
           style={[
             styles.sheet,
             {
-              backgroundColor: palette.surface,
-              borderColor: palette.divider,
+              backgroundColor: palette.page,
+              borderColor: palette.line,
               paddingBottom: 24 + insets.bottom,
             },
           ]}
         >
-          <View style={[styles.header, { borderBottomColor: palette.divider }]}>
-            <Text style={[styles.headerTitle, { color: palette.text }]}>
+          <View style={[styles.header, { borderBottomColor: palette.line }]}>
+            <Text style={[styles.headerTitle, { color: palette.ink }]}>
               {t('community.compose.title')}
             </Text>
             <TouchableOpacity
@@ -656,7 +655,7 @@ export function CommunityPostSheet({
               accessibilityRole="button"
               accessibilityLabel={t('community.compose.close')}
             >
-              <Text style={[styles.closeButtonText, { color: palette.text }]}>✕</Text>
+              <Text style={[styles.closeButtonText, { color: palette.ink }]}>✕</Text>
             </TouchableOpacity>
           </View>
 
@@ -665,7 +664,7 @@ export function CommunityPostSheet({
             contentContainerStyle={styles.contentContainer}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.helperText, { color: palette.mutedText }]}>
+            <Text style={[styles.helperText, { color: palette.inkMuted }]}>
               {t('community.compose.description')}
             </Text>
 
@@ -680,10 +679,10 @@ export function CommunityPostSheet({
             />
             {/* Alt text: server suggestion, author edit, explicit confirmation */}
             <View style={styles.section} onLayout={reveal.sectionLayout('alt')}>
-              <Text style={[styles.sectionLabel, { color: palette.text }]}>
+              <Text style={[styles.sectionLabel, { color: palette.ink }]}>
                 {t('community.compose.altLabel')}
               </Text>
-              <Text style={[styles.helperText, { color: palette.mutedText }]}>
+              <Text style={[styles.helperText, { color: palette.inkMuted }]}>
                 {allocated
                   ? t('community.compose.altSuggested')
                   : t('community.compose.altHint')}
@@ -692,10 +691,10 @@ export function CommunityPostSheet({
                 testID="community-alt-text-input"
                 style={[
                   styles.textInput,
-                  { borderColor: palette.mutedText, color: palette.text },
+                  { borderColor: palette.inkMuted, color: palette.ink },
                 ]}
                 placeholder={t('community.compose.altPlaceholder')}
-                placeholderTextColor={palette.mutedText}
+                placeholderTextColor={palette.inkMuted}
                 accessibilityLabel={t('community.compose.altLabel')}
                 multiline
                 maxLength={200}
@@ -719,14 +718,14 @@ export function CommunityPostSheet({
             </View>
 
             <View style={styles.section} onLayout={reveal.sectionLayout('title')}>
-              <Text style={[styles.sectionLabel, { color: palette.text }]}>
+              <Text style={[styles.sectionLabel, { color: palette.ink }]}>
                 {t('community.compose.titleLabel')}
               </Text>
               <TextInput
                 testID="community-title-input"
                 style={[
                   styles.textInput,
-                  { borderColor: palette.mutedText, color: palette.text },
+                  { borderColor: palette.inkMuted, color: palette.ink },
                 ]}
                 accessibilityLabel={t('community.compose.titleLabel')}
                 {...reveal.fieldFocus('title')}
@@ -745,11 +744,11 @@ export function CommunityPostSheet({
             {/* Caption */}
             <View style={styles.section} onLayout={reveal.sectionLayout('caption')}>
               <View style={styles.captionHeader}>
-                <Text style={[styles.sectionLabel, { color: palette.text }]}>
+                <Text style={[styles.sectionLabel, { color: palette.ink }]}>
                   {t('community.compose.captionLabel')}
                 </Text>
                 <Text
-                  style={[styles.countText, { color: palette.mutedText }]}
+                  style={[styles.countText, { color: palette.inkMuted }]}
                   testID="community-caption-count"
                 >
                   {t('community.compose.captionCount', { count: caption.length })}
@@ -759,10 +758,10 @@ export function CommunityPostSheet({
                 testID="community-caption-input"
                 style={[
                   styles.textInput,
-                  { borderColor: palette.mutedText, color: palette.text },
+                  { borderColor: palette.inkMuted, color: palette.ink },
                 ]}
                 placeholder={t('community.compose.captionPlaceholder')}
-                placeholderTextColor={palette.mutedText}
+                placeholderTextColor={palette.inkMuted}
                 accessibilityLabel={t('community.compose.captionLabel')}
                 multiline
                 {...reveal.fieldFocus('caption')}
@@ -793,7 +792,7 @@ export function CommunityPostSheet({
             {/* Weekly challenge opt-in */}
             {challenge ? (
               <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: palette.text }]}>
+                <Text style={[styles.sectionLabel, { color: palette.ink }]}>
                   {t('community.compose.challengeLabel')}
                 </Text>
                 <ComposeCheckboxRow
@@ -809,8 +808,8 @@ export function CommunityPostSheet({
 
             {isBusy ? (
               <View style={styles.statusRow} testID="community-publish-status">
-                <ActivityIndicator size="small" color={palette.text} />
-                <Text style={[styles.helperText, { color: palette.mutedText }]}>
+                <ActivityIndicator size="small" color={palette.ink} />
+                <Text style={[styles.helperText, { color: palette.inkMuted }]}>
                   {busyLabel}
                 </Text>
               </View>
@@ -887,9 +886,9 @@ function DraftDescriptionControl({
           testID="community-suggest-description"
           disabled={disabled}
           onPress={onSuggest}
-          style={[styles.descriptionButton, { borderColor: palette.divider }]}
+          style={[styles.descriptionButton, { borderColor: palette.line }]}
         >
-          <Text style={{ color: palette.text }}>
+          <Text style={{ color: palette.ink }}>
             {t(
               loading
                 ? 'community.compose.descriptionWorking'
@@ -899,7 +898,7 @@ function DraftDescriptionControl({
         </TouchableOpacity>
       )}
       {status === 'failed' && (
-        <Text accessibilityLiveRegion="polite" style={{ color: palette.mutedText }}>
+        <Text accessibilityLiveRegion="polite" style={{ color: palette.inkMuted }}>
           {t('community.compose.descriptionFailed')}
         </Text>
       )}
@@ -928,7 +927,7 @@ function ComposeActions({
         <Text
           testID="community-compose-verifying"
           accessibilityLiveRegion="polite"
-          style={[styles.helperText, { color: palette.mutedText }]}
+          style={[styles.helperText, { color: palette.inkMuted }]}
         >
           {t('community.realtime.unavailable')}
         </Text>
@@ -937,7 +936,7 @@ function ComposeActions({
         testID="community-publish-button"
         style={[
           styles.publishButton,
-          { backgroundColor: ACCENT_GOLD },
+          { backgroundColor: palette.primary },
           disabled && styles.publishButtonDisabled,
         ]}
         disabled={disabled}
@@ -952,9 +951,9 @@ function ComposeActions({
         aria-busy={busy}
       >
         {busy ? (
-          <ActivityIndicator size="small" color={ON_ACCENT} />
+          <ActivityIndicator size="small" color={palette.onPrimary} />
         ) : (
-          <Text style={[styles.publishButtonText, { color: ON_ACCENT }]}>
+          <Text style={[styles.publishButtonText, { color: palette.onPrimary }]}>
             {t('community.compose.publish')}
           </Text>
         )}
@@ -977,8 +976,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     maxHeight: '90%',
     borderWidth: 1,
   },
@@ -1023,7 +1022,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -1042,8 +1041,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   outlineButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 44,
@@ -1052,7 +1051,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   outlineButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   pickImageButton: {
@@ -1070,15 +1069,15 @@ const styles = StyleSheet.create({
   textInput: {
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    fontSize: 13,
+    padding: 12,
+    fontSize: 14,
     minHeight: 60,
     textAlignVertical: 'top',
   },
   confirmationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     marginTop: 8,
     minHeight: 44,
   },
@@ -1091,9 +1090,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxMark: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 15,
+    lineHeight: 16,
   },
   confirmationText: {
     fontSize: 12,
@@ -1109,7 +1108,7 @@ const styles = StyleSheet.create({
     columnGap: 8,
   },
   countText: {
-    fontSize: 11,
+    fontSize: 12,
   },
   statusRow: {
     flexDirection: 'row',
@@ -1120,7 +1119,8 @@ const styles = StyleSheet.create({
   errorPanel: {
     marginTop: 8,
     borderRadius: 8,
-    padding: 10,
+    borderWidth: 1,
+    padding: 12,
   },
   errorText: {
     fontSize: 12,
@@ -1128,11 +1128,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingTop: 12,
   },
   publishButton: {
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 8,
+    paddingVertical: 16,
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   publishButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
 })

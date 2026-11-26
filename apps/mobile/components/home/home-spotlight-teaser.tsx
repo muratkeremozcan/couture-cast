@@ -8,7 +8,7 @@ import React, {
   useEffect,
   useState,
 } from 'react'
-import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SpotlightTeaserValue } from '@couture/api-client'
 import {
@@ -25,15 +25,7 @@ import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
 import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
 import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
 
-/**
- * The CTA is text, so it needs AA contrast: the deep gold the web hero uses on
- * light surfaces (#C9A14A on white is about 2.3:1), the accent gold on dark ones.
- */
-const CTA_GOLD = { light: '#8A691F', dark: '#C9A14A' } as const
 const THUMBNAIL_SIZE = 72
-/** The community card's Partnered pill colours, so both read as one disclosure. */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
 
 export interface HomeSpotlightTeaserProps {
   value: SpotlightTeaserValue
@@ -84,7 +76,6 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
   ) {
     const { t } = useTranslation()
     const palette = useHeroPalette()
-    const ctaColor = CTA_GOLD[useColorScheme() === 'dark' ? 'dark' : 'light']
     const { item, label } = value
     const imageUrl = item.imageAccess.url
     const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
@@ -117,7 +108,7 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
         <View
           style={[
             styles.card,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
+            { backgroundColor: palette.card, borderColor: palette.line },
           ]}
         >
           <Pressable
@@ -133,7 +124,7 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
             style={({ pressed }) => [styles.link, { opacity: pressed ? 0.85 : 1 }]}
           >
             <View
-              style={[styles.thumbnail, { backgroundColor: palette.skeleton }]}
+              style={[styles.thumbnail, { backgroundColor: palette.cardMuted }]}
               // Decorative: the link label already names the look.
               accessible={false}
               accessibilityElementsHidden
@@ -155,24 +146,25 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
               <Text
                 testID="home-spotlight-teaser-heading"
                 numberOfLines={2}
-                style={[styles.heading, { color: palette.text }]}
+                style={[styles.heading, { color: palette.ink }]}
               >
                 {t('home.spotlightTeaser.heading', { label })}
               </Text>
               <Text
                 testID="home-spotlight-teaser-author"
                 numberOfLines={1}
-                style={[styles.meta, { color: palette.mutedText }]}
+                style={[styles.meta, { color: palette.inkMuted }]}
               >
                 {author}
               </Text>
               <Text
                 testID="home-spotlight-teaser-reactions"
-                style={[styles.meta, { color: palette.mutedText }]}
+                style={[styles.meta, { color: palette.inkMuted }]}
               >
                 {t('home.spotlightTeaser.reactions', { count })}
               </Text>
-              <Text style={[styles.cta, { color: ctaColor }]}>
+              {/* Story CC-7.9 D3: the CTA is a text link in ink; gold belongs to the main action. */}
+              <Text style={[styles.cta, { color: palette.ink }]}>
                 {t('home.spotlightTeaser.cta')}
               </Text>
             </View>
@@ -185,14 +177,15 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
             <View testID="home-spotlight-teaser-sponsored" style={styles.sponsored}>
               <View
                 testID="home-spotlight-teaser-partnered"
-                style={[styles.partneredPill, { backgroundColor: ACCENT_GOLD }]}
+                // The community card's Partnered pill roles, so both read as one disclosure.
+                style={[styles.partneredPill, { backgroundColor: palette.inverse }]}
               >
                 <Text
                   accessible={false}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                   aria-hidden
-                  style={[styles.partneredText, { color: ON_ACCENT }]}
+                  style={[styles.partneredText, { color: palette.onInverse }]}
                 >
                   {t('community.card.sponsored')}
                 </Text>
@@ -333,10 +326,10 @@ const styles = StyleSheet.create({
   partneredPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   partneredText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   shop: {
@@ -356,15 +349,15 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   heading: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
   },
   meta: {
-    fontSize: 13,
+    fontSize: 14,
   },
   cta: {
     marginTop: 4,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
 })

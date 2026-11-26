@@ -28,6 +28,7 @@ import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { createSchemeStyles, useSchemeColors } from '@/components/themed'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { useTokens } from '@/src/theme/tokens'
 
 export interface MobileGarmentTaggingModalProps {
   visible: boolean
@@ -121,6 +122,7 @@ export function MobileGarmentTaggingModal({
   const insets = useModalInsets()
   const styles = useStyles()
   const colors = useSchemeColors()
+  const { scrim } = useTokens()
   const { announce } = useAccessibilityAnnouncer()
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
@@ -324,7 +326,7 @@ export function MobileGarmentTaggingModal({
       visible={visible}
       animationType={modalAnimation}
       onRequestClose={onClose}
-      scrim="rgba(0, 0, 0, 0.5)"
+      scrim={scrim}
     >
       <View style={styles.overlay}>
         <View
@@ -370,7 +372,7 @@ export function MobileGarmentTaggingModal({
             <ActivityIndicator
               accessibilityLabel={t('wardrobe.tagging.loading')}
               size="large"
-              color={colors.text}
+              color={colors.ink}
               style={{ marginVertical: 20 }}
             />
           ) : !isAnalysisPending ? (
@@ -604,7 +606,7 @@ const useStyles = createSchemeStyles((colors) => ({
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.page,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '85%',
@@ -616,12 +618,12 @@ const useStyles = createSchemeStyles((colors) => ({
     alignItems: 'center',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.line,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.ink,
   },
   closeBtn: {
     minWidth: 44,
@@ -631,14 +633,14 @@ const useStyles = createSchemeStyles((colors) => ({
   },
   closeText: {
     fontSize: 18,
-    color: colors.mutedText,
+    color: colors.inkMuted,
   },
   errorText: {
-    color: colors.dangerText,
+    color: colors.dangerInk,
     backgroundColor: colors.dangerSurface,
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
-    marginVertical: 10,
+    marginVertical: 12,
     fontSize: 14,
   },
   retryBtn: {
@@ -648,7 +650,7 @@ const useStyles = createSchemeStyles((colors) => ({
     paddingHorizontal: 12,
   },
   retryText: {
-    color: colors.noticeText,
+    color: colors.noticeInk,
     fontWeight: '700',
   },
   content: {
@@ -657,12 +659,12 @@ const useStyles = createSchemeStyles((colors) => ({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text,
+    color: colors.ink,
     marginTop: 12,
     marginBottom: 8,
   },
   suggestionText: {
-    color: colors.mutedText,
+    color: colors.inkMuted,
     fontSize: 12,
     marginBottom: 8,
   },
@@ -678,22 +680,22 @@ const useStyles = createSchemeStyles((colors) => ({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
-    backgroundColor: colors.subtleSurface,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipSelected: {
-    borderColor: colors.noticeBorder,
+    borderColor: colors.noticeLine,
     backgroundColor: colors.noticeSurface,
   },
   chipText: {
-    fontSize: 13,
-    color: colors.text,
+    fontSize: 14,
+    color: colors.ink,
   },
   chipTextSelected: {
     fontWeight: 'bold',
-    color: colors.text,
+    color: colors.ink,
   },
   comfortList: {
     gap: 8,
@@ -703,17 +705,17 @@ const useStyles = createSchemeStyles((colors) => ({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
-    backgroundColor: colors.subtleSurface,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.card,
     justifyContent: 'center',
   },
   comfortCardSelected: {
-    borderColor: colors.noticeBorder,
+    borderColor: colors.noticeLine,
     backgroundColor: colors.noticeSurface,
   },
   comfortText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.ink,
   },
   footer: {
     flexDirection: 'row',
@@ -721,7 +723,7 @@ const useStyles = createSchemeStyles((colors) => ({
     gap: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: colors.line,
   },
   cancelBtn: {
     minWidth: 44,
@@ -731,11 +733,11 @@ const useStyles = createSchemeStyles((colors) => ({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.strongBorder,
+    borderColor: colors.lineStrong,
   },
   cancelText: {
     fontSize: 14,
-    color: colors.mutedText,
+    color: colors.inkMuted,
   },
   saveBtn: {
     minWidth: 44,
@@ -744,10 +746,10 @@ const useStyles = createSchemeStyles((colors) => ({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
-    backgroundColor: colors.inverseSurface,
+    backgroundColor: colors.inverse,
   },
   saveBtnDisabled: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.line,
   },
   saveText: {
     fontSize: 14,

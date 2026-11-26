@@ -71,8 +71,10 @@ jobs:
     # lanes 14 to 16 minutes after the push (scripts/ci/pr-pipeline-shape.test.mjs).
     needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
-    # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
-    # Supabase start stops at its own 10 minute step limit.
+    # 11.3 minutes at p50, 12.4 at p95 on two shards (40 shard runs, 2026-11-11 to 12). CC-7.9
+    # grew the suite past two: the second shard's Playwright step took 16.75 minutes after a
+    # 3.5 minute setup and hit this limit (CI fd692390), so it runs on three. The Supabase start
+    # stops at its own 10 minute step limit.
     timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
@@ -91,8 +93,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2]
-        shardTotal: [2]
+        shardIndex: [1, 2, 3]
+        shardTotal: [3]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -194,6 +196,15 @@ jobs:
         run: |
           mkdir -p blob-report/trace
           cp -r playwright/test-results/**/*.zip blob-report/trace || true
+
+      # Story CC-7.9: a new or changed visual snapshot fails the run and leaves its screen as
+      # `<name>-actual.png` in the output folder. Kept beside the report so the baseline is
+      # reviewed and committed from CI: npm run visual:pull-baselines -- --web <run-id>.
+      - name: Copy visual snapshot actuals to blob-report
+        if: always()
+        run: |
+          mkdir -p blob-report/visual-actuals
+          find playwright/artifacts -name '*-actual.png' -exec cp {} blob-report/visual-actuals/ \;
 
       # Blocks the upload when a report or trace carries a secret this job
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
@@ -316,32 +327,6 @@ jobs:
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
         run: npm run test:pw-real-session -- --skip-web-build
 
-      # Burn-in for the real-session specs the pull request changes: rwf-burn-in.yml leaves
-      # them out, since under its config they have no owned stack and every case skips. Each
-      # changed spec runs three times with no retries on a fresh isolated database, reusing the
-      # web build above, once per consent policy like the runs above; with none changed a step
-      # ends in seconds. The SKIP_BURN_IN label skips them, as it skips the burn-in job. Each has
-      # its own timeout, so a hung stack cannot take the steps after it.
-      - name: Burn in changed real-session specs
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') && steps.supabase.outcome == 'success' }}
-        timeout-minutes: 7
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
-        run: node scripts/ci/real-session-burn-in.mjs
-      - name: Burn in changed real-session guardian consent cases
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') && steps.supabase.outcome == 'success' }}
-        timeout-minutes: 7
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          GUARDIAN_CONSENT_POLICY: required_13_15
-          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
-        run: node scripts/ci/real-session-burn-in.mjs
-
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
       # Its own isolated database, so a real-session failure neither hides this nor shares state with it.
       - name: Prove Storage refuses a late community upload
@@ -402,16 +387,6 @@ jobs:
         env:
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
         run: node scripts/e2e-real-session/cleanup-users.mjs
-      - name: Delete the Auth users the real-session burn-in created
-        if: always()
-        env:
-          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
-        run: node scripts/e2e-real-session/cleanup-users.mjs
-      - name: Delete the Auth users the guardian consent burn-in created
-        if: always()
-        env:
-          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
-        run: node scripts/e2e-real-session/cleanup-users.mjs
 
       # Fails closed: nothing is uploaded unless run.mjs finished publishing the
       # redacted set (its completion record matches the upload directory byte for
@@ -439,12 +414,126 @@ jobs:
           include-hidden-files: true
           retention-days: 5
 
+  # The burn-in for the real-session specs a pull request changes: rwf-burn-in.yml leaves them
+  # out, since under its config they have no owned stack and every case skips. Its own job on its
+  # own stack, beside the lane job: with eight changed specs (CC-7.9) the three repeats on both
+  # projects ran past 7 minutes after the lane's runs, and the lane job is near its 20-minute cap.
+  # Each changed spec runs three times with no retries on a fresh isolated database, once per
+  # consent policy like the lane's runs; with none changed the job ends after its plan step.
+  # The SKIP_BURN_IN label skips it, as it skips the burn-in job.
+  real-session-burn-in:
+    name: Real-session burn-in
+    needs: [lanes]
+    if: ${{ fromJSON(needs.lanes.outputs.plan)['web-e2e'] && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}
+    # Setup about 3 minutes, a web build and stack start about 2, the repeats at most 12.
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # The same isolation as the lane job: an isolated database per run on the CI Supabase,
+      # and this job's own Redis service.
+      REDIS_URL: redis://127.0.0.1:6379
+      STORY65_REAL_SESSION_OTP_MODE: real-email
+      STORY65_REAL_SESSION_REQUIRED: 'true'
+      GITHUB_TOKEN: ${{ github.token }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+
+      - name: List changed real-session specs
+        id: plan
+        run: node scripts/ci/real-session-burn-in.mjs --plan
+
+      - name: Setup Node environment
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Cache Playwright browsers
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Start local Supabase services with Mailpit
+        id: supabase
+        if: ${{ steps.plan.outputs.any == 'true' }}
+        uses: ./.github/actions/start-local-supabase
+        timeout-minutes: 10
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+      - name: Upload the Supabase start log
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
+
+      - name: Build the shared packages
+        if: ${{ steps.supabase.outcome == 'success' }}
+        run: npm run prepare:playwright
+
+      # The first pass builds the web app; the consent pass serves that build. Each has its own
+      # timeout, so a hung stack cannot take the steps after it.
+      - name: Burn in changed real-session specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        timeout-minutes: 12
+        env:
+          REAL_SESSION_BURN_IN_BUILD_WEB: 'true'
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
+        run: exec node scripts/ci/real-session-burn-in.mjs
+      - name: Burn in changed real-session guardian consent cases
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        timeout-minutes: 4
+        env:
+          GUARDIAN_CONSENT_POLICY: required_13_15
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
+        run: exec node scripts/ci/real-session-burn-in.mjs
+
+      # run.mjs deletes its users itself; these cover a run that was killed first.
+      - name: Delete the Auth users the real-session burn-in created
+        if: ${{ always() && steps.plan.outputs.any == 'true' }}
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+      - name: Delete the Auth users the guardian consent burn-in created
+        if: ${{ always() && steps.plan.outputs.any == 'true' }}
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+
       # The burn-in runs' redacted output, under the same fail-closed checks: a burn-in that
       # never started left no directory and is passed over; one killed mid-teardown left no
       # completion record, so verify fails and nothing of it ships.
       - name: Check real-session burn-in artifacts for secret values
         id: burn_in_secret_scan
-        if: always()
+        if: ${{ always() && steps.plan.outputs.any == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -592,7 +681,7 @@ jobs:
         with:
           environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
-          shards: '2'
+          shards: '3'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 

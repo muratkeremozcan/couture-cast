@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Pressable, Platform, ScrollView } from 'react-native'
+import { StyleSheet, Pressable, ScrollView } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
 import { useTranslation } from 'react-i18next'
@@ -41,7 +41,7 @@ export function ScenarioToggles({
               onPress={() => onScenarioChange(tab.key)}
               style={[
                 styles.tabButton,
-                { borderBottomColor: palette.divider },
+                { borderBottomColor: palette.line },
                 isActive && styles.activeTabButton,
               ]}
               testID={`scenario-toggle-${tab.key}`}
@@ -52,14 +52,18 @@ export function ScenarioToggles({
                 numberOfLines={1}
                 style={[
                   styles.tabLabel,
-                  { color: palette.mutedText },
+                  { color: palette.inkMuted },
                   isActive && styles.activeTabLabel,
-                  isActive && { color: palette.text },
+                  isActive && { color: palette.ink },
                 ]}
               >
                 {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
               </Text>
-              {isActive && <View style={styles.activeUnderline} />}
+              {isActive && (
+                <View
+                  style={[styles.activeUnderline, { backgroundColor: palette.ink }]}
+                />
+              )}
             </Pressable>
           )
         })}
@@ -83,8 +87,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexShrink: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#E6E6ED',
-    paddingHorizontal: 12,
+    // 8 keeps the three short en-US labels on a 360-point phone at the 14-point step.
+    paddingHorizontal: 8,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -95,18 +99,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#a3a3a3',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
   },
   activeTabLabel: {
-    color: '#111111',
     fontWeight: '700',
   },
   activeUnderline: {
@@ -114,7 +110,7 @@ const styles = StyleSheet.create({
     bottom: -1,
     left: '15%',
     right: '15%',
+    // The active underline is ink: a selected toggle never paints gold (Story CC-7.9 D3).
     height: 2,
-    backgroundColor: '#C9A14A', // active gold underline
   },
 })

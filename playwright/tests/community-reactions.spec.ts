@@ -6,6 +6,7 @@ import type { Locator, Page } from '@playwright/test'
 import { contrastRatio } from '@couture/utils'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
+import { focusBackdrop, focusRing } from '../support/helpers/painted-contrast'
 import {
   completedCommunityFeed,
   communityTest as test,
@@ -13,6 +14,13 @@ import {
 } from '../support/helpers/community-session'
 
 const labels = ['Applaud', 'Love', 'Inspired'] as const
+/** A computed `rgb()`/`rgba()` color as the hex `@couture/utils` contrastRatio takes. */
+const hex = (rgb: string) =>
+  '#' +
+  (rgb.match(/\d+/g) ?? [])
+    .slice(0, 3)
+    .map((part) => Number(part).toString(16).padStart(2, '0'))
+    .join('')
 const emojis = ['👏', '❤️', '✨'] as const
 const modalHeaderClose = (page: Page) =>
   page.getByRole('dialog').getByLabel('Close this look', { exact: true })
@@ -257,6 +265,10 @@ test.describe('Story 6.3 curated reactions', () => {
     await applause.focus()
     await page.keyboard.press('Space')
     await expect(applause).toHaveAttribute('aria-pressed', 'true')
+    // The save settles before any ring is measured: while it is out the controls are aria-busy
+    // and show a pending line, and that line leaving between the probe's bare and focused shots
+    // made the first case (default light) compare two different layouts (CI 7c284e60).
+    await expect(controls).toHaveAttribute('aria-busy', 'false')
     await expect(applause).toBeFocused()
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme })
@@ -270,24 +282,39 @@ test.describe('Story 6.3 curated reactions', () => {
           element.setAttribute('data-theme', value)
         }, theme)
         await applause.focus()
+        await expect(applause).toBeFocused()
+        const label = `${theme} ${colorScheme}`
         const colors = await applause.evaluate((button) => {
           const style = getComputedStyle(button)
-          const surface = getComputedStyle(button.closest('[data-focus-surface]')!)
-          const hex = (rgb: string) =>
-            '#' +
-            (rgb.match(/\d+/g) ?? [])
-              .slice(0, 3)
-              .map((part) => Number(part).toString(16).padStart(2, '0'))
-              .join('')
           return {
-            text: hex(style.color),
-            background: hex(style.backgroundColor),
-            focus: hex(style.outlineColor),
-            surface: hex(surface.backgroundColor),
+            text: style.color,
+            background: style.backgroundColor,
+            focus: style.outlineColor,
+            focusVisible: button.matches(':focus-visible'),
+            inCard: button.closest('[data-surface="card"]') !== null,
           }
         })
-        expect(contrastRatio(colors.text, colors.background)).toBeGreaterThanOrEqual(4.5)
-        expect(contrastRatio(colors.focus, colors.surface)).toBeGreaterThanOrEqual(3)
+        expect(colors.focusVisible, label).toBe(true)
+        // Story CC-7.9 D7: the `data-focus-surface` hook is gone; the reaction sits in a card
+        // (`data-surface="card"`) and its ring is drawn over whatever that card paints behind it.
+        expect(colors.inCard, label).toBe(true)
+        const backdrop = await focusBackdrop(applause)
+        expect(
+          contrastRatio(hex(colors.text), hex(colors.background)),
+          label
+        ).toBeGreaterThanOrEqual(4.5)
+        // Story CC-7.9 D3: the `focusEssential` outline holds 3:1 on the palette card surface.
+        expect(
+          contrastRatio(hex(colors.focus), hex(backdrop.color)),
+          `${label} on ${backdrop.node}`
+        ).toBeGreaterThanOrEqual(3)
+        // Painted: the pixels focus changes around the button, each at 3:1 against what was there.
+        const ring = await focusRing(applause, async () => {
+          await applause.focus()
+          await expect(applause).toBeFocused()
+        })
+        // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the button.
+        expect(ring!.qualifying, label).toBeGreaterThanOrEqual(ring!.required!)
       }
     }
     await page.getByTestId('lookbook-open-lookbook-5').click()

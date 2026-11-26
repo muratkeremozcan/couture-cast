@@ -42,7 +42,7 @@ tags:
     timeout: 15000
 
 - assertVisible:
-    id: 'garment-detail-back'
+    id: 'app-top-bar-back'
 - assertVisible:
     id: 'garment-detail-photo'
 - assertVisible:
@@ -148,7 +148,7 @@ tags:
     text: 'Cotton'
 
 - tapOn:
-    id: 'garment-detail-back'
+    id: 'app-top-bar-back'
 - extendedWaitUntil:
     visible:
       id: 'wardrobe-screen'

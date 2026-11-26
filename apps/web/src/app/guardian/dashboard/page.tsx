@@ -1,23 +1,18 @@
-import Link from 'next/link'
+import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
+import { AppTopBar } from '../../components/app-top-bar'
 import { GuardianDashboardView } from './guardian-dashboard-view'
 
 export default function GuardianDashboardPage() {
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      data-focus-surface="dark"
-      className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white outline-none"
-    >
-      <div className="mx-auto max-w-5xl space-y-8">
-        <Link
-          href="/"
-          className="inline-flex rounded-full border border-white/20 px-4 py-2 text-sm uppercase tracking-[0.24em] text-neutral-200 transition hover:border-amber-300 hover:text-amber-200"
-        >
-          Back home
-        </Link>
-        <GuardianDashboardView />
-      </div>
-    </main>
+    // Story CC-7.9 D6, D7: the shared top bar (its back control replaces the old "Back home"
+    // link) on the page surface; the always-dark gradient is gone.
+    <AppPage>
+      <AppTopBar titleKey="guardian.dashboard.title" backHref="/" />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <div className="mx-auto w-full max-w-5xl">
+          <GuardianDashboardView />
+        </div>
+      </main>
+    </AppPage>
   )
 }

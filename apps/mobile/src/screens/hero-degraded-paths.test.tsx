@@ -219,6 +219,26 @@ describe('TabOneScreen degraded and native-only paths', () => {
     })
   })
 
+  it('7.9-NAT-INSET-003 insets the deep-linked Home alert 16 from each edge, the shared tab body inset', async () => {
+    mockParams = { source: 'notification', type: 'severe_weather', alertId: 'alert-777' }
+    server.use(
+      http.get('*/api/v1/events/poll', () =>
+        HttpResponse.json({
+          events: [createWeatherAlertPolledEvent('alert-777', 'test-user-id')],
+          nextSince: '2026-07-24T17:29:00.000Z',
+        })
+      )
+    )
+
+    await renderScreen()
+
+    const alert = await screen.findByTestId('severe-weather-alert-focused')
+    const frame = screen.getByTestId('hero-experience-scrollview').getBoundingClientRect()
+    const card = alert.getBoundingClientRect()
+    expect(card.left - frame.left).toBeCloseTo(16, 0)
+    expect(frame.right - card.right).toBeCloseTo(16, 0)
+  })
+
   it('3.3-MOB-HERO-21 moves native accessibility focus into the swap sheet', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
 

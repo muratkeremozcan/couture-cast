@@ -24,17 +24,11 @@ import {
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useModalAnimation } from '@/src/hooks/use-modal-animation'
+import { useTokens } from '@/src/theme/tokens'
 
-/**
- * `hero-theme.ts` carries neither the premium gold accent nor the community
- * surface's merlot destructive colour, and this task may not extend it, so both
- * are derived here once and reported as a palette gap. Merlot is a fill with
- * white ink (10.2:1); it is never used as text on a dark ground.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
-const DESTRUCTIVE_MERLOT = '#7A1F2D'
-const ON_DESTRUCTIVE = '#FFFFFF'
+// Story CC-7.9 D2, D3: every color is a role. The main action is `primary` (gold), a checked
+// box is `inverse` with `onInverse`, and an error is the danger panel (`dangerSurface`,
+// `dangerLine`, `dangerInk`), which meets 4.5:1 in both schemes.
 
 export interface CommunityReportModalProps {
   suspended?: boolean
@@ -63,6 +57,7 @@ export function CommunityReportModal({
   const modalAnimation = useModalAnimation('fade')
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
   // R66: while the keyboard is up for the details field the reasons leave the layout,
   // so the lifted dialog shows the label, the field and its count whole, with no
   // reason row cut by the scroll edge. They return as the keyboard closes; the chosen
@@ -111,7 +106,7 @@ export function CommunityReportModal({
       animationType={modalAnimation}
       onRequestClose={onClose}
       testID="community-report-modal"
-      scrim="rgba(0, 0, 0, 0.6)"
+      scrim={scrim}
       scrimTestID="community-report-modal-scrim"
     >
       <View
@@ -127,19 +122,19 @@ export function CommunityReportModal({
           accessibilityLabel={t('community.report.title')}
           style={[
             styles.container,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
+            { backgroundColor: palette.page, borderColor: palette.line },
           ]}
         >
-          <Text style={[styles.title, { color: palette.text }]}>
+          <Text style={[styles.title, { color: palette.ink }]}>
             {t('community.report.title')}
           </Text>
-          <Text style={[styles.subtitle, { color: palette.mutedText }]}>
+          <Text style={[styles.subtitle, { color: palette.inkMuted }]}>
             {t('community.report.description')}
           </Text>
 
           <ScrollView style={styles.reasonsList} keyboardShouldPersistTaps="handled">
             <View testID="report-reasons" style={writingDetails && styles.hidden}>
-              <Text style={[styles.groupLabel, { color: palette.text }]}>
+              <Text style={[styles.groupLabel, { color: palette.ink }]}>
                 {t('community.report.reasonLabel')}
               </Text>
 
@@ -162,7 +157,7 @@ export function CommunityReportModal({
                       accessibilityLabel={label}
                       style={[
                         styles.reasonOption,
-                        { borderColor: isSelected ? palette.text : 'transparent' },
+                        { borderColor: isSelected ? palette.ink : 'transparent' },
                       ]}
                       onPress={() => setSelectedReason(reason)}
                     >
@@ -172,21 +167,23 @@ export function CommunityReportModal({
                           {
                             // 3:1 against the surface in both schemes, where the
                             // old #55555C on #222228 computed to 2.14:1.
-                            borderColor: isSelected ? palette.text : palette.mutedText,
-                            backgroundColor: isSelected ? ACCENT_GOLD : 'transparent',
+                            borderColor: isSelected ? palette.ink : palette.inkMuted,
+                            backgroundColor: isSelected ? palette.inverse : 'transparent',
                           },
                         ]}
                       >
                         {/* Shape, not colour: the check mark is what says selected. */}
                         {isSelected ? (
-                          <Text style={[styles.radioCheck, { color: ON_ACCENT }]}>✓</Text>
+                          <Text style={[styles.radioCheck, { color: palette.onInverse }]}>
+                            ✓
+                          </Text>
                         ) : null}
                       </View>
                       <Text
                         style={[
                           styles.reasonLabel,
                           {
-                            color: palette.text,
+                            color: palette.ink,
                             fontWeight: isSelected ? '700' : '400',
                           },
                         ]}
@@ -199,7 +196,7 @@ export function CommunityReportModal({
               </View>
             </View>
 
-            <Text style={[styles.detailsLabel, { color: palette.text }]}>
+            <Text style={[styles.detailsLabel, { color: palette.ink }]}>
               {t('community.report.detailsLabel')}
             </Text>
             <TextInput
@@ -207,15 +204,15 @@ export function CommunityReportModal({
               style={[
                 styles.detailsInput,
                 {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.mutedText,
-                  color: palette.text,
+                  backgroundColor: palette.page,
+                  borderColor: palette.inkMuted,
+                  color: palette.ink,
                 },
               ]}
               placeholder={t('community.report.detailsPlaceholder')}
               // 4.74:1 in light and 11.2:1 in dark, where #666666 on #121214
               // computed to 3.26:1 and failed 1.4.3.
-              placeholderTextColor={palette.mutedText}
+              placeholderTextColor={palette.inkMuted}
               accessibilityLabel={t('community.report.detailsLabel')}
               multiline
               maxLength={500}
@@ -225,7 +222,7 @@ export function CommunityReportModal({
               onBlur={() => setDetailsFocused(false)}
             />
             <Text
-              style={[styles.detailsCount, { color: palette.mutedText }]}
+              style={[styles.detailsCount, { color: palette.inkMuted }]}
               testID="report-details-count"
             >
               {t('community.report.detailsCount', { count: details.length })}
@@ -236,9 +233,15 @@ export function CommunityReportModal({
                 testID="report-error-message"
                 accessibilityRole="alert"
                 accessibilityLiveRegion="assertive"
-                style={[styles.errorPanel, { backgroundColor: DESTRUCTIVE_MERLOT }]}
+                style={[
+                  styles.errorPanel,
+                  {
+                    backgroundColor: palette.dangerSurface,
+                    borderColor: palette.dangerLine,
+                  },
+                ]}
               >
-                <Text style={[styles.errorText, { color: ON_DESTRUCTIVE }]}>
+                <Text style={[styles.errorText, { color: palette.dangerInk }]}>
                   {errorMessage}
                 </Text>
               </View>
@@ -250,11 +253,11 @@ export function CommunityReportModal({
               testID="cancel-report-button"
               accessibilityRole="button"
               accessibilityLabel={t('community.report.cancel')}
-              style={[styles.cancelButton, { borderColor: palette.mutedText }]}
+              style={[styles.cancelButton, { borderColor: palette.inkMuted }]}
               onPress={onClose}
               disabled={isSubmitting}
             >
-              <Text style={[styles.cancelButtonText, { color: palette.text }]}>
+              <Text style={[styles.cancelButtonText, { color: palette.ink }]}>
                 {t('community.report.cancel')}
               </Text>
             </TouchableOpacity>
@@ -277,16 +280,16 @@ export function CommunityReportModal({
               aria-busy={isSubmitting}
               style={[
                 styles.submitButton,
-                { backgroundColor: ACCENT_GOLD },
+                { backgroundColor: palette.primary },
                 isSubmitDisabled && styles.submitButtonDisabled,
               ]}
               disabled={isSubmitDisabled}
               onPress={handleSubmit}
             >
               {isSubmitting ? (
-                <ActivityIndicator size="small" color={ON_ACCENT} />
+                <ActivityIndicator size="small" color={palette.onPrimary} />
               ) : (
-                <Text style={[styles.submitButtonText, { color: ON_ACCENT }]}>
+                <Text style={[styles.submitButtonText, { color: palette.onPrimary }]}>
                   {t('community.report.submit')}
                 </Text>
               )}
@@ -316,40 +319,40 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 14,
     marginBottom: 16,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   reasonsList: {
     maxHeight: 340,
   },
   hidden: { display: 'none' },
   groupLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
   },
   reasonOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    marginBottom: 6,
+    marginBottom: 8,
     minHeight: 44,
   },
   radioCircle: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 9999,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   radioCheck: {
     fontSize: 12,
@@ -357,31 +360,32 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   reasonLabel: {
-    fontSize: 13,
+    fontSize: 14,
     flex: 1,
   },
   detailsLabel: {
     fontSize: 12,
     fontWeight: '600',
     marginTop: 12,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   detailsInput: {
     borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    fontSize: 13,
+    padding: 12,
+    fontSize: 14,
     minHeight: 60,
     textAlignVertical: 'top',
   },
   detailsCount: {
-    fontSize: 11,
+    fontSize: 12,
     marginTop: 4,
   },
   errorPanel: {
     marginTop: 12,
     borderRadius: 8,
-    padding: 10,
+    borderWidth: 1,
+    padding: 12,
   },
   errorText: {
     fontSize: 12,
@@ -402,7 +406,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   submitButton: {
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   submitButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 })

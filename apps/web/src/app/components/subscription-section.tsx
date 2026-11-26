@@ -125,7 +125,7 @@ function SubscriptionStatusNotes({ subscription }: { subscription: Subscription 
   if (subscription.status === 'grace_period') {
     return (
       <p
-        className="mt-2 rounded-md border border-amber-500/60 bg-amber-950/40 p-3 text-sm text-amber-200"
+        className="mt-2 rounded-md border border-notice-line bg-notice-surface p-3 text-sm text-notice-ink"
         data-testid="premium-grace-banner"
       >
         {t('commerce.premium.graceBanner')}
@@ -134,7 +134,7 @@ function SubscriptionStatusNotes({ subscription }: { subscription: Subscription 
   }
   if (subscription.status === 'expired' || subscription.status === 'revoked') {
     return (
-      <p className="mt-2 text-sm text-neutral-300" data-testid="premium-ended-note">
+      <p className="mt-2 text-sm text-ink-soft" data-testid="premium-ended-note">
         {t('commerce.premium.endedNote')}
       </p>
     )
@@ -178,7 +178,7 @@ function SubscribeControls({
           aria-busy={isRedirecting}
           aria-describedby={isSignedOut ? SIGNED_OUT_HINT_ID : undefined}
           onClick={() => onSubscribe(plan)}
-          className="rounded-lg bg-[#c9a14a] px-4 py-2 text-sm font-semibold text-neutral-950 hover:bg-[#b58e3c] disabled:opacity-60"
+          className="rounded-lg border border-line-strong bg-page px-4 py-2 text-sm font-semibold text-ink hover:bg-card disabled:opacity-60"
           data-testid={testId}
         >
           {t('commerce.premium.subscribe')}: {label}
@@ -202,7 +202,7 @@ function ManageControls({
   if (entry === 'none') return null
   if (entry === 'store') {
     return (
-      <p className="mt-6 text-sm text-neutral-300" data-testid="premium-manage-in-store">
+      <p className="mt-6 text-sm text-ink-soft" data-testid="premium-manage-in-store">
         {t('commerce.premium.manageInStore')}
       </p>
     )
@@ -212,7 +212,7 @@ function ManageControls({
       type="button"
       aria-busy={isRedirecting}
       onClick={onManage}
-      className="mt-6 rounded-lg border border-neutral-600 px-4 py-2 text-sm font-semibold text-white hover:border-neutral-400"
+      className="mt-6 rounded-lg border border-line-strong px-4 py-2 text-sm font-semibold text-ink hover:border-inverse"
       data-testid="premium-manage-button"
     >
       {t('commerce.premium.manage')}
@@ -693,11 +693,11 @@ function MemberSubscriptionSection({
       aria-labelledby="premium-subscription-title"
       data-testid="premium-subscription-section"
       aria-busy={sectionState === 'checking' || sectionState === 'loading'}
-      className="mt-10 max-w-2xl border-t border-neutral-800 pt-8"
+      className="mt-10 max-w-2xl border-t border-line pt-8"
     >
       <h2
         id="premium-subscription-title"
-        className="text-xl font-semibold text-white"
+        className="text-xl font-semibold text-ink"
         data-testid="premium-subscription-title"
       >
         {t('commerce.premium.sectionTitle')}
@@ -711,7 +711,7 @@ function MemberSubscriptionSection({
       {view.showDisclosure && (
         <p
           data-landing={landing}
-          className="mt-3 text-sm leading-relaxed text-neutral-200"
+          className="mt-3 text-sm leading-relaxed text-ink-soft"
           data-testid="premium-disclosure"
         >
           {t('commerce.premium.disclosure')}
@@ -721,7 +721,7 @@ function MemberSubscriptionSection({
       {view.showStatusLine && (
         <p
           data-landing={landing}
-          className="mt-6 text-base text-white"
+          className="mt-6 text-base text-ink"
           data-testid="premium-status-line"
         >
           {statusLineFor(t, subscription, complimentary)}
@@ -730,7 +730,7 @@ function MemberSubscriptionSection({
 
       {view.showComplimentaryNote && (
         <p
-          className="mt-2 text-sm text-neutral-300"
+          className="mt-2 text-sm text-ink-soft"
           data-testid="premium-complimentary-note"
         >
           {t('commerce.premium.complimentaryNote')}
@@ -767,12 +767,12 @@ function MemberSubscriptionSection({
           <GuestText
             id={SIGNED_OUT_HINT_ID}
             text={t('commerce.premium.signedOutHint')}
-            className="mt-2 text-sm text-neutral-300"
+            className="mt-2 text-sm text-ink-soft"
           />
         ) : (
           <p
             id={SIGNED_OUT_HINT_ID}
-            className="mt-2 text-sm text-neutral-300"
+            className="mt-2 text-sm text-ink-soft"
             data-testid="premium-signed-out-hint"
           >
             {t('commerce.premium.signedOutHint')}
@@ -780,10 +780,7 @@ function MemberSubscriptionSection({
         ))}
 
       {showPortalLagHint && (
-        <p
-          className="mt-4 text-sm text-neutral-300"
-          data-testid="premium-portal-lag-hint"
-        >
+        <p className="mt-4 text-sm text-ink-soft" data-testid="premium-portal-lag-hint">
           {t('commerce.premium.portalLagHint')}
         </p>
       )}
@@ -795,7 +792,7 @@ function MemberSubscriptionSection({
       */}
       <p
         role="status"
-        className="mt-4 min-h-[1.25rem] text-sm text-emerald-300"
+        className="mt-4 min-h-[1.25rem] text-sm text-success-ink"
         data-testid="premium-status-region"
       >
         {activationState === 'activating' && t('commerce.premium.activating')}
@@ -803,7 +800,11 @@ function MemberSubscriptionSection({
       </p>
 
       {error && (
-        <p role="alert" className="mt-1 text-sm text-red-300" data-testid="premium-error">
+        <p
+          role="alert"
+          className="mt-1 text-sm text-danger-ink"
+          data-testid="premium-error"
+        >
           {error}
         </p>
       )}

@@ -299,11 +299,11 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
     <section
       aria-labelledby="commerce-preferences-title"
       data-testid="commerce-preferences-section"
-      className="mt-10 max-w-2xl border-t border-neutral-800 pt-8"
+      className="mt-10 max-w-2xl border-t border-line pt-8"
     >
       <h2
         id="commerce-preferences-title"
-        className="text-xl font-semibold text-white"
+        className="text-xl font-semibold text-ink"
         data-testid="commerce-preferences-title"
       >
         {t('commerce.settings.sectionTitle')}
@@ -315,7 +315,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
         never a tooltip and never only an accessible name.
       */}
       <p
-        className="mt-3 text-sm leading-relaxed text-neutral-200"
+        className="mt-3 text-sm leading-relaxed text-ink-soft"
         data-testid="commerce-disclosure"
       >
         {t('commerce.settings.disclosure')}
@@ -337,26 +337,26 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
           onChange={(event) => {
             void handleToggle(event.target.checked)
           }}
-          className="shrink-0 accent-[#c9a14a] disabled:opacity-60"
+          className="shrink-0 accent-ink disabled:opacity-60"
           data-testid="commerce-opt-out-toggle"
         />
         <label
           htmlFor={TOGGLE_ID}
-          className="text-base font-medium text-white"
+          className="text-base font-medium text-ink"
           data-testid="commerce-opt-out-label"
         >
           {t('commerce.settings.optOutLabel')}
         </label>
       </div>
 
-      <p id={HELP_ID} className="mt-2 text-sm text-neutral-300">
+      <p id={HELP_ID} className="mt-2 text-sm text-ink-soft">
         {t('commerce.settings.optOutHelp')}
       </p>
 
       {isSignedOut && (
         <p
           id={SIGNED_OUT_HINT_ID}
-          className="mt-2 text-sm text-neutral-300"
+          className="mt-2 text-sm text-ink-soft"
           data-testid="commerce-signed-out-hint"
         >
           {t('commerce.settings.signedOutHint')}
@@ -365,7 +365,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       {showGuestHint && (
         <GuestText
           text={t('commerce.settings.signedOutHint')}
-          className="mt-2 text-sm text-neutral-300"
+          className="mt-2 text-sm text-ink-soft"
         />
       )}
 
@@ -376,7 +376,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       */}
       <p
         role="status"
-        className="mt-4 min-h-[1.25rem] text-sm text-emerald-300"
+        className="mt-4 min-h-[1.25rem] text-sm text-success-ink"
         data-testid="commerce-status-region"
       >
         {confirmation ?? ''}
@@ -385,7 +385,7 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
       {error && (
         <p
           role="alert"
-          className="mt-1 text-sm text-red-300"
+          className="mt-1 text-sm text-danger-ink"
           data-testid="commerce-error-message"
         >
           {error}

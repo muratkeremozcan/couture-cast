@@ -194,8 +194,18 @@ jobs:
         include:
           - shard: 10
             auth: signed-out
+          # Story CC-7.9 (TEA, 7.9-NVIS): the shell snapshot flow, alone, on the smallest
+          # supported phone (small_phone, 360 x 640 dp). Its baselines are taken on this
+          # device, so no other shard discovers it (scripts/lib/native-maestro-flows.mjs).
+          - shard: 11
+            auth: member
+            lane: visual
+            profile: small_phone
     env:
       MAESTRO_MEMBER_SHARDS: '9'
+      # The workflow-level ANDROID_PROFILE comment explains medium_phone; only the visual
+      # row overrides it. A job's env cannot read the workflow env, hence the literal.
+      ANDROID_PROFILE: ${{ matrix.profile || 'medium_phone' }}
     # No PR job runs past 20 minutes. A shard is about 10.8 minutes of fixed cost
     # (setup, Supabase, emulator, API and Metro) plus its share of flows (269 s at
     # p95 with nine shards). Twelve shards saved about a minute a shard for three
@@ -286,7 +296,12 @@ jobs:
       # out at precisely the times it is most needed. `save-always` is the
       # documented-but-deprecated patch for this; the restore/save split is
       # what the action's own docs point to instead.
+      # The visual shard (small_phone) keeps no AVD cache: its 1.5 GB entry pushed the repository
+      # to its 10 GB cache limit on CC-7.9 and evicted main's Gradle dependency cache, so the
+      # TalkBack job downloaded every artifact from Maven Central and hit 429s (CI 5f2043f2). It
+      # boots cold instead, inside its 20-minute limit (its job ran about 8 minutes with the cache).
       - name: Restore cached AVD and snapshot
+        if: ${{ matrix.lane != 'visual' }}
         uses: actions/cache/restore@v4
         id: avd-cache
         with:
@@ -306,7 +321,7 @@ jobs:
       # Every later run restores it, which is the whole point of the cache: the
       # old job passed `-no-snapshot` and so paid a full cold boot every time.
       - name: Create AVD and generate snapshot for caching
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+        if: ${{ matrix.lane != 'visual' && steps.avd-cache.outputs.cache-hit != 'true' }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ env.ANDROID_API_LEVEL }}
@@ -332,7 +347,7 @@ jobs:
       # failed, and a poisoned cache is worse than no cache because every later
       # run restores it instead of rebuilding.
       - name: Save AVD and snapshot to cache
-        if: steps.avd-cache.outputs.cache-hit != 'true'
+        if: ${{ matrix.lane != 'visual' && steps.avd-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: |
@@ -431,6 +446,7 @@ jobs:
             --auth "${{ matrix.auth }}" \
             --shard ${{ matrix.shard }} \
             --shards "$MAESTRO_MEMBER_SHARDS" \
+            --lane "${{ matrix.lane || 'suite' }}" \
             >> "$GITHUB_OUTPUT"
 
       - name: Run Maestro suite
@@ -502,6 +518,13 @@ jobs:
           # any member flow, and a member row refuses any guest flow.
           script: bash ./scripts/ci-mobile-e2e.sh ${{ matrix.auth == 'signed-out' && '--signed-out' || '' }} ${{ steps.flows.outputs.list }}
 
+      # Story CC-7.9 (7.9-NVIS): the visual shard's flow only captures; this compares all eight
+      # captures with the committed baselines and writes a diff beside each changed one, before
+      # the upload below. It runs after a failed flow too, so the report names every screen.
+      - name: Compare native shell snapshots
+        if: ${{ !cancelled() && matrix.lane == 'visual' && steps.flows.outputs.empty != 'true' }}
+        run: node scripts/visual-baselines/compare-native.mjs
+
       # Blocks the upload when a log or report carries a secret this job
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
       - name: Check Maestro artifacts for secret values
@@ -572,12 +595,12 @@ jobs:
           # exactly one directory per shard.
           artifact-pattern: android-test-results-shard-*-attempt-*
           suite-result: ${{ needs.mobile-e2e-android.result }}
-          # Keep in step with the matrix rows above: nine member shards plus the
-          # signed-out shard 10. `strategy.job-total` is not readable from a job
+          # Keep in step with the matrix rows above: nine member shards, the
+          # signed-out shard 10 and the visual shard 11. `strategy.job-total` is not readable from a job
           # that only `needs:` the matrix, so this is a label rather than a
           # derived value; the flow counts in the comment come from the reports
           # themselves and are unaffected by it.
-          shards: '10'
+          shards: '11'
           platform: Android (Expo Go)
           device-label: API ${{ env.ANDROID_API_LEVEL }} · ${{ env.ANDROID_PROFILE }} · ${{ env.ANDROID_ARCH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

@@ -46,7 +46,13 @@
         "heat": "Hitzewarnung",
         "ice": "Glättewarnung"
       },
-      "body_generic": "Für Ihre Region gilt eine Wetterwarnung."
+      "body_generic": "Für Ihre Region gilt eine Wetterwarnung.",
+      "focused_badge": "Wetterwarnung: {{severity}}",
+      "severity": {
+        "info": "Hinweis",
+        "warning": "Warnung",
+        "critical": "Kritisch"
+      }
     },
     "no_location": "Fügen Sie Ihren Standort hinzu, um tägliche Outfits zu erhalten"
   },
@@ -141,7 +147,8 @@
       "storage_forbidden": "Zugriff auf den Speicher verweigert.",
       "consent_required": "Für Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
       "upload_expired": "Die Upload-Sitzung ist abgelaufen.",
-      "upload_session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus."
+      "upload_session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus.",
+      "sign_in_required": "Melde dich an, um deinen Kleiderschrank zu verwalten."
     },
     "crop": {
       "title": "Zuschneiden und positionieren",
@@ -283,7 +290,53 @@
       },
       "garmentsSelected": "Kleidungsstücke ({{count}} von {{max}} ausgewählt)",
       "garmentsRange": "Wähle {{min}} bis {{max}} Kleidungsstücke aus.",
-      "garmentOrder": "Reihenfolge der Kleidungsstücke"
+      "garmentOrder": "Reihenfolge der Kleidungsstücke",
+      "signIn": "Melde dich an, um Kapseln zu verwalten.",
+      "status": {
+        "ready": "Bereit",
+        "needsRepair": "Muss repariert werden"
+      },
+      "garmentCount_one": "{{count}} Kleidungsstück",
+      "garmentCount_other": "{{count}} Kleidungsstücke",
+      "truncation": "{{shown}} von {{total}} werden angezeigt. Verfeinere deine Suche, um den Rest zu sehen.",
+      "garmentAtPosition": "{{garment}} (Position {{position}})",
+      "garmentNumber": "Kleidungsstück {{position}}",
+      "closeBuilder": "Kapsel-Editor schließen",
+      "repairRemoved_one": "{{count}} Kleidungsstück ist nicht mehr verfügbar und wurde entfernt. Wähle vor dem Speichern einen Ersatz.",
+      "repairRemoved_other": "{{count}} Kleidungsstücke sind nicht mehr verfügbar und wurden entfernt. Wähle vor dem Speichern Ersatz.",
+      "favoriteMarked": "Lieblingskapsel",
+      "markFavorite": "Als Favorit markieren",
+      "saving": "Wird gespeichert...",
+      "subtitle": "Stelle deine eigenen Outfit-Kombinationen zusammen und verwalte sie.",
+      "filterOccasionLabel": "Nach Anlass filtern",
+      "loading": "Outfit-Kapseln werden geladen…",
+      "favoriteCapsule": "Kapsel {{name}} als Favorit markieren",
+      "editAction": "Bearbeiten",
+      "deleteAction": "Löschen",
+      "cancelDeletion": "Löschen abbrechen",
+      "cancel": "Abbrechen",
+      "builderDescription": "Stelle aus deinem Kleiderschrank eine stimmige Outfit-Kapsel zusammen.",
+      "reloadLatest": "Neueste Version laden",
+      "garmentFallback": "Kleidungsstück {{position}}",
+      "garmentNoun": "Kleidungsstück",
+      "untagged": "Kleidungsstück",
+      "garmentLabel": "{{category}} (Position {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (Position {{position}})",
+      "category": {
+        "top": "Oberteil",
+        "bottom": "Unterteil",
+        "outerwear": "Oberbekleidung",
+        "dress": "Kleid",
+        "shoes": "Schuhe",
+        "accessory": "Accessoire"
+      },
+      "comfort": {
+        "cold": "kalt",
+        "cool": "kühl",
+        "mild": "gemäßigt",
+        "warm": "warm",
+        "hot": "heiß"
+      }
     },
     "onboarding": {
       "title": "Richte deinen Kleiderschrank ein",
@@ -324,7 +377,8 @@
         "storage_error": "Dieses Foto konnte nicht gespeichert werden. Versuche es erneut.",
         "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst.",
         "session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus."
-      }
+      },
+      "sign_in_required": "Melde dich an, um deine Silhouette zu bearbeiten."
     },
     "detail": {
       "back": "Zurück zum Schrank",
@@ -351,6 +405,20 @@
       "deleteUndone": "Löschen rückgängig gemacht",
       "deleteFailed": "Dieses Teil konnte nicht gelöscht werden.",
       "deleteUsageFailed": "Wir konnten nicht prüfen, wo dieses Teil verwendet wird. Versuche es erneut."
+    },
+    "hub": {
+      "loading": "Kleiderschrank wird geladen",
+      "saved_looks_failed": "Deine gespeicherten Looks konnten nicht geladen werden.",
+      "status": {
+        "pending_upload": "Wird hochgeladen",
+        "bytes_uploaded": "Wird hochgeladen",
+        "processing": "Wird verarbeitet",
+        "awaiting_tags": "Wartet auf Tags",
+        "ready": "Fertig",
+        "failed": "Hochladen fehlgeschlagen",
+        "unknown": "In Bearbeitung"
+      },
+      "detailTitle": "Teil-Details"
     }
   },
   "commerce": {
@@ -627,7 +695,8 @@
           "unchanged": "Für diesen Tag waren keine anderen Outfits verfügbar.",
           "conflict": "Dieser Tag hat sich geändert, seit du ihn zuletzt gesehen hast. Wird aktualisiert …",
           "error": "Dieser Tag konnte nicht neu gemischt werden. Versuche es erneut."
-        }
+        },
+        "openControl": "Woche planen"
       },
       "plannerLocked": {
         "title": "Der 7-Tage-Planer ist eine Premium-Funktion",
@@ -1112,5 +1181,61 @@
     "close": "Schließen",
     "showList": "Gespeicherte Looks anzeigen",
     "hideList": "Gespeicherte Looks ausblenden"
+  },
+  "shell": {
+    "back": "Zurück",
+    "notFound": {
+      "title": "Bildschirm nicht gefunden",
+      "body": "Den gesuchten Bildschirm gibt es nicht. Kehre zur Startseite zurück, um weiterzumachen."
+    },
+    "goHome": "Zur Startseite"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Einwilligung der Erziehungsberechtigten",
+      "heading": "Zugriff auf die Teen-Garderobe annehmen",
+      "intro": "Bestätige diese Einladung, um das Konto der erziehungsberechtigten Person zu verknüpfen und die Teen-Garderobe freizuschalten.",
+      "tokenMissing": "In diesem Link fehlt der Einladungscode.",
+      "success": "Einwilligung für {{teenEmail}} erfasst. Das Konto {{guardianEmail}} der erziehungsberechtigten Person ist jetzt verknüpft.",
+      "failed": "Die Einladung konnte nicht angenommen werden",
+      "accepting": "Wird angenommen…",
+      "accept": "Einladung annehmen",
+      "acceptingLabel": "Einladung wird angenommen"
+    },
+    "dashboard": {
+      "title": "Übersicht für Erziehungsberechtigte",
+      "intro": "Prüfe verknüpfte Teen-Konten und widerrufe die Einwilligung, wenn der Zugriff enden soll.",
+      "loading": "Verknüpfte Teens werden geladen...",
+      "loadFailed": "Die Übersicht konnte nicht geladen werden",
+      "revokeFailed": "Die Einwilligung konnte nicht widerrufen werden",
+      "revoked": "Einwilligung für {{teenId}} widerrufen. Teen-Sitzung beendet: {{invalidated}}.",
+      "yes": "ja",
+      "no": "nein",
+      "linkedTeens": "Verknüpfte Teens",
+      "revokeLabel": "Einwilligung für {{teenId}} widerrufen",
+      "revoking": "Wird widerrufen...",
+      "revoke": "Widerrufen",
+      "empty": "Noch keine verknüpften Teen-Konten."
+    },
+    "consent": {
+      "awaiting": "Einwilligung ausstehend",
+      "status": {
+        "granted": "erteilt",
+        "pending": "ausstehend",
+        "revoked": "widerrufen"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Teen-Übersicht",
+      "loading": "Status der Einwilligung wird geladen...",
+      "loadFailed": "Die Übersicht konnte nicht geladen werden",
+      "granted": "Einwilligung der Erziehungsberechtigten erteilt",
+      "revoked": "Einwilligung der Erziehungsberechtigten widerrufen",
+      "pending": "Einwilligung der Erziehungsberechtigten ausstehend",
+      "linkedGuardians": "Verknüpfte Erziehungsberechtigte",
+      "empty": "Noch hat keine erziehungsberechtigte Person eingewilligt."
+    }
   }
 }

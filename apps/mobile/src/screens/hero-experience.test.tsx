@@ -99,7 +99,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     try {
       await render(<TabOneScreen />)
       await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() => expect(setFocus).toHaveBeenCalledWith(77))
@@ -144,7 +144,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       )
       const opener = await screen.findByTestId('outfit-share-card-open')
       await userEvent.click(opener)
-      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
       await userEvent.click(screen.getByTestId('share-card-cancel'))
       await waitFor(() =>
@@ -382,8 +382,10 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('hero-error-state')).toBeTruthy()
     })
-    expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
-    expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText("Unable to load today's outfit.")).toBeVisible()
+    )
+    await waitFor(() => expect(screen.getByTestId('member-sample-outfit')).toBeVisible())
     // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
     expect(screen.getByTestId('hero-retry')).toHaveAccessibleName('Try again')
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()

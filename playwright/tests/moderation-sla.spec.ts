@@ -350,7 +350,9 @@ test.describe('P-SLA: the page', () => {
     const link = page.locator(`a[href="/moderation/cases/${seeded.caseId}"]`).first()
     await expect(link).toBeVisible()
     await link.click()
-    await expect(page.getByRole('heading', { level: 1, name: 'Post case' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Post case', exact: true })
+    ).toBeVisible()
   })
 
   test('[P0] P-SLA-AXE passes axe on the live page, in light and dark', async ({
@@ -583,7 +585,8 @@ test.describe('P-SLA: the page', () => {
       await page.keyboard.press('Tab')
       const focused = await page.evaluate(() => {
         const element = document.activeElement as HTMLElement | null
-        if (!element || !element.closest('main')) return null
+        // CC-7.9 D6: Back is the shared top bar control, so the bar is part of the tab order.
+        if (!element || !element.closest('[data-testid="app-header"], main')) return null
         const look = () => {
           const style = getComputedStyle(element)
           return `${style.outlineStyle} ${style.outlineWidth} ${style.boxShadow}`
@@ -602,11 +605,21 @@ test.describe('P-SLA: the page', () => {
       expect(focused.ring, focused.label).toBe(true)
       order.push(focused.label)
     }
-    expect(order.slice(0, 4)).toEqual([
+    // CC-7.9 D6: Back is the shared top bar control; from 768 px the bar's tab links follow it.
+    expect(order.slice(0, 8)).toEqual([
+      'Back',
+      'Home',
+      'Wardrobe',
+      'Community',
+      'Profile',
       'Refresh',
-      'Back to queue',
       'Open case',
       'Open case',
     ])
+    // CC-7.9 D6: Back is the shared top bar control and points at the queue (backHref).
+    await expect(
+      // A link named Back (Codex replaced-assertions check).
+      page.getByTestId('app-header').getByRole('link', { name: 'Back', exact: true })
+    ).toHaveAttribute('href', '/moderation')
   })
 })

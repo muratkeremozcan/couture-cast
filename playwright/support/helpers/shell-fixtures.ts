@@ -248,7 +248,8 @@ function bodies(memberId: string, populated: boolean) {
     retentionStatus: 'active',
     createdAt: iso,
     committedAt: iso,
-    imageAccess: null,
+    // CC-7.9 snapshots: a populated closet shows its photos. Inline, so nothing loads late.
+    imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
   })
 
   const profile = {

@@ -53,36 +53,37 @@ export function CommunityReactions({
               minHeight: 44,
               minWidth: 44,
               paddingHorizontal: 12,
-              borderRadius: 22,
+              borderRadius: 9999,
               borderWidth: 1,
-              borderColor: summary.viewerReaction === id ? '#C9A14A' : palette.mutedText,
+              // Story CC-7.9 D3: a pressed reaction is `inverse`, never gold.
+              borderColor:
+                summary.viewerReaction === id ? palette.inverse : palette.inkMuted,
               backgroundColor:
-                summary.viewerReaction === id ? '#C9A14A' : palette.surface,
+                summary.viewerReaction === id ? palette.inverse : palette.page,
               justifyContent: 'center',
               opacity: pending ? 0.6 : 1,
             }}
           >
             <Text
               testID={`community-reaction-count-${id}-${item.id}`}
-              style={{ color: summary.viewerReaction === id ? '#111111' : palette.text }}
+              style={{
+                color: summary.viewerReaction === id ? palette.onInverse : palette.ink,
+              }}
             >
               {emoji} {summary.counts[id]}
             </Text>
           </Pressable>
         ))}
       </View>
-      <Text
-        testID={`community-reaction-total-${item.id}`}
-        style={{ color: palette.text }}
-      >
+      <Text testID={`community-reaction-total-${item.id}`} style={{ color: palette.ink }}>
         {t('community.reactions.total', { count: summary.total })}
       </Text>
       {pending && (
-        <Text style={{ color: palette.text }}>{t('community.reactions.pending')}</Text>
+        <Text style={{ color: palette.ink }}>{t('community.reactions.pending')}</Text>
       )}
       {errorKey && (
         <View>
-          <Text style={{ color: palette.text }}>{t(errorKey)}</Text>
+          <Text style={{ color: palette.ink }}>{t(errorKey)}</Text>
           {canRetry && (
             <Pressable
               accessibilityRole="button"
@@ -92,9 +93,7 @@ export function CommunityReactions({
                 onSubmit()
               }}
             >
-              <Text style={{ color: palette.text }}>
-                {t('community.reactions.retry')}
-              </Text>
+              <Text style={{ color: palette.ink }}>{t('community.reactions.retry')}</Text>
             </Pressable>
           )}
         </View>

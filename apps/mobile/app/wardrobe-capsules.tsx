@@ -1,5 +1,6 @@
 // Story 4.3 Task 6 step 2 owner: implement the mobile capsule screen in apps/mobile/app/wardrobe-capsules.tsx
-import { WardrobeBackButton } from '@/src/features/wardrobe/wardrobe-back-button'
+// Story CC-7.9 D6: the root stack's AppTopBar carries the title (set in app/_layout.tsx) and the
+// back control; D9: every member-facing string comes from the catalogs.
 import {
   useCallback,
   useEffect,
@@ -18,7 +19,6 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -129,19 +129,19 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
       try {
         const token = await memberToken(signal)
         if (!current(signal)) return
-        if (!token) throw new Error('Sign in to manage capsules.')
+        if (!token) throw new Error(t('wardrobe.capsules.signIn'))
         const owner = await resolveOwnerUserId(token)
         if (!current(signal)) return
         setOwnerUserId(owner)
       } catch (error: unknown) {
         if (!current(signal)) return
         setErrorMessage(
-          error instanceof Error ? error.message : 'Sign in to manage capsules.'
+          error instanceof Error ? error.message : t('wardrobe.capsules.signIn')
         )
         setIsLoading(false)
       }
     })()
-  }, [current, memberToken])
+  }, [current, memberToken, t])
 
   /** Debounce keystrokes into one query instead of a request per character. */
   useEffect(() => {
@@ -165,7 +165,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
     try {
       const token = await memberToken(controller.signal)
       if (!reading()) return
-      if (!token) throw new Error('Sign in to manage capsules.')
+      if (!token) throw new Error(t('wardrobe.capsules.signIn'))
       const [page, garmentList] = await Promise.all([
         listCapsulesFromMobile(
           token,
@@ -195,7 +195,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
         setIsLoading(false)
       }
     }
-  }, [current, memberToken, ownerUserId, searchQuery, occasionFilter, favoriteOnly])
+  }, [current, memberToken, ownerUserId, searchQuery, occasionFilter, favoriteOnly, t])
 
   useEffect(() => {
     void loadCapsules()
@@ -214,7 +214,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
     if (!signal || !ownerUserId) return
     const token = await memberToken(signal)
     if (!current(signal)) return
-    if (!token) throw new Error('Sign in to manage capsules.')
+    if (!token) throw new Error(t('wardrobe.capsules.signIn'))
     if (editingCapsule && options.ifMatch) {
       await updateCapsuleFromMobile(
         token,
@@ -250,7 +250,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
     try {
       const token = await memberToken(signal)
       if (!current(signal)) return
-      if (!token) throw new Error('Sign in to manage capsules.')
+      if (!token) throw new Error(t('wardrobe.capsules.signIn'))
       await favoriteCapsuleFromMobile(
         token,
         ownerUserId,
@@ -286,7 +286,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
               try {
                 const token = await memberToken(signal)
                 if (!current(signal)) return
-                if (!token) throw new Error('Sign in to manage capsules.')
+                if (!token) throw new Error(t('wardrobe.capsules.signIn'))
                 await deleteCapsuleFromMobile(
                   token,
                   ownerUserId,
@@ -316,13 +316,6 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
 
   return (
     <View style={[styles.screen, themed.screen]}>
-      <Stack.Screen
-        options={{
-          headerLeft: () => <WardrobeBackButton />,
-          title: t('wardrobe.capsules.title'),
-        }}
-      />
-
       {/* Polite status so success does not interrupt a screen reader mid-sentence. */}
       <Text
         accessibilityLiveRegion="polite"
@@ -338,7 +331,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
           onChangeText={setSearchInput}
           placeholder={t('wardrobe.capsules.searchPlaceholder')}
           accessibilityLabel={t('wardrobe.capsules.searchLabel')}
-          placeholderTextColor={colors.mutedText}
+          placeholderTextColor={colors.inkMuted}
           style={[styles.searchInput, themed.field]}
           testID="capsule-search-input"
         />
@@ -452,7 +445,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
 
       {isLoading ? (
         <ActivityIndicator
-          color={colors.text}
+          color={colors.ink}
           style={styles.loader}
           testID="capsule-loading-state"
         />
@@ -485,7 +478,9 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
                   style={styles.iconButton}
                   testID={`favorite-button-${capsule.id}`}
                 >
-                  <Text style={styles.iconText}>{capsule.isFavorite ? '★' : '☆'}</Text>
+                  <Text style={[styles.iconText, themed.text]}>
+                    {capsule.isFavorite ? '★' : '☆'}
+                  </Text>
                 </Pressable>
               </View>
 
@@ -496,8 +491,11 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
               ) : null}
 
               <Text style={[styles.cardMeta, themed.mutedText]}>
-                {capsule.garments.length} garments ·{' '}
-                {capsule.availabilityStatus === 'ready' ? 'Ready' : 'Needs repair'}
+                {t('wardrobe.capsules.garmentCount', { count: capsule.garments.length })}{' '}
+                ·{' '}
+                {capsule.availabilityStatus === 'ready'
+                  ? t('wardrobe.capsules.status.ready')
+                  : t('wardrobe.capsules.status.needsRepair')}
               </Text>
 
               {capsule.unavailableGarmentCount > 0 && (
@@ -550,7 +548,7 @@ function MemberCapsulesScreen({ epoch }: { epoch: number }) {
               style={[styles.truncation, themed.mutedText]}
               testID="capsule-truncation-notice"
             >
-              Showing {capsules.length} of {total}. Refine your search to see the rest.
+              {t('wardrobe.capsules.truncation', { shown: capsules.length, total })}
             </Text>
           )}
         </ScrollView>
@@ -592,16 +590,16 @@ const styles = StyleSheet.create({
   filterRow: { gap: 8, paddingBottom: 8, paddingHorizontal: 16 },
   filterChip: {
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: 9999,
     borderWidth: 1,
     justifyContent: 'center',
     minHeight: 44,
     minWidth: 44,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
-  filterText: { fontSize: 13, textTransform: 'capitalize' },
+  filterText: { fontSize: 14, textTransform: 'capitalize' },
   errorBox: { margin: 16, padding: 12 },
-  errorText: { fontSize: 13 },
+  errorText: { fontSize: 14 },
   loader: { marginTop: 40 },
   emptyState: { alignItems: 'center', marginTop: 48, paddingHorizontal: 24 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
@@ -610,7 +608,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 12,
     borderWidth: 1,
-    gap: 6,
+    gap: 8,
     padding: 16,
   },
   cardHeader: {
@@ -619,7 +617,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardTitle: { flex: 1, fontSize: 16, fontWeight: '600' },
-  cardBody: { fontSize: 13 },
+  cardBody: { fontSize: 14 },
   cardMeta: { fontSize: 12 },
   repairText: { fontSize: 12 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
@@ -629,7 +627,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
   },
-  iconText: { color: '#eab308', fontSize: 20 },
+  // Story CC-7.9 D3: a favorite is a selected state, so the star is `ink`, never gold.
+  iconText: { fontSize: 20 },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 8,
@@ -639,7 +638,7 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 16,
   },
-  secondaryButtonText: { fontSize: 13 },
+  secondaryButtonText: { fontSize: 14 },
   destructiveButton: {
     alignItems: 'center',
     borderRadius: 8,
@@ -649,29 +648,29 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 16,
   },
-  destructiveButtonText: { fontSize: 13 },
+  destructiveButtonText: { fontSize: 14 },
   truncation: { fontSize: 12, textAlign: 'center' },
 })
 
 /** The OS light/dark colors for the layout above. */
 const useThemedStyles = createSchemeStyles((colors) => ({
-  screen: { backgroundColor: colors.background },
-  text: { color: colors.text },
-  mutedText: { color: colors.mutedText },
-  field: { borderColor: colors.strongBorder, color: colors.text },
-  primaryButton: { backgroundColor: colors.inverseSurface },
+  screen: { backgroundColor: colors.page },
+  text: { color: colors.ink },
+  mutedText: { color: colors.inkMuted },
+  field: { borderColor: colors.lineStrong, color: colors.ink },
+  primaryButton: { backgroundColor: colors.inverse },
   primaryButtonText: { color: colors.onInverse },
-  filterChip: { borderColor: colors.strongBorder },
+  filterChip: { borderColor: colors.lineStrong },
   filterChipSelected: {
-    backgroundColor: colors.inverseSurface,
-    borderColor: colors.inverseSurface,
+    backgroundColor: colors.inverse,
+    borderColor: colors.inverse,
   },
-  filterText: { color: colors.text },
+  filterText: { color: colors.ink },
   filterTextSelected: { color: colors.onInverse },
   errorBox: { backgroundColor: colors.dangerSurface },
-  errorText: { color: colors.dangerText },
-  card: { backgroundColor: colors.surface, borderColor: colors.border },
-  secondaryButton: { borderColor: colors.strongBorder },
-  destructiveButton: { borderColor: colors.dangerBorder },
-  repairText: { color: colors.noticeText },
+  errorText: { color: colors.dangerInk },
+  card: { backgroundColor: colors.card, borderColor: colors.line },
+  secondaryButton: { borderColor: colors.lineStrong },
+  destructiveButton: { borderColor: colors.dangerLine },
+  repairText: { color: colors.noticeInk },
 }))

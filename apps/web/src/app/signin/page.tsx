@@ -10,6 +10,8 @@ import {
   type FederatedSignInStrings,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { AppPage, APP_MAIN_CLASS } from '../components/app-page'
+import { AppTopBar } from '../components/app-top-bar'
 import { destinationAfterSignIn } from '../../lib/post-signin-destination'
 import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
 import { LegalLinks } from '../components/legal-page'
@@ -57,106 +59,125 @@ export default function SignInPage() {
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const fieldClass =
+    'min-h-12 rounded-md border border-line-strong bg-page p-3 text-base text-ink'
   return (
-    <main id="main-content" className="mx-auto flex max-w-md flex-col gap-5 p-6">
-      <h1 className="text-3xl font-semibold">{t('community.notifications.signin')}</h1>
-      <GoogleSignInButton
-        from={fromPreview ? 'preview' : null}
-        shape="rect"
-        onUnavailable={() => setGoogleMessage('unavailable')}
-      />
-      {googleMessage ? (
-        <p role="alert" data-testid="google-sign-in-status">
-          {googleStrings[googleMessage as keyof FederatedSignInStrings]}
-        </p>
-      ) : null}
-      <SignInDivider />
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          setBusy(true)
-          setMessage(null)
-          const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
-          void action
-            .then(async () => {
-              if (sent)
-                window.location.assign(
-                  await destinationAfterSignIn(
-                    parsePreviewFrom(
-                      new URLSearchParams(window.location.search).get('from')
-                    ) !== null
-                  )
-                )
-              else {
-                setSent(true)
-                setMessage('community.notifications.codeSent')
-              }
-            })
-            .catch((error: unknown) => {
-              const reason =
-                error instanceof WebSignInError ? error.reason : 'unavailable'
-              // A teen waiting on a guardian goes to the guardian invitation, not a refusal.
-              if (reason === 'awaiting_guardian')
-                window.location.assign(
-                  finishStepHref(fromPreview ? 'preview' : null, 'signin')
-                )
-              // Anything unclassified is treated as temporary, so the person retries.
-              else setMessage(FAILURE_KEYS[reason])
-            })
-            .finally(() => setBusy(false))
-        }}
-      >
-        <label className="flex flex-col gap-2">
-          {t('community.notifications.email')}
-          <input
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            disabled={sent || busy}
-            onChange={(event) => setEmail(event.target.value)}
-            className="min-h-12 rounded border p-3"
-          />
-        </label>
-        {sent && (
-          <label className="flex flex-col gap-2">
-            {t('community.notifications.code')}
-            <input
-              name="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              required
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              className="min-h-12 rounded border p-3"
+    // Story CC-7.9 D6, D7: the shared top bar owns the page's only heading; the form is one card.
+    <AppPage>
+      <AppTopBar title={t('community.notifications.signin')} backHref="/" />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <div className="mx-auto flex w-full max-w-md flex-col gap-5">
+          <div
+            data-surface="card"
+            className="flex flex-col gap-5 rounded-xl border border-line bg-card p-6"
+          >
+            <GoogleSignInButton
+              from={fromPreview ? 'preview' : null}
+              shape="rect"
+              onUnavailable={() => setGoogleMessage('unavailable')}
             />
-          </label>
-        )}
-        <button
-          type="submit"
-          disabled={busy}
-          className="min-h-12 rounded bg-[#C9A14A] px-4 py-3 text-black focus-visible:outline focus-visible:outline-2"
-        >
-          {t(
-            sent ? 'community.notifications.verify' : 'community.notifications.sendCode'
-          )}
-        </button>
-      </form>
-      <p role="status" aria-live="polite">
-        {message ? t(message) : ''}
-      </p>
-      {fromPreview ? (
-        <Link
-          href="/preview"
-          data-testid="signin-back-to-preview"
-          className="inline-flex min-h-11 items-center underline underline-offset-4"
-        >
-          {previewStrings.conversionDetail.backToPreview}
-        </Link>
-      ) : null}
-      <LegalLinks />
-    </main>
+            {googleMessage ? (
+              <p
+                role="alert"
+                data-testid="google-sign-in-status"
+                className="rounded-lg border border-danger-line bg-danger-surface px-4 py-3 text-sm text-danger-ink"
+              >
+                {googleStrings[googleMessage as keyof FederatedSignInStrings]}
+              </p>
+            ) : null}
+            <SignInDivider />
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(event) => {
+                event.preventDefault()
+                setBusy(true)
+                setMessage(null)
+                const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
+                void action
+                  .then(async () => {
+                    if (sent)
+                      window.location.assign(
+                        await destinationAfterSignIn(
+                          parsePreviewFrom(
+                            new URLSearchParams(window.location.search).get('from')
+                          ) !== null
+                        )
+                      )
+                    else {
+                      setSent(true)
+                      setMessage('community.notifications.codeSent')
+                    }
+                  })
+                  .catch((error: unknown) => {
+                    const reason =
+                      error instanceof WebSignInError ? error.reason : 'unavailable'
+                    // A teen waiting on a guardian goes to the guardian invitation, not a refusal.
+                    if (reason === 'awaiting_guardian')
+                      window.location.assign(
+                        finishStepHref(fromPreview ? 'preview' : null, 'signin')
+                      )
+                    // Anything unclassified is treated as temporary, so the person retries.
+                    else setMessage(FAILURE_KEYS[reason])
+                  })
+                  .finally(() => setBusy(false))
+              }}
+            >
+              <label className="flex flex-col gap-2 text-sm font-medium text-ink">
+                {t('community.notifications.email')}
+                <input
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  disabled={sent || busy}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className={fieldClass}
+                />
+              </label>
+              {sent && (
+                <label className="flex flex-col gap-2 text-sm font-medium text-ink">
+                  {t('community.notifications.code')}
+                  <input
+                    name="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    className={fieldClass}
+                  />
+                </label>
+              )}
+              <button
+                type="submit"
+                disabled={busy}
+                data-gold="primary"
+                className="min-h-12 rounded-md bg-primary px-4 py-3 font-semibold text-on-primary disabled:opacity-70"
+              >
+                {t(
+                  sent
+                    ? 'community.notifications.verify'
+                    : 'community.notifications.sendCode'
+                )}
+              </button>
+            </form>
+            <p role="status" aria-live="polite" className="text-sm text-ink-soft">
+              {message ? t(message) : ''}
+            </p>
+            {fromPreview ? (
+              <Link
+                href="/preview"
+                data-testid="signin-back-to-preview"
+                className="inline-flex min-h-11 items-center text-ink underline underline-offset-4"
+              >
+                {previewStrings.conversionDetail.backToPreview}
+              </Link>
+            ) : null}
+          </div>
+          <LegalLinks />
+        </div>
+      </main>
+    </AppPage>
   )
 }

@@ -8,6 +8,8 @@ import {
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
 import { useEffect, type ChangeEvent, type MouseEvent } from 'react'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 import { browserAnalytics } from '../../analytics/browser-analytics'
 import {
   createWebEventsClient,
@@ -78,6 +80,7 @@ function readSignedInAccount(): string | null {
 }
 
 export function AnalyticsEventActions() {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   useEffect(() => {
     if (window.__enableAnalyticsTestHook) {
       window.__analyticsBindingsReady = true
@@ -214,7 +217,8 @@ export function AnalyticsEventActions() {
   }
 
   // On phones these match the landing's sign-in actions in the same stack: 44 px, text-sm (TEA
-  // P1, P3). Wider screens keep their original size.
+  // P1, P3). Wider screens keep their original size. Story CC-7.9 D3: Home's one gold action is
+  // the sample preview entry (guest) or Open wardrobe (member), so these are neutral outlines.
   return (
     <div className="flex flex-wrap gap-4" data-testid="hero-cta-group">
       <a
@@ -224,9 +228,9 @@ export function AnalyticsEventActions() {
         data-ph-cta-label="Preview outfits"
         data-ph-cta-type="primary"
         onClick={handleRitualCreated}
-        className="inline-flex min-h-11 items-center whitespace-nowrap bg-amber-300 text-black px-5 py-3 text-sm sm:px-6 sm:text-base rounded-full font-semibold hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong bg-page px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        Preview outfits
+        {t('landing.actions.previewOutfits')}
       </a>
       <a
         href="#wardrobe"
@@ -234,16 +238,16 @@ export function AnalyticsEventActions() {
         data-ph-event="cta_clicked"
         data-ph-cta-label="See the planner"
         data-ph-cta-type="secondary"
-        className="inline-flex min-h-11 items-center whitespace-nowrap border border-white/30 px-5 py-[11px] text-sm sm:px-6 sm:py-3 sm:text-base rounded-full font-semibold hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        See the planner
+        {t('landing.actions.seePlanner')}
       </a>
       <label
         htmlFor="wardrobe-upload-input"
         data-testid="track-wardrobe-upload-started"
-        className="inline-flex min-h-11 items-center whitespace-nowrap border border-amber-300/70 px-5 py-[11px] text-sm sm:px-6 sm:py-3 sm:text-base rounded-full font-semibold text-amber-200 hover:bg-amber-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-line-strong px-5 py-2 text-sm font-semibold text-ink hover:bg-ink/5 sm:px-6 sm:py-3 sm:text-base"
       >
-        Start wardrobe upload
+        {t('landing.actions.startUpload')}
       </label>
       <input
         id="wardrobe-upload-input"

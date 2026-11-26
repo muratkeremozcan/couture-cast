@@ -1,6 +1,7 @@
 import { parsePreviewFrom } from '@couture/utils'
+import { AppPage, APP_MAIN_CLASS } from '../components/app-page'
 import { SignupForm } from './signup-form'
-import { SignupIntro } from './signup-intro'
+import { SignupIntro, SignupTopBar } from './signup-intro'
 
 export default async function SignupPage({
   searchParams,
@@ -15,19 +16,18 @@ export default async function SignupPage({
       ? google
       : null
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      data-focus-surface="dark"
-      className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white outline-none"
-    >
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 lg:flex-row lg:items-start">
-        <SignupIntro />
+    // Story CC-7.9 D6, D7: the shared top bar and page surface; the always-dark gradient is gone.
+    <AppPage>
+      <SignupTopBar />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 lg:flex-row lg:items-start">
+          <SignupIntro />
 
-        <div className="w-full max-w-lg">
-          <SignupForm fromPreview={fromPreview} googleOutcome={googleOutcome} />
+          <div className="w-full max-w-lg">
+            <SignupForm fromPreview={fromPreview} googleOutcome={googleOutcome} />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </AppPage>
   )
 }

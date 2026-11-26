@@ -46,7 +46,13 @@
         "heat": "Alerta por calor",
         "ice": "Alerta por hielo"
       },
-      "body_generic": "Hay una alerta meteorológica vigente para tu zona."
+      "body_generic": "Hay una alerta meteorológica vigente para tu zona.",
+      "focused_badge": "Alerta meteorológica: {{severity}}",
+      "severity": {
+        "info": "Información",
+        "warning": "Advertencia",
+        "critical": "Crítica"
+      }
     },
     "no_location": "Agrega tu ubicación para recibir tus atuendos del día"
   },
@@ -141,7 +147,8 @@
       "storage_forbidden": "No tienes acceso al almacenamiento.",
       "consent_required": "Se requiere el consentimiento de un tutor para subir prendas.",
       "upload_expired": "La sesión de carga venció.",
-      "upload_session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto."
+      "upload_session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto.",
+      "sign_in_required": "Inicia sesión para administrar tu clóset."
     },
     "crop": {
       "title": "Recortar y posicionar",
@@ -283,7 +290,53 @@
       },
       "garmentsSelected": "Prendas ({{count}} de {{max}} seleccionadas)",
       "garmentsRange": "Selecciona de {{min}} a {{max}} prendas.",
-      "garmentOrder": "Orden de las prendas"
+      "garmentOrder": "Orden de las prendas",
+      "signIn": "Inicia sesión para administrar tus cápsulas.",
+      "status": {
+        "ready": "Lista",
+        "needsRepair": "Necesita reparación"
+      },
+      "garmentCount_one": "{{count}} prenda",
+      "garmentCount_other": "{{count}} prendas",
+      "truncation": "Se muestran {{shown}} de {{total}}. Ajusta tu búsqueda para ver el resto.",
+      "garmentAtPosition": "{{garment}} (posición {{position}})",
+      "garmentNumber": "Prenda {{position}}",
+      "closeBuilder": "Cerrar el creador de cápsulas",
+      "repairRemoved_one": "{{count}} prenda ya no está disponible y se quitó. Elige un reemplazo antes de guardar.",
+      "repairRemoved_other": "{{count}} prendas ya no están disponibles y se quitaron. Elige reemplazos antes de guardar.",
+      "favoriteMarked": "Cápsula favorita",
+      "markFavorite": "Marcar como favorita",
+      "saving": "Guardando...",
+      "subtitle": "Crea y administra tus propias combinaciones de outfits.",
+      "filterOccasionLabel": "Filtrar por ocasión",
+      "loading": "Cargando cápsulas de outfits…",
+      "favoriteCapsule": "Marcar la cápsula {{name}} como favorita",
+      "editAction": "Editar",
+      "deleteAction": "Eliminar",
+      "cancelDeletion": "Cancelar eliminación",
+      "cancel": "Cancelar",
+      "builderDescription": "Arma una cápsula de outfits coherente con tu clóset.",
+      "reloadLatest": "Cargar la versión más reciente",
+      "garmentFallback": "Prenda {{position}}",
+      "garmentNoun": "prenda",
+      "untagged": "Prenda",
+      "garmentLabel": "{{category}} (posición {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (posición {{position}})",
+      "category": {
+        "top": "prenda superior",
+        "bottom": "prenda inferior",
+        "outerwear": "abrigo",
+        "dress": "vestido",
+        "shoes": "zapatos",
+        "accessory": "accesorio"
+      },
+      "comfort": {
+        "cold": "frío",
+        "cool": "fresco",
+        "mild": "templado",
+        "warm": "cálido",
+        "hot": "caluroso"
+      }
     },
     "onboarding": {
       "title": "Configura tu clóset",
@@ -324,7 +377,8 @@
         "storage_error": "No pudimos guardar esta foto. Inténtalo de nuevo.",
         "confirm_required": "Confirma la indicación sobre la ropa base antes de subir la foto.",
         "session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto."
-      }
+      },
+      "sign_in_required": "Inicia sesión para editar tu silueta."
     },
     "detail": {
       "back": "Volver al clóset",
@@ -351,6 +405,20 @@
       "deleteUndone": "Se deshizo",
       "deleteFailed": "No se pudo eliminar esta prenda.",
       "deleteUsageFailed": "No se pudo revisar dónde se usa esta prenda. Inténtalo de nuevo."
+    },
+    "hub": {
+      "loading": "Cargando el clóset",
+      "saved_looks_failed": "No se pudieron cargar tus looks guardados.",
+      "status": {
+        "pending_upload": "Subiendo",
+        "bytes_uploaded": "Subiendo",
+        "processing": "Procesando",
+        "awaiting_tags": "Esperando etiquetas",
+        "ready": "Lista",
+        "failed": "No se pudo subir",
+        "unknown": "En curso"
+      },
+      "detailTitle": "Detalles de la prenda"
     }
   },
   "commerce": {
@@ -627,7 +695,8 @@
           "unchanged": "No había otros looks disponibles para este día.",
           "conflict": "Este día cambió desde la última vez que lo viste. Actualizando…",
           "error": "No se pudo reorganizar este día. Inténtalo de nuevo."
-        }
+        },
+        "openControl": "Planificar la semana"
       },
       "plannerLocked": {
         "title": "El planificador de 7 días es una función Premium",
@@ -1112,5 +1181,61 @@
     "close": "Cerrar",
     "showList": "Mostrar looks guardados",
     "hideList": "Ocultar looks guardados"
+  },
+  "shell": {
+    "back": "Atrás",
+    "notFound": {
+      "title": "Pantalla no encontrada",
+      "body": "La pantalla que buscas no existe. Vuelve a la pantalla de inicio para continuar."
+    },
+    "goHome": "Ir al inicio"
+  },
+  "guardian": {
+    "accept": {
+      "title": "Consentimiento del tutor",
+      "heading": "Aceptar el acceso al armario adolescente",
+      "intro": "Confirma esta invitación para vincular la cuenta del tutor y desbloquear el armario adolescente.",
+      "tokenMissing": "Falta el código de invitación en este enlace.",
+      "success": "Consentimiento registrado para {{teenEmail}}. La cuenta de tutor {{guardianEmail}} ya está vinculada.",
+      "failed": "No se pudo aceptar la invitación del tutor",
+      "accepting": "Aceptando…",
+      "accept": "Aceptar invitación",
+      "acceptingLabel": "Aceptando invitación"
+    },
+    "dashboard": {
+      "title": "Panel del tutor",
+      "intro": "Revisa las cuentas adolescentes vinculadas y revoca el consentimiento cuando el acceso deba terminar.",
+      "loading": "Cargando adolescentes vinculados...",
+      "loadFailed": "No se pudo cargar el panel",
+      "revokeFailed": "No se pudo revocar el consentimiento",
+      "revoked": "Consentimiento revocado para {{teenId}}. Sesión adolescente cerrada: {{invalidated}}.",
+      "yes": "sí",
+      "no": "no",
+      "linkedTeens": "Adolescentes vinculados",
+      "revokeLabel": "Revocar el consentimiento para {{teenId}}",
+      "revoking": "Revocando...",
+      "revoke": "Revocar",
+      "empty": "Aún no hay cuentas adolescentes vinculadas."
+    },
+    "consent": {
+      "awaiting": "Consentimiento pendiente",
+      "status": {
+        "granted": "otorgado",
+        "pending": "pendiente",
+        "revoked": "revocado"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Panel adolescente",
+      "loading": "Cargando el estado del consentimiento...",
+      "loadFailed": "No se pudo cargar el panel",
+      "granted": "Consentimiento del tutor otorgado",
+      "revoked": "Consentimiento del tutor revocado",
+      "pending": "Consentimiento del tutor pendiente",
+      "linkedGuardians": "Tutores vinculados",
+      "empty": "Ningún tutor ha aceptado el consentimiento todavía."
+    }
   }
 }

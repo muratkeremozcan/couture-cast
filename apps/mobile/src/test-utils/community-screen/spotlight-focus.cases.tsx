@@ -232,7 +232,9 @@ export function registerCommunitySpotlightFocusCases() {
     expect(screen.queryByTestId('community-spotlight-loading-more')).toBeNull()
 
     act(() => releaseRefresh())
-    expect(await screen.findByTestId('community-spotlight-item-fresh-1')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-spotlight-item-fresh-1')).toBeVisible()
+    )
     await waitFor(() =>
       expect(screen.getByTestId('community-spotlight-view-more')).not.toHaveAttribute(
         'aria-disabled',

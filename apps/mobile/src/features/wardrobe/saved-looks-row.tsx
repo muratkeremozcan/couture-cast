@@ -492,10 +492,10 @@ function ClosetSavedLooksRowInner({
           key={`${slot.slotIndex}-${slot.itemId}`}
           testID={`saved-look-slot-${slot.slotIndex}`}
           accessibilityHint={slot.itemId}
-          style={[styles.slotChip, { borderColor: colors.strongBorder }]}
+          style={[styles.slotChip, { borderColor: colors.lineStrong }]}
         >
           {catalogItem ? <SampleGarmentArt garment={catalogItem} size={24} /> : null}
-          <Text style={[styles.slotText, { color: colors.text }]}>{label}</Text>
+          <Text style={[styles.slotText, { color: colors.ink }]}>{label}</Text>
         </View>
       )
     }
@@ -509,12 +509,12 @@ function ClosetSavedLooksRowInner({
           style={[
             styles.slotChip,
             {
-              borderColor: colors.noticeBorder,
+              borderColor: colors.noticeLine,
               backgroundColor: colors.noticeSurface,
             },
           ]}
         >
-          <Text style={[styles.slotText, { color: colors.noticeText }]}>
+          <Text style={[styles.slotText, { color: colors.noticeInk }]}>
             {`${samples.values.category[slot.category]} · ${t('savedLooks.missingPiece')}`}
           </Text>
         </View>
@@ -531,7 +531,7 @@ function ClosetSavedLooksRowInner({
         key={`${slot.slotIndex}-${slot.itemId}`}
         testID={`saved-look-slot-${slot.slotIndex}`}
         accessibilityHint={slot.itemId}
-        style={[styles.slotChip, { borderColor: colors.strongBorder }]}
+        style={[styles.slotChip, { borderColor: colors.lineStrong }]}
       >
         {photoUsable && slot.imageAccess ? (
           <Image
@@ -553,12 +553,12 @@ function ClosetSavedLooksRowInner({
             testID="saved-look-photo-placeholder"
             style={[styles.photoFallback, { backgroundColor: colors.noticeSurface }]}
           >
-            <Text style={[styles.photoFallbackText, { color: colors.noticeText }]}>
+            <Text style={[styles.photoFallbackText, { color: colors.noticeInk }]}>
               {samples.values.category[slot.category].slice(0, 2).toUpperCase()}
             </Text>
           </View>
         )}
-        <Text style={[styles.slotText, { color: colors.text }]}>
+        <Text style={[styles.slotText, { color: colors.ink }]}>
           {photoUsable
             ? samples.values.category[slot.category]
             : `${samples.values.category[slot.category]} · ${t('savedLooks.photoUnavailable')}`}
@@ -570,7 +570,7 @@ function ClosetSavedLooksRowInner({
   const displayedCount = totalCount ?? savedLooks.length
 
   return (
-    <View style={[styles.container, { borderColor: colors.strongBorder }]}>
+    <View style={[styles.container, { borderColor: colors.lineStrong }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded }}
@@ -579,16 +579,16 @@ function ClosetSavedLooksRowInner({
         onPress={() => setExpanded((current) => !current)}
       >
         <View>
-          <Text style={[styles.title, { color: colors.text }]}>
+          <Text style={[styles.title, { color: colors.ink }]}>
             {t('savedLooks.title')}
           </Text>
-          <Text style={[styles.count, { color: colors.text }]}>
+          <Text style={[styles.count, { color: colors.ink }]}>
             {isLoading && savedLooks.length === 0
               ? '…'
               : t('savedLooks.count', { count: displayedCount })}
           </Text>
         </View>
-        <Text style={[styles.toggle, { color: colors.text }]}>
+        <Text style={[styles.toggle, { color: colors.ink }]}>
           {expanded ? t('savedLooks.hideList') : t('savedLooks.showList')}
         </Text>
       </Pressable>
@@ -598,7 +598,7 @@ function ClosetSavedLooksRowInner({
           accessibilityRole="alert"
           style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
         >
-          <Text style={{ color: colors.dangerText }}>{t('savedLooks.loadFailed')}</Text>
+          <Text style={{ color: colors.dangerInk }}>{t('savedLooks.loadFailed')}</Text>
           <PreviewButton
             label={t('savedLooks.retry')}
             testID="saved-looks-retry"
@@ -611,7 +611,7 @@ function ClosetSavedLooksRowInner({
       {expanded ? (
         <View testID="closet-saved-looks-list" style={styles.list}>
           {savedLooks.length === 0 ? (
-            <Text style={{ color: colors.text }}>{t('savedLooks.empty')}</Text>
+            <Text style={{ color: colors.ink }}>{t('savedLooks.empty')}</Text>
           ) : (
             savedLooks.map((look) => {
               const title =
@@ -622,10 +622,10 @@ function ClosetSavedLooksRowInner({
                 <View
                   key={look.id}
                   testID={`saved-look-card-${look.id}`}
-                  style={[styles.card, { borderColor: colors.strongBorder }]}
+                  style={[styles.card, { borderColor: colors.lineStrong }]}
                 >
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{title}</Text>
-                  <Text style={[styles.meta, { color: colors.text }]}>
+                  <Text style={[styles.cardTitle, { color: colors.ink }]}>{title}</Text>
+                  <Text style={[styles.meta, { color: colors.ink }]}>
                     {`${weatherLabel(look.weather)} · ${
                       look.source === 'style_piece'
                         ? t('savedLooks.sourceStylePiece')
@@ -636,7 +636,7 @@ function ClosetSavedLooksRowInner({
                     status={look.availabilityStatus}
                     missingLabel={t('savedLooks.missingPiece')}
                     needsReviewLabel={t('savedLooks.needsReview')}
-                    color={colors.noticeText}
+                    color={colors.noticeInk}
                   />
                   <View style={styles.slotsRow}>
                     {sortedSlots(look).map((slot) => renderSlot(look.id, slot))}
@@ -684,7 +684,7 @@ function ClosetSavedLooksRowInner({
             style={[
               styles.modal,
               {
-                backgroundColor: palette.background,
+                backgroundColor: palette.page,
                 paddingTop: insets.top,
                 paddingBottom: insets.bottom,
               },
@@ -693,7 +693,7 @@ function ClosetSavedLooksRowInner({
             <View style={styles.modalHeader}>
               <Text
                 accessibilityRole="header"
-                style={[styles.modalTitle, { color: palette.text }]}
+                style={[styles.modalTitle, { color: palette.ink }]}
               >
                 {t('savedLooks.detailTitle')}
               </Text>
@@ -705,7 +705,7 @@ function ClosetSavedLooksRowInner({
               />
             </View>
             <ScrollView contentContainerStyle={styles.modalBody}>
-              <Text style={{ color: palette.text }}>
+              <Text style={{ color: palette.ink }}>
                 {`${weatherLabel(detailLook.weather)} · ${
                   detailLook.source === 'style_piece'
                     ? t('savedLooks.sourceStylePiece')
@@ -716,9 +716,9 @@ function ClosetSavedLooksRowInner({
                 status={detailLook.availabilityStatus}
                 missingDetail={t('savedLooks.missingPieceDetail')}
                 needsReviewDetail={t('savedLooks.needsReviewDetail')}
-                color={colors.noticeText}
+                color={colors.noticeInk}
               />
-              <Text style={[styles.cardTitle, { color: palette.text }]}>
+              <Text style={[styles.cardTitle, { color: palette.ink }]}>
                 {t('savedLooks.slotOrderLabel')}
               </Text>
               <View style={styles.slotsRow}>
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 14,
+    padding: 16,
     gap: 12,
   },
   headerButton: {
@@ -755,18 +755,18 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: '700' },
   count: { fontSize: 12, opacity: 0.75 },
-  toggle: { fontSize: 13, fontWeight: '600' },
-  errorBox: { borderRadius: 10, padding: 12, gap: 8 },
+  toggle: { fontSize: 14, fontWeight: '600' },
+  errorBox: { borderRadius: 12, padding: 12, gap: 8 },
   list: { gap: 12 },
   card: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 8 },
-  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardTitle: { fontSize: 16, fontWeight: '600' },
   meta: { fontSize: 12, opacity: 0.75 },
   badge: { fontSize: 12, fontWeight: '700' },
   slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   slotChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     borderRadius: 8,
     borderWidth: 1,
     paddingHorizontal: 8,
@@ -780,7 +780,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoFallbackText: { fontSize: 10, fontWeight: '700' },
+  photoFallbackText: { fontSize: 12, fontWeight: '700' },
   slotText: { fontSize: 12 },
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modal: { flex: 1, paddingHorizontal: 16 },

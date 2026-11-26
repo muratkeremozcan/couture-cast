@@ -29,6 +29,12 @@ import {
 } from '../../test-utils/moderation-console'
 import { ModerationCaseDetailView } from './moderation-case-detail'
 
+/**
+ * Story CC-7.9 D6: the route's top bar owns the h1, so a loaded case is the article its title
+ * (now the first h2) names. The wait holds in every locale.
+ */
+const loadedCase = () => screen.findByRole('article')
+
 const CANARY_URL = '/test-only/request-canary'
 // The opt-in test latency can give a canary a shorter wait than an earlier request, so it also waits the longest one.
 const longestTestLatencyMs = () =>
@@ -95,7 +101,7 @@ async function openCase(
   )
   const tree = <ModerationCaseDetailView caseId="post.p1" />
   const view = render(strict ? <StrictMode>{tree}</StrictMode> : tree)
-  await screen.findByRole('heading', { level: 1 })
+  await loadedCase()
   return { reads, bodies, ...view }
 }
 
@@ -1202,13 +1208,13 @@ describe('C-WEB-D-ANNOUNCE', () => {
       mutationHandler<ModerationDecisionInput>(DECISION_PATH, () => json(decisionBody()))
     )
     const view = render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     await submitResolve()
     await waitFor(() => expect(outcomeRegion()).toHaveTextContent(TEXT))
     await waitFor(() => expect(reads).toHaveLength(2))
     view.rerender(<ModerationCaseDetailView caseId="post.p2" />)
     await waitFor(() => expect(reads).toEqual(['post.p1', 'post.p1', 'post.p2']))
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     expect(outcomeRegion()).toBeEmptyDOMElement()
   })
 })
@@ -1281,7 +1287,7 @@ describe('C-WEB-D-RELOAD-ONE: each read writes one audit row', () => {
       mutationHandler<ModerationDecisionInput>(DECISION_PATH, () => json(decisionBody()))
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await loadedCase()
     await submitResolve()
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not refresh. Showing the last result.'
@@ -1398,13 +1404,14 @@ describe('C-WEB-D-A11Y', () => {
     for (const radio of screen.getAllByRole('radio')) expect(radio).toHaveAccessibleName()
   })
 
+  // Story CC-7.9 D6: the back control moved to the route's top bar, ahead of the view.
   it('tabs from the header through the action, the terms, the reason and the submit, in reading order', async () => {
     await openCase(undefined, {
       allowedActions: ['ban'],
       banKinds: ['temporary', 'permanent'],
     })
     const order: string[] = []
-    for (let step = 0; step < 7; step++) {
+    for (let step = 0; step < 6; step++) {
       await userEvent.tab()
       const active = document.activeElement as HTMLElement
       order.push(
@@ -1419,7 +1426,6 @@ describe('C-WEB-D-A11Y', () => {
       )
     }
     expect(order).toEqual([
-      'Back to queue',
       'Reload case',
       'radio',
       'select:temporary',

@@ -96,11 +96,11 @@ describe('AccessibleModal stack', () => {
 
   it('dims the page once: only the top dialog keeps its scrim, and a covered one regains it on top', () => {
     const { controls } = mountSurface()
-    expect(dialog('Share')).toHaveClass('bg-black/60')
+    expect(dialog('Share')).toHaveClass('bg-scrim/60')
     expect(dialog('Detail')).toHaveClass('bg-transparent')
-    expect(dialog('Detail')).not.toHaveClass('bg-black/60')
+    expect(dialog('Detail')).not.toHaveClass('bg-scrim/60')
     act(() => controls.current!.set({ share: false }))
-    expect(dialog('Detail')).toHaveClass('bg-black/60')
+    expect(dialog('Detail')).toHaveClass('bg-scrim/60')
     expect(dialog('Detail')).not.toHaveClass('bg-transparent')
   })
 

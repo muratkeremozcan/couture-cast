@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Text, View } from '@/components/themed'
 import type { WeatherAlert } from '@couture/api-client/contracts/http'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { useTokens } from '@/src/theme/tokens'
 
 type WeatherAlertBannerProps = {
   alerts?: WeatherAlert[]
@@ -62,6 +63,7 @@ function useAlertText(alert: WeatherAlert | undefined) {
 
 export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
   const { announce } = useAccessibilityAnnouncer()
+  const { colors } = useTokens()
   const alertKey = alerts
     ?.map((a) => `${a.event}:${a.severity}:${a.description}:${a.start}:${a.end}`)
     .join('|')
@@ -88,7 +90,10 @@ export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
 
   return (
     <View
-      style={styles.bannerContainer}
+      style={[
+        styles.bannerContainer,
+        { backgroundColor: colors.dangerSurface, borderColor: colors.dangerLine },
+      ]}
       testID="weather-alert-banner"
       accessible
       accessibilityRole="alert"
@@ -100,8 +105,13 @@ export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
           ⚠️
         </Text>
         <View style={styles.textContainer}>
-          <Text style={styles.eventText}>{text.title}</Text>
-          <Text style={styles.descriptionText} numberOfLines={2}>
+          <Text style={[styles.eventText, { color: colors.dangerInk }]}>
+            {text.title}
+          </Text>
+          <Text
+            style={[styles.descriptionText, { color: colors.dangerInk }]}
+            numberOfLines={2}
+          >
             {text.body}
           </Text>
         </View>
@@ -111,10 +121,9 @@ export function WeatherAlertBanner({ alerts }: WeatherAlertBannerProps) {
 }
 
 const styles = StyleSheet.create({
+  // A severe weather alert reads on the danger roles of the scheme (Story CC-7.9 D2).
   bannerContainer: {
-    backgroundColor: '#361F1F',
     borderWidth: 1,
-    borderColor: '#B04A4A',
     borderRadius: 8,
     padding: 12,
     marginHorizontal: 16,
@@ -134,15 +143,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   eventText: {
-    color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
-    fontFamily: 'Inter',
     marginBottom: 2,
   },
   descriptionText: {
-    color: '#FFFFFF',
     fontSize: 12,
-    fontFamily: 'Inter',
   },
 })

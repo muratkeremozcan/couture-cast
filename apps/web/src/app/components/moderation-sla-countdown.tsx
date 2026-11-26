@@ -28,14 +28,11 @@ export function formatDuration(
 }
 
 export const SLA_BADGE_CLASS: Record<ModerationCaseSlaState, string> = {
-  on_track:
-    'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
-  at_risk:
-    'bg-amber-100 text-amber-950 ring-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-500',
-  breached:
-    'bg-red-100 text-red-950 ring-red-800 dark:bg-red-950 dark:text-red-100 dark:ring-red-400',
-  resolved:
-    'bg-emerald-100 text-emerald-950 ring-emerald-800 dark:bg-emerald-950 dark:text-emerald-100 dark:ring-emerald-400',
+  // Story CC-7.9 D2: severity reads through the notice, danger and success roles in both schemes.
+  on_track: 'bg-card-muted text-ink ring-line-strong',
+  at_risk: 'bg-notice-surface text-notice-ink ring-notice-line',
+  breached: 'bg-danger-surface text-danger-ink ring-danger-line',
+  resolved: 'bg-card text-success-ink ring-success-ink',
 }
 
 /**
@@ -116,7 +113,7 @@ export function SlaCountdown({
     <span className="inline-flex flex-wrap items-center gap-2">
       <span
         data-sla-state={state}
-        className={`inline-flex min-h-[28px] items-center rounded px-2 text-sm font-semibold ring-1 ring-inset ${SLA_BADGE_CLASS[state]}`}
+        className={`inline-flex min-h-[28px] items-center rounded-md px-2 text-sm font-semibold ring-1 ring-inset ${SLA_BADGE_CLASS[state]}`}
       >
         {t(`moderation.slaState.${state}`)}
       </span>

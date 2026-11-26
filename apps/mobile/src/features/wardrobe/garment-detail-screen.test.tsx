@@ -25,22 +25,31 @@ const routerMock = vi.hoisted(() => ({
   replace: vi.fn(),
   setParams: vi.fn(),
 }))
+// Story CC-7.9 D6: the root stack draws its header with renderStackTopBar from the options the
+// screen registers. The mock renders that real header inline for this route, entered directly
+// (no caller below), so the title and Back a member sees are the ones asserted.
+const stackHeader = vi.hoisted(() => ({
+  render: null as null | ((props: never) => React.ReactNode),
+}))
 vi.mock('expo-router', () => ({
   router: routerMock,
-  // The stack header is native chrome; render its title and back control inline.
   Stack: {
-    Screen: ({
-      options,
-    }: {
-      options: { title?: string; headerLeft?: () => React.ReactNode }
-    }) => (
-      <div data-testid="stack-header">
-        {options.headerLeft?.()}
-        <span data-testid="stack-header-title">{options.title}</span>
-      </div>
-    ),
+    Screen: ({ options }: { options: { title?: string } }) => {
+      const route = { key: 'wardrobe-garment-1', name: 'wardrobe-garment' }
+      return stackHeader.render?.({
+        options,
+        route,
+        navigation: {
+          goBack: routerMock.back,
+          canGoBack: () => false,
+          getState: () => ({ routes: [route] }),
+        },
+      } as never)
+    },
   },
 }))
+// The icon font loader has no web module Vite resolves; the Back chevron is decoration.
+vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
 
 const files = vi.hoisted(() => new Map<string, string>())
 vi.mock('expo-file-system', () => ({
@@ -140,7 +149,10 @@ import {
   resetGarmentDeletionForTests,
   type MobileGarmentDeletion,
 } from './garment-deletion'
+import { renderStackTopBar } from '@/src/components/app-top-bar'
 import { GarmentDetailScreen } from './garment-detail-screen'
+
+stackHeader.render = renderStackTopBar as (props: never) => React.ReactNode
 
 const owner = 'garment-detail-owner'
 const garmentId = 'native-blue-top'
@@ -195,6 +207,8 @@ function renderDetail(id: string | undefined = garmentId, withProvider = true) {
 }
 
 const tag = (testId: string) => screen.getByTestId(testId)
+/** The title of the shared top bar the screen registers. */
+const topBarTitle = () => within(tag('app-top-bar')).getByRole('heading')
 
 /** The visible group and choice names a member hears for each tag option. */
 const TAG_CHOICES: Record<string, readonly [group: string, choice: string]> = {
@@ -309,11 +323,11 @@ describe('GarmentDetailScreen', () => {
     vi.clearAllMocks()
   })
 
-  it('[P0] [7.5-NAT-003] shows back, the labeled photo, the tags, Edit tags and Style this piece', async () => {
+  it('[P0] [7.5-NAT-003] [7.9 D6] titles the header, shows the labeled photo, the tags, Edit tags and Style this piece', async () => {
     renderDetail()
 
     const detail = await screen.findByTestId('garment-detail')
-    expect(screen.getByTestId('stack-header-title')).toHaveTextContent('Blue top')
+    expect(topBarTitle()).toHaveTextContent('Blue top')
     expect(within(detail).getByTestId('garment-detail-photo')).toHaveAccessibleName(
       'Blue top'
     )
@@ -322,19 +336,17 @@ describe('GarmentDetailScreen', () => {
     expect(tag('garment-detail-comfort').textContent).toBe('Mild')
     expect(await editTagsButton()).toHaveAttribute('data-testid', 'garment-edit-tags')
     expect(tag('style-piece-open')).toBeVisible()
-
-    await browserUser.click(tag('garment-detail-back'))
-    expect(routerMock.back).toHaveBeenCalledTimes(1)
+    // The header owns the title; the body repeats it in no heading of its own.
+    expect(within(detail).queryByRole('heading', { name: 'Blue top' })).toBeNull()
   })
 
-  it('[P1] [7.5-NAT-003] back with no history returns to the closet tab', async () => {
-    routerMock.canGoBack.mockReturnValueOnce(false)
+  it('[P1] [7.9 D6] titles the top bar while the piece loads', async () => {
     renderDetail()
 
-    await browserUser.click(await screen.findByTestId('garment-detail-back'))
-
-    expect(routerMock.dismissTo).toHaveBeenCalledWith('/wardrobe')
-    expect(routerMock.back).not.toHaveBeenCalled()
+    expect(tag('garment-detail-loading')).toBeInTheDocument()
+    expect(topBarTitle().textContent).toBe('Piece details')
+    expect(await screen.findByTestId('garment-detail')).toBeInTheDocument()
+    expect(topBarTitle().textContent).toBe('Blue top')
   })
 
   it.each([
@@ -353,7 +365,12 @@ describe('GarmentDetailScreen', () => {
       expect(await screen.findByTestId('garment-detail-missing')).toHaveTextContent(
         'This piece is no longer in your closet.'
       )
-      expect(tag('garment-detail-back')).toBeVisible()
+      // The top bar keeps a localized title and a working Back on the missing state.
+      expect(topBarTitle().textContent).toBe('Piece details')
+      const back = within(tag('app-top-bar')).getByTestId('app-top-bar-back')
+      expect(back).toHaveAccessibleName('Back')
+      fireEvent.click(back)
+      expect(routerMock.replace).toHaveBeenCalledWith('/wardrobe')
     }
   )
 
@@ -390,9 +407,7 @@ describe('GarmentDetailScreen', () => {
     renderDetail()
     await openEditorAndPick('garment-tag-option-category-outerwear')
     await browserUser.click(tag('garment-tag-done'))
-    await waitFor(() =>
-      expect(tag('stack-header-title')).toHaveTextContent('Blue outer layer')
-    )
+    await waitFor(() => expect(topBarTitle()).toHaveTextContent('Blue outer layer'))
 
     await browserUser.click(await screen.findByTestId('status-bar-action-undo'))
 
@@ -405,7 +420,7 @@ describe('GarmentDetailScreen', () => {
       { ...loaded, expected: savedTags },
     ])
     expect(tag('garment-detail-category').textContent).toBe('Top')
-    expect(tag('stack-header-title')).toHaveTextContent('Blue top')
+    expect(topBarTitle()).toHaveTextContent('Blue top')
     expect(changes).toBe(2)
   })
 
@@ -983,11 +998,13 @@ describe('GarmentDetailScreen', () => {
     )
     renderDetail()
 
-    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText('Could not load this piece. Try again.')).toBeVisible()
+    )
     expect(screen.queryByTestId('garment-detail-missing')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
 
-    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-detail')).toBeVisible())
     expect(reads).toBe(2)
   })
 
@@ -1002,12 +1019,14 @@ describe('GarmentDetailScreen', () => {
     const restoreSignedOut = setMobileAccessTokenResolver(() => undefined)
     renderDetail()
 
-    expect(await screen.findByText('Could not load this piece. Try again.')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText('Could not load this piece. Try again.')).toBeVisible()
+    )
     expect(reads).toBe(0)
 
     restoreSignedOut()
     await browserUser.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(await screen.findByTestId('garment-detail')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-detail')).toBeVisible())
     expect(reads).toBe(1)
   })
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Platform } from 'react-native'
+import { StyleSheet } from 'react-native'
 import { Text, View } from '@/components/themed'
 import {
   defaultSupportedLocale,
@@ -52,8 +52,8 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
   if (isLoading) {
     return (
       <View style={styles.skeletonContainer} testID="weather-header-skeleton">
-        <View style={[styles.skeletonTemp, { backgroundColor: palette.skeleton }]} />
-        <View style={[styles.skeletonText, { backgroundColor: palette.skeleton }]} />
+        <View style={[styles.skeletonTemp, { backgroundColor: palette.cardMuted }]} />
+        <View style={[styles.skeletonText, { backgroundColor: palette.cardMuted }]} />
       </View>
     )
   }
@@ -88,7 +88,7 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
     >
       <View style={styles.row}>
         <Text
-          style={[styles.temperature, { color: palette.text }]}
+          style={[styles.temperature, { color: palette.ink }]}
           testID="current-temperature"
           accessible={false}
         >
@@ -99,7 +99,7 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
         </Text>
       </View>
       <Text
-        style={[styles.conditionText, { color: palette.mutedText }]}
+        style={[styles.conditionText, { color: palette.inkMuted }]}
         testID="current-condition"
         accessible={false}
       >
@@ -122,29 +122,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   temperature: {
-    fontSize: 48,
+    fontSize: 30,
     fontWeight: '700',
-    fontFamily: Platform.select({
-      ios: 'Space Grotesk Bold',
-      android: 'Space Grotesk Bold',
-      web: 'Space Grotesk, "SF Mono", monospace',
-      default: 'System',
-    }),
-    color: '#111111',
   },
   glyph: {
-    fontSize: 40,
+    fontSize: 30,
     marginLeft: 12,
   },
   conditionText: {
     fontSize: 14,
-    color: '#a3a3a3',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
     marginTop: 4,
   },
   skeletonContainer: {
@@ -155,14 +141,12 @@ const styles = StyleSheet.create({
   skeletonTemp: {
     width: 120,
     height: 48,
-    backgroundColor: '#E6E6ED',
     borderRadius: 8,
     marginBottom: 8,
   },
   skeletonText: {
     width: 80,
     height: 16,
-    backgroundColor: '#E6E6ED',
     borderRadius: 4,
   },
 })

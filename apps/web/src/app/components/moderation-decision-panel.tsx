@@ -23,12 +23,12 @@ import {
   type ModerationCaseResult,
   type ModerationDecisionFailure,
 } from '../../lib/moderation'
-import { moderationControl } from './moderation-failure-notice'
+import { moderationControl, moderationPrimaryControl } from './moderation-failure-notice'
 
 const field =
-  'min-h-[44px] rounded border border-neutral-500 bg-white p-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)] dark:bg-neutral-900 dark:text-neutral-100'
-export const moderationCard =
-  'rounded-lg border border-neutral-400 bg-white p-4 text-neutral-900 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100'
+  'min-h-[44px] rounded-md border border-line-strong bg-page p-2 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
+/** Story CC-7.9 D7: a console card. Its container also carries `data-surface="card"`. */
+export const moderationCard = 'rounded-xl border border-line bg-card p-4 text-ink'
 
 const CONFIRMED: readonly ModerationDecisionAction[] = ['takedown', 'ban']
 type Duration = (typeof MODERATION_BAN_DURATION_DAYS)[number]
@@ -70,7 +70,7 @@ export function DecisionFailureNotice({
   return (
     <div
       role="alert"
-      className="flex flex-col gap-2 rounded border border-red-800 p-3 text-sm dark:border-red-400"
+      className="flex flex-col gap-2 rounded-md border border-danger-line bg-danger-surface p-3 text-sm text-danger-ink"
     >
       <p>{message}</p>
       {retryable ? (
@@ -281,7 +281,11 @@ export function ModerationDecisionPanel({
 
   const counterId = 'moderation-decision-count'
   return (
-    <section aria-labelledby="decision-heading" className={moderationCard}>
+    <section
+      aria-labelledby="decision-heading"
+      data-surface="card"
+      className={moderationCard}
+    >
       <h2 id="decision-heading" className="mb-3 text-lg font-semibold">
         {t('moderation.decision.title')}
       </h2>
@@ -302,7 +306,7 @@ export function ModerationDecisionPanel({
               <input
                 type="radio"
                 name="moderation-decision-action"
-                className="h-5 min-h-0 w-5 min-w-0 shrink-0"
+                className="h-5 min-h-0 w-5 min-w-0 shrink-0 accent-ink"
                 checked={action === option}
                 onChange={() => {
                   setChosen(option)
@@ -315,7 +319,7 @@ export function ModerationDecisionPanel({
                 <span className="font-medium">
                   {t(`moderation.decision.action.${option}`)}
                 </span>
-                <span className="block text-neutral-700 dark:text-neutral-300">
+                <span className="block text-ink-soft">
                   {t(`moderation.decision.hint.${option}`)}
                 </span>
               </span>
@@ -354,7 +358,7 @@ export function ModerationDecisionPanel({
             }}
           />
         </label>
-        <p id={counterId} className="text-sm text-neutral-700 dark:text-neutral-300">
+        <p id={counterId} className="text-sm text-ink-soft">
           {t('moderation.decision.reasonCount', {
             count: trimmed.length,
             max: MODERATION_REASON_MAX_LENGTH,
@@ -378,7 +382,7 @@ export function ModerationDecisionPanel({
           <div
             role="group"
             aria-labelledby="decision-confirm"
-            className="flex flex-col gap-3 rounded border border-amber-700 p-3 text-sm"
+            className="flex flex-col gap-3 rounded-md border border-notice-line bg-notice-surface p-3 text-sm text-notice-ink"
           >
             <p id="decision-confirm">
               {t(
@@ -409,7 +413,8 @@ export function ModerationDecisionPanel({
             <button
               ref={submitRef}
               type="submit"
-              className={moderationControl}
+              data-gold="primary"
+              className={moderationPrimaryControl}
               aria-disabled={!reasonValid || submitting}
             >
               {t(

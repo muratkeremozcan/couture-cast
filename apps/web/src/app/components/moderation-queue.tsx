@@ -20,10 +20,9 @@ import { PlainText } from './moderation-plain-text'
 import { SlaCountdown } from './moderation-sla-countdown'
 
 const RISK_CLASS = {
-  high: 'bg-red-100 text-red-950 ring-red-800 dark:bg-red-950 dark:text-red-100 dark:ring-red-400',
-  medium:
-    'bg-amber-100 text-amber-950 ring-amber-700 dark:bg-amber-950 dark:text-amber-100 dark:ring-amber-500',
-  low: 'bg-neutral-100 text-neutral-900 ring-neutral-400 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-500',
+  high: 'bg-danger-surface text-danger-ink ring-danger-line',
+  medium: 'bg-notice-surface text-notice-ink ring-notice-line',
+  low: 'bg-card-muted text-ink ring-line-strong',
 } as const
 
 type Phase = 'loading' | 'ready' | 'failed'
@@ -218,14 +217,10 @@ export function ModerationQueueView() {
   const status = queueStatus(t, phase, refreshed, items.length)
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      {/* Story CC-7.9 D6: the title lives in the top bar; the body opens on its subtitle and links. */}
       <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold">{t('moderation.title')}</h1>
-          <p className="text-sm text-neutral-700 dark:text-neutral-300">
-            {t('moderation.subtitle')}
-          </p>
-        </div>
+        <p className="text-sm text-ink-soft">{t('moderation.subtitle')}</p>
         <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/moderation/sla"
@@ -285,7 +280,7 @@ function QueueEmpty({ show, filtered }: { show: boolean; filtered: boolean }) {
   const { t } = useModerationTranslation()
   if (!show) return null
   return (
-    <p className="rounded border border-dashed border-neutral-500 p-6">
+    <p className="rounded-md border border-dashed border-line-strong p-6">
       {t(filtered ? 'moderation.queue.filteredEmpty' : 'moderation.queue.empty')}
     </p>
   )
@@ -305,7 +300,7 @@ function StaleNotice({
   return (
     <div
       role="alert"
-      className="flex flex-wrap items-center gap-3 rounded border border-amber-700 p-3 text-sm"
+      className="flex flex-wrap items-center gap-3 rounded-md border border-notice-line bg-notice-surface p-3 text-sm text-notice-ink"
     >
       <p>{t(specific ? `moderation.state.${failure}` : 'moderation.state.stale')}</p>
       <button
@@ -405,11 +400,12 @@ function CaseRow({
   return (
     <article
       aria-labelledby={`case-${item.caseId}`}
-      className="relative rounded-lg border border-neutral-400 bg-white p-4 text-neutral-900 focus-within:outline focus-within:outline-2 focus-within:outline-[color:var(--focus-essential)] dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100"
+      data-surface="card"
+      className="relative rounded-xl border border-line bg-card p-4 text-ink focus-within:outline focus-within:outline-2 focus-within:outline-focus-essential"
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
-          className={`inline-flex min-h-[28px] items-center rounded px-2 text-sm font-semibold ring-1 ring-inset ${RISK_CLASS[item.risk]}`}
+          className={`inline-flex min-h-[28px] items-center rounded-md px-2 text-sm font-semibold ring-1 ring-inset ${RISK_CLASS[item.risk]}`}
         >
           {t('moderation.riskLabel', { risk: t(`moderation.risk.${item.risk}`) })}
         </span>
@@ -424,7 +420,7 @@ function CaseRow({
           id={`case-link-${item.caseId}`}
           aria-labelledby={`case-link-${item.caseId} case-hint-${item.caseId} case-ref-${item.caseId}`}
           href={`/moderation/cases/${encodeURIComponent(item.caseId)}`}
-          className="rounded after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]"
+          className="rounded-md after:absolute after:inset-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           {t('moderation.queue.caseTitle', {
             source: t(`moderation.source.${item.source}`),
@@ -440,7 +436,7 @@ function CaseRow({
       <span id={`case-ref-${item.caseId}`} className="sr-only">
         {t('moderation.queue.caseRef', { id: item.caseId })}
       </span>
-      <p className="mt-2 text-sm text-neutral-700 dark:text-neutral-300">
+      <p className="mt-2 text-sm text-ink-soft">
         {t('moderation.queue.reports', { count: item.reportCount })}
         {' · '}
         {item.reasons.map((reason) => t(`moderation.reason.${reason}`)).join(', ')}

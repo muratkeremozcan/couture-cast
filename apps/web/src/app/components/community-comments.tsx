@@ -12,8 +12,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 
-const control =
-  'min-h-[44px] min-w-[44px] rounded px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]'
+const control = 'min-h-11 min-w-11 rounded-md px-3 py-2 text-sm font-medium'
 
 /**
  * The author line of a comment, by the community card's rule: the alias, else
@@ -160,7 +159,7 @@ export function CommunityComments({
           )
             focusedEntry.current = null
         }}
-        className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] p-3"
+        className="space-y-2 rounded-lg border border-theme-card-border p-3"
       >
         {author && <p className="text-sm font-semibold">{author}</p>}
         <p className="break-words text-sm">
@@ -241,7 +240,7 @@ export function CommunityComments({
               {t('community.report.reasonLabel')}
               <select
                 ref={reasonRef}
-                className={`${control} block w-full border bg-[var(--theme-card-bg)]`}
+                className={`${control} block w-full border bg-theme-card-bg`}
                 value={reason}
                 onChange={(event) =>
                   setReason(communityReportReasonSchema.parse(event.target.value))
@@ -274,7 +273,7 @@ export function CommunityComments({
     <section
       aria-labelledby="community-comments-title"
       data-testid="community-comments"
-      className="space-y-4 border-t border-[color:var(--theme-card-border)] pt-4 text-[color:var(--theme-card-text)]"
+      className="space-y-4 border-t border-theme-card-border pt-4 text-theme-card-text"
     >
       <div className="flex items-center justify-between gap-3">
         <h3
@@ -311,7 +310,7 @@ export function CommunityComments({
           <div key={root.id}>
             {renderEntry(root)}
             {thread.replies.has(root.id) && (
-              <div className="ml-4 mt-2 space-y-2 border-l border-[color:var(--theme-card-border)] pl-3">
+              <div className="ml-4 mt-2 space-y-2 border-l border-theme-card-border pl-3">
                 {thread.replies.get(root.id)?.items.map(renderEntry)}
                 {thread.replies.get(root.id)?.nextCursor && (
                   <button
@@ -358,7 +357,7 @@ export function CommunityComments({
           <article
             key={item.id}
             data-testid={`comment-submission-${item.id}`}
-            className="rounded border border-[color:var(--theme-card-border)] p-3 text-sm"
+            className="rounded-md border border-theme-card-border p-3 text-sm"
           >
             <p>{t(`community.comments.status.${item.status}`)}</p>
             {item.body && <p className="break-words">{item.body}</p>}
@@ -428,7 +427,7 @@ export function CommunityComments({
           ref={composerRef}
           data-testid="comment-body"
           value={thread.draft.body}
-          className="min-h-[44px] w-full rounded border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] px-3 text-[color:var(--theme-card-text)] focus:outline focus:outline-2 focus:outline-[color:var(--theme-secondary)]"
+          className="min-h-11 w-full rounded-md border border-line-strong bg-page px-3 text-theme-card-text"
           onChange={(event) =>
             state.draft(postId, {
               body: composing.current
@@ -458,7 +457,7 @@ export function CommunityComments({
         )}
         <button
           type="submit"
-          className={`${control} bg-[#C9A14A] text-[#111111]`}
+          className={`${control} border border-line-strong bg-page text-ink`}
           disabled={thread.pending}
         >
           {t(

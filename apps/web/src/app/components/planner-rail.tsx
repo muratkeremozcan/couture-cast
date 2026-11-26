@@ -118,13 +118,13 @@ function GarmentThumb({
       ) : (
         <div
           aria-hidden="true"
-          className="flex h-14 w-14 items-center justify-center rounded-md bg-[var(--theme-card-bg)] text-xl"
+          className="flex h-14 w-14 items-center justify-center rounded-md border border-theme-card-border text-xl"
         >
           👗
         </div>
       )}
       {garment.category && (
-        <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
+        <span className="text-xs text-ink-muted">
           {t(`commerce.premium.planner.garmentCategory.${garment.category}`)}
         </span>
       )}
@@ -141,40 +141,32 @@ function OutfitCard({
 }) {
   return (
     <li
-      className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-3"
+      className="space-y-2 border-t border-theme-card-border pt-3"
       data-testid={`planner-outfit-${outfit.scenario}`}
     >
       {/*
-       * `--theme-secondary` is a decorative accent (a button background at
-       * line ~363, a focus-outline color at ~656), not a text color: in every
-       * one of the four premium themes it is too light against this card's
-       * white background to clear WCAG's 4.5:1 small-text minimum (the
-       * default theme's `#c9a14a` measures 2.41:1). `--theme-card-text` is
-       * the token this codebase already defines for legible text on a card
-       * (Decision 8), and the capsule name directly below already uses it.
+       * Story CC-7.9 D7: an outfit is a plain section of its day, inside the rail's one card.
+       * `theme-secondary` is a decorative accent, too light for text in every premium palette,
+       * so the scenario label uses `theme-card-text`, the palette's text color (Decision 8).
        */}
-      <p className="lookbook-metrics text-[11px] uppercase tracking-wide text-[color:var(--theme-card-text)]">
+      <p className="text-xs uppercase tracking-wide text-theme-card-text">
         {t(`commerce.premium.planner.scenario.${outfit.scenario}`)}
       </p>
       {outfit.capsuleName && (
-        <p className="text-sm font-medium text-[color:var(--theme-card-text)]">
-          {outfit.capsuleName}
-        </p>
+        <p className="text-sm font-medium text-theme-card-text">{outfit.capsuleName}</p>
       )}
       <ul className="flex flex-wrap gap-2">
         {outfit.displayGarments.map((garment) => (
           <GarmentThumb key={garment.id} garment={garment} t={t} />
         ))}
       </ul>
-      <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
-        {outfit.comfortNotes}
-      </p>
+      <p className="text-xs text-ink-muted">{outfit.comfortNotes}</p>
       {outfit.reasoningBadges.length > 0 && (
         <ul className="flex flex-wrap gap-1">
           {outfit.reasoningBadges.map((badge) => (
             <li
               key={badge.key}
-              className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-[color:var(--lookbook-ink-muted)]"
+              className="rounded-full border border-theme-card-border px-2 py-0.5 text-xs text-ink-muted"
             >
               {badge.label}
             </li>
@@ -195,15 +187,11 @@ function WeatherSummary({
   t: (key: string) => string
 }) {
   if (weather.confidence === 'unavailable') {
-    // `text-[color:var(--lookbook-ink-muted)]` measured 4.35:1 against this card's
-    // `--theme-card-bg` (a `ReadyDayCard` root, not the white `OutfitCard`
-    // background `--theme-card-text`'s sibling fix at `OutfitCard` above
-    // addresses), just under WCAG's 4.5:1 small-text minimum.
-    // `--theme-card-text` is the token this codebase pairs with
-    // `--theme-card-bg` by design (Decision 8) for exactly this reason.
+    // `theme-card-text` is the text color each premium palette pairs with its
+    // `theme-card-bg` (Decision 8), so this line holds 4.5:1 on every palette.
     return (
       <p
-        className="text-xs text-[color:var(--theme-card-text)]"
+        className="text-xs text-theme-card-text"
         data-testid="planner-weather-unavailable"
       >
         {t('commerce.premium.planner.weatherUnavailable')}
@@ -224,10 +212,7 @@ function WeatherSummary({
       : null
 
   return (
-    <p
-      className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]"
-      data-testid="planner-weather"
-    >
+    <p className="text-xs text-ink-muted" data-testid="planner-weather">
       {[high, low].filter(Boolean).join(' / ')}
       {conditionLabel ? ` · ${conditionLabel}` : ''}
       {' · '}
@@ -264,19 +249,17 @@ function ReadyDayCard({
 
   return (
     <li
-      className="space-y-3 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4"
+      className="space-y-3 border-t border-theme-card-border pt-4 first:border-t-0 first:pt-0"
       data-testid={`planner-day-${day.planDate}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
-            {dayLabel}
-          </p>
+          <p className="text-sm font-semibold text-theme-card-text">{dayLabel}</p>
           <WeatherSummary weather={day.weather} locale={locale} t={t} />
         </div>
         {day.isStarterWardrobe && (
           <span
-            className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-[color:var(--lookbook-ink-muted)]"
+            className="rounded-full border border-theme-card-border px-2 py-0.5 text-xs text-ink-muted"
             data-testid={`planner-starter-${day.planDate}`}
           >
             {t('commerce.premium.planner.starterWardrobe')}
@@ -293,7 +276,7 @@ function ReadyDayCard({
 
       <button
         type="button"
-        className="min-h-[44px] w-full rounded-md border border-[color:var(--theme-card-border)] text-sm font-semibold text-[color:var(--theme-card-text)] disabled:opacity-70"
+        className="min-h-11 w-full rounded-md border border-theme-card-border text-sm font-semibold text-theme-card-text disabled:opacity-70"
         data-testid={`planner-reshuffle-${day.planDate}`}
         aria-busy={isBusy}
         disabled={isBusy}
@@ -308,7 +291,7 @@ function ReadyDayCard({
         <p
           role="alert"
           aria-live="assertive"
-          className="text-xs font-medium text-[color:var(--lookbook-danger)]"
+          className="text-xs font-medium text-danger-ink"
           data-testid={`planner-day-alert-${day.planDate}`}
         >
           {dayError}
@@ -340,22 +323,20 @@ function ErrorDayCard({
 
   return (
     <li
-      className="space-y-2 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4"
+      className="space-y-2 border-t border-theme-card-border pt-4 first:border-t-0 first:pt-0"
       data-testid={`planner-day-${day.planDate}`}
     >
-      <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
-        {dayLabel}
-      </p>
+      <p className="text-sm font-semibold text-theme-card-text">{dayLabel}</p>
       <p
         role="alert"
         aria-live="assertive"
-        className="text-xs font-medium text-[color:var(--lookbook-danger)]"
+        className="text-xs font-medium text-danger-ink"
       >
         {t('commerce.premium.planner.dayError')}
       </p>
       <button
         type="button"
-        className="min-h-[44px] rounded-md border border-[color:var(--theme-card-border)] px-4 text-sm font-semibold text-[color:var(--theme-card-text)]"
+        className="min-h-11 rounded-md border border-theme-card-border px-4 text-sm font-semibold text-theme-card-text"
         data-testid={`planner-retry-${day.planDate}`}
         onClick={onRetry}
       >
@@ -371,7 +352,7 @@ function PlannerSkeleton() {
       {Array.from({ length: 7 }, (_unused, index) => (
         <li
           key={index}
-          className="h-20 motion-safe:animate-pulse rounded-[8px] bg-[var(--theme-card-bg)]"
+          className="h-20 motion-safe:animate-pulse rounded-md bg-theme-card-border"
         />
       ))}
     </ul>
@@ -387,11 +368,8 @@ function LockedPanel({
 }) {
   if (reason === 'disabled') {
     return (
-      <div
-        className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
-        data-testid="planner-rail-disabled"
-      >
-        <p className="text-sm font-medium text-[color:var(--theme-card-text)]">
+      <div className="space-y-2" data-testid="planner-rail-disabled">
+        <p className="text-sm font-medium text-theme-card-text">
           {t('commerce.premium.planner.disabled')}
         </p>
       </div>
@@ -399,16 +377,13 @@ function LockedPanel({
   }
 
   return (
-    <div
-      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
-      data-testid="planner-rail-locked"
-    >
-      <p className="text-sm font-medium text-[color:var(--theme-card-text)]">
+    <div className="space-y-3" data-testid="planner-rail-locked">
+      <p className="text-sm font-medium text-theme-card-text">
         {t('commerce.premium.plannerLocked.title')}
       </p>
       <a
         href="/settings"
-        className="inline-block min-h-[44px] rounded-lg bg-[#C9A14A] px-4 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-primary)]"
+        className="inline-block min-h-11 rounded-lg border border-theme-card-border px-4 py-2 text-xs font-semibold text-theme-card-text"
         data-testid="planner-rail-get-premium"
       >
         {t('commerce.premium.plannerLocked.cta')}
@@ -419,20 +394,17 @@ function LockedPanel({
 
 function ErrorPanel({ onRetry, t }: { onRetry: () => void; t: (key: string) => string }) {
   return (
-    <div
-      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
-      data-testid="planner-rail-error"
-    >
+    <div className="space-y-3" data-testid="planner-rail-error">
       <p
         role="alert"
         aria-live="assertive"
-        className="text-sm font-medium text-[color:var(--lookbook-danger)]"
+        className="text-sm font-medium text-danger-ink"
       >
         {t('commerce.premium.planner.errorTitle')}
       </p>
       <button
         type="button"
-        className="min-h-[44px] rounded-md border border-[color:var(--theme-card-border)] px-4 text-sm font-semibold text-[color:var(--theme-card-text)]"
+        className="min-h-11 rounded-md border border-theme-card-border px-4 text-sm font-semibold text-theme-card-text"
         data-testid="planner-rail-retry"
         onClick={onRetry}
       >
@@ -535,19 +507,20 @@ export function PlannerRail({
   return (
     <aside
       ref={dialogRef as React.RefObject<HTMLElement>}
-      aria-label="Planner Rail"
+      aria-label={t('commerce.premium.planner.railLabel')}
+      data-surface="card"
       tabIndex={-1}
       onKeyDown={handleKeyDown}
       className={
         isOverlay
-          ? 'planner-rail-enter fixed inset-0 z-[60] flex flex-col gap-6 overflow-y-auto bg-[var(--theme-card-bg)] p-6 shadow-2xl'
-          : 'planner-rail-enter flex flex-col gap-6 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-6 shadow-sm'
+          ? 'planner-rail-enter fixed inset-0 z-[60] flex flex-col gap-6 overflow-y-auto bg-theme-card-bg p-6 shadow-overlay'
+          : 'planner-rail-enter flex flex-col gap-6 rounded-xl border border-theme-card-border bg-theme-card-bg p-6 shadow-card'
       }
       aria-busy={isChecking}
     >
-      <div className="flex items-center justify-between border-b border-[color:var(--theme-card-border)] pb-4">
+      <div className="flex items-center justify-between border-b border-theme-card-border pb-4">
         <div>
-          <h3 className="lookbook-display text-lg font-semibold text-[color:var(--theme-card-text)]">
+          <h3 className="text-lg font-semibold text-theme-card-text">
             {t('commerce.premium.planner.sectionTitle')}
           </h3>
         </div>
@@ -556,7 +529,7 @@ export function PlannerRail({
           type="button"
           onClick={onClose}
           aria-label={t('commerce.premium.planner.close')}
-          className="min-h-[44px] min-w-[44px] rounded-md p-1 text-[color:var(--theme-card-text)] hover:opacity-70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--theme-secondary)]"
+          className="min-h-11 min-w-11 rounded-md p-1 text-theme-card-text hover:opacity-70"
         >
           ✕
         </button>

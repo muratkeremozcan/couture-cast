@@ -96,6 +96,7 @@ import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import { CommunityFilterChips } from '@/components/community/community-filter-chips'
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
 import { CommunityCard } from '@/components/community/community-card'
@@ -118,16 +119,9 @@ import {
   useResolvedCommunityLocale,
 } from '@/components/community/community-post-sheet'
 
-/**
- * `hero-theme.ts` carries neither the premium gold accent nor the community
- * surface's merlot destructive colour, and this task may not extend it, so both
- * are derived here once and reported as a palette gap. Merlot is a fill with
- * white ink (10.2:1); as text on a dark ground it computes to 2.1:1 and fails.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
-const DESTRUCTIVE_MERLOT = '#7A1F2D'
-const ON_DESTRUCTIVE = '#FFFFFF'
+// Story CC-7.9 D3: New post is the screen's one main action, so it alone is `primary` (gold).
+// Retry and the empty state's Share are neutral outline buttons, the new-looks pill is
+// `inverse`, pull-to-refresh spins in `ink`, and an action error is the danger panel.
 
 const FEED_PAGE_SIZE = 12
 /**
@@ -1845,8 +1839,8 @@ export function CommunityScreen() {
         <CommunityBannedNotice
           sanction={bannedSanction}
           locale={locale}
-          textColor={palette.text}
-          mutedColor={palette.mutedText}
+          textColor={palette.ink}
+          mutedColor={palette.inkMuted}
         />
       )
     if (!communityAvailable)
@@ -1854,7 +1848,7 @@ export function CommunityScreen() {
         <View style={styles.stateContainer} testID="community-feed-unavailable">
           <Text
             accessibilityLiveRegion="polite"
-            style={[styles.stateBody, { color: palette.mutedText }]}
+            style={[styles.stateBody, { color: palette.inkMuted }]}
           >
             {t('community.realtime.unavailable')}
           </Text>
@@ -1872,18 +1866,18 @@ export function CommunityScreen() {
               key={index}
               style={[
                 styles.skeletonCard,
-                { backgroundColor: palette.surface, borderColor: palette.divider },
+                { backgroundColor: palette.card, borderColor: palette.line },
               ]}
               testID="community-feed-skeleton"
             >
               <View
-                style={[styles.skeletonHeader, { backgroundColor: palette.skeleton }]}
+                style={[styles.skeletonHeader, { backgroundColor: palette.cardMuted }]}
               />
               <View
-                style={[styles.skeletonImage, { backgroundColor: palette.skeleton }]}
+                style={[styles.skeletonImage, { backgroundColor: palette.cardMuted }]}
               />
               <View
-                style={[styles.skeletonFooter, { backgroundColor: palette.skeleton }]}
+                style={[styles.skeletonFooter, { backgroundColor: palette.cardMuted }]}
               />
             </View>
           ))}
@@ -1894,22 +1888,29 @@ export function CommunityScreen() {
     if (feedState === 'error') {
       return (
         <View style={styles.stateContainer} testID="community-feed-error">
-          <Text style={[styles.stateTitle, { color: palette.text }]}>
+          <Text style={[styles.stateTitle, { color: palette.ink }]}>
             {t('community.feed.errorTitle')}
           </Text>
           <Text
-            style={[styles.stateBody, styles.centeredText, { color: palette.mutedText }]}
+            style={[styles.stateBody, styles.centeredText, { color: palette.inkMuted }]}
           >
             {feedErrorMessage}
           </Text>
           <TouchableOpacity
             testID="community-feed-retry"
-            style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+            style={[
+              styles.primaryButton,
+              {
+                backgroundColor: palette.page,
+                borderColor: palette.lineStrong,
+                borderWidth: 1,
+              },
+            ]}
             onPress={handleRetry}
             accessibilityRole="button"
             accessibilityLabel={t('community.feed.retry')}
           >
-            <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+            <Text style={[styles.primaryButtonText, { color: palette.ink }]}>
               {t('community.feed.retry')}
             </Text>
           </TouchableOpacity>
@@ -1919,11 +1920,11 @@ export function CommunityScreen() {
 
     return (
       <View style={styles.stateContainer} testID="community-feed-empty">
-        <Text style={[styles.stateTitle, { color: palette.text }]}>
+        <Text style={[styles.stateTitle, { color: palette.ink }]}>
           {t('community.feed.emptyTitle')}
         </Text>
         <Text
-          style={[styles.stateBody, styles.centeredText, { color: palette.mutedText }]}
+          style={[styles.stateBody, styles.centeredText, { color: palette.inkMuted }]}
         >
           {t('community.feed.emptyBody')}
         </Text>
@@ -1931,22 +1932,29 @@ export function CommunityScreen() {
           <TouchableOpacity
             testID="community-clear-filters"
             accessibilityRole="button"
-            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
             onPress={() => handleSelectMode('all')}
           >
-            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
               {t('community.feed.clearFilters')}
             </Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
           testID="community-feed-empty-cta"
-          style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+          style={[
+            styles.primaryButton,
+            {
+              backgroundColor: palette.page,
+              borderColor: palette.lineStrong,
+              borderWidth: 1,
+            },
+          ]}
           onPress={() => openPostSheet(false)}
           accessibilityRole="button"
           accessibilityLabel={t('community.share')}
         >
-          <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+          <Text style={[styles.primaryButtonText, { color: palette.ink }]}>
             {t('community.share')}
           </Text>
         </TouchableOpacity>
@@ -1962,14 +1970,14 @@ export function CommunityScreen() {
       <View
         style={[
           styles.authorStates,
-          { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+          { backgroundColor: palette.card, borderColor: palette.line },
         ]}
         testID="community-author-states"
       >
-        <Text style={[styles.authorStatesTitle, { color: palette.text }]}>
+        <Text style={[styles.authorStatesTitle, { color: palette.ink }]}>
           {t('community.feed.yourPostsTitle')}
         </Text>
-        <Text style={[styles.stateBody, { color: palette.mutedText }]}>
+        <Text style={[styles.stateBody, { color: palette.inkMuted }]}>
           {t('community.feed.yourPostsBody')}
         </Text>
         {authorStates.map((authorState) => (
@@ -1978,18 +1986,18 @@ export function CommunityScreen() {
             testID={`community-author-state-${authorState.id}`}
             accessible
             accessibilityRole="summary"
-            style={[styles.authorStateRow, { borderColor: palette.divider }]}
+            style={[styles.authorStateRow, { borderColor: palette.line }]}
           >
             <Text
               testID={`community-author-state-status-${authorState.id}`}
-              style={[styles.authorStateStatus, { color: palette.text }]}
+              style={[styles.authorStateStatus, { color: palette.ink }]}
             >
               {t(`community.status.${authorState.status}`)}
             </Text>
             {EXPLAINED_AUTHOR_STATES.has(authorState.status) ? (
               <Text
                 testID={`community-author-state-explanation-${authorState.id}`}
-                style={[styles.stateBody, { color: palette.mutedText }]}
+                style={[styles.stateBody, { color: palette.inkMuted }]}
               >
                 {t(`community.removed.${authorState.status}`)}
               </Text>
@@ -1997,7 +2005,7 @@ export function CommunityScreen() {
             {authorState.title ? (
               <Text
                 testID={`community-author-state-title-${authorState.id}`}
-                style={[styles.authorStateStatus, { color: palette.text }]}
+                style={[styles.authorStateStatus, { color: palette.ink }]}
               >
                 {authorState.title}
               </Text>
@@ -2005,7 +2013,7 @@ export function CommunityScreen() {
             {authorState.moderationReason ? (
               <Text
                 testID={`community-author-state-reason-${authorState.id}`}
-                style={[styles.stateBody, { color: palette.mutedText }]}
+                style={[styles.stateBody, { color: palette.inkMuted }]}
               >
                 {moderationReasonText(authorState.moderationReason, t)}
               </Text>
@@ -2096,9 +2104,12 @@ export function CommunityScreen() {
           testID="community-action-error"
           accessibilityRole="alert"
           accessibilityLiveRegion="assertive"
-          style={[styles.errorPanel, { backgroundColor: DESTRUCTIVE_MERLOT }]}
+          style={[
+            styles.errorPanel,
+            { backgroundColor: palette.dangerSurface, borderColor: palette.dangerLine },
+          ]}
         >
-          <Text style={[styles.errorText, { color: ON_DESTRUCTIVE }]}>
+          <Text style={[styles.errorText, { color: palette.dangerInk }]}>
             {actionErrorMessage}
           </Text>
         </View>
@@ -2116,10 +2127,10 @@ export function CommunityScreen() {
           testID="community-band-unresolved"
           style={[
             styles.infoPanel,
-            { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
+            { backgroundColor: palette.card, borderColor: palette.line },
           ]}
         >
-          <Text style={[styles.stateBody, { color: palette.text }]}>
+          <Text style={[styles.stateBody, { color: palette.ink }]}>
             {t(`community.band.unresolved.${bandUnresolvedReason}`)}
           </Text>
           {bandUnresolvedReason === 'no_location' ? (
@@ -2129,11 +2140,11 @@ export function CommunityScreen() {
               style={[
                 styles.outlineButton,
                 styles.bandAction,
-                { borderColor: palette.mutedText },
+                { borderColor: palette.inkMuted },
               ]}
               testID="community-add-location"
             >
-              <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+              <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
                 {t('locations.guided.add')}
               </Text>
             </Pressable>
@@ -2220,8 +2231,8 @@ export function CommunityScreen() {
     if (isLoadingMore) {
       return (
         <View style={styles.loadingMoreContainer} testID="community-feed-loading-more">
-          <ActivityIndicator size="small" color={palette.text} />
-          <Text style={[styles.stateBody, { color: palette.mutedText }]}>
+          <ActivityIndicator size="small" color={palette.ink} />
+          <Text style={[styles.stateBody, { color: palette.inkMuted }]}>
             {t('community.feed.loadingMore')}
           </Text>
         </View>
@@ -2232,12 +2243,12 @@ export function CommunityScreen() {
         <View style={styles.loadingMoreContainer}>
           <TouchableOpacity
             testID="community-feed-load-more"
-            style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+            style={[styles.outlineButton, { borderColor: palette.inkMuted }]}
             onPress={handleLoadMore}
             accessibilityRole="button"
             accessibilityLabel={t('community.feed.loadMore')}
           >
-            <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            <Text style={[styles.outlineButtonText, { color: palette.ink }]}>
               {t('community.feed.loadMore')}
             </Text>
           </TouchableOpacity>
@@ -2250,7 +2261,7 @@ export function CommunityScreen() {
   return (
     <SponsoredCtaImpressions focused={screenFocused}>
       <View
-        style={[styles.container, { backgroundColor: palette.background }]}
+        style={[styles.container, { backgroundColor: palette.page }]}
         testID="community-screen"
       >
         <LiveFontMountMarker scope="community" />
@@ -2260,13 +2271,13 @@ export function CommunityScreen() {
             <TouchableOpacity
               ref={newPostButtonRef}
               testID="community-new-post-button"
-              style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+              style={[styles.primaryButton, { backgroundColor: palette.primary }]}
               onPress={() => openPostSheet(false)}
               accessibilityRole="button"
               accessibilityLabel={t('community.newPost')}
             >
               <Text
-                style={[styles.primaryButtonText, { color: ON_ACCENT }]}
+                style={[styles.primaryButtonText, { color: palette.onPrimary }]}
                 testID="community-new-post-label"
               >
                 {t('community.newPost')}
@@ -2326,7 +2337,7 @@ export function CommunityScreen() {
               <RefreshControl
                 refreshing={isRefreshing}
                 onRefresh={handleRefresh}
-                tintColor={ACCENT_GOLD}
+                tintColor={palette.ink}
               />
             }
             onEndReached={handleLoadMore}
@@ -2350,13 +2361,13 @@ export function CommunityScreen() {
               <TouchableOpacity
                 testID="community-new-looks-pill"
                 accessibilityRole="button"
-                style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+                style={[styles.primaryButton, { backgroundColor: palette.inverse }]}
                 disabled={isInsertingLooks}
                 onPress={() => {
                   void insertNewLooks()
                 }}
               >
-                <Text style={{ color: ON_ACCENT }}>
+                <Text style={{ color: palette.onInverse }}>
                   {t('community.realtime.showNewLooks', { count: newLooks.length })}
                 </Text>
               </TouchableOpacity>
@@ -2479,7 +2490,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     paddingTop: 16,
     paddingBottom: 8,
     gap: 12,
@@ -2506,13 +2517,13 @@ const styles = StyleSheet.create({
   primaryButton: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 9999,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   outlineButton: {
@@ -2525,7 +2536,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   outlineButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   highlightSection: {
@@ -2533,55 +2544,56 @@ const styles = StyleSheet.create({
   },
   bandAction: {
     alignSelf: 'flex-start',
-    marginTop: 10,
+    marginTop: 12,
   },
   infoPanel: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
   },
   errorPanel: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
+    borderWidth: 1,
   },
   errorText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   authorStates: {
-    marginHorizontal: 16,
+    marginHorizontal: TAB_BODY_INSET,
     marginTop: 12,
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 6,
+    gap: 8,
   },
   authorStatesTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
   },
   authorStateRow: {
     borderTopWidth: 1,
-    paddingTop: 10,
-    marginTop: 6,
+    paddingTop: 12,
+    marginTop: 8,
     gap: 4,
   },
   authorStateStatus: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
   skeletonsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: TAB_BODY_INSET,
     gap: 16,
     marginTop: 12,
   },
   skeletonCard: {
     borderRadius: 16,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
   },
   skeletonHeader: {
@@ -2598,14 +2610,14 @@ const styles = StyleSheet.create({
   skeletonFooter: {
     height: 24,
     width: '70%',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   stateContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
     paddingVertical: 48,
-    gap: 10,
+    gap: 12,
   },
   stateTitle: {
     fontSize: 18,
@@ -2613,8 +2625,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   stateBody: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   centeredText: {
     textAlign: 'center',

@@ -36,10 +36,15 @@ type Props = {
   saveResetKey?: string
   useSharedFeedback?: boolean
   requiresNetwork?: boolean
+  /**
+   * Story CC-7.9 D7: true where a parent card already holds these controls (Home's hero), so
+   * they render as a plain section; on /preview they are their own card.
+   */
+  nested?: boolean
 }
 
 const buttonClass =
-  'min-h-11 rounded-lg border border-[#C9C9D1] px-3 text-sm font-semibold'
+  'min-h-11 rounded-lg border border-line-strong bg-page px-3 text-sm font-semibold text-ink'
 
 export function SampleIdeaControls({
   strings,
@@ -60,6 +65,7 @@ export function SampleIdeaControls({
   saveResetKey,
   useSharedFeedback = false,
   requiresNetwork = false,
+  nested = false,
 }: Props) {
   const labels = strings.styleIdeas
   const dimensions = Object.keys(SAMPLE_STYLE_OPTIONS) as (keyof SampleStylePreferences)[]
@@ -67,7 +73,12 @@ export function SampleIdeaControls({
     lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
   )
   return (
-    <div className="space-y-4 rounded-lg border border-[#E6E6ED] bg-white p-5 text-sm text-[#111111]">
+    <div
+      data-surface={nested ? undefined : 'card'}
+      className={`space-y-4 text-sm text-ink ${
+        nested ? 'border-t border-line pt-4' : 'rounded-xl border border-line bg-card p-5'
+      }`}
+    >
       {lookId &&
         (useSharedFeedback ? (
           <SaveActionButton
@@ -122,7 +133,7 @@ export function SampleIdeaControls({
                   {bookmark.needsReview && needsReviewLabel && (
                     <span
                       data-testid="saved-look-needs-review"
-                      className="rounded bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-900"
+                      className="rounded-md bg-notice-surface px-2 py-0.5 text-xs font-semibold text-notice-ink"
                     >
                       {needsReviewLabel}
                     </span>
@@ -144,7 +155,7 @@ export function SampleIdeaControls({
         <label className="flex flex-col gap-1 font-medium">
           {strings.preferences.weather}
           <select
-            className="min-h-11 rounded-lg border border-[#C9C9D1] bg-white px-2"
+            className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
             value={weather}
             onChange={(event) => {
               const next = SAMPLE_WEATHER_KEYS.find(
@@ -168,7 +179,7 @@ export function SampleIdeaControls({
             <label key={dimension} className="flex flex-col gap-1 font-medium">
               {labels[dimension]}
               <select
-                className="min-h-11 rounded-lg border border-[#C9C9D1] bg-white px-2"
+                className="min-h-11 rounded-lg border border-line-strong bg-page px-2 text-ink"
                 value={preferences?.[dimension] ?? ''}
                 onChange={(event) =>
                   onPreferences({

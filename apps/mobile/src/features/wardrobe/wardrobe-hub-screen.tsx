@@ -20,6 +20,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
 } from 'react-native'
 import type {
   GarmentItemContract,
@@ -37,6 +40,7 @@ import { underModalAccessibility } from '@/components/edge-to-edge-modal'
 import { ScreenGate } from '@/src/components/screen-gate'
 import { useStatusBar } from '@/components/save-feedback'
 import { Text, View, useSchemeColors } from '@/components/themed'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -182,29 +186,40 @@ function showFirstReadSpinner(
 
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
-  return <MemberWardrobeHub key={epoch} epoch={epoch} {...props} />
+  const sessionSeen = useSessionSeen(mobileApplicationUserId())
+  return (
+    <MemberWardrobeHub key={epoch} epoch={epoch} sessionSeen={sessionSeen} {...props} />
+  )
 }
 
 function MemberWardrobeHub({
   pollOffsetsMs,
   addEntry,
   epoch,
+  sessionSeen,
   deletion = garmentDeletion,
-}: WardrobeHubScreenProps & { epoch: number }) {
+}: WardrobeHubScreenProps & { epoch: number; sessionSeen: SessionSeen }) {
   const { t, i18n } = useTranslation()
   const strings = getGuestPreviewStrings(i18n.language)
   const colors = useSchemeColors()
-  const secondaryButton = [styles.secondaryButton, { borderColor: colors.strongBorder }]
-  const secondaryButtonText = [styles.secondaryButtonText, { color: colors.text }]
+  const secondaryButton = [styles.secondaryButton, { borderColor: colors.lineStrong }]
+  const secondaryButtonText = [styles.secondaryButtonText, { color: colors.ink }]
   const notice = {
     backgroundColor: colors.noticeSurface,
-    borderColor: colors.noticeBorder,
+    borderColor: colors.noticeLine,
   }
   const [garments, setGarments] = useState<ClosetGarment[]>([])
   const inventoryRevision = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
   const [hasLoaded, setHasLoaded] = useState(false)
   const [loadFailed, setLoadFailed] = useState(false)
+  /**
+   * Story CC-7.9 add-on B: a visitor who never signed in. The closet read finds no token and the
+   * screen has seen no session (`useSessionSeen`), so there is nothing that failed: the screen
+   * offers sign-in in place of the "could not load" notice, and Add goes to sign-in. A member
+   * whose session ends here keeps the failure notice and its Retry.
+   */
+  const [visitor, setVisitor] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
   const [confirmedGarment, setConfirmedGarment] = useState(false)
   const [isCaptureOpen, setIsCaptureOpen] = useState(false)
@@ -394,11 +409,13 @@ function MemberWardrobeHub({
       const token = await resolveMobileAccessToken()
       if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
       if (!token) throw new Error('AUTHENTICATION_REQUIRED')
+      sessionSeen.current = true
       setAccessToken(token)
       const next = await refreshGarmentList(token, signal)
       if (next) {
         setHasLoaded(true)
         setLoadFailed(false)
+        setVisitor(false)
         void ensureMobileLegacySavedLooksMigration({
           owner: mobileApplicationUserId(),
           epoch,
@@ -408,7 +425,7 @@ function MemberWardrobeHub({
       }
       return next
     },
-    [epoch, refreshGarmentList]
+    [epoch, refreshGarmentList, sessionSeen]
   )
 
   const savedLooksLoadEpochRef = useRef(0)
@@ -444,7 +461,7 @@ function MemberWardrobeHub({
           return
         }
         setSavedLooksError(
-          error instanceof Error ? error.message : 'Unable to load your saved looks.'
+          error instanceof Error ? error.message : t('wardrobe.hub.saved_looks_failed')
         )
       })
       .finally(() => {
@@ -454,7 +471,7 @@ function MemberWardrobeHub({
         }
       })
     return () => controller.abort()
-  }, [epoch, owner, savedLooksAttempt])
+  }, [epoch, owner, savedLooksAttempt, t])
 
   useEffect(() => {
     if (!owner) return
@@ -528,8 +545,12 @@ function MemberWardrobeHub({
     const controller = new AbortController()
     setIsLoading(true)
     void loadGarments(controller.signal)
-      .catch(() => {
-        if (!controller.signal.aborted) setLoadFailed(true)
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        const noSession =
+          error instanceof Error && error.message === 'AUTHENTICATION_REQUIRED'
+        if (noSession && !sessionSeen.current) setVisitor(true)
+        else setLoadFailed(true)
       })
       .finally(() => {
         if (controller.signal.aborted) return
@@ -537,7 +558,7 @@ function MemberWardrobeHub({
         setInventorySettled(true)
       })
     return () => controller.abort()
-  }, [loadAttempt, loadGarments])
+  }, [loadAttempt, loadGarments, sessionSeen])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -633,7 +654,7 @@ function MemberWardrobeHub({
     const freshToken = await resolveMobileAccessToken()
     if (epoch !== mobileIdentityEpoch()) return
     if (!freshToken) {
-      setErrorMessage('AUTHENTICATION_REQUIRED')
+      setErrorMessage(t('wardrobe.error.sign_in_required'))
       return
     }
     setAccessToken(freshToken)
@@ -664,11 +685,10 @@ function MemberWardrobeHub({
         {...underModalAccessibility(Boolean(taggingGarmentId || styleSelection))}
       >
         <ScrollView contentContainerStyle={styles.content}>
+          {/* Story CC-7.9 D6: the tab's AppTopBar shows the Wardrobe title, so the body has no
+              second one. The header actions that do not fit the bar open the body. */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>{t('wardrobe.title')}</Text>
-              <Text style={styles.subtitle}>{t('wardrobe.empty_desc')}</Text>
-            </View>
+            <Text style={{ color: colors.inkMuted }}>{t('wardrobe.empty_desc')}</Text>
             <View style={styles.headerActions}>
               {/* The capsule screen had no entry point anywhere in the app. */}
               <Pressable
@@ -693,10 +713,14 @@ function MemberWardrobeHub({
                 ref={addGarmentButtonRef}
                 accessibilityRole="button"
                 testID="garment-capture-open"
-                style={[styles.primaryButton, { backgroundColor: colors.inverseSurface }]}
-                onPress={() => setIsCaptureOpen(true)}
+                // D3: the screen's one main action takes the primary role (gold), as on web;
+                // Outfit capsules and Silhouette stay neutral.
+                style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+                onPress={() =>
+                  visitor ? router.push('/signin') : setIsCaptureOpen(true)
+                }
               >
-                <Text style={[styles.primaryButtonText, { color: colors.onInverse }]}>
+                <Text style={[styles.primaryButtonText, { color: colors.onPrimary }]}>
                   {t('wardrobe.add_garment')}
                 </Text>
               </Pressable>
@@ -721,10 +745,10 @@ function MemberWardrobeHub({
                 style={[styles.onboardingCard, notice]}
                 onPress={() => router.push('/wardrobe-onboarding')}
               >
-                <Text style={[styles.onboardingCardTitle, { color: colors.noticeText }]}>
+                <Text style={[styles.onboardingCardTitle, { color: colors.noticeInk }]}>
                   {t('wardrobe.onboarding.title')}
                 </Text>
-                <Text style={[styles.onboardingCardBody, { color: colors.noticeText }]}>
+                <Text style={[styles.onboardingCardBody, { color: colors.noticeInk }]}>
                   {t('wardrobe.onboarding.permission_body')}
                 </Text>
               </Pressable>
@@ -763,7 +787,7 @@ function MemberWardrobeHub({
                 accessibilityRole="alert"
                 testID="wardrobe-error-banner"
               >
-                <Text style={{ color: colors.dangerText }}>{errorMessage}</Text>
+                <Text style={{ color: colors.dangerInk }}>{errorMessage}</Text>
               </View>
             ) : null}
             {loadFailed ? (
@@ -771,7 +795,7 @@ function MemberWardrobeHub({
                 style={[styles.errorBox, { backgroundColor: colors.dangerSurface }]}
                 accessibilityLiveRegion="polite"
               >
-                <Text style={{ color: colors.dangerText }}>
+                <Text style={{ color: colors.dangerInk }}>
                   {garments.length > 0
                     ? strings.firstUse.staleWardrobe
                     : strings.firstUse.wardrobeFailed}
@@ -797,10 +821,15 @@ function MemberWardrobeHub({
               </Pressable>
             ) : null}
 
+            <ClosetVisitorOffer
+              visible={visitor}
+              buttonStyle={secondaryButton}
+              textStyle={secondaryButtonText}
+            />
             {/* Story CC-7.7 D5: only the first read shows the spinner; a refresh after a tag
               save, a delete or a Retry keeps the grid or the empty state in place. */}
             {showFirstReadSpinner(isLoading, inventorySettled, visibleGarments.length) ? (
-              <ActivityIndicator accessibilityLabel="Loading wardrobe" />
+              <ActivityIndicator accessibilityLabel={t('wardrobe.hub.loading')} />
             ) : visibleGarments.length === 0 ? (
               hasLoaded && !loadFailed ? (
                 <View style={styles.emptyState}>
@@ -834,7 +863,11 @@ function MemberWardrobeHub({
                       <GarmentCardFace garment={garment} locale={i18n.language} />
                     )}
                     <Text testID={`garment-status-${garment.status}`}>
-                      {garment.status}
+                      {/* The status set is open (the contract says so): a new state reads as
+                        in progress until the catalogs name it. */}
+                      {t(`wardrobe.hub.status.${garment.status}`, {
+                        defaultValue: t('wardrobe.hub.status.unknown'),
+                      })}
                     </Text>
                     {garment.status === 'awaiting_tags' && (
                       <Pressable
@@ -850,9 +883,7 @@ function MemberWardrobeHub({
                           )
                         }}
                       >
-                        <Text
-                          style={[styles.needsTagsText, { color: colors.noticeText }]}
-                        >
+                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
                           {t('wardrobe.tagging.needs_tags', {
                             defaultValue: 'Needs tags',
                           })}
@@ -865,9 +896,7 @@ function MemberWardrobeHub({
                         style={[styles.needsTagsBtn, notice]}
                         onPress={() => setIsCaptureOpen(true)}
                       >
-                        <Text
-                          style={[styles.needsTagsText, { color: colors.noticeText }]}
-                        >
+                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
                           {strings.firstUse.replaceGarment}
                         </Text>
                       </Pressable>
@@ -878,9 +907,7 @@ function MemberWardrobeHub({
                         style={[styles.needsTagsBtn, notice]}
                         onPress={() => pollCommittedGarment(garment.id, accessToken)}
                       >
-                        <Text
-                          style={[styles.needsTagsText, { color: colors.noticeText }]}
-                        >
+                        <Text style={[styles.needsTagsText, { color: colors.noticeInk }]}>
                           {strings.firstUse.checkGarment}
                         </Text>
                       </Pressable>
@@ -995,11 +1022,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
-  content: { padding: 20, gap: 24 },
+  content: { paddingHorizontal: TAB_BODY_INSET, paddingVertical: 20, gap: 24 },
   gatedBody: { gap: 24 },
   header: { gap: 16 },
-  title: { fontSize: 28, fontWeight: '700' },
-  subtitle: { marginTop: 6, opacity: 0.7 },
   // Story 6.15 F-00i: at iOS XXXL and the accessibility sizes the three actions are wider than
   // the screen, so they wrap instead of pushing Add garment past the edge.
   headerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1012,13 +1037,13 @@ const styles = StyleSheet.create({
     minWidth: 44,
     paddingHorizontal: 12,
   },
-  secondaryButtonText: { fontSize: 13, fontWeight: '600' },
+  secondaryButtonText: { fontSize: 14, fontWeight: '600' },
   primaryButton: {
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   primaryButtonText: { fontWeight: '700' },
@@ -1026,15 +1051,61 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    gap: 6,
+    gap: 8,
   },
   onboardingCardTitle: { fontSize: 18, fontWeight: '700' },
   onboardingCardBody: { opacity: 0.8 },
-  emptyState: { alignItems: 'center', borderRadius: 16, padding: 36 },
+  emptyState: { alignItems: 'center', borderRadius: 16, padding: 40 },
   emptyTitle: { fontSize: 18, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 10 },
+  garmentCard: { width: '47%', overflow: 'hidden', borderRadius: 12, padding: 12 },
   garmentImage: { width: '100%', aspectRatio: 0.75, borderRadius: 8 },
-  garmentLabel: { marginTop: 8, fontSize: 13, fontWeight: '600' },
+  garmentLabel: { marginTop: 8, fontSize: 14, fontWeight: '600' },
   errorBox: { borderRadius: 12, padding: 12, gap: 8 },
+})
+
+/** Set once this screen has seen a member or a stored session token. */
+type SessionSeen = { current: boolean }
+
+/**
+ * Add-on B, review P2-2: whether this screen has seen any session since it mounted, a member
+ * holding it or a token the closet read resolved. It lives in the screen, above the
+ * identity-epoch keyed hub, so a sign-out or expiry that remounts the hub keeps it: that person
+ * keeps the failure notice and its Retry, and only someone who never had a session is a
+ * visitor. It holds one flag and no member data.
+ */
+function useSessionSeen(owner: string | null): SessionSeen {
+  const seen = useRef(false)
+  if (owner !== null) seen.current = true
+  return seen
+}
+
+/** Add-on B: the visitor's sign-in offer, where the empty closet would be. */
+function ClosetVisitorOffer({
+  visible,
+  buttonStyle,
+  textStyle,
+}: {
+  visible: boolean
+  buttonStyle: StyleProp<ViewStyle>
+  textStyle: StyleProp<TextStyle>
+}) {
+  const { t } = useTranslation()
+  if (!visible) return null
+  return (
+    <View style={visitorStyles.offer} testID="wardrobe-visitor-offer">
+      <Pressable
+        accessibilityRole="link"
+        testID="wardrobe-sign-in"
+        style={buttonStyle}
+        onPress={() => router.push('/signin')}
+      >
+        <Text style={textStyle}>{t('community.notifications.signin')}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+const visitorStyles = StyleSheet.create({
+  offer: { alignItems: 'center', paddingVertical: 32 },
 })

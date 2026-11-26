@@ -68,7 +68,9 @@ export function SampleIdeaControls({
     lookId && bookmarks.some((bookmark) => bookmark.lookId === lookId)
   )
   return (
-    <View style={[styles.card, { borderColor: palette.divider }]}>
+    <View
+      style={[styles.card, { backgroundColor: palette.card, borderColor: palette.line }]}
+    >
       {lookId &&
         (useSharedFeedback ? (
           <SaveActionButton
@@ -93,7 +95,7 @@ export function SampleIdeaControls({
         ))}
       {onWeather && (
         <View style={styles.group}>
-          <Text style={{ color: palette.text }}>{strings.preferences.weather}</Text>
+          <Text style={{ color: palette.ink }}>{strings.preferences.weather}</Text>
           <View style={styles.row}>
             {SAMPLE_WEATHER_KEYS.map((value) => (
               <PreviewButton
@@ -117,7 +119,7 @@ export function SampleIdeaControls({
           <Text
             accessibilityRole={bookmarks.length > 0 ? 'header' : undefined}
             accessibilityLiveRegion="none"
-            style={{ color: palette.text }}
+            style={{ color: palette.ink }}
           >
             {persistent ? labels.saved : strings.chrome.storageUnavailable}
           </Text>
@@ -133,7 +135,7 @@ export function SampleIdeaControls({
                   palette={palette}
                 />
                 {bookmark.needsReview && needsReviewLabel ? (
-                  <Text testID="saved-look-needs-review" style={{ color: palette.text }}>
+                  <Text testID="saved-look-needs-review" style={{ color: palette.ink }}>
                     {needsReviewLabel}
                   </Text>
                 ) : null}
@@ -158,7 +160,7 @@ export function SampleIdeaControls({
       {expanded &&
         dimensions.map((dimension) => (
           <View key={dimension} style={styles.group}>
-            <Text style={{ color: palette.text }}>{labels[dimension]}</Text>
+            <Text style={{ color: palette.ink }}>{labels[dimension]}</Text>
             <View style={styles.row}>
               {[undefined, ...SAMPLE_STYLE_OPTIONS[dimension]].map((option) => (
                 <PreviewButton
@@ -179,7 +181,7 @@ export function SampleIdeaControls({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 8, borderWidth: 1, padding: 16, gap: 10 },
+  card: { borderRadius: 8, borderWidth: 1, padding: 16, gap: 12 },
   group: { gap: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 })

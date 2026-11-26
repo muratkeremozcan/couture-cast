@@ -309,7 +309,7 @@ export function ScreenGate({
   screen,
   reads,
   ready,
-  placeholderClassName = 'min-h-[60vh] w-full rounded-[16px] bg-[var(--screen-placeholder-surface)]',
+  placeholderClassName = 'min-h-[60vh] w-full rounded-xl bg-card-muted',
   children,
 }: ScreenGateProps) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })

@@ -30,8 +30,7 @@ export function CommunityReactions({
   return (
     <div
       aria-busy={pending}
-      data-focus-surface="light"
-      className="space-y-2 rounded-lg bg-[var(--theme-card-bg)] p-2"
+      className="space-y-2 rounded-lg bg-theme-card-bg p-2"
       data-testid={`${scope}community-reactions-${item.id}`}
     >
       <div
@@ -49,7 +48,7 @@ export function CommunityReactions({
             onClick={() => {
               onSubmit(id)
             }}
-            className="min-h-[44px] min-w-[44px] rounded-full border border-[color:var(--theme-card-border)] px-3 text-xs text-[color:var(--theme-card-text)] aria-pressed:border-[color:var(--theme-secondary)] aria-pressed:bg-[#C9A14A] aria-pressed:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] aria-disabled:opacity-60"
+            className="min-h-11 min-w-11 rounded-full border border-theme-card-border px-3 text-xs text-theme-card-text aria-pressed:border-inverse aria-pressed:bg-inverse aria-pressed:text-on-inverse aria-disabled:opacity-60"
           >
             <span aria-hidden="true">
               {emoji} {summary.counts[id]}
@@ -57,17 +56,17 @@ export function CommunityReactions({
           </button>
         ))}
       </div>
-      <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
+      <p className="text-xs text-ink-muted">
         {t('community.reactions.total', { count: summary.total })}
       </p>
       {pending && <p className="text-xs">{t('community.reactions.pending')}</p>}
       {errorKey && (
-        <div className="text-xs text-[color:var(--theme-card-text)]">
+        <div className="text-xs text-theme-card-text">
           <p>{t(errorKey)}</p>
           {canRetry && (
             <button
               type="button"
-              className="min-h-[44px] underline"
+              className="min-h-11 underline"
               onClick={() => {
                 onSubmit()
               }}

@@ -1,6 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ContactLink, LegalList, LegalPage, LegalSection } from '../components/legal-page'
+import {
+  ContactLink,
+  LEGAL_INLINE_LINK_CLASS,
+  LegalList,
+  LegalPage,
+  LegalSection,
+} from '../components/legal-page'
 
 export const metadata: Metadata = {
   title: 'CoutureCast Privacy Policy',
@@ -151,10 +157,7 @@ export default function PrivacyPage() {
       <LegalSection title="Contact">
         <p>
           Questions, review requests, and deletion requests go to <ContactLink />. The{' '}
-          <Link
-            href="/terms"
-            className="text-amber-200 underline underline-offset-4 hover:text-amber-100"
-          >
+          <Link href="/terms" className={LEGAL_INLINE_LINK_CLASS}>
             Terms of Service
           </Link>{' '}
           cover the rules for using CoutureCast.

@@ -256,7 +256,7 @@ async function exactReplyFocus(handle: ReturnType<typeof recordFocus>) {
   await waitFor(() =>
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(handle(target))
   )
-  expect(screen.getByText(reply.body)).toBeVisible()
+  await waitFor(() => expect(screen.getByText(reply.body)).toBeVisible())
 }
 
 export function registerCommunityNotificationRecoveryCases() {
@@ -294,9 +294,13 @@ export function registerCommunityNotificationRecoveryCases() {
           expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
         )
         await communityGateOpen()
-        expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+        await waitFor(() =>
+          expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+        )
         if (opened === 'post-b') {
-          expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          await waitFor(() =>
+            expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          )
           expect(screen.getByLabelText('Add a comment')).toHaveValue(
             'Unrelated owned draft'
           )
@@ -325,7 +329,9 @@ export function registerCommunityNotificationRecoveryCases() {
         await Promise.allSettled(f.pending)
       })
       await communityGateOpen()
-      expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+      )
       expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
       expect(screen.queryByTestId('comment-target-reply')).toBeNull()
     } finally {
@@ -351,7 +357,9 @@ export function registerCommunityNotificationRecoveryCases() {
     expect(f.rootRequests).toHaveLength(before)
     expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
     await communityGateOpen()
-    expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+    )
     expect(screen.getByTestId('community-card-comments-post-b')).not.toHaveAttribute(
       'aria-disabled',
       'true'
@@ -384,7 +392,9 @@ export function registerCommunityNotificationRecoveryCases() {
     expect(screen.queryByTestId('community-post-card-post-new')).toBeNull()
     press(restored)
     await screen.findByTestId('community-post-card-post-new')
-    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    )
   }, 15000)
 
   it.each(['visible', 'withdrawn'] as const)(
@@ -420,7 +430,9 @@ export function registerCommunityNotificationRecoveryCases() {
           expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
           expect(f.rootRequests).toHaveLength(0)
           await communityGateOpen()
-          expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+          await waitFor(() =>
+            expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+          )
         }
         expect(
           f.targetBodies.filter((body) => body.targets[0]?.key === 'notification')
@@ -481,8 +493,10 @@ export function registerCommunityNotificationRecoveryCases() {
           handle(target)
         )
       )
-      expect(screen.getByText(rootComment.body)).toBeVisible()
-      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      await waitFor(() => expect(screen.getByText(rootComment.body)).toBeVisible())
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      )
     } finally {
       held.release()
       await Promise.allSettled(f.pending)
@@ -519,7 +533,9 @@ export function registerCommunityNotificationRecoveryCases() {
       })
       expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
       expect(f.rootRequests).toHaveLength(0)
-      expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+      )
     } finally {
       held.release()
       await Promise.allSettled(f.pending)
@@ -569,7 +585,9 @@ export function registerCommunityNotificationRecoveryCases() {
         if (kind === 'missing-card') {
           expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
           await communityGateOpen()
-          expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+          await waitFor(() =>
+            expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+          )
         } else {
           if (kind === 'card')
             await screen.findByText('Independent late card stays authoritative')
@@ -701,7 +719,9 @@ export function registerCommunityNotificationRecoveryCases() {
       ).toEqual([])
       expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
       expect(screen.queryByTestId('highlighted-community-card-post-a')).toBeNull()
-      expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
+      )
       await Promise.allSettled(f.pending)
     },
     13000

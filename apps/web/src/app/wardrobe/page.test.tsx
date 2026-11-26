@@ -361,6 +361,21 @@ describe('WardrobePage garment card label', () => {
     )
     expect(card).not.toHaveTextContent(tagged.id)
   })
+
+  it('labels a status the catalogs do not name with the localized fallback, never the raw code', async () => {
+    // Review P2-11: the status list is an open set; a newer backend code is diagnostic data.
+    const unfamiliar = garmentFixture('unfamiliar-status-1', 'ready', {
+      status: 'quarantine_review' as GarmentItemContract['status'],
+    })
+    listGarmentsFromWeb.mockReset().mockResolvedValue([unfamiliar])
+
+    render(<WardrobePage />)
+
+    const card = await screen.findByTestId(`garment-card-${unfamiliar.id}`)
+    const chip = within(card).getByTestId('garment-status-quarantine_review')
+    expect(chip).toHaveTextContent(/^In progress$/)
+    expect(card).not.toHaveTextContent(/quarantine/i)
+  })
 })
 
 // The card names the garment by its tags (Untagged before tagging) and never prints its id:
@@ -727,7 +742,7 @@ describe('WardrobePage direct garment entry', () => {
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
     expect(
-      within(screen.getByTestId(`garment-card-${pending.id}`)).getByText('ready')
+      within(screen.getByTestId(`garment-card-${pending.id}`)).getByText('Ready')
     ).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toHaveAttribute(
       'href',
@@ -760,7 +775,7 @@ describe('WardrobePage direct garment entry', () => {
     await user.click(check)
 
     const card = screen.getByTestId(`garment-card-${processing.id}`)
-    expect(await within(card).findByText('ready')).toBeVisible()
+    expect(await within(card).findByText('Ready')).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()

@@ -920,7 +920,7 @@ describe('C-WEB-SHARE-DIALOG: Web Share beside Download', () => {
     for (const action of Array.from(secondary.children))
       expect(action).toHaveClass('px-3')
     for (const action of [...primary.children, ...secondary.children])
-      expect(action).toHaveClass('min-h-[44px]')
+      expect(action).toHaveClass('min-h-11')
     expect(screen.getByTestId('share-card-cancel')).toHaveAccessibleName(
       enUS.shareCard.cancel
     )

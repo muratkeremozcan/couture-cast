@@ -19,11 +19,10 @@ import {
   expect,
 } from '../support/helpers/commerce-session'
 import { test as anonymousTest } from '../support/fixtures/merged-fixtures'
+import { roleRgb } from '../support/helpers/app-shell'
+import { focusBackdrop, focusRing } from '../support/helpers/painted-contrast'
 
 const PREFERENCES_URL = `**${COMMERCE_PREFERENCES_PATH}`
-
-/** The dark settings surface `data-focus-surface="dark"` selects the ring for. */
-const DARK_SURFACE_RGB = 'rgb(10, 10, 10)'
 
 /** WCAG 2.2 non-text contrast floor, which is what a focus indicator is held to. */
 const MIN_FOCUS_CONTRAST = 3
@@ -214,12 +213,22 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     )
 
     await log.step('Tab from the top of the document to the control')
-    // The desktop path reaches the toggle in five presses via Skip, Home and
-    // the two city controls. Check each stop to catch extra focus targets.
+    // Story CC-7.9 D6: from 768 px the four tab links sit in the top bar
+    // (`primary-nav`), ahead of main, so the desktop path reaches the toggle in eight
+    // presses via Skip, the four tab links and the two city controls. Check each stop
+    // to catch extra focus targets.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(page.getByRole('link', { name: 'Home', exact: true })).toBeFocused()
+    const primaryNav = page.getByTestId('primary-nav')
+    // Each stop is a link with its tab name, Home first, as the old named Home link lookup
+    // required (Codex replaced-assertions check).
+    for (const name of ['Home', 'Wardrobe', 'Community', 'Profile']) {
+      await page.keyboard.press('Tab')
+      await expect(primaryNav.getByRole('link', { name, exact: true })).toBeFocused()
+    }
+    await expect(
+      primaryNav.getByRole('link', { name: 'Profile', exact: true })
+    ).toHaveAttribute('aria-current', 'page')
     await page.keyboard.press('Tab')
     await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
     await page.keyboard.press('Tab')
@@ -235,16 +244,33 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
         outlineStyle: styles.outlineStyle,
         outlineWidth: styles.outlineWidth,
         boxShadow: styles.boxShadow,
+        scheme: window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? ('dark' as const)
+          : ('light' as const),
       }
     })
     expect(ring.outlineStyle).toBe('solid')
     expect(Number.parseFloat(ring.outlineWidth)).toBeGreaterThanOrEqual(2)
-    expect(contrastRatio(ring.outlineColor, DARK_SURFACE_RGB)).toBeGreaterThanOrEqual(
-      MIN_FOCUS_CONTRAST
-    )
+    // Story CC-7.9 D3, D7: the always-dark settings page and its `data-focus-surface`
+    // hook are gone. The outline is the scheme's `focusEssential` role and is held to
+    // 3:1 on the surface it is really drawn over (the Profile page or card surface).
+    expect(ring.outlineColor).toBe(roleRgb(ring.scheme, 'focusEssential'))
+    const backdrop = await focusBackdrop(optOutToggle(page))
+    expect(
+      contrastRatio(ring.outlineColor, backdrop.color),
+      `outline on ${backdrop.node}`
+    ).toBeGreaterThanOrEqual(MIN_FOCUS_CONTRAST)
     // The gold halo is the second half of the indicator; without it the ring is a
-    // plain outline and the design token is dead code.
-    expect(ring.boxShadow).toContain('201, 161, 74')
+    // plain outline and the design token is dead code. Story CC-7.9 D2: the halo is
+    // the scheme's `focus` role (the light one is darkened from the fill gold).
+    expect(ring.boxShadow).toContain(roleRgb(ring.scheme, 'focus'))
+    // Painted: the pixels keyboard focus changes reach 3:1 against what was there.
+    const painted = await focusRing(optOutToggle(page), async () => {
+      await optOutToggle(page).focus()
+      await expect(optOutToggle(page)).toBeFocused()
+    })
+    // WCAG 2.4.13: the 3:1 change covers at least a 2 CSS px perimeter of the toggle.
+    expect(painted!.qualifying).toBeGreaterThanOrEqual(painted!.required!)
 
     await log.step('Toggle with Space and assert the request went out')
     const save = watchPreferenceCall(interceptNetworkCall, 'PUT')

@@ -59,7 +59,7 @@ export function GuestPreviewWardrobe({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2
           id="guest-preview-wardrobe-heading"
-          className="lookbook-display text-2xl font-semibold text-[#111111]"
+          className="text-2xl font-semibold text-ink"
         >
           {strings.wardrobe.heading}
         </h2>
@@ -67,7 +67,7 @@ export function GuestPreviewWardrobe({
           type="button"
           onClick={onBackToOutfit}
           data-testid="guest-preview-back-to-outfit"
-          className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold"
+          className="min-h-11 rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
         >
           {strings.wardrobe.backToOutfit}
         </button>
@@ -102,7 +102,7 @@ export function GuestPreviewWardrobe({
       />
       <p
         role="status"
-        className="text-sm text-[#5C5C66]"
+        className="text-sm text-ink-muted"
         data-testid="guest-preview-item-count"
       >
         {items.length === 0
@@ -118,16 +118,17 @@ export function GuestPreviewWardrobe({
                 type="button"
                 data-testid="guest-preview-item"
                 data-garment-id={garment.id}
+                data-surface="card"
                 onClick={(event) => {
                   invoker.current = event.currentTarget
                   setOpen(garment)
                   onInspect()
                 }}
-                className="flex min-h-11 w-full flex-col items-center gap-2 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-3 text-center hover:border-[#C9A14A]"
+                className="flex min-h-11 w-full flex-col items-center gap-2 rounded-xl border border-line bg-card p-3 text-center hover:border-line-strong"
               >
                 <SampleGarmentArt garment={garment} />
-                <span className="text-sm font-medium text-[#111111]">{text.name}</span>
-                <span className="text-xs text-[#5C5C66]">
+                <span className="text-sm font-medium text-ink">{text.name}</span>
+                <span className="text-xs text-ink-muted">
                   {values.categoryTitle[garment.category]}
                 </span>
               </button>
@@ -148,7 +149,7 @@ export function GuestPreviewWardrobe({
         {open && openText ? (
           <div className="space-y-4" data-testid="guest-preview-item-detail">
             <div className="flex items-center gap-4">
-              <span className="rounded-lg bg-[#F5F5F7] p-2">
+              <span className="rounded-lg bg-card-muted p-2">
                 <SampleGarmentArt
                   garment={open}
                   label={openText.description}
@@ -181,7 +182,8 @@ export function GuestPreviewWardrobe({
                   onUse(open)
                   setOpen(null)
                 }}
-                className="min-h-11 w-full rounded-lg bg-[#C9A14A] px-4 text-sm font-semibold text-[#111111]"
+                // Story CC-7.9 D3: gold is the screen's main action only; this is a neutral outline.
+                className="min-h-11 w-full rounded-lg border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
               >
                 {formatPreviewString(strings.outfit.swap, {
                   category: values.category[open.category],

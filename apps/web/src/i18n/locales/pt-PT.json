@@ -114,7 +114,8 @@
           "opened": "Planeador de looks aberto.",
           "ready": "O seu plano de 7 dias está pronto.",
           "dayFailed": "Não foi possível gerar o look de {{day}}."
-        }
+        },
+        "railLabel": "Painel do planeador"
       },
       "theme": {
         "sectionTitle": "Paletas da interface",
@@ -352,7 +353,53 @@
         "evening": "Noite",
         "outdoor": "Ar livre",
         "home": "Casa"
-      }
+      },
+      "signIn": "Inicie sessão para gerir as suas cápsulas.",
+      "subtitle": "Crie e faça a gestão das suas próprias combinações de looks.",
+      "filterOccasionLabel": "Filtrar por ocasião",
+      "loading": "A carregar cápsulas de looks…",
+      "favoriteCapsule": "Marcar a cápsula {{name}} como favorita",
+      "garmentCount_one": "{{count}} peça",
+      "garmentCount_other": "{{count}} peças",
+      "status": {
+        "ready": "Pronta",
+        "needsRepair": "Precisa de reparação"
+      },
+      "editAction": "Editar",
+      "deleteAction": "Eliminar",
+      "truncation": "A mostrar {{shown}} de {{total}}. Refine a pesquisa para ver as restantes.",
+      "cancelDeletion": "Cancelar eliminação",
+      "cancel": "Cancelar",
+      "builderDescription": "Crie uma cápsula de looks coerente a partir do seu roupeiro.",
+      "repairRemoved_one": "{{count}} peça já não está disponível e foi removida. Escolha uma substituta antes de guardar.",
+      "repairRemoved_other": "{{count}} peças já não estão disponíveis e foram removidas. Escolha substitutas antes de guardar.",
+      "reloadLatest": "Recarregar a versão mais recente",
+      "garmentFallback": "Peça {{position}}",
+      "garmentNoun": "peça",
+      "untagged": "Peça",
+      "garmentLabel": "{{category}} (posição {{position}})",
+      "garmentLabelWithComfort": "{{category}}, {{comfort}} (posição {{position}})",
+      "category": {
+        "top": "parte de cima",
+        "bottom": "parte de baixo",
+        "outerwear": "agasalho",
+        "dress": "vestido",
+        "shoes": "sapatos",
+        "accessory": "acessório"
+      },
+      "comfort": {
+        "cold": "frio",
+        "cool": "fresco",
+        "mild": "ameno",
+        "warm": "quente",
+        "hot": "muito quente"
+      },
+      "garmentAtPosition": "{{garment}} (posição {{position}})",
+      "garmentNumber": "Peça {{position}}",
+      "closeBuilder": "Fechar o criador de cápsulas",
+      "favoriteMarked": "Cápsula favorita",
+      "markFavorite": "Marcar como favorita",
+      "saving": "A guardar..."
     },
     "onboarding": {
       "title": "Configura o teu roupeiro",
@@ -492,6 +539,103 @@
       "deleteUndone": "Eliminação anulada",
       "deleteFailed": "Não foi possível eliminar esta peça.",
       "deleteUsageFailed": "Não foi possível verificar onde esta peça é usada. Tenta novamente."
+    },
+    "hub": {
+      "loading": "A carregar o teu roupeiro...",
+      "emptyTitle": "Ainda não adicionaste peças",
+      "emptyBody": "Tira uma fotografia ao teu casaco, top ou vestido favorito para começar.",
+      "emptyAction": "Fotografar ou importar peça",
+      "accountFailed": "Não foi possível carregar a tua conta, por isso as definições de silhueta estão indisponíveis de momento. Recarrega a página para tentares novamente.",
+      "accountFailedShort": "Não foi possível carregar a tua conta. Recarrega a página para tentares novamente.",
+      "setupFailed": "Não foi possível verificar o progresso da configuração do teu roupeiro.",
+      "addGarment": "+ Adicionar peça",
+      "closetTitle": "O teu roupeiro digital",
+      "closetBody": "Fotografa ou carrega as tuas peças para receberes sugestões de tempo personalizadas.",
+      "needsTags": "Faltam etiquetas",
+      "taggingSlow": "A etiquetagem inteligente está a demorar mais do que o esperado. A peça continua visível enquanto o processamento continua.",
+      "statusRefreshFailed": "Não foi possível atualizar o estado da peça.",
+      "refreshFailed": "Não foi possível atualizar o teu roupeiro.",
+      "silhouetteSaving": "A guardar as alterações. Aguarda.",
+      "status": {
+        "pending_upload": "A enviar",
+        "bytes_uploaded": "Enviada",
+        "processing": "A processar",
+        "awaiting_tags": "A aguardar etiquetas",
+        "ready": "Pronta",
+        "failed": "Falhou",
+        "unknown": "Em curso"
+      },
+      "detailTitle": "Detalhes da peça"
+    },
+    "tagEditor": {
+      "title": "Organizar etiquetas da peça",
+      "suggestedDescription": "Reveja ou ajuste as sugestões da IA para personalizar as suas recomendações diárias de looks.",
+      "savingAnnouncement": "A guardar etiquetas da peça",
+      "retrySuggestions": "Tentar sugestões inteligentes novamente",
+      "categoryLegend": "Categoria da peça",
+      "materialLegend": "Material do tecido",
+      "optional": "(Opcional)",
+      "comfortLegend": "Intervalo de conforto",
+      "suggestedConfident": "(Sugestão da IA: {{value}})",
+      "suggestedReview": "(Rever, sugestão: {{value}})",
+      "materialClear": "Não sei / Limpar",
+      "cancel": "Cancelar",
+      "save": "Confirmar e guardar etiquetas",
+      "saving": "A guardar...",
+      "errors": {
+        "suggestionUnavailable": "Sugestão indisponível",
+        "analysisPending": "A análise da peça ainda está pendente. Tente novamente daqui a pouco.",
+        "inferenceUnavailable": "As sugestões inteligentes estão indisponíveis. Escolha as etiquetas manualmente.",
+        "suggestionsFailed": "Não foi possível carregar as sugestões inteligentes.",
+        "selectionRequired": "Escolha uma categoria e um intervalo de conforto antes de guardar.",
+        "saveFailed": "Não foi possível guardar as etiquetas. Tente novamente."
+      },
+      "category": {
+        "top": "Parte de cima",
+        "bottom": "Parte de baixo",
+        "outerwear": "Agasalho",
+        "dress": "Vestido",
+        "shoes": "Sapatos",
+        "accessory": "Acessório"
+      },
+      "material": {
+        "cotton": "Algodão",
+        "wool": "Lã",
+        "linen": "Linho",
+        "leather": "Pele",
+        "denim": "Ganga",
+        "fleece": "Tecido polar",
+        "synthetic": "Sintético",
+        "down": "Penas",
+        "silk": "Seda"
+      },
+      "comfort": {
+        "cold": {
+          "label": "Frio (< 10 °C / 50 °F)",
+          "desc": "Muito calor e camadas",
+          "name": "Frio"
+        },
+        "cool": {
+          "label": "Fresco (10–16 °C / 50–60 °F)",
+          "desc": "Casaco ou camisola leve",
+          "name": "Fresco"
+        },
+        "mild": {
+          "label": "Ameno (16–22 °C / 60–72 °F)",
+          "desc": "Camada leve e confortável",
+          "name": "Ameno"
+        },
+        "warm": {
+          "label": "Quente (22–28 °C / 72–82 °F)",
+          "desc": "Peças de verão habituais",
+          "name": "Quente"
+        },
+        "hot": {
+          "label": "Muito quente (> 28 °C / 82 °F)",
+          "desc": "Respirável, para o calor",
+          "name": "Muito quente"
+        }
+      }
     }
   },
   "community": {
@@ -887,6 +1031,85 @@
       "cta": "Ver nos Destaques da cidade"
     }
   },
+  "landing": {
+    "tagline": "Planos de guarda-roupa de acordo com o tempo para cada trajeto",
+    "hero": {
+      "eyebrow": "Ritual diário",
+      "headline": "Planeie looks com confiança em menos de 90 segundos.",
+      "body": "O CoutureCast junta o tempo hiperlocal, o arquivo do seu guarda-roupa e as ideias da comunidade para recomendar looks à medida do trajeto, da reunião e do ambiente."
+    },
+    "lookbook": {
+      "eyebrow": "Lookbook Prism",
+      "title": "Guarda-roupa e comunidade conforme o clima",
+      "heroLabel": "Área do ritual diário",
+      "communityLabel": "Secção da comunidade",
+      "alert": {
+        "label": "Detalhes do alerta de clima severo",
+        "severity": "Alerta de clima: {{severity}}",
+        "advisory": "Aviso: {{type}}",
+        "adjustOutfit": "Ajustar look"
+      },
+      "demo": {
+        "heading": "Ritual diário",
+        "timeCity": "08h30 • NYC",
+        "temperature": "18 °C",
+        "humidity": "Humidade moderada • 65%",
+        "change": "+3 °C em relação ao trajeto de ontem",
+        "primaryLook": "Look principal recomendado",
+        "matchScore": "Compatibilidade: {{score}}",
+        "garments": {
+          "blazer": "Blazer ónix",
+          "scarf": "Lenço de seda cor merlot",
+          "loafers": "Mocassins de pele"
+        },
+        "lookA": {
+          "label": "LOOK A (principal)",
+          "title": "Blazer e malha de seda",
+          "body": "Nível de aquecimento ajustado ao vento fresco da manhã."
+        },
+        "lookB": {
+          "label": "LOOK B (alternativa)",
+          "title": "Gabardina e casaco de malha de merino",
+          "body": "Mais proteção contra o vento com uma camada resistente à água."
+        }
+      },
+      "recommendations": {
+        "personal": {
+          "eyebrow": "Pronto para o trajeto",
+          "title": "Blazer trespassado e malha de seda",
+          "description": "Pensado para um trajeto de comboio a 18 °C de manhã até um escritório com ar condicionado."
+        },
+        "community": {
+          "eyebrow": "Em destaque na comunidade",
+          "title": "Mistura parisiense de seda e caxemira",
+          "description": "Os favoritos da comunidade combinam caxemira leve com uma saia midi plissada para a previsão de vento."
+        },
+        "brands": {
+          "eyebrow": "Escolhas das marcas",
+          "title": "Conjunto de arquivo Couture House",
+          "description": "Combinações focadas em marcas, com lã reciclada e detalhes dourados característicos."
+        }
+      }
+    },
+    "chips": {
+      "navLabel": "Filtrar recomendações por categoria",
+      "groupLabel": "Filtros de categoria",
+      "personal": "Pessoal",
+      "community": "Comunidade",
+      "sponsored": "Patrocinado",
+      "showing": "A mostrar recomendações: {{category}}"
+    },
+    "layoutControls": {
+      "label": "Controlos de esquema",
+      "comparison": "Modo de comparação",
+      "mobilePreview": "Pré-visualização móvel"
+    },
+    "actions": {
+      "previewOutfits": "Ver looks",
+      "seePlanner": "Ver o planeador",
+      "startUpload": "Começar a carregar peças"
+    }
+  },
   "shareCard": {
     "launcher": "Criar o meu cartão de look",
     "sourceOutfit": "Look",
@@ -1141,7 +1364,8 @@
       "firstDecision": "Primeira decisão: {{when}}",
       "escalated": "Este caso aguarda um administrador. Só um administrador o pode encerrar.",
       "reporterScreening": "Triagem automática",
-      "reasonRemoved": "Motivo removido pelo apagamento"
+      "reasonRemoved": "Motivo removido pelo apagamento",
+      "screenTitle": "Revisão do caso"
     },
     "action": {
       "flagged": "Sinalizado pela triagem",
@@ -1318,6 +1542,7 @@
   },
   "nav": {
     "label": "Navegação inferior",
+    "primaryLabel": "Navegação principal",
     "home": "Início",
     "wardrobe": "Guarda-roupa",
     "community": "Comunidade",
@@ -1368,5 +1593,72 @@
     "close": "Fechar",
     "showList": "Mostrar conjuntos guardados",
     "hideList": "Ocultar conjuntos guardados"
+  },
+  "shell": {
+    "back": "Voltar",
+    "goHome": "Ir para o início",
+    "notFound": {
+      "title": "Página não encontrada",
+      "body": "A página que procurava não existe. Volte ao ecrã inicial para continuar."
+    },
+    "error": {
+      "title": "Algo correu mal",
+      "retry": "Tentar novamente"
+    },
+    "dismissBanner": "Fechar aviso",
+    "skipToContent": "Saltar para o conteúdo principal",
+    "close": "Fechar a janela",
+    "legal": {
+      "label": "Informação legal",
+      "privacy": "Política de Privacidade",
+      "terms": "Termos de Serviço"
+    }
+  },
+  "guardian": {
+    "accept": {
+      "title": "Consentimento do encarregado",
+      "heading": "Aceitar o acesso ao guarda-roupa adolescente",
+      "intro": "Confirme este convite para associar a conta do encarregado e desbloquear o guarda-roupa adolescente.",
+      "tokenMissing": "Falta o código do convite nesta ligação.",
+      "success": "Consentimento registado para {{teenEmail}}. A conta do encarregado {{guardianEmail}} está agora associada.",
+      "failed": "Não foi possível aceitar o convite do encarregado",
+      "accepting": "A aceitar…",
+      "accept": "Aceitar convite"
+    },
+    "dashboard": {
+      "title": "Painel do encarregado",
+      "intro": "Reveja as contas de adolescentes associadas e revogue o consentimento quando o acesso deve terminar.",
+      "loading": "A carregar adolescentes associados...",
+      "loadFailed": "Não foi possível carregar o painel",
+      "revokeFailed": "Não foi possível revogar o consentimento",
+      "revoked": "Consentimento revogado para {{teenId}}. Sessão do adolescente terminada: {{invalidated}}.",
+      "yes": "sim",
+      "no": "não",
+      "linkedTeens": "Adolescentes associados",
+      "revokeLabel": "Revogar o consentimento de {{teenId}}",
+      "revoking": "A revogar...",
+      "revoke": "Revogar",
+      "empty": "Ainda não há contas de adolescentes associadas."
+    },
+    "consent": {
+      "awaiting": "A aguardar consentimento",
+      "status": {
+        "granted": "concedido",
+        "pending": "pendente",
+        "revoked": "revogado"
+      }
+    }
+  },
+  "teen": {
+    "dashboard": {
+      "title": "Painel do adolescente",
+      "loading": "A carregar o estado do consentimento...",
+      "loadFailed": "Não foi possível carregar o painel",
+      "granted": "Consentimento do encarregado concedido",
+      "revoked": "Consentimento do encarregado revogado",
+      "pending": "Consentimento do encarregado pendente",
+      "linkedGuardians": "Encarregados associados",
+      "empty": "Nenhum encarregado deu ainda o consentimento."
+    }
   }
 }

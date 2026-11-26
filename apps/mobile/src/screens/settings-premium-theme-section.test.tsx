@@ -16,6 +16,12 @@ import { act, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
+import {
+  colorRoles,
+  contrastRatio,
+  PREMIUM_PALETTE_KEYS,
+  premiumPalettes,
+} from '@couture/utils'
 
 /*
  * Story 5.4: `settings.tsx` gained an `expo-router` import for the palette advisor
@@ -140,6 +146,18 @@ const themeResponse = (
 /** Serves the GET only; suites that press a card add their own PUT handler. */
 function serveTheme(body: ReturnType<typeof themeResponse>) {
   server.use(http.get(THEME_ROUTE, () => HttpResponse.json(body)))
+}
+
+/** `#RRGGBB` painted at `alpha` over `under`, as a dimmed card composites onto the screen. */
+function composite(color: string, under: string, alpha: number): string {
+  const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16)
+  return `#${[1, 3, 5]
+    .map((at) =>
+      Math.round(alpha * channel(color, at) + (1 - alpha) * channel(under, at))
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`
 }
 
 const errorEnvelope = (statusCode: number, message: string) =>
@@ -381,6 +399,31 @@ describe('SettingsScreen interface palettes section', () => {
       expect(card.getAttribute('aria-describedby')).toBe(note.getAttribute('id'))
     })
 
+    it('7.9 P2-9 keeps every dimmed palette preview at 4.5:1 in light and dark', async () => {
+      serveTheme(themeResponse({ themesEnabled: false }))
+      await renderSettings()
+
+      const card = await screen.findByTestId('premium-theme-option-jewel_radiance')
+      await waitFor(() => expect(card.getAttribute('aria-disabled')).toBe('true'))
+      // The opacity the disabled card actually renders with, matching web's opacity-80.
+      const opacity = Number(getComputedStyle(card).opacity)
+      expect(opacity).toBe(0.8)
+
+      for (const scheme of ['light', 'dark'] as const) {
+        const roles = colorRoles[scheme]
+        for (const key of ['default', ...PREMIUM_PALETTE_KEYS] as const) {
+          const { cardText, cardBg } = premiumPalettes[key][scheme]
+          for (const under of [roles.page, roles.card, roles.cardMuted]) {
+            const ratio = contrastRatio(
+              composite(cardText, under, opacity),
+              composite(cardBg, under, opacity)
+            )
+            expect(ratio, `${scheme} ${key} over ${under}`).toBeGreaterThanOrEqual(4.5)
+          }
+        }
+      }
+    })
+
     /**
      * A read that failed tells us nothing about entitlement, so the section shows the
      * error and Default rather than an upsell a paying subscriber would find insulting.
@@ -506,7 +549,7 @@ describe('SettingsScreen interface palettes section', () => {
 
     act(() => releaseEntryRead())
 
-    expect(await screen.findByTestId('premium-theme-gallery')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('premium-theme-gallery')).toBeVisible())
     expect(screen.queryByTestId('premium-theme-locked')).toBeNull()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })

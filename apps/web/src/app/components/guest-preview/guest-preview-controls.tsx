@@ -36,16 +36,17 @@ export function GuestPreviewControls({
     <section
       aria-labelledby="guest-preview-controls-heading"
       data-testid="guest-preview-controls"
-      className="space-y-5 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-5"
+      data-surface="card"
+      className="space-y-5 rounded-xl border border-line bg-card p-5"
     >
       <div className="space-y-1">
         <h2
           id="guest-preview-controls-heading"
-          className="lookbook-display text-lg font-semibold text-[#111111]"
+          className="text-lg font-semibold text-ink"
         >
           {strings.preferences.heading}
         </h2>
-        <p className="text-sm text-[#36363D]">{strings.chrome.supporting}</p>
+        <p className="text-sm text-ink-soft">{strings.chrome.supporting}</p>
       </div>
       <GuestPreviewChoiceGroup
         legend={strings.preferences.weather}
@@ -58,7 +59,7 @@ export function GuestPreviewControls({
         }))}
         onChange={onWeather}
       />
-      <p className="text-xs text-[#5C5C66]" data-testid="guest-preview-weather-detail">
+      <p className="text-xs text-ink-muted" data-testid="guest-preview-weather-detail">
         {formatPreviewString(strings.preferences.weatherDetail, {
           temperature: formatSampleTemperature(weather.feelsLike, locale),
           windSpeed: weather.windSpeed,

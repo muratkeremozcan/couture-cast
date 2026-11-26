@@ -413,19 +413,17 @@ function MemberLocationsSection({
       aria-labelledby="locations-title"
       data-testid="locations-section"
       data-state={sectionState}
-      className="mt-10 max-w-2xl border-t border-neutral-800 pt-8"
+      className="mt-10 max-w-2xl border-t border-line pt-8"
     >
       <h2
         id="locations-title"
         ref={headingRef}
         tabIndex={-1}
-        className="text-xl font-semibold text-white outline-none"
+        className="text-xl font-semibold text-ink outline-none"
       >
         {t('locations.title')}
       </h2>
-      <p className="mt-3 text-sm leading-relaxed text-neutral-200">
-        {t('locations.intro')}
-      </p>
+      <p className="mt-3 text-sm leading-relaxed text-ink-soft">{t('locations.intro')}</p>
 
       {showGuidedCancel(guided, sectionState, guestHint) && (
         <button
@@ -441,14 +439,14 @@ function MemberLocationsSection({
       )}
 
       {sectionState === 'signed_out' && (
-        <p className="mt-4 text-sm text-neutral-300" data-testid="locations-signed-out">
+        <p className="mt-4 text-sm text-ink-soft" data-testid="locations-signed-out">
           {t('locations.signedOutHint')}
         </p>
       )}
       {guestHint && (
         <GuestText
           text={t('locations.signedOutHint')}
-          className="mt-4 text-sm text-neutral-300"
+          className="mt-4 text-sm text-ink-soft"
         />
       )}
 
@@ -456,7 +454,7 @@ function MemberLocationsSection({
         <div className="mt-4 flex flex-col gap-2">
           <p
             role="alert"
-            className="text-sm text-red-300"
+            className="text-sm text-danger-ink"
             data-testid="locations-load-error"
           >
             {loadErrorMessage}
@@ -464,7 +462,7 @@ function MemberLocationsSection({
           <button
             type="button"
             onClick={retryLoad}
-            className="min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-white"
+            className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4"
             data-testid="locations-load-retry"
           >
             {t('locations.loadRetry')}
@@ -474,11 +472,11 @@ function MemberLocationsSection({
 
       {sectionState === 'ready' && (
         <>
-          <p className="mt-4 text-sm text-neutral-300" data-testid="locations-count">
+          <p className="mt-4 text-sm text-ink-soft" data-testid="locations-count">
             {t('locations.count', { count: locations.length })}
           </p>
           {locations.length === 0 ? (
-            <p className="mt-2 text-sm text-neutral-200" data-testid="locations-empty">
+            <p className="mt-2 text-sm text-ink-soft" data-testid="locations-empty">
               {t('locations.empty')}
             </p>
           ) : (
@@ -486,7 +484,8 @@ function MemberLocationsSection({
               {locations.map((location) => (
                 <li
                   key={location.id}
-                  className="rounded-md border border-neutral-700 p-4"
+                  data-surface="card"
+                  className="rounded-lg border border-line bg-card p-4"
                   data-testid="location-item"
                   data-primary={location.isPrimary}
                 >
@@ -497,14 +496,14 @@ function MemberLocationsSection({
                         else itemRefs.current.delete(location.id)
                       }}
                       tabIndex={-1}
-                      className="text-base font-semibold text-white outline-none"
+                      className="text-base font-semibold text-ink outline-none"
                       data-testid="location-item-label"
                     >
                       {location.label}
                     </h3>
                     {location.isPrimary && (
                       <span
-                        className="rounded-full bg-[#c9a14a] px-2 text-xs font-semibold text-neutral-950"
+                        className="rounded-full bg-inverse px-2 text-xs font-semibold text-on-inverse"
                         data-testid="location-primary-badge"
                       >
                         {t('locations.primary')}
@@ -512,7 +511,7 @@ function MemberLocationsSection({
                     )}
                   </div>
                   <p
-                    className="mt-1 text-sm text-neutral-300"
+                    className="mt-1 text-sm text-ink-soft"
                     data-testid="location-item-place"
                   >
                     {formatPlace(location, locale)}
@@ -526,7 +525,7 @@ function MemberLocationsSection({
                         saveRename(location)
                       }}
                     >
-                      <label className="flex flex-col gap-1 text-sm text-white">
+                      <label className="flex flex-col gap-1 text-sm text-ink">
                         {t('locations.renameField')}
                         <input
                           autoFocus
@@ -540,14 +539,14 @@ function MemberLocationsSection({
                               focusLater(location.id, ownedBy(owner))
                             }
                           }}
-                          className="rounded-md border border-neutral-600 bg-neutral-900 px-3 text-white"
+                          className="rounded-md border border-line-strong bg-page px-3 text-ink"
                           data-testid="location-rename-input"
                         />
                       </label>
                       <button
                         type="submit"
                         aria-busy={busyId === location.id}
-                        className="min-h-[44px] rounded-md bg-[#c9a14a] px-3 font-semibold text-neutral-950"
+                        className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3 font-semibold"
                         data-testid="location-rename-save"
                       >
                         {t('locations.renameSave')}
@@ -558,7 +557,7 @@ function MemberLocationsSection({
                           setRenamingId(null)
                           focusLater(location.id, ownedBy(owner))
                         }}
-                        className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3"
                       >
                         {t('locations.cancel')}
                       </button>
@@ -568,7 +567,7 @@ function MemberLocationsSection({
                     // buttons here: the focused Delete would become Cancel and
                     // "Yes, delete" would never mount, so autoFocus would not run.
                     <div key="confirm" className="mt-3 flex flex-wrap items-center gap-2">
-                      <p className="text-sm text-white">
+                      <p className="text-sm text-ink">
                         {t('locations.deleteConfirm', { label: location.label })}
                       </p>
                       <button
@@ -576,7 +575,7 @@ function MemberLocationsSection({
                         autoFocus
                         aria-busy={busyId === location.id}
                         onClick={() => confirmDelete(location)}
-                        className="min-h-[44px] rounded-md border border-red-400 px-3 text-red-200"
+                        className="min-h-11 rounded-md border border-danger-line bg-danger-surface px-3 text-danger-ink"
                         data-testid="location-delete-confirm"
                       >
                         {t('locations.deleteConfirmAction')}
@@ -587,7 +586,7 @@ function MemberLocationsSection({
                           setConfirmingId(null)
                           focusLater(location.id, ownedBy(owner))
                         }}
-                        className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3"
                       >
                         {t('locations.cancel')}
                       </button>
@@ -599,7 +598,7 @@ function MemberLocationsSection({
                           type="button"
                           aria-busy={busyId === location.id}
                           onClick={() => makePrimary(location)}
-                          className="min-h-[44px] rounded-md border border-[#c9a14a] px-3 text-white"
+                          className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3"
                           aria-label={`${t('locations.makePrimary')}, ${location.label}`}
                           data-testid="location-make-primary"
                         >
@@ -613,7 +612,7 @@ function MemberLocationsSection({
                           setRenameValue(location.label)
                           setRenamingId(location.id)
                         }}
-                        className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3"
                         aria-label={`${t('locations.rename')}, ${location.label}`}
                         data-testid="location-rename"
                       >
@@ -625,7 +624,7 @@ function MemberLocationsSection({
                           setRenamingId(null)
                           setConfirmingId(location.id)
                         }}
-                        className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        className="min-h-11 rounded-md border border-line-strong bg-page text-ink px-3"
                         aria-label={`${t('locations.delete')}, ${location.label}`}
                         data-testid="location-delete"
                       >
@@ -639,7 +638,7 @@ function MemberLocationsSection({
           )}
 
           {isFull ? (
-            <p className="mt-4 text-sm text-neutral-200" data-testid="locations-limit">
+            <p className="mt-4 text-sm text-ink-soft" data-testid="locations-limit">
               {t('locations.limit')}
             </p>
           ) : (
@@ -660,7 +659,7 @@ function MemberLocationsSection({
 
       <p
         role="status"
-        className="mt-4 min-h-[1.25rem] text-sm text-emerald-300"
+        className="mt-4 min-h-[1.25rem] text-sm text-success-ink"
         data-testid="locations-status-region"
       >
         {status}
@@ -669,7 +668,7 @@ function MemberLocationsSection({
       {error && (
         <p
           role="alert"
-          className="mt-1 text-sm text-red-300"
+          className="mt-1 text-sm text-danger-ink"
           data-testid="locations-error"
         >
           {t(errorKey(error))}

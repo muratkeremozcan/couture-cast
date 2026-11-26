@@ -8,7 +8,7 @@ import type { ModerationMedia } from '@couture/api-client/contracts/http'
 import { useModerationTranslation } from '../../lib/moderation'
 
 const control =
-  'min-h-[44px] min-w-[44px] rounded border border-neutral-500 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--focus-essential)]'
+  'min-h-[44px] min-w-[44px] rounded-md border border-line-strong bg-page px-4 py-2 text-sm font-medium text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
 
 export function CaseMedia({
   media,
@@ -45,14 +45,14 @@ export function CaseMedia({
 
   if (media.state === 'unavailable') {
     return (
-      <p className="rounded border border-dashed border-neutral-500 p-4 text-sm">
+      <p className="rounded-md border border-dashed border-line-strong p-4 text-sm">
         {t(`moderation.mediaReason.${media.reason}`)}
       </p>
     )
   }
   if (expired || failed) {
     return (
-      <div className="flex flex-col items-start gap-3 rounded border border-dashed border-neutral-500 p-4 text-sm">
+      <div className="flex flex-col items-start gap-3 rounded-md border border-dashed border-line-strong p-4 text-sm">
         <p>{t(failed ? 'moderation.media.failed' : 'moderation.media.expired')}</p>
         <button type="button" className={control} onClick={onReload}>
           {t('moderation.media.reload')}
@@ -69,7 +69,7 @@ export function CaseMedia({
         referrerPolicy="no-referrer"
         decoding="async"
         onError={() => setFailed(true)}
-        className="max-h-[70vh] w-full rounded bg-neutral-200 object-contain dark:bg-neutral-800"
+        className="max-h-[70vh] w-full rounded-md bg-card-muted object-contain"
       />
     </figure>
   )

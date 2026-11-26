@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-25.
-Added Steps 40 to 65:
+Added Steps 40 to 66:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -29,7 +29,8 @@ Added Steps 40 to 65:
 - Step 62: Story 7.4, community post edits persist, `ea93273b` (PR #289), merged on 2026-11-22.
 - Step 63: Story 7.5, garment detail and tag edit, `246577af` (PR #290), merged on 2026-11-25.
 - Step 64: Story 7.6, garment delete, `11c26918` (PR #291), merged on 2026-11-25.
-- Step 65: Story 7.7, signed-in shell without flashes, in review on `feat/epic7-story-7-7-signed-in-shell-without-flashes`.
+- Step 65: Story 7.7, signed-in shell without flashes, `812cadce` (PR #292), merged on 2026-11-25.
+- Step 66: Story 7.9, one app shell and visual system, in review on `feat/epic7-story-7-9-one-app-shell-visual-system`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -37,6 +38,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 66 for Story CC-7.9 (one app shell and visual system) while its PR is in review, and moved Step 65 to merged (`812cadce`, PR #292).
 Added Step 65 for Story CC-7.7 (signed-in shell without flashes) while its PR is in review, and moved Step 64 to merged (`11c26918`, PR #291).
 Added Step 64 for Story CC-7.6 (garment delete) while its PR is in review, and moved Step 63 to merged (`246577af`, PR #290).
 Added Step 63 for Story CC-7.5 (garment detail and tag edit) while its PR is in review, and moved Step 62 to merged (`ea93273b`, PR #289).
@@ -156,10 +158,11 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 59, Story CC-7.1, shared save, undo and status feedback, status `review` on `feat/epic7-story-7-1-shared-save-undo-status-feedback`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-1-shared-save-undo-status-feedback.md`.
-  Step 59 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
+- Latest step: Step 66, Story CC-7.9, one app shell and visual system, status `in-progress` on `feat/epic7-story-7-9-one-app-shell-visual-system`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-9-one-app-shell-visual-system.md`.
+  Step 66 was written before merge, and its `Evidence boundaries` section says what ran and what did not.
   `epic-7` is `in-progress` in `sprint-status.yaml`.
+- Previous completed steps: Steps 59 to 65, Stories CC-7.1 to CC-7.7, merged on `main` (the last, Step 65, as `812cadce`, PR #292).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -21809,3 +21812,108 @@ Evidence boundaries:
   files.
 - Unit, component, native and Playwright suites (the Chromium layout-shift check included) run in
   CI on the PR.
+
+## Step 66: One app shell and visual system
+
+User/business impact:
+
+- Every tab looks like the same app. Home and Community lose the dark gradient page with a
+  light lookbook card inset in it; Wardrobe loses its light admin look; Profile, `/palette`,
+  sign-in, guardian, teen, error and not-found pages lose their always-dark frame. Each screen
+  is one page surface with a 56 px top bar (title, optional back) and cards one level deep.
+- Light and dark follow the system setting on every screen, web and native, including a live
+  flip while the app is open. A premium palette follows it too: each palette has a dark variant.
+- Gold marks only the main action, the focus ring, the active tab and Premium. Selected chips,
+  pressed reactions and active toggles use the ink and inverse roles; warnings use the notice
+  roles. Web Wardrobe and capsules strings come from the locale catalogs.
+
+Technical architecture:
+
+- One token set: `packages/utils/src/design-tokens.ts` (`colorRoles.light|dark`, `typeScale`,
+  `space`, `radius`, `elevation`, `shell`, `premiumPalettes`), exported from `@couture/utils`.
+  `design-tokens.spec.ts` pins every contrast pairing in both schemes and the gold rule.
+- Web: `apps/web/tailwind.config.ts` replaces `colors` wholesale with the roles as
+  `rgb(var(--cc-<role>) / <alpha-value>)`, so opacity modifiers keep working and a Tailwind
+  palette class emits nothing. Its plugin emits the `--cc-*` channel triples for `:root`, the
+  dark media query and every `[data-theme]` palette in both schemes
+  (`buildDesignTokenCssRules`). `AppPage` (`data-surface="page"`) and `AppTopBar`
+  (`components/app-top-bar.tsx`, `app-header`, `app-top-bar-back`) frame every screen.
+- Native: `apps/mobile/src/theme/tokens.ts` (`useTokens()` from `useColorScheme`), with
+  `constants/colors.ts`, `themed.tsx`, `hero-theme.ts` and `theme-palettes.ts` derived from the
+  tokens. `src/components/app-top-bar.tsx` is the `header` of the tab navigator and the root
+  stack (56 pt plus the top inset); a direct entry goes back to the parent tab.
+- The guard: `scripts/check-design-tokens.mjs`, run in the PR gate's lint job, fails on a raw
+  color, a palette or unknown color class, an interpolated color class, a `dark:` color
+  variant or an off-scale spacing, type, radius or shadow class, naming `file:line`.
+
+Hard-won lessons from the implementation of this story:
+
+- Replacing Tailwind `colors` makes a stale class silently paint nothing, so the guard has to
+  allow-list the role names; a deny list of palette names misses `bg-gold` and `text-foreground`.
+- Tailwind only sees whole class names in the source, so a class built at run time
+  (`bg-${tone}`) never gets CSS: map each value to a full literal class.
+- A color role that carries meaning needs its own contrast floor in each scheme; the light gold
+  ink and focus halo had to darken to clear 4.5:1 and 3:1 on the muted card.
+
+Story/Task mapping:
+
+- Story CC-7.9: One app shell and visual system (Epic 7 Lane B clarity).
+- Follows CC-7.7 (signed-in shell without flashes): the placeholder now renders inside this shell.
+
+Story reference:
+
+- `_bmad-output/planning-artifacts/epics.md` (`**Story CC-7.9: One app shell and visual system**`)
+- `_bmad-output/implementation-artifacts/spec-7-9-one-app-shell-visual-system.md`
+- `_bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md`
+
+Cross-links:
+
+- Step 65 (`#step-65-signed-in-shell-without-flashes`): the screen gate and placeholder the shell
+  now frames.
+- Step 35 (`#step-35-premium-theme-switcher`): the premium palettes that gained dark variants.
+
+Sequence to follow:
+
+1. Add `packages/utils/src/design-tokens.ts` and its contrast pins.
+2. Web plumbing: `tailwind.config.ts`, `globals.css`, `layout.tsx` (Geist on every page).
+3. Web `AppPage` and `AppTopBar`, then the tab frames, bottom nav and gate placeholder.
+4. Migrate every web screen to the roles and scales; frame each routed sub-screen.
+5. Native `useTokens`, the derived color modules and the `AppTopBar` headers; migrate every
+   screen and remove the duplicate in-body titles.
+6. Move hard-coded strings into the 10 + 10 catalogs; add `shell.back`.
+7. Add `scripts/check-design-tokens.mjs` with its `node --test` spec and the PR gate step.
+
+Task owner map:
+
+- Step 66 step 1 owner: `packages/utils/src/design-tokens.ts`.
+- Step 66 step 2 owner: `apps/web/tailwind.config.ts`.
+- Step 66 step 3 owner: `apps/web/src/app/components/app-top-bar.tsx` and
+  `apps/web/src/app/components/app-page.tsx`.
+- Step 66 step 5 owner: `apps/mobile/src/theme/tokens.ts` and
+  `apps/mobile/src/components/app-top-bar.tsx`.
+- Step 66 step 7 owner: `scripts/check-design-tokens.mjs`.
+
+Tests that cover this step:
+
+- [`packages/utils/src/design-tokens.spec.ts`](../../packages/utils/src/design-tokens.spec.ts):
+  7.9-UNIT-001 to 7.9-UNIT-005.
+- [`apps/web/src/design-token-plugin.test.ts`](../../apps/web/src/design-token-plugin.test.ts):
+  7.9-UNIT-006.
+- [`apps/web/src/app/components/app-top-bar.test.tsx`](../../apps/web/src/app/components/app-top-bar.test.tsx):
+  7.9-CMP-001; [`app-shell-placeholder.test.tsx`](../../apps/web/src/app/components/app-shell-placeholder.test.tsx):
+  7.9-CMP-002.
+- [`apps/mobile/src/theme/tokens.test.tsx`](../../apps/mobile/src/theme/tokens.test.tsx): 7.9-NAT-001;
+  [`apps/mobile/src/components/app-top-bar.test.tsx`](../../apps/mobile/src/components/app-top-bar.test.tsx):
+  7.9-NAT-002; [`apps/mobile/src/screens/tab-shell-tokens.test.tsx`](../../apps/mobile/src/screens/tab-shell-tokens.test.tsx):
+  7.9-NAT-003 and 7.9-NAT-004.
+- [`scripts/check-design-tokens.test.mjs`](../../scripts/check-design-tokens.test.mjs):
+  7.9-GRD-001 to 7.9-GRD-011.
+- The Playwright, snapshot and native snapshot suites are listed in
+  `_bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md`.
+
+Evidence boundaries:
+
+- Locally: the guard and its `node --test` spec, `tsc --noEmit` in packages/utils, apps/web and
+  apps/mobile, and ESLint on touched files.
+- Unit, component, native, Playwright and snapshot suites run in CI on the PR; snapshot
+  baselines are generated on Linux CI.

@@ -16,7 +16,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -183,14 +182,14 @@ export function OfflineStatusLine({
         !inline ? { top: topOffset } : undefined,
         {
           backgroundColor: colors.noticeSurface,
-          borderColor: colors.noticeBorder,
-          borderBottomColor: colors.noticeBorder,
+          borderColor: colors.noticeLine,
+          borderBottomColor: colors.noticeLine,
         },
       ]}
     >
       <Text
         accessibilityLiveRegion="none"
-        style={[styles.offlineText, { color: colors.noticeText }]}
+        style={[styles.offlineText, { color: colors.noticeInk }]}
       >
         {t('feedback.offlineBanner')}
       </Text>
@@ -210,7 +209,6 @@ export function StatusFeedbackBar({
   primaryActionClearance?: number
 }) {
   const colors = useSchemeColors()
-  const isDark = useColorScheme() === 'dark'
   const insets = useSafeAreaInsets()
   const tabBarHeight = useMobileTabBarHeight()
   const sharedPrimaryClearance = useMobilePrimaryActionClearance()
@@ -241,24 +239,25 @@ export function StatusFeedbackBar({
       case 'error':
         return {
           backgroundColor: colors.dangerSurface,
-          borderColor: colors.dangerBorder,
-          textColor: colors.dangerText,
-          actionColor: colors.dangerText,
+          borderColor: colors.dangerLine,
+          textColor: colors.dangerInk,
+          actionColor: colors.dangerInk,
         }
       case 'offline':
         return {
           backgroundColor: colors.noticeSurface,
-          borderColor: colors.noticeBorder,
-          textColor: colors.noticeText,
-          actionColor: colors.noticeText,
+          borderColor: colors.noticeLine,
+          textColor: colors.noticeInk,
+          actionColor: colors.noticeInk,
         }
       case 'success':
       case 'neutral':
         return {
-          backgroundColor: colors.inverseSurface,
-          borderColor: colors.strongBorder,
+          backgroundColor: colors.inverse,
+          borderColor: colors.lineStrong,
           textColor: colors.onInverse,
-          actionColor: isDark ? '#8A5A00' : '#F0D59A',
+          // Story CC-7.9 D3: the action on the inverse bar is its ink, never a gold tint.
+          actionColor: colors.onInverse,
         }
     }
   })()
@@ -512,7 +511,7 @@ const styles = StyleSheet.create({
     zIndex: 35,
     borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -522,7 +521,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -543,10 +542,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 10,
+    gap: 8,
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     minHeight: 48,
   },
@@ -569,7 +568,7 @@ const styles = StyleSheet.create({
   barActionButton: {
     minHeight: 44,
     minWidth: 44,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 8,

@@ -400,9 +400,10 @@ describe('R52 CommunityReportModal over the system bars', () => {
     const overlay = screen.getByTestId('community-report-modal-overlay')
     expect(paddingTopOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.top)
     expect(paddingBottomOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
+    // Story CC-7.9 D2: the scrim is the shared token (`scrim` at SCRIM_OPACITY 0.5).
     expect(
       getComputedStyle(screen.getByTestId('community-report-modal-scrim')).backgroundColor
-    ).toBe('rgba(0, 0, 0, 0.6)')
+    ).toBe('rgba(0, 0, 0, 0.5)')
   })
 
   it('R57 lifts its fields with the wrapper keyboard view under a scrim of its own layer', () => {

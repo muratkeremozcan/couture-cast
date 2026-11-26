@@ -10,6 +10,7 @@ import {
   GOOGLE_G_MARK_VIEWBOX,
   type SignInDoor,
 } from '@couture/utils'
+import Colors from '@/constants/colors'
 import { useSchemeColors } from '@/components/themed'
 import type { NativeOAuthOutcome } from '@/src/lib/native-session'
 
@@ -77,10 +78,13 @@ export function GoogleSignInButton({
 }
 
 /**
- * The rule's line on each scheme's page: at least 3:1 (WCAG 1.4.11) on white and on black.
- * The label takes the scheme's muted text, which clears 4.5:1 on both.
+ * The rule's line on each scheme's page: the `lineStrong` role, pinned at 3:1 or more
+ * (WCAG 1.4.11) on `page` in both schemes. The label takes `inkMuted`, pinned at 4.5:1.
  */
-export const SIGN_IN_DIVIDER_LINE = { light: '#8E8E93', dark: '#636366' } as const
+export const SIGN_IN_DIVIDER_LINE = {
+  light: Colors.light.lineStrong,
+  dark: Colors.dark.lineStrong,
+} as const
 
 /** The "or" rule between Google and the email form, in the OS scheme's colors. */
 export function SignInDivider() {
@@ -94,7 +98,7 @@ export function SignInDivider() {
         testID="sign-in-divider-rule"
         style={[styles.rule, { backgroundColor: line }]}
       />
-      <Text style={[styles.dividerText, { color: colors.mutedText }]}>{label}</Text>
+      <Text style={[styles.dividerText, { color: colors.inkMuted }]}>{label}</Text>
       <View style={[styles.rule, { backgroundColor: line }]} />
     </View>
   )
@@ -135,7 +139,7 @@ const styles = StyleSheet.create({
   button: {
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: 999,
+    borderRadius: 9999,
     paddingHorizontal: 20,
     paddingVertical: 12,
     flexDirection: 'row',
@@ -143,7 +147,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
   },
-  label: { fontSize: 15, fontWeight: '500', flexShrink: 1, textAlign: 'center' },
+  label: { fontSize: 16, fontWeight: '500', flexShrink: 1, textAlign: 'center' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 24 },
   // One device pixel and more: a hairline at 3:1 still read as missing on a dense screen.
   rule: { flex: 1, height: 1 },

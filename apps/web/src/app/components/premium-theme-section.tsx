@@ -6,9 +6,10 @@
 // section are load-bearing rather than stylistic:
 //
 // - The gallery is the story's one demonstration surface (Decision 4). Each card
-//   carries its own `data-theme`, so `globals.css` re-colors that card from the
-//   palette's own custom properties while a different palette may be active on
-//   `<html>`. No hex value appears in this file; the CSS layer is the single web copy.
+//   carries its own `data-theme`, so the `--cc-theme-*` variables the Tailwind token plugin
+//   emits for that palette (Story CC-7.9 D5, from `@couture/utils` `premiumPalettes`, light
+//   and dark) re-color that card while a different palette may be active on `<html>`. No hex
+//   value appears in this file; the token module is the single copy.
 // - `LivePreview` is the counterpart to that, and it is why the `data-theme` written to
 //   `<html>` is a visible change rather than a DOM attribute nothing reads. It is the
 //   one element here that pins no palette of its own, so it inherits whatever is active
@@ -17,7 +18,7 @@
 // - Contrast is the reason the cards look the way they do. Two of the three `primary`
 //   fills miss the 4.5:1 small-text floor with white text (Decision 2), so `primary`
 //   never carries text here: it is a swatch dot ringed in the card's own text color,
-//   and every string in a card renders in `--theme-card-text` on `--theme-card-bg`,
+//   and every string in a card renders in `theme-card-text` on `theme-card-bg`,
 //   the pairing that measures 8.01-11.58:1 across all three palettes.
 // - Selection is never signalled by color alone. The active card states "Selected" in
 //   text and carries `aria-pressed`, so the palette is decoration on top of a state
@@ -83,7 +84,7 @@ const PALETTE_LABEL_KEYS: Record<PremiumThemeKey, string> = {
 interface ThemeOption {
   /** `null` is the implicit Default palette, which is also the reset control. */
   key: PremiumThemeKey | null
-  /** The `globals.css` selector this card renders itself with. */
+  /** The `data-theme` palette this card renders itself with. */
   dataTheme: string
   labelKey: string
 }
@@ -169,12 +170,13 @@ function PaletteCard({
         aria-describedby={isSelectable ? undefined : UNAVAILABLE_HINT_ID}
         disabled={!isSelectable}
         onClick={onSelect}
-        className="flex w-full flex-col items-start gap-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-left text-[color:var(--theme-card-text)] disabled:opacity-70"
+        data-surface="card"
+        className="flex w-full flex-col items-start gap-3 rounded-lg border border-theme-card-border bg-theme-card-bg p-4 text-left text-theme-card-text disabled:opacity-80"
       >
         <span className="flex items-center gap-2">
           {/*
             The two swatches are the only place `primary` and `secondary` appear. Both
-            are ringed in `--theme-card-text` because Autumn Umber's Wheat and Winter
+            are ringed in `theme-card-text` because Autumn Umber's Wheat and Winter
             Metallic's Platinum measure 1.68:1 and 1.36:1 against their own card
             backgrounds: the fill alone would leave no discernible boundary. The ring
             sits at the same 8.01-11.58:1 as the card's text, which clears SC 1.4.11's
@@ -182,12 +184,14 @@ function PaletteCard({
           */}
           <span
             aria-hidden="true"
-            className="h-4 w-4 rounded-full border border-[color:var(--theme-card-text)] bg-[var(--theme-primary)]"
+            className="h-4 w-4 rounded-full border border-theme-card-text bg-theme-primary"
             data-testid={`premium-theme-swatch-primary-${option.dataTheme}`}
           />
           <span
             aria-hidden="true"
-            className="h-4 w-4 rounded-full border border-[color:var(--theme-card-text)] bg-[var(--theme-secondary)]"
+            className="h-4 w-4 rounded-full border border-theme-card-text bg-theme-secondary"
+            // The Default palette's secondary is the premium gold: a palette mark (D3).
+            data-gold="premium"
             data-testid={`premium-theme-swatch-secondary-${option.dataTheme}`}
           />
           <span className="text-base font-semibold">{t(option.labelKey)}</span>
@@ -216,15 +220,13 @@ function PaletteCard({
  * change nothing on screen and the plumbing would be proven only in a DOM inspector.
  * If a palette is ever added here, do not give it a `data-theme`.
  *
- * The rest of the section stays in the page's own monochrome. That is not an omission:
- * these tokens are a light card system (`--theme-card-text` is #111111 for Default),
- * and painting the section heading or the disclosure with them on `/settings`'s
- * `bg-neutral-950` would put dark text on a near-black page. The preview carries its own
- * background, so it re-colors without ever leaving the pairing that was measured.
+ * The rest of the section stays on the page roles. The palette tokens are a card system
+ * (`theme-card-text` pairs with `theme-card-bg`, in each scheme), so the preview carries its
+ * own background and re-colors without ever leaving the pairing that was measured.
  *
  * Both pairings it renders are ones the gallery already proves: text is
- * `--theme-card-text` on `--theme-card-bg` (8.01-17.34:1, `5.3-WEB-122`), and the
- * `--theme-primary` accent is non-text UI carrying no copy (3.05:1 and up,
+ * `theme-card-text` on `theme-card-bg` (8.01-17.34:1, `5.3-WEB-122`), and the
+ * `theme-primary` accent is non-text UI carrying no copy (3.05:1 and up,
  * `5.3-WEB-123`).
  */
 function LivePreview() {
@@ -232,12 +234,13 @@ function LivePreview() {
 
   return (
     <div
-      className="mt-6 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-[color:var(--theme-card-text)]"
+      data-surface="card"
+      className="mt-6 rounded-lg border border-theme-card-border bg-theme-card-bg p-4 text-theme-card-text"
       data-testid="premium-theme-preview"
     >
       <span
         aria-hidden="true"
-        className="block h-1.5 w-16 rounded-full bg-[var(--theme-primary)]"
+        className="block h-1.5 w-16 rounded-full bg-theme-primary"
         data-testid="premium-theme-preview-accent"
       />
       <p className="mt-3 text-base font-semibold">
@@ -322,19 +325,20 @@ function LockedPanel({
   return (
     <div
       data-landing={landing}
-      className="mt-6 space-y-3 rounded-lg border border-neutral-700 bg-neutral-900 p-4"
+      data-surface="card"
+      className="mt-6 space-y-3 rounded-lg border border-line bg-card p-4"
       data-testid="premium-theme-locked"
     >
-      <p className="text-sm font-medium text-white">
+      <p className="text-sm font-medium text-ink">
         {t('commerce.premium.theme.locked.title')}
       </p>
       {landing ? (
         <GuestText
           text={t('commerce.premium.theme.locked.signedOutBody', { palettes })}
-          className="text-sm text-neutral-300"
+          className="text-sm text-ink-soft"
         />
       ) : (
-        <p className="text-sm text-neutral-300">
+        <p className="text-sm text-ink-soft">
           {t(
             isSignedOut
               ? 'commerce.premium.theme.locked.signedOutBody'
@@ -608,11 +612,11 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       aria-labelledby="premium-theme-title"
       data-testid="premium-theme-section"
       aria-busy={sectionState === 'checking' || sectionState === 'loading'}
-      className="mt-10 max-w-2xl border-t border-neutral-800 pt-8"
+      className="mt-10 max-w-2xl border-t border-line pt-8"
     >
       <h2
         id="premium-theme-title"
-        className="text-xl font-semibold text-white"
+        className="text-xl font-semibold text-ink"
         data-testid="premium-theme-title"
       >
         {t('commerce.premium.theme.sectionTitle')}
@@ -624,7 +628,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         tooltip and never only an accessible name.
       */}
       <p
-        className="mt-3 text-sm leading-relaxed text-neutral-200"
+        className="mt-3 text-sm leading-relaxed text-ink-soft"
         data-testid="premium-theme-disclosure"
       >
         {t('commerce.premium.theme.disclosure')}
@@ -637,7 +641,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       {view.showUnavailableNote && (
         <p
           id={UNAVAILABLE_HINT_ID}
-          className="mt-4 text-sm text-neutral-300"
+          className="mt-4 text-sm text-ink-soft"
           data-testid="premium-theme-unavailable"
         >
           {t('commerce.premium.theme.unavailable')}
@@ -683,7 +687,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
       {error && (
         <p
           role="alert"
-          className="mt-4 text-sm text-red-300"
+          className="mt-4 text-sm text-danger-ink"
           data-testid="premium-theme-error"
         >
           {error}

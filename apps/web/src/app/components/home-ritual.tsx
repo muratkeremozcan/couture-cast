@@ -73,7 +73,7 @@ import { screenSnapshot } from '../../lib/screen-snapshot'
 const linkClass =
   'inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold underline underline-offset-4'
 const primaryLinkClass =
-  'inline-flex min-h-11 items-center rounded-lg bg-[#111111] px-4 text-sm font-semibold text-white'
+  'inline-flex min-h-11 items-center rounded-lg bg-inverse px-4 text-sm font-semibold text-on-inverse'
 
 let retainedSample: { owner: string; result: SampleOutfitResult } | undefined
 
@@ -367,11 +367,11 @@ function SampleOutfitInner({
   const currentId = result.garments.find((garment) => garment.category === category)?.id
   const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
   return (
-    <div data-testid="member-sample-outfit" className="space-y-3 text-[#111111]">
-      <p className="text-sm text-[color:var(--lookbook-ink)]">
-        {strings.chrome.sampleLabel}
-      </p>
+    <div data-testid="member-sample-outfit" className="space-y-3 text-ink">
+      <p className="text-sm text-ink">{strings.chrome.sampleLabel}</p>
+      {/* Story CC-7.9 D7: on Home these sit inside the hero canvas card, so they are sections. */}
       <GuestPreviewOutfit
+        nested
         result={result}
         strings={strings}
         locale={locale}
@@ -407,6 +407,7 @@ function SampleOutfitInner({
         }}
       />
       <SampleIdeaControls
+        nested
         strings={strings}
         preferences={result.input.preferences}
         onPreferences={(preferences) => {
@@ -738,14 +739,9 @@ function LiveOutfit({
   const starterOnly = available.every((item) => !item.displayGarments?.length)
   if (!outfit) return null
   return (
-    <div
-      data-testid="home-live-outfit"
-      className="min-w-0 space-y-4 text-[color:var(--lookbook-ink)]"
-    >
+    <div data-testid="home-live-outfit" className="min-w-0 space-y-4 text-ink">
       <div>
-        <h2 className="lookbook-display text-2xl font-semibold">
-          {strings.firstUse.today}
-        </h2>
+        <h2 className="text-2xl font-semibold">{strings.firstUse.today}</h2>
         <p className="mt-1 flex flex-wrap gap-x-3 text-sm">
           {city ? <span>{city}</span> : null}
           <span>
@@ -756,7 +752,7 @@ function LiveOutfit({
       {ritual.weather.alerts.map((alert) => (
         <details
           key={alert.start + alert.event}
-          className="rounded-lg border border-amber-600/40 p-2"
+          className="rounded-lg border border-notice-line bg-notice-surface p-2 text-notice-ink"
         >
           <summary className="cursor-pointer font-semibold">{alert.event}</summary>
           <p className="mt-2 text-sm">{alert.description}</p>
@@ -775,7 +771,7 @@ function LiveOutfit({
             type="button"
             onClick={() => setScenario(item.scenario)}
             aria-pressed={item.scenario === outfit.scenario}
-            className="min-h-11 rounded-lg border border-[color:var(--lookbook-ink)] px-3 text-sm font-semibold aria-pressed:bg-[var(--lookbook-ink)] aria-pressed:text-[color:var(--lookbook-surface)]"
+            className="min-h-11 rounded-lg border border-line-strong px-3 text-sm font-semibold aria-pressed:border-inverse aria-pressed:bg-inverse aria-pressed:text-on-inverse"
           >
             {t(`shareCard.scenarios.${item.scenario}`)}
           </button>
@@ -790,10 +786,7 @@ function LiveOutfit({
             outfit.displayGarments?.find((garment) => garment.id === id)?.category ??
             starter
           return (
-            <li
-              key={id}
-              className="rounded-lg border border-[color:var(--lookbook-line)] p-2 text-sm"
-            >
+            <li key={id} className="rounded-lg border border-line p-2 text-sm">
               {category
                 ? t(`commerce.premium.planner.garmentCategory.${category}`)
                 : t('shareCard.sourceOutfit')}
@@ -968,7 +961,7 @@ function MemberRitual({
           <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-end">
             <div
               data-testid="home-outfit-refresh-failed"
-              className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 text-[color:var(--lookbook-ink)] shadow-md"
+              className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-lg border border-line bg-page px-3 text-ink shadow-overlay"
             >
               <p role="status">{t('commerce.premium.planner.freshness.stale')}</p>
               {retry}

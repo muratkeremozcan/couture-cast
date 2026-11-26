@@ -15,6 +15,7 @@ import {
   type SignInDoor,
 } from '@couture/utils'
 import { getI18n } from '../../../i18n'
+import { AppTopBar } from '../../components/app-top-bar'
 import { inviteGuardianFromWeb } from '../../../lib/guardian'
 import { webGuestPreviewStore } from '../../../lib/guest-preview'
 import { destinationAfterSignIn } from '../../../lib/post-signin-destination'
@@ -48,8 +49,24 @@ async function leaveUntilApproved() {
   window.location.replace('/')
 }
 
+// Story CC-7.9 D2: fields on the page surface inside the one card; the global ring marks focus.
 const fieldClass =
-  'w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300'
+  'w-full rounded-lg border border-line-strong bg-page px-4 py-3 text-ink transition'
+const CARD_CLASS = 'space-y-6 rounded-xl border border-line bg-card p-8'
+
+/**
+ * Story CC-7.9 D6: the finish step's top bar, titled in the browser's language. A client
+ * component, so the server page can render it above the form.
+ */
+export function FinishSignupTopBar() {
+  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  return (
+    <AppTopBar
+      title={getFederatedSignInStrings(i18n.language).finishTitle}
+      backHref="/"
+    />
+  )
+}
 
 export function FinishSignupForm({
   fromPreview,
@@ -154,9 +171,9 @@ export function FinishSignupForm({
 
   if (phase.kind === 'loading')
     return (
+      // Story CC-7.9 D6: the top bar shows the title (FinishSignupTopBar), so no in-body copy.
       <section className="space-y-4">
-        <h1 className="text-3xl font-semibold">{strings.finishTitle}</h1>
-        <p role="status" aria-live="polite">
+        <p role="status" aria-live="polite" className="text-ink-soft">
           {strings.finishing}
         </p>
       </section>
@@ -170,18 +187,17 @@ export function FinishSignupForm({
           ? strings.refused
           : strings.noSession
     return (
-      <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-        <h1 className="text-3xl font-semibold">{strings.finishTitle}</h1>
+      <section data-surface="card" className={CARD_CLASS}>
         <p
           data-testid="finish-signup-outcome"
           role="alert"
-          className="text-base text-neutral-100"
+          className="text-base text-ink"
         >
           {text}
         </p>
         <Link
           href={phase.kind === 'underage' ? '/' : doorHref}
-          className="inline-flex min-h-11 items-center underline underline-offset-4"
+          className="inline-flex min-h-11 items-center text-ink underline underline-offset-4"
         >
           {strings.continue}
         </Link>
@@ -193,29 +209,24 @@ export function FinishSignupForm({
 
   return (
     <form
-      className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8"
+      data-surface="card"
+      className={CARD_CLASS}
       onSubmit={(event) => {
         void handleSubmit(event)
       }}
-      aria-labelledby="finish-signup-title"
+      aria-label={strings.finishTitle}
     >
-      <h1 id="finish-signup-title" className="text-3xl font-semibold">
-        {strings.finishTitle}
-      </h1>
-      <p className="text-neutral-300">{strings.finishIntro}</p>
+      <p className="text-ink-soft">{strings.finishIntro}</p>
       {phase.email ? (
         <div className="space-y-1">
-          <p className="text-sm font-medium text-neutral-100">{strings.googleAccount}</p>
-          <p data-testid="finish-signup-email" className="break-all text-neutral-200">
+          <p className="text-sm font-medium text-ink">{strings.googleAccount}</p>
+          <p data-testid="finish-signup-email" className="break-all text-ink-soft">
             {phase.email}
           </p>
         </div>
       ) : null}
       <div className="space-y-2">
-        <label
-          htmlFor="finish-signup-birthdate"
-          className="text-sm font-medium text-neutral-100"
-        >
+        <label htmlFor="finish-signup-birthdate" className="text-sm font-medium text-ink">
           {strings.birthdate}
         </label>
         <input
@@ -229,13 +240,13 @@ export function FinishSignupForm({
           onChange={(event) => setBirthdate(event.target.value)}
           className={fieldClass}
         />
-        <p id="finish-signup-birthdate-hint" className="text-sm text-neutral-400">
+        <p id="finish-signup-birthdate-hint" className="text-sm text-ink-muted">
           {strings.birthdateHint}
         </p>
         {inlineMessage ? (
           <p
             data-testid="finish-signup-inline-message"
-            className="text-sm text-amber-200"
+            className="text-sm text-notice-ink"
             aria-live="polite"
           >
             {inlineMessage}
@@ -246,14 +257,15 @@ export function FinishSignupForm({
       <p
         data-testid="finish-signup-message"
         role="alert"
-        className="text-sm text-amber-200 empty:!mt-0"
+        className="text-sm text-notice-ink empty:!mt-0"
       >
         {message ?? ''}
       </p>
       <button
         type="submit"
         disabled={busy !== null}
-        className="min-h-12 w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-70"
+        data-gold="primary"
+        className="min-h-12 w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary disabled:cursor-not-allowed disabled:opacity-70"
       >
         {busy === 'create' ? strings.creating : strings.create}
       </button>
@@ -263,7 +275,7 @@ export function FinishSignupForm({
         onClick={() => {
           void handleCancel()
         }}
-        className="min-h-12 w-full rounded-full border border-white/30 px-5 py-3 text-sm font-semibold text-neutral-100 disabled:opacity-70"
+        className="min-h-12 w-full rounded-full border border-line-strong bg-page px-5 py-3 text-sm font-semibold text-ink disabled:opacity-70"
       >
         {busy === 'cancel' ? strings.cancelling : strings.cancel}
       </button>
@@ -280,9 +292,9 @@ function GuardianStep({ phase }: { phase: GuardianPhase }) {
   const strings = getFederatedSignInStrings(i18n.language)
   const created = phase.kind === 'created'
   return (
-    <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-      <h1 className="text-3xl font-semibold">{strings.guardianStepTitle}</h1>
-      <p data-testid="finish-signup-outcome" role="status" className="text-emerald-200">
+    <section data-surface="card" className={CARD_CLASS}>
+      <h2 className="text-2xl font-semibold text-ink">{strings.guardianStepTitle}</h2>
+      <p data-testid="finish-signup-outcome" role="status" className="text-success-ink">
         {created ? strings.createdGuardianPending : strings.awaitingGuardian}
       </p>
       <GuardianInvitePanel teenId={created ? phase.account.userId : phase.accountId} />
@@ -291,7 +303,8 @@ function GuardianStep({ phase }: { phase: GuardianPhase }) {
         onClick={() => {
           void leaveUntilApproved()
         }}
-        className="min-h-12 w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-black"
+        data-gold="primary"
+        className="min-h-12 w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-on-primary"
       >
         {strings.guardianStepLeave}
       </button>
@@ -335,12 +348,13 @@ function GuardianInvitePanel({ teenId }: { teenId: string }) {
   }
 
   return (
-    <div className="space-y-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-5">
-      <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">
+    // D7: a plain section of the guardian step card, never a card inside it.
+    <div className="space-y-4 border-t border-line pt-6">
+      <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-ink-muted">
         {strings.guardianTitle}
-      </h2>
-      <p className="text-sm text-neutral-200">{strings.guardianIntro}</p>
-      <label htmlFor="finish-guardian-email" className="block text-sm text-neutral-100">
+      </h3>
+      <p className="text-sm text-ink-soft">{strings.guardianIntro}</p>
+      <label htmlFor="finish-guardian-email" className="block text-sm text-ink">
         {strings.guardianEmail}
       </label>
       <input
@@ -351,7 +365,7 @@ function GuardianInvitePanel({ teenId }: { teenId: string }) {
         onChange={(event) => setGuardianEmail(event.target.value)}
         className={fieldClass}
       />
-      <label htmlFor="finish-guardian-consent" className="block text-sm text-neutral-100">
+      <label htmlFor="finish-guardian-consent" className="block text-sm text-ink">
         {strings.consentLevel}
       </label>
       <select
@@ -371,17 +385,17 @@ function GuardianInvitePanel({ teenId }: { teenId: string }) {
         onClick={() => {
           void invite()
         }}
-        className="min-h-12 w-full rounded-full border border-amber-300/60 px-5 py-3 text-sm font-semibold text-amber-100 disabled:opacity-70"
+        className="min-h-12 w-full rounded-full border border-line-strong bg-page px-5 py-3 text-sm font-semibold text-ink disabled:opacity-70"
       >
         {inviting ? strings.sendingInvite : strings.sendInvite}
       </button>
-      <p role="status" aria-live="polite" className="text-sm text-neutral-200">
+      <p role="status" aria-live="polite" className="text-sm text-ink-soft">
         {message ?? ''}
       </p>
       {inviteLink ? (
         <p
           data-testid="guardian-invite-link"
-          className="break-all rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-neutral-200"
+          className="break-all rounded-lg border border-line bg-page px-4 py-3 text-sm text-ink-soft"
         >
           {inviteLink}
         </p>

@@ -1,8 +1,20 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import i18n, { initI18n } from '@/src/lib/i18n'
+import deDE from '@/assets/locales/de-DE.json'
 import { GuardianAcceptScreen } from './guardian-accept-screen'
 
 describe('GuardianAcceptScreen', () => {
+  // Story CC-7.9 D9: the screen's copy comes from the locale catalog.
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  afterEach(async () => {
+    await i18n.changeLanguage('en-US')
+  })
+
   it('accepts invitations when a token is present', async () => {
     const acceptInvitation = vi.fn().mockResolvedValue({
       teenId: 'teen-1',
@@ -25,6 +37,25 @@ describe('GuardianAcceptScreen', () => {
     expect(screen.getByTestId('guardian-accept-success').textContent).toContain(
       'Consent recorded for teen1@example.com.'
     )
+  })
+
+  it('CC-7.9 D9: renders its copy and the missing-token error from the de-DE catalog', async () => {
+    await i18n.changeLanguage('de-DE')
+    const acceptInvitation = vi.fn()
+
+    render(<GuardianAcceptScreen token={null} acceptInvitation={acceptInvitation} />)
+
+    expect(
+      screen.getByRole('heading', { name: deDE.guardian.accept.heading })
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: deDE.guardian.accept.accept }))
+
+    await waitFor(() => {
+      expect(screen.getByTestId('guardian-accept-error').textContent).toBe(
+        deDE.guardian.accept.tokenMissing
+      )
+    })
+    expect(acceptInvitation).not.toHaveBeenCalled()
   })
 
   it('shows an error when the token is missing', async () => {

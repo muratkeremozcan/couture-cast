@@ -205,7 +205,7 @@ export function CommunityPostTextEditor({
           testID="community-edit-text"
           style={[
             styles.opener,
-            { borderColor: palette.divider, opacity: active ? 1 : 0.5 },
+            { borderColor: palette.line, opacity: active ? 1 : 0.5 },
           ]}
           onPress={() => {
             setFeedback(null)
@@ -216,14 +216,14 @@ export function CommunityPostTextEditor({
             })
           }}
         >
-          <Text style={{ color: palette.text, textAlign: 'center', fontWeight: '600' }}>
+          <Text style={{ color: palette.ink, textAlign: 'center', fontWeight: '600' }}>
             {t('community.compose.editText')}
           </Text>
         </Pressable>
         {feedback && (
           <Text
             testID="community-edit-status"
-            style={[styles.feedback, { color: palette.mutedText }]}
+            style={[styles.feedback, { color: palette.inkMuted }]}
           >
             {t(`community.compose.${feedback}`)}
           </Text>
@@ -231,10 +231,10 @@ export function CommunityPostTextEditor({
       </View>
     )
 
-  const fieldStyle = [styles.field, { borderColor: palette.divider, color: palette.text }]
+  const fieldStyle = [styles.field, { borderColor: palette.line, color: palette.ink }]
   return (
     <View style={styles.form} testID="community-edit-form">
-      <Text style={{ color: palette.text }}>{t('community.compose.titleLabel')}</Text>
+      <Text style={{ color: palette.ink }}>{t('community.compose.titleLabel')}</Text>
       <TextInput
         ref={field}
         value={draft.title}
@@ -245,7 +245,7 @@ export function CommunityPostTextEditor({
         testID="community-edit-title"
         editable={active && !busy}
       />
-      <Text style={{ color: palette.text }}>{t('community.compose.captionLabel')}</Text>
+      <Text style={{ color: palette.ink }}>{t('community.compose.captionLabel')}</Text>
       <TextInput
         value={draft.caption}
         onChangeText={(caption) => setDraft({ ...draft, caption })}
@@ -257,7 +257,7 @@ export function CommunityPostTextEditor({
         editable={active && !busy}
       />
       {error && (
-        <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+        <Text accessibilityRole="alert" style={{ color: palette.dangerInk }}>
           {t(`community.compose.${error}`)}
         </Text>
       )}
@@ -281,7 +281,7 @@ export function CommunityPostTextEditor({
 }
 
 const styles = StyleSheet.create({
-  openerGroup: { gap: 6 },
+  openerGroup: { gap: 8 },
   opener: {
     borderWidth: 1,
     borderRadius: 8,

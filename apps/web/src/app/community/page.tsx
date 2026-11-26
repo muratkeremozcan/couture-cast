@@ -3,65 +3,43 @@
 // only the word "Community"), so a phone reader who tapped Community met an empty screen while
 // the real lookbook lived only on Home. It now renders that lookbook: spotlight, the Latest looks
 // heading with its climate explainer and chips, and the feed.
+// Story CC-7.9 D7: on the one page surface, with no dark frame and no inset lookbook card.
 'use client'
 
-import Link from 'next/link'
 import React from 'react'
-import { useTranslation } from 'react-i18next'
-import { getI18n } from '../../i18n'
+import { AppPage, APP_MAIN_NARROW_CLASS } from '../components/app-page'
+import { AppTopBar } from '../components/app-top-bar'
 import { CommunityLookbookGrid } from '../components/community-lookbook-grid'
 import { ScreenGate } from '../components/screen-gate'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 
 export default function CommunityPage() {
-  const { t } = useTranslation(undefined, { i18n: getI18n() })
   return (
-    <div
-      data-focus-surface="dark"
-      className="min-h-screen overflow-x-clip bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white"
-    >
+    <AppPage className="overflow-x-clip">
+      <AppTopBar titleKey="nav.community" />
       <main
         id="main-content"
         tabIndex={-1}
         data-testid="community-page"
-        className="mx-auto max-w-3xl px-4 pt-4 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] outline-none sm:px-6"
+        className={APP_MAIN_NARROW_CLASS}
       >
-        <header data-testid="app-header">
-          {/* The bottom nav hides from 768 px, so wider screens get the same brand link Home's
-              header shows, or a desktop reader who opened /community has no way back. */}
-          <Link
-            href="/"
-            data-testid="community-page-home-link"
-            className="inline-flex min-h-[44px] items-center text-xs uppercase tracking-[0.3em] text-neutral-400 hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
-          >
-            CoutureCast
-          </Link>
-          <h1 className="mb-6 text-3xl font-semibold">{t('community.title')}</h1>
-        </header>
         {/* Story CC-7.7 D3: the lookbook appears once its first feed page and the City Spotlight
             above it have answered, so neither moves the other when it lands. */}
         <ScreenGate
           screen="community"
           reads={COMMUNITY_GATE_READS}
-          placeholderClassName="min-h-[60vh] w-full rounded-[16px] bg-[var(--lookbook-surface)] opacity-60"
+          placeholderClassName="min-h-[60vh] w-full rounded-xl bg-card-muted"
         >
-          {/* The same lookbook surface Home's prism container gives the grid. The wrapper
-              clips with overflow-x-clip: overflow-x-hidden makes it a scroll container, and the
-              sticky filter nav would then stick to it and scroll off the screen. */}
-          <div
-            data-focus-surface="light"
-            className="lookbook-body rounded-[16px] bg-[var(--lookbook-surface)] px-4 py-6 text-[color:var(--lookbook-ink)] sm:px-6"
-          >
-            <CommunityLookbookGrid
-              showFilterNav
-              filterNavStickyTop={0}
-              returnPath="/community"
-            />
-          </div>
+          <CommunityLookbookGrid
+            showFilterNav
+            filterNavStickyTop={0}
+            returnPath="/community"
+            newPostEmphasis="primary"
+          />
         </ScreenGate>
       </main>
       <StickyBottomNav />
-    </div>
+    </AppPage>
   )
 }
 

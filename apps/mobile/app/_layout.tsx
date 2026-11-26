@@ -5,15 +5,6 @@ import { sweepExpiredShareCardFiles } from '@/src/lib/share-card-share'
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
-import {
-  PlayfairDisplay_400Regular,
-  PlayfairDisplay_400Regular_Italic,
-  PlayfairDisplay_700Bold,
-} from '@expo-google-fonts/playfair-display'
-import {
-  SpaceGrotesk_400Regular,
-  SpaceGrotesk_700Bold,
-} from '@expo-google-fonts/space-grotesk'
 import Constants, { AppOwnership } from 'expo-constants'
 import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
@@ -23,7 +14,7 @@ import { StatusBar } from 'expo-status-bar'
 import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
 
-import { Platform, StyleSheet, useColorScheme, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 import {
   MobileAnalyticsProvider,
   mobileAnalyticsClient,
@@ -34,6 +25,8 @@ import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { useTokens, type Tokens } from '@/src/theme/tokens'
+import { renderStackTopBar, tabsAnchorListeners } from '@/src/components/app-top-bar'
 import {
   underModalAccessibility,
   useEdgeToEdgeModalOpen,
@@ -107,14 +100,9 @@ export default function RootLayout() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   // Expo's types return an untyped tuple; narrow locally to satisfy type-aware linting.
   const fontLoadResult = useFonts({
+    // Story CC-7.9 D4: screens use the system font, so only the template's SpaceMono and the
+    // icon font load here. The widget and watch targets copy their own faces at build time.
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    'Playfair Display': PlayfairDisplay_400Regular,
-    'Playfair Display Bold': PlayfairDisplay_700Bold,
-    // Story 6.15: the comfort notes' face. Each face is its own family, so italic is a family,
-    // never fontStyle on the regular face (iOS drew it upright, Android drew italic sans).
-    'Playfair Display Italic': PlayfairDisplay_400Regular_Italic,
-    'Space Grotesk': SpaceGrotesk_400Regular,
-    'Space Grotesk Bold': SpaceGrotesk_700Bold,
     ...FontAwesome.font,
   }) as unknown as FontLoadTuple
   const [loaded, fontError]: FontLoadTuple = fontLoadResult
@@ -153,8 +141,8 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-  const colorScheme = useColorScheme()
-  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+  const tokens = useTokens()
+  const theme = navigationTheme(tokens)
   const { t, i18n } = useTranslation()
   const modalOpen = useEdgeToEdgeModalOpen()
   const reduceMotion = useReducedMotion()
@@ -306,11 +294,21 @@ function RootLayoutNav() {
                 >
                   <Stack
                     screenOptions={{
+                      // Story CC-7.9 D6, D7: the one app top bar on every root stack screen
+                      // that shows a header, over the page surface.
+                      header: renderStackTopBar,
+                      contentStyle: { backgroundColor: tokens.colors.page },
                       headerBackTitle: t('common.back'),
                       ...rootStackMotionOptions(reduceMotion),
                     }}
                   >
-                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    {/* A cold deep link mounts the tab group below the linked screen without
+                      focusing it; the listener tells the top bar which anchors were seen. */}
+                    <Stack.Screen
+                      name="(tabs)"
+                      options={{ headerShown: false }}
+                      listeners={tabsAnchorListeners}
+                    />
                     {/* The modal names itself in its own heading; an untitled header would
                       show the raw route name "modal". Android keeps the bar for its back
                       arrow; an iOS sheet dismisses by swipe or Cancel and needs no empty bar. */}
@@ -346,9 +344,11 @@ function RootLayoutNav() {
                         title: getGuestPreviewStrings(i18n.language).chrome.entry,
                       }}
                     />
-                    {/* Signup names itself in its own heading; an untitled header would show the
-                      raw route name "signup". */}
-                    <Stack.Screen name="signup" options={{ title: '' }} />
+                    {/* The web signup bar's title; the body keeps its own heading. */}
+                    <Stack.Screen
+                      name="signup"
+                      options={{ title: getFederatedSignInStrings(i18n.language).create }}
+                    />
                     {/* Story 6.17 D3, D5: the Google finish step and its callback. The header
                       carries the finish step's title; the screen renders no second one. */}
                     <Stack.Screen
@@ -405,3 +405,26 @@ const styles = StyleSheet.create({
     height: 1,
   },
 })
+
+/**
+ * Story CC-7.9 D1: React Navigation's theme from the token roles, so navigator chrome it still
+ * paints (a modal card, a scene behind a transition) is the page surface of the OS scheme.
+ */
+function navigationTheme({ scheme, colors }: Tokens) {
+  // The navigation themes type as `error` under the lint program, as in RootLayoutNav above.
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access */
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.ink,
+      background: colors.page,
+      card: colors.page,
+      text: colors.ink,
+      border: colors.line,
+      notification: colors.danger,
+    },
+  }
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access */
+}

@@ -520,7 +520,10 @@ describe('Closet garment delete', () => {
     await openAndDelete(user, 'blue-top')
     await screen.findByTestId('garment-delete-usage-failed')
 
-    await user.click(screen.getByTestId('garment-detail-back'))
+    // CC-7.9 D7: the open detail's back control is the top bar's.
+    await user.click(
+      within(screen.getByTestId('app-header')).getByTestId('app-top-bar-back')
+    )
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(screen.queryByTestId('garment-delete-usage-failed')).toBeNull()
 

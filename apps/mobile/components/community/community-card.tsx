@@ -18,19 +18,9 @@ import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
 import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
 import { CommunitySponsoredShop, withDisclosure } from './community-sponsored-shop'
 
-/**
- * `hero-theme.ts` carries no premium accent and no destructive token -- its
- * `danger` is the hero screen's `#B42318`/`#FF9A8F` pair, not the community
- * surface's merlot -- and this task may not extend that file, so both are derived
- * here in one place and reported as a palette gap.
- *
- * Merlot is used as a fill with white ink on top (10.2:1), never as text on a
- * dark ground, where it computes to 2.1:1 and fails.
- */
-const ACCENT_GOLD = '#C9A14A'
-const ON_ACCENT = '#111111'
-const DESTRUCTIVE_MERLOT = '#7A1F2D'
-const ON_DESTRUCTIVE = '#FFFFFF'
+// Story CC-7.9 D3: the card reads every color from the D2 roles. Withdraw is the destructive
+// fill (`danger` with `onDanger`); the highlighted card and the Sponsored pill are markers, so
+// they use `inverse` and gold stays with the five gold roles.
 
 /**
  * A signed image URL that is already expired is refreshed by asking the screen to
@@ -80,13 +70,13 @@ function CommunityCardMedia({
   const palette = useHeroPalette()
 
   return (
-    <View style={[styles.imageContainer, { backgroundColor: palette.skeleton }]}>
+    <View style={[styles.imageContainer, { backgroundColor: palette.cardMuted }]}>
       {isUnavailable ? (
         <View
           style={styles.imageFallback}
           testID={`community-card-image-unavailable-${postId}`}
         >
-          <Text style={[styles.imageFallbackText, { color: palette.text }]}>
+          <Text style={[styles.imageFallbackText, { color: palette.ink }]}>
             {t('community.card.imageUnavailable')}
           </Text>
           <TouchableOpacity
@@ -94,9 +84,9 @@ function CommunityCardMedia({
             accessibilityRole="button"
             accessibilityLabel={t('community.card.imageRetry')}
             onPress={onRetry}
-            style={[styles.secondaryButton, { borderColor: palette.mutedText }]}
+            style={[styles.secondaryButton, { borderColor: palette.inkMuted }]}
           >
-            <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
+            <Text style={[styles.secondaryButtonText, { color: palette.ink }]}>
               {t('community.card.imageRetry')}
             </Text>
           </TouchableOpacity>
@@ -170,12 +160,12 @@ function CommunityCardActions({
         testID={`community-card-withdraw-${item.id}`}
         accessibilityRole="button"
         accessibilityLabel={t('community.card.withdraw')}
-        style={[styles.withdrawButton, { backgroundColor: DESTRUCTIVE_MERLOT }]}
+        style={[styles.withdrawButton, { backgroundColor: palette.danger }]}
         onPress={() => {
           void onWithdraw(item)
         }}
       >
-        <Text style={[styles.withdrawButtonText, { color: ON_DESTRUCTIVE }]}>
+        <Text style={[styles.withdrawButtonText, { color: palette.onDanger }]}>
           {t('community.card.withdraw')}
         </Text>
       </TouchableOpacity>
@@ -197,7 +187,7 @@ function CommunityCardActions({
       disabled={isReported}
       style={({ pressed }) => [
         styles.secondaryButton,
-        { borderColor: palette.mutedText },
+        { borderColor: palette.inkMuted },
         isReported && styles.secondaryButtonSettled,
         pressed && styles.pressed,
       ]}
@@ -208,7 +198,7 @@ function CommunityCardActions({
       <Text
         style={[
           styles.secondaryButtonText,
-          { color: isReported ? palette.mutedText : palette.text },
+          { color: isReported ? palette.inkMuted : palette.ink },
         ]}
       >
         {label}
@@ -267,10 +257,15 @@ function CommunityShareAction({
       accessibilityLabel={t('shareCard.launcher')}
       testID={`community-share-card-open-${item.id}`}
       ref={opener}
-      style={{ minHeight: 48, padding: 12, borderColor: '#B28D46', borderWidth: 1 }}
+      style={{
+        minHeight: 48,
+        padding: 12,
+        borderColor: palette.lineStrong,
+        borderWidth: 1,
+      }}
       onPress={() => onExport(item.id, () => safeFindNodeHandle(opener.current))}
     >
-      <Text style={{ color: palette.text }}>{t('shareCard.launcher')}</Text>
+      <Text style={{ color: palette.ink }}>{t('shareCard.launcher')}</Text>
     </Pressable>
   )
 }
@@ -286,7 +281,7 @@ function CommunityCardText({
       {item.title ? (
         <Text
           accessibilityRole="header"
-          style={[styles.caption, { color: palette.text, fontWeight: '700' }]}
+          style={[styles.caption, { color: palette.ink, fontWeight: '700' }]}
           testID={`community-card-title-${item.id}`}
         >
           {item.title}
@@ -294,7 +289,7 @@ function CommunityCardText({
       ) : null}
       {item.caption ? (
         <Text
-          style={[styles.caption, { color: palette.text }]}
+          style={[styles.caption, { color: palette.ink }]}
           testID={`community-card-caption-${item.id}`}
         >
           {item.caption}
@@ -324,14 +319,14 @@ function CommunityCardAuthorMeta({
   return (
     <View style={styles.authorMeta}>
       <Text
-        style={[styles.authorName, { color: palette.text }]}
+        style={[styles.authorName, { color: palette.ink }]}
         testID={`community-card-author-${item.id}`}
       >
         {authorName}
       </Text>
       {item.status !== 'published' && (
         <Text
-          style={[styles.statusBadge, { color: palette.mutedText }]}
+          style={[styles.statusBadge, { color: palette.inkMuted }]}
           testID={`community-card-status-${item.id}`}
         >
           {t(`community.status.${item.status}`)}
@@ -339,7 +334,7 @@ function CommunityCardAuthorMeta({
       )}
       {(item.textRevision ?? 0) > 0 && (
         <Text
-          style={[styles.statusBadge, { color: palette.mutedText }]}
+          style={[styles.statusBadge, { color: palette.inkMuted }]}
           testID={`community-card-edited-${item.id}`}
         >
           {t('community.card.edited')}
@@ -517,8 +512,8 @@ export function CommunityCard({
       accessibilityLabel={cardLabel}
       style={[
         styles.card,
-        { backgroundColor: palette.surface, borderColor: palette.divider },
-        isHighlighted && { borderColor: ACCENT_GOLD, borderWidth: 2 },
+        { backgroundColor: palette.card, borderColor: palette.line },
+        isHighlighted && { borderColor: palette.inverse, borderWidth: 2 },
       ]}
     >
       <View style={styles.header}>
@@ -527,10 +522,10 @@ export function CommunityCard({
             style={[
               styles.avatarPlaceholder,
               avatarBox,
-              { backgroundColor: palette.subtleSurface },
+              { backgroundColor: palette.cardMuted },
             ]}
           >
-            <Text style={[styles.avatarText, { color: palette.text }]}>
+            <Text style={[styles.avatarText, { color: palette.ink }]}>
               {authorName.charAt(0).toUpperCase()}
             </Text>
           </View>
@@ -543,18 +538,18 @@ export function CommunityCard({
               testID={`community-card-partnered-${item.id}`}
               accessible
               accessibilityLabel={sponsoredAnnounce}
-              style={[styles.sponsoredPill, { backgroundColor: ACCENT_GOLD }]}
+              style={[styles.sponsoredPill, { backgroundColor: palette.inverse }]}
             >
-              <Text style={[styles.sponsoredPillText, { color: ON_ACCENT }]}>
+              <Text style={[styles.sponsoredPillText, { color: palette.onInverse }]}>
                 {t('community.card.sponsored')}
               </Text>
             </View>
           )}
           <View
-            style={[styles.climatePill, { borderColor: palette.mutedText }]}
+            style={[styles.climatePill, { borderColor: palette.inkMuted }]}
             testID={`community-card-climate-pill-${item.id}`}
           >
-            <Text style={[styles.climatePillText, { color: palette.text }]}>
+            <Text style={[styles.climatePillText, { color: palette.ink }]}>
               {climateLabel}
             </Text>
           </View>
@@ -601,10 +596,10 @@ export function CommunityCard({
             accessibilityRole="button"
             accessibilityLabel={t('community.comments.title')}
             testID={`community-card-comments-${item.id}`}
-            style={[styles.secondaryButton, { borderColor: palette.mutedText }]}
+            style={[styles.secondaryButton, { borderColor: palette.inkMuted }]}
             onPress={() => onComments(item)}
           >
-            <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
+            <Text style={[styles.secondaryButtonText, { color: palette.ink }]}>
               {t('community.comments.title')}
             </Text>
           </TouchableOpacity>
@@ -636,14 +631,14 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 8,
   },
   authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
     flexGrow: 1,
     flexShrink: 1,
     minWidth: 150,
@@ -667,7 +662,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusBadge: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   // Story 6.15 F-00i: at the largest text sizes the climate pill alone is wider than a spotlight
@@ -677,26 +672,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     flexShrink: 1,
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   sponsoredPill: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 9999,
   },
   sponsoredPillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
   },
   climatePill: {
     flexShrink: 1,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
   },
   climatePillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   imageContainer: {
@@ -719,39 +714,39 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
     padding: 16,
   },
   imageFallbackText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
   },
   shop: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   caption: {
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    fontSize: 13,
-    lineHeight: 18,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    fontSize: 14,
+    lineHeight: 20,
   },
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   pressed: {
     // TouchableOpacity's default `activeOpacity`.
     opacity: 0.2,
   },
   secondaryButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 44,
@@ -761,18 +756,18 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   secondaryButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   withdrawButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 8,
     minHeight: 44,
     justifyContent: 'center',
   },
   withdrawButtonText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
   },
 })

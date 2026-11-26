@@ -219,6 +219,14 @@ import { press } from '@/src/test-utils/press'
 import { notifyWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { WardrobeHubScreen } from './wardrobe-hub-screen'
+import { colorRoles } from '@couture/utils'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
+
+/** A `#RRGGBB` token as the browser's computed `rgb(r, g, b)`. */
+const rgb = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16))
+  return `rgb(${r}, ${g}, ${b})`
+}
 
 /**
  * Base64url-shaped JWT payload, built at runtime (not a literal) so it
@@ -389,6 +397,21 @@ describe('WardrobeHubScreen', () => {
     vi.clearAllMocks()
   })
 
+  it('[P1] [7.9 D6, D9] leaves the title to the tab header and names a garment status in words', async () => {
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ data: [garmentFixture()] })
+      )
+    )
+    renderScreen()
+
+    const status = await screen.findByTestId('garment-status-awaiting_tags')
+    expect(status).toHaveTextContent('Waiting for tags')
+    await waitFor(() => expect(screen.getByTestId('garment-capture-open')).toBeVisible())
+    // The tab's AppTopBar shows the Wardrobe title; the body has no second one.
+    expect(screen.queryByText(i18n.t('wardrobe.title'))).toBeNull()
+  })
+
   it('7.7-NAT-003 the Closet gate waits for the inventory and onboarding reads, then a refresh keeps the closet in place', async () => {
     let releaseOnboarding!: () => void
     const onboardingHeld = new Promise<void>((resolve) => {
@@ -412,7 +435,9 @@ describe('WardrobeHubScreen', () => {
     act(() => releaseOnboarding())
 
     // The setup card is in place when the closet appears: nothing is inserted above it later.
-    expect(await screen.findByTestId('wardrobe-onboarding-card')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    )
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
 
@@ -434,8 +459,12 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => expect(garmentReads).toBe(1))
 
     expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
-    expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
-    expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('wardrobe-onboarding-card')).toBeVisible()
+    )
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 
@@ -467,7 +496,7 @@ describe('WardrobeHubScreen', () => {
     act(() => releaseSavedLooks())
 
     // The row's error and Retry arrive with the closet in one commit, above nothing shown yet.
-    expect(await screen.findByTestId('saved-looks-retry')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('saved-looks-retry')).toBeVisible())
     expect(setupCard).toBeVisible()
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
@@ -539,6 +568,32 @@ describe('WardrobeHubScreen', () => {
     )
     expect(rowContainer).toBeDefined()
     expect(rowContainer!.getBoundingClientRect().top - cardBottom).toBeCloseTo(24, 0)
+  })
+
+  it('7.9-NAT-PRIMARY-001 fills Add Garment with the primary gold and keeps the two links neutral', async () => {
+    renderScreen()
+    const add = await screen.findByTestId('garment-capture-open')
+    const light = colorRoles.light
+    // D3: the screen's one main action takes the primary role, as web's Add Garment does.
+    expect(getComputedStyle(add).backgroundColor).toBe(rgb(light.primary))
+    expect(getComputedStyle(add.firstElementChild ?? add).color).toBe(
+      rgb(light.onPrimary)
+    )
+    for (const id of ['wardrobe-capsules-link', 'wardrobe-silhouette-link']) {
+      expect(getComputedStyle(screen.getByTestId(id)).backgroundColor).not.toBe(
+        rgb(light.primary)
+      )
+    }
+  })
+
+  it('7.9-NAT-INSET-002 insets the Wardrobe body 16 from each edge, the shared tab body inset', async () => {
+    renderScreen()
+    const frame = (await screen.findByTestId('wardrobe-screen')).getBoundingClientRect()
+    const add = screen.getByTestId('garment-capture-open').getBoundingClientRect()
+    const capsules = screen.getByTestId('wardrobe-capsules-link').getBoundingClientRect()
+    // The header actions open the body at its left edge (Add Garment wraps to its own row on
+    // a phone, so either may lead).
+    expect(Math.min(add.left, capsules.left) - frame.left).toBeCloseTo(16, 0)
   })
 
   it('4.4-MOB-HUB-01 renders the wardrobe hub header and empty state (regression)', async () => {
@@ -873,7 +928,7 @@ describe('WardrobeHubScreen', () => {
 
     nativeStyleRuntime.focus.mockClear()
     await browserUser.click(within(panel).getByTestId('style-piece-close'))
-    expect(await screen.findByTestId('style-piece-refresh')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('style-piece-refresh')).toBeVisible())
     await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenCalledWith(82))
   })
 
@@ -1080,7 +1135,9 @@ describe('WardrobeHubScreen', () => {
         expect(nativeStyleRuntime.finishDismissal).toBeTypeOf('function')
       )
       act(() => nativeStyleRuntime.finishDismissal?.())
-      expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId('garment-tagging-modal')).toBeVisible()
+      )
     } finally {
       releasePoll()
     }
@@ -1138,7 +1195,9 @@ describe('WardrobeHubScreen', () => {
       await waitFor(() => expect(within(panel).queryByRole('progressbar')).toBeNull())
       expect(screen.queryByTestId('garment-status-processing')).toBeNull()
       expect(within(panel).queryByTestId('style-piece-anchor')).toBeNull()
-      expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
+      await waitFor(() =>
+        expect(screen.getByTestId(`garment-card-${anchor.id}`)).toBeVisible()
+      )
 
       await browserUser.click(within(panel).getByTestId('style-piece-refresh'))
       await waitFor(() =>
@@ -1219,7 +1278,7 @@ describe('WardrobeHubScreen', () => {
     )
     await browserUser.click(retry)
 
-    expect(await screen.findByText(empty)).toBeVisible()
+    await waitFor(() => expect(screen.getByText(empty)).toBeVisible())
     expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
   })
 
@@ -1236,7 +1295,7 @@ describe('WardrobeHubScreen', () => {
 
     render(<WardrobeHubScreen addEntry />)
 
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
   })
@@ -1259,10 +1318,12 @@ describe('WardrobeHubScreen', () => {
 
     render(<WardrobeHubScreen addEntry pollOffsetsMs={[1]} />)
 
-    expect(await screen.findByTestId('garment-status-processing')).toBeVisible()
+    await waitFor(() =>
+      expect(screen.getByTestId('garment-status-processing')).toBeVisible()
+    )
     expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
     expect(routerMock.setParams).toHaveBeenCalledExactlyOnceWith({ entry: undefined })
   })
 
@@ -1399,7 +1460,10 @@ describe('WardrobeHubScreen', () => {
     })
   })
 
-  it('4.4-MOB-HUB-09 shows a recovery action when the wardrobe session is missing', async () => {
+  it("4.4-MOB-HUB-09 shows a recovery action when a member's wardrobe session is missing", async () => {
+    // Story CC-7.9 add-on B: this is a member (the screen holds their id) whose token is gone. A
+    // visitor who never signed in has no failure to recover from; 7.9-NAT-VISITOR covers them.
+    setMobileApplicationUserId('member-session-lapsed')
     restoreAccessTokenResolver()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
 
@@ -1408,6 +1472,80 @@ describe('WardrobeHubScreen', () => {
     expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
     expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
     expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR offers sign-in, and no failure, to a visitor who never signed in', async () => {
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+
+    renderScreen()
+
+    const signIn = await screen.findByTestId('wardrobe-sign-in')
+    expect(signIn).toHaveTextContent(i18n.t('community.notifications.signin'))
+    expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-error-banner')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+
+    // react-native-web refreshes a Pressable's onPress in a passive effect; flushing effects first
+    // means Add presses with the visitor render's handler (src/test-utils/press.ts).
+    await act(() => Promise.resolve())
+    press(signIn)
+    expect(routerMock.push).toHaveBeenLastCalledWith('/signin')
+    routerMock.push.mockClear()
+    press(screen.getByTestId('garment-capture-open'))
+    expect(routerMock.push).toHaveBeenCalledExactlyOnceWith('/signin')
+    expect(screen.queryByTestId('garment-capture-modal')).toBeNull()
+  })
+
+  // Review P2-2: the session evidence lives above the identity-epoch keyed hub, so a sign-out or
+  // expiry that remounts the hub keeps it. Only a screen that never saw a session is a visitor.
+  it('7.9-NAT-VISITOR-02 a fresh visitor (no token, no member from the start) gets the sign-in offer', async () => {
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+
+    renderScreen()
+
+    expect(await screen.findByTestId('wardrobe-sign-in')).toBeInTheDocument()
+    expect(screen.queryByTestId('wardrobe-list-retry')).toBeNull()
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR-03 a returning session that fails before verification keeps the failure notice', async () => {
+    // A stored token resolves but no member is named yet, and the API refuses it; the session
+    // is then cleared, so the Retry read finds no token while no member ever held the screen.
+    server.use(
+      http.get('*/api/v1/wardrobe/garments', () =>
+        HttpResponse.json({ error: 'unauthorized' }, { status: 401 })
+      )
+    )
+    renderScreen()
+    const retry = await screen.findByTestId('wardrobe-list-retry')
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    await waitFor(() => expect(retry).toBeEnabled())
+    press(retry)
+
+    await waitFor(() => expect(screen.getByTestId('wardrobe-list-retry')).toBeEnabled())
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-visitor-offer')).toBeNull()
+  })
+
+  it('7.9-NAT-VISITOR-04 a verified session that ends with the Closet open keeps the failure notice', async () => {
+    setMobileApplicationUserId('member-1')
+    renderScreen()
+    expect(await screen.findByText(i18n.t('wardrobe.empty_title'))).toBeInTheDocument()
+
+    // The session ends: the token is gone and the identity epoch advances, remounting the hub.
+    restoreAccessTokenResolver()
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => undefined)
+    act(() => setMobileApplicationUserId(null))
+
+    expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
+    expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
+    expect(screen.queryByTestId('wardrobe-visitor-offer')).toBeNull()
   })
 
   it('4.4-MOB-HUB-10 opens tagging from the Needs tags action on an already-untagged garment', async () => {
@@ -1443,7 +1581,7 @@ describe('WardrobeHubScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('wardrobe-error-banner')).toHaveTextContent(
-        'AUTHENTICATION_REQUIRED'
+        'Sign in to manage your wardrobe.'
       )
     })
     expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
@@ -1526,7 +1664,7 @@ describe('WardrobeHubScreen', () => {
       )
     )
     await browserUser.click(screen.getByRole('button', { name: 'Check garment status' }))
-    expect(await screen.findByTestId('garment-tagging-modal')).toBeVisible()
+    await waitFor(() => expect(screen.getByTestId('garment-tagging-modal')).toBeVisible())
   })
 
   it('4.4-MOB-HUB-14 surfaces a wardrobe read failure that happens mid-poll', async () => {
@@ -1600,9 +1738,9 @@ describe('WardrobeHubScreen', () => {
       const add = await waitFor(() => screen.getByTestId('garment-capture-open'))
       const screenBox = screen.getByTestId('wardrobe-screen').getBoundingClientRect()
       const addBox = add.getBoundingClientRect()
-      // The content is padded 20 on each side.
-      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - 20 + 0.5)
-      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + 20 - 0.5)
+      // The content is padded by the shared tab body inset (16, CC-7.9) on each side.
+      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - TAB_BODY_INSET + 0.5)
+      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + TAB_BODY_INSET - 0.5)
     } finally {
       await setViewport(414, 896)
     }
@@ -1752,6 +1890,8 @@ describe('WardrobeHubScreen', () => {
       renderScreen()
 
       const open = await screen.findByTestId('garment-open-hub-blue-top')
+      // The closet gate keeps the grid mounted but hidden until every read settles (CC-7.7).
+      await waitFor(() => expect(open).toBeVisible())
       expect(colorHeaders.length).toBeGreaterThan(0)
       expect(colorHeaders.every((header) => header === '1')).toBe(true)
       expect(open).toHaveAccessibleName('Blue top')
@@ -1765,7 +1905,7 @@ describe('WardrobeHubScreen', () => {
       )
       // A garment still being tagged keeps its tagging button and opens no detail.
       expect(screen.queryByTestId('garment-open-hub-tagging')).toBeNull()
-      expect(screen.getByLabelText('Needs tags')).toBeVisible()
+      await waitFor(() => expect(screen.getByLabelText('Needs tags')).toBeVisible())
       // The raw garment id never shows (2026-11-19 tester report).
       for (const id of [blueTop.id, plainShoes.id, tagging.id]) {
         expect(screen.queryByText(id, { exact: false })).toBeNull()

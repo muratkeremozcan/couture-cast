@@ -2,16 +2,30 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: P-Q-DEEPLINK at the page boundary. A case id reaches the page as an
 // encoded URL segment; a malformed escape must become a not-found case, never a crash.
-import { isValidElement, type ReactElement } from 'react'
+import { Children, isValidElement, type ReactElement, type ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
+import { ModerationCaseDetailView } from '../../../components/moderation-case-detail'
 import ModerationCasePage from './page'
 
+type Props = { children?: ReactNode; caseId?: string }
+
+/** Story CC-7.9 D6: the view sits inside the page surface and its main, under the top bar. */
+function findView(node: ReactNode): ReactElement<Props> | null {
+  if (!isValidElement<Props>(node)) return null
+  if (node.type === ModerationCaseDetailView) return node
+  for (const child of Children.toArray(node.props.children)) {
+    const found = findView(child)
+    if (found) return found
+  }
+  return null
+}
+
 const caseIdOf = async (segment: string) => {
-  const page = (await ModerationCasePage({
-    params: Promise.resolve({ caseId: segment }),
-  })) as ReactElement<{ children: ReactElement<{ caseId: string }> }>
+  const page = await ModerationCasePage({ params: Promise.resolve({ caseId: segment }) })
   expect(isValidElement(page)).toBe(true)
-  return page.props.children.props.caseId
+  const view = findView(page)
+  expect(view).not.toBeNull()
+  return view?.props.caseId
 }
 
 describe('ModerationCasePage case id decoding', () => {

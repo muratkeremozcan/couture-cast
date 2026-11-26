@@ -28,9 +28,6 @@ import {
   resolveAffiliateLocaleRegion,
 } from '../../lib/commerce'
 
-/** Merlot as text: globals.css gives it a dark-mode value that reads on the dark surface. */
-const MERLOT_INK = 'var(--lookbook-merlot-ink)'
-
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
 /** Blocks already reported as shown during this screen visit. */
@@ -182,14 +179,14 @@ export function CommunitySponsoredCta({
         onClick={() => {
           void activate()
         }}
-        className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--theme-secondary,#111111)] motion-safe:transition-colors aria-disabled:cursor-progress aria-disabled:opacity-80"
+        className="min-h-11 rounded-full border border-line-strong bg-page text-ink px-5 py-2 text-xs font-semibold motion-safe:transition-colors aria-disabled:cursor-progress aria-disabled:opacity-80"
       >
         {t('community.card.shopCta', { partner: sponsorship.partnerDisplayName })}
       </button>
       <span
         id={opensId}
         data-testid={`${ctaId}-opens`}
-        className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
+        className="text-xs text-ink-muted"
       >
         {t('community.card.shopOpensInBrowser')}
       </span>
@@ -198,8 +195,7 @@ export function CommunitySponsoredCta({
           id={statusId}
           data-testid={`${ctaId}-status`}
           data-state={state}
-          className="text-xs"
-          style={state === 'error' ? { color: MERLOT_INK } : undefined}
+          className={`text-xs ${state === 'error' ? 'text-merlot-ink' : ''}`}
         >
           {t(STATUS_KEYS[state])}
         </span>

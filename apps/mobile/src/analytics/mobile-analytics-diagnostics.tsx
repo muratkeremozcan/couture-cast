@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
+import { useTokens } from '@/src/theme/tokens'
 
 export type MobileAnalyticsRecordedEvent = {
   event: string
@@ -91,6 +92,7 @@ function useMobileAnalyticsDiagnostics(limit = 5) {
 
 export function MobileAnalyticsDiagnosticsPanel() {
   const visibleRecords = useMobileAnalyticsDiagnostics()
+  const { colors } = useTokens()
 
   if (!isMobileAnalyticsDiagnosticsEnabled) {
     return null
@@ -99,17 +101,19 @@ export function MobileAnalyticsDiagnosticsPanel() {
   return (
     <View
       accessibilityLabel="Mobile analytics diagnostics"
-      style={styles.container}
+      style={[styles.container, { borderColor: colors.lineStrong }]}
       testID="mobile-analytics-diagnostics"
     >
-      <Text style={styles.heading}>Mobile analytics diagnostics</Text>
+      <Text style={[styles.heading, { color: colors.ink }]}>
+        Mobile analytics diagnostics
+      </Text>
       {visibleRecords.length === 0 ? (
-        <Text style={styles.record}>Analytics event: none</Text>
+        <Text style={[styles.record, { color: colors.ink }]}>Analytics event: none</Text>
       ) : (
         visibleRecords.map((record, index) => (
           <Text
             key={`${record.event}-${record.recordedAt}-${index}`}
-            style={styles.record}
+            style={[styles.record, { color: colors.ink }]}
             testID={`mobile-analytics-event-${record.event}`}
           >
             Analytics event: {record.event}
@@ -125,13 +129,12 @@ const styles = StyleSheet.create({
     marginTop: 16,
     width: '80%',
     borderWidth: 1,
-    borderColor: '#737373',
-    borderRadius: 6,
-    padding: 10,
-    gap: 6,
+    borderRadius: 8,
+    padding: 8,
+    gap: 8,
   },
   heading: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },

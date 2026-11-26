@@ -1,6 +1,7 @@
 import { parsePreviewFrom, parseSignInDoor } from '@couture/utils'
+import { AppPage, APP_MAIN_CLASS } from '../../components/app-page'
 import { LegalLinks } from '../../components/legal-page'
-import { FinishSignupForm } from './finish-signup-form'
+import { FinishSignupForm, FinishSignupTopBar } from './finish-signup-form'
 
 export default async function FinishSignupPage({
   searchParams,
@@ -9,19 +10,18 @@ export default async function FinishSignupPage({
 }) {
   const { from, door } = await searchParams
   return (
-    <main
-      id="main-content"
-      tabIndex={-1}
-      data-focus-surface="dark"
-      className="min-h-screen bg-gradient-to-b from-neutral-950 via-black to-neutral-900 px-6 py-16 text-white outline-none"
-    >
-      <div className="mx-auto w-full max-w-lg">
-        <FinishSignupForm
-          fromPreview={parsePreviewFrom(from) !== null}
-          door={parseSignInDoor(typeof door === 'string' ? door : null)}
-        />
-        <LegalLinks className="mt-8 text-neutral-300" />
-      </div>
-    </main>
+    // Story CC-7.9 D6, D7: the shared top bar and page surface; the always-dark gradient is gone.
+    <AppPage>
+      <FinishSignupTopBar />
+      <main id="main-content" tabIndex={-1} className={APP_MAIN_CLASS}>
+        <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
+          <FinishSignupForm
+            fromPreview={parsePreviewFrom(from) !== null}
+            door={parseSignInDoor(typeof door === 'string' ? door : null)}
+          />
+          <LegalLinks />
+        </div>
+      </main>
+    </AppPage>
   )
 }

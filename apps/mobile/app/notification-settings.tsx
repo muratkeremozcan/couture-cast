@@ -13,14 +13,13 @@ import {
   Switch,
   Pressable,
   ScrollView,
-  StyleSheet,
   Linking,
   AccessibilityInfo,
   Platform,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
-import { Text, useThemeColor } from '@/components/themed'
+import { createSchemeStyles, Text } from '@/components/themed'
 import {
   LOAD_RETRY_DELAYS_MS,
   nextRetryDelayMs,
@@ -51,7 +50,7 @@ export default function NotificationSettingsScreen() {
   // True once the bounded automatic retries have stopped without settings.
   const [loadStalled, setLoadStalled] = useState(false)
   const reload = useRef<(() => void) | null>(null)
-  const inputColor = useThemeColor({}, 'text')
+  const styles = useStyles()
   const suggestedTimezone = useRef<string | undefined>(undefined)
   const generation = useRef(0)
   const clientRef = useRef<ReturnType<typeof communitySyncFromMobile> | null>(null)
@@ -248,6 +247,7 @@ export default function NotificationSettingsScreen() {
   }, [message, t])
   return (
     <ScrollView
+      style={styles.screen}
       contentContainerStyle={styles.container}
       testID="notification-settings-screen"
     >
@@ -278,14 +278,14 @@ export default function NotificationSettingsScreen() {
             accessibilityLabel={t('community.notifications.start')}
             value={draft.quietHoursStart}
             onChangeText={(quietHoursStart) => setDraft({ ...draft, quietHoursStart })}
-            style={[styles.input, { color: inputColor }]}
+            style={styles.input}
           />
           <Text>{t('community.notifications.end')}</Text>
           <TextInput
             accessibilityLabel={t('community.notifications.end')}
             value={draft.quietHoursEnd}
             onChangeText={(quietHoursEnd) => setDraft({ ...draft, quietHoursEnd })}
-            style={[styles.input, { color: inputColor }]}
+            style={styles.input}
           />
           <Text>{t('community.notifications.timezone')}</Text>
           <TextInput
@@ -296,7 +296,7 @@ export default function NotificationSettingsScreen() {
               setDraft({ ...draft, timezone })
             }}
             autoCapitalize="none"
-            style={[styles.input, { color: inputColor }]}
+            style={styles.input}
           />
           <Pressable
             accessibilityRole="button"
@@ -304,9 +304,9 @@ export default function NotificationSettingsScreen() {
             onPress={() => {
               void save()
             }}
-            style={styles.button}
+            style={[styles.button, styles.primaryButton]}
           >
-            <ButtonLabel style={styles.buttonLabel}>
+            <ButtonLabel style={styles.primaryButtonLabel}>
               {t('community.notifications.save')}
             </ButtonLabel>
           </Pressable>
@@ -319,9 +319,9 @@ export default function NotificationSettingsScreen() {
           accessibilityLabel={t('community.notifications.retry')}
           testID="notification-settings-retry"
           onPress={() => reload.current?.()}
-          style={styles.button}
+          style={[styles.button, styles.primaryButton]}
         >
-          <ButtonLabel style={styles.buttonLabel}>
+          <ButtonLabel style={styles.primaryButtonLabel}>
             {t('community.notifications.retry')}
           </ButtonLabel>
         </Pressable>
@@ -362,24 +362,31 @@ export default function NotificationSettingsScreen() {
     </ScrollView>
   )
 }
-const styles = StyleSheet.create({
+// Story CC-7.9 D2, D3: colors follow the OS scheme. Save (or Try again while nothing loaded)
+// is the screen's one main action and is `primary`; the other buttons are neutral outlines.
+const useStyles = createSchemeStyles((colors) => ({
+  screen: { backgroundColor: colors.page },
   container: { padding: 24, gap: 16 },
-  title: { fontSize: 26, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
   label: { flex: 1 },
   input: {
     minHeight: 48,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#777',
+    borderColor: colors.lineStrong,
     borderRadius: 8,
+    color: colors.ink,
   },
-  buttonLabel: { color: '#000' },
+  buttonLabel: { color: colors.ink },
   button: {
     minHeight: 48,
-    padding: 14,
-    backgroundColor: '#C9A14A',
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.page,
     borderRadius: 8,
     alignItems: 'center',
   },
-})
+  primaryButton: { backgroundColor: colors.primary, borderColor: colors.primary },
+  primaryButtonLabel: { color: colors.onPrimary },
+}))

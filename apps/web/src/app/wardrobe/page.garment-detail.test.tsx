@@ -124,6 +124,10 @@ function setUrl(search: string) {
 }
 
 const card = (id: string) => within(screen.getByTestId(`garment-card-${id}`))
+/** CC-7.9 D7: an open detail's title and back control live in the shared top bar. */
+const topBar = () => within(screen.getByTestId('app-header'))
+const topBarBack = () => topBar().getByTestId('app-top-bar-back')
+const topBarTitle = () => topBar().getByRole('heading', { level: 1 })
 
 beforeEach(() => {
   // Story CC-7.7: the Closet keeps a per-member snapshot in module memory, so one test's closet
@@ -222,11 +226,14 @@ describe('Closet garment detail', () => {
 
     const detail = await screen.findByTestId('garment-detail')
     expect(window.location.search).toBe('?garment=blue-top')
-    expect(within(detail).getByRole('heading', { name: 'Blue top' })).toHaveFocus()
+    expect(detail).toHaveAccessibleName('Blue top')
+    expect(detail).toHaveFocus()
+    expect(topBarTitle()).toHaveTextContent(/^Blue top$/)
     expect(within(detail).getByTestId('garment-detail-category')).toHaveTextContent(
       /^Top$/
     )
-    expect(within(detail).getByTestId('garment-detail-back')).toBeVisible()
+    expect(topBarBack()).toBeVisible()
+    expect(within(detail).queryByTestId('garment-detail-back')).toBeNull()
     expect(within(detail).getByTestId('style-piece-open')).toBeVisible()
     const grid = screen.getByTestId('wardrobe-closet-view')
     expect(grid).not.toBeVisible()
@@ -245,10 +252,12 @@ describe('Closet garment detail', () => {
     await screen.findByTestId('garment-detail')
     expect(scrollTo).toHaveBeenLastCalledWith(0, 0)
 
-    await user.click(screen.getByTestId('garment-detail-back'))
+    await user.click(topBarBack())
 
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(window.location.search).toBe('')
+    expect(topBarTitle()).toHaveTextContent(/^Wardrobe$/)
+    expect(topBar().queryByTestId('app-top-bar-back')).toBeNull()
     expect(scrollTo).toHaveBeenLastCalledWith(0, 640)
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
     expect(screen.getByTestId('garment-open-black-shoes')).toHaveFocus()
@@ -261,9 +270,10 @@ describe('Closet garment detail', () => {
     signIn()
 
     const detail = await screen.findByTestId('garment-detail')
-    expect(within(detail).getByRole('heading', { name: 'Blue top' })).toBeVisible()
+    expect(detail).toBeVisible()
+    expect(topBarTitle()).toHaveTextContent(/^Blue top$/)
 
-    await user.click(within(detail).getByTestId('garment-detail-back'))
+    await user.click(topBarBack())
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(window.location.search).toBe('')
     expect(screen.getByTestId('garment-open-blue-top')).toBeVisible()
@@ -279,7 +289,7 @@ describe('Closet garment detail', () => {
       expect(await screen.findByTestId('garment-detail-missing')).toHaveTextContent(
         'This piece is no longer in your closet.'
       )
-      expect(screen.getByTestId('garment-detail-back')).toBeVisible()
+      expect(topBarBack()).toBeVisible()
     }
   )
 
@@ -294,11 +304,9 @@ describe('Closet garment detail', () => {
     await user.click(screen.getByTestId('garment-tag-done'))
 
     expect(await screen.findByTestId('status-feedback-bar')).toHaveTextContent('Saved')
-    const detail = screen.getByTestId('garment-detail')
-    expect(
-      within(detail).getByRole('heading', { name: 'Blue outer layer' })
-    ).toBeVisible()
-    await user.click(within(detail).getByTestId('garment-detail-back'))
+    expect(screen.getByTestId('garment-detail')).toHaveAccessibleName('Blue outer layer')
+    expect(topBarTitle()).toHaveTextContent(/^Blue outer layer$/)
+    await user.click(topBarBack())
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(screen.getByTestId('garment-open-blue-top')).toHaveAccessibleName(
       'Blue outer layer'
@@ -386,7 +394,7 @@ describe('Closet garment detail', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
     )
-    await user.click(screen.getByTestId('garment-detail-back'))
+    await user.click(topBarBack())
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     expect(screen.getByText('Blue top look')).toBeVisible()
     expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
@@ -407,7 +415,7 @@ describe('Closet garment detail', () => {
 
     const back = vi.spyOn(window.history, 'back')
     const replace = vi.spyOn(window.history, 'replaceState')
-    await user.click(screen.getByTestId('garment-detail-back'))
+    await user.click(topBarBack())
 
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
     // Back steps through history instead of writing a second grid entry over the detail.

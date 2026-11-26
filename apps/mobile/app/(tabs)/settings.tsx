@@ -71,6 +71,7 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useAppTheme, useAppThemeSettled } from '@/src/theme/theme-context'
 import { useMemberSessionState } from '@/src/lib/member-session'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
+import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { ScreenGate } from '@/src/components/screen-gate'
 
@@ -516,7 +517,7 @@ export default function SettingsScreen() {
                       style={[
                         styles.localeButton,
                         tone.localeButton,
-                        isSelected && styles.selectedLocaleButton,
+                        isSelected && tone.selectedLocaleButton,
                       ]}
                       disabled={isChangingLocale || isSelected}
                       onPress={() => {
@@ -586,7 +587,7 @@ export default function SettingsScreen() {
                     style={[
                       styles.commerceToggle,
                       tone.commerceToggle,
-                      affiliateCtasEnabled ? styles.commerceToggleOn : null,
+                      affiliateCtasEnabled ? tone.commerceToggleOn : null,
                     ]}
                     disabled={affiliateCtasEnabled === null}
                     onPress={() => {
@@ -606,7 +607,12 @@ export default function SettingsScreen() {
                     accessibilityLabel={t('commerce.settings.optOutLabel')}
                     accessibilityHint={t('commerce.settings.optOutHelp')}
                   >
-                    <Text style={styles.commerceToggleLabel}>
+                    <Text
+                      style={[
+                        styles.commerceToggleLabel,
+                        affiliateCtasEnabled ? tone.commerceToggleOnLabel : null,
+                      ]}
+                    >
                       {t('commerce.settings.optOutLabel')}
                     </Text>
                   </Pressable>
@@ -641,7 +647,7 @@ export default function SettingsScreen() {
             <Pressable
               accessibilityRole="link"
               onPress={() => router.push('/notification-settings')}
-              style={styles.actionButton}
+              style={[styles.actionButton, tone.actionButton]}
             >
               <Text style={styles.actionText}>{t('community.notifications.title')}</Text>
             </Pressable>
@@ -667,7 +673,7 @@ export default function SettingsScreen() {
                   })}
                 </Text>
                 <Pressable
-                  style={styles.actionButton}
+                  style={[styles.actionButton, tone.actionButton]}
                   onPress={recordDiagnosticAlert}
                   accessibilityRole="button"
                   accessibilityLabel={t('settings.diagnostic_alert_btn', {
@@ -1131,7 +1137,7 @@ function PremiumSettingsSection({
           ) : null}
           {renderState.manageEntry === 'store' ? (
             <Pressable
-              style={styles.actionButton}
+              style={[styles.actionButton, tone.actionButton]}
               onPress={() => {
                 void showManageSubscriptionsInStore()
               }}
@@ -1227,7 +1233,7 @@ function PremiumSubscribeControls({
       {(purchasesEnabled ? plans : []).map(({ plan, labelKey }) => (
         <Pressable
           key={plan}
-          style={styles.actionButton}
+          style={[styles.actionButton, tone.actionButton]}
           disabled={busy}
           onPress={() => {
             onPurchase(plan)
@@ -1242,7 +1248,7 @@ function PremiumSubscribeControls({
         </Pressable>
       ))}
       <Pressable
-        style={styles.actionButton}
+        style={[styles.actionButton, tone.actionButton]}
         disabled={busy}
         onPress={onRestore}
         testID="premium-restore"
@@ -1639,7 +1645,8 @@ function PaletteCard({
   onSelect: () => void
 }) {
   const { t } = useTranslation()
-  const palette = resolveThemePalette(option.key)
+  // Story CC-7.9 D5: each card shows its palette in the OS scheme, as Community will.
+  const palette = resolveThemePalette(option.key, useTokens().scheme)
   const name = t(option.labelKey)
 
   return (
@@ -1731,12 +1738,13 @@ function PaletteCard({
  */
 function PaletteAdvisorLinkRow() {
   const { t } = useTranslation()
+  const tone = useSettingsTone()
 
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t('commerce.premium.palette.sectionTitle')}
-      style={styles.actionButton}
+      style={[styles.actionButton, tone.actionButton]}
       testID="palette-advisor-link"
       onPress={() => router.push('/palette-advisor')}
     >
@@ -1850,12 +1858,13 @@ function ProfileAccountHeader({
  */
 function LocationsLinkRow() {
   const { t } = useTranslation()
+  const tone = useSettingsTone()
 
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t('locations.title')}
-      style={styles.actionButton}
+      style={[styles.actionButton, tone.actionButton]}
       testID="locations-link"
       onPress={() => router.push('/locations')}
     >
@@ -1874,12 +1883,13 @@ function LocationsLinkRow() {
  */
 function PlannerLinkRow() {
   const { t } = useTranslation()
+  const tone = useSettingsTone()
 
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
-      style={styles.actionButton}
+      style={[styles.actionButton, tone.actionButton]}
       testID="planner-link"
       onPress={() => router.push('/planner')}
     >
@@ -1901,17 +1911,20 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  // CC-7.9 small-phone capture: the body sat 16 inside the container and again inside a
+  // centered 90% section, about 33 from the edge. One inset now, the shared tab body inset.
   container: {
     flexGrow: 1,
-    alignItems: 'center',
+    alignItems: 'stretch',
     justifyContent: 'flex-start',
-    padding: 16,
+    paddingHorizontal: TAB_BODY_INSET,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   settingsSection: {
-    width: '90%',
+    width: '100%',
     marginTop: 8,
-    marginBottom: 15,
+    marginBottom: 16,
     alignItems: 'stretch',
     backgroundColor: 'transparent',
   },
@@ -1932,7 +1945,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 12,
     textAlign: 'left',
   },
   localeGrid: {
@@ -1949,19 +1962,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: 'transparent',
   },
-  selectedLocaleButton: {
-    borderColor: '#C9A14A',
-    backgroundColor: 'rgba(201, 161, 74, 0.1)',
-  },
   localeText: {
-    fontSize: 13,
+    fontSize: 14,
   },
   selectedLocaleText: {
     fontWeight: 'bold',
   },
   disclosureText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     marginBottom: 12,
   },
   commerceToggle: {
@@ -1969,15 +1978,11 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
     justifyContent: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 8,
     backgroundColor: 'transparent',
-  },
-  commerceToggleOn: {
-    borderColor: '#C9A14A',
-    backgroundColor: 'rgba(201, 161, 74, 0.1)',
   },
   commerceToggleLabel: {
     fontSize: 14,
@@ -1995,21 +2000,20 @@ const styles = StyleSheet.create({
   },
   premiumGraceBanner: {
     marginTop: 8,
-    padding: 10,
+    padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    backgroundColor: 'rgba(181, 71, 8, 0.08)',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   statusText: {
     marginTop: 8,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   errorText: {
     marginTop: 12,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
     maxWidth: '90%',
@@ -2025,9 +2029,8 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: '#a3a3a3',
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 8,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     alignItems: 'center',
   },
@@ -2048,7 +2051,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: '46%',
     gap: 8,
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 8,
@@ -2059,7 +2062,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   themeCardDisabled: {
-    opacity: 0.7,
+    // Story CC-7.9 D5: 0.8 matches web's `disabled:opacity-80`, the lowest step that keeps
+    // every palette's cardText at 4.5:1 on its dimmed cardBg in both schemes (0.7 left light
+    // Jewel Radiance at 3.77:1).
+    opacity: 0.8,
   },
   themeCardHeader: {
     flexDirection: 'row',
@@ -2078,7 +2084,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   themeCardState: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
   },
   themePreview: {
@@ -2091,15 +2097,15 @@ const styles = StyleSheet.create({
   themePreviewAccent: {
     width: 64,
     height: 6,
-    borderRadius: 3,
+    borderRadius: 9999,
   },
   themePreviewTitle: {
     fontSize: 14,
     fontWeight: '600',
   },
   themePreviewBody: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
   },
   themeLockedPanel: {
     marginTop: 12,
@@ -2115,16 +2121,27 @@ const styles = StyleSheet.create({
   },
 })
 
-/** The OS light/dark colors for the settings styles above. */
+/**
+ * The OS light/dark colors for the settings styles above. Story CC-7.9 D3: a selected locale
+ * and the switched-on toggle are `inverse` with `onInverse` ink; gold stays with the roles.
+ */
 const useSettingsTone = createSchemeStyles((colors) => ({
-  localeButton: { borderColor: colors.border },
-  localeText: { color: colors.mutedText },
-  selectedLocaleText: { color: colors.accentText },
-  disclosureText: { color: colors.mutedText },
-  helpText: { color: colors.mutedText },
-  commerceToggle: { borderColor: colors.border },
-  premiumGraceBanner: { borderColor: colors.noticeBorder, color: colors.noticeText },
-  statusText: { color: colors.successText },
-  errorText: { color: colors.dangerText },
-  themeLockedPanel: { borderColor: colors.border },
+  localeButton: { borderColor: colors.lineStrong },
+  selectedLocaleButton: { borderColor: colors.inverse, backgroundColor: colors.inverse },
+  localeText: { color: colors.inkMuted },
+  selectedLocaleText: { color: colors.onInverse },
+  disclosureText: { color: colors.inkMuted },
+  helpText: { color: colors.inkMuted },
+  commerceToggle: { borderColor: colors.lineStrong },
+  commerceToggleOn: { borderColor: colors.inverse, backgroundColor: colors.inverse },
+  commerceToggleOnLabel: { color: colors.onInverse },
+  premiumGraceBanner: {
+    borderColor: colors.noticeLine,
+    backgroundColor: colors.noticeSurface,
+    color: colors.noticeInk,
+  },
+  statusText: { color: colors.successInk },
+  errorText: { color: colors.dangerInk },
+  themeLockedPanel: { borderColor: colors.line },
+  actionButton: { borderColor: colors.lineStrong },
 }))

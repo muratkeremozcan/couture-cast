@@ -21,6 +21,13 @@ import { inviteGuardianFromWeb } from '../../lib/guardian'
 import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
 import { SignupRefusedError, submitWebSignup } from '../../lib/signup'
 
+// Story CC-7.9 D2: fields sit on the page surface inside the form card; the global focus ring
+// marks the focused field, so no per-field focus color.
+const FIELD_CLASS =
+  'w-full rounded-lg border border-line-strong bg-page px-4 py-3 text-ink transition'
+const ERROR_CLASS =
+  'rounded-lg border border-danger-line bg-danger-surface px-4 py-3 text-sm text-danger-ink'
+
 type SignupFormProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
@@ -145,28 +152,24 @@ export function SignupForm({
 
   return (
     <form
-      className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8"
+      data-surface="card"
+      className="space-y-6 rounded-xl border border-line bg-card p-8"
       onSubmit={onSubmit}
     >
       {/* Story 6.17 D2: Google first; the email form below is unchanged. */}
       <GoogleSignInButton
         from={fromPreview ? 'preview' : null}
         door="signup"
-        theme="dark"
         onUnavailable={setErrorMessage}
       />
       {googleMessage && !errorMessage ? (
-        <p
-          data-testid="google-sign-in-status"
-          role="alert"
-          className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
-        >
+        <p data-testid="google-sign-in-status" role="alert" className={ERROR_CLASS}>
           {googleMessage}
         </p>
       ) : null}
-      <SignInDivider tone="dark" />
+      <SignInDivider />
       <div className="space-y-2">
-        <label htmlFor="signup-email" className="text-sm font-medium text-neutral-100">
+        <label htmlFor="signup-email" className="text-sm font-medium text-ink">
           {strings.email}
         </label>
         <input
@@ -177,15 +180,12 @@ export function SignupForm({
           autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300"
+          className={FIELD_CLASS}
         />
       </div>
 
       <div className="space-y-2">
-        <label
-          htmlFor="signup-birthdate"
-          className="text-sm font-medium text-neutral-100"
-        >
+        <label htmlFor="signup-birthdate" className="text-sm font-medium text-ink">
           {strings.birthdate}
         </label>
         <input
@@ -195,12 +195,12 @@ export function SignupForm({
           required
           value={birthdate}
           onChange={(event) => setBirthdate(event.target.value)}
-          className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300"
+          className={FIELD_CLASS}
         />
         {inlineMessage ? (
           <p
             data-testid="signup-inline-message"
-            className="text-sm text-amber-200"
+            className="text-sm text-notice-ink"
             aria-live="polite"
           >
             {inlineMessage}
@@ -211,7 +211,7 @@ export function SignupForm({
       {errorMessage ? (
         <p
           data-testid="signup-error-message"
-          className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+          className={ERROR_CLASS}
           aria-live="assertive"
         >
           {errorMessage}
@@ -221,7 +221,7 @@ export function SignupForm({
       {successMessage ? (
         <p
           data-testid="signup-success-message"
-          className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+          className="rounded-lg border border-line px-4 py-3 text-sm text-success-ink"
           aria-live="polite"
         >
           {successMessage}
@@ -237,20 +237,18 @@ export function SignupForm({
       />
 
       {pendingTeenId ? (
-        <div className="space-y-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-5">
+        // Story CC-7.9 D7: a plain section of the form card, never a card inside it.
+        <div className="space-y-4 border-t border-line pt-6">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-ink-muted">
               {strings.guardianTitle}
             </h2>
-            <p className="text-sm text-neutral-200">{strings.guardianIntro}</p>
+            <p className="text-sm text-ink-soft">{strings.guardianIntro}</p>
           </div>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <label
-                htmlFor="guardian-email"
-                className="text-sm font-medium text-neutral-100"
-              >
+              <label htmlFor="guardian-email" className="text-sm font-medium text-ink">
                 {strings.guardianEmail}
               </label>
               <input
@@ -261,14 +259,14 @@ export function SignupForm({
                 autoComplete="email"
                 value={guardianEmail}
                 onChange={(event) => setGuardianEmail(event.target.value)}
-                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300"
+                className={FIELD_CLASS}
               />
             </div>
 
             <div className="space-y-2">
               <label
                 htmlFor="guardian-consent-level"
-                className="text-sm font-medium text-neutral-100"
+                className="text-sm font-medium text-ink"
               >
                 {strings.consentLevel}
               </label>
@@ -281,7 +279,7 @@ export function SignupForm({
                     event.target.value as GuardianInvitationInput['consentLevel']
                   )
                 }
-                className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300"
+                className={FIELD_CLASS}
               >
                 <option value="read_only">{strings.readOnly}</option>
                 <option value="full_access">{strings.fullAccess}</option>
@@ -294,7 +292,7 @@ export function SignupForm({
               onClick={() => {
                 void handleGuardianInvite()
               }}
-              className="w-full rounded-full border border-amber-300/60 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-100 transition hover:bg-amber-300/10 disabled:cursor-not-allowed disabled:opacity-70"
+              className="w-full rounded-full border border-line-strong bg-page px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-ink transition hover:bg-card-muted disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isInviting ? strings.sendingInvite : strings.sendInvite}
             </button>
@@ -303,7 +301,7 @@ export function SignupForm({
           {inviteLink ? (
             <p
               data-testid="guardian-invite-link"
-              className="break-all rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-neutral-200"
+              className="break-all rounded-lg border border-line bg-page px-4 py-3 text-sm text-ink-soft"
             >
               {inviteLink}
             </p>
@@ -315,7 +313,7 @@ export function SignupForm({
         <Link
           href="/preview"
           data-testid="signup-back-to-preview"
-          className="inline-flex min-h-11 items-center text-sm text-neutral-200 underline underline-offset-4"
+          className="inline-flex min-h-11 items-center text-sm text-ink underline underline-offset-4"
         >
           {previewStrings.backToPreview}
         </Link>
@@ -356,7 +354,8 @@ function SignupNextStep({
       <Link
         href={fromPreview ? '/signin?from=preview' : '/signin'}
         data-testid="signup-sign-in-to-continue"
-        className="inline-flex min-h-11 items-center rounded-full border border-amber-300 px-5 text-sm font-semibold text-amber-200"
+        data-gold="primary"
+        className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-semibold text-on-primary"
       >
         {signInLabel}
       </Link>
@@ -365,7 +364,8 @@ function SignupNextStep({
     <button
       type="submit"
       disabled={isSubmitting}
-      className="w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
+      data-gold="primary"
+      className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-on-primary transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
     >
       {submitLabel}
     </button>

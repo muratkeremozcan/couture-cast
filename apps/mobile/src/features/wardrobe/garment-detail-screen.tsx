@@ -54,7 +54,7 @@ import {
   SaveFeedbackProvider,
   useStatusBar,
 } from '@/components/save-feedback'
-import { createSchemeStyles, useSchemeColors } from '@/components/themed'
+import { createSchemeStyles } from '@/components/themed'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -91,26 +91,6 @@ export function garmentCardLabel(locale: string, garment: ClosetGarment): string
   if (!garment.category) return formatGarmentAlt(locale, { category: null })
   const labels = formatGarmentTagLabels(locale, garment)
   return [labels.category, labels.material].filter(Boolean).join(' · ')
-}
-
-/** The header back control: back to the hub, which kept its scroll position. */
-export function GarmentDetailBackButton() {
-  const { t } = useTranslation()
-  const colors = useSchemeColors()
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t('wardrobe.detail.back')}
-      testID="garment-detail-back"
-      style={styles.backButton}
-      onPress={() => {
-        if (router.canGoBack()) router.back()
-        else router.dismissTo('/wardrobe')
-      }}
-    >
-      <Text style={{ color: colors.text }}>{t('wardrobe.detail.back')}</Text>
-    </Pressable>
-  )
 }
 
 export function GarmentDetailScreen({
@@ -221,11 +201,14 @@ function MemberGarmentDetail({
   const garment =
     closet.garments?.find((item) => item.id === garmentId && item.status === 'ready') ??
     null
-  const title = garment ? garmentPhotoLabel(locale, garment) : ''
+  // Loading or missing, the piece has no name yet; the bar still names the screen.
+  const title = garment
+    ? garmentPhotoLabel(locale, garment)
+    : t('wardrobe.hub.detailTitle')
 
-  const header = (
-    <Stack.Screen options={{ title, headerLeft: () => <GarmentDetailBackButton /> }} />
-  )
+  // Story CC-7.9 D6: the root stack's AppTopBar shows this title and the back control (back to
+  // the hub, or the Wardrobe tab on a direct entry), so the body carries no second heading.
+  const header = <Stack.Screen options={{ title }} />
 
   if (!garment) {
     // A current read failure comes first: an id missing from an older read may be back.
@@ -272,9 +255,6 @@ function MemberGarmentDetail({
         {header}
         <ScrollView contentContainerStyle={styles.content} testID="garment-detail">
           <GarmentDetailPhoto garment={garment} label={title} onRefresh={closet.reload} />
-          <Text accessibilityRole="header" style={[styles.title, themed.text]}>
-            {title}
-          </Text>
           <GarmentTagPanel
             garment={garment}
             owner={owner}
@@ -1161,18 +1141,21 @@ function GarmentTagPanel({
   )
 }
 
+// Room under the last action for the floating save bar, which overlays this screen with no tab bar
+// below it: a wrapped bar of two 44 pt action rows plus its 12 pt gap. A component clearance,
+// sized from the bar, so it sits outside the D4 spacing steps.
+const FLOATING_SAVE_BAR_CLEARANCE = 120
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { gap: 12, padding: 20, paddingBottom: 120 },
-  backButton: { justifyContent: 'center', minHeight: 44, paddingHorizontal: 12 },
+  content: { gap: 12, padding: 20, paddingBottom: FLOATING_SAVE_BAR_CLEARANCE },
   photo: { alignSelf: 'center', aspectRatio: 0.75, borderRadius: 12, width: '70%' },
-  title: { fontSize: 22, fontWeight: '700' },
   tagRow: {
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 16,
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   tagLabel: { fontSize: 14 },
   tagValue: { flexShrink: 1, fontSize: 14, fontWeight: '600', textAlign: 'right' },
@@ -1216,7 +1199,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { fontSize: 14, fontWeight: '600' },
   errorBox: { borderRadius: 8, marginTop: 12, padding: 12 },
-  confirmTitle: { fontSize: 15, fontWeight: '700' },
+  confirmTitle: { fontSize: 16, fontWeight: '700' },
   missingBox: { gap: 12, padding: 20 },
   missingText: { fontSize: 16, fontWeight: '600', padding: 20 },
   bodyText: { fontSize: 14 },
@@ -1225,24 +1208,24 @@ const styles = StyleSheet.create({
 
 /** The OS light/dark colors for the layout above. */
 const useThemedStyles = createSchemeStyles((colors) => ({
-  screen: { backgroundColor: colors.background },
-  text: { color: colors.text },
-  mutedText: { color: colors.mutedText },
-  divider: { borderBottomColor: colors.border },
-  placeholder: { backgroundColor: colors.subtleSurface },
-  chip: { borderColor: colors.strongBorder },
+  screen: { backgroundColor: colors.page },
+  text: { color: colors.ink },
+  mutedText: { color: colors.inkMuted },
+  divider: { borderBottomColor: colors.line },
+  placeholder: { backgroundColor: colors.card },
+  chip: { borderColor: colors.lineStrong },
   chipSelected: {
-    backgroundColor: colors.inverseSurface,
-    borderColor: colors.inverseSurface,
+    backgroundColor: colors.inverse,
+    borderColor: colors.inverse,
   },
   chipTextSelected: { color: colors.onInverse },
-  primaryButton: { backgroundColor: colors.inverseSurface },
+  primaryButton: { backgroundColor: colors.inverse },
   primaryButtonText: { color: colors.onInverse },
-  secondaryButton: { borderColor: colors.strongBorder },
+  secondaryButton: { borderColor: colors.lineStrong },
   errorBox: { backgroundColor: colors.dangerSurface },
-  errorText: { color: colors.dangerText },
-  dangerButton: { borderColor: colors.dangerText },
-  dangerButtonText: { color: colors.dangerText },
-  dangerPrimaryButton: { backgroundColor: colors.dangerText },
-  dangerPrimaryButtonText: { color: colors.dangerSurface },
+  errorText: { color: colors.dangerInk },
+  dangerButton: { borderColor: colors.dangerLine },
+  dangerButtonText: { color: colors.dangerInk },
+  dangerPrimaryButton: { backgroundColor: colors.danger },
+  dangerPrimaryButtonText: { color: colors.onDanger },
 }))

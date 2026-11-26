@@ -213,13 +213,14 @@ function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
 
   return (
     <div
-      className="mt-6 space-y-3 rounded-lg border border-neutral-700 bg-neutral-900 p-4"
+      data-surface="card"
+      className="mt-6 space-y-3 rounded-lg border border-line bg-card p-4"
       data-testid="palette-advisor-locked"
     >
-      <p className="text-sm font-medium text-white">
+      <p className="text-sm font-medium text-ink">
         {t('commerce.premium.palette.locked.title')}
       </p>
-      <p className="text-sm text-neutral-300">
+      <p className="text-sm text-ink-soft">
         {t(
           isSignedOut
             ? 'commerce.premium.palette.locked.signedOutBody'
@@ -251,24 +252,26 @@ function RecommendationCard({
 
   return (
     <li
-      className="rounded-lg border border-neutral-700 bg-neutral-900 p-4"
+      data-surface="card"
+      className="rounded-lg border border-line bg-card p-4"
       data-testid={`palette-advisor-card-${card.itemKey}`}
     >
-      <p className="text-xs uppercase tracking-wider text-neutral-400">
+      <p className="text-xs uppercase tracking-wider text-ink-muted">
         {t(`commerce.premium.palette.slot.${card.slot}`)}
       </p>
-      <p className="mt-2 flex items-center gap-2 text-base font-semibold text-white">
+      <p className="mt-2 flex items-center gap-2 text-base font-semibold text-ink">
         {/*
-          The one literal colour in this file, and it is a colour rather than
+          The one data colour in this file, and it is a colour rather than
           copy: `swatchHex` comes from the server's ADVISOR_RULES entry and is
           pinned against `ADVISOR_SWATCH_CARD_BACKGROUND` at SC 1.4.11's 3:1
-          non-text floor by the contract's own test. It is `aria-hidden` and
-          carries no information the label does not, so the shade is never
-          conveyed by colour alone.
+          non-text floor by the contract's own test. On the light or dark card
+          its `line-strong` ring (3:1 on every surface, Story CC-7.9 D2) keeps
+          the boundary visible. It is `aria-hidden` and carries no information
+          the label does not, so the shade is never conveyed by colour alone.
         */}
         <span
           aria-hidden="true"
-          className="h-5 w-5 shrink-0 rounded-full border border-white/40"
+          className="h-5 w-5 shrink-0 rounded-full border border-line-strong"
           style={{ backgroundColor: card.swatchHex }}
           data-testid={`palette-advisor-swatch-${card.itemKey}`}
         />
@@ -279,7 +282,7 @@ function RecommendationCard({
 
       {card.sponsored && (
         <div
-          className="mt-4 rounded-md border border-neutral-700 bg-neutral-950 p-3"
+          className="mt-4 border-t border-line pt-3"
           data-testid={`palette-advisor-sponsored-${card.itemKey}`}
         >
           {/*
@@ -288,20 +291,20 @@ function RecommendationCard({
             name, and never after the button.
           */}
           <p
-            className="text-xs leading-relaxed text-neutral-300"
+            className="text-xs leading-relaxed text-ink-soft"
             data-testid={`palette-advisor-sponsored-disclosure-${card.itemKey}`}
           >
             {t('commerce.premium.palette.sponsored.disclosure')}
           </p>
-          <p className="mt-2 text-xs text-neutral-400">
+          <p className="mt-2 text-xs text-ink-muted">
             {t('commerce.premium.palette.sponsored.partnerLabel', {
               partner: card.sponsored.partnerDisplayName,
             })}
           </p>
-          <p className="mt-1 text-sm text-white">{card.sponsored.offerTitle}</p>
+          <p className="mt-1 text-sm text-ink">{card.sponsored.offerTitle}</p>
           <button
             type="button"
-            className="mt-3 min-h-[44px] rounded-md bg-[#C9A14A] px-4 text-sm font-semibold text-[#111111]"
+            className="mt-3 min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm font-semibold text-ink"
             data-testid={`palette-advisor-sponsored-cta-${card.itemKey}`}
             onClick={onSponsoredActivate}
           >
@@ -310,7 +313,7 @@ function RecommendationCard({
           {sponsoredError && (
             <p
               role="alert"
-              className="mt-2 text-xs text-red-300"
+              className="mt-2 text-xs text-danger-ink"
               data-testid={`palette-advisor-sponsored-error-${card.itemKey}`}
             >
               {sponsoredError}
@@ -323,14 +326,14 @@ function RecommendationCard({
         {card.saved ? (
           <>
             <span
-              className="text-sm font-medium text-white"
+              className="text-sm font-medium text-ink"
               data-testid={`palette-advisor-saved-${card.itemKey}`}
             >
               {t('commerce.premium.palette.actions.saved')}
             </span>
             <button
               type="button"
-              className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+              className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
               data-testid={`palette-advisor-unsave-${card.itemKey}`}
               disabled={isBusy}
               onClick={onUndoSave}
@@ -341,7 +344,7 @@ function RecommendationCard({
         ) : (
           <button
             type="button"
-            className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+            className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
             data-testid={`palette-advisor-save-${card.itemKey}`}
             disabled={isBusy}
             onClick={onSave}
@@ -351,7 +354,7 @@ function RecommendationCard({
         )}
         <button
           type="button"
-          className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+          className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
           data-testid={`palette-advisor-dismiss-${card.itemKey}`}
           disabled={isBusy}
           onClick={onDismiss}
@@ -397,7 +400,7 @@ function ConsentBlock({
 
   return (
     <div className="mt-6" data-testid="palette-advisor-consent">
-      <h3 className="text-base font-semibold text-white">
+      <h3 className="text-base font-semibold text-ink">
         {t('commerce.premium.palette.consent.title')}
       </h3>
       {/*
@@ -406,7 +409,7 @@ function ConsentBlock({
         sponsored disclosure, applied to the consent itself.
       */}
       <p
-        className="mt-2 text-sm leading-relaxed text-neutral-200"
+        className="mt-2 text-sm leading-relaxed text-ink-soft"
         data-testid="palette-advisor-consent-body"
       >
         {t('commerce.premium.palette.consent.body')}
@@ -415,20 +418,20 @@ function ConsentBlock({
       {hasConsent ? (
         <div className="mt-4 space-y-3">
           <p
-            className="text-sm font-medium text-white"
+            className="text-sm font-medium text-ink"
             data-testid="palette-advisor-consent-granted"
           >
             {t('commerce.premium.palette.consent.granted')}
           </p>
           {confirmingErase ? (
             <div className="space-y-3" data-testid="palette-advisor-erase-confirm">
-              <p className="text-sm text-neutral-200">
+              <p className="text-sm text-ink-soft">
                 {t('commerce.premium.palette.deleteConfirm')}
               </p>
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
-                  className="min-h-[44px] rounded-md border border-red-400 px-4 text-sm font-semibold text-red-200"
+                  className="min-h-11 rounded-md border border-danger-line bg-danger-surface px-4 text-sm font-semibold text-danger-ink"
                   data-testid="palette-advisor-erase-confirm-yes"
                   disabled={isBusy}
                   onClick={onConfirmErase}
@@ -437,7 +440,7 @@ function ConsentBlock({
                 </button>
                 <button
                   type="button"
-                  className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+                  className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
                   data-testid="palette-advisor-erase-confirm-no"
                   onClick={onCancelErase}
                 >
@@ -448,7 +451,7 @@ function ConsentBlock({
           ) : (
             <button
               type="button"
-              className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+              className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
               data-testid="palette-advisor-consent-revoke"
               disabled={isBusy}
               onClick={onStartErase}
@@ -460,7 +463,7 @@ function ConsentBlock({
       ) : (
         <button
           type="button"
-          className="mt-4 min-h-[44px] rounded-md bg-white px-4 text-sm font-semibold text-neutral-900 disabled:opacity-70"
+          className="mt-4 min-h-11 rounded-md bg-inverse px-4 text-sm font-semibold text-on-inverse disabled:opacity-70"
           data-testid="palette-advisor-consent-grant"
           aria-describedby={showUnavailableNote ? UNAVAILABLE_HINT_ID : undefined}
           disabled={isBusy || !isAnalysisEnabled}
@@ -501,14 +504,14 @@ function SourceChoice({
     <div className="mt-8" data-testid="palette-advisor-sources">
       <p
         id={WARDROBE_HINT_ID}
-        className="text-sm text-neutral-300"
+        className="text-sm text-ink-soft"
         data-testid="palette-advisor-wardrobe-hint"
       >
         {t('commerce.premium.palette.source.wardrobeHint')}
       </p>
       <button
         type="button"
-        className="mt-2 min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white disabled:opacity-70"
+        className="mt-2 min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink disabled:opacity-70"
         data-testid="palette-advisor-source-wardrobe"
         aria-describedby={
           showUnavailableNote
@@ -523,14 +526,14 @@ function SourceChoice({
 
       <p
         id={SELFIE_HINT_ID}
-        className="mt-6 text-sm text-neutral-300"
+        className="mt-6 text-sm text-ink-soft"
         data-testid="palette-advisor-selfie-hint"
       >
         {t('commerce.premium.palette.source.selfieHint')}
       </p>
       <label
         htmlFor={SELFIE_INPUT_ID}
-        className="mt-2 block text-sm font-medium text-white"
+        className="mt-2 block text-sm font-medium text-ink"
       >
         {t('commerce.premium.palette.source.selfie')}
       </label>
@@ -538,7 +541,7 @@ function SourceChoice({
         id={SELFIE_INPUT_ID}
         type="file"
         accept="image/jpeg,image/png,image/webp"
-        className="mt-2 block text-sm text-neutral-200"
+        className="mt-2 block text-sm text-ink-soft"
         data-testid="palette-advisor-selfie-input"
         aria-describedby={
           showUnavailableNote
@@ -583,7 +586,7 @@ function PaletteResult({
       */}
       {isStale && (
         <p
-          className="mt-4 text-sm text-neutral-300"
+          className="mt-4 text-sm text-ink-soft"
           data-testid="palette-advisor-stale-version"
         >
           {t('commerce.premium.palette.staleVersion')}
@@ -592,28 +595,26 @@ function PaletteResult({
 
       <dl className="mt-6 space-y-2 text-sm" data-testid="palette-advisor-result">
         <div className="flex gap-2">
-          <dt className="text-neutral-400">
+          <dt className="text-ink-muted">
             {t('commerce.premium.palette.result.undertone')}
           </dt>
-          <dd className="font-medium text-white" data-testid="palette-advisor-undertone">
+          <dd className="font-medium text-ink" data-testid="palette-advisor-undertone">
             {t(`commerce.premium.palette.undertone.${undertone}`)}
           </dd>
         </div>
         <div className="flex gap-2">
-          <dt className="text-neutral-400">
-            {t('commerce.premium.palette.result.depth')}
-          </dt>
-          <dd className="font-medium text-white" data-testid="palette-advisor-depth">
+          <dt className="text-ink-muted">{t('commerce.premium.palette.result.depth')}</dt>
+          <dd className="font-medium text-ink" data-testid="palette-advisor-depth">
             {depth
               ? t(`commerce.premium.palette.depth.${depth}`)
               : t('commerce.premium.palette.result.depthUnknown')}
           </dd>
         </div>
         <div className="flex gap-2">
-          <dt className="text-neutral-400">
+          <dt className="text-ink-muted">
             {t('commerce.premium.palette.result.confidence')}
           </dt>
-          <dd className="font-medium text-white" data-testid="palette-advisor-confidence">
+          <dd className="font-medium text-ink" data-testid="palette-advisor-confidence">
             {confidenceLabel}
           </dd>
         </div>
@@ -621,7 +622,7 @@ function PaletteResult({
 
       {depth === null && (
         <p
-          className="mt-3 text-sm text-neutral-300"
+          className="mt-3 text-sm text-ink-soft"
           data-testid="palette-advisor-foundation-depth-unknown"
         >
           {t('commerce.premium.palette.foundationDepthUnknown')}
@@ -653,7 +654,7 @@ function AnalysisStatus({
       {statusKey && (
         <p
           role="status"
-          className="mt-6 text-sm text-neutral-200"
+          className="mt-6 text-sm text-ink-soft"
           data-testid="palette-advisor-status"
         >
           {t(statusKey)}
@@ -663,7 +664,7 @@ function AnalysisStatus({
       {failureReason && (
         <p
           role="alert"
-          className="mt-2 text-sm text-red-300"
+          className="mt-2 text-sm text-danger-ink"
           data-testid="palette-advisor-failure"
         >
           {t(FAILURE_KEYS[failureReason])}
@@ -1095,23 +1096,20 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
       className="max-w-2xl"
     >
       {/*
-        An `h1`, not an `h2`, because this panel IS the whole of `/palette`
-        rather than one section among three the way `PremiumThemeSection` sits
-        on `/settings`. Rendering a hardcoded English `<h1>Palette</h1>` on the
-        page and this heading beneath it would have put an untranslated string
-        on a surface whose every other word ships in ten catalogs, and said the
-        same thing twice.
+        Story CC-7.9 D6: `/palette`'s top bar shows this same catalog title as the page's only
+        `h1`, so the panel's own heading is an `h2` for assistive technology only. It still
+        names the section (`aria-labelledby`), and the page never says the title twice.
       */}
-      <h1
+      <h2
         id="palette-advisor-title"
-        className="text-4xl font-semibold text-white"
+        className="sr-only"
         data-testid="palette-advisor-title"
       >
         {t('commerce.premium.palette.sectionTitle')}
-      </h1>
+      </h2>
 
       <p
-        className="mt-3 text-sm leading-relaxed text-neutral-200"
+        className="text-sm leading-relaxed text-ink-soft"
         data-testid="palette-advisor-intro"
       >
         {t('commerce.premium.palette.intro')}
@@ -1125,7 +1123,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
       {view.showUnavailableNote && (
         <p
           id={UNAVAILABLE_HINT_ID}
-          className="mt-4 text-sm text-neutral-300"
+          className="mt-4 text-sm text-ink-soft"
           data-testid="palette-advisor-unavailable"
         >
           {t('commerce.premium.palette.unavailable')}
@@ -1180,12 +1178,12 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
               className="mt-4 flex flex-wrap items-center gap-3"
               data-testid="palette-advisor-dismissed-notice"
             >
-              <span role="status" className="text-sm text-neutral-200">
+              <span role="status" className="text-sm text-ink-soft">
                 {t('commerce.premium.palette.actions.dismissed')}
               </span>
               <button
                 type="button"
-                className="min-h-[44px] rounded-md border border-neutral-600 px-4 text-sm text-white"
+                className="min-h-11 rounded-md border border-line-strong bg-page px-4 text-sm text-ink"
                 data-testid="palette-advisor-undo-dismiss"
                 disabled={busy !== null}
                 onClick={handleUndoDismiss}
@@ -1223,7 +1221,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
       {error && (
         <p
           role="alert"
-          className="mt-4 text-sm text-red-300"
+          className="mt-4 text-sm text-danger-ink"
           data-testid="palette-advisor-error"
         >
           {error}

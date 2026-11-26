@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet } from 'react-native'
+import { Pressable } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import type {
   GuardianConsentRevokeInput,
   GuardianConsentRevokeResponse,
   UserProfileResponse,
 } from '@couture/api-client/contracts/http'
-import { Text, View } from '@/components/themed'
+import { createSchemeStyles, Text, View } from '@/components/themed'
 import { revokeGuardianConsentFromMobile } from '@/src/lib/guardian'
 import { getUserProfileFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -17,12 +19,12 @@ type GuardianDashboardScreenProps = {
   ) => Promise<GuardianConsentRevokeResponse>
 }
 
-function formatConsentDate(value: string | null) {
+function formatConsentDate(value: string | null, t: TFunction, locale: string) {
   if (!value) {
-    return 'Awaiting consent'
+    return t('guardian.consent.awaiting')
   }
 
-  return new Intl.DateTimeFormat('en', {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeZone: 'UTC',
   }).format(new Date(value))
@@ -32,6 +34,8 @@ export function GuardianDashboardScreen({
   loadProfile = getUserProfileFromMobile,
   revokeConsent = revokeGuardianConsentFromMobile,
 }: GuardianDashboardScreenProps) {
+  const { t, i18n } = useTranslation()
+  const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
   const [profile, setProfile] = useState<UserProfileResponse | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -59,7 +63,7 @@ export function GuardianDashboardScreen({
       .catch((error) => {
         if (isMounted) {
           setErrorMessage(
-            error instanceof Error ? error.message : 'Unable to load dashboard'
+            error instanceof Error ? error.message : t('guardian.dashboard.loadFailed')
           )
         }
       })
@@ -67,7 +71,7 @@ export function GuardianDashboardScreen({
     return () => {
       isMounted = false
     }
-  }, [loadProfile])
+  }, [loadProfile, t])
 
   async function handleRevoke(teenId: string) {
     if (!profile) {
@@ -96,10 +100,17 @@ export function GuardianDashboardScreen({
         ),
       })
       setMessage(
-        `Consent revoked for ${response.teenId}. Teen session invalidated: ${response.sessionInvalidated ? 'yes' : 'no'}.`
+        t('guardian.dashboard.revoked', {
+          teenId: response.teenId,
+          invalidated: response.sessionInvalidated
+            ? t('guardian.dashboard.yes')
+            : t('guardian.dashboard.no'),
+        })
       )
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to revoke consent')
+      setErrorMessage(
+        error instanceof Error ? error.message : t('guardian.dashboard.revokeFailed')
+      )
     } finally {
       setPendingTeenId(null)
     }
@@ -109,7 +120,7 @@ export function GuardianDashboardScreen({
     return (
       <View style={styles.container}>
         <Text style={styles.title} accessibilityRole="header">
-          Guardian dashboard
+          {t('guardian.dashboard.title')}
         </Text>
         <Text
           testID="guardian-dashboard-error"
@@ -126,20 +137,18 @@ export function GuardianDashboardScreen({
   if (!profile) {
     return (
       <View style={styles.container}>
-        <Text style={styles.description}>Loading linked teens...</Text>
+        <Text style={styles.description}>{t('guardian.dashboard.loading')}</Text>
       </View>
     )
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.eyebrow}>Guardian dashboard</Text>
+      <Text style={styles.eyebrow}>{t('guardian.dashboard.title')}</Text>
       <Text style={styles.title} accessibilityRole="header">
         {profile.user.displayName ?? profile.user.email}
       </Text>
-      <Text style={styles.description}>
-        Review linked teen accounts and revoke consent when access should stop.
-      </Text>
+      <Text style={styles.description}>{t('guardian.dashboard.intro')}</Text>
 
       {message ? (
         <Text
@@ -163,7 +172,7 @@ export function GuardianDashboardScreen({
       ) : null}
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Linked teens</Text>
+        <Text style={styles.sectionTitle}>{t('guardian.dashboard.linkedTeens')}</Text>
         {profile.linkedTeens.length > 0 ? (
           profile.linkedTeens.map((teen) => (
             <View
@@ -172,14 +181,18 @@ export function GuardianDashboardScreen({
               style={styles.row}
             >
               <Text style={styles.rowTitle}>{teen.teenId}</Text>
-              <Text style={styles.rowMeta}>{teen.status}</Text>
               <Text style={styles.rowMeta}>
-                {formatConsentDate(teen.consentGrantedAt)}
+                {t(`guardian.consent.status.${teen.status}`)}
+              </Text>
+              <Text style={styles.rowMeta}>
+                {formatConsentDate(teen.consentGrantedAt, t, i18n.language)}
               </Text>
               {teen.status === 'granted' ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Revoke consent for ${teen.teenId}`}
+                  accessibilityLabel={t('guardian.dashboard.revokeLabel', {
+                    teenId: teen.teenId,
+                  })}
                   style={[
                     styles.revokeButton,
                     pendingTeenId === teen.teenId ? styles.buttonDisabled : null,
@@ -190,21 +203,24 @@ export function GuardianDashboardScreen({
                   disabled={pendingTeenId === teen.teenId}
                 >
                   <Text style={styles.revokeButtonText}>
-                    {pendingTeenId === teen.teenId ? 'Revoking...' : 'Revoke'}
+                    {pendingTeenId === teen.teenId
+                      ? t('guardian.dashboard.revoking')
+                      : t('guardian.dashboard.revoke')}
                   </Text>
                 </Pressable>
               ) : null}
             </View>
           ))
         ) : (
-          <Text style={styles.description}>No linked teen accounts yet.</Text>
+          <Text style={styles.description}>{t('guardian.dashboard.empty')}</Text>
         )}
       </View>
     </View>
   )
 }
 
-const styles = StyleSheet.create({
+// Story CC-7.9 D2, D7: colors follow the OS scheme; each linked teen is one card on the page.
+const useStyles = createSchemeStyles((colors) => ({
   container: {
     flex: 1,
     paddingHorizontal: 24,
@@ -215,69 +231,70 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
-    color: '#fcd34d',
+    color: colors.inkMuted,
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    lineHeight: 34,
+    lineHeight: 32,
   },
   description: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#a3a3a3',
+    fontSize: 16,
+    lineHeight: 24,
+    color: colors.inkMuted,
   },
   successMessage: {
-    fontSize: 13,
-    color: '#bbf7d0',
+    fontSize: 14,
+    color: colors.successInk,
   },
   errorMessage: {
-    fontSize: 13,
-    color: '#fecaca',
+    fontSize: 14,
+    color: colors.dangerInk,
   },
   section: {
     marginTop: 12,
-    gap: 10,
+    gap: 12,
   },
   sectionTitle: {
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: '#d4d4d4',
+    color: colors.inkSoft,
   },
   row: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 14,
-    padding: 14,
-    gap: 6,
+    borderColor: colors.line,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
   },
   rowTitle: {
     fontSize: 14,
     fontWeight: '700',
   },
   rowMeta: {
-    fontSize: 13,
-    color: '#a3a3a3',
+    fontSize: 14,
+    color: colors.inkMuted,
   },
   revokeButton: {
     minHeight: 44,
-    marginTop: 6,
+    marginTop: 8,
     borderWidth: 1,
-    borderColor: '#fca5a5',
-    borderRadius: 999,
-    paddingVertical: 10,
+    borderColor: colors.dangerInk,
+    borderRadius: 9999,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   revokeButtonText: {
-    color: '#fecaca',
+    color: colors.dangerInk,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
   },
-})
+}))

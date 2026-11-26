@@ -79,7 +79,6 @@ function acceptTags(body: Record<string, unknown>) {
 
 function Harness({
   initial = blueTop,
-  onBack = vi.fn(),
   onStylePiece = vi.fn(),
   onRefresh = vi.fn(),
   refreshTo,
@@ -88,7 +87,6 @@ function Harness({
   withProvider = true,
 }: {
   initial?: ClosetGarment | null
-  onBack?: () => void
   onStylePiece?: (selection: unknown, button: HTMLButtonElement) => void
   onRefresh?: () => void
   /** What the closet re-read finds; it arrives after the refresh call, as a real read does. */
@@ -125,7 +123,6 @@ function Harness({
       hasLoaded
       loadFailed={read.failed}
       loading={read.loading}
-      onBack={onBack}
       onTagsSaved={setGarment}
       onRefresh={refresh}
       onStylePiece={onStylePiece}
@@ -187,17 +184,19 @@ afterEach(() => {
 })
 
 describe('GarmentDetail', () => {
-  it('[P0] [7.5-CMP-003] shows back, the photo, the tags, Edit tags and Style this piece', () => {
+  it('[P0] [7.5-CMP-003] shows the photo, the tags, Edit tags and Style this piece', () => {
     render(<Harness />)
 
-    expect(detail().getByTestId('garment-detail-back')).toHaveTextContent(
-      'Back to closet'
-    )
+    // CC-7.9 D7: back and the title live in the page's top bar, so the detail has neither.
+    expect(detail().queryByTestId('garment-detail-back')).not.toBeInTheDocument()
+    expect(detail().queryByRole('heading')).not.toBeInTheDocument()
     expect(detail().getByRole('img', { name: 'Blue top' })).toHaveAttribute(
       'src',
       'https://photos.example.test/blue-top.png'
     )
-    expect(detail().getByRole('heading', { name: 'Blue top' })).toHaveFocus()
+    const region = screen.getByTestId('garment-detail')
+    expect(region).toHaveAccessibleName('Blue top')
+    expect(region).toHaveFocus()
     expect(detail().getByTestId('garment-detail-category')).toHaveTextContent(/^Top$/)
     expect(detail().getByTestId('garment-detail-material')).toHaveTextContent(/^Cotton$/)
     expect(detail().getByTestId('garment-detail-comfort')).toHaveTextContent(/^Mild$/)
@@ -664,16 +663,14 @@ describe('GarmentDetail', () => {
     })
   })
 
-  it('[P1] [7.5-CMP-004] an id that left the closet says so and offers back', async () => {
-    const user = userEvent.setup()
-    const onBack = vi.fn()
-    render(<Harness initial={null} onBack={onBack} />)
+  it('[P1] [7.5-CMP-004] an id that left the closet says so', () => {
+    render(<Harness initial={null} />)
 
+    // CC-7.9 D7: the page's top bar offers back (page.garment-detail.test.tsx 7.5-CMP-004).
     expect(screen.getByTestId('garment-detail-missing')).toHaveTextContent(
       'This piece is no longer in your closet.'
     )
-    await user.click(screen.getByTestId('garment-detail-back'))
-    expect(onBack).toHaveBeenCalledTimes(1)
+    expect(screen.queryByTestId('garment-detail-back')).not.toBeInTheDocument()
   })
 
   it('[P2] [7.5-CMP-012] shows Saved inline when no status bar provider is mounted', async () => {
@@ -828,7 +825,6 @@ describe('GarmentDetail', () => {
           hasLoaded
           loadFailed={false}
           loading={false}
-          onBack={vi.fn()}
           onTagsSaved={setGarment}
           onRefresh={vi.fn()}
           onStylePiece={vi.fn()}
@@ -886,7 +882,6 @@ describe('GarmentDetail', () => {
       hasLoaded: true,
       loadFailed: false,
       loading: false,
-      onBack: vi.fn(),
       onTagsSaved: vi.fn(),
       onRefresh,
       onStylePiece: vi.fn(),
@@ -937,7 +932,6 @@ describe('GarmentDetail', () => {
             hasLoaded
             loadFailed={false}
             loading={false}
-            onBack={vi.fn()}
             onTagsSaved={setGarment}
             onRefresh={vi.fn()}
             onStylePiece={vi.fn()}
@@ -983,7 +977,6 @@ describe('GarmentDetail', () => {
           hasLoaded
           loadFailed
           loading={false}
-          onBack={vi.fn()}
           onTagsSaved={vi.fn()}
           onRefresh={onRefresh}
           onStylePiece={vi.fn()}

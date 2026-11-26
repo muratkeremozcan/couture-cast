@@ -666,7 +666,7 @@ export function SilhouetteEditor({
     return (
       <View testID="silhouette-editor-loading" style={styles.container}>
         <ActivityIndicator
-          color={colors.text}
+          color={colors.ink}
           accessibilityLabel={t('wardrobe.silhouette.title')}
         />
       </View>
@@ -849,7 +849,7 @@ export function SilhouetteEditor({
 
           {myFormPhase === 'uploading' || myFormPhase === 'processing' ? (
             <View style={styles.uploadState} testID="silhouette-my-form-processing">
-              <ActivityIndicator color={colors.text} />
+              <ActivityIndicator color={colors.ink} />
               <Text>{t('wardrobe.silhouette.processing')}</Text>
             </View>
           ) : null}
@@ -913,7 +913,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
   },
   tabText: { fontWeight: '700' },
   sliderRow: { gap: 8, marginBottom: 12 },
@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: 12,
   },
   stepperDisabled: { opacity: 0.4 },
   stepperText: { fontSize: 20, fontWeight: '700' },
@@ -943,7 +943,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingVertical: 12,
   },
   primaryButtonText: { fontWeight: '700' },
@@ -962,10 +962,10 @@ const styles = StyleSheet.create({
 /** The OS light/dark colors for the layout above. */
 const useThemedStyles = createSchemeStyles((colors) => ({
   errorBox: { backgroundColor: colors.dangerSurface },
-  errorText: { color: colors.dangerText },
-  link: { color: colors.noticeText },
-  tab: { backgroundColor: colors.border },
-  inverse: { backgroundColor: colors.inverseSurface },
+  errorText: { color: colors.dangerInk },
+  link: { color: colors.noticeInk },
+  tab: { backgroundColor: colors.line },
+  inverse: { backgroundColor: colors.inverse },
   onInverse: { color: colors.onInverse },
-  outline: { borderColor: colors.strongBorder },
+  outline: { borderColor: colors.lineStrong },
 }))

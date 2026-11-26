@@ -11,6 +11,7 @@ import {
   burnInCommand,
   burnInSpecs,
   childEnv,
+  plan,
   tagsConsentCases,
 } from './real-session-burn-in.mjs'
 
@@ -133,6 +134,58 @@ test('runs run.mjs directly: the specs three times, no retries, on the existing 
     '--retries=0',
   ])
   assert.ok(fs.existsSync(new URL(`../../${RUN_SCRIPT}`, import.meta.url)))
+  // The job's first pass builds the web app the consent pass then serves.
+  assert.deepEqual(burnInCommand([LANDING], { buildWeb: true }), [
+    'scripts/e2e-real-session/run.mjs',
+    LANDING,
+    '--repeat-each=3',
+    '--retries=0',
+  ])
+})
+
+test('burnIn builds the web app only when the job asks for it', async () => {
+  for (const [flag, expected] of [
+    ['true', burnInCommand([LANDING], { buildWeb: true })],
+    [undefined, burnInCommand([LANDING])],
+  ]) {
+    const child = fakeChild()
+    const calls = []
+    const done = burnIn({
+      env: { ...event, REAL_SESSION_BURN_IN_BUILD_WEB: flag },
+      list: async () => [LANDING],
+      start: (command, args) => (calls.push(args), child),
+      io,
+      log: () => undefined,
+      signals: new EventEmitter(),
+    })
+    await new Promise((resolve) => setImmediate(resolve))
+    child.emit('exit', 0, null)
+    assert.equal(await done, 0)
+    assert.deepEqual(calls, [expected])
+  }
+})
+
+test('plan writes any=true for a changed real-session spec and any=false for none', async () => {
+  for (const [files, any] of [
+    [[LANDING, 'apps/web/src/app/page.tsx'], 'true'],
+    [['apps/web/src/app/page.tsx'], 'false'],
+  ]) {
+    const writes = []
+    const lines = []
+    assert.equal(
+      await plan({
+        env: { ...event, GITHUB_OUTPUT: '/out' },
+        list: async () => files,
+        io,
+        log: (line) => lines.push(line),
+        write: (file, text) => writes.push([file, text]),
+      }),
+      0
+    )
+    assert.deepEqual(writes, [['/out', `any=${any}\n`]])
+    assert.equal(lines.length, 1)
+    if (any === 'true') assert.match(lines[0], /1 changed real-session spec/)
+  }
 })
 
 test('matches the burn-in repeat count of the Playwright burn-in config', () => {
@@ -252,41 +305,105 @@ test('burnIn fails when the comparison cannot be read', async () => {
   )
 })
 
-const job = () =>
+const workflow = () =>
   parse(
     fs.readFileSync(
       new URL('../../.github/workflows/pr-pw-e2e-local.yml', import.meta.url),
       'utf8'
     )
-  ).jobs['real-session-e2e']
+  )
+const job = () => workflow().jobs['real-session-burn-in']
 
-const BURN_IN_IF =
-  "${{ !cancelled() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') && steps.supabase.outcome == 'success' }}"
+const BURN_IN_IF = "${{ !cancelled() && steps.supabase.outcome == 'success' }}"
+const PLANNED = "${{ always() && steps.plan.outputs.any == 'true' }}"
 
-for (const [name, dir, policy] of [
-  ['Burn in changed real-session specs', '.real-session-e2e-burn-in', undefined],
+test('the burn-in is its own pull request job beside the lane job, skipped by the label', () => {
+  const { jobs } = workflow()
+  assert.deepEqual(jobs['real-session-burn-in'].needs, ['lanes'])
+  assert.equal(
+    jobs['real-session-burn-in'].if,
+    "${{ fromJSON(needs.lanes.outputs.plan)['web-e2e'] && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}"
+  )
+  assert.equal(jobs['real-session-burn-in']['timeout-minutes'], 20)
+  assert.deepEqual(
+    {
+      GITHUB_TOKEN: job().env.GITHUB_TOKEN,
+      BASE_SHA: job().env.BASE_SHA,
+      HEAD_SHA: job().env.HEAD_SHA,
+      REDIS_URL: job().env.REDIS_URL,
+    },
+    {
+      GITHUB_TOKEN: '${{ github.token }}',
+      BASE_SHA: '${{ github.event.pull_request.base.sha }}',
+      HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+      REDIS_URL: 'redis://127.0.0.1:6379',
+    }
+  )
+  assert.ok(jobs['real-session-burn-in'].services.redis, 'its own Redis service')
+  // The lane job no longer burns in.
+  const lane = jobs['real-session-e2e'].steps.map((step) => step.name)
+  assert.equal(
+    lane.some((name) => /burn/i.test(name)),
+    false
+  )
+})
+
+test('the burn-in job plans first and starts no stack when no real-session spec changed', () => {
+  const steps = job().steps
+  const names = steps.map((step) => step.name)
+  const planStep = steps.find((step) => step.id === 'plan')
+  assert.equal(planStep.run, 'node scripts/ci/real-session-burn-in.mjs --plan')
+  assert.equal(planStep.if, undefined)
+  const supabase = steps.find((step) => step.id === 'supabase')
+  for (const name of [
+    'Setup Node environment',
+    'Cache Playwright browsers',
+    'Start local Supabase services with Mailpit',
+  ]) {
+    assert.ok(names.indexOf(name) > names.indexOf(planStep.name), name)
+    assert.equal(
+      steps.find((step) => step.name === name).if,
+      "${{ steps.plan.outputs.any == 'true' }}",
+      name
+    )
+  }
+  assert.ok(supabase)
+  const build = steps.find((step) => step.name === 'Build the shared packages')
+  assert.equal(build.run, 'npm run prepare:playwright')
+  assert.equal(build.if, "${{ steps.supabase.outcome == 'success' }}")
+})
+
+for (const [name, dir, policy, minutes, buildWeb] of [
+  [
+    'Burn in changed real-session specs',
+    '.real-session-e2e-burn-in',
+    undefined,
+    12,
+    'true',
+  ],
   [
     'Burn in changed real-session guardian consent cases',
     '.real-session-e2e-burn-in-consent',
     'required_13_15',
+    4,
+    undefined,
   ],
 ]) {
-  test(`the real-session job wires "${name}" on its own run directory`, () => {
+  test(`the burn-in job wires "${name}" on its own run directory`, () => {
     const steps = job().steps
     const names = steps.map((step) => step.name)
     const index = names.indexOf(name)
     assert.ok(
-      index > names.indexOf('Run real-session specs'),
-      'after the web build it reuses'
+      index > names.indexOf('Build the shared packages'),
+      'after the package build'
     )
     const step = steps[index]
-    assert.equal(step.run, 'node scripts/ci/real-session-burn-in.mjs')
+    // exec: the step timeout's signals reach node itself, never a shell around it.
+    assert.equal(step.run, 'exec node scripts/ci/real-session-burn-in.mjs')
     assert.equal(step.if, BURN_IN_IF)
-    assert.equal(step['timeout-minutes'], 7)
+    assert.equal(step['timeout-minutes'], minutes)
     assert.deepEqual(step.env, {
-      GITHUB_TOKEN: '${{ github.token }}',
-      BASE_SHA: '${{ github.event.pull_request.base.sha }}',
-      HEAD_SHA: '${{ github.event.pull_request.head.sha }}',
+      ...(buildWeb ? { REAL_SESSION_BURN_IN_BUILD_WEB: buildWeb } : {}),
       ...(policy ? { GUARDIAN_CONSENT_POLICY: policy } : {}),
       STORY65_REAL_SESSION_DIR: `\${{ github.workspace }}/${dir}`,
     })
@@ -296,7 +413,7 @@ for (const [name, dir, policy] of [
         candidate.env?.STORY65_REAL_SESSION_DIR === step.env.STORY65_REAL_SESSION_DIR
     )
     assert.ok(cleanup, 'a cleanup step deletes the Auth users the burn-in created')
-    assert.equal(cleanup.if, 'always()')
+    assert.equal(cleanup.if, PLANNED)
     const scan = steps.find((candidate) => candidate.id === 'burn_in_secret_scan')
     assert.ok(
       scan.run.includes(`"\${{ github.workspace }}/${dir}"`),
@@ -312,7 +429,7 @@ for (const [name, dir, policy] of [
 test('burn-in output ships only after the secret scan passed', () => {
   const steps = job().steps
   const scan = steps.find((candidate) => candidate.id === 'burn_in_secret_scan')
-  assert.equal(scan.if, 'always()')
+  assert.equal(scan.if, PLANNED)
   assert.match(scan.run, /artifacts\.mjs verify/)
   assert.match(scan.run, /check-artifact-secrets\.mjs/)
   assert.match(scan.run, /--reject-jwt/)

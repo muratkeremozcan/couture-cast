@@ -48,6 +48,8 @@ const APPROVED_COGNATES: Record<string, readonly SupportedLocale[]> = {
   'occasions.casual': ['it-IT', 'es-419', 'pt-PT', 'pt-BR'],
   'occasions.formal': ['es-419', 'pt-PT', 'pt-BR'],
   'occasions.sport': ['fr-FR', 'fr-CA', 'it-IT', 'de-DE'],
+  // German says "warm" for the warm comfort range too.
+  'comfort.warm': ['de-DE'],
 }
 
 function capsuleTree(catalog: Catalog): Record<string, unknown> {
@@ -142,6 +144,111 @@ describe('4.3 wardrobe capsule locale parity', () => {
       for (const [key, value] of flatten(capsuleTree(CATALOGS[locale]))) {
         expect(value.trim().length, `${locale}.${key}`).toBeGreaterThan(0)
       }
+    }
+  })
+})
+
+/**
+ * Story CC-7.9 D9: the capsules screen, the capsule builder and the tag editor read every
+ * member-facing string from the catalogs. These are the keys that replaced hard-coded English.
+ */
+const CC_7_9_CAPSULE_KEYS = [
+  'signIn',
+  'subtitle',
+  'filterOccasionLabel',
+  'loading',
+  'favoriteCapsule',
+  'garmentCount_one',
+  'garmentCount_other',
+  'status.ready',
+  'status.needsRepair',
+  'editAction',
+  'deleteAction',
+  'truncation',
+  'cancelDeletion',
+  'cancel',
+  'builderDescription',
+  'repairRemoved_one',
+  'repairRemoved_other',
+  'reloadLatest',
+  'garmentFallback',
+  'garmentNoun',
+  'untagged',
+  'garmentLabel',
+  'garmentLabelWithComfort',
+  'category.top',
+  'category.bottom',
+  'category.outerwear',
+  'category.dress',
+  'category.shoes',
+  'category.accessory',
+  'comfort.cold',
+  'comfort.cool',
+  'comfort.mild',
+  'comfort.warm',
+  'comfort.hot',
+] as const
+
+/** Same-spelled words reviewed per locale, as for the capsule tree above. */
+const TAG_EDITOR_COGNATES: Record<string, readonly SupportedLocale[]> = {
+  'comfort.warm.name': ['de-DE'],
+}
+
+function tagEditorTree(catalog: Catalog): Record<string, unknown> {
+  const wardrobe = catalog.wardrobe as Record<string, unknown> | undefined
+  return (wardrobe?.tagEditor ?? {}) as Record<string, unknown>
+}
+
+const tagEditorReference = flatten(tagEditorTree(enUS as Catalog))
+
+describe('CC-7.9 capsules and tag editor strings in the catalogs', () => {
+  it('7.9-I18N-WEB-01 ships every new capsule key non-empty in all ten locales', () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const catalog = flatten(capsuleTree(CATALOGS[locale]))
+      for (const key of CC_7_9_CAPSULE_KEYS) {
+        expect(catalog.get(key)?.trim() ?? '', `${locale}.${key}`).not.toBe('')
+      }
+    }
+  })
+
+  it('7.9-I18N-WEB-02 translates every new capsule key for de-DE', () => {
+    const german = flatten(capsuleTree(CATALOGS['de-DE']))
+    const untranslated = CC_7_9_CAPSULE_KEYS.filter(
+      (key) =>
+        !APPROVED_COGNATES[key]?.includes('de-DE') &&
+        german.get(key) === reference.get(key)
+    )
+    expect(untranslated).toEqual([])
+  })
+
+  it('7.9-I18N-WEB-03 ships the same tag editor key tree, non-empty, in every locale', () => {
+    const expected = [...tagEditorReference.keys()].sort()
+    expect(expected).toContain('title')
+    expect(expected).toContain('comfort.hot.label')
+    for (const locale of SUPPORTED_LOCALES) {
+      const catalog = flatten(tagEditorTree(CATALOGS[locale]))
+      expect([...catalog.keys()].sort(), `${locale} key tree`).toEqual(expected)
+      for (const [key, value] of catalog) {
+        expect(value.trim().length, `${locale}.${key}`).toBeGreaterThan(0)
+        expect(placeholders(value), `${locale}.${key}`).toEqual(
+          placeholders(tagEditorReference.get(key) ?? '')
+        )
+      }
+    }
+  })
+
+  it('7.9-I18N-WEB-04 leaves no English tag editor value in a non-English catalog', () => {
+    const nonEnglish = SUPPORTED_LOCALES.filter((locale) => !locale.startsWith('en-'))
+    for (const locale of nonEnglish) {
+      const catalog = flatten(tagEditorTree(CATALOGS[locale]))
+      const untranslated = [...tagEditorReference.entries()]
+        .filter(
+          ([key, englishValue]) =>
+            !TAG_EDITOR_COGNATES[key]?.includes(locale) &&
+            catalog.get(key) === englishValue
+        )
+        .map(([key]) => key)
+      expect(untranslated, `${locale} untranslated keys`).toEqual([])
     }
   })
 })

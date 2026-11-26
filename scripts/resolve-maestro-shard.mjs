@@ -33,7 +33,10 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { NATIVE_MAESTRO_FLOWS } from './lib/native-maestro-flows.mjs'
+import {
+  NATIVE_MAESTRO_FLOWS,
+  VISUAL_MAESTRO_FLOWS,
+} from './lib/native-maestro-flows.mjs'
 import { MAESTRO_AUTH_MODES, flowsForAuthMode } from './lib/maestro-auth-mode.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -50,9 +53,26 @@ const fail = (message) => {
 
 const SUITE = readArg('suite') || 'full'
 const AUTH = readArg('auth') || 'member'
+// Story CC-7.9: `--lane visual` is the one small-phone shard that runs the snapshot flows.
+const LANE = readArg('lane') || 'suite'
 const SIGNED_OUT = AUTH === 'signed-out'
 const SHARD = SIGNED_OUT ? 1 : Number(readArg('shard'))
 const SHARDS = SIGNED_OUT ? 1 : Number(readArg('shards'))
+
+if (LANE === 'visual') {
+  if (AUTH !== 'member') fail(`--lane visual runs member flows only, got --auth ${AUTH}`)
+  if (SUITE === 'smoke') {
+    console.log('empty=true')
+    console.error('The smoke suite has no visual flows. Skipping.')
+    process.exit(0)
+  }
+  const visual = [...VISUAL_MAESTRO_FLOWS].sort()
+  console.log('empty=false')
+  console.log(`list=${visual.map((name) => `maestro/${name}`).join(' ')}`)
+  console.error(`Visual lane runs ${visual.join(', ')}`)
+  process.exit(0)
+}
+if (LANE !== 'suite') fail(`--lane must be suite or visual, got ${LANE}`)
 
 if (!MAESTRO_AUTH_MODES.includes(AUTH)) {
   fail(`--auth must be one of ${MAESTRO_AUTH_MODES.join(', ')}, got ${AUTH}`)
@@ -79,6 +99,7 @@ const discoverFullSuite = () =>
     .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
     .filter((entry) => entry.name !== 'config.yaml')
     .filter((entry) => !NATIVE_MAESTRO_FLOWS.has(entry.name))
+    .filter((entry) => !VISUAL_MAESTRO_FLOWS.has(entry.name))
     .map((entry) => entry.name)
     .sort()
 

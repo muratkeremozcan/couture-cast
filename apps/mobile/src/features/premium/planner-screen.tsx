@@ -40,7 +40,7 @@ import {
   type PlannerScenarioOutfit,
 } from '@couture/api-client/contracts/http'
 
-import { Text, View } from '@/components/themed'
+import { createSchemeStyles, Text, View } from '@/components/themed'
 import { useAppTheme } from '@/src/theme/theme-context'
 import { formatTemperature } from '@/src/lib/formatters'
 import {
@@ -189,14 +189,15 @@ function OutfitBlock({ outfit }: { outfit: PlannerScenarioOutfit }) {
 
 function ErrorDayCard({ onRetry }: { onRetry: () => void }) {
   const { t } = useTranslation()
+  const tone = useTone()
   return (
-    <View style={styles.card} testID="planner-day-error">
+    <View style={[styles.card, tone.card]} testID="planner-day-error">
       <Text style={styles.body} accessibilityRole="alert">
         {t('commerce.premium.planner.day.error.title')}
       </Text>
       <Pressable
         accessibilityRole="button"
-        style={styles.secondaryButton}
+        style={[styles.secondaryButton, tone.button]}
         testID="planner-day-error-retry"
         onPress={onRetry}
       >
@@ -221,6 +222,7 @@ function ReadyDayCard({
 }) {
   const { t, i18n } = useTranslation()
   const palette = useAppTheme().palette
+  const tone = useTone()
   const outfitsByScenario = new Map(
     day.outfits.map((outfit) => [outfit.scenario, outfit])
   )
@@ -272,7 +274,7 @@ function ReadyDayCard({
         <Text
           accessibilityRole={notice.isError ? 'alert' : undefined}
           accessibilityLiveRegion={notice.isError ? 'assertive' : 'polite'}
-          style={notice.isError ? styles.errorText : styles.body}
+          style={notice.isError ? [styles.errorText, tone.errorText] : styles.body}
           testID={`planner-day-notice-${day.planDate}`}
         >
           {notice.text}
@@ -290,6 +292,7 @@ export function PlannerScreen() {
 function MemberPlannerScreen() {
   const { t, i18n } = useTranslation()
   const { palette } = useAppTheme()
+  const tone = useTone()
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
@@ -439,9 +442,8 @@ function MemberPlannerScreen() {
       testID="planner-screen"
       accessibilityLabel={t('commerce.premium.planner.sectionTitle')}
     >
-      <Text accessibilityRole="header" style={styles.title} testID="planner-title">
-        {t('commerce.premium.planner.sectionTitle')}
-      </Text>
+      {/* Story CC-7.9 D6: the stack's AppTopBar carries the title; the labeled scroll view keeps
+        the section name, and the body repeats it in no heading of its own. */}
       <Text style={styles.body}>{t('commerce.premium.planner.intro')}</Text>
 
       {screenState === 'loading' ? (
@@ -476,14 +478,14 @@ function MemberPlannerScreen() {
         <>
           <Text
             accessibilityRole="alert"
-            style={styles.errorText}
+            style={[styles.errorText, tone.errorText]}
             testID="planner-load-error"
           >
             {t('commerce.premium.planner.errorLoad')}
           </Text>
           <Pressable
             accessibilityRole="button"
-            style={styles.secondaryButton}
+            style={[styles.secondaryButton, tone.button]}
             testID="planner-retry"
             onPress={() => {
               setScreenState('loading')
@@ -523,25 +525,34 @@ function MemberPlannerScreen() {
   )
 }
 
+/**
+ * Story CC-7.9 D2: the OS-scheme colors for the parts outside a palette card. React Native
+ * draws an unset border black, which vanished on the dark page.
+ */
+const useTone = createSchemeStyles((colors) => ({
+  card: { borderColor: colors.line },
+  button: { borderColor: colors.lineStrong },
+  errorText: { color: colors.dangerInk },
+}))
+
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12 },
-  title: { fontSize: 28, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 20 },
   panel: { gap: 8, paddingVertical: 8 },
   panelTitle: { fontSize: 18, fontWeight: '600' },
   card: { gap: 8, padding: 12, borderRadius: 8, borderWidth: 1 },
   dayLabel: { fontSize: 16, fontWeight: '700' },
   starterBadge: { fontSize: 12, fontStyle: 'italic' },
-  weatherLine: { fontSize: 13 },
-  outfitBlock: { gap: 4, paddingVertical: 6 },
-  scenarioLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase' },
-  capsuleName: { fontSize: 13, fontWeight: '500' },
-  comfortNotes: { fontSize: 13, lineHeight: 18 },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  badge: { fontSize: 11, paddingHorizontal: 6, paddingVertical: 2 },
-  garmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  weatherLine: { fontSize: 14 },
+  outfitBlock: { gap: 4, paddingVertical: 8 },
+  scenarioLabel: { fontSize: 14, fontWeight: '600', textTransform: 'uppercase' },
+  capsuleName: { fontSize: 14, fontWeight: '500' },
+  comfortNotes: { fontSize: 14, lineHeight: 20 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  badge: { fontSize: 12, paddingHorizontal: 8, paddingVertical: 2 },
+  garmentRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   garmentTile: { width: 48, height: 48 },
-  garmentImage: { width: 48, height: 48, borderRadius: 6 },
+  garmentImage: { width: 48, height: 48, borderRadius: 8 },
   primaryButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 16 },
   primaryButtonText: { fontSize: 14, fontWeight: '600' },
   secondaryButton: {

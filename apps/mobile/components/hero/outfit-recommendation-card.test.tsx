@@ -324,12 +324,13 @@ describe('OutfitRecommendationCard affiliate CTA', () => {
 
 describe('6.15 comfort notes face', () => {
   // Story 6.15: the notes used fontStyle italic on the regular Playfair face, which iOS drew
-  // upright and Android drew as italic sans. The italic face is loaded as its own family.
-  it('6.15-MOB-FONT-01 sets the comfort notes in the Playfair Display Italic family', () => {
+  // upright and Android drew as italic sans. Story CC-7.9 D4 drops the custom faces: the notes
+  // use the system font, whose italic face is real on every platform.
+  it('6.15-MOB-FONT-01 sets the comfort notes in the system italic face', () => {
     renderCard({})
     const notes = getComputedStyle(screen.getByTestId('outfit-comfort-notes'))
-    expect(notes.fontFamily).toContain('Playfair Display Italic')
-    expect(notes.fontStyle).toBe('normal')
+    expect(notes.fontFamily).not.toContain('Playfair')
+    expect(notes.fontStyle).toBe('italic')
   })
 })
 

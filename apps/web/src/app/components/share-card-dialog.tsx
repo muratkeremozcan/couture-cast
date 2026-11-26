@@ -115,7 +115,7 @@ function ShareCardShareButton({
     <button
       ref={buttonRef}
       type="button"
-      className="min-h-[44px] rounded border border-[color:var(--theme-card-text)] px-5 text-[color:var(--theme-card-text)] disabled:opacity-50 aria-disabled:opacity-50"
+      className="min-h-11 rounded-md border border-theme-card-text px-5 text-theme-card-text disabled:opacity-50 aria-disabled:opacity-50"
       data-testid="share-card-share"
       {...state}
       aria-busy={busyAttribute(sharing)}
@@ -136,7 +136,7 @@ function ShareCardShareNote({ note }: { note: ShareFeedback | null }) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
   return (
     <p
-      className="mt-2 min-h-5 text-sm text-[color:var(--theme-card-text)]"
+      className="mt-2 min-h-5 text-sm text-theme-card-text"
       data-testid="share-card-feedback"
       aria-hidden="true"
     >
@@ -158,7 +158,7 @@ function ShareCardOpenButton({
       type="button"
       data-testid="share-card-open"
       onClick={(event) => onOpen(event.currentTarget)}
-      className="min-h-[44px] rounded border border-[#B28D46] px-4 text-sm text-[color:var(--lookbook-cream-ink)]"
+      className="min-h-11 rounded-md border border-line-strong px-4 text-sm text-ink"
     >
       {t('shareCard.title')}
     </button>
@@ -605,10 +605,10 @@ export function ShareCardDialog({
       {source.kind === 'community_post' && (
         <p className="mt-3 text-sm">{t('shareCard.photoPrivacyHelp')}</p>
       )}
-      <label className="my-3 flex min-h-[44px] items-center gap-3">
+      <label className="my-3 flex min-h-11 items-center gap-3">
         <input
           type="checkbox"
-          className="!h-5 !min-h-0 !w-5 !min-w-0 shrink-0 accent-[#B28D46]"
+          className="!h-5 !min-h-0 !w-5 !min-w-0 shrink-0 accent-ink"
           checked={watermark}
           disabled={saving.current}
           onChange={(event) => {
@@ -667,7 +667,7 @@ export function ShareCardDialog({
           <button
             ref={saveRef}
             type="button"
-            className="min-h-[44px] rounded bg-[var(--theme-card-text)] px-5 text-[color:var(--theme-card-bg)] disabled:opacity-50 aria-disabled:opacity-50"
+            className="min-h-11 rounded-md bg-theme-card-text px-5 text-theme-card-bg disabled:opacity-50 aria-disabled:opacity-50"
             data-testid="share-card-save"
             {...saveButtonState(changed, busy, saveUnavailable)}
             aria-busy={busyAttribute(downloadBusy)}
@@ -688,7 +688,7 @@ export function ShareCardDialog({
             <button
               ref={recoveryRef}
               data-testid="share-card-recovery"
-              className="min-h-[44px] px-3 aria-disabled:opacity-50"
+              className="min-h-11 px-3 aria-disabled:opacity-50"
               type="button"
               aria-disabled={busy || undefined}
               aria-busy={busy || undefined}
@@ -707,7 +707,7 @@ export function ShareCardDialog({
           )}
           <button
             type="button"
-            className="min-h-[44px] px-3"
+            className="min-h-11 px-3"
             data-testid="share-card-cancel"
             onClick={close}
           >

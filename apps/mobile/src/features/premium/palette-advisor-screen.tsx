@@ -974,13 +974,8 @@ export function PaletteAdvisorScreen() {
       testID="palette-advisor-screen"
       accessibilityLabel={t('commerce.premium.palette.sectionTitle')}
     >
-      <Text
-        accessibilityRole="header"
-        style={styles.title}
-        testID="palette-advisor-title"
-      >
-        {t('commerce.premium.palette.sectionTitle')}
-      </Text>
+      {/* Story CC-7.9 D6: the stack's AppTopBar carries the title; the labeled scroll view keeps
+        the section name, and the body repeats it in no heading of its own. */}
       <Text style={styles.body} testID="palette-advisor-intro">
         {t('commerce.premium.palette.intro')}
       </Text>
@@ -1076,16 +1071,15 @@ export function PaletteAdvisorScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 20, gap: 12 },
-  title: { fontSize: 28, fontWeight: '600' },
   panel: { gap: 8, paddingVertical: 8 },
   panelTitle: { fontSize: 18, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 20 },
   card: { gap: 8, paddingVertical: 12 },
   slotLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 },
   shadeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  swatch: { width: 20, height: 20, borderRadius: 10 },
+  swatch: { width: 20, height: 20, borderRadius: 8 },
   shadeName: { fontSize: 16, fontWeight: '600' },
-  sponsored: { gap: 6, paddingVertical: 8 },
+  sponsored: { gap: 8, paddingVertical: 8 },
   disclosure: { fontSize: 12, lineHeight: 18 },
   partnerLabel: { fontSize: 12 },
   offerTitle: { fontSize: 14, fontWeight: '600' },

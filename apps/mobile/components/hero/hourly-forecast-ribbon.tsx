@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { StyleSheet, ScrollView, Pressable, Platform } from 'react-native'
+import { StyleSheet, ScrollView, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
 import {
   type WeatherHourlyEntry,
@@ -8,6 +8,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { formatTemperature } from './weather-header'
 import { useHeroPalette } from './hero-theme'
+import { elevationStyle } from '@/src/theme/tokens'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/src/lib/i18n'
@@ -56,7 +57,7 @@ export function HourlyForecastRibbon({
           {Array.from({ length: 6 }).map((_, idx) => (
             <View
               key={idx}
-              style={[styles.skeletonItem, { backgroundColor: palette.skeleton }]}
+              style={[styles.skeletonItem, { backgroundColor: palette.cardMuted }]}
             />
           ))}
         </ScrollView>
@@ -74,17 +75,17 @@ export function HourlyForecastRibbon({
   return (
     <View style={styles.container} testID="hourly-forecast-ribbon">
       <View style={styles.headerRow}>
-        <Text style={[styles.title, { color: palette.text }]}>
+        <Text style={[styles.title, { color: palette.ink }]}>
           {t('hero.hourly_forecast', { defaultValue: 'Hourly Forecast' })}
         </Text>
         <Pressable
           onPress={handleToggle}
           accessibilityRole="button"
           aria-expanded={isExpanded}
-          style={[styles.toggleButton, { backgroundColor: palette.subtleSurface }]}
+          style={[styles.toggleButton, { backgroundColor: palette.card }]}
           testID="ribbon-expand-toggle"
         >
-          <Text style={[styles.toggleText, { color: palette.accentText }]}>
+          <Text style={[styles.toggleText, { color: palette.ink }]}>
             {isExpanded
               ? t('hero.collapse', { defaultValue: 'Collapse' })
               : t('hero.expand_hours', {
@@ -125,14 +126,14 @@ export function HourlyForecastRibbon({
               key={item.forecastAt || index}
               style={[
                 styles.itemCard,
-                { backgroundColor: palette.surface, borderColor: palette.divider },
+                { backgroundColor: palette.card, borderColor: palette.line },
               ]}
               testID="hourly-item"
               accessible
               accessibilityLabel={description}
             >
               <Text
-                style={[styles.hourText, { color: palette.mutedText }]}
+                style={[styles.hourText, { color: palette.inkMuted }]}
                 accessible={false}
               >
                 {formatHour(item.forecastAt)}
@@ -140,11 +141,14 @@ export function HourlyForecastRibbon({
               <Text style={styles.glyph} accessible={false} aria-hidden>
                 {glyph}
               </Text>
-              <Text style={[styles.tempText, { color: palette.text }]} accessible={false}>
+              <Text style={[styles.tempText, { color: palette.ink }]} accessible={false}>
                 {formatTemperature(item.temperature)}
               </Text>
               {precipPercent > 0 && (
-                <Text style={styles.precipText} accessible={false}>
+                <Text
+                  style={[styles.precipText, { color: palette.inkSoft }]}
+                  accessible={false}
+                >
                   {precipPercent}%
                 </Text>
               )}
@@ -172,13 +176,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    fontFamily: Platform.select({
-      ios: 'SF Pro Text',
-      android: 'Roboto',
-      web: 'Inter, "SF Pro Text", -apple-system, sans-serif',
-      default: 'System',
-    }),
-    color: '#111111',
   },
   toggleButton: {
     // Centered, so the 44-pt box no longer hangs below a top-aligned label.
@@ -188,7 +185,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.05)',
   },
   toggleText: {
     fontSize: 12,
@@ -200,55 +196,26 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     width: 70,
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E6E6ED',
     borderRadius: 8,
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: 'center',
     gap: 4,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 2,
-      },
-      android: {
-        elevation: 1,
-      },
-      web: {
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.08)',
-      },
-    }),
+    ...elevationStyle('card'),
   },
   hourText: {
-    fontSize: 11,
-    color: '#a3a3a3',
-    fontFamily: Platform.select({
-      ios: 'Space Grotesk Bold',
-      android: 'Space Grotesk Bold',
-      web: 'Space Grotesk, "SF Mono", monospace',
-      default: 'System',
-    }),
+    fontSize: 12,
+    fontWeight: '700',
   },
   glyph: {
     fontSize: 20,
   },
   tempText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#111111',
-    fontFamily: Platform.select({
-      ios: 'Space Grotesk',
-      android: 'Space Grotesk',
-      web: 'Space Grotesk, "SF Mono", monospace',
-      default: 'System',
-    }),
   },
   precipText: {
-    fontSize: 10,
-    color: '#2f95dc',
+    fontSize: 12,
     fontWeight: '600',
   },
   skeletonContainer: {
@@ -259,7 +226,6 @@ const styles = StyleSheet.create({
   skeletonItem: {
     width: 70,
     height: 90,
-    backgroundColor: '#E6E6ED',
     borderRadius: 8,
     marginRight: 8,
   },

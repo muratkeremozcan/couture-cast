@@ -80,12 +80,12 @@ function RitualShareCardSourcePicker() {
   const selected = outfits.find((outfit) => outfit.scenario === scenario)
   return (
     <div
-      className="rounded-lg border border-[color:var(--lookbook-cream-line)] bg-[var(--lookbook-cream)] p-4 text-[color:var(--lookbook-cream-ink)]"
+      className="border-t border-line pt-4 text-ink"
       data-testid="ritual-share-card-launcher"
     >
       <button
         type="button"
-        className="min-h-[44px] text-sm font-semibold text-[color:var(--lookbook-cream-ink)]"
+        className="min-h-11 text-sm font-semibold text-ink"
         disabled={busy}
         onClick={() => void activate()}
       >
@@ -105,7 +105,7 @@ function RitualShareCardSourcePicker() {
           <label className="text-sm">
             {t('shareCard.sourceOutfit')}
             <select
-              className="ml-2 min-h-[44px] rounded bg-[var(--lookbook-surface)] px-3"
+              className="ml-2 min-h-11 rounded-md border border-line-strong bg-page px-3 text-ink"
               value={scenario}
               onChange={(event) => setScenario(event.target.value)}
             >

@@ -261,15 +261,14 @@ describe('C-WEB-NO-WRITE: the page is read-only', () => {
 })
 
 describe('C-WEB-LINKS', () => {
-  it('links an alert to its case, an orphan id included, and links back to the queue', async () => {
+  // Story CC-7.9 D6: the way back to the queue is the route's top bar (moderation-shell.test.tsx).
+  it('links an alert to its case, an orphan id included, and leaves the way back to the top bar', async () => {
     serve(summary({ recentAlerts: [alert({ caseId: 'orphan-post.r_1-a' })] }))
     render(<ModerationSlaDashboard />)
     expect(
       await screen.findByRole('link', { name: openCaseName('orphan-post.r_1-a') })
     ).toHaveAttribute('href', '/moderation/cases/orphan-post.r_1-a')
-    expect(
-      screen.getByRole('link', { name: enUS.moderation.backToQueue })
-    ).toHaveAttribute('href', '/moderation')
+    expect(screen.queryByRole('link', { name: enUS.moderation.backToQueue })).toBeNull()
   })
 
   it('names each alert link after its case, and keeps the visible words in the name', async () => {
@@ -522,6 +521,7 @@ describe('C-WEB-A11Y', () => {
       })
     ).violations.map((violation) => violation.id)
 
+  // Story CC-7.9 D6: the route's top bar holds the h1, so every heading in the view is an h2.
   it.each([
     ['healthy', summary()],
     [
@@ -537,8 +537,8 @@ describe('C-WEB-A11Y', () => {
     const levels = screen
       .getAllByRole('heading')
       .map((heading) => Number(heading.tagName[1]))
-    expect(levels[0]).toBe(1)
-    for (const level of levels.slice(1)) expect(level).toBe(2)
+    expect(levels.length).toBeGreaterThan(0)
+    for (const level of levels) expect(level).toBe(2)
   })
 
   it('disabled has no violation', async () => {

@@ -28,6 +28,7 @@ vi.mock('../modules/accessibility-focus', () => ({
 import { ShareCardTabHeading } from './share-card-tab-heading'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { StyleSheet } from 'react-native'
+import { fontWeight, typeScale } from '@couture/utils'
 import { Text as ThemedText } from './themed'
 import { shareCardHeadingNode } from '@/src/lib/share-card-focus'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
@@ -84,7 +85,13 @@ describe('ShareCardTabHeading', () => {
     expect(props.allowFontScaling).toBeUndefined()
     expect(props.maxFontSizeMultiplier).toBeUndefined()
     expect(props.numberOfLines).toBe(1)
-    expect(StyleSheet.flatten(props.style)?.fontSize).toBe(20)
+    // Story CC-7.9 D6: AppTopBar's title style (type.lg, semibold), the same on both OSes.
+    expect(StyleSheet.flatten(props.style)).toMatchObject({
+      fontSize: typeScale.lg.fontSize,
+      lineHeight: typeScale.lg.lineHeight,
+      fontWeight: fontWeight.semibold,
+    })
+    expect(typeScale.lg).toMatchObject({ fontSize: 18, lineHeight: 28 })
     expect(shareCardHeadingNode('outfit')).toBe(71)
     expect(vi.mocked(safeFindNodeHandle).mock.calls.at(-1)?.[0]).toBe(heading)
   })

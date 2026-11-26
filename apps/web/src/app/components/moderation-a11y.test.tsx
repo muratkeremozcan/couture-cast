@@ -60,11 +60,12 @@ describe('C-WEB-Q-A11Y: the queue', () => {
     expect(await violations(view.container)).toEqual([])
   })
 
-  it('has one h1, then one h2 per case, and names every list and control', async () => {
+  // Story CC-7.9 D6: the route's top bar owns the page's one h1 (app/moderation/moderation-shell.test.tsx).
+  it('leaves the h1 to the top bar, has one h2 per case, and names every list and control', async () => {
     mockApi(queueHandler(() => json(page(items))))
     render(<ModerationQueueView />)
     await screen.findByRole('list', { name: 'Cases' })
-    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
+    expect(screen.queryAllByRole('heading', { level: 1 })).toEqual([])
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(2)
     expect(screen.getByRole('search', { name: 'Filter cases' })).toBeInTheDocument()
     for (const combobox of screen.getAllByRole('combobox'))
@@ -122,7 +123,7 @@ describe('C-WEB-Q-A11Y: the case view', () => {
   async function openDetail() {
     mockApi(detailHandler(() => json({ data: detail({ viewerConflict: true }) })))
     const view = render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
     return view
   }
 
@@ -167,15 +168,18 @@ describe('C-WEB-Q-A11Y: the case view', () => {
   ])('has no axe violation with findings: %s', async (_label, findings) => {
     mockApi(detailHandler(() => json({ data: detail({ findings }) })))
     const view = render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
     expect(view.container.querySelectorAll('dl > p')).toHaveLength(0)
     expect(await violations(view.container)).toEqual([])
   })
 
-  it('gives each section a heading name and keeps the h1 first and focusable by script', async () => {
+  it('gives each section a heading name and keeps the case title first and focusable by script', async () => {
     await openDetail()
-    const h1 = screen.getByRole('heading', { level: 1 })
-    expect(h1).toHaveAttribute('tabindex', '-1')
+    // Story CC-7.9 D6: the route's top bar holds the h1, so the case title is the view's first h2.
+    const title = screen.getByRole('heading', { level: 2, name: 'Post case' })
+    expect(title).toHaveAttribute('tabindex', '-1')
+    expect(screen.getAllByRole('heading')[0]).toBe(title)
+    expect(screen.queryAllByRole('heading', { level: 1 })).toEqual([])
     const names = screen
       .getAllByRole('region')
       .map((region) => region.getAttribute('aria-labelledby'))
@@ -198,10 +202,10 @@ describe('C-WEB-Q-A11Y: the case view', () => {
     for (const region of live) expect(region.textContent).not.toMatch(/left|over/)
   })
 
-  it('tabs from the back link to Reload before any content link or control', async () => {
+  // Story CC-7.9 D6: the way back to the queue is the route's top bar, ahead of the view.
+  it('tabs to Reload before any content link or control', async () => {
     await openDetail()
-    await userEvent.tab()
-    expect(document.activeElement).toHaveAccessibleName('Back to queue')
+    expect(screen.queryByRole('link', { name: 'Back to queue' })).toBeNull()
     await userEvent.tab()
     expect(document.activeElement).toHaveAccessibleName('Reload case')
   })
@@ -222,7 +226,7 @@ describe('C-WEB-Q-A11Y: the case view', () => {
       )
     )
     render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('heading', { level: 1 })
+    await screen.findByRole('heading', { level: 2, name: 'Post case' })
     expect(screen.getByText('The image link expired.')).toBeInTheDocument()
     const names = screen.getAllByRole('button').map((button) => button.textContent)
     expect(names).toEqual(['Reload case', 'Reload image'])

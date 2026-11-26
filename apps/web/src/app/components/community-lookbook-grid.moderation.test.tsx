@@ -17,9 +17,9 @@ import {
   FEED_PATH,
   REPORT_PATH,
   WITHDRAW_PATH,
-  MERLOT,
-  MERLOT_INK,
-  GOLD,
+  MERLOT_INK_CLASS,
+  MERLOT_LINE_CLASS,
+  GOLD_CLASSES,
   item,
   authorState,
   feedBody,
@@ -227,23 +227,16 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       const badge = await screen.findByTestId('status-badge-as-flagged')
-      // jsdom keeps the token as declared but cannot resolve a var() border for toHaveStyle, so
-      // the inline declaration is read directly.
-      expect({ color: badge.style.color, borderColor: badge.style.borderColor }).toEqual({
-        color: MERLOT_INK,
-        borderColor: MERLOT_INK,
-      })
-      expect(badge).not.toHaveStyle({ color: GOLD })
-      expect(screen.getByTestId('author-state-explanation-as-flagged')).toHaveStyle({
-        color: MERLOT_INK,
-      })
+      // Story CC-7.9 D2: merlot is the `merlotInk` token role, painted by class.
+      expect(badge).toHaveClass(MERLOT_INK_CLASS, MERLOT_LINE_CLASS)
+      for (const gold of GOLD_CLASSES) expect(badge).not.toHaveClass(gold)
+      expect(screen.getByTestId('author-state-explanation-as-flagged')).toHaveClass(
+        MERLOT_INK_CLASS
+      )
       // Merlot is reserved for the destructive state, so a withdrawal is neutral.
-      expect(screen.getByTestId('status-badge-as-withdrawn')).not.toHaveStyle({
-        color: MERLOT_INK,
-      })
-      expect(screen.getByTestId('status-badge-as-withdrawn')).not.toHaveStyle({
-        color: MERLOT,
-      })
+      const withdrawn = screen.getByTestId('status-badge-as-withdrawn')
+      expect(withdrawn).not.toHaveClass(MERLOT_INK_CLASS)
+      expect(withdrawn).not.toHaveClass(MERLOT_LINE_CLASS)
     })
 
     it('6.1-WEB-022 badges a non-published row inside the grid too', async () => {
@@ -541,7 +534,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(notice).toHaveTextContent(
         'We could not withdraw this look. It is still in the feed.'
       )
-      expect(notice).toHaveStyle({ color: MERLOT_INK })
+      expect(notice).toHaveClass(MERLOT_INK_CLASS)
       expect(notice).not.toHaveTextContent('withdraw transaction rolled back')
       expect(screen.getByTestId('lookbook-card-self-post')).toBeInTheDocument()
       expect(feedCalls).toBe(1)
