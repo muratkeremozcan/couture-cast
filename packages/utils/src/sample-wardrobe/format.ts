@@ -1,5 +1,6 @@
 // Story 6.16: turns a policy result into words with the shared strings, so web and
 // mobile say exactly the same thing for the same state.
+import { getRainProbThreshold } from '../comfort-rules'
 import type { SampleExplanation } from './selector'
 import type { SampleCatalog, SampleGarment, SampleLook } from './types'
 import {
@@ -39,6 +40,12 @@ export function formatSampleTemperature(
   return resolveGuestPreviewLocale(locale) === 'en-US'
     ? `${Math.round((celsius * 9) / 5 + 32)}°F`
     : `${Math.round(celsius)}°C`
+}
+
+export function formatRainChance(percent: number, strings: GuestPreviewStrings): string {
+  const { none, possible, likely } = strings.values.rainChance
+  if (percent <= 0) return none
+  return percent < 50 ? possible : likely
 }
 
 const slug = (id: string) => id.slice('sample:x:'.length)
@@ -93,12 +100,19 @@ export function formatSampleExplanation(
   const look = catalog.looks.find((entry) => entry.id === p.lookId)
   const temperature = (value: string | number | undefined) =>
     typeof value === 'number' ? formatSampleTemperature(value, locale) : ''
+  const rainSetting = (['high', 'medium', 'low'] as const).find(
+    (setting) =>
+      Math.round(getRainProbThreshold(setting) * 100) === p.rainThresholdPercent
+  )
   return formatPreviewString(strings.explanation[item.key], {
     ...p,
     weather: pick(values.weather, p.weather),
     feelsLike: temperature(p.feelsLike),
     adjustedFeelsLike: temperature(p.adjustedFeelsLike),
     threshold: temperature(p.threshold),
+    rainPercent:
+      typeof p.rainPercent === 'number' ? formatRainChance(p.rainPercent, strings) : '',
+    rainThresholdPercent: rainSetting ? values.precipPreparedness[rainSetting] : '',
     range: pick(values.range, p.range),
     runsColdWarm: pick(values.range, p.runsColdWarm),
     category: pick(values.category, p.category),

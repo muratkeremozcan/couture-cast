@@ -1244,7 +1244,7 @@ describe('7.12 Looks Plan segment (D10, D11)', () => {
     render(<LooksPage />)
 
     expect(screen.getByTestId('plan-free-preview')).toHaveTextContent(
-      'Premium plans your whole week around your forecast.'
+      'With Premium, you can plan what to wear all week.'
     )
     const upgrades = screen.getAllByTestId('plan-upgrade')
     expect(upgrades).toHaveLength(1)

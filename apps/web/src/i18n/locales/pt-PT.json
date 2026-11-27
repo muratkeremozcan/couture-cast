@@ -400,12 +400,12 @@
     "onboarding": {
       "title": "Configura o teu roupeiro",
       "garmentFallback": "Peça {{position}}",
-      "permissionTitle": "Permite o acesso à câmara e às fotos",
+      "permissionTitle": "Permitir acesso",
       "permissionAction": "Permite o acesso à câmara e às fotos",
-      "permissionBody": "A CoutureCast precisa de acesso à câmara ou à galeria para captar as tuas peças.",
-      "permissionDenied": "Não conseguimos aceder à tua câmara ou às tuas fotos. Ainda podes importar ficheiros ou usar o roupeiro inicial.",
-      "useStarterWardrobe": "Usar roupeiro inicial",
-      "addAnother": "Adicionar outra peça",
+      "permissionBody": "Dá acesso à câmara ou às fotos para adicionares uma peça.",
+      "permissionDenied": "Não conseguimos abrir a câmara nem as fotos. Escolhe um ficheiro ou experimenta o armário de exemplo.",
+      "useStarterWardrobe": "Usar armário de exemplo",
+      "addAnother": "Adicionar uma peça",
       "continue": "Continuar",
       "back": "Voltar",
       "checklistTagged": "{{garment}}: etiquetas confirmadas",
@@ -423,9 +423,9 @@
         "garmentTagged": "{{garment}} etiquetada."
       },
       "errors": {
-        "loadFailed": "Não é possível carregar o teu progresso de configuração.",
-        "saveFailed": "Não é possível guardar esta etapa. Tenta novamente.",
-        "stale": "Esta etapa foi alterada noutro sítio. Consulta a versão mais recente e tenta novamente."
+        "loadFailed": "Não conseguimos ver onde ficaste.",
+        "saveFailed": "Não conseguimos guardar este passo. Tenta outra vez.",
+        "stale": "Este passo mudou. Vê os novos dados e tenta outra vez."
       }
     },
     "silhouette": {
@@ -540,20 +540,20 @@
       "categoryAll": "Todas",
       "categoryFilters": "Filtrar por categoria",
       "setupProgress": "{{completed}} de {{total}} passos concluídos",
-      "loading": "A carregar o teu roupeiro...",
-      "emptyTitle": "Ainda não adicionaste peças",
-      "emptyBody": "Tira uma fotografia ao teu casaco, top ou vestido favorito para começar.",
-      "emptyAction": "Fotografar ou importar peça",
-      "accountFailed": "Não foi possível carregar a tua conta, por isso as definições de silhueta estão indisponíveis de momento. Recarrega a página para tentares novamente.",
-      "accountFailedShort": "Não foi possível carregar a tua conta. Recarrega a página para tentares novamente.",
-      "setupFailed": "Não foi possível verificar o progresso da configuração do teu roupeiro.",
+      "loading": "A carregar o teu armário",
+      "emptyTitle": "Ainda sem peças",
+      "emptyBody": "Tira uma fotografia de uma peça que usas.",
+      "emptyAction": "Adiciona uma foto",
+      "accountFailed": "A tua conta não carregou. Atualiza a página para mudar as opções de ajuste.",
+      "accountFailedShort": "A tua conta não carregou. Atualiza a página.",
+      "setupFailed": "Ainda não conseguimos ver como vai a preparação do teu armário.",
       "addGarment": "+ Adicionar peça",
       "closetTitle": "O teu roupeiro digital",
       "closetBody": "Fotografa ou carrega as tuas peças para receberes sugestões de tempo personalizadas.",
       "needsTags": "Faltam etiquetas",
-      "taggingSlow": "A etiquetagem inteligente está a demorar mais do que o esperado. A peça continua visível enquanto o processamento continua.",
-      "statusRefreshFailed": "Não foi possível atualizar o estado da peça.",
-      "refreshFailed": "Não foi possível atualizar o teu roupeiro.",
+      "taggingSlow": "As etiquetas estão a demorar. Ainda podes ver a tua peça.",
+      "statusRefreshFailed": "Não conseguimos voltar a verificar esta peça.",
+      "refreshFailed": "Não conseguimos atualizar o teu armário.",
       "silhouetteSaving": "A guardar as alterações. Aguarda.",
       "status": {
         "pending_upload": "A enviar",
@@ -651,7 +651,7 @@
     "calm": {
       "post": "Publicar",
       "nearYou": "Perto de ti",
-      "climateEmpty": "Ainda não há looks para o teu clima",
+      "climateEmpty": "Ainda não há conjuntos para o teu tempo",
       "seeAllClimates": "Ver todos os climas",
       "cardActions": "Opções da publicação",
       "dismissChallenge": "Ocultar desafio",
@@ -667,8 +667,8 @@
       "invalid": "Esta ligação é inválida, expirou ou já não está disponível."
     },
     "filters": {
-      "label": "Filtros da comunidade",
-      "explainer": "Os filtros de clima agrupam os visuais pela previsão da semana no local guardado de quem os partilha, de frio e húmido a quente e seco.",
+      "label": "Filtrar conjuntos",
+      "explainer": "Juntamos os looks pelo tempo da semana na zona que cada pessoa guardou.",
       "announce": "A mostrar visuais de {{filter}}.",
       "mode": {
         "auto": "O seu clima",
@@ -789,7 +789,7 @@
     },
     "report": {
       "title": "Denunciar este visual",
-      "description": "Ajude a manter a comunidade segura. Escolha um motivo e a moderação irá analisá-lo.",
+      "description": "Escolhe um motivo. A nossa equipa vai ver a tua denúncia.",
       "reasonLabel": "Motivo da denúncia",
       "detailsLabel": "Mais detalhes (opcional)",
       "detailsPlaceholder": "Descreva como este visual infringe as regras da comunidade",
@@ -818,9 +818,9 @@
       "changePhoto": "Mudar a fotografia",
       "preview": "Pré-visualização do visual que vai partilhar",
       "altLabel": "Descrição da imagem",
-      "altHint": "Descreva as peças, as camadas e as cores para os membros que usam um leitor de ecrã.",
-      "altPlaceholder": "Descreva as peças, as camadas e as cores",
-      "altSuggested": "Sugerimos uma descrição. Edite-a para corresponder à sua fotografia.",
+      "altHint": "Diz a quem usa um leitor de ecrã o que tens vestido. Indica as peças e as cores.",
+      "altPlaceholder": "Indica as peças e as cores",
+      "altSuggested": "Aqui vai uma ideia. Muda as palavras para combinar com a tua foto.",
       "altConfirm": "Confirmo que esta descrição corresponde à fotografia",
       "titleLabel": "Título (opcional)",
       "suggestDescription": "Sugerir uma descrição com base na foto",
@@ -966,9 +966,9 @@
       "sendCode": "Enviar código de acesso",
       "verify": "Verificar código",
       "codeSent": "Consulte o seu e-mail para obter o código de acesso.",
-      "signinDenied": "Nenhuma conta CoutureCast pode iniciar sessão com este e-mail. Verifique o endereço e tente novamente.",
-      "signinUnavailable": "O início de sessão está temporariamente indisponível. Tente novamente dentro de momentos.",
-      "signinCodeInvalid": "O código está incorreto ou expirou. Verifique o seu e-mail ou peça um novo código.",
+      "signinDenied": "Não podes entrar com este e-mail. Confirma o endereço e tenta outra vez.",
+      "signinUnavailable": "Agora não podes entrar. Tenta outra vez daqui a pouco.",
+      "signinCodeInvalid": "O código está errado ou expirou. Vê o teu e-mail ou pede outro código.",
       "signout": "Terminar sessão",
       "deviceSettings": "Abrir definições do dispositivo",
       "back": "Voltar à comunidade",
@@ -1056,8 +1056,8 @@
       "off": "Desativadas",
       "learnMore": "Saber mais",
       "languageHelp": "O teu navegador define o idioma.",
-      "browserLanguageHelp": "Altera o idioma preferido nas definições do navegador e volta a carregar o CoutureCast.",
-      "aboutHelp": "Planeia os teus conjuntos de acordo com o tempo e organiza o teu guarda-roupa.",
+      "browserLanguageHelp": "Muda o idioma no navegador. Depois volta a carregar a página.",
+      "aboutHelp": "Vê o que vestir e organiza a tua roupa.",
       "themeHelp": "Escolhe as cores da aplicação.",
       "privacy": "Política de privacidade",
       "terms": "Termos de serviço",
@@ -1097,8 +1097,8 @@
       "outfitDetails": "Detalhes do visual",
       "sampleLook": "Visual de exemplo",
       "editSample": "Editar o exemplo",
-      "addFirstPiece": "Adicione a sua primeira peça",
-      "weatherUnavailable": "Previsão meteorológica indisponível",
+      "addFirstPiece": "Adiciona uma peça",
+      "weatherUnavailable": "Ainda sem previsão",
       "recentPieces": "Peças recentes",
       "conditions": {
         "clear": "Céu limpo",
@@ -1122,7 +1122,7 @@
       "linkLabel": "Visual em destaque em {{label}} de {{author}}, {{count}} reações. Abre os Destaques da cidade.",
       "linkLabel_one": "Visual em destaque em {{label}} de {{author}}, {{count}} reação. Abre os Destaques da cidade.",
       "linkLabel_other": "Visual em destaque em {{label}} de {{author}}, {{count}} reações. Abre os Destaques da cidade.",
-      "cta": "Ver nos Destaques da cidade"
+      "cta": "Ver conjunto"
     }
   },
   "landing": {
@@ -1205,12 +1205,12 @@
     }
   },
   "shareCard": {
-    "launcher": "Criar o meu cartão de look",
+    "launcher": "Criar cartão",
     "sourceOutfit": "Look",
     "sourceCommunity": "Look da comunidade",
     "title": "O seu cartão",
-    "previewDescription": "Pré-visualização do seu cartão CoutureCast",
-    "photoPrivacyHelp": "A sua fotografia permanece visível, incluindo nomes e matrículas na imagem. Verifique a pré-visualização antes de guardar.",
+    "previewDescription": "Pré-visualização do teu cartão",
+    "photoPrivacyHelp": "A tua fotografia fica no cartão. Os nomes e as placas da fotografia também ficam visíveis. Vê o cartão antes de o guardares.",
     "preparing": "A preparar o cartão",
     "watermark": "Mostrar marca de água",
     "save": "Guardar nas Fotografias",
@@ -1235,16 +1235,16 @@
     "nativeSaveUnavailable": "Atualize a aplicação para guardar fotografias.",
     "permissionDenied": "O acesso às fotografias foi negado. Tente novamente quando pretender.",
     "permissionPermanent": "Permita guardar fotografias nas definições.",
-    "sourceUnavailable": "Esta fonte está indisponível.",
+    "sourceUnavailable": "Não foi possível abrir este conjunto.",
     "previewChanged": "O cartão foi alterado. Atualize a pré-visualização antes de guardar.",
     "offline": "Ligue-se à Internet para preparar um cartão.",
-    "storage": "Não foi possível guardar. Verifique o espaço disponível e tente novamente.",
-    "render": "Não foi possível preparar o cartão. Tente novamente.",
+    "storage": "Liberta espaço. Depois tenta outra vez.",
+    "render": "Não foi possível criar o teu cartão. Tenta outra vez.",
     "unknown": "Ocorreu um erro. Tente novamente.",
     "scenarios": {
-      "morning": "Manhã",
+      "morning": "Antes das aulas",
       "midday": "Meio-dia",
-      "evening": "Noite"
+      "evening": "Para sair"
     },
     "climateBands": {
       "cold_dry": "Frio e seco",
@@ -1676,9 +1676,9 @@
     "reopen": "Reabrir",
     "remove": "Remover",
     "missingPiece": "Peça em falta",
-    "missingPieceDetail": "Uma peça deste conjunto guardado já não está no seu guarda-roupa.",
+    "missingPieceDetail": "Uma peça deste conjunto já não está no teu roupeiro.",
     "needsReview": "Requer revisão",
-    "needsReviewDetail": "Alterou as etiquetas de uma peça neste conjunto. Reveja para confirmar que ainda resulta.",
+    "needsReviewDetail": "Mudaste uma etiqueta de uma peça. Vê se o conjunto ainda funciona para ti.",
     "photoUnavailable": "Fotografia indisponível",
     "loadFailed": "Não foi possível carregar os seus conjuntos guardados.",
     "retry": "Tentar novamente",
@@ -1789,7 +1789,7 @@
     },
     "freePlan": {
       "week": "Semana de exemplo",
-      "line": "O Premium planeia a tua semana inteira com base na previsão do tempo.",
+      "line": "Com Premium podes planear o que vestir a semana toda.",
       "upgrade": "Aderir ao Premium"
     },
     "loadMore": "Mostrar mais"

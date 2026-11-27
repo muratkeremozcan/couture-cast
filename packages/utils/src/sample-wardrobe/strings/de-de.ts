@@ -3,14 +3,14 @@ import type { GuestPreviewStrings } from './en-us'
 
 export const deDE: GuestPreviewStrings = {
   styleIdeas: {
-    heading: 'Stilvorlieben (optional)',
+    heading: 'Wähle deinen Stil (freiwillig)',
     style: 'Stil',
-    palette: 'Farbpalette',
+    palette: 'Farben',
     texture: 'Textur',
     any: 'Beliebig',
-    active: 'Sportlich und alltagstauglich',
-    chic: 'Lässig und schick',
-    cozy: 'Gemütlich und elegant',
+    active: 'Sportlich',
+    chic: 'Schick',
+    cozy: 'Gemütlich',
     neutral: 'Neutral',
     colorful: 'Farbenfroh',
     smooth: 'Glatt',
@@ -19,40 +19,40 @@ export const deDE: GuestPreviewStrings = {
     update: 'Gespeichertes Outfit aktualisieren',
     saved: 'Auf diesem Gerät gespeichert',
     remove: '{look} entfernen',
-    illustrations: 'Kleidungsillustrationen',
-    inspiration: 'Beispielideen',
+    illustrations: 'Zeichnungen von Kleidung',
+    inspiration: 'Outfitideen',
   },
   firstUse: {
     cleanupFallback:
-      'Der Hintergrund bleibt erhalten, weil das Kleidungsstück nicht sicher freigestellt werden konnte.',
+      'Der Hintergrund bleibt auf deinem Foto. Wir konnten das Teil nicht ausschneiden.',
     replaceGarment: 'Anderes Foto wählen',
     discardPhoto: 'Dieses Foto verwerfen?',
     keepEditing: 'Weiter bearbeiten',
     discard: 'Verwerfen',
     today: 'Dein heutiges Outfit',
-    addGarment: 'Ein Kleidungsstück hinzufügen',
+    addGarment: 'Teil hinzufügen',
     setCity: 'Stadt festlegen',
     wardrobeFailed: 'Deine Garderobe konnte nicht geladen werden.',
     staleWardrobe:
       'Gespeicherte Kleidungsstücke werden angezeigt. Aktualisierung fehlgeschlagen.',
-    backToOutfit: 'Zurück zum heutigen Outfit',
-    checkGarment: 'Status prüfen',
-    backToWardrobe: 'Zurück zur Garderobe',
+    backToOutfit: 'Zurück zum Outfit',
+    checkGarment: 'Teil prüfen',
+    backToWardrobe: 'Zum Kleiderschrank',
     outfitFailed: 'Das heutige Outfit konnte nicht geladen werden.',
-    sampleEntry: 'Ein Beispieloutfit ausprobieren',
+    sampleEntry: 'Beispieloutfits testen',
     outfitIdea: 'Outfitidee',
   },
   chrome: {
-    entry: 'Beispielgarderobe ausprobieren',
+    entry: 'Beispieloutfits testen',
     exampleLabel: 'Beispiel',
     welcomeHeading: 'Outfits für das Wetter von heute',
     welcomeBody:
-      'Probieren Sie zuerst eine Beispielgarderobe aus oder melden Sie sich an, um Outfits aus Ihrem eigenen Kleiderschrank zu sehen.',
+      'Probiere ein paar Beispieloutfits. Melde dich an, um Outfits aus deinem Schrank zu sehen.',
     sampleLabel:
-      'Beispielgarderobe. Beispielwetter und Beispieloutfits, nicht Ihr Kleiderschrank und keine Live-Vorhersage.',
-    supporting: 'Ändern Sie eine Einstellung, um zu sehen, wie dieses Beispiel reagiert.',
+      'Das sind Beispieloutfits und Beispielwetter. Dein Schrank und das aktuelle Wetter bleiben getrennt.',
+    supporting: 'Probiere eine neue Einstellung.',
     conversion:
-      'Erstellen Sie ein Konto, um Ihre Kleidung hinzuzufügen. Nach der Anmeldung können Sie Ihre Komforteinstellungen speichern. Beispielteile und Likes aus der Vorschau bleiben in dieser Vorschau.',
+      'Erstelle ein Konto, um deine Kleidung hinzuzufügen. Nach der Anmeldung kannst du deine Wettereinstellungen behalten. Deine Beispielteile und Likes bleiben hier.',
     createAccount: 'Konto erstellen',
     signIn: 'Anmelden',
     openWardrobe: 'Ihren Kleiderschrank öffnen',
@@ -63,7 +63,7 @@ export const deDE: GuestPreviewStrings = {
     connectionNeeded: 'Für die Kontoerstellung ist eine Internetverbindung nötig.',
     navLabel: 'Bereiche der Vorschau',
     navOutfit: 'Outfit',
-    navWardrobe: 'Beispielgarderobe',
+    navWardrobe: 'Beispielschrank',
     navPreferences: 'Einstellungen',
     close: 'Schließen',
     checkingSession: 'Sitzung wird geprüft…',
@@ -72,12 +72,12 @@ export const deDE: GuestPreviewStrings = {
     retry: 'Erneut versuchen',
   },
   gate: {
-    heading: 'Bevor Sie die Beispielgarderobe ausprobieren',
-    body: 'Geben Sie Ihr Geburtsdatum ein. Es wird nur auf diesem Gerät geprüft und weder gespeichert noch gesendet.',
+    heading: 'Prüfe dein Alter',
+    body: 'Gib dein Geburtsdatum ein. Nur dieses Gerät prüft es. Die App speichert und sendet es nicht.',
     field: 'Geburtsdatum (YYYY-MM-DD)',
     submit: 'Weiter',
     selfReported:
-      'Dies ist eine Altersprüfung per Selbstauskunft, keine Identitätsprüfung.',
+      'Wir verwenden das Alter, das du angibst. Wir prüfen deinen Ausweis nicht.',
     underage: 'Sie müssen mindestens 13 Jahre alt sein',
     invalid: 'Geben Sie Ihr Geburtsdatum im Format YYYY-MM-DD ein',
     exit: 'Zur Startseite',
@@ -87,35 +87,32 @@ export const deDE: GuestPreviewStrings = {
     whyThisWorks: 'Darum passt es',
     tryAnother: 'Anderen Look ausprobieren',
     noAlternative:
-      'Dies ist der einzige Beispiellook, der zu diesen Einstellungen passt. Probieren Sie ein anderes Wetterbeispiel oder eine andere Komforteinstellung.',
-    browseWardrobe: 'Beispielgarderobe durchsehen',
+      'Nur dieses Outfit passt. Probiere anderes Wetter oder ändere eine Einstellung.',
+    browseWardrobe: 'Beispielschrank ansehen',
     swap: '{category} tauschen',
     swapTitle: '{category} auswählen',
     current: 'Aktuell',
-    noSuitableAlternative: 'Keine passende Alternative in dieser Beispielgarderobe.',
+    noSuitableAlternative: 'Kein anderes Teil passt zu diesem Outfit.',
     undoSwaps: 'Tausch rückgängig machen',
     swapped: 'Jetzt im Outfit: {garment}.',
     updated: 'Outfit aktualisiert: {look}.',
-    allDisliked:
-      'Sie haben jeden Look, der zu diesen Einstellungen passt, als „Nicht für mich“ markiert.',
-    noEligible:
-      'Kein Beispiellook in dieser Kollektion passt zu diesen Einstellungen. Probieren Sie eine andere Kollektion oder ein anderes Wetterbeispiel.',
+    allDisliked: 'Du hast bei allen passenden Outfits „Nicht für mich“ gewählt.',
+    noEligible: 'Kein Outfit passt. Wähle eine andere Gruppe oder ändere das Wetter.',
     reviewChoices: 'Auswahl prüfen',
     resetChoices: 'Auswahl zurücksetzen',
   },
   preferences: {
-    heading: 'Einstellungen',
+    heading: 'Deine Einstellungen',
     weather: 'Beispielwetter',
-    weatherDetail:
-      'Beispiel: gefühlt {temperature}, Wind {windSpeed} m/s, {rainPercent}% Regenwahrscheinlichkeit.',
-    thermal: 'Wärmeempfinden',
-    wind: 'Windtoleranz',
-    rain: 'Regenvorsorge',
+    weatherDetail: 'Gefühlt {temperature}. Wind: {windSpeed} m/s. {rainPercent}.',
+    thermal: 'Wie warm du es magst',
+    wind: 'Wie du Wind empfindest',
+    rain: 'Wann du dich auf Regen einstellst',
     collection: 'Kollektion',
   },
   feedback: {
-    heading: 'Beispiellooks bewerten (optional)',
-    body: 'Likes rücken einen Look nach oben. Als „Nicht für mich“ markierte Looks werden übersprungen, bis Sie die Markierung entfernen.',
+    heading: 'Sag, was dir gefällt',
+    body: 'Outfits, die dir gefallen, rücken nach oben. Mit „Nicht für mich“ blendest du sie aus, bis du deine Auswahl löschst.',
     like: 'Gefällt mir',
     dislike: 'Nicht für mich',
     progress: '{reviewed} von {total} bewertet',
@@ -124,7 +121,7 @@ export const deDE: GuestPreviewStrings = {
     skip: 'Vorerst überspringen',
   },
   wardrobe: {
-    heading: 'Beispielgarderobe',
+    heading: 'Beispielschrank',
     category: 'Kategorie',
     allCategories: 'Alle',
     details: 'Details',
@@ -139,7 +136,7 @@ export const deDE: GuestPreviewStrings = {
     count: '{count} Beispielteile',
   },
   conversionDetail: {
-    garmentHeading: 'Füge ein eigenes Kleidungsstück hinzu',
+    garmentHeading: 'Deine Kleidung hinzufügen',
     canSave: 'Nach der Anmeldung speicherbar',
     canSaveBody: 'Ihre drei Komforteinstellungen.',
     previewOnly: 'Nur in der Vorschau',
@@ -148,14 +145,14 @@ export const deDE: GuestPreviewStrings = {
     stillRequired: 'Weiterhin erforderlich',
     stillRequiredBody: 'Kontoeinrichtung und bestätigte Anmeldung.',
     backToPreview: 'Zurück zur Vorschau',
-    signInToContinue: 'Zum Fortfahren anmelden',
+    signInToContinue: 'Anmelden',
   },
   review: {
-    heading: 'Diese Komforteinstellungen übernehmen?',
+    heading: 'Diese Einstellungen behalten?',
     account: 'Ihr Konto',
     proposed: 'Aus der Vorschau',
     use: 'Vorschau-Einstellungen übernehmen',
-    keep: 'Kontoeinstellungen behalten',
+    keep: 'Meine Einstellungen behalten',
     saving: 'Wird gespeichert…',
     saved: 'Ihre Komforteinstellungen sind gespeichert.',
     kept: 'Ihre Kontoeinstellungen sind unverändert.',
@@ -167,6 +164,11 @@ export const deDE: GuestPreviewStrings = {
     continue: 'Weiter',
   },
   values: {
+    rainChance: {
+      none: 'Kein Regen in Sicht',
+      possible: 'Es kann regnen',
+      likely: 'Es regnet wohl',
+    },
     runsColdWarm: {
       cold: 'Mir ist oft kalt',
       neutral: 'Etwa durchschnittlich',
@@ -252,14 +254,14 @@ export const deDE: GuestPreviewStrings = {
     'layer-wind':
       '{garment}: hält Wind mit {windSpeed} m/s ab, mehr als Ihre Toleranz von {windThreshold} m/s.',
     'layer-rain':
-      '{garment}: hält Sie bei {rainPercent}% Regenwahrscheinlichkeit trocken, mehr als Ihre {rainThresholdPercent}%.',
+      '{rainPercent}. Deine Regeneinstellung: {rainThresholdPercent}. {garment} hält dich trocken.',
     'no-layer': 'Es ist {range} genug, um auf eine Außenschicht zu verzichten.',
     'layer-unavailable':
       'Diese Beispielgarderobe hat keine Außenschicht mit dem Schutz, den dieses Wetter braucht.',
     'wind-within':
       'Wind mit {windSpeed} m/s liegt innerhalb Ihrer Toleranz von {windThreshold} m/s.',
     'rain-within':
-      'Eine Regenwahrscheinlichkeit von {rainPercent}% liegt innerhalb Ihrer {rainThresholdPercent}%.',
+      '{rainPercent}. Deine Regeneinstellung: {rainThresholdPercent}. Du brauchst keine Regenkleidung.',
     'liked-first': 'Ihnen gefällt {look}, daher kommt dieser Look zuerst.',
     'stale-selection':
       'Ihr vorheriger Look passt nicht mehr zu diesen Einstellungen, daher wird {look} gezeigt.',
@@ -432,16 +434,17 @@ export const deDE: GuestPreviewStrings = {
       description: 'Merinopullover, Wollhose und Lederstiefel.',
     },
     'weekend-flannel': {
-      name: 'Wochenend-Flanell',
-      description: 'Flanellhemd, Indigo-Jeans, Lederstiefel und Mütze.',
+      name: 'Wochenend-Outfit',
+      description:
+        'Ein Flanellhemd, dunkle Jeans, Stiefel und eine Mütze fürs Wochenende.',
     },
     'soft-pleats': {
       name: 'Weiche Falten',
       description: 'Zopfstrickpullover, Faltenrock und Stiefeletten.',
     },
     'office-oxford': {
-      name: 'Oxford im Büro',
-      description: 'Oxfordhemd, Indigo-Jeans und Loafer.',
+      name: 'Schultag',
+      description: 'Ein Hemd mit Knöpfen, dunkle Jeans und Loafer für die Schule.',
     },
     'silk-midi': {
       name: 'Seide und Midi',
@@ -461,7 +464,7 @@ export const deDE: GuestPreviewStrings = {
     },
     'wrap-day': {
       name: 'Wickeltag',
-      description: 'Wickelkleid, Loafer und Canvas-Tasche.',
+      description: 'Ein Wickelkleid, Loafer und eine Tasche zum Ausgehen.',
     },
     'court-polo': {
       name: 'Tennis-Polo',

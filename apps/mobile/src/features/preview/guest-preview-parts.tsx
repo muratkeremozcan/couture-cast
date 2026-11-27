@@ -15,6 +15,7 @@ import {
   colorRoles,
   evaluateGuestPreviewGate,
   formatPreviewString,
+  formatRainChance,
   formatSampleExplanation,
   formatSampleTemperature,
   hasAppliedSampleSwaps,
@@ -530,7 +531,7 @@ export function PreviewControls({
         {formatPreviewString(strings.preferences.weatherDetail, {
           temperature: formatSampleTemperature(weather.feelsLike, locale),
           windSpeed: weather.windSpeed,
-          rainPercent: Math.round(weather.precipitationProbability * 100),
+          rainPercent: formatRainChance(weather.precipitationProbability * 100, strings),
         })}
       </Text>
       <ChoiceGroup

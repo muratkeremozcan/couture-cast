@@ -1,0 +1,24 @@
+# Learning path Step 74: Teen voice and copy.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+# The caller sets German, the 320 dp viewport and 2.0 font scale.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: 'tab-looks'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'looks-segment-plan'
+    timeout: 15000
+- tapOn:
+    id: 'looks-segment-plan'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'plan-free-preview'
+    timeout: 15000
+- assertVisible: 'Mit Premium kannst du deine Outfits für die ganze Woche planen.'
+- assertVisible:
+    id: 'plan-upgrade'
+- takeScreenshot:
+    path: maestro/artifacts/teen-voice-accessibility/${SCHEME}-looks-de-large

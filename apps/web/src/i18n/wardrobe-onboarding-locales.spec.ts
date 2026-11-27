@@ -133,8 +133,6 @@ describe('4.4 wardrobe onboarding & silhouette locale parity', () => {
     expect(tree.title).toBe('Set up your closet')
     expect(tree.checklistTagged).toBe('{{garment}}: tags confirmed')
     const errors = tree.errors as Record<string, unknown>
-    expect(errors.stale).toBe(
-      'This step changed elsewhere. Review the latest version and try again.'
-    )
+    expect(errors.stale).toBe('This step changed. Check the new details and try again.')
   })
 })

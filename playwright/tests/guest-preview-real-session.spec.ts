@@ -68,7 +68,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
       await choose(page, 'guest-preview-rain-high')
 
       await page
-        .getByRole('region', { name: 'Add your own garment' })
+        .getByRole('region', { name: 'Add your clothes' })
         .getByRole('link', { name: 'Create account' })
         .click()
       await expect(page).toHaveURL(/\/signup\?from=preview$/)
@@ -195,7 +195,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
     await page.goto('/wardrobe/onboarding')
     const step = page.getByTestId('onboarding-step-region')
     const requestCamera = step.getByRole('button', {
-      name: 'Allow camera and photo access',
+      name: 'Allow access',
     })
     await expect(requestCamera).toBeVisible()
     expect(await cameraRequests(page)).toBe(0)
@@ -203,7 +203,7 @@ test.describe('Guest preview and first garment with verified auth', () => {
     await expect(step.getByRole('alert')).toContainText('You can still import files')
     expect(await cameraRequests(page)).toBe(1)
 
-    await step.getByRole('button', { name: 'Add another garment' }).click()
+    await step.getByRole('button', { name: 'Add a piece' }).click()
     const capture = page.getByRole('dialog', { name: 'Garment Capture Flow' })
     const chooseFile = page.waitForEvent('filechooser')
     await capture.getByRole('button', { name: 'Choose File' }).click()

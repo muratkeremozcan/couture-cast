@@ -47,7 +47,7 @@ async function clickContinueAndWaitForAdvance(
 
 async function captureAndTagOneGarment(page: Page) {
   await test.step('Capture and tag one garment', async () => {
-    await page.getByRole('button', { name: 'Add another garment' }).click()
+    await page.getByRole('button', { name: 'Add a piece' }).click()
     const captureDialog = page.getByRole('dialog')
     await expect(captureDialog).toBeVisible()
     await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
@@ -102,27 +102,25 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
         await expect(
           page.getByRole('heading', {
             level: 2,
-            name: 'Allow camera and photo access',
+            name: 'Allow access',
           })
         ).toBeVisible()
       })
 
       await test.step('Allow permission and move to the capture step', async () => {
-        await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
+        await page.getByRole('button', { name: 'Allow access' }).click()
+        await expect(page.getByRole('button', { name: 'Add a piece' })).toBeVisible()
         await expect(
-          page.getByRole('button', { name: 'Add another garment' })
-        ).toBeVisible()
-        await expect(
-          page.getByRole('button', { name: 'Use starter wardrobe' })
+          page.getByRole('button', { name: 'Use sample closet' })
         ).toBeVisible()
       })
 
       await captureAndTagOneGarment(page)
 
       await test.step('The starter-wardrobe skip is withdrawn once a real garment exists', async () => {
-        await expect(
-          page.getByRole('button', { name: 'Use starter wardrobe' })
-        ).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Use sample closet' })).toHaveCount(
+          0
+        )
       })
 
       await test.step('Continue to the silhouette step', async () => {
@@ -193,7 +191,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
 
       await page.goto('/wardrobe/onboarding')
       await waitForAccessibilityReady(page)
-      await page.getByRole('button', { name: 'Allow camera and photo access' }).click()
+      await page.getByRole('button', { name: 'Allow access' }).click()
       await captureAndTagOneGarment(page)
       await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // capture -> tagging
       await clickContinueAndWaitForAdvance(page, interceptNetworkCall) // tagging -> silhouette
@@ -220,9 +218,7 @@ onboardingTest.describe('Wardrobe Onboarding Guided Flow', () => {
           'Picking up where you left off'
         )
         await expect(page.getByTestId('silhouette-settings-panel')).toBeVisible()
-        await expect(
-          page.getByRole('button', { name: 'Allow camera and photo access' })
-        ).toHaveCount(0)
+        await expect(page.getByRole('button', { name: 'Allow access' })).toHaveCount(0)
       })
 
       await test.step('The persisted slider value survived the reload', async () => {

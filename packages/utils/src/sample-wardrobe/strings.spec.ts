@@ -1,6 +1,7 @@
 // Learning path Step 56: Guest wardrobe and outfit preview.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 U-CATALOG-STRINGS, U-VOTES progress text and the shared formatter.
+// CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import { describe, expect, it } from 'vitest'
 import { AGE_GATE_MESSAGES, INVALID_BIRTHDATE_MESSAGE } from '../age'
 import { SAMPLE_CATALOG } from './catalog'
@@ -38,8 +39,36 @@ const placeholders = (text: string) =>
   [...text.matchAll(/\{([a-zA-Z]+)\}/g)].map((m) => m[1]).sort()
 const slug = (id: string) => id.slice('sample:x:'.length)
 const enUS = GUEST_PREVIEW_STRINGS['en-US']
+const adultSituations =
+  /\b(?:commut(?:e|es|er|ers|ing)|offices?|meetings?|workdays?|workwear)\b/i
 
 describe('guest preview strings (U-CATALOG-STRINGS)', () => {
+  it.each(['en-US', 'en-CA'] as const)(
+    '[7.17-COPY-002] %s catalog names and descriptions use everyday situations',
+    (locale) => {
+      const strings = getGuestPreviewStrings(locale)
+      for (const garment of SAMPLE_CATALOG.garments) {
+        const { name, description } = sampleGarmentText(garment, strings)
+        expect(`${name} ${description}`, garment.id).not.toMatch(adultSituations)
+      }
+      for (const look of SAMPLE_CATALOG.looks) {
+        const { name, description } = sampleLookText(look, strings)
+        expect(`${name} ${description}`, look.id).not.toMatch(adultSituations)
+      }
+    }
+  )
+
+  it.each(['en-US', 'en-CA'] as const)(
+    '[7.17-COPY-002] %s saved Oxford look opens with a school-day name and description',
+    (locale) => {
+      const look = SAMPLE_CATALOG.looks.find(({ id }) => id === 'sample:l:office-oxford')!
+      expect(sampleLookText(look, getGuestPreviewStrings(locale))).toEqual({
+        name: 'School day',
+        description: 'A button-up shirt, dark jeans and loafers for school.',
+      })
+    }
+  )
+
   it('ships the ten supported locales', () => {
     expect([...GUEST_PREVIEW_LOCALES].sort()).toEqual(
       [
@@ -104,13 +133,11 @@ describe('guest preview strings (U-CATALOG-STRINGS)', () => {
 
   it('keeps the persistent label and gate copy exactly as specified in en-US', () => {
     expect(enUS.chrome.sampleLabel).toBe(
-      'Sample wardrobe. Example weather and outfits, not your closet or live forecast.'
+      'Sample looks and weather. Your closet and live weather stay separate.'
     )
-    expect(enUS.chrome.supporting).toBe(
-      'Change a preference to see how this example responds.'
-    )
+    expect(enUS.chrome.supporting).toBe('Change a setting to see a new look.')
     expect(enUS.chrome.conversion).toBe(
-      'Create an account to add your clothes. You can choose to save your comfort preferences after signing in. Sample items and preview likes stay in this preview.'
+      'Make an account to add your clothes. Once you sign in, you can keep your fit and weather settings. Your sample pieces and likes stay here.'
     )
     expect(enUS.gate.underage).toBe(AGE_GATE_MESSAGES.underage)
     expect(enUS.gate.invalid).toBe(INVALID_BIRTHDATE_MESSAGE)
@@ -257,7 +284,7 @@ describe('guest preview formatter', () => {
     expect(text).toEqual([
       'Cool and windy example, feels like 48°F.',
       'At about average comfort, that reads as cold weather.',
-      'A 10% chance of rain is within your 40%.',
+      'Rain may fall. Your rain setting: When rain is likely. You can skip your rain gear.',
       'Wool overcoat adds warmth below 59°F.',
       'Wool overcoat blocks wind of 6.5 m/s, above your 5 m/s tolerance.',
     ])

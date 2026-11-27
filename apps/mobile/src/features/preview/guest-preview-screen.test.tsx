@@ -373,9 +373,7 @@ describe('mobile guest preview surfaces', () => {
     press(screen.getByTestId('guest-preview-try-another'))
     expect(screen.getByText('Silk midi')).toBeVisible()
     press(reopen)
-    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent(
-      'Office oxford'
-    )
+    expect(screen.getByTestId('guest-preview-look-name')).toHaveTextContent('School day')
     expect(screen.queryByTestId('guest-preview-undo-swaps')).toBeNull()
     expect(screen.getByText(en.looks['office-oxford'].description)).toBeVisible()
   })

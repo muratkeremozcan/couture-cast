@@ -323,7 +323,7 @@ describe('7.12 saved look detail (D5)', () => {
     const { unmount } = renderDetail()
 
     expect(await screen.findByTestId('saved-look-detail-missing')).toHaveTextContent(
-      'A garment from this saved look is no longer in your closet.'
+      'A piece in this look is gone from your closet.'
     )
     expect(screen.getByTestId('saved-look-slot-0')).toHaveTextContent('Missing piece')
     expect(screen.queryByTestId('saved-look-detail-needs-review')).toBeNull()

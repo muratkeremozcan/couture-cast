@@ -1,6 +1,7 @@
 // Learning path Step 70: Calm Today with one primary job.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
 // Test design: _bmad-output/test-artifacts/test-design-7-13-calm-today-one-primary-job.md.
+// CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import type { Locator, Page } from '@playwright/test'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { foldBand } from '../support/helpers/five-tab'
@@ -107,6 +108,12 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     await expect(details).toHaveAttribute('aria-expanded', 'false')
     await details.click()
     await expect(details).toHaveAttribute('aria-expanded', 'true')
+    const situations = card.getByTestId('home-scenario-choices')
+    await expect(situations.getByRole('button')).toHaveText([
+      'Before school',
+      'Midday',
+      'Going out',
+    ])
     await expect(card.getByText(/comfort note for shell-visual-member/)).toBeVisible()
     await details.click()
     await expect(card.getByText(/comfort note for shell-visual-member/)).toBeHidden()
@@ -153,7 +160,7 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
         await expect(emptyCloset ? closet(page) : add(page)).toHaveCount(0)
         if (mode === 'empty') await expect(spotlight(page)).toHaveCount(0)
         if (emptyCloset) {
-          await expect(add(page)).toHaveText(/Add your first piece/)
+          await expect(add(page)).toHaveText(/Add a piece/)
           await expect(add(page)).toHaveAttribute('href', '/wardrobe?entry=add')
         }
         const height = (await measureWebScreen(page, 'today')).todayHeight

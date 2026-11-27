@@ -10,9 +10,9 @@
   },
   "hero": {
     "scenarios": {
-      "morning": "Viaje matutino",
+      "morning": "Antes de clases",
       "midday": "Mediodía",
-      "evening": "Planes nocturnos"
+      "evening": "Para salir"
     },
     "conditions": {
       "clear": "Cielo despejado",
@@ -27,10 +27,10 @@
       "wind": "Ventoso",
       "unknown": "Desconocido"
     },
-    "hourly_forecast": "Pronóstico por hora",
+    "hourly_forecast": "Clima por hora",
     "expand_hours": "Ampliar ({{hours}} h)",
     "collapse": "Contraer",
-    "load_error": "No se pudieron cargar las recomendaciones diarias",
+    "load_error": "No pudimos cargar tus conjuntos.",
     "retry": "Reintentar",
     "badge_justification": "Justificación de {{label}}:",
     "alert_title": "Advertencia de Clima Severo",
@@ -80,7 +80,7 @@
       "on": "Activadas",
       "off": "Desactivadas",
       "learnMore": "Más información",
-      "aboutHelp": "Planea tus atuendos según el clima y organiza tu armario.",
+      "aboutHelp": "Elige qué ponerte y lleva un registro de tu ropa.",
       "themeHelp": "Elige los colores de la app.",
       "privacy": "Política de privacidad",
       "terms": "Términos del servicio",
@@ -154,9 +154,9 @@
   },
   "wardrobe": {
     "title": "Armario",
-    "add_garment": "Agregar prenda",
-    "empty_title": "Aún no agregaste prendas",
-    "empty_desc": "Toma una foto de tu prenda favorita para comenzar.",
+    "add_garment": "Agrega una foto",
+    "empty_title": "Aún no hay prendas",
+    "empty_desc": "Toma una foto de una prenda que usas.",
     "capture": {
       "title": "Capturar prenda",
       "camera": "Tomar foto",
@@ -237,7 +237,7 @@
       "selection_required": "Selecciona una categoría y un rango de confort.",
       "save_failed": "No se pudieron guardar las etiquetas. Inténtalo de nuevo.",
       "saved": "Etiquetas de la prenda guardadas.",
-      "poll_timeout": "El etiquetado está tardando más de lo esperado. La prenda seguirá disponible durante el procesamiento.",
+      "poll_timeout": "Las etiquetas están tardando. Aún puedes ver tu prenda.",
       "options": {
         "category": {
           "top": "Prenda superior",
@@ -373,11 +373,11 @@
     },
     "onboarding": {
       "title": "Configura tu clóset",
-      "permission_title": "Permite el acceso a la cámara y las fotos",
-      "permission_body": "CoutureCast necesita acceso a la cámara o a la galería para capturar tus prendas.",
-      "permission_denied": "No pudimos acceder a tu cámara ni a tus fotos. Aún puedes importar archivos o usar el clóset inicial.",
-      "use_starter_wardrobe": "Usar clóset inicial",
-      "add_another": "Agregar otra prenda",
+      "permission_title": "Permitir acceso",
+      "permission_body": "Dale a la app acceso a tu cámara o fotos para agregar una prenda.",
+      "permission_denied": "No podemos abrir tu cámara ni tus fotos. Elige un archivo o prueba el clóset de muestra.",
+      "use_starter_wardrobe": "Usar clóset de muestra",
+      "add_another": "Agregar una prenda",
       "continue": "Continuar",
       "back": "Atrás",
       "checklist_tagged": "{{garment}}: etiquetas confirmadas",
@@ -385,9 +385,9 @@
       "complete": "Tu clóset está listo",
       "resumed": "Retomando donde lo dejaste",
       "errors": {
-        "load_failed": "No se pudo cargar tu progreso de configuración.",
-        "save_failed": "No se pudo guardar este paso. Inténtalo de nuevo.",
-        "stale": "Este paso cambió en otro lugar. Revisa la versión más reciente e inténtalo de nuevo."
+        "load_failed": "No pudimos ver dónde te quedaste.",
+        "save_failed": "No pudimos guardar este paso. Inténtalo de nuevo.",
+        "stale": "Este paso cambió. Revisa los datos nuevos e inténtalo de nuevo."
       }
     },
     "silhouette": {
@@ -443,7 +443,7 @@
       "categoryAll": "Todas",
       "categoryFilters": "Filtrar por categoría",
       "setupProgress": "{{completed}} de {{total}} pasos completados",
-      "loading": "Cargando el clóset",
+      "loading": "Cargando tu clóset",
       "saved_looks_failed": "No se pudieron cargar tus looks guardados.",
       "status": {
         "pending_upload": "Subiendo",
@@ -751,7 +751,7 @@
     "calm": {
       "post": "Publicar",
       "nearYou": "Cerca de ti",
-      "climateEmpty": "Aún no hay looks en tu clima",
+      "climateEmpty": "Aún no hay conjuntos para tu clima",
       "seeAllClimates": "Ver todos los climas",
       "cardActions": "Opciones de la publicación",
       "dismissChallenge": "Ocultar el reto",
@@ -767,8 +767,8 @@
       "invalid": "Este enlace no es válido, venció o ya no está disponible."
     },
     "filters": {
-      "label": "Filtros de la comunidad",
-      "explainer": "Los filtros de clima agrupan los looks según el pronóstico semanal de la ubicación guardada de quien los comparte, de frío y húmedo a cálido y seco.",
+      "label": "Filtrar conjuntos",
+      "explainer": "Agrupamos los looks por el clima de la semana en la zona que guardó cada persona.",
       "announce": "Se muestran looks de {{filter}}.",
       "mode": {
         "auto": "Tu clima",
@@ -863,7 +863,7 @@
     },
     "report": {
       "title": "Reportar este look",
-      "description": "Ayuda a mantener segura a la comunidad. Elige un motivo y una persona moderadora lo revisará.",
+      "description": "Elige un motivo. Nuestro equipo revisará tu reporte.",
       "reasonLabel": "Motivo del reporte",
       "detailsLabel": "Más detalles (opcional)",
       "detailsPlaceholder": "Describe cómo este look incumple las normas de la comunidad",
@@ -892,9 +892,9 @@
       "changePhoto": "Cambiar la foto",
       "preview": "Vista previa del look que vas a compartir",
       "altLabel": "Descripción de la imagen",
-      "altHint": "Describe las prendas, las capas y los colores para quienes usan un lector de pantalla.",
-      "altPlaceholder": "Describe las prendas, las capas y los colores",
-      "altSuggested": "Sugerimos una descripción. Edítala para que coincida con tu foto.",
+      "altHint": "Cuéntales a quienes usan un lector de pantalla qué llevas. Nombra las prendas y los colores.",
+      "altPlaceholder": "Nombra las prendas y los colores",
+      "altSuggested": "Aquí tienes un ejemplo. Cambia el texto para que coincida con tu foto.",
       "altConfirm": "Confirmo que esta descripción coincide con la foto",
       "titleLabel": "Título (opcional)",
       "suggestDescription": "Sugerir una descripción a partir de la foto",
@@ -1040,9 +1040,9 @@
       "sendCode": "Enviar código de acceso",
       "verify": "Verificar código",
       "codeSent": "Busca el código de acceso en tu correo.",
-      "signinDenied": "Ninguna cuenta de CoutureCast puede iniciar sesión con este correo. Revisa la dirección e inténtalo de nuevo.",
-      "signinUnavailable": "El inicio de sesión no está disponible por el momento. Inténtalo de nuevo en un momento.",
-      "signinCodeInvalid": "El código es incorrecto o venció. Revisa tu correo o solicita un código nuevo.",
+      "signinDenied": "No puedes entrar con este correo. Revísalo e inténtalo de nuevo.",
+      "signinUnavailable": "No puedes entrar ahora. Inténtalo de nuevo en un momento.",
+      "signinCodeInvalid": "El código no es válido o venció. Revisa tu correo o pide otro código.",
       "signout": "Cerrar sesión",
       "deviceSettings": "Abrir ajustes del dispositivo",
       "back": "Volver a la comunidad",
@@ -1143,8 +1143,8 @@
       "outfitDetails": "Detalles del conjunto",
       "sampleLook": "Conjunto de ejemplo",
       "editSample": "Editar el ejemplo",
-      "addFirstPiece": "Agrega tu primera prenda",
-      "weatherUnavailable": "Pronóstico no disponible",
+      "addFirstPiece": "Agrega una prenda",
+      "weatherUnavailable": "Sin datos del clima",
       "recentPieces": "Prendas recientes"
     },
     "spotlightTeaser": {
@@ -1155,16 +1155,16 @@
       "linkLabel": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
       "linkLabel_one": "Look destacado en {{label}} de {{author}}, {{count}} reacción. Abre Destacados de la ciudad.",
       "linkLabel_other": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
-      "cta": "Ver en Destacados de la ciudad"
+      "cta": "Ver conjunto"
     }
   },
   "shareCard": {
-    "launcher": "Crear mi tarjeta de conjunto",
+    "launcher": "Crear tarjeta",
     "sourceOutfit": "Conjunto",
     "sourceCommunity": "Look de la comunidad",
     "title": "Tu tarjeta",
-    "previewDescription": "Vista previa de tu tarjeta CoutureCast",
-    "photoPrivacyHelp": "Tu foto sigue visible, incluidos los nombres y carteles que contiene. Revisa esta vista previa antes de guardar.",
+    "previewDescription": "Vista previa de tu tarjeta",
+    "photoPrivacyHelp": "Tu foto queda en la tarjeta. También se verán los nombres o letreros de la foto. Revisa la tarjeta antes de guardarla.",
     "preparing": "Preparando tarjeta",
     "watermark": "Mostrar marca de agua",
     "save": "Guardar en fotos",
@@ -1189,16 +1189,16 @@
     "nativeSaveUnavailable": "Para guardar fotos, actualiza la aplicación.",
     "permissionDenied": "Se denegó el acceso a fotos. Puedes reintentarlo.",
     "permissionPermanent": "Permite guardar fotos en Ajustes.",
-    "sourceUnavailable": "Esta fuente no está disponible.",
+    "sourceUnavailable": "No pudimos abrir este conjunto.",
     "previewChanged": "La tarjeta ha cambiado. Actualiza la vista previa antes de guardar.",
     "offline": "Conéctate a internet para preparar una tarjeta.",
-    "storage": "No se pudo guardar. Comprueba el espacio disponible y reintenta.",
-    "render": "No se pudo preparar la tarjeta. Reintenta.",
+    "storage": "Libera espacio. Luego inténtalo de nuevo.",
+    "render": "No pudimos crear tu tarjeta. Inténtalo de nuevo.",
     "unknown": "Se produjo un error. Reintenta.",
     "scenarios": {
-      "morning": "Mañana",
+      "morning": "Antes de clases",
       "midday": "Mediodía",
-      "evening": "Noche"
+      "evening": "Para salir"
     },
     "climateBands": {
       "cold_dry": "Frío y seco",
@@ -1236,9 +1236,9 @@
     "reopen": "Volver a abrir",
     "remove": "Quitar",
     "missingPiece": "Prenda faltante",
-    "missingPieceDetail": "Una prenda de este look guardado ya no está en tu clóset.",
+    "missingPieceDetail": "Una prenda de este conjunto ya no está en tu clóset.",
     "needsReview": "Requiere revisión",
-    "needsReviewDetail": "Cambiaste las etiquetas de una prenda de este look. Revísalo para confirmar que aún combina.",
+    "needsReviewDetail": "Cambiaste una etiqueta de una prenda. Revisa si el conjunto aún te sirve.",
     "photoUnavailable": "Foto no disponible",
     "loadFailed": "No se pudieron cargar tus looks guardados.",
     "retry": "Reintentar",
@@ -1343,7 +1343,7 @@
     },
     "freePlan": {
       "week": "Semana de ejemplo",
-      "line": "Premium planifica toda tu semana según tu pronóstico.",
+      "line": "Con Premium puedes planear qué ponerte toda la semana.",
       "upgrade": "Mejorar"
     },
     "loadMore": "Mostrar más"

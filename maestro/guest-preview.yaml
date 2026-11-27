@@ -1,5 +1,6 @@
 # Learning path Step 56: Guest wardrobe and outfit preview.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
+# CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 # Story 6.16 owner: the signed-out mobile guest preview, from a true first launch.
 #
 # Runs only in the signed-out shard (`run-maestro.mjs --signed-out`): Metro serves a bundle
@@ -20,7 +21,7 @@ env:
   UNDERAGE_BIRTHDATE: '2016-06-01'
   ADULT_BIRTHDATE: '1990-05-05'
   UNDERAGE_ERROR: 'You must be 13 or older'
-  SAMPLE_LABEL: 'Sample wardrobe. Example weather and outfits, not your closet or live forecast.'
+  SAMPLE_LABEL: 'Sample looks and weather. Your closet and live weather stay separate.'
   ONE_REVIEWED: '1 of 9 reviewed'
 ---
 - launchApp:
@@ -45,12 +46,17 @@ env:
     id: 'member-sample-outfit'
     label: 'A signed-out launch does not show the member sample'
 
+- assertVisible:
+    id: 'home-try-sample'
+    text: 'Try sample looks'
 - tapOn:
     id: 'home-try-sample'
 - extendedWaitUntil:
     visible:
       id: 'guest-preview-gate'
     timeout: 20000
+- assertVisible: 'Check your age'
+- assertVisible: 'Enter your birthdate. This device checks it. The app never saves or sends it.'
 
 # D2: the self-reported age gate refuses an under-13 birthdate and clears the field.
 - tapOn:
@@ -84,6 +90,9 @@ env:
 - assertVisible:
     id: 'guest-preview-label'
     text: ${SAMPLE_LABEL}
+- assertVisible:
+    id: 'guest-preview-look-name'
+    text: 'School day'
 - assertVisible:
     id: 'guest-preview-garment-oxford-shirt'
     label: 'Default mild-dry look leads with the oxford shirt'

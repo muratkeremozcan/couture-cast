@@ -148,7 +148,7 @@ test.describe('6.1 community feed by climate band', () => {
       modes.length
     )
 
-    await expect(page.getByRole('dialog', { name: 'Community filters' })).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Filter looks' })).toBeVisible()
   })
 
   test('6.1-E2E-03 restarts paging when the filter changes', async ({

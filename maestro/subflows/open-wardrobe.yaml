@@ -11,7 +11,7 @@ appId: ${MAESTRO_APP_ID}
     timeout: 15000
 
 - extendedWaitUntil:
-    notVisible: 'Loading wardrobe'
+    notVisible: 'Loading your closet'
     timeout: 15000
 
 - waitForAnimationToEnd

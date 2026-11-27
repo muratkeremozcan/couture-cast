@@ -56,7 +56,7 @@ test(
     await page.keyboard.press('Escape')
     await expect(more).toHaveAttribute('aria-expanded', 'false')
     const retry = page.getByRole('alert').getByTestId('wardrobe-list-retry')
-    const empty = page.getByRole('heading', { name: 'No garments added yet' })
+    const empty = page.getByRole('heading', { name: 'No pieces yet' })
     await expect(retry).toHaveAccessibleName('Try again')
     await expect(retry).toBeVisible()
     await expect(empty).toHaveCount(0)

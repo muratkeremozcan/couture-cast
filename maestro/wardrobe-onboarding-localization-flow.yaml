@@ -91,7 +91,7 @@ tags:
       id: 'onboarding-permission-step'
     timeout: 15000
 - assertVisible:
-    text: 'CoutureCast, kıyafetlerini yakalamak için kamera veya kitaplık erişimine ihtiyaç duyar.'
+    text: 'Parça eklemek için uygulamanın kamerana ya da fotoğraflarına erişmesine izin ver.'
     label: 'Setup permission body is localized'
 
 - tapOn:

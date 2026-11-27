@@ -79,9 +79,7 @@ describe('SignupScreen', () => {
       'Account created. Sign in with your email to continue.'
     )
     // TEA sign-off N-3: the next step is a button to sign-in, and Create account is gone.
-    expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe(
-      'Sign in to continue'
-    )
+    expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe('Sign in')
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
   })
 

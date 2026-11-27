@@ -90,7 +90,7 @@ describe('CC-7.12 mobile looks locale parity', () => {
     expect(reference.get('state.savedOn')).toBe('Saved {{date}}')
     expect(reference.get('detail.gone')).toBe('This look is no longer saved')
     expect(reference.get('freePlan.line')).toBe(
-      'Premium plans your whole week around your forecast.'
+      'With Premium, you can plan what to wear all week.'
     )
     expect(reference.get('filterEmpty.today')).toBe('No looks from Today yet')
     expect(reference.get('filterEmpty.capsules')).toBe('No capsules yet')

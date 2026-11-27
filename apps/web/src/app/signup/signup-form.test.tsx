@@ -76,7 +76,7 @@ describe('SignupForm', () => {
     // TEA sign-off N-3: the page names the next step and links to it; the form is done, so
     // Create account is gone instead of inviting a second signup with the same address.
     const next = screen.getByTestId('signup-sign-in-to-continue')
-    expect(next.textContent).toBe('Sign in to continue')
+    expect(next.textContent).toBe('Sign in')
     expect(next.getAttribute('href')).toBe('/signin')
     expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
   })

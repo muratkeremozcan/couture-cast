@@ -596,7 +596,7 @@ describe('WardrobeHubScreen', () => {
     act(() => notifyWardrobeChanged())
     await waitFor(() => expect(garmentReads).toBe(1))
 
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     await waitFor(() =>
       expect(screen.getByText(i18n.t('wardrobe.empty_title'))).toBeVisible()
     )
@@ -678,7 +678,7 @@ describe('WardrobeHubScreen', () => {
     // position), no placeholder, no first-read spinner.
     expect(screen.getByTestId('screen-gate-body-closet')).toBe(body)
     expect(screen.queryByTestId('screen-placeholder')).toBeNull()
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     expect(emptyTitle).toBeVisible()
     expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
     act(() => releaseReads())
@@ -1505,7 +1505,7 @@ describe('WardrobeHubScreen', () => {
 
     try {
       renderScreen()
-      await screen.findByText('No garments added yet')
+      await screen.findByText('No pieces yet')
       await captureOneGarment()
       await browserUser.click(screen.getByTestId('garment-capture-done'))
 
@@ -1626,7 +1626,7 @@ describe('WardrobeHubScreen', () => {
 
     expect(await screen.findByTestId('wardrobe-list-retry')).toBeEnabled()
     expect(screen.queryByText(i18n.t('wardrobe.empty_title'))).toBeNull()
-    expect(screen.queryByLabelText('Loading wardrobe')).toBeNull()
+    expect(screen.queryByLabelText('Loading your closet')).toBeNull()
     expect(screen.queryByTestId('wardrobe-sign-in')).toBeNull()
   })
 

@@ -935,7 +935,7 @@ describe('7.12 PlannerRail free preview (D10)', () => {
     }
     expect(within(preview).queryByTestId('plan-free-day-7')).toBeNull()
     expect(
-      within(preview).getAllByText('Premium plans your whole week around your forecast.')
+      within(preview).getAllByText('With Premium, you can plan what to wear all week.')
     ).toHaveLength(1)
     const upgrades = screen.getAllByTestId('plan-upgrade')
     expect(upgrades).toHaveLength(1)

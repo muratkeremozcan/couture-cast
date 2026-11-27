@@ -242,7 +242,7 @@ const committedGarment2: GarmentItemContract = {
 const CONFIRM_CHECKBOX_LABEL = /I'm wearing plain white or black clothing/
 
 async function captureAndCommitGarment(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Add another garment' }))
+  await user.click(await screen.findByRole('button', { name: 'Add a piece' }))
   await user.upload(
     screen.getByLabelText('Garment image file'),
     new File(['fixture'], 'garment.png', { type: 'image/png' })
@@ -309,7 +309,7 @@ describe('WardrobeOnboardingPage', () => {
     getOnboardingStateFromWeb.mockResolvedValue(state())
     render(<WardrobeOnboardingPage />)
 
-    await screen.findByRole('button', { name: 'Allow camera and photo access' })
+    await screen.findByRole('button', { name: 'Allow access' })
     const header = within(screen.getByTestId('app-header'))
     expect(header.getByRole('heading', { level: 1 })).toHaveTextContent(/^Closet setup$/)
     const back = header.getByTestId('app-top-bar-back')
@@ -335,9 +335,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     await waitFor(() => {
       expect(advanceOnboardingStepFromWeb).toHaveBeenCalledWith(
@@ -347,7 +345,7 @@ describe('WardrobeOnboardingPage', () => {
       )
     })
     expect(getUserMedia).toHaveBeenCalled()
-    await screen.findByRole('button', { name: 'Add another garment' })
+    await screen.findByRole('button', { name: 'Add a piece' })
   })
 
   it('denies camera permission, shows guidance, and still advances to the capture step', async () => {
@@ -360,14 +358,12 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     await screen.findByText(
-      /We couldn't access your camera or photos\. You can still import files or use the starter wardrobe\./
+      /We can't open your camera or photos\. You can pick a file or try the sample closet\./
     )
-    await screen.findByRole('button', { name: 'Add another garment' })
+    await screen.findByRole('button', { name: 'Add a piece' })
   })
 
   it('shows a checklist row for a captured garment and chains into tagging', async () => {
@@ -387,7 +383,7 @@ describe('WardrobeOnboardingPage', () => {
     await screen.findByText('Organize Garment Tags')
   })
 
-  it('hides "Use starter wardrobe" once a garment has been captured, so it cannot bypass required tagging', async () => {
+  it('hides "Use sample closet" once a garment has been captured, so it cannot bypass required tagging', async () => {
     const user = userEvent.setup()
     getOnboardingStateFromWeb.mockResolvedValue(
       state({ status: 'in_progress', currentStep: 'capture', revision: 1 })
@@ -397,14 +393,14 @@ describe('WardrobeOnboardingPage', () => {
     render(<WardrobeOnboardingPage />)
 
     expect(
-      await screen.findByRole('button', { name: 'Use starter wardrobe' })
+      await screen.findByRole('button', { name: 'Use sample closet' })
     ).toBeInTheDocument()
 
     await captureAndCommitGarment(user)
     await screen.findByText('Garment 1: needs tags')
 
     expect(
-      screen.queryByRole('button', { name: 'Use starter wardrobe' })
+      screen.queryByRole('button', { name: 'Use sample closet' })
     ).not.toBeInTheDocument()
   })
 
@@ -424,7 +420,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(await screen.findByRole('button', { name: 'Use starter wardrobe' }))
+    await user.click(await screen.findByRole('button', { name: 'Use sample closet' }))
 
     await waitFor(() => {
       expect(advanceOnboardingStepFromWeb).toHaveBeenCalledWith(
@@ -488,7 +484,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    const addAnother = await screen.findByRole('button', { name: 'Add another garment' })
+    const addAnother = await screen.findByRole('button', { name: 'Add a piece' })
     await user.click(addAnother)
     await screen.findByRole('dialog')
     await user.click(screen.getByLabelText('Close capture modal'))
@@ -519,9 +515,7 @@ describe('WardrobeOnboardingPage', () => {
     render(<WardrobeOnboardingPage />)
 
     await screen.findByText('Garment 1: needs tags')
-    expect(
-      screen.queryByRole('button', { name: 'Allow camera and photo access' })
-    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Allow access' })).not.toBeInTheDocument()
   })
 
   it('keeps a garment’s checklist position stable once assigned, instead of renumbering on newest-first reorder', async () => {
@@ -582,11 +576,9 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(await screen.findByRole('button', { name: 'Use starter wardrobe' }))
+    await user.click(await screen.findByRole('button', { name: 'Use sample closet' }))
 
-    await screen.findByText(
-      'This step changed elsewhere. Review the latest version and try again.'
-    )
+    await screen.findByText('This step changed. Check the new details and try again.')
   })
 
   it('disables the permission button while a step-advance request is in flight, guarding against a double submit', async () => {
@@ -605,7 +597,7 @@ describe('WardrobeOnboardingPage', () => {
     render(<WardrobeOnboardingPage />)
 
     const allowButton = await screen.findByRole('button', {
-      name: 'Allow camera and photo access',
+      name: 'Allow access',
     })
     await user.click(allowButton)
 
@@ -628,7 +620,7 @@ describe('WardrobeOnboardingPage', () => {
     )
 
     const { unmount } = render(<WardrobeOnboardingPage />)
-    await user.click(await screen.findByRole('button', { name: 'Use starter wardrobe' }))
+    await user.click(await screen.findByRole('button', { name: 'Use sample closet' }))
     await waitFor(() => expect(capturedSignal).toBeDefined())
 
     unmount()
@@ -788,9 +780,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(
@@ -809,9 +799,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(
@@ -860,7 +848,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(await screen.findByRole('button', { name: 'Use starter wardrobe' }))
+    await user.click(await screen.findByRole('button', { name: 'Use sample closet' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-status-region')).toHaveTextContent(
@@ -910,9 +898,7 @@ describe('WardrobeOnboardingPage', () => {
 
     render(<WardrobeOnboardingPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Allow camera and photo access' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Allow access' }))
 
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-step-region')).toHaveFocus()

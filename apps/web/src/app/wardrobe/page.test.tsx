@@ -357,7 +357,7 @@ describe('WardrobePage persistence', () => {
     uploadGarmentImageFromWeb.mockResolvedValue(persistedGarment)
 
     const firstRender = render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     await user.click(screen.getByRole('button', { name: '+ Add Garment' }))
     await user.upload(
       screen.getByLabelText('Garment image file'),
@@ -447,7 +447,7 @@ describe('WardrobePage onboarding entry card', () => {
     )
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalled())
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
@@ -463,7 +463,7 @@ describe('WardrobePage onboarding entry card', () => {
     )
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
@@ -483,7 +483,7 @@ describe('WardrobePage onboarding entry card', () => {
     getOnboardingStateFromWeb.mockRejectedValue(new Error('network down'))
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
@@ -499,7 +499,7 @@ describe('WardrobePage onboarding entry card', () => {
     render(<WardrobePage />)
 
     const alert = await screen.findByRole('alert')
-    expect(alert).toHaveTextContent('Unable to check your closet setup progress.')
+    expect(alert).toHaveTextContent("We can't check your closet setup yet.")
 
     // CC-7.11 D5: the Retry's answer is the only way the setup item can read done.
     getOnboardingStateFromWeb.mockResolvedValueOnce(
@@ -574,7 +574,7 @@ describe('WardrobePage onboarding entry card', () => {
     getOnboardingStateFromWeb.mockResolvedValue(onboardingState({ status: 'completed' }))
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     expect(screen.queryByRole('button', { name: 'Silhouette' })).toBeNull()
     await openMoreSetupItem()
     const silhouette = screen.getByRole('menuitem', { name: 'Silhouette' })
@@ -671,7 +671,7 @@ describe('WardrobePage wardrobe load failures', () => {
 
     expect(await screen.findByText('Wardrobe service down')).toBeInTheDocument()
     // A failed load must still stop the spinner, or the hub looks hung forever.
-    expect(screen.queryByText('Loading your wardrobe...')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading your closet')).not.toBeInTheDocument()
   })
 
   it('falls back to generic copy when the rejection carries no message', async () => {
@@ -686,14 +686,14 @@ describe('WardrobePage wardrobe load failures', () => {
     getOnboardingStateFromWeb.mockReset().mockRejectedValue(new Error('network down'))
     render(<WardrobePage />)
 
-    await screen.findByText('Unable to check your closet setup progress.')
+    await screen.findByText("We can't check your closet setup yet.")
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
     // A retry that also fails must leave the affordance in place; dropping the
     // banner would strand an incomplete user with no route into setup.
     await waitFor(() => expect(getOnboardingStateFromWeb).toHaveBeenCalledTimes(2))
     expect(
-      await screen.findByText('Unable to check your closet setup progress.')
+      await screen.findByText("We can't check your closet setup yet.")
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })
@@ -721,7 +721,7 @@ describe('WardrobePage wardrobe load failures', () => {
     )
 
     const view = render(<WardrobePage />)
-    await screen.findByText('Loading your wardrobe...')
+    await screen.findByText('Loading your closet')
     view.unmount()
 
     // Unmount must abort the in-flight fetches; that abort is what lets the
@@ -740,7 +740,7 @@ describe('WardrobePage wardrobe load failures', () => {
       .mockResolvedValue(onboardingState({ status: 'completed' }))
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
@@ -776,7 +776,7 @@ describe('WardrobePage direct garment entry', () => {
     const error = await screen.findByRole('alert')
     const opener = screen.getByRole('button', { name: '+ Add Garment' })
     expect(error).toHaveTextContent('Unable to load your wardrobe.')
-    expect(screen.queryByText('No garments added yet')).not.toBeInTheDocument()
+    expect(screen.queryByText('No pieces yet')).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(window.location.search).toBe('?entry=add&from=home')
     await user.click(within(error).getByRole('button', { name: 'Try again' }))
@@ -804,7 +804,7 @@ describe('WardrobePage direct garment entry', () => {
 
     view.unmount()
     render(<WardrobePage />)
-    expect(await screen.findByText('No garments added yet')).toBeVisible()
+    expect(await screen.findByText('No pieces yet')).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
@@ -828,7 +828,7 @@ describe('WardrobePage direct garment entry', () => {
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
     expect(screen.getByTestId(`garment-open-${pending.id}`)).toBeVisible()
-    expect(screen.getByRole('link', { name: "Back to today's outfit" })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Back to outfit' })).toHaveAttribute(
       'href',
       '/'
     )
@@ -854,7 +854,7 @@ describe('WardrobePage direct garment entry', () => {
     render(<WardrobePage />)
 
     const check = await screen.findByRole('button', {
-      name: /Processing\. Check garment status/,
+      name: /Processing\. Check your piece/,
     })
     expect(window.location.search).toBe('?from=home')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -862,7 +862,7 @@ describe('WardrobePage direct garment entry', () => {
 
     const card = screen.getByTestId(`garment-card-${processing.id}`)
     expect(await within(card).findByTestId(`garment-open-${processing.id}`)).toBeVisible()
-    expect(screen.getByRole('link', { name: "Back to today's outfit" })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Back to outfit' })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
   })
@@ -876,7 +876,7 @@ describe('WardrobePage direct garment entry', () => {
       .mockResolvedValue([current])
     render(<WardrobePage />)
     const [firstSignal] = listGarmentsFromWeb.mock.calls[0] ?? []
-    expect(await screen.findByText('Loading your wardrobe...')).toBeVisible()
+    expect(await screen.findByText('Loading your closet')).toBeVisible()
 
     act(() => publishMember('user-hub-2'))
     expect(await screen.findByTestId(`garment-card-${current.id}`)).toBeVisible()
@@ -925,9 +925,7 @@ describe('WardrobePage garment grid', () => {
     const user = userEvent.setup()
     render(<WardrobePage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Snap or Import Garment' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Add a photo' }))
 
     expect(await screen.findByText('Garment Capture Flow')).toBeInTheDocument()
   })
@@ -1055,9 +1053,7 @@ describe('WardrobePage tag confirmation', () => {
 
     await confirmTagsOnAwaitingGarment()
 
-    expect(
-      await screen.findByText('Unable to refresh your wardrobe.')
-    ).toBeInTheDocument()
+    expect(await screen.findByText("We couldn't update your closet.")).toBeInTheDocument()
   })
 })
 
@@ -1067,7 +1063,7 @@ describe('WardrobePage commit reconciliation', () => {
   it('defers tagging until the capture modal closes on an awaiting_tags commit', async () => {
     const user = userEvent.setup()
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1086,7 +1082,7 @@ describe('WardrobePage commit reconciliation', () => {
   it('adds an already-ready commit to the grid without polling or tagging', async () => {
     const user = userEvent.setup()
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1188,7 +1184,7 @@ describe('WardrobePage processing poll', () => {
       .mockResolvedValueOnce([garmentFixture('garment-poll', 'processing')])
       .mockResolvedValue([garmentFixture('garment-poll', 'awaiting_tags')])
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1220,7 +1216,7 @@ describe('WardrobePage processing poll', () => {
         })
       )
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1245,7 +1241,7 @@ describe('WardrobePage processing poll', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValue([garmentFixture('garment-poll', 'ready')])
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1274,7 +1270,7 @@ describe('WardrobePage processing poll', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValue([garmentFixture('garment-poll', 'processing')])
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1292,7 +1288,7 @@ describe('WardrobePage processing poll', () => {
       garmentFixture('garment-poll', 'awaiting_tags'),
     ])
     await user.click(
-      screen.getByRole('button', { name: /Processing\. Check garment status/ })
+      screen.getByRole('button', { name: /Processing\. Check your piece/ })
     )
     expect(await screen.findByText('Organize Garment Tags')).toBeInTheDocument()
   })
@@ -1305,7 +1301,7 @@ describe('WardrobePage processing poll', () => {
       .mockResolvedValueOnce([])
       .mockRejectedValue(new Error('Poll request failed'))
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1325,7 +1321,7 @@ describe('WardrobePage processing poll', () => {
       .mockResolvedValueOnce([])
       .mockRejectedValue('ECONNRESET')
     render(<WardrobePage />)
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
 
     await commitGarmentThroughCapture(
       user,
@@ -1335,7 +1331,7 @@ describe('WardrobePage processing poll', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }))
 
     expect(
-      await screen.findByText('Unable to refresh garment status.')
+      await screen.findByText("We couldn't check this piece again.")
     ).toBeInTheDocument()
   })
 
@@ -1358,7 +1354,7 @@ describe('WardrobePage processing poll', () => {
     await commitGarmentThroughCapture(
       user,
       garmentFixture('garment-poll', 'processing'),
-      await screen.findByRole('button', { name: 'Snap or Import Garment' })
+      await screen.findByRole('button', { name: 'Add a photo' })
     )
     await user.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() =>
@@ -1407,7 +1403,7 @@ describe('WardrobePage late bootstrap results', () => {
     resetWardrobeMocks()
     render(<WardrobePage />)
 
-    await screen.findByText('No garments added yet')
+    await screen.findByText('No pieces yet')
     expect(
       screen.queryByRole('link', { name: 'Set up your closet' })
     ).not.toBeInTheDocument()
@@ -1463,7 +1459,7 @@ describe('WardrobePage commit deduplication', () => {
     await commitGarmentThroughCapture(
       user,
       garmentFixture('garment-poll', 'processing'),
-      await screen.findByRole('button', { name: 'Snap or Import Garment' })
+      await screen.findByRole('button', { name: 'Add a photo' })
     )
     await user.click(screen.getByRole('button', { name: 'Done' }))
     await waitFor(() =>

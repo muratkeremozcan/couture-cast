@@ -75,7 +75,7 @@ tags:
     label: 'The Plan segment is the open one'
 
 - assertVisible:
-    text: 'Premium plans your whole week around your forecast.'
+    text: 'With Premium, you can plan what to wear all week.'
     label: 'The one line on what Premium adds renders in full'
 
 # --- AC 5 (CC-7.12 D10): a non-entitled reader sees the free preview and no lock --

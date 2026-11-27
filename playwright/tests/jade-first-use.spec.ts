@@ -154,16 +154,16 @@ test.describe('Jade first use on a phone', () => {
 
     const outfit = page.getByTestId('guest-preview-outfit')
     const nextLook = outfit.getByRole('button', { name: 'Try another look' })
-    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
+    await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
     await expect(page.getByText(/sample wardrobe\. example weather/i)).toBeVisible()
-    await expect(outfit.getByText('Garment illustrations')).toBeVisible()
+    await expect(outfit.getByText('Drawings of clothes')).toBeVisible()
     await nextLook.click()
     await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
 
-    await page.getByText('Style preferences (optional)', { exact: true }).click()
+    await page.getByText('Pick your style (optional)', { exact: true }).click()
     await page
       .getByRole('combobox', { name: 'Style', exact: true })
-      .selectOption({ label: 'Cozy and sophisticated' })
+      .selectOption({ label: 'Cozy' })
     await page
       .getByRole('combobox', { name: 'Palette', exact: true })
       .selectOption({ value: 'colorful' })
@@ -313,10 +313,10 @@ test.describe('Jade first use on a phone', () => {
       await page.goto('/community')
       const card = page.getByTestId(`lookbook-card-${ownLook.id}`)
       const rows = page.getByTestId('community-card-grid').getByTestId(/^lookbook-card-/)
-      const examples = page.getByRole('region', { name: 'Example inspiration' })
+      const examples = page.getByRole('region', { name: 'Look ideas' })
       await expect(card).toContainText(ownLook.title!)
       await expect(rows).toHaveCount(1)
-      await expect(examples.getByText('Garment illustrations')).toBeVisible()
+      await expect(examples.getByText('Drawings of clothes')).toBeVisible()
       await expect(examples.getByText('Sample weather · Mild and dry')).toHaveCount(3)
 
       await selectCommunityClimate(page, 'cold_wet')

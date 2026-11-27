@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { StyleSheet, ScrollView, Pressable } from 'react-native'
+import { StyleSheet, ScrollView, Pressable, useWindowDimensions } from 'react-native'
 import { Text, View } from '@/components/themed'
 import {
   type WeatherHourlyEntry,
@@ -12,7 +12,11 @@ import { elevationStyle } from '@/src/theme/tokens'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/src/lib/i18n'
-import { formatWeatherAltText } from '@couture/utils'
+import {
+  formatRainChance,
+  formatWeatherAltText,
+  getGuestPreviewStrings,
+} from '@couture/utils'
 import { getTemperatureUnit } from '@/src/lib/formatters'
 
 type HourlyForecastRibbonProps = {
@@ -45,6 +49,8 @@ export function HourlyForecastRibbon({
   const { t } = useTranslation()
   const [isExpanded, setIsExpanded] = useState(false)
   const palette = useHeroPalette()
+  const { width, fontScale } = useWindowDimensions()
+  const cardWidth = Math.min(width - 32, 88 * Math.max(1, fontScale))
 
   const handleToggle = () => {
     const nextState = !isExpanded
@@ -80,7 +86,7 @@ export function HourlyForecastRibbon({
     <View style={styles.container} testID="hourly-forecast-ribbon">
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: palette.ink }]}>
-          {t('hero.hourly_forecast', { defaultValue: 'Hourly Forecast' })}
+          {t('hero.hourly_forecast', { defaultValue: 'Weather by hour' })}
         </Text>
         {!showAll && (
           <Pressable
@@ -109,10 +115,13 @@ export function HourlyForecastRibbon({
       >
         {visibleEntries.map((item, index) => {
           const glyph = weatherConditionGlyphs[item.condition] || '❓'
-          const precipPercent = Math.round(item.precipitationProbability * 100)
           const locale =
             resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
             defaultSupportedLocale
+          const rainChance = formatRainChance(
+            item.precipitationProbability * 100,
+            getGuestPreviewStrings(locale)
+          )
           const condition = t(`hero.conditions.${item.condition}`, {
             defaultValue: item.condition,
           })
@@ -124,7 +133,7 @@ export function HourlyForecastRibbon({
             temperature,
             unit,
             locale,
-            descriptor: `${formatHour(item.forecastAt, timeZone)}, ${t('hero.precipitation')}: ${precipPercent}%`,
+            descriptor: `${formatHour(item.forecastAt, timeZone)}, ${rainChance}`,
           })
 
           return (
@@ -132,7 +141,11 @@ export function HourlyForecastRibbon({
               key={item.forecastAt || index}
               style={[
                 styles.itemCard,
-                { backgroundColor: palette.card, borderColor: palette.line },
+                {
+                  backgroundColor: palette.card,
+                  borderColor: palette.line,
+                  width: cardWidth,
+                },
               ]}
               testID="hourly-item"
               accessible
@@ -150,12 +163,12 @@ export function HourlyForecastRibbon({
               <Text style={[styles.tempText, { color: palette.ink }]} accessible={false}>
                 {formatTemperature(item.temperature)}
               </Text>
-              {precipPercent > 0 && (
+              {item.precipitationProbability > 0 && (
                 <Text
                   style={[styles.precipText, { color: palette.inkSoft }]}
                   accessible={false}
                 >
-                  {precipPercent}%
+                  {rainChance}
                 </Text>
               )}
             </View>
@@ -173,6 +186,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
+    gap: 8,
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -180,6 +194,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   title: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -201,9 +216,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   itemCard: {
-    width: 70,
     borderWidth: 1,
     borderRadius: 8,
+    paddingHorizontal: 6,
     paddingVertical: 8,
     alignItems: 'center',
     gap: 4,
@@ -223,6 +238,7 @@ const styles = StyleSheet.create({
   precipText: {
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
   },
   skeletonContainer: {
     paddingVertical: 12,

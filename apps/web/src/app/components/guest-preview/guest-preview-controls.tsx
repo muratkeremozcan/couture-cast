@@ -2,6 +2,7 @@
 // Story 6.16 D5: the sample weather and the three real comfort settings.
 import {
   formatPreviewString,
+  formatRainChance,
   formatSampleTemperature,
   SAMPLE_WEATHER,
   SAMPLE_WEATHER_KEYS,
@@ -63,7 +64,7 @@ export function GuestPreviewControls({
         {formatPreviewString(strings.preferences.weatherDetail, {
           temperature: formatSampleTemperature(weather.feelsLike, locale),
           windSpeed: weather.windSpeed,
-          rainPercent: Math.round(weather.precipitationProbability * 100),
+          rainPercent: formatRainChance(weather.precipitationProbability * 100, strings),
         })}
       </p>
       <GuestPreviewChoiceGroup

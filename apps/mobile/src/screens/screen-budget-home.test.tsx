@@ -637,7 +637,7 @@ describe('Screen budget: native Today', () => {
       releaseGarments()
     }
     expect(await screen.findByTestId('home-add-garment')).toHaveAccessibleName(
-      'Add your first piece'
+      'Add a piece'
     )
   }, 30_000)
 

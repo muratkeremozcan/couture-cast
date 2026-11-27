@@ -35,10 +35,10 @@ tags:
 # Verify the default forecast period inside Outfit details.
 - runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
-    element: 'Morning commute'
+    element: 'Before school'
     direction: DOWN
     visibilityPercentage: 100
-- assertVisible: 'Morning commute'
+- assertVisible: 'Before school'
 - scrollUntilVisible:
     element:
       id: 'today-outfit-details'

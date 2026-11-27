@@ -11,6 +11,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   evaluateBirthdateInput,
+  getBirthdateNotice,
   getFederatedSignInStrings,
   type SignInDoor,
 } from '@couture/utils'
@@ -85,7 +86,7 @@ export function FinishSignupForm({
   const birthdateRef = useRef<HTMLInputElement>(null)
   const doorHref = `/${door}${fromPreview ? '?from=preview' : ''}`
   // D3: the email signup's inline birthdate messages, as signup-form.tsx shows them.
-  const inlineMessage = evaluateBirthdateInput(birthdate).message
+  const inlineMessage = getBirthdateNotice(evaluateBirthdateInput(birthdate), strings)
 
   useEffect(() => {
     let active = true

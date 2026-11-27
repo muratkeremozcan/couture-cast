@@ -92,7 +92,7 @@ function publish(member: string | null) {
   })
 }
 function activate() {
-  return userEvent.click(screen.getByRole('button', { name: 'Create my outfit card' }))
+  return userEvent.click(screen.getByRole('button', { name: 'Make a card' }))
 }
 beforeEach(async () => {
   deadlines.length = 0
@@ -144,7 +144,7 @@ describe('ritual share launcher verified-session boundary', () => {
     expect(api.factory).not.toHaveBeenCalled()
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create my outfit card' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Make a card' })).toBeEnabled()
   })
   it('aborts an in-flight former-member ritual and ignores its late response after a new activation', async () => {
     auth.member = 'first-member'
@@ -192,7 +192,7 @@ describe('ritual share launcher verified-session boundary', () => {
       render(<RitualShareCardLauncher />)
       await activate()
       expect(await screen.findByRole('alert')).toHaveTextContent(
-        'This source is unavailable.'
+        "We couldn't open this look."
       )
       expect(api.factory).not.toHaveBeenCalled()
     }

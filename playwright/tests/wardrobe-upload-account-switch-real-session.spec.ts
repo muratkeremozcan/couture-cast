@@ -165,9 +165,7 @@ async function expectHubSignedIn(page: Page) {
     page.getByText('Unable to load your account', { exact: false })
   ).toHaveCount(0)
   await expect(page.getByText('Your session expired', { exact: false })).toHaveCount(0)
-  await expect(page.getByText('Unable to check your closet setup progress.')).toHaveCount(
-    0
-  )
+  await expect(page.getByText("We can't check your closet setup yet.")).toHaveCount(0)
 }
 
 type SilhouetteBody = {

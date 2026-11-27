@@ -24,7 +24,6 @@ import type { CapsuleOccasion } from '@couture/api-client'
 import {
   adjustFeelsLike,
   CLOSE_COMFORT_MATCHES,
-  getRainAmountThreshold,
   getRainProbThreshold,
   getWindThreshold,
   needsOuterwear,
@@ -199,9 +198,7 @@ export function localizeTemperatureTokens(text: string, locale: SupportedLocale)
 }
 
 // ---------------------------------------------------------------------------
-// Comfort notes translations (verbatim, plus a new `weatherUnavailable` key
-// for Story 5.5's honest-degradation baseline -- AC 2: "no weather-derived
-// badge or precision claim").
+// Comfort notes shown beside the outfit, including the unavailable-weather state.
 // ---------------------------------------------------------------------------
 
 interface ComfortNotesDict {
@@ -220,158 +217,138 @@ interface ComfortNotesDict {
 export const comfortNotesTranslations: Record<SupportedLocale, ComfortNotesDict> = {
   'en-US': {
     feels_like_adjusted:
-      'Feels like {feelsLike}°F (adjusted to {adjustedFeelsLike}°F for comfort).',
-    feels_like_neutral: 'Feels like {feelsLike}°F (neutral preference).',
-    cold: 'It is cold, so a heavy coat or extra warmth is recommended.',
-    chilly: 'Chilly conditions today; outerwear is recommended.',
-    mild: 'Mild and pleasant day; light layers will keep you comfortable.',
-    warm: 'Warm day; a standard top and bottom or dress is perfect.',
-    hot: 'Hot weather; light, breathable garments are best.',
-    windy: 'Winds are high at {windSpeed} m/s, so we suggest a wind-blocking layer.',
-    rainy:
-      'Rain is likely. We recommend bringing an umbrella or rain-resistant outerwear.',
-    weatherUnavailable:
-      "Weather isn't available for this date, so we picked a versatile everyday outfit.",
+      'Feels like {feelsLike}°F. We planned for {adjustedFeelsLike}°F to suit you.',
+    feels_like_neutral: 'Feels like {feelsLike}°F.',
+    cold: 'Wear a warm coat.',
+    chilly: 'Take a jacket.',
+    mild: 'Wear light layers.',
+    warm: 'Try a top with pants or a dress.',
+    hot: 'Wear light clothes to stay cool.',
+    windy: 'Wind is strong at {windSpeed} m/s. Take a jacket.',
+    rainy: 'Rain may come. Take an umbrella or raincoat.',
+    weatherUnavailable: 'We picked a look you can wear any day. The forecast is missing.',
   },
   'en-CA': {
     feels_like_adjusted:
-      'Feels like {feelsLike}°C (adjusted to {adjustedFeelsLike}°C for comfort).',
-    feels_like_neutral: 'Feels like {feelsLike}°C (neutral preference).',
-    cold: 'It is cold, so a heavy coat or extra warmth is recommended.',
-    chilly: 'Chilly conditions today; outerwear is recommended.',
-    mild: 'Mild and pleasant day; light layers will keep you comfortable.',
-    warm: 'Warm day; a standard top and bottom or dress is perfect.',
-    hot: 'Hot weather; light, breathable garments are best.',
-    windy: 'Winds are high at {windSpeed} m/s, so we suggest a wind-blocking layer.',
-    rainy:
-      'Rain is likely. We recommend bringing an umbrella or rain-resistant outerwear.',
-    weatherUnavailable:
-      "Weather isn't available for this date, so we picked a versatile everyday outfit.",
+      'Feels like {feelsLike}°C. We planned for {adjustedFeelsLike}°C to suit you.',
+    feels_like_neutral: 'Feels like {feelsLike}°C.',
+    cold: 'Wear a warm coat.',
+    chilly: 'Take a jacket.',
+    mild: 'Wear light layers.',
+    warm: 'Try a top with pants or a dress.',
+    hot: 'Wear light clothes to stay cool.',
+    windy: 'Wind is strong at {windSpeed} m/s. Take a jacket.',
+    rainy: 'Rain may come. Take an umbrella or raincoat.',
+    weatherUnavailable: 'We picked a look you can wear any day. The forecast is missing.',
   },
   'es-419': {
     feels_like_adjusted:
-      'Sensación térmica {feelsLike}°C (ajustado a {adjustedFeelsLike}°C para tu comodidad).',
-    feels_like_neutral: 'Sensación térmica {feelsLike}°C (preferencia neutra).',
-    cold: 'Hace frío, por lo que se recomienda un abrigo pesado o abrigo extra.',
-    chilly: 'Condiciones frescas hoy; se recomienda ropa de abrigo.',
-    mild: 'Día templado y agradable; capas ligeras te mantendrán cómodo.',
-    warm: 'Día cálido; una blusa/camisa estándar y pantalón o un vestido es perfecto.',
-    hot: 'Clima caluroso; las prendas ligeras y transpirables son las mejores.',
-    windy:
-      'Los vientos son fuertes a {windSpeed} m/s, por lo que sugerimos una capa cortavientos.',
-    rainy:
-      'Es probable que llueva. Recomendamos llevar paraguas o ropa exterior resistente a la lluvia.',
-    weatherUnavailable:
-      'El clima no está disponible para esta fecha, así que elegimos un look versátil para el día a día.',
+      'Sensación térmica de {feelsLike}°C. Pensamos en {adjustedFeelsLike}°C para tu look.',
+    feels_like_neutral: 'Sensación térmica de {feelsLike}°C.',
+    cold: 'Usa un abrigo grueso.',
+    chilly: 'Lleva una chaqueta.',
+    mild: 'Usa capas ligeras.',
+    warm: 'Prueba una blusa o camisa con pantalón, o un vestido.',
+    hot: 'Usa ropa ligera para no pasar calor.',
+    windy: 'El viento sopla fuerte a {windSpeed} m/s. Lleva una chaqueta.',
+    rainy: 'Puede llover. Lleva un paraguas o un impermeable.',
+    weatherUnavailable: 'Elegimos un look para cualquier día. Falta el pronóstico.',
   },
   'fr-CA': {
     feels_like_adjusted:
-      'Température ressentie de {feelsLike}°C (ajustée à {adjustedFeelsLike}°C pour votre confort).',
-    feels_like_neutral: 'Température ressentie de {feelsLike}°C (préférence neutre).',
-    cold: 'Il fait froid, un manteau chaud ou des épaisseurs supplémentaires sont recommandés.',
-    chilly: 'Conditions fraîches aujourd’hui; un vêtement d’extérieur est recommandé.',
-    mild: 'Journée douce et agréable; des vêtements légers vous garderont à l’aise.',
-    warm: 'Journée chaude; un haut et un bas standard ou une robe conviennent parfaitement.',
-    hot: 'Temps chaud; des vêtements légers et respirants sont préférables.',
-    windy:
-      'Les vents sont forts à {windSpeed} m/s, nous suggérons donc une couche coupe-vent.',
-    rainy:
-      'De la pluie est probable. Nous vous conseillons d’apporter un parapluie ou un vêtement imperméable.',
+      'Température ressentie de {feelsLike}°C. On a choisi ta tenue pour {adjustedFeelsLike}°C.',
+    feels_like_neutral: 'Température ressentie de {feelsLike}°C.',
+    cold: 'Mets un manteau chaud.',
+    chilly: 'Prends une veste.',
+    mild: 'Mets des couches légères.',
+    warm: 'Essaie un haut avec un pantalon ou une robe.',
+    hot: 'Mets des vêtements légers pour rester au frais.',
+    windy: 'Le vent souffle fort à {windSpeed} m/s. Prends une veste.',
+    rainy: 'Il peut pleuvoir. Prends un parapluie ou un imperméable.',
     weatherUnavailable:
-      'La météo n’est pas disponible pour cette date, nous avons donc choisi une tenue polyvalente pour tous les jours.',
+      'On a choisi une tenue de tous les jours. Les prévisions manquent.',
   },
   'fr-FR': {
     feels_like_adjusted:
-      'Température ressentie de {feelsLike}°C (ajustée à {adjustedFeelsLike}°C pour votre confort).',
-    feels_like_neutral: 'Température ressentie de {feelsLike}°C (préférence neutre).',
-    cold: 'Il fait froid, un manteau chaud ou des épaisseurs supplémentaires sont recommandés.',
-    chilly: 'Conditions fraîches aujourd’hui; un vêtement d’extérieur est recommandé.',
-    mild: 'Journée douce et agréable; des vêtements légers vous garderont à l’aise.',
-    warm: 'Journée chaude; un haut et un bas standard ou une robe conviennent parfaitement.',
-    hot: 'Temps chaud; des vêtements légers et respirants sont préférables.',
-    windy:
-      'Les vents sont forts à {windSpeed} m/s, nous suggérons donc une couche coupe-vent.',
-    rainy:
-      'De la pluie est probable. Nous vous conseillons d’apporter un parapluie ou un vêtement imperméable.',
+      'Température ressentie de {feelsLike}°C. On a choisi ta tenue pour {adjustedFeelsLike}°C.',
+    feels_like_neutral: 'Température ressentie de {feelsLike}°C.',
+    cold: 'Mets un manteau chaud.',
+    chilly: 'Prends une veste.',
+    mild: 'Mets des couches légères.',
+    warm: 'Essaie un haut avec un pantalon ou une robe.',
+    hot: 'Mets des vêtements légers pour rester au frais.',
+    windy: 'Le vent souffle fort à {windSpeed} m/s. Prends une veste.',
+    rainy: 'Il peut pleuvoir. Prends un parapluie ou un imperméable.',
     weatherUnavailable:
-      'La météo n’est pas disponible pour cette date, nous avons donc choisi une tenue polyvalente pour tous les jours.',
+      'On a choisi une tenue de tous les jours. Les prévisions manquent.',
   },
   'tr-TR': {
     feels_like_adjusted:
-      'Hissedilen sıcaklık {feelsLike}°C (konfor için {adjustedFeelsLike}°C ayarlandı).',
-    feels_like_neutral: 'Hissedilen sıcaklık {feelsLike}°C (nötr tercih).',
-    cold: 'Hava soğuk, bu nedenle kalın bir mont veya ekstra giysi önerilir.',
-    chilly: 'Bugün hava serin; dış giyim önerilir.',
-    mild: 'Ilık ve hoş bir gün; hafif katmanlar sizi rahat ettirecektir.',
-    warm: 'Sıcak bir gün; standart bir üst ve alt veya elbise mükemmeldir.',
-    hot: 'Sıcak hava; hafif, nefes alabilen giysiler en iyisidir.',
-    windy: 'Rüzgar hızı {windSpeed} m/s ile yüksek, rüzgar kesici bir katman öneriyoruz.',
-    rainy:
-      'Yağmur olasıdır. Şemsiye veya yağmura dayanıklı dış giyim getirmenizi öneririz.',
-    weatherUnavailable:
-      'Bu tarih için hava durumu bilgisi yok, bu yüzden çok yönlü, günlük bir kombin seçtik.',
+      'Hissedilen sıcaklık {feelsLike}°C. Senin için {adjustedFeelsLike}°C’ye uygun bir kombin seçtik.',
+    feels_like_neutral: 'Hissedilen sıcaklık {feelsLike}°C.',
+    cold: 'Kalın bir mont giy.',
+    chilly: 'Bir ceket al.',
+    mild: 'İnce katlar giy.',
+    warm: 'Üst ve pantolon ya da elbise dene.',
+    hot: 'Serin kalmak için ince giysiler giy.',
+    windy: 'Rüzgâr {windSpeed} m/s hızla esiyor. Bir ceket al.',
+    rainy: 'Yağmur yağabilir. Şemsiye ya da yağmurluk al.',
+    weatherUnavailable: 'Her gün giyebileceğin bir kombin seçtik. Hava tahmini yok.',
   },
   'de-DE': {
     feels_like_adjusted:
-      'Gefühlt wie {feelsLike}°C (für Komfort auf {adjustedFeelsLike}°C angepasst).',
-    feels_like_neutral: 'Gefühlt wie {feelsLike}°C (neutrale Präferenz).',
-    cold: 'Es ist kalt, daher wird ein schwerer Mantel oder zusätzliche Wärme empfohlen.',
-    chilly: 'Kühle Bedingungen heute; Oberbekleidung wird empfohlen.',
-    mild: 'Milder und angenehmer Tag; leichte Schichten halten Sie bequem.',
-    warm: 'Warmer Tag; ein Standard-Oberteil und -Unterteil oder ein Kleid ist perfekt.',
-    hot: 'Heißes Wetter; leichte, atmungsaktive Kleidungsstücke sind am besten.',
-    windy:
-      'Die Winde sind hoch bei {windSpeed} m/s, daher empfehlen wir eine windabweisende Schicht.',
-    rainy:
-      'Regen ist wahrscheinlich. Wir empfehlen einen Regenschirm oder regenbeständige Oberbekleidung.',
+      'Es fühlt sich an wie {feelsLike} °C. Dein Outfit passt zu {adjustedFeelsLike} °C.',
+    feels_like_neutral: 'Es fühlt sich an wie {feelsLike} °C.',
+    cold: 'Zieh einen warmen Mantel an.',
+    chilly: 'Nimm eine Jacke mit.',
+    mild: 'Zieh dünne Schichten an.',
+    warm: 'Probier ein Oberteil mit Hose oder ein Kleid.',
+    hot: 'Zieh leichte Sachen an. So bleibst du kühl.',
+    windy: 'Der Wind weht stark mit {windSpeed} m/s. Nimm eine Jacke mit.',
+    rainy: 'Es könnte regnen. Nimm einen Schirm oder eine Regenjacke mit.',
     weatherUnavailable:
-      'Für dieses Datum sind keine Wetterdaten verfügbar, daher haben wir ein vielseitiges Alltagsoutfit ausgewählt.',
+      'Wir haben ein Outfit für jeden Tag ausgesucht. Die Vorhersage fehlt.',
   },
   'it-IT': {
     feels_like_adjusted:
-      'Percepito {feelsLike}°C (adattato a {adjustedFeelsLike}°C per il comfort).',
-    feels_like_neutral: 'Percepito {feelsLike}°C (preferenza neutrale).',
-    cold: 'Fa freddo, quindi si consiglia un cappotto pesante o calore extra.',
-    chilly: 'Condizioni fresche oggi; si consiglia un capospalla.',
-    mild: 'Giornata mite e piacevole; strati leggeri ti terranno comodo.',
-    warm: 'Giornata calda; un top e un fondo standard o un vestito sono perfetti.',
-    hot: 'Tempo caldo; i capi leggeri e traspiranti sono i migliori.',
-    windy:
-      'I venti sono forti a {windSpeed} m/s, quindi suggeriamo uno strato antivento.',
-    rainy:
-      'È probabile che piova. Si consiglia di portare un ombrello o un capospalla resistente alla pioggia.',
+      'Si sentono {feelsLike} °C. Abbiamo scelto un look per {adjustedFeelsLike} °C.',
+    feels_like_neutral: 'Si sentono {feelsLike} °C.',
+    cold: 'Metti un cappotto caldo.',
+    chilly: 'Porta una giacca.',
+    mild: 'Vestiti a strati leggeri.',
+    warm: 'Prova una maglia con pantaloni o un vestito.',
+    hot: 'Metti abiti leggeri per stare al fresco.',
+    windy: 'Il vento soffia forte a {windSpeed} m/s. Porta una giacca.',
+    rainy: 'Potrebbe piovere. Porta un ombrello o un impermeabile.',
     weatherUnavailable:
-      'Il meteo non è disponibile per questa data, quindi abbiamo scelto un outfit versatile per tutti i giorni.',
+      'Abbiamo scelto un look di tutti i giorni. Mancano le previsioni.',
   },
   'pt-BR': {
     feels_like_adjusted:
-      'Sensação térmica de {feelsLike}°C (ajustada para {adjustedFeelsLike}°C para seu conforto).',
-    feels_like_neutral: 'Sensação térmica de {feelsLike}°C (preferência neutra).',
-    cold: 'Está frio, por isso recomenda-se um casaco pesado ou agasalho extra.',
-    chilly: 'Condições amenas/frias hoje; recomenda-se um casaco leve.',
-    mild: 'Dia ameno e agradável; roupas leves em camadas vão manter você confortável.',
-    warm: 'Dia quente; camiseta e calça padrão ou um vestido são perfeitos.',
-    hot: 'Clima quente; roupas leves e respiráveis são as melhores.',
-    windy: 'Vento forte de {windSpeed} m/s, sugerimos uma camada corta-vento.',
-    rainy:
-      'Chance de chuva. Recomendamos levar um guarda-chuva ou usar um casaco impermeável.',
+      'A sensação é de {feelsLike} °C. Escolhemos um look para {adjustedFeelsLike} °C.',
+    feels_like_neutral: 'A sensação é de {feelsLike} °C.',
+    cold: 'Use um casaco quente.',
+    chilly: 'Leve um casaco.',
+    mild: 'Vista camadas leves.',
+    warm: 'Experimente uma blusa com calça ou um vestido.',
+    hot: 'Use roupas leves para ficar à vontade no calor.',
+    windy: 'O vento está forte a {windSpeed} m/s. Leve um casaco.',
+    rainy: 'Pode chover. Leve um guarda-chuva ou uma capa de chuva.',
     weatherUnavailable:
-      'O clima não está disponível para esta data, então escolhemos um look versátil para o dia a dia.',
+      'Escolhemos um look para o dia a dia. A previsão está indisponível.',
   },
   'pt-PT': {
     feels_like_adjusted:
-      'Sensação térmica de {feelsLike}°C (ajustada para {adjustedFeelsLike}°C para o seu conforto).',
-    feels_like_neutral: 'Sensação térmica de {feelsLike}°C (preferência neutra).',
-    cold: 'Está frio, pelo que se recomenda um casaco pesado ou agasalho extra.',
-    chilly: 'Condições amenas/frias hoje; recomenda-se um casaco leve.',
-    mild: 'Dia ameno e agradável; roupas leves em camadas vão mantê-lo confortável.',
-    warm: 'Dia quente; camisola e calças padrão ou um vestido são perfeitos.',
-    hot: 'Clima quente; roupas leves e respiráveis são as melhores.',
-    windy: 'Vento forte de {windSpeed} m/s, sugerimos uma camada corta-vento.',
-    rainy:
-      'Chance de chuva. Recomendamos levar um guarda-chuva ou usar um casaco impermeável.',
-    weatherUnavailable:
-      'O tempo não está disponível para esta data, por isso escolhemos um look versátil para o dia a dia.',
+      'A sensação é de {feelsLike} °C. Escolhemos roupa para {adjustedFeelsLike} °C.',
+    feels_like_neutral: 'A sensação é de {feelsLike} °C.',
+    cold: 'Veste um casaco quente.',
+    chilly: 'Leva um casaco.',
+    mild: 'Veste camadas leves.',
+    warm: 'Experimenta uma camisola com calças ou um vestido.',
+    hot: 'Veste roupa leve para te manteres fresco.',
+    windy: 'O vento está forte a {windSpeed} m/s. Leva um casaco.',
+    rainy: 'Pode chover. Leva um guarda-chuva ou um impermeável.',
+    weatherUnavailable: 'Escolhemos roupa para o dia a dia. Falta a previsão.',
   },
 }
 
@@ -384,8 +361,8 @@ const BADGE_MAPPING = [
   { keyword: 'rain', key: 'rain_ready', label: 'Rain-ready' },
   { keyword: 'evening', key: 'evening_chill', label: 'Evening chill' },
   { keyword: 'chill', key: 'evening_chill', label: 'Evening chill' },
-  { keyword: 'commute', key: 'commute_warmth', label: 'Commute warmth' },
-  { keyword: 'warmth', key: 'commute_warmth', label: 'Commute warmth' },
+  { keyword: 'commute', key: 'commute_warmth', label: 'Morning layers' },
+  { keyword: 'warmth', key: 'commute_warmth', label: 'Morning layers' },
   { keyword: 'sun', key: 'sun_protection', label: 'Sun protection' },
   { keyword: 'protection', key: 'sun_protection', label: 'Sun protection' },
   { keyword: 'light', key: 'light_layers', label: 'Light layers' },
@@ -412,8 +389,8 @@ export const badgeTranslations: Record<
       bullets: ['Wear warm layers as temperature drops in the evening'],
     },
     commute_warmth: {
-      label: 'Commute warmth',
-      bullets: ['Extra layers suggested for cooler morning commute'],
+      label: 'Morning layers',
+      bullets: ['Wear a warm layer this morning.'],
     },
     sun_protection: {
       label: 'Sun protection',
@@ -450,8 +427,8 @@ export const badgeTranslations: Record<
       bullets: ['Wear warm layers as temperature drops in the evening'],
     },
     commute_warmth: {
-      label: 'Commute warmth',
-      bullets: ['Extra layers suggested for cooler morning commute'],
+      label: 'Morning layers',
+      bullets: ['Wear a warm layer this morning.'],
     },
     sun_protection: {
       label: 'Sun protection',
@@ -490,8 +467,8 @@ export const badgeTranslations: Record<
       bullets: ['Usa capas abrigadas ya que la temperatura baja por la tarde/noche'],
     },
     commute_warmth: {
-      label: 'Viaje abrigado',
-      bullets: ['Capas extra recomendadas para el viaje matutino fresco'],
+      label: 'Capas para la mañana',
+      bullets: ['Ponte una capa abrigada esta mañana.'],
     },
     sun_protection: {
       label: 'Protección solar',
@@ -528,8 +505,8 @@ export const badgeTranslations: Record<
       bullets: ['Porter des couches chaudes car la température baisse en soirée'],
     },
     commute_warmth: {
-      label: 'Chaleur matinale',
-      bullets: ['Épaisseurs supplémentaires suggérées pour le trajet frais du matin'],
+      label: 'Couches du matin',
+      bullets: ['Mets une couche chaude ce matin.'],
     },
     sun_protection: {
       label: 'Protection solaire',
@@ -566,8 +543,8 @@ export const badgeTranslations: Record<
       bullets: ['Porter des couches chaudes car la température baisse en soirée'],
     },
     commute_warmth: {
-      label: 'Chaleur matinale',
-      bullets: ['Épaisseurs supplémentaires suggérées pour le trajet frais du matin'],
+      label: 'Couches du matin',
+      bullets: ['Mets une couche chaude ce matin.'],
     },
     sun_protection: {
       label: 'Protection solaire',
@@ -604,8 +581,8 @@ export const badgeTranslations: Record<
       bullets: ['Akşam sıcaklık düştüğü için sıcak katmanlar giyin'],
     },
     commute_warmth: {
-      label: 'Sabah yolculuğu',
-      bullets: ['Serin sabah yolculuğu için ekstra katmanlar önerilir'],
+      label: 'Sabah için katlar',
+      bullets: ['Bu sabah üstüne kalın bir şey al.'],
     },
     sun_protection: {
       label: 'Güneş koruması',
@@ -642,8 +619,8 @@ export const badgeTranslations: Record<
       bullets: ['Tragen Sie warme Schichten, wenn die Temperaturen am Abend sinken'],
     },
     commute_warmth: {
-      label: 'Pendlerwärme',
-      bullets: ['Zusätzliche Schichten für den kühleren Morgenpendelverkehr empfohlen'],
+      label: 'Schichten am Morgen',
+      bullets: ['Zieh heute Morgen eine warme Schicht an.'],
     },
     sun_protection: {
       label: 'Sonnenschutz',
@@ -680,8 +657,8 @@ export const badgeTranslations: Record<
       bullets: ['Indossa strati caldi poiché la temperatura scende in serata'],
     },
     commute_warmth: {
-      label: 'Calore per il viaggio',
-      bullets: ['Strati extra consigliati per il pendolarismo mattutino più fresco'],
+      label: 'Strati per il mattino',
+      bullets: ['Metti uno strato caldo stamattina.'],
     },
     sun_protection: {
       label: 'Protezione solare',
@@ -718,8 +695,8 @@ export const badgeTranslations: Record<
       bullets: ['Use casaco ou camadas quentes, pois a temperatura cai à noite'],
     },
     commute_warmth: {
-      label: 'Caminho aquecido',
-      bullets: ['Camadas extras sugeridas para o caminho frio da manhã'],
+      label: 'Camadas para a manhã',
+      bullets: ['Vista uma camada quente nesta manhã.'],
     },
     sun_protection: {
       label: 'Proteção solar',
@@ -756,8 +733,8 @@ export const badgeTranslations: Record<
       bullets: ['Use casaco ou camadas quentes, pois a temperatura cai à noite'],
     },
     commute_warmth: {
-      label: 'Percurso aquecido',
-      bullets: ['Camadas extras sugeridas para o percurso frio da manhã'],
+      label: 'Camadas para a manhã',
+      bullets: ['Veste uma camada quente esta manhã.'],
     },
     sun_protection: {
       label: 'Proteção solar',
@@ -812,6 +789,28 @@ function preserveCustomBadge(badge: RawReasoningBadge) {
 
 const defaultLocale: SupportedLocale = 'en-US'
 
+function refreshStoredBadgeCopy(key: string, bullet: string): string {
+  // Older recommendations keep their original English evidence in storage.
+  if (key === 'commute_warmth') {
+    return bullet.replace(
+      /^Morning feels-like temperature is (.*?), which is below the commute warmth threshold of 12°C\./,
+      'It feels like $1 this morning. Wear a warm layer.'
+    )
+  }
+  if (key === 'rain_ready') {
+    return bullet
+      .replace(
+        /^Precipitation probability is \d+%, which exceeds your threshold of \d+%\./,
+        'It may rain. Take a raincoat.'
+      )
+      .replace(
+        /^Precipitation amount is [\d.]+ mm, which exceeds your threshold of [\d.]+ mm\./,
+        'It may get wet. Take an umbrella.'
+      )
+  }
+  return bullet
+}
+
 export function mapRawBadgeToCanonical(
   badge: RawReasoningBadge,
   locale: SupportedLocale = defaultLocale
@@ -824,7 +823,7 @@ export function mapRawBadgeToCanonical(
   const localized = badgeTranslations[locale][key]
   const sourceBullets = validBadgeBullets(badge.bullets)
   const localizedSourceBullets = sourceBullets.map((bullet) =>
-    localizeTemperatureTokens(bullet, locale)
+    localizeTemperatureTokens(refreshStoredBadgeCopy(key, bullet), locale)
   )
   const shouldLocalizeBullets = locale !== 'en-US' && locale !== 'en-CA'
   const bullets =
@@ -1098,19 +1097,12 @@ function generateAvailableScenario(
       label: 'Wind layer',
       bullets: withEvidenceSuffix(
         [
-          `Wind speed is ${windSpeedFormatted} m/s, which exceeds your wind tolerance threshold of ${windThreshold} m/s.`,
+          `Wind is strong at ${windSpeedFormatted} m/s. Your wind limit is ${windThreshold} m/s.`,
         ],
         weather.source
       ),
     })
   }
-
-  const rainProbThreshold = getRainProbThreshold(precipPreparedness)
-  const rainAmountThreshold = getRainAmountThreshold(precipPreparedness)
-  const roundedProb = Math.round(weather.precipitationProbability * 100)
-  const roundedProbThreshold = Math.round(rainProbThreshold * 100)
-  const roundedAmount = Math.round(weather.precipitationAmount * 10) / 10
-  const roundedAmountThreshold = Math.round(rainAmountThreshold * 10) / 10
 
   const probabilityExceeds = rainProbabilityExceeds(
     weather.precipitationProbability,
@@ -1120,14 +1112,10 @@ function generateAvailableScenario(
   if (probabilityExceeds || amountExceeds) {
     const rainBullets: string[] = []
     if (probabilityExceeds) {
-      rainBullets.push(
-        `Precipitation probability is ${roundedProb}%, which exceeds your threshold of ${roundedProbThreshold}%.`
-      )
+      rainBullets.push('It may rain. Take a raincoat.')
     }
     if (amountExceeds) {
-      rainBullets.push(
-        `Precipitation amount is ${roundedAmount} mm, which exceeds your threshold of ${roundedAmountThreshold} mm.`
-      )
+      rainBullets.push('It may get wet. Take an umbrella.')
     }
     badgesList.push({
       key: 'rain_ready',
@@ -1142,10 +1130,7 @@ function generateAvailableScenario(
       label: 'Evening chill',
       bullets: withEvidenceSuffix(
         [
-          `Evening feels-like temperature is ${getFeelsLikeDesc(
-            weather.feelsLike,
-            adjustedFeelsLike
-          )}, which is below the evening chill threshold of 15°C.`,
+          `It feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)} tonight. Wear a warm layer.`,
         ],
         weather.source
       ),
@@ -1156,13 +1141,10 @@ function generateAvailableScenario(
     if (weather.scenario === 'morning' && roundedAdjustedFeelsLike < 12) {
       badgesList.push({
         key: 'commute_warmth',
-        label: 'Commute warmth',
+        label: 'Morning layers',
         bullets: withEvidenceSuffix(
           [
-            `Morning feels-like temperature is ${getFeelsLikeDesc(
-              weather.feelsLike,
-              adjustedFeelsLike
-            )}, which is below the commute warmth threshold of 12°C.`,
+            `It feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)} this morning. Wear a warm layer.`,
           ],
           weather.source
         ),
@@ -1173,10 +1155,7 @@ function generateAvailableScenario(
         label: 'Sun protection',
         bullets: withEvidenceSuffix(
           [
-            `Skies are clear and feels-like temperature is ${getFeelsLikeDesc(
-              weather.feelsLike,
-              adjustedFeelsLike
-            )}, which is at or above 22°C.`,
+            `It is sunny and feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)}. Take a hat.`,
           ],
           weather.source
         ),
@@ -1187,10 +1166,7 @@ function generateAvailableScenario(
         label: 'Light layers',
         bullets: withEvidenceSuffix(
           [
-            `Feels-like temperature is ${getFeelsLikeDesc(
-              weather.feelsLike,
-              adjustedFeelsLike
-            )}, which is between 15°C and 22°C.`,
+            `It feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)}. Wear light layers.`,
           ],
           weather.source
         ),
@@ -1201,10 +1177,7 @@ function generateAvailableScenario(
         label: 'Breathable comfort',
         bullets: withEvidenceSuffix(
           [
-            `Feels-like temperature is ${getFeelsLikeDesc(
-              weather.feelsLike,
-              adjustedFeelsLike
-            )}, which is at or above 25°C.`,
+            `It feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)}. Wear light clothes.`,
           ],
           weather.source
         ),
@@ -1214,9 +1187,7 @@ function generateAvailableScenario(
         key: 'daily_base',
         label: 'Daily base',
         bullets: withEvidenceSuffix(
-          [
-            `Feels-like temperature is ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)}.`,
-          ],
+          [`It feels like ${getFeelsLikeDesc(weather.feelsLike, adjustedFeelsLike)}.`],
           weather.source
         ),
       })

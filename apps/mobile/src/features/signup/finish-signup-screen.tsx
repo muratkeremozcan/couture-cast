@@ -9,7 +9,12 @@ import {
   type GuardianInvitationResponse,
   type SignupResponse,
 } from '@couture/api-client/contracts/http'
-import { evaluateBirthdateInput, getFederatedSignInStrings } from '@couture/utils'
+import {
+  evaluateBirthdateInput,
+  getBirthdateNotice,
+  getFederatedSignInStrings,
+  type FederatedSignInStrings,
+} from '@couture/utils'
 import { Text, View, createSchemeStyles } from '@/components/themed'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
@@ -72,15 +77,12 @@ const awaitingSessionAccount = async (accessToken: string) =>
   (await session()).fetchNativeAwaitingGuardianAccount(accessToken)
 const ignoreUnderage = () => undefined
 
-/**
- * D3: the email signup's inline birthdate messages, as signup-screen.tsx shows them. An
- * under-13 birthdate is an error (styled, an alert, announced); the rest are guidance.
- */
-function birthdateNotice(birthdate: string) {
+function birthdateNotice(birthdate: string, strings: FederatedSignInStrings) {
   const check = evaluateBirthdateInput(birthdate)
+  const message = getBirthdateNotice(check, strings)
   return {
-    message: check.message,
-    error: check.gate?.accountStatus === 'blocked_underage' ? check.message : null,
+    message,
+    error: check.gate?.accountStatus === 'blocked_underage' ? message : null,
   }
 }
 
@@ -146,7 +148,10 @@ export function FinishSignupScreen({
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'create' | 'cancel' | null>(null)
   const birthdateRef = useRef<TextInput>(null)
-  const { message: inlineMessage, error: inlineError } = birthdateNotice(birthdate)
+  const { message: inlineMessage, error: inlineError } = birthdateNotice(
+    birthdate,
+    strings
+  )
 
   useEffect(() => {
     let active = true

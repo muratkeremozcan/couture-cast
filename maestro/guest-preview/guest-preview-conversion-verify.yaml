@@ -16,9 +16,9 @@ tags:
 env:
   CODE_LABEL: 'Email code'
   VERIFY: 'Verify code'
-  PROPOSED_THERMAL: 'Thermal comfort: I tend to feel cold'
-  PROPOSED_WIND: 'Wind tolerance: Wind bothers me'
-  PROPOSED_RAIN: 'Rain preparedness: For any chance of rain'
+  PROPOSED_THERMAL: 'How warm you feel: I tend to feel cold'
+  PROPOSED_WIND: 'How wind feels: Wind bothers me'
+  PROPOSED_RAIN: 'When you pack for rain: For any chance of rain'
   SAVED: 'Your comfort preferences are saved.'
 ---
 - extendedWaitUntil:

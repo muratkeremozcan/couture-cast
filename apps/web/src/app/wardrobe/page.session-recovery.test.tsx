@@ -178,7 +178,7 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     expect(await screen.findByText(SIGNED_OUT_MESSAGE)).toBeInTheDocument()
     expect(await screen.findByText(/Unable to load your account, so/)).toBeInTheDocument()
     expect(
-      await screen.findByText('Unable to check your closet setup progress.')
+      await screen.findByText("We can't check your closet setup yet.")
     ).toBeInTheDocument()
     // CC-7.11 D6: Silhouette is a route link in the More menu, never gated on the account read.
     expect(screen.queryByRole('button', { name: 'Silhouette' })).toBeNull()
@@ -199,7 +199,7 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     await waitFor(() =>
       expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
     )
-    expect(await screen.findByText('No garments added yet')).toBeInTheDocument()
+    expect(await screen.findByText('No pieces yet')).toBeInTheDocument()
     openMore()
     await waitFor(() =>
       expect(screen.getByTestId('closet-more-setup')).toHaveTextContent(
@@ -210,7 +210,7 @@ describe('Step 58 follow-up: mount-time reads recover when the verified identity
     expect(screen.queryByText(SIGNED_OUT_MESSAGE)).not.toBeInTheDocument()
     expect(screen.queryByText(/Unable to load your account/)).not.toBeInTheDocument()
     expect(
-      screen.queryByText('Unable to check your closet setup progress.')
+      screen.queryByText("We can't check your closet setup yet.")
     ).not.toBeInTheDocument()
     expect(wardrobe.resolveCurrentUserId).toHaveBeenCalledTimes(2)
     expect(wardrobe.getOnboardingStateFromWeb).toHaveBeenCalledTimes(2)

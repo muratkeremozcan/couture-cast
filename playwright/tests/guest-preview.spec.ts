@@ -4,12 +4,14 @@
 // W-GATE-*, W-NO-PROTECTED-CALLS, W-NAV-HISTORY, W-RELOAD-RESUME, W-RAPID-CHANGES,
 // W-GATE-TAMPER, E-NO-DB-WRITES, E-GATE-SERVER-WINS, T-NO-PAGEVIEW, T-BEFORE-ELIGIBILITY,
 // L-MEMBER-OPENS-PREVIEW and the AC2 timing record.
+// CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page, Request } from '@playwright/test'
-import { SAMPLE_CATALOG } from '@couture/utils'
+import { getGuestPreviewStrings, SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
+import { expectReadable } from '../support/helpers/readable-text'
 import {
   isAllowedGuestPreviewRequest,
   isVercelPreviewToolbarRequest,
@@ -22,8 +24,7 @@ import {
 } from '../support/helpers/commerce-session'
 
 const STORAGE_KEY = 'couturecast.guest-preview'
-const LABEL =
-  'Sample wardrobe. Example weather and outfits, not your closet or live forecast.'
+const LABEL = 'Sample looks and weather. Your closet and live weather stay separate.'
 
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
@@ -111,13 +112,13 @@ async function expectPageFitsWidth(page: Page, width: number) {
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
 
-  test('[P0] [UX-FIRST-001] a phone visitor can find and edit a sample outfit', async ({
+  test('[P0] [UX-FIRST-001] [7.17-COPY-001/002] a phone visitor can find and edit a sample outfit', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/')
     const teaser = page.getByRole('region', { name: 'Outfit idea' })
-    const entry = teaser.getByRole('link', { name: 'Try a sample look' })
+    const entry = teaser.getByRole('link', { name: 'Try sample looks' })
     await expect(teaser.getByRole('heading', { name: 'Outfit idea' })).toBeInViewport({
       ratio: 1,
     })
@@ -127,11 +128,16 @@ test.describe('Guest preview (signed out)', () => {
       page.getByText('All personalization services reporting healthy.', { exact: true })
     ).toHaveCount(0)
     await entry.click()
+    const gate = page.getByTestId('guest-preview-gate')
+    await expect(gate.getByRole('heading', { name: 'Check your age' })).toBeVisible()
+    await expect(gate).toContainText(
+      'Enter your birthdate. This device checks it. The app never saves or sends it.'
+    )
     await passGate(page)
 
     const outfit = page.getByTestId('guest-preview-outfit')
     const nextLook = outfit.getByRole('button', { name: 'Try another look' })
-    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeInViewport({
+    await expect(outfit.getByRole('heading', { name: 'School day' })).toBeInViewport({
       ratio: 1,
     })
     const weather = outfit.getByTestId('guest-preview-weather-chip')
@@ -140,6 +146,11 @@ test.describe('Guest preview (signed out)', () => {
     await expect(nextLook).toBeInViewport({ ratio: 1 })
 
     const explanation = outfit.getByTestId('guest-preview-explanation')
+    await expect(
+      outfit.getByText('A button-up shirt, dark jeans and loafers for school.', {
+        exact: true,
+      })
+    ).toBeVisible()
     await expect(outfit.getByText('Loafers', { exact: true })).toBeVisible()
     await outfit.getByRole('button', { name: 'Swap shoes: Loafers' }).click()
     await page.getByRole('dialog').getByRole('radio', { name: 'White sneakers' }).click()
@@ -158,6 +169,48 @@ test.describe('Guest preview (signed out)', () => {
     await expect(explanation).toContainText('It is mild enough to skip an outer layer.')
   })
 
+  test.describe('CC-7.17 German first run @local-lane', () => {
+    test.use({ locale: 'de-DE', viewport: { width: 320, height: 760 } })
+
+    for (const colorScheme of ['light', 'dark'] as const) {
+      test.describe(colorScheme, () => {
+        test.use({ colorScheme })
+
+        test('[7.17-I18N-001/LAYOUT-001] the age check and first look fit at 320 px', async ({
+          page,
+        }) => {
+          await page.addInitScript(() => {
+            document.addEventListener('DOMContentLoaded', () => {
+              document.documentElement.style.fontSize = '200%'
+            })
+          })
+          await page.goto('/')
+          await expect(page.locator('html')).toHaveCSS('font-size', '32px')
+          const de = getGuestPreviewStrings('de-DE')
+          const entry = page.getByRole('link', { name: de.firstUse.sampleEntry })
+          await expectReadable(entry)
+          await entry.click()
+
+          const gate = page.getByTestId('guest-preview-gate')
+          await expectReadable(gate.getByRole('heading', { name: de.gate.heading }))
+          await expectReadable(gate.getByText(de.gate.body, { exact: true }))
+          await expectReadable(gate.getByText(de.gate.selfReported, { exact: true }))
+          await expectReadable(gate.getByTestId('guest-preview-gate-submit'))
+          await expectPageFitsWidth(page, 320)
+          await passGate(page)
+
+          const outfit = page.getByTestId('guest-preview-outfit')
+          const firstLook = de.looks['office-oxford']
+          await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
+          await expectReadable(outfit.getByRole('heading', { name: firstLook.name }))
+          await expectReadable(outfit.getByText(firstLook.description, { exact: true }))
+          await expectReadable(outfit.getByTestId('guest-preview-try-another'))
+          await expectPageFitsWidth(page, 320)
+        })
+      })
+    }
+  })
+
   test('[P0] [UX-FIRST-002] adding a garment from the preview asks the guest to create an account', async ({
     page,
   }) => {
@@ -166,8 +219,8 @@ test.describe('Guest preview (signed out)', () => {
     await page.getByRole('button', { name: 'Try another look' }).click()
     const editedOutfit = page.getByRole('heading', { name: 'Silk midi' })
     await expect(editedOutfit).toBeVisible()
-    const add = page.getByRole('region', { name: 'Add your own garment' })
-    await expect(add).toContainText('Create an account to add your clothes')
+    const add = page.getByRole('region', { name: 'Add your clothes' })
+    await expect(add).toContainText('Make an account to add your clothes')
     await add.getByRole('link', { name: 'Create account' }).click()
     await expect(page).toHaveURL(/\/signup\?from=preview$/)
     await page.getByRole('link', { name: 'Back to preview' }).click()
@@ -188,7 +241,7 @@ test.describe('Guest preview (signed out)', () => {
     await expect(page.locator('html')).toHaveCSS('font-size', '32px')
 
     const teaser = page.getByRole('region', { name: 'Outfit idea' })
-    const entry = teaser.getByRole('link', { name: 'Try a sample look' })
+    const entry = teaser.getByRole('link', { name: 'Try sample looks' })
     await expect(teaser.getByText(LABEL, { exact: true })).toBeVisible()
     await entry.scrollIntoViewIfNeeded()
     await expect(entry).toBeInViewport({ ratio: 1 })
@@ -198,7 +251,7 @@ test.describe('Guest preview (signed out)', () => {
 
     const outfit = page.getByTestId('guest-preview-outfit')
     const nextLook = outfit.getByRole('button', { name: 'Try another look' })
-    await expect(outfit.getByRole('heading', { name: 'Office oxford' })).toBeVisible()
+    await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
     await nextLook.scrollIntoViewIfNeeded()
     await expect(nextLook).toBeInViewport({ ratio: 1 })
     await expectPageFitsWidth(page, width)

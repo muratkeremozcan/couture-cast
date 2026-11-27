@@ -114,7 +114,7 @@ describe('7.11 Looks tab and Closet More menu strings (web)', () => {
       'looks.detail.signIn': 'Sign in to see your saved looks',
       'looks.detail.signInAction': 'Sign in',
       'looks.freePlan.week': 'Sample week',
-      'looks.freePlan.line': 'Premium plans your whole week around your forecast.',
+      'looks.freePlan.line': 'With Premium, you can plan what to wear all week.',
       'looks.freePlan.upgrade': 'Upgrade',
       'looks.loadMore': 'Show more',
       'wardrobe.menu.add': 'Add',

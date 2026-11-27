@@ -39,7 +39,7 @@ test.describe('Web smoke', () => {
     await page.goto('/')
 
     await expect(page.getByTestId('guest-preview-entry')).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Try a sample look' })).toHaveCount(1)
+    await expect(page.getByRole('link', { name: 'Try sample looks' })).toHaveCount(1)
     await expect(page.getByTestId('primary-nav')).toBeVisible()
     await expect(page.getByTestId('health-indicator')).toHaveCount(0)
 

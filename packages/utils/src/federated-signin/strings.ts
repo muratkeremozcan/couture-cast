@@ -1,6 +1,7 @@
 // Story 6.17 D11: Google sign-in and finish-step copy for the ten supported locales, shared
 // by web and mobile so both clients say the same thing for the same outcome.
 import { SUPPORTED_SIGNIN_LOCALES, type SupportedSigninLocale } from './locales'
+import type { BirthdateAgeGateEvaluation } from '../age'
 
 export type FederatedSignInStrings = {
   continueWithGoogle: string
@@ -28,6 +29,7 @@ export type FederatedSignInStrings = {
   continue: string
   underage: string
   invalidBirthdate: string
+  guardianRequired: string
   guardianMinor: string
   createUnavailable: string
   alreadyRegistered: string
@@ -68,33 +70,33 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'This Google account cannot sign in to CoutureCast. Sign in with an email code instead.',
     finishing: 'Finishing sign-in…',
-    finishTitle: 'Finish creating your account',
-    finishIntro:
-      'You are signed in with Google. Add your birthdate to create your CoutureCast account.',
+    finishTitle: 'Finish setup',
+    finishIntro: 'You signed in with Google. Add your birthdate to make your account.',
     googleAccount: 'Google account',
     birthdate: 'Birthdate',
-    birthdateHint: 'We use your birthdate only to check who can use CoutureCast.',
+    birthdateHint: 'We use your birthdate only to check your age.',
     create: 'Create account',
     creating: 'Creating account…',
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
+      'Your account is set up. Your guardian must approve it before you can add photos. Send the invite, then sign in after they approve.',
     awaitingGuardian:
-      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
+      'Your guardian still needs to approve your account. Send the invite, then sign in after they approve.',
     guardianStepTitle: 'Waiting for your guardian',
     guardianStepLeave: 'Sign out',
     continue: 'Continue',
-    underage: 'You must be 13 or older to use CoutureCast.',
-    invalidBirthdate: 'Enter your birthdate as a full date.',
+    underage: 'You must be 13 or older',
+    invalidBirthdate: 'Enter your birthdate as YYYY-MM-DD',
+    guardianRequired: 'You need your guardian’s approval.',
     guardianMinor: 'Guardian accounts need an adult birthdate.',
     createUnavailable:
       'Your account could not be created right now. Try again in a moment.',
     alreadyRegistered:
       'This Google address already has a CoutureCast account. Signing you in…',
     noSession: 'Your Google sign-in has ended. Start again from Sign in.',
-    guardianTitle: 'Guardian invitation',
-    guardianIntro: 'Invite a guardian to approve access for this teen account.',
+    guardianTitle: 'Invite a guardian',
+    guardianIntro: 'Ask your guardian to approve your account.',
     guardianEmail: 'Guardian email',
     consentLevel: 'Consent level',
     readOnly: 'Read only',
@@ -103,14 +105,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     fullAccessConsent: 'Full access consent',
     sendInvite: 'Send guardian invite',
     sendingInvite: 'Sending invite…',
-    inviteSent:
-      'Guardian invitation sent to {email}. Share the link below if they do not see the email.',
+    inviteSent: 'We sent an invite to {email}. Share the link if they miss the email.',
     invalidGuardianEmail: 'Enter a valid guardian email address.',
     inviteFailed: 'The guardian invitation could not be sent. Try again.',
-    signupEyebrow: 'COPPA-ready signup',
-    signupHeading: 'Start with age verification before wardrobe access unlocks.',
-    signupIntro:
-      'CoutureCast asks for your birthdate and does not create accounts for children under 13.',
+    signupEyebrow: 'Age check',
+    signupHeading: 'Enter your birthdate',
+    signupIntro: 'You must be 13 or older to make an account.',
     backHome: 'Back home',
     email: 'Email',
     signupCreated: 'Account created. Sign in with your email to continue.',
@@ -125,33 +125,33 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'This Google account cannot sign in to CoutureCast. Sign in with an email code instead.',
     finishing: 'Finishing sign-in…',
-    finishTitle: 'Finish creating your account',
-    finishIntro:
-      'You are signed in with Google. Add your birthdate to create your CoutureCast account.',
+    finishTitle: 'Finish setup',
+    finishIntro: 'You signed in with Google. Add your birthdate to make your account.',
     googleAccount: 'Google account',
     birthdate: 'Birthdate',
-    birthdateHint: 'We use your birthdate only to check who can use CoutureCast.',
+    birthdateHint: 'We use your birthdate only to check your age.',
     create: 'Create account',
     creating: 'Creating account…',
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
+      'Your account is set up. Your guardian must approve it before you can add photos. Send the invite, then sign in after they approve.',
     awaitingGuardian:
-      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
+      'Your guardian still needs to approve your account. Send the invite, then sign in after they approve.',
     guardianStepTitle: 'Waiting for your guardian',
     guardianStepLeave: 'Sign out',
     continue: 'Continue',
-    underage: 'You must be 13 or older to use CoutureCast.',
-    invalidBirthdate: 'Enter your birthdate as a full date.',
+    underage: 'You must be 13 or older',
+    invalidBirthdate: 'Enter your birthdate as YYYY-MM-DD',
+    guardianRequired: 'You need your guardian’s approval.',
     guardianMinor: 'Guardian accounts need an adult birthdate.',
     createUnavailable:
       'Your account could not be created right now. Try again in a moment.',
     alreadyRegistered:
       'This Google address already has a CoutureCast account. Signing you in…',
     noSession: 'Your Google sign-in has ended. Start again from Sign in.',
-    guardianTitle: 'Guardian invitation',
-    guardianIntro: 'Invite a guardian to approve access for this teen account.',
+    guardianTitle: 'Invite a guardian',
+    guardianIntro: 'Ask your guardian to approve your account.',
     guardianEmail: 'Guardian email',
     consentLevel: 'Consent level',
     readOnly: 'Read only',
@@ -160,14 +160,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     fullAccessConsent: 'Full access consent',
     sendInvite: 'Send guardian invite',
     sendingInvite: 'Sending invite…',
-    inviteSent:
-      'Guardian invitation sent to {email}. Share the link below if they do not see the email.',
+    inviteSent: 'We sent an invite to {email}. Share the link if they miss the email.',
     invalidGuardianEmail: 'Enter a valid guardian email address.',
     inviteFailed: 'The guardian invitation could not be sent. Try again.',
-    signupEyebrow: 'COPPA-ready signup',
-    signupHeading: 'Start with age verification before wardrobe access unlocks.',
-    signupIntro:
-      'CoutureCast asks for your birthdate and does not create accounts for children under 13.',
+    signupEyebrow: 'Age check',
+    signupHeading: 'Enter your birthdate',
+    signupIntro: 'You must be 13 or older to make an account.',
     backHome: 'Back home',
     email: 'Email',
     signupCreated: 'Account created. Sign in with your email to continue.',
@@ -182,26 +180,26 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Esta cuenta de Google no puede iniciar sesión en CoutureCast. Inicia sesión con un código por correo.',
     finishing: 'Terminando el inicio de sesión…',
-    finishTitle: 'Termina de crear tu cuenta',
+    finishTitle: 'Termina el registro',
     finishIntro:
-      'Iniciaste sesión con Google. Agrega tu fecha de nacimiento para crear tu cuenta de CoutureCast.',
+      'Ya iniciaste sesión con Google. Escribe tu fecha de nacimiento para crear tu cuenta.',
     googleAccount: 'Cuenta de Google',
     birthdate: 'Fecha de nacimiento',
-    birthdateHint:
-      'Solo usamos tu fecha de nacimiento para comprobar quién puede usar CoutureCast.',
+    birthdateHint: 'Solo usamos tu fecha de nacimiento para comprobar tu edad.',
     create: 'Crear cuenta',
     creating: 'Creando cuenta…',
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
+      'Tu cuenta está lista. Tu tutor debe aprobarla antes de que agregues fotos. Envía la invitación y vuelve a iniciar sesión cuando la apruebe.',
     awaitingGuardian:
-      'Tu cuenta está esperando la aprobación de un tutor. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
+      'Tu tutor aún debe aprobar tu cuenta. Envía la invitación y vuelve a iniciar sesión cuando la apruebe.',
     guardianStepTitle: 'Esperando a tu tutor',
     guardianStepLeave: 'Cerrar sesión',
     continue: 'Continuar',
-    underage: 'Debes tener 13 años o más para usar CoutureCast.',
-    invalidBirthdate: 'Escribe tu fecha de nacimiento completa.',
+    underage: 'Debes tener 13 años o más',
+    invalidBirthdate: 'Escribe tu fecha de nacimiento en formato YYYY-MM-DD',
+    guardianRequired: 'Necesitas la aprobación de tu tutor.',
     guardianMinor: 'Las cuentas de tutor necesitan una fecha de nacimiento de un adulto.',
     createUnavailable:
       'No pudimos crear tu cuenta en este momento. Vuelve a intentarlo en un momento.',
@@ -209,9 +207,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Esta dirección de Google ya tiene una cuenta de CoutureCast. Iniciando sesión…',
     noSession:
       'Tu inicio de sesión con Google terminó. Vuelve a empezar desde Iniciar sesión.',
-    guardianTitle: 'Invitación al tutor',
-    guardianIntro:
-      'Invita a un tutor para que apruebe el acceso de esta cuenta adolescente.',
+    guardianTitle: 'Invita a tu tutor',
+    guardianIntro: 'Pide a tu tutor que apruebe tu cuenta.',
     guardianEmail: 'Correo del tutor',
     consentLevel: 'Nivel de consentimiento',
     readOnly: 'Solo lectura',
@@ -221,14 +218,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: 'Enviar invitación al tutor',
     sendingInvite: 'Enviando invitación…',
     inviteSent:
-      'Invitación enviada a {email}. Comparte el enlace de abajo si no ve el correo.',
+      'Enviamos una invitación a {email}. Comparte el enlace si no ven el correo.',
     invalidGuardianEmail: 'Escribe un correo válido para el tutor.',
     inviteFailed: 'No se pudo enviar la invitación al tutor. Vuelve a intentarlo.',
-    signupEyebrow: 'Registro compatible con COPPA',
-    signupHeading:
-      'Comienza con la verificación de edad antes de desbloquear el acceso al armario.',
-    signupIntro:
-      'CoutureCast te pide tu fecha de nacimiento y no crea cuentas para menores de 13 años.',
+    signupEyebrow: 'Control de edad',
+    signupHeading: 'Escribe tu fecha de nacimiento',
+    signupIntro: 'Debes tener 13 años o más para crear una cuenta.',
     backHome: 'Volver al inicio',
     email: 'Correo electrónico',
     signupCreated:
@@ -244,26 +239,26 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Ce compte Google ne peut pas se connecter à CoutureCast. Connectez-vous plutôt avec un code par courriel.',
     finishing: 'Finalisation de la connexion…',
-    finishTitle: 'Terminez la création de votre compte',
+    finishTitle: 'Termine ton inscription',
     finishIntro:
-      'Vous êtes connecté avec Google. Ajoutez votre date de naissance pour créer votre compte CoutureCast.',
+      'Tu es connecté avec Google. Entre ta date de naissance pour créer ton compte.',
     googleAccount: 'Compte Google',
     birthdate: 'Date de naissance',
-    birthdateHint:
-      'Nous utilisons votre date de naissance uniquement pour vérifier qui peut utiliser CoutureCast.',
+    birthdateHint: 'On utilise ta date de naissance seulement pour vérifier ton âge.',
     create: 'Créer le compte',
     creating: 'Création du compte…',
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+      'Ton compte est créé. Ton parent ou tuteur doit l’approuver avant que tu puisses ajouter des photos. Envoie l’invitation et reconnecte-toi après son accord.',
     awaitingGuardian:
-      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+      'Ton parent ou tuteur doit encore approuver ton compte. Envoie l’invitation et reconnecte-toi après son accord.',
     guardianStepTitle: 'En attente de votre parent ou tuteur',
     guardianStepLeave: 'Se déconnecter',
     continue: 'Continuer',
-    underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
-    invalidBirthdate: 'Entrez votre date de naissance complète.',
+    underage: 'Tu dois avoir 13 ans ou plus',
+    invalidBirthdate: 'Entre ta date de naissance au format YYYY-MM-DD',
+    guardianRequired: 'Il te faut l’accord de ton parent ou tuteur.',
     guardianMinor: "Les comptes de tuteur exigent une date de naissance d'adulte.",
     createUnavailable:
       "Votre compte n'a pas pu être créé pour le moment. Réessayez dans un instant.",
@@ -271,9 +266,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Cette adresse Google a déjà un compte CoutureCast. Connexion en cours…',
     noSession:
       'Votre connexion avec Google a pris fin. Recommencez à partir de Se connecter.',
-    guardianTitle: 'Invitation au tuteur',
-    guardianIntro:
-      "Invitez un parent ou tuteur à approuver l'accès de ce compte adolescent.",
+    guardianTitle: 'Invite ton parent ou tuteur',
+    guardianIntro: 'Demande à ton parent ou tuteur d’approuver ton compte.',
     guardianEmail: 'Courriel du tuteur',
     consentLevel: 'Niveau de consentement',
     readOnly: 'Lecture seule',
@@ -283,14 +277,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: "Envoyer l'invitation au tuteur",
     sendingInvite: "Envoi de l'invitation…",
     inviteSent:
-      "Invitation envoyée à {email}. Partagez le lien ci-dessous s'il ne voit pas le courriel.",
+      'On a envoyé une invitation à {email}. Partage le lien si la personne ne voit pas le courriel.',
     invalidGuardianEmail: 'Entrez une adresse courriel valide pour le tuteur.',
     inviteFailed: "L'invitation au tuteur n'a pas pu être envoyée. Réessayez.",
-    signupEyebrow: 'Inscription conforme à la COPPA',
-    signupHeading:
-      "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
-    signupIntro:
-      'CoutureCast demande votre date de naissance et ne crée pas de compte pour les enfants de moins de 13 ans.',
+    signupEyebrow: 'Vérification de l’âge',
+    signupHeading: 'Entre ta date de naissance',
+    signupIntro: 'Tu dois avoir 13 ans ou plus pour créer un compte.',
     backHome: "Retour à l'accueil",
     email: 'Adresse courriel',
     signupCreated:
@@ -306,35 +298,34 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Ce compte Google ne peut pas se connecter à CoutureCast. Connectez-vous plutôt avec un code reçu par e-mail.',
     finishing: 'Finalisation de la connexion…',
-    finishTitle: 'Terminez la création de votre compte',
+    finishTitle: 'Termine ton inscription',
     finishIntro:
-      'Vous êtes connecté avec Google. Ajoutez votre date de naissance pour créer votre compte CoutureCast.',
+      'Tu es connecté avec Google. Saisis ta date de naissance pour créer ton compte.',
     googleAccount: 'Compte Google',
     birthdate: 'Date de naissance',
-    birthdateHint:
-      'Nous utilisons votre date de naissance uniquement pour vérifier qui peut utiliser CoutureCast.',
+    birthdateHint: 'On utilise ta date de naissance seulement pour vérifier ton âge.',
     create: 'Créer le compte',
     creating: 'Création du compte…',
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+      'Ton compte est créé. Ton parent ou tuteur doit l’approuver avant que tu puisses ajouter des photos. Envoie l’invitation et reconnecte-toi après son accord.',
     awaitingGuardian:
-      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+      'Ton parent ou tuteur doit encore approuver ton compte. Envoie l’invitation et reconnecte-toi après son accord.',
     guardianStepTitle: 'En attente de votre parent ou tuteur',
     guardianStepLeave: 'Se déconnecter',
     continue: 'Continuer',
-    underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
-    invalidBirthdate: 'Saisissez votre date de naissance complète.',
+    underage: 'Tu dois avoir 13 ans ou plus',
+    invalidBirthdate: 'Saisis ta date de naissance au format YYYY-MM-DD',
+    guardianRequired: 'Il te faut l’accord de ton parent ou tuteur.',
     guardianMinor: "Les comptes de tuteur exigent une date de naissance d'adulte.",
     createUnavailable:
       "Votre compte n'a pas pu être créé pour le moment. Réessayez dans un instant.",
     alreadyRegistered:
       'Cette adresse Google a déjà un compte CoutureCast. Connexion en cours…',
     noSession: 'Votre connexion avec Google a pris fin. Recommencez depuis Se connecter.',
-    guardianTitle: 'Invitation au tuteur',
-    guardianIntro:
-      "Invitez un parent ou tuteur à approuver l'accès de ce compte adolescent.",
+    guardianTitle: 'Invite ton parent ou tuteur',
+    guardianIntro: 'Demande à ton parent ou tuteur d’approuver ton compte.',
     guardianEmail: 'E-mail du tuteur',
     consentLevel: 'Niveau de consentement',
     readOnly: 'Lecture seule',
@@ -344,14 +335,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: "Envoyer l'invitation au tuteur",
     sendingInvite: "Envoi de l'invitation…",
     inviteSent:
-      "Invitation envoyée à {email}. Partagez le lien ci-dessous s'il ne voit pas l'e-mail.",
+      'On a envoyé une invitation à {email}. Partage le lien si la personne ne voit pas l’e-mail.',
     invalidGuardianEmail: 'Saisissez une adresse e-mail valide pour le tuteur.',
     inviteFailed: "L'invitation au tuteur n'a pas pu être envoyée. Réessayez.",
-    signupEyebrow: 'Inscription conforme à la COPPA',
-    signupHeading:
-      "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
-    signupIntro:
-      'CoutureCast demande votre date de naissance et ne crée pas de compte pour les enfants de moins de 13 ans.',
+    signupEyebrow: 'Vérification de l’âge',
+    signupHeading: 'Saisis ta date de naissance',
+    signupIntro: 'Tu dois avoir 13 ans ou plus pour créer un compte.',
     backHome: "Retour à l'accueil",
     email: 'Adresse e-mail',
     signupCreated:
@@ -367,33 +356,32 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       "Bu Google hesabı CoutureCast'e giriş yapamaz. Bunun yerine e-posta koduyla giriş yapın.",
     finishing: 'Giriş tamamlanıyor…',
-    finishTitle: 'Hesabınızı oluşturmayı tamamlayın',
-    finishIntro:
-      'Google ile giriş yaptınız. CoutureCast hesabınızı oluşturmak için doğum tarihinizi ekleyin.',
+    finishTitle: 'Kaydını tamamla',
+    finishIntro: 'Google ile giriş yaptın. Hesap açmak için doğum tarihini gir.',
     googleAccount: 'Google hesabı',
     birthdate: 'Doğum tarihi',
-    birthdateHint:
-      "Doğum tarihinizi yalnızca CoutureCast'i kimlerin kullanabileceğini kontrol etmek için kullanırız.",
+    birthdateHint: 'Doğum tarihini sadece yaşını kontrol etmek için kullanırız.',
     create: 'Hesap oluştur',
     creating: 'Hesap oluşturuluyor…',
     cancel: 'İptal',
     cancelling: 'İptal ediliyor…',
     createdGuardianPending:
-      'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
+      'Hesabın açıldı. Fotoğraf eklemeden önce velin hesabı onaylamalı. Daveti gönder, onaydan sonra giriş yap.',
     awaitingGuardian:
-      'Hesabınız bir velinin onayını bekliyor. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
+      'Velin hesabını henüz onaylamadı. Daveti gönder, onaydan sonra giriş yap.',
     guardianStepTitle: 'Velinizin onayı bekleniyor',
     guardianStepLeave: 'Çıkış yap',
     continue: 'Devam',
-    underage: "CoutureCast'i kullanmak için en az 13 yaşında olmalısınız.",
-    invalidBirthdate: 'Doğum tarihinizi tam tarih olarak girin.',
+    underage: 'En az 13 yaşında olmalısın',
+    invalidBirthdate: 'Doğum tarihini YYYY-MM-DD biçiminde gir',
+    guardianRequired: 'Velinin onayı gerekiyor.',
     guardianMinor: 'Veli hesapları için yetişkin doğum tarihi gerekir.',
     createUnavailable: 'Hesabınız şu anda oluşturulamadı. Biraz sonra tekrar deneyin.',
     alreadyRegistered:
       'Bu Google adresinin zaten bir CoutureCast hesabı var. Giriş yapılıyor…',
     noSession: 'Google ile girişiniz sona erdi. Giriş yap sayfasından yeniden başlayın.',
-    guardianTitle: 'Veli daveti',
-    guardianIntro: 'Bu genç hesabının erişimini onaylaması için bir veli davet edin.',
+    guardianTitle: 'Velini davet et',
+    guardianIntro: 'Velinden hesabını onaylamasını iste.',
     guardianEmail: 'Veli e-postası',
     consentLevel: 'Onay düzeyi',
     readOnly: 'Salt okunur',
@@ -402,14 +390,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     fullAccessConsent: 'Tam erişim onayı',
     sendInvite: 'Veli daveti gönder',
     sendingInvite: 'Davet gönderiliyor…',
-    inviteSent:
-      'Davet {email} adresine gönderildi. E-postayı görmezse aşağıdaki bağlantıyı paylaşın.',
+    inviteSent: '{email} adresine davet gönderdik. E-postayı görmezse bağlantıyı paylaş.',
     invalidGuardianEmail: 'Geçerli bir veli e-posta adresi girin.',
     inviteFailed: 'Veli daveti gönderilemedi. Tekrar deneyin.',
-    signupEyebrow: 'COPPA uyumlu kayıt',
-    signupHeading: 'Gardırop erişimi açılmadan önce yaş doğrulamasıyla başlayın.',
-    signupIntro:
-      'CoutureCast doğum tarihinizi sorar ve 13 yaşından küçük çocuklar için hesap oluşturmaz.',
+    signupEyebrow: 'Yaş kontrolü',
+    signupHeading: 'Doğum tarihini gir',
+    signupIntro: 'Hesap açmak için en az 13 yaşında olmalısın.',
     backHome: 'Ana sayfaya dön',
     email: 'E-posta adresi',
     signupCreated: 'Hesap oluşturuldu. Devam etmek için e-posta adresinizle giriş yapın.',
@@ -424,26 +410,26 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Mit diesem Google-Konto ist keine Anmeldung bei CoutureCast möglich. Melde dich stattdessen mit einem E-Mail-Code an.',
     finishing: 'Anmeldung wird abgeschlossen…',
-    finishTitle: 'Konto fertig erstellen',
+    finishTitle: 'Einrichtung abschließen',
     finishIntro:
-      'Du bist mit Google angemeldet. Gib dein Geburtsdatum ein, um dein CoutureCast-Konto zu erstellen.',
+      'Du bist mit Google angemeldet. Gib dein Geburtsdatum ein, um dein Konto zu erstellen.',
     googleAccount: 'Google-Konto',
     birthdate: 'Geburtsdatum',
-    birthdateHint:
-      'Wir verwenden dein Geburtsdatum nur, um zu prüfen, wer CoutureCast nutzen darf.',
+    birthdateHint: 'Wir nutzen dein Geburtsdatum nur, um dein Alter zu prüfen.',
     create: 'Konto erstellen',
     creating: 'Konto wird erstellt…',
     cancel: 'Abbrechen',
     cancelling: 'Wird abgebrochen…',
     createdGuardianPending:
-      'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
+      'Dein Konto ist erstellt. Ein Elternteil oder Vormund muss zustimmen, bevor du Fotos hinzufügen kannst. Sende die Einladung und melde dich nach der Zustimmung wieder an.',
     awaitingGuardian:
-      'Dein Konto wartet auf die Zustimmung eines Erziehungsberechtigten. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
+      'Ein Elternteil oder Vormund muss deinem Konto noch zustimmen. Sende die Einladung und melde dich nach der Zustimmung wieder an.',
     guardianStepTitle: 'Warten auf deine erziehungsberechtigte Person',
     guardianStepLeave: 'Abmelden',
     continue: 'Weiter',
-    underage: 'Du musst mindestens 13 Jahre alt sein, um CoutureCast zu nutzen.',
-    invalidBirthdate: 'Gib dein vollständiges Geburtsdatum ein.',
+    underage: 'Du musst mindestens 13 sein',
+    invalidBirthdate: 'Gib dein Geburtsdatum als YYYY-MM-DD ein',
+    guardianRequired: 'Du brauchst die Zustimmung eines Elternteils oder Vormunds.',
     guardianMinor:
       'Konten von Erziehungsberechtigten brauchen das Geburtsdatum einer erwachsenen Person.',
     createUnavailable:
@@ -451,9 +437,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     alreadyRegistered:
       'Für diese Google-Adresse gibt es bereits ein CoutureCast-Konto. Du wirst angemeldet…',
     noSession: 'Deine Anmeldung mit Google ist beendet. Starte erneut über Anmelden.',
-    guardianTitle: 'Einladung an Erziehungsberechtigte',
-    guardianIntro:
-      'Lade eine erziehungsberechtigte Person ein, den Zugang für dieses Teenager-Konto zu genehmigen.',
+    guardianTitle: 'Elternteil oder Vormund einladen',
+    guardianIntro: 'Bitte einen Elternteil oder Vormund, deinem Konto zuzustimmen.',
     guardianEmail: 'E-Mail der erziehungsberechtigten Person',
     consentLevel: 'Einwilligungsstufe',
     readOnly: 'Nur lesen',
@@ -463,15 +448,13 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: 'Einladung senden',
     sendingInvite: 'Einladung wird gesendet…',
     inviteSent:
-      'Einladung an {email} gesendet. Teile den Link unten, falls die E-Mail nicht ankommt.',
+      'Wir haben eine Einladung an {email} gesendet. Teile den Link, falls die E-Mail übersehen wird.',
     invalidGuardianEmail:
       'Gib eine gültige E-Mail-Adresse der erziehungsberechtigten Person ein.',
     inviteFailed: 'Die Einladung konnte nicht gesendet werden. Versuche es erneut.',
-    signupEyebrow: 'COPPA-konforme Registrierung',
-    signupHeading:
-      'Starte mit der Altersprüfung, bevor dein Kleiderschrank freigeschaltet wird.',
-    signupIntro:
-      'CoutureCast fragt nach deinem Geburtsdatum und erstellt keine Konten für Kinder unter 13 Jahren.',
+    signupEyebrow: 'Altersprüfung',
+    signupHeading: 'Gib dein Geburtsdatum ein',
+    signupIntro: 'Du musst mindestens 13 sein, um ein Konto zu erstellen.',
     backHome: 'Zur Startseite',
     email: 'E-Mail-Adresse',
     signupCreated:
@@ -487,35 +470,34 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Questo account Google non può accedere a CoutureCast. Accedi invece con un codice via email.',
     finishing: "Completamento dell'accesso…",
-    finishTitle: 'Completa la creazione del tuo account',
+    finishTitle: 'Completa la registrazione',
     finishIntro:
-      "Hai effettuato l'accesso con Google. Aggiungi la tua data di nascita per creare il tuo account CoutureCast.",
+      'Hai effettuato l’accesso con Google. Inserisci la data di nascita per creare il tuo account.',
     googleAccount: 'Account Google',
     birthdate: 'Data di nascita',
-    birthdateHint:
-      'Usiamo la tua data di nascita solo per verificare chi può usare CoutureCast.',
+    birthdateHint: 'Usiamo la tua data di nascita solo per controllare la tua età.',
     create: 'Crea account',
     creating: "Creazione dell'account…",
     cancel: 'Annulla',
     cancelling: 'Annullamento…',
     createdGuardianPending:
-      "Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
+      'Il tuo account è pronto. Un genitore o tutore deve approvarlo prima che tu possa aggiungere foto. Invia l’invito e accedi dopo il suo consenso.',
     awaitingGuardian:
-      "Il tuo account è in attesa dell'approvazione di un genitore o tutore. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
+      'Il tuo genitore o tutore deve ancora approvare l’account. Invia l’invito e accedi dopo il suo consenso.',
     guardianStepTitle: 'In attesa del tuo genitore o tutore',
     guardianStepLeave: 'Esci',
     continue: 'Continua',
-    underage: 'Devi avere almeno 13 anni per usare CoutureCast.',
-    invalidBirthdate: 'Inserisci la tua data di nascita completa.',
+    underage: 'Devi avere almeno 13 anni',
+    invalidBirthdate: 'Inserisci la data di nascita in formato YYYY-MM-DD',
+    guardianRequired: 'Ti serve il consenso di un genitore o tutore.',
     guardianMinor: 'Gli account dei tutori richiedono la data di nascita di un adulto.',
     createUnavailable:
       'Non è stato possibile creare il tuo account in questo momento. Riprova tra poco.',
     alreadyRegistered:
       'Questo indirizzo Google ha già un account CoutureCast. Accesso in corso…',
     noSession: "L'accesso con Google è terminato. Ricomincia da Accedi.",
-    guardianTitle: 'Invito al tutore',
-    guardianIntro:
-      "Invita un genitore o tutore ad approvare l'accesso di questo account adolescente.",
+    guardianTitle: 'Invita un genitore o tutore',
+    guardianIntro: 'Chiedi a un genitore o tutore di approvare il tuo account.',
     guardianEmail: 'Email del tutore',
     consentLevel: 'Livello di consenso',
     readOnly: 'Sola lettura',
@@ -525,14 +507,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: 'Invia invito al tutore',
     sendingInvite: "Invio dell'invito…",
     inviteSent:
-      "Invito inviato a {email}. Condividi il link qui sotto se non vede l'email.",
+      'Abbiamo inviato un invito a {email}. Condividi il link se l’e-mail sfugge.',
     invalidGuardianEmail: 'Inserisci un indirizzo email valido per il tutore.',
     inviteFailed: "Non è stato possibile inviare l'invito al tutore. Riprova.",
-    signupEyebrow: 'Registrazione conforme al COPPA',
-    signupHeading:
-      "Inizia con la verifica dell'età prima di sbloccare l'accesso al guardaroba.",
-    signupIntro:
-      'CoutureCast chiede la tua data di nascita e non crea account per bambini sotto i 13 anni.',
+    signupEyebrow: 'Controllo dell’età',
+    signupHeading: 'Inserisci la tua data di nascita',
+    signupIntro: 'Devi avere almeno 13 anni per creare un account.',
     backHome: 'Torna alla home',
     email: 'Indirizzo email',
     signupCreated: 'Account creato. Accedi con il tuo indirizzo email per continuare.',
@@ -547,35 +527,34 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Esta conta do Google não pode entrar no CoutureCast. Entre com um código por e-mail.',
     finishing: 'Concluindo o login…',
-    finishTitle: 'Termine de criar sua conta',
+    finishTitle: 'Termine o cadastro',
     finishIntro:
-      'Você entrou com o Google. Adicione sua data de nascimento para criar sua conta do CoutureCast.',
+      'Você entrou com o Google. Informe sua data de nascimento para criar sua conta.',
     googleAccount: 'Conta do Google',
     birthdate: 'Data de nascimento',
-    birthdateHint:
-      'Usamos sua data de nascimento só para verificar quem pode usar o CoutureCast.',
+    birthdateHint: 'Usamos sua data de nascimento só para verificar sua idade.',
     create: 'Criar conta',
     creating: 'Criando conta…',
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados. Envie o convite abaixo e entre de novo quando ele aprovar.',
+      'Sua conta foi criada. Seu responsável precisa aprová-la antes de você adicionar fotos. Mande o convite e entre depois da aprovação.',
     awaitingGuardian:
-      'Sua conta está aguardando a aprovação de um responsável. Envie o convite abaixo e entre de novo quando ele aprovar.',
+      'Seu responsável ainda precisa aprovar a conta. Mande o convite e entre depois da aprovação.',
     guardianStepTitle: 'Aguardando seu responsável',
     guardianStepLeave: 'Sair',
     continue: 'Continuar',
-    underage: 'Você precisa ter 13 anos ou mais para usar o CoutureCast.',
-    invalidBirthdate: 'Digite sua data de nascimento completa.',
+    underage: 'Você precisa ter 13 anos ou mais',
+    invalidBirthdate: 'Digite sua data de nascimento no formato YYYY-MM-DD',
+    guardianRequired: 'Você precisa da autorização do seu responsável.',
     guardianMinor: 'Contas de responsável precisam da data de nascimento de um adulto.',
     createUnavailable:
       'Não foi possível criar sua conta agora. Tente de novo em instantes.',
     alreadyRegistered:
       'Este endereço do Google já tem uma conta do CoutureCast. Entrando…',
     noSession: 'Seu login com o Google terminou. Comece de novo em Entrar.',
-    guardianTitle: 'Convite ao responsável',
-    guardianIntro:
-      'Convide um responsável para aprovar o acesso desta conta de adolescente.',
+    guardianTitle: 'Convide seu responsável',
+    guardianIntro: 'Peça ao seu responsável para aprovar sua conta.',
     guardianEmail: 'E-mail do responsável',
     consentLevel: 'Nível de consentimento',
     readOnly: 'Somente leitura',
@@ -585,14 +564,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: 'Enviar convite ao responsável',
     sendingInvite: 'Enviando convite…',
     inviteSent:
-      'Convite enviado para {email}. Compartilhe o link abaixo se a pessoa não vir o e-mail.',
+      'Mandamos um convite para {email}. Compartilhe o link se a pessoa não vir o e-mail.',
     invalidGuardianEmail: 'Digite um e-mail válido para o responsável.',
     inviteFailed: 'Não foi possível enviar o convite ao responsável. Tente de novo.',
-    signupEyebrow: 'Cadastro em conformidade com a COPPA',
-    signupHeading:
-      'Comece pela verificação de idade antes de liberar o acesso ao guarda-roupa.',
-    signupIntro:
-      'O CoutureCast pede sua data de nascimento e não cria contas para crianças menores de 13 anos.',
+    signupEyebrow: 'Verificação de idade',
+    signupHeading: 'Informe sua data de nascimento',
+    signupIntro: 'Você precisa ter 13 anos ou mais para criar uma conta.',
     backHome: 'Voltar ao início',
     email: 'Endereço de e-mail',
     signupCreated: 'Conta criada. Entre com seu e-mail para continuar.',
@@ -607,26 +584,26 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     refused:
       'Esta conta Google não pode iniciar sessão no CoutureCast. Inicie sessão com um código por email.',
     finishing: 'A concluir o início de sessão…',
-    finishTitle: 'Termine de criar a sua conta',
+    finishTitle: 'Termina o registo',
     finishIntro:
-      'Iniciou sessão com o Google. Adicione a sua data de nascimento para criar a sua conta CoutureCast.',
+      'Entraste com o Google. Indica a tua data de nascimento para criares a tua conta.',
     googleAccount: 'Conta Google',
     birthdate: 'Data de nascimento',
-    birthdateHint:
-      'Usamos a sua data de nascimento apenas para verificar quem pode usar o CoutureCast.',
+    birthdateHint: 'Só usamos a tua data de nascimento para confirmar a tua idade.',
     create: 'Criar conta',
     creating: 'A criar conta…',
     cancel: 'Cancelar',
     cancelling: 'A cancelar…',
     createdGuardianPending:
-      'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
+      'A tua conta está criada. O teu encarregado de educação tem de a aprovar antes de poderes adicionar fotografias. Envia o convite e entra após a aprovação.',
     awaitingGuardian:
-      'A sua conta está a aguardar a aprovação de um encarregado de educação. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
+      'O teu encarregado de educação ainda tem de aprovar a conta. Envia o convite e entra após a aprovação.',
     guardianStepTitle: 'A aguardar o seu encarregado de educação',
     guardianStepLeave: 'Terminar sessão',
     continue: 'Continuar',
-    underage: 'Tem de ter 13 anos ou mais para usar o CoutureCast.',
-    invalidBirthdate: 'Introduza a sua data de nascimento completa.',
+    underage: 'Tens de ter 13 anos ou mais',
+    invalidBirthdate: 'Indica a tua data de nascimento no formato YYYY-MM-DD',
+    guardianRequired: 'Precisas da autorização do teu encarregado de educação.',
     guardianMinor:
       'As contas de encarregado de educação precisam da data de nascimento de um adulto.',
     createUnavailable:
@@ -635,9 +612,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Este endereço Google já tem uma conta CoutureCast. A iniciar sessão…',
     noSession:
       'O seu início de sessão com o Google terminou. Recomece em Iniciar sessão.',
-    guardianTitle: 'Convite ao encarregado de educação',
-    guardianIntro:
-      'Convide um encarregado de educação a aprovar o acesso desta conta de adolescente.',
+    guardianTitle: 'Convida o teu encarregado de educação',
+    guardianIntro: 'Pede ao teu encarregado de educação que aprove a tua conta.',
     guardianEmail: 'Email do encarregado de educação',
     consentLevel: 'Nível de consentimento',
     readOnly: 'Apenas leitura',
@@ -647,14 +623,12 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     sendInvite: 'Enviar convite',
     sendingInvite: 'A enviar convite…',
     inviteSent:
-      'Convite enviado para {email}. Partilhe a ligação abaixo se não vir o email.',
+      'Enviámos um convite para {email}. Partilha a ligação se a pessoa não vir o e-mail.',
     invalidGuardianEmail: 'Introduza um email válido do encarregado de educação.',
     inviteFailed: 'Não foi possível enviar o convite. Tente novamente.',
-    signupEyebrow: 'Registo em conformidade com a COPPA',
-    signupHeading:
-      'Comece pela verificação da idade antes de desbloquear o acesso ao guarda-roupa.',
-    signupIntro:
-      'O CoutureCast pede a sua data de nascimento e não cria contas para crianças com menos de 13 anos.',
+    signupEyebrow: 'Verificação da idade',
+    signupHeading: 'Indica a tua data de nascimento',
+    signupIntro: 'Tens de ter 13 anos ou mais para criar uma conta.',
     backHome: 'Voltar ao início',
     email: 'Endereço de e-mail',
     signupCreated: 'Conta criada. Inicie sessão com o seu e-mail para continuar.',
@@ -689,4 +663,16 @@ export function getFederatedSignInStrings(
   locale: string | undefined
 ): FederatedSignInStrings {
   return FEDERATED_SIGNIN_STRINGS[resolveFederatedSignInLocale(locale)]
+}
+
+export function getBirthdateNotice(
+  evaluation: BirthdateAgeGateEvaluation,
+  strings: FederatedSignInStrings
+): string | null {
+  if (evaluation.kind === 'invalid') return strings.invalidBirthdate
+  if (evaluation.gate?.accountStatus === 'blocked_underage') return strings.underage
+  if (evaluation.gate?.accountStatus === 'pending_guardian_consent') {
+    return strings.guardianRequired
+  }
+  return null
 }

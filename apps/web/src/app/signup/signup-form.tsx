@@ -12,6 +12,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   evaluateBirthdateInput,
+  getBirthdateNotice,
   getFederatedSignInStrings,
   getGuestPreviewStrings,
 } from '@couture/utils'
@@ -61,10 +62,7 @@ export function SignupForm({
   const [isInviting, setIsInviting] = useState(false)
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
-  const inlineMessage =
-    birthdateEvaluation.gate?.accountStatus === 'blocked_underage'
-      ? strings.underage
-      : birthdateEvaluation.message
+  const inlineMessage = getBirthdateNotice(birthdateEvaluation, strings)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
