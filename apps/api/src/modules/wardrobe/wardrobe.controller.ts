@@ -26,11 +26,13 @@ import {
   updateGarmentTagsInputSchema,
   updateGarmentTagsResponseSchema,
   updateGarmentTagsWithColorResponseSchema,
+  TODAY_WARDROBE_HEADER,
   WARDROBE_GARMENT_COLOR_HEADER,
 } from '@couture/api-client/contracts/http'
 import { AuthContext } from '../auth/security.decorators'
 import { RequestAuthGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
+import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { WardrobeUploadGuard } from './wardrobe.guard'
 import { WardrobeService } from './wardrobe.service'
 
@@ -53,20 +55,37 @@ function wantsGarmentColor(header: string | string[] | undefined): boolean {
 @UseGuards(RequestAuthGuard, WardrobeUploadGuard)
 export class WardrobeController {
   constructor(
-    @Inject(WardrobeService) private readonly wardrobeService: WardrobeService
+    @Inject(WardrobeService) private readonly wardrobeService: WardrobeService,
+    @Inject(GuardianConsentStateService)
+    private readonly guardianConsent: GuardianConsentStateService
   ) {}
 
   @Get('garments')
   @Header('Cache-Control', 'private, no-store')
   async listGarments(
     @AuthContext() auth: RequestAuthContext,
-    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[]
+    @Headers(WARDROBE_GARMENT_COLOR_HEADER) colorHeader?: string | string[],
+    @Headers(TODAY_WARDROBE_HEADER) todayHeader?: string | string[]
   ) {
+    const today = todayHeader === '1'
+    if (
+      today &&
+      auth.role === 'teen' &&
+      !(await this.guardianConsent.canTeenViewPrivateGarmentPhotos(auth.userId))
+    ) {
+      return { data: [] }
+    }
     if (!wantsGarmentColor(colorHeader)) {
-      return await this.wardrobeService.listGarments(auth.userId)
+      return await this.wardrobeService.listGarments(
+        auth.userId,
+        today ? { today } : undefined
+      )
     }
     return garmentListWithColorResponseSchema.parse(
-      await this.wardrobeService.listGarments(auth.userId, { includeColor: true })
+      await this.wardrobeService.listGarments(auth.userId, {
+        includeColor: true,
+        ...(today ? { today } : {}),
+      })
     )
   }
 

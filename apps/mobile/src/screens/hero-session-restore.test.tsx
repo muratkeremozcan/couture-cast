@@ -107,7 +107,11 @@ describe('Home after a native cold start', () => {
       setMobileApplicationUserId('restored-member')
       await Promise.resolve()
     })
-    await waitFor(() => expect(screen.getByText('Classic Trench Coat')).toBeTruthy())
+    await waitFor(() =>
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
+    )
     expect(screen.queryByTestId('hero-error-state')).toBeNull()
     expect(screen.queryByTestId('home-signed-out-welcome')).toBeNull()
     expect(ritualRequests).toEqual(['Bearer restored-token'])

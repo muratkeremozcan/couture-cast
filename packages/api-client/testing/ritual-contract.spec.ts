@@ -4,10 +4,13 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-21-reasoning-badges-and-explanations
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 import { describe, expect, it } from 'vitest'
 import {
   ritualQueryParamsSchema,
   ritualResponseSchema,
+  scenarioOutfitSchema,
   type ScenarioName,
 } from '../src/contracts/http'
 
@@ -58,6 +61,33 @@ function buildResponse(scenarios: ScenarioName[]) {
 }
 
 describe('ritual response outfits collection', () => {
+  it('preserves fresh photo access and accepts pieces without an image field', () => {
+    const imageAccess = {
+      url: 'https://storage.example.test/private-top.png?token=fixture',
+      expiresAt: '2026-07-07T14:15:00.000Z',
+    }
+    const displayGarments = [
+      { id: 'garment-1', category: 'top', imageAccess },
+      { id: 'garment-2', category: 'shoes' },
+    ]
+
+    expect(
+      scenarioOutfitSchema.parse({ ...buildOutfit('morning'), displayGarments })
+        .displayGarments
+    ).toEqual(displayGarments)
+    expect(
+      scenarioOutfitSchema.parse(buildOutfit('morning')).displayGarments
+    ).toBeUndefined()
+    expect(
+      scenarioOutfitSchema.safeParse({
+        ...buildOutfit('morning'),
+        displayGarments: [
+          { ...displayGarments[0], imageAccess: { url: imageAccess.url } },
+        ],
+      }).success
+    ).toBe(false)
+  })
+
   it('accepts exactly one outfit per scenario', () => {
     const parsed = ritualResponseSchema.parse(
       buildResponse(['morning', 'midday', 'evening'])

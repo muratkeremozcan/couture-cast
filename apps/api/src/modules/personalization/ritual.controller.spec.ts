@@ -16,6 +16,7 @@ import type { AccessTokenIdentityService } from '../auth/access-token-identity.s
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import { RitualController } from './ritual.controller.js'
+import { RitualGarmentPhotoService } from './ritual-garment-photo.service.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { AffiliateOfferService } from '../commerce/affiliate-offer.service.js'
 import { CommerceRepository } from '../commerce/commerce.repository.js'
@@ -128,6 +129,7 @@ describe('RitualController', () => {
    * block never reaches the Redis payload or the persisted recommendation rows.
    */
   const featureFlagsMock = { getFeatureFlag: vi.fn() }
+  const garmentPhotos = { resolve: vi.fn() }
   const commerceRepositoryMock = {
     findAffiliateCtasEnabled: vi.fn(),
     findUserCommerceContext: vi.fn(),
@@ -143,6 +145,7 @@ describe('RitualController', () => {
     // spies created with `vi.spyOn`, so a bare `vi.fn()` would carry its call
     // history from the previous test into a "was never called" assertion.
     featureFlagsMock.getFeatureFlag.mockReset().mockResolvedValue(false)
+    garmentPhotos.resolve.mockReset().mockResolvedValue(new Map())
     commerceRepositoryMock.findAffiliateCtasEnabled.mockReset().mockResolvedValue(null)
     commerceRepositoryMock.findUserCommerceContext
       .mockReset()
@@ -298,6 +301,7 @@ describe('RitualController', () => {
         // the eligibility chain produces in this environment, where
         // commerce_affiliate_enabled defaults to false.
         AffiliateOfferService,
+        { provide: RitualGarmentPhotoService, useValue: garmentPhotos },
         { provide: CommerceRepository, useValue: commerceRepositoryMock },
         { provide: FeatureFlagsService, useValue: featureFlagsMock },
       ],
@@ -369,6 +373,58 @@ describe('RitualController', () => {
 
     expect(cachedResponse.status).toBe(200)
     expect(outfitRecommendationCreateMock).not.toHaveBeenCalled()
+  })
+
+  it('[7.14-PIC-001/002] adds fresh image access on each cached read and redacts private slots when denied', async () => {
+    const fetchRitual = () =>
+      request(baseUrl())
+        .get('/api/v1/ritual')
+        .set({ authorization: 'Bearer ritual-token' })
+        .expect(200)
+
+    await fetchRitual()
+    const entry = redisStore['ritual:user-1:chicago-il:07/16/2026:en-US:any']!
+    const cached = JSON.parse(entry.val) as { data: RitualResponse['data'] }
+    const garment = { id: 'member-top', category: 'top' as const }
+    cached.data.outfits[0] = {
+      ...cached.data.outfits[0]!,
+      garmentIds: [garment.id, 'default-shoes'],
+      displayGarments: [garment],
+    }
+    entry.val = JSON.stringify(cached)
+    const originalCache = entry.val
+
+    const sign = (version: string) => ({
+      url: `https://storage.example.test/top.png?token=${version}`,
+      expiresAt: '2026-07-16T06:15:00.000Z',
+    })
+    garmentPhotos.resolve
+      .mockResolvedValueOnce(
+        new Map([[garment.id, { ...garment, imageAccess: sign('one') }]])
+      )
+      .mockResolvedValueOnce(
+        new Map([[garment.id, { ...garment, imageAccess: sign('two') }]])
+      )
+      .mockResolvedValueOnce(null)
+
+    const first = await fetchRitual()
+    expect(first.headers['cache-control']).toBe('private, no-store')
+    expect(
+      ritualResponseSchema.parse(first.body).data.outfits[0]?.displayGarments
+    ).toEqual([{ ...garment, imageAccess: sign('one') }])
+    const second = await fetchRitual()
+    expect(
+      ritualResponseSchema.parse(second.body).data.outfits[0]?.displayGarments
+    ).toEqual([{ ...garment, imageAccess: sign('two') }])
+    const denied = await fetchRitual()
+    expect(ritualResponseSchema.parse(denied.body).data.outfits[0]).toMatchObject({
+      garmentIds: ['default-top', 'default-shoes'],
+      displayGarments: [],
+      recommendationActionsAvailable: false,
+      shopThisLook: null,
+    })
+    expect(entry.val).toBe(originalCache)
+    expect(outfitRecommendationCreateMock).toHaveBeenCalledTimes(3)
   })
 
   it('serves shopThisLook without ever writing it into the ritual cache', async () => {

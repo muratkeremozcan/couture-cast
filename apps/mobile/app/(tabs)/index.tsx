@@ -12,7 +12,6 @@ import {
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import {
-  type ComponentRef,
   type RefObject,
   useCallback,
   useEffect,
@@ -49,25 +48,15 @@ import {
   saveRitualCache,
   withoutShopThisLook,
 } from '@/src/lib/ritual-cache'
-import {
-  resolveAffiliateLocaleRegion,
-  resolveRenderableShopThisLook,
-} from '@/src/lib/commerce'
 import { loadWidgetAlertPreferences } from '@/src/lib/widget-alert-preferences'
 import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
   ritualResponseSchema,
-  type GarmentCategory,
   type RitualResponse,
-  type WeatherHourlyEntry,
-  type AlertPreferences,
 } from '@couture/api-client/contracts/http'
-import {
-  trackMobileAffiliateCtaShown,
-  trackMobileRitualCreated,
-} from '@/src/analytics/track-events'
+import { trackMobileRitualCreated } from '@/src/analytics/track-events'
 import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { processMobileDeepLink } from '@/src/lib/mobile-deep-link-handler'
@@ -75,26 +64,15 @@ import { InfoBanner } from '@/components/info-banner'
 import { WeatherHeader } from '@/components/hero/weather-header'
 import { HourlyForecastRibbon } from '@/components/hero/hourly-forecast-ribbon'
 import { ScenarioToggles } from '@/components/hero/scenario-toggles'
-import { OutfitRecommendationCard } from '@/components/hero/outfit-recommendation-card'
+import { TodayLiveOutfit } from '@/components/home/today-live-outfit'
 import { WeatherAlertBanner } from '@/components/hero/weather-alert-banner'
-import {
-  SWAP_CATALOGUE,
-  garmentTitle,
-  parseGarmentId,
-} from '@/components/hero/garment-item-tile'
-import {
-  EdgeToEdgeModal,
-  LayerSwipeHandle,
-  useModalInsets,
-} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
-import { TAB_BODY_INSET, useTokens, withAlpha } from '@/src/theme/tokens'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
-import { useModalAnimation } from '@/src/hooks/use-modal-animation'
 import { ScreenGate } from '@/src/components/screen-gate'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import { HomeCloset, useRecentHomePieces } from '@/components/home/home-closet'
+import { HomeCloset, useHomeWardrobe } from '@/components/home/home-closet'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useMemberSessionState } from '@/src/lib/member-session'
@@ -104,12 +82,14 @@ import {
   HomePlannerLink,
   MemberSampleOutfit,
 } from '@/src/features/preview/member-sample-outfit'
-import { getGuestPreviewStrings } from '@couture/utils'
-import { PreviewButton } from '@/src/features/preview/guest-preview-parts'
+import {
+  getGuestPreviewStrings,
+  todayForecastPeriods,
+  todayRitualAnchorDate,
+} from '@couture/utils'
 import { formatTemperature } from '@/src/lib/formatters'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
-type SwapFocusTarget = number | { focus?: () => void }
 
 const ritualRequestTimeoutMs = 15_000
 // The API's 400 message for a user with no saved location (RitualService).
@@ -129,7 +109,6 @@ async function classifyRitualError(error: unknown): Promise<HeroLoadError> {
     return 'generic'
   }
 }
-const modalFocusRestorationDelayMs = 400
 
 /**
  * Story CC-7.7 D5: whether a ritual read brought back the answer already on screen. Both sides
@@ -137,31 +116,6 @@ const modalFocusRestorationDelayMs = 400
  */
 function sameRitualAnswer(shown: unknown, fetched: unknown): boolean {
   return JSON.stringify(shown) === JSON.stringify(fetched)
-}
-
-function focusAccessibilityTarget(
-  target: ComponentRef<typeof Pressable> | null,
-  testId: string
-) {
-  const browserTarget =
-    typeof document === 'undefined'
-      ? null
-      : document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)
-  if (browserTarget) {
-    browserTarget.focus()
-    return
-  }
-
-  const focusableTarget = target as unknown as { focus?: () => void } | null
-  if (focusableTarget?.focus) {
-    focusableTarget.focus()
-    return
-  }
-
-  const node = safeFindNodeHandle(target)
-  if (node) {
-    AccessibilityInfo.setAccessibilityFocus(node)
-  }
 }
 
 function CachedWeatherNotice({ visible }: { visible: boolean }) {
@@ -199,47 +153,6 @@ function InvalidDeepLinkBanner({
   return <InfoBanner message={message} onDismiss={onDismiss} />
 }
 
-/**
- * The options offered in the garment swap modal, worn garment first.
- *
- * `SWAP_CATALOGUE` is a fixed catalogue, so a worn garment outside it --
- * every `default-*` placeholder a user with an empty wardrobe sees, which is
- * every new account -- was absent from its own swap modal. The modal declares
- * `accessibilityRole="radiogroup"` and marks the worn option
- * `aria-checked`, so in that state it rendered a radiogroup with
- * no selected radio at all: a screen-reader user was offered five alternatives
- * with nothing indicating which one they are wearing now, and no way to return
- * to it once they moved off.
- *
- * Leading with it also puts `firstSwapOptionRef` -- the element focused when the
- * modal opens -- on the current selection, which is where focus belongs in a
- * radiogroup.
- *
- * Extracted from the screen component rather than inlined: these branches are a
- * pure function of the garment id, and carrying them inside `TabOneScreen` put
- * that component over the repository's cyclomatic complexity limit.
- */
-function resolveGarmentSwap(
-  swappingGarmentId: string | null,
-  knownCategory?: GarmentCategory | null
-): {
-  category: string
-  options: string[]
-} {
-  const category = swappingGarmentId
-    ? parseGarmentId(swappingGarmentId, knownCategory).category
-    : 'Garment'
-  const baseSwapOptions = SWAP_CATALOGUE[category] || SWAP_CATALOGUE.Garment || []
-
-  return {
-    category,
-    options:
-      swappingGarmentId && !baseSwapOptions.includes(swappingGarmentId)
-        ? [swappingGarmentId, ...baseSwapOptions]
-        : baseSwapOptions,
-  }
-}
-
 function shareComposerIsOpen(open: boolean, owner: string | null, member: string | null) {
   return open && owner === member
 }
@@ -264,38 +177,7 @@ function homeGateReady(
 }
 
 /** `readAt`: when the read that produced `data` began, which fixes the ritual's day. */
-type OwnedRitual = { owner: string | null; data: RitualResponse; readAt: number }
-
-/** Story 5.5 Decision 2: from 08:00 local the server's ritual is the next day's. */
-const ritualRolloverHour = 8
-const dayMs = 24 * 60 * 60 * 1000
-
-function localDateAndHourIn(timeZone: string) {
-  const format = (zone: string) =>
-    new Intl.DateTimeFormat('en-US', {
-      timeZone: zone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      hourCycle: 'h23',
-    })
-  let formatter: Intl.DateTimeFormat
-  try {
-    formatter = format(timeZone)
-  } catch {
-    formatter = format('UTC')
-  }
-  return (at: number) => {
-    const parts = formatter.formatToParts(new Date(at))
-    const part = (type: Intl.DateTimeFormatPartTypes) =>
-      parts.find((entry) => entry.type === type)?.value ?? ''
-    return {
-      date: `${part('year')}-${part('month')}-${part('day')}`,
-      hour: Number(part('hour')),
-    }
-  }
-}
+type OwnedRitual = { epoch: number; data: RitualResponse; readAt: number }
 
 function hasDistinctForecastPeriods(
   weather: RitualResponse['data']['weather'],
@@ -303,30 +185,12 @@ function hasDistinctForecastPeriods(
   readAt: number,
   availableScenarios: readonly ScenarioType[]
 ): boolean {
-  const { timezone, hourly } = weather
-  const localDateAndHour = localDateAndHourIn(timezone)
-  const { hour, date } = localDateAndHour(readAt)
-  const anchor = hour < ritualRolloverHour ? date : localDateAndHour(readAt + dayMs).date
-  // These are the same representative hours used to generate the recommendations.
-  const byDay = new Map<string, Map<number, WeatherHourlyEntry>>()
-  for (const entry of hourly) {
-    const local = localDateAndHour(Date.parse(entry.forecastAt))
-    if (local.hour !== 8 && local.hour !== 13 && local.hour !== 19) continue
-    const periods = byDay.get(local.date) ?? new Map<number, WeatherHourlyEntry>()
-    if (!periods.has(local.hour)) periods.set(local.hour, entry)
-    byDay.set(local.date, periods)
-  }
-  const anchorPeriods = byDay.get(anchor)
-  const periods =
-    anchorPeriods?.size === 3
-      ? anchorPeriods
-      : [...byDay.values()].reverse().find((day) => day.size === 3)
+  const periods = todayForecastPeriods(weather, readAt)
   if (!periods) return false
-  const periodHour = { morning: 8, midday: 13, evening: 19 } as const
   return (
     new Set(
       availableScenarios.map((scenario) => {
-        const entry = periods.get(periodHour[scenario])!
+        const entry = periods[scenario]
         return JSON.stringify([
           entry.condition,
           formatTemperature(entry.temperature, locale),
@@ -344,24 +208,7 @@ function hasDistinctForecastPeriods(
  */
 function ritualIdentity(ritual: RitualResponse, readAt: number): string {
   const { locationKey, timezone } = ritual.data.weather
-  const localDateAndHour = localDateAndHourIn(timezone)
-  const { hour } = localDateAndHour(readAt)
-  const anchorAt = hour >= ritualRolloverHour ? readAt + dayMs : readAt
-  return `${locationKey}|${localDateAndHour(anchorAt).date}`
-}
-
-/** The garments a member swapped on one ritual, per scenario, as the swap left them. */
-type MemberSwaps = {
-  owner: string | null
-  ritual: string
-  outfits: Map<
-    string,
-    Pick<RitualResponse['data']['outfits'][number], 'garmentIds' | 'displayGarments'>
-  >
-}
-
-function ritualForOwner(record: OwnedRitual | null, owner: string | null) {
-  return record?.owner === owner ? record.data : null
+  return locationKey + '|' + todayRitualAnchorDate(timezone, readAt)
 }
 
 export default function TabOneScreen() {
@@ -393,15 +240,16 @@ export default function TabOneScreen() {
   const params = useLocalSearchParams()
   const { source, size, slot, type, alertId, cardId, expiresAt } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
-  const applicationUserId = useSyncExternalStore(
+  const identityEpoch = useSyncExternalStore(
     subscribeMobileApplicationUser,
-    mobileApplicationUserId,
-    mobileApplicationUserId
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
   )
+  const applicationUserId = mobileApplicationUserId()
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
   const [sessionState, retrySession] = useMemberSessionState()
-  const recentPieces = useRecentHomePieces(applicationUserId, sessionState === 'member')
+  const homeWardrobe = useHomeWardrobe(applicationUserId, sessionState === 'member')
   // Story 6.17 D3: a Google identity that left the finish step returns to it. On focus only,
   // so a screen pushed above Home is never hijacked (6.16 stacked-screen rule).
   useFocusEffect(
@@ -423,19 +271,12 @@ export default function TabOneScreen() {
   const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale = activeHomeLocale(i18n)
   const palette = useHeroPalette()
-  const { scrim } = useTokens()
-  const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const statusBar = useStatusBar()
   const reduceMotion = useReducedMotion()
-  const swapModalAnimation = useModalAnimation('slide')
   const latestLoadId = useRef(0)
   const deepLinkIdentity = useRef<{ key: string; epoch: number } | null>(null)
   const hasTrackedTabView = useRef(false)
-  // Keyed on recommendation id, not on mount: the impression effect re-runs
-  // whenever the locale or the analytics identity changes, and a scenario
-  // toggle away and back re-renders the same card. One card is one impression.
-  const trackedCtaImpressions = useRef(new Set<string>())
   const scrollViewRef = useRef<ScrollView>(null)
   // The scroll content's host view. measureLayout takes a host component ref under the new
   // architecture; a node handle from getInnerViewNode() is rejected with a warning, and
@@ -443,26 +284,17 @@ export default function TabOneScreen() {
   const scrollContentRef = useRef<NativeView>(null)
   const focusedAlertRef = useRef<NativeView>(null)
   const focusedAlertY = useRef(0)
-  const firstSwapOptionRef = useRef<ComponentRef<typeof Pressable>>(null)
-  const swapTriggerRef = useRef<SwapFocusTarget | null>(null)
-  const garmentRefs = useRef(new Map<string, ComponentRef<typeof Pressable> | null>())
-
   const [ownedRitual, setOwnedRitual] = useState<OwnedRitual | null>(null)
-  const ritual = ritualForOwner(ownedRitual, applicationUserId)
+  const ritual = ownedRitual?.epoch === identityEpoch ? ownedRitual.data : null
   const ritualRef = useRef(ritual)
   ritualRef.current = ritual
-  // Story CC-7.7: a member's garment swaps stay in place for the ritual they were made on. Any
-  // ritual read that lands for the same location and day, one that began before the swap
-  // included, carries them; a ritual for another day or location replaces them.
-  const memberSwapsRef = useRef<MemberSwaps | null>(null)
   // Story CC-7.7: the member whose first ritual read settled (success, empty or error). Keyed
   // by member, so the next member's first render is unsettled before any effect runs.
-  const [settledOwner, setSettledOwner] = useState<string | null | undefined>(undefined)
-  const ritualSettled = settledOwner === applicationUserId
+  const [settledEpoch, setSettledEpoch] = useState<number>()
+  const ritualSettled = settledEpoch === identityEpoch
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<HeroLoadError | null>(null)
   const [selectedScenario, setActiveScenario] = useState<ScenarioType>('morning')
-  const [detailsOpen, setDetailsOpen] = useState(false)
   const [hourlyOpen, setHourlyOpen] = useState(false)
   const activeOutfit =
     ritual?.data.outfits.find(
@@ -475,35 +307,22 @@ export default function TabOneScreen() {
   // covers the under-15-minute cache hit, which is a perfectly fresh read for
   // weather and still an unacceptable source for an affiliate CTA.
   const [isCacheServed, setIsCacheServed] = useState(false)
-  const [alertPreferences, setAlertPreferences] = useState<AlertPreferences | undefined>(
-    undefined
-  )
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
   const invalidDeepLinkMessage = t('common.invalid_link')
   const [focusedWeatherAlert, setFocusedWeatherAlert] =
     useState<WeatherAlertDeepLinkTarget | null>(null)
-
-  // Garment swap modal states
-  const [isSwapModalVisible, setIsSwapModalVisible] = useState(false)
-  const [swappingGarmentId, setSwappingGarmentId] = useState<string | null>(null)
-  const [garmentFocusTarget, setGarmentFocusTarget] = useState<string | null>(null)
 
   useEffect(() => {
     traceShareCardOpener('reset-identity')
     setShareCardSource(null)
     setShareCardOpen(false)
     setOwnedRitual(null)
-    memberSwapsRef.current = null
     // Cleared when the member leaves, so the same member returning (A, signed out, A) is
     // unsettled until their new ritual read settles: no sample outfit before it.
-    setSettledOwner(undefined)
-    setAlertPreferences(undefined)
+    setSettledEpoch(undefined)
     setError(null)
     setIsCacheServed(false)
     setIsStale(false)
-    setIsSwapModalVisible(false)
-    setSwappingGarmentId(null)
-    setDetailsOpen(false)
     setHourlyOpen(false)
     setActiveScenario('morning')
     setPendingWidgetSlot(null)
@@ -511,11 +330,11 @@ export default function TabOneScreen() {
     setIsInvalidDeepLink(false)
     // The next member's own first load starts from the initial loading state.
     setIsLoading(true)
-  }, [applicationUserId])
+  }, [identityEpoch])
 
   const fetchRitual = async () => {
     const token = await resolveMobileAccessToken()
-    if (!token || applicationUserId !== mobileApplicationUserId()) {
+    if (!token || identityEpoch !== mobileIdentityEpoch()) {
       throw new Error('Ritual session changed.')
     }
     const client = createMobileApiClient({
@@ -574,26 +393,6 @@ export default function TabOneScreen() {
     })
   }
 
-  /** A ritual read's answer with the member's swaps for that same ritual laid over it. */
-  const withMemberSwaps = (data: RitualResponse, readAt: number): RitualResponse => {
-    const swaps = memberSwapsRef.current
-    if (!swaps || swaps.owner !== applicationUserId) return data
-    if (swaps.ritual !== ritualIdentity(data, readAt)) {
-      memberSwapsRef.current = null
-      return data
-    }
-    return {
-      ...data,
-      data: {
-        ...data.data,
-        outfits: data.data.outfits.map((outfit) => {
-          const swapped = swaps.outfits.get(outfit.scenario)
-          return swapped ? { ...outfit, ...swapped } : outfit
-        }),
-      },
-    }
-  }
-
   const loadData = async (
     forceRefresh = false,
     allowCacheFallback = true,
@@ -602,7 +401,7 @@ export default function TabOneScreen() {
   ) => {
     const loadId = ++latestLoadId.current
     const isCurrent = () =>
-      loadId === latestLoadId.current && applicationUserId === mobileApplicationUserId()
+      loadId === latestLoadId.current && identityEpoch === mobileIdentityEpoch()
     // Story CC-7.7 D5: a refresh with the member's outfit on screen (a locale or analytics
     // identity change, a retry) refreshes in place. It never returns to the initial loading
     // state, and the banners stay as they are until the answer lands.
@@ -612,7 +411,7 @@ export default function TabOneScreen() {
       setError(null)
       setIsStale(false)
     }
-    const settle = () => setSettledOwner(applicationUserId)
+    const settle = () => setSettledEpoch(identityEpoch)
 
     const cached = allowCacheFallback
       ? await readLatestRitualCache(cacheOwner, activeLocale)
@@ -622,11 +421,10 @@ export default function TabOneScreen() {
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
       setOwnedRitual({
-        owner: applicationUserId,
-        data: withMemberSwaps(cached.data, cached.timestamp),
+        epoch: identityEpoch,
+        data: cached.data,
         readAt: cached.timestamp,
       })
-      setAlertPreferences(cached.alertPreferences)
       setIsCacheServed(true)
       setError(null)
       setIsStale(false)
@@ -636,25 +434,18 @@ export default function TabOneScreen() {
     }
 
     try {
-      const { data: fetched, alertPreferences: fetchedPreferences } = await fetchRitual()
+      const { data, alertPreferences: fetchedPreferences } = await fetchRitual()
       if (!isCurrent()) return
-      // The server never stores a swap, so its answer comes back without one; the member's
-      // swaps for this ritual go back over it before it shows or enters the cache.
-      const data = withMemberSwaps(fetched, now)
-
       // A tab return re-reads in place; an unchanged answer for the same ritual keeps the state
       // it already has, so the outfit card and the rest of Home do not render again for the same
       // outfit. An identical payload across the 08:00 rollover is the next day's ritual: it takes
       // this read's time, or a swap made on it would be keyed to the previous day.
       setOwnedRitual((shown) =>
-        shown?.owner === applicationUserId &&
+        shown?.epoch === identityEpoch &&
         sameRitualAnswer(shown.data, data) &&
         ritualIdentity(shown.data, shown.readAt) === ritualIdentity(data, now)
           ? shown
-          : { owner: applicationUserId, data, readAt: now }
-      )
-      setAlertPreferences((shown) =>
-        sameRitualAnswer(shown, fetchedPreferences) ? shown : fetchedPreferences
+          : { epoch: identityEpoch, data, readAt: now }
       )
       setIsCacheServed(false)
       setError(null)
@@ -677,22 +468,21 @@ export default function TabOneScreen() {
       // banner above it after the member started using the screen. The failure and its Retry
       // show in the root status bar, a floating slot that moves no content.
       if (inPlace && ritualRef.current !== null) {
+        setIsCacheServed(true)
         reportRefreshFailure()
         return
       }
       // Offline fallback: try using cached data if available, even if stale
       if (cached) {
         setOwnedRitual({
-          owner: applicationUserId,
-          data: withMemberSwaps(cached.data, cached.timestamp),
+          epoch: identityEpoch,
+          data: cached.data,
           readAt: cached.timestamp,
         })
-        setAlertPreferences(cached.alertPreferences)
         setIsStale(true)
         setIsCacheServed(true)
       } else {
         setOwnedRitual(null)
-        setAlertPreferences(undefined)
         setIsCacheServed(false)
         setError(errorKind)
       }
@@ -717,15 +507,12 @@ export default function TabOneScreen() {
     latestLoadId.current += 1
     setIsLoading(true)
     setOwnedRitual(null)
-    // A wardrobe change can remove a swapped-in garment, and a location change is another
-    // ritual: the swaps go with the previous ritual.
-    memberSwapsRef.current = null
     // The previous ritual is gone, so the reload below is not a refresh in place.
     ritualRef.current = null
     setIsCacheServed(false)
     setIsStale(false)
     await forgetLatestRitual(cacheOwner)
-    if (applicationUserId === mobileApplicationUserId()) await loadData(true, false)
+    if (identityEpoch === mobileIdentityEpoch()) await loadData(true, false)
   }
   const reloadForRitualChangeRef = useRef(reloadForRitualChange)
   reloadForRitualChangeRef.current = reloadForRitualChange
@@ -734,7 +521,9 @@ export default function TabOneScreen() {
       void reloadForRitualChangeRef.current()
     }
     const unsubscribeLocations = onLocationsChanged(reload)
-    const unsubscribeWardrobe = onWardrobeChanged(reload)
+    const unsubscribeWardrobe = onWardrobeChanged(() => {
+      void latestLoadDataRef.current(true, false, true)
+    })
     return () => {
       unsubscribeLocations()
       unsubscribeWardrobe()
@@ -774,7 +563,7 @@ export default function TabOneScreen() {
     return () => {
       latestLoadId.current += 1
     }
-  }, [activeLocale, analyticsUserId, applicationUserId, sessionState])
+  }, [activeLocale, analyticsUserId, identityEpoch, sessionState])
 
   useEffect(() => {
     if (sessionState === 'restoring') return
@@ -944,149 +733,6 @@ export default function TabOneScreen() {
     })
   }
 
-  const handleSwapGarment = (garmentId: string, trigger?: SwapFocusTarget) => {
-    swapTriggerRef.current = trigger ?? null
-    setSwappingGarmentId(garmentId)
-    setIsSwapModalVisible(true)
-  }
-
-  // Story CC-7.11 D13: EdgeToEdgeModal returns focus to the swap trigger (returnFocusRef); a
-  // completed swap clears the trigger and focuses the new garment instead.
-  const closeSwapModal = () => {
-    setIsSwapModalVisible(false)
-    setSwappingGarmentId(null)
-  }
-
-  useEffect(() => {
-    if (!garmentFocusTarget || isSwapModalVisible) {
-      return
-    }
-
-    const focusTimer = setTimeout(
-      () => {
-        focusAccessibilityTarget(
-          garmentRefs.current.get(garmentFocusTarget) ?? null,
-          `garment-tile-${garmentFocusTarget}`
-        )
-        setGarmentFocusTarget(null)
-      },
-      reduceMotion ? 0 : modalFocusRestorationDelayMs
-    )
-
-    return () => clearTimeout(focusTimer)
-  }, [garmentFocusTarget, isSwapModalVisible, reduceMotion, ritual])
-
-  const focusFirstSwapOption = () => {
-    requestAnimationFrame(() => {
-      if (Platform.OS === 'web') {
-        const webNode = firstSwapOptionRef.current as unknown as { focus?: () => void }
-        webNode?.focus?.()
-        return
-      }
-      const node = safeFindNodeHandle(firstSwapOptionRef.current)
-      if (node) {
-        AccessibilityInfo.setAccessibilityFocus(node)
-      }
-    })
-  }
-
-  const performSwap = (newGarmentId: string) => {
-    if (!ritual || !ownedRitual || !swappingGarmentId) return
-
-    // Update state local model copy
-    const nextOutfits = ritual.data.outfits.map((outfit) => {
-      if (outfit.scenario === activeScenario) {
-        return {
-          ...outfit,
-          garmentIds: outfit.garmentIds.map((id) =>
-            id === swappingGarmentId ? newGarmentId : id
-          ),
-        }
-      }
-      return outfit
-    })
-
-    const updatedRitual = {
-      ...ritual,
-      data: {
-        ...ritual.data,
-        outfits: nextOutfits,
-      },
-    }
-
-    setOwnedRitual({
-      owner: applicationUserId,
-      data: updatedRitual,
-      readAt: ownedRitual.readAt,
-    })
-    const swappedOutfit = nextOutfits.find((outfit) => outfit.scenario === activeScenario)
-    if (swappedOutfit) {
-      const identity = ritualIdentity(ritual, ownedRitual.readAt)
-      const current = memberSwapsRef.current
-      const swaps: MemberSwaps =
-        current?.owner === applicationUserId && current.ritual === identity
-          ? current
-          : { owner: applicationUserId, ritual: identity, outfits: new Map() }
-      swaps.outfits.set(activeScenario, {
-        garmentIds: swappedOutfit.garmentIds,
-        displayGarments: swappedOutfit.displayGarments,
-      })
-      memberSwapsRef.current = swaps
-    }
-
-    void saveRitualCache(cacheOwner, activeLocale, {
-      // A swap rewrites a network payload, so this write can carry a commerce
-      // block too. Decision 6 applies to every cache write, not just the fetch.
-      data: withoutShopThisLook(updatedRitual),
-      timestamp: Date.now(),
-      alertPreferences,
-    }).catch(() => undefined)
-
-    analytics.capture('hero_interaction', {
-      interactionType: 'garment_swap',
-      scenario: activeScenario,
-      itemId: newGarmentId,
-    })
-    const swappedInCategory = ritual.data.outfits
-      .find((outfit) => outfit.scenario === activeScenario)
-      ?.displayGarments?.find((garment) => garment.id === newGarmentId)?.category
-    announce(
-      'swap',
-      garmentTitle(parseGarmentId(newGarmentId, swappedInCategory), t, activeLocale)
-    )
-    setIsSwapModalVisible(false)
-    setSwappingGarmentId(null)
-    swapTriggerRef.current = null
-    setGarmentFocusTarget(newGarmentId)
-  }
-
-  const activeShopThisLook = resolveRenderableShopThisLook(activeOutfit, isCacheServed)
-
-  useEffect(() => {
-    if (!detailsOpen || !activeOutfit || !activeShopThisLook) {
-      return
-    }
-    if (trackedCtaImpressions.current.has(activeOutfit.id)) {
-      return
-    }
-
-    trackedCtaImpressions.current.add(activeOutfit.id)
-    trackMobileAffiliateCtaShown(analytics, analyticsUserId, {
-      partnerId: activeShopThisLook.partnerId,
-      scenario: activeOutfit.scenario,
-      surface: 'mobile_hero',
-      localeRegion: resolveAffiliateLocaleRegion(activeLocale),
-      recommendationId: activeOutfit.id,
-    })
-  }, [
-    activeOutfit,
-    activeShopThisLook,
-    activeLocale,
-    analyticsUserId,
-    analytics,
-    detailsOpen,
-  ])
-
   const handleRetry = () => {
     void loadData(true)
   }
@@ -1094,6 +740,10 @@ export default function TabOneScreen() {
   const weather = ritual?.data.weather
   const hasHourly = Boolean(weather?.hourly.length)
   const readAt = ownedRitual?.readAt
+  const liveLook =
+    activeOutfit && weather && readAt !== undefined
+      ? { outfit: activeOutfit, snapshot: weather, readAt }
+      : null
   const availableScenarios = useMemo(
     () =>
       ritual?.data.outfits
@@ -1108,12 +758,6 @@ export default function TabOneScreen() {
       availableScenarios.length > 1 &&
       hasDistinctForecastPeriods(weather, activeLocale, readAt, availableScenarios),
     [activeLocale, availableScenarios, readAt, weather]
-  )
-
-  const { category: swapCategory, options: swapOptions } = resolveGarmentSwap(
-    swappingGarmentId,
-    activeOutfit?.displayGarments?.find((garment) => garment.id === swappingGarmentId)
-      ?.category
   )
 
   // The hero for the session on screen, in its own function to keep the screen's branching
@@ -1163,84 +807,43 @@ export default function TabOneScreen() {
               />
             )}
             <NativeView testID="today-first-content">
-              {activeOutfit ? (
-                <View
-                  testID="outfit-recommendation-card"
-                  style={[
-                    styles.todayCard,
-                    { backgroundColor: palette.card, borderColor: palette.line },
-                  ]}
-                >
-                  <Text
-                    accessibilityRole="header"
-                    style={[styles.todayTitle, { color: palette.ink }]}
-                  >
-                    {t(
-                      activeOutfit.garmentIds.every((id) => id.startsWith('default-'))
-                        ? 'home.today.starterOutfit'
-                        : 'home.today.outfit'
-                    )}
-                  </Text>
-                  <View style={styles.todayGarments}>
-                    {activeOutfit.garmentIds.map((id) => (
-                      <Text
-                        key={id}
-                        style={[
-                          styles.todayGarment,
-                          { color: palette.ink, backgroundColor: palette.page },
-                        ]}
-                      >
-                        {garmentTitle(
-                          parseGarmentId(
-                            id,
-                            activeOutfit.displayGarments?.find(
-                              (garment) => garment.id === id
-                            )?.category
-                          ),
-                          t,
-                          activeLocale
-                        )}
-                      </Text>
-                    ))}
-                  </View>
-                  <PreviewButton
-                    label={t('home.today.outfitDetails')}
-                    palette={palette}
-                    testID="today-primary-action"
-                    expanded={detailsOpen}
-                    onPress={() => setDetailsOpen((open) => !open)}
-                    primary
-                    todayPrimary
-                  />
-                  {detailsOpen && (
-                    <OutfitRecommendationCard
-                      outfit={activeOutfit}
-                      onExport={(recommendationId, opener) => {
-                        if (
-                          openAndroidShareCard(
-                            { kind: 'outfit', recommendationId },
-                            'outfit',
-                            opener
-                          )
-                        )
-                          return
-                        shareCardInvoker.current = {
-                          node: opener,
-                          member: mobileApplicationUserId(),
-                        }
-                        setShareCardSource({ kind: 'outfit', recommendationId })
-                        setShareCardOpen(true)
-                        traceShareCardOpener('state-open')
-                      }}
-                      onSwapGarment={handleSwapGarment}
-                      onGarmentRef={(garmentId, element) => {
-                        garmentRefs.current.set(garmentId, element)
-                      }}
-                      isCacheServed={isCacheServed}
-                      nested
-                    />
-                  )}
-                </View>
+              {liveLook ? (
+                <TodayLiveOutfit
+                  key={identityEpoch}
+                  {...liveLook}
+                  owner={applicationUserId}
+                  epoch={identityEpoch}
+                  locale={activeLocale}
+                  wardrobe={homeWardrobe?.wardrobe ?? []}
+                  isCacheServed={isCacheServed}
+                  stale={isStale}
+                  periodPicker={
+                    showPeriods ? (
+                      <ScenarioToggles
+                        activeScenario={activeScenario}
+                        availableScenarios={availableScenarios}
+                        onScenarioChange={handleScenarioChange}
+                      />
+                    ) : null
+                  }
+                  onExport={(recommendationId, opener) => {
+                    if (
+                      openAndroidShareCard(
+                        { kind: 'outfit', recommendationId },
+                        'outfit',
+                        opener
+                      )
+                    )
+                      return
+                    shareCardInvoker.current = {
+                      node: opener,
+                      member: mobileApplicationUserId(),
+                    }
+                    setShareCardSource({ kind: 'outfit', recommendationId })
+                    setShareCardOpen(true)
+                    traceShareCardOpener('state-open')
+                  }}
+                />
               ) : (
                 <MemberSampleOutfit
                   key={applicationUserId}
@@ -1253,17 +856,10 @@ export default function TabOneScreen() {
               )}
             </NativeView>
             <CachedWeatherNotice visible={isStale} />
-            {activeOutfit && showPeriods && (
-              <ScenarioToggles
-                activeScenario={activeScenario}
-                availableScenarios={availableScenarios}
-                onScenarioChange={handleScenarioChange}
-              />
-            )}
             {weather && <WeatherAlertBanner alerts={weather.alerts} />}
           </>
         )}
-        <HomeCloset pieces={recentPieces} />
+        <HomeCloset pieces={homeWardrobe?.pieces} />
         <HomePlannerLink />
       </>
     ) : null
@@ -1331,7 +927,7 @@ export default function TabOneScreen() {
         <ScreenGate
           screen="home"
           session={sessionState}
-          ready={homeGateReady(sessionState, ritualSettled && recentPieces !== undefined)}
+          ready={homeGateReady(sessionState, ritualSettled && homeWardrobe !== undefined)}
         >
           {renderHero()}
 
@@ -1346,112 +942,6 @@ export default function TabOneScreen() {
         </ScreenGate>
       </ScrollView>
 
-      {/* Garment Swap Modal */}
-      <EdgeToEdgeModal
-        visible={isSwapModalVisible}
-        animationType={swapModalAnimation}
-        onShow={focusFirstSwapOption}
-        onRequestClose={closeSwapModal}
-        returnFocusRef={swapTriggerRef}
-        scrim={scrim}
-      >
-        <View style={styles.modalOverlay}>
-          {(() => {
-            const categoryKey = `accessibility.garment_category_${swapCategory.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
-            const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
-            return (
-              <View
-                style={[
-                  styles.modalContent,
-                  {
-                    backgroundColor: palette.page,
-                    paddingBottom: 20 + modalInsets.bottom,
-                  },
-                ]}
-                testID="garment-swap-modal"
-                accessibilityViewIsModal
-                role="dialog"
-                accessibilityLabel={t('hero.garment_swap_title', {
-                  category: localizedCategory,
-                })}
-                aria-modal
-                aria-labelledby="garment-swap-title"
-              >
-                {/* Story CC-7.11 D13: the header is the layer's swipe-down handle, through the same close. */}
-                <LayerSwipeHandle>
-                  <Text
-                    nativeID="garment-swap-title"
-                    style={[styles.modalTitle, { color: palette.ink }]}
-                    accessibilityRole="header"
-                  >
-                    {t('hero.garment_swap_title', {
-                      category: localizedCategory,
-                      defaultValue: `Choose alternate ${swapCategory}`,
-                    })}
-                  </Text>
-                </LayerSwipeHandle>
-                <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
-                  {swapOptions.map((option, index) => {
-                    const isCurrent = option === swappingGarmentId
-                    const optionTitle = garmentTitle(
-                      parseGarmentId(
-                        option,
-                        activeOutfit?.displayGarments?.find(
-                          (garment) => garment.id === option
-                        )?.category
-                      ),
-                      t,
-                      activeLocale
-                    )
-                    return (
-                      <Pressable
-                        ref={index === 0 ? firstSwapOptionRef : undefined}
-                        key={option}
-                        style={[
-                          styles.modalItem,
-                          { borderBottomColor: palette.line },
-                          // The current option is marked in ink, never gold (Story CC-7.9 D3).
-                          isCurrent && { backgroundColor: withAlpha(palette.ink, 0.08) },
-                        ]}
-                        onPress={() => performSwap(option)}
-                        testID={`swap-option-${option}`}
-                        accessibilityRole="radio"
-                        accessibilityLabel={optionTitle}
-                        aria-checked={isCurrent}
-                      >
-                        <Text
-                          style={[
-                            styles.modalItemText,
-                            { color: palette.ink },
-                            isCurrent && styles.modalItemTextCurrent,
-                          ]}
-                        >
-                          {optionTitle}
-                        </Text>
-                        {isCurrent && (
-                          <Text style={[styles.modalItemCheck, { color: palette.ink }]}>
-                            ✓
-                          </Text>
-                        )}
-                      </Pressable>
-                    )
-                  })}
-                </ScrollView>
-                <Pressable
-                  style={[styles.closeButton, { backgroundColor: palette.inverse }]}
-                  onPress={closeSwapModal}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('common.cancel')}
-                >
-                  <Text style={[styles.closeButtonText, { color: palette.onInverse }]}>
-                    {t('common.cancel', { defaultValue: 'Cancel' })}
-                  </Text>
-                </Pressable>
-              </View>
-            )
-          })()}
-        </View>
-      </EdgeToEdgeModal>
       <ScreenShareCardComposer
         source={shareCardSource}
         open={shareComposerIsOpen(
@@ -1484,22 +974,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 24,
-  },
-  todayCard: {
-    marginHorizontal: TAB_BODY_INSET,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
-  },
-  todayTitle: { fontSize: 20, fontWeight: '700' },
-  todayGarments: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  todayGarment: {
-    flexShrink: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    fontSize: 14,
   },
   staleBanner: {
     borderBottomWidth: 1,
@@ -1541,56 +1015,6 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 14,
     fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    maxHeight: '60%',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  modalScroll: {
-    marginBottom: 16,
-  },
-  modalItem: {
-    minHeight: 44,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  modalItemText: {
-    fontSize: 16,
-  },
-  modalItemTextCurrent: {
-    fontWeight: '700',
-  },
-  modalItemCheck: {
-    fontWeight: '700',
-  },
-  closeButton: {
-    borderRadius: 9999, // Pill corner radius
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
   },
   focusedAlertCard: {
     marginHorizontal: TAB_BODY_INSET,

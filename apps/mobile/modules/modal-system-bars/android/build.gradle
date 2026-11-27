@@ -7,7 +7,15 @@ version = '1.0.0'
 android {
   namespace 'expo.modules.modalsystembars'
   defaultConfig { versionCode 1; versionName '1.0.0' }
-  testOptions { unitTests { includeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+      all {
+        // Use the same Maven Central host as Gradle for Robolectric's runtime fetches.
+        systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
+      }
+    }
+  }
 }
 dependencies {
   testImplementation 'junit:junit:4.13.2'

@@ -3,15 +3,19 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { GarmentCategory } from '@couture/api-client/contracts/http'
+import type {
+  GarmentCategory,
+  GarmentWithColor,
+} from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { isLiveScope } from '../../lib/use-web-session'
 import { listGarmentsFromWeb } from '../../lib/wardrobe'
 import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
-export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
-  const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
+const noGarments: GarmentWithColor[] = []
+
+export function useHomeWardrobe(owner: string, scope: string | null) {
   const { restored, beginRead, remember } = useSectionSnapshot<
     (GarmentCategory | null)[]
   >('recent-pieces', owner)
@@ -19,6 +23,7 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
   const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null | undefined>(
     restored
   )
+  const [wardrobe, setWardrobe] = useState<GarmentWithColor[]>(noGarments)
   useScreenGateRead('closet', pieces !== undefined)
 
   useEffect(() => {
@@ -29,7 +34,7 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
       beginRead()
       const request = new AbortController()
       controller = request
-      void listGarmentsFromWeb(request.signal)
+      void listGarmentsFromWeb(request.signal, { today: true })
         .then((garments) => {
           if (request.signal.aborted || !isLiveScope(scope)) return
           const recent = [...garments]
@@ -37,11 +42,13 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
             .slice(0, 3)
             .map(({ category }) => category)
           setPieces(recent)
+          setWardrobe(garments)
           remember(recent)
         })
         .catch(() => {
           if (!request.signal.aborted && isLiveScope(scope)) {
             setPieces(null)
+            setWardrobe(noGarments)
             remember(undefined)
           }
         })
@@ -56,7 +63,14 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
     }
   }, [beginRead, remember, scope])
 
-  if (!pieces || !isLiveScope(scope)) return null
+  return isLiveScope(scope)
+    ? { pieces, wardrobe }
+    : { pieces: null, wardrobe: noGarments }
+}
+
+export function HomeCloset({ pieces }: { pieces?: (GarmentCategory | null)[] | null }) {
+  const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
+  if (!pieces) return null
   const recentLabel = t('home.today.recentPieces')
   const garments = formatLocalizedList(
     pieces.map((category) => formatGarmentAlt(i18n.language, { category })),

@@ -2,10 +2,9 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useId, useReducer, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  garmentCategoryEnum,
   type RitualResponse,
   type SavedLookContract,
   type ScenarioName,
@@ -22,13 +21,13 @@ import {
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
-  sampleGarmentText,
   sampleLookText,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
   savedLookMatchesHomeSample,
   savedLookToSampleBookmark,
   swapMemberSampleGarment,
+  todayCatalogSlot,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
   type GuestPreviewStrings,
@@ -62,13 +61,13 @@ import {
   useWebSessionScope,
   type MemberSession,
 } from '../../lib/use-web-session'
-import { HomeCloset } from './home-closet'
-import { SampleGarmentArt } from './guest-preview/sample-garment-art'
+import { HomeCloset, useHomeWardrobe } from './home-closet'
 import { GuestPreviewOutfit } from './guest-preview/guest-preview-outfit'
 import { GuestPreviewSwapDialog } from './guest-preview/guest-preview-swap-dialog'
 import { SampleIdeaControls } from './guest-preview/sample-idea-controls'
-import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 import { SaveFeedbackProvider, useStatusBar } from './save-feedback'
+import { TodayLiveOutfit } from './today-live-outfit'
+import { TodayOutfitPicture } from './today-outfit-picture'
 import {
   ScreenGateReport,
   useGuestFirstPaint,
@@ -723,17 +722,30 @@ function SampleOutfitInner({
           ? sampleLookText(result.look, strings).name
           : strings.firstUse.outfitIdea}
       </h2>
-      <ul className="flex flex-wrap gap-2">
-        {result.garments.map((garment) => (
-          <li key={garment.id} className="rounded-md bg-page p-1">
-            <SampleGarmentArt
-              garment={garment}
-              label={sampleGarmentText(garment, strings).description}
-              className="h-11 w-11"
-            />
-          </li>
-        ))}
-      </ul>
+      <p data-testid="today-outfit-weather-reason" className="text-sm text-ink-soft">
+        {strings.values.weather[result.context.weather]}
+      </p>
+      <TodayOutfitPicture
+        slots={result.garments.map(todayCatalogSlot)}
+        strings={strings}
+        getOptions={(index) => {
+          const current = result.garments[index]
+          if (!current) return []
+          const alternatives = sampleSwapCandidates(
+            SAMPLE_CATALOG,
+            current.category,
+            result.input
+          ).filter((piece) => piece.id !== current.id)
+          return [current, ...alternatives].map(todayCatalogSlot)
+        }}
+        onChoose={(_, slot) =>
+          pushUndoAndUpdate(
+            swapMemberSampleGarment(result, slot.category, slot.itemId),
+            t('feedback.pieceSwapped'),
+            'swap'
+          )
+        }
+      />
       {actions}
       <details className="space-y-3">
         <summary
@@ -759,89 +771,6 @@ function usableOutfit(outfit: ScenarioOutfit) {
 }
 
 type LiveRitual = RitualResponse['data']
-
-function LiveOutfit({
-  ritual,
-  stale,
-  initialScenario,
-}: {
-  ritual: LiveRitual
-  stale: boolean
-  initialScenario?: ScenarioName
-}) {
-  const { t } = useTranslation(undefined, { i18n: getI18n() })
-  const available = ritual.outfits.filter(usableOutfit)
-  const [selectedScenario, setScenario] = useState<ScenarioName>()
-  const [detailsOpen, setDetailsOpen] = useState(false)
-  const detailsId = useId()
-  const outfit =
-    available.find(
-      (item) => item.scenario === (selectedScenario ?? initialScenario ?? 'morning')
-    ) ?? available[0]
-  if (!outfit) return null
-  const starter = outfit.garmentIds.every((id) => id.startsWith('default-'))
-  return (
-    <section
-      data-testid="today-first-content"
-      data-surface="card"
-      className={todayCardClass}
-    >
-      <div data-testid="home-live-outfit" className="space-y-3">
-        <h2 className="text-xl font-semibold">
-          {t(starter ? 'home.today.starterOutfit' : 'home.today.outfit')}
-        </h2>
-        <ul className="flex flex-wrap gap-2">
-          {outfit.garmentIds.map((id) => {
-            const category =
-              outfit.displayGarments?.find((garment) => garment.id === id)?.category ??
-              garmentCategoryEnum.options.find((value) => id === `default-${value}`)
-            return (
-              <li key={id} className="rounded-md bg-page px-2 py-1 text-sm">
-                {category
-                  ? t(`commerce.premium.planner.garmentCategory.${category}`)
-                  : t('shareCard.sourceOutfit')}
-              </li>
-            )
-          })}
-        </ul>
-        <button
-          type="button"
-          data-testid="today-primary-action"
-          data-gold="primary"
-          data-primary-action="true"
-          aria-expanded={detailsOpen}
-          aria-controls={detailsId}
-          className={primaryLinkClass}
-          onClick={() => setDetailsOpen((open) => !open)}
-        >
-          {t('home.today.outfitDetails')}
-        </button>
-        <div id={detailsId} hidden={!detailsOpen} className="space-y-3">
-          {available.length > 1 && (
-            <div data-testid="home-scenario-choices" className="flex flex-wrap gap-2">
-              {available.map((item) => (
-                <button
-                  key={item.scenario}
-                  type="button"
-                  onClick={() => setScenario(item.scenario)}
-                  aria-pressed={item.scenario === outfit.scenario}
-                  className="min-h-11 rounded-lg border border-line-strong px-3 text-sm font-semibold aria-pressed:border-inverse aria-pressed:bg-inverse aria-pressed:text-on-inverse"
-                >
-                  {t(`shareCard.scenarios.${item.scenario}`)}
-                </button>
-              ))}
-            </div>
-          )}
-          {starter && (
-            <p className="text-sm">{t('commerce.premium.planner.starterWardrobe')}</p>
-          )}
-          <p className="text-sm">{outfit.comfortNotes}</p>
-          {!stale && detailsOpen && <RitualShareCardLauncher outfit={outfit} />}
-        </div>
-      </div>
-    </section>
-  )
-}
 
 type RitualFailure = 'missing-city' | 'failed'
 
@@ -873,6 +802,7 @@ function SetCityAction({
 /** Story CC-7.7 D5: what a return to Home shows in its first frame, per member. */
 type RitualSnapshot = {
   ritual: LiveRitual | null
+  readAt: number
   city: string | undefined
   failure: RitualFailure | null
 }
@@ -930,7 +860,9 @@ function MemberRitual({
     }
   })
   const snapshot = start.snapshot
+  const { pieces, wardrobe } = useHomeWardrobe(owner, start.scope)
   const [ritual, setRitual] = useState<LiveRitual | null>(snapshot?.ritual ?? null)
+  const [readAt, setReadAt] = useState(() => snapshot?.readAt ?? Date.now())
   const [city, setCity] = useState<string | undefined>(snapshot?.city)
   const [failure, setFailure] = useState<RitualFailure | null>(snapshot?.failure ?? null)
   const [attempt, setAttempt] = useState(0)
@@ -957,11 +889,22 @@ function MemberRitual({
     if (!screen || !readSettled) return
     // Stored under the scope its read started in: the store drops it once that scope left.
     screenSnapshot.remember(shownScopeRef.current, screen, RITUAL_SNAPSHOT_PART, {
-      ritual,
+      ritual: ritual && {
+        ...ritual,
+        outfits: ritual.outfits.map((outfit) => ({
+          ...outfit,
+          displayGarments: outfit.displayGarments?.map(({ id, category }) => ({
+            id,
+            category,
+          })),
+          shopThisLook: null,
+        })),
+      },
       city,
       failure,
+      readAt,
     } satisfies RitualSnapshot)
-  }, [city, failure, readSettled, ritual, screen])
+  }, [city, failure, readAt, readSettled, ritual, screen])
 
   useEffect(() => {
     const token = currentWebSessionBearer()
@@ -981,6 +924,7 @@ function MemberRitual({
       return false
     }
     setBusy(true)
+    const requestStartedAt = Date.now()
     void getRitualFromWeb(token, locale, controller.signal)
       .then((data) => {
         if (!current() || !sameScope()) return
@@ -997,6 +941,7 @@ function MemberRitual({
             : undefined
         shownScopeRef.current = scope
         setRitual(data)
+        setReadAt(requestStartedAt)
         setCity(keptCity)
         setFailure(null)
         const credentials = captureLocationCredentials()
@@ -1052,11 +997,21 @@ function MemberRitual({
     <>
       {settled && <TodayWeather ritual={ritual} city={city} locale={locale} />}
       {liveOutfit && (
-        <LiveOutfit
-          ritual={liveOutfit}
-          initialScenario={scenario}
-          stale={failure === 'failed'}
-        />
+        <section
+          data-testid="today-first-content"
+          data-surface="card"
+          className={todayCardClass}
+        >
+          <TodayLiveOutfit
+            ritual={liveOutfit}
+            readAt={readAt}
+            initialScenario={scenario}
+            stale={failure === 'failed'}
+            owner={owner}
+            scope={start.scope}
+            wardrobe={wardrobe}
+          />
+        </section>
       )}
       {settled && !liveOutfit && (
         <section
@@ -1098,7 +1053,7 @@ function MemberRitual({
           <p className="mt-2 text-sm">{alert.description}</p>
         </details>
       ))}
-      {start.scope && <HomeCloset owner={owner} scope={start.scope} />}
+      <HomeCloset pieces={pieces} />
       <Link
         href="/looks?segment=plan"
         data-testid="home-plan-week"

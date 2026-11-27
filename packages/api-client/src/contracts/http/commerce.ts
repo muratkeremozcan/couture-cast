@@ -34,6 +34,7 @@ import { garmentCategoryEnum } from './wardrobe'
  */
 export const affiliateRecommendationSurfaceSchema = z.enum([
   'mobile_hero',
+  'web_hero',
   'palette_advisor',
 ])
 

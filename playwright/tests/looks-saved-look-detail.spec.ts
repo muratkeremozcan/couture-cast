@@ -7,16 +7,19 @@
 // (7.12-E2E-020..026). Reads come from looks-fixtures.ts; the saves a test drives are answered
 // by `serveSavedLookWrites` below with schema-checked contracts.
 // Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
-import type { Page } from '@playwright/test'
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
+import type { Page, Request, Route } from '@playwright/test'
 import {
   createSavedLookInputSchema,
   savedLookListResponseSchema,
   savedLookResponseSchema,
+  type CreateSavedLookInput,
   type SavedLookContract,
 } from '@couture/api-client/contracts/http'
 import { getGuestPreviewStrings, sampleLookText } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
-import { waitForShellSettled } from '../support/helpers/app-shell'
+import { FIXED_NOW, waitForShellSettled } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
 import {
   minutesAfter,
@@ -82,49 +85,74 @@ function watchHttpErrors(page: Page, expected: RegExp[]) {
  */
 async function serveSavedLookWrites(page: Page, memberId: string) {
   const created: SavedLookContract[] = []
+  const requests: { input: CreateSavedLookInput; idempotencyKey?: string }[] = []
+  const listQueries: string[] = []
+  const receipts = new Map<string, SavedLookContract>()
+  let failResponse = false
+  function answerSave(route: Route, request: Request) {
+    const input = createSavedLookInputSchema.parse(request.postDataJSON())
+    const idempotencyKey = request.headers()['idempotency-key']
+    requests.push({ input, idempotencyKey })
+    const replay = idempotencyKey ? receipts.get(idempotencyKey) : undefined
+    if (replay) {
+      return route.fulfill({
+        status: 200,
+        json: { data: replay },
+        headers: { etag: `"saved-look:${replay.id}:0"` },
+      })
+    }
+    const at = minutesAfter(1_000 + created.length)
+    const { data } = savedLookResponseSchema.parse({
+      data: {
+        id: `created-look-${created.length + 1}`,
+        ownerUserId: memberId,
+        source: input.source === 'today' ? 'home_sample' : input.source,
+        lookId: input.lookId,
+        wornOn: input.wornOn,
+        weather: input.weather,
+        title: input.title ?? null,
+        anchorGarmentId: input.anchorGarmentId ?? null,
+        anchorSnapshot: input.anchorSnapshot ?? null,
+        composition: input.composition.map((slot) => ({
+          ...slot,
+          label: slot.label ?? null,
+          missing: false,
+          imageAccess: null,
+        })),
+        swaps: input.swaps,
+        collection: input.collection ?? null,
+        comfort: input.comfort ?? null,
+        availabilityStatus: 'ready',
+        missingGarmentIds: [],
+        needsReviewReasons: [],
+        revision: 0,
+        createdAt: at,
+        updatedAt: at,
+      },
+    })
+    created.push(data)
+    if (idempotencyKey) receipts.set(idempotencyKey, data)
+    if (failResponse) {
+      // The save committed before a gateway error hid its result from the client.
+      failResponse = false
+      return route.fulfill({
+        status: 503,
+        json: { message: 'Save temporarily unavailable' },
+      })
+    }
+    return route.fulfill({
+      status: 201,
+      json: { data },
+      headers: { etag: `"saved-look:${data.id}:0"` },
+    })
+  }
   await page.route('**/api/v1/wardrobe/saved-looks**', async (route, request) => {
     const url = new URL(request.url())
     const match = /\/wardrobe\/saved-looks(?:\/([^/]+))?$/.exec(url.pathname)
     if (!match) return route.fallback()
     const [, id] = match
     const method = request.method()
-    if (!id && method === 'POST') {
-      const input = createSavedLookInputSchema.parse(request.postDataJSON())
-      const at = minutesAfter(1_000 + created.length)
-      const { data } = savedLookResponseSchema.parse({
-        data: {
-          id: `created-look-${created.length + 1}`,
-          ownerUserId: memberId,
-          source: input.source,
-          lookId: input.lookId,
-          weather: input.weather,
-          title: input.title ?? null,
-          anchorGarmentId: input.anchorGarmentId ?? null,
-          anchorSnapshot: input.anchorSnapshot ?? null,
-          composition: input.composition.map((slot) => ({
-            ...slot,
-            label: slot.label ?? null,
-            missing: false,
-            imageAccess: null,
-          })),
-          swaps: input.swaps,
-          collection: input.collection ?? null,
-          comfort: input.comfort ?? null,
-          availabilityStatus: 'ready',
-          missingGarmentIds: [],
-          needsReviewReasons: [],
-          revision: 0,
-          createdAt: at,
-          updatedAt: at,
-        },
-      })
-      created.push(data)
-      return route.fulfill({
-        status: 201,
-        json: { data },
-        headers: { etag: `"saved-look:${data.id}:0"` },
-      })
-    }
+    if (!id && method === 'POST') return answerSave(route, request)
     if (method !== 'GET' || created.length === 0) return route.fallback()
     if (id) {
       const look = created.find((entry) => entry.id === id)
@@ -139,8 +167,11 @@ async function serveSavedLookWrites(page: Page, memberId: string) {
     }
     const source = url.searchParams.get('source')
     const anchor = url.searchParams.get('anchorGarmentId')
+    const includeToday = url.searchParams.get('includeToday') === 'true'
+    listQueries.push(url.search)
     const rows = [...created]
       .reverse()
+      .filter((look) => !look.wornOn || includeToday)
       .filter((look) => !source || look.source === source)
       .filter((look) => !anchor || look.anchorGarmentId === anchor)
     return route.fulfill({
@@ -153,10 +184,105 @@ async function serveSavedLookWrites(page: Page, memberId: string) {
       headers: { 'cache-control': 'private, no-store' },
     })
   })
-  return { created: () => [...created] }
+  return {
+    created: () => [...created],
+    requests,
+    listQueries,
+    failNextSaveResponse: () => {
+      failResponse = true
+    },
+  }
 }
 
 test.describe('CC-7.12 View opens the saved look @local-lane', () => {
+  test(
+    '[P0] [7.14-PIC-005] Wear this saves the edited picture for the forecast local date',
+    {
+      annotation: [{ type: 'skipNetworkMonitoring' }],
+    },
+    async ({ page, interceptNetworkCall }) => {
+      const unexpectedErrors = watchHttpErrors(page, [
+        /^POST 503 \/api\/v1\/wardrobe\/saved-looks$/,
+      ])
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.clock.setFixedTime(FIXED_NOW)
+      const fixture = await openLooksFixture(page, interceptNetworkCall, { looks: [] })
+      const writes = await serveSavedLookWrites(page, fixture.memberId)
+      fixture.setScreen('home')
+      await page.goto('/')
+      await waitForShellSettled(page, fixture.router)
+
+      const picture = page.getByTestId('today-outfit-picture')
+      const bottom = picture.getByTestId('today-outfit-slot-1')
+      await bottom.click()
+      const swap = page.getByTestId('today-outfit-swap')
+      await expect(swap.getByTestId('today-outfit-swap-option-0')).toHaveAttribute(
+        'aria-checked',
+        'true'
+      )
+      await swap.getByTestId('today-outfit-swap-option-1').click()
+      await expect(bottom).toBeFocused()
+
+      const wear = page.getByTestId('today-primary-action')
+      await expect(wear).toHaveAccessibleName('Wear this')
+      writes.failNextSaveResponse()
+      await wear.click()
+      await expect(wear).toHaveAttribute('data-save-state', 'failed')
+      await page.getByTestId('status-bar-action-retry').click()
+      await expect(wear).toHaveAttribute('data-save-state', 'saved')
+      expect(writes.requests).toHaveLength(2)
+      expect(writes.requests[0]).toEqual(writes.requests[1])
+      expect(writes.created()).toHaveLength(1)
+      const { input, idempotencyKey } = writes.requests[0]!
+      expect(idempotencyKey).toBeTruthy()
+      expect(input).toMatchObject({
+        source: 'today',
+        wornOn: '2026-11-20',
+        lookId: expect.stringMatching(/^today:2026-11-20:/),
+        composition: [
+          { slotIndex: 0, category: 'top', kind: 'garment', itemId: 'shell-garment-1' },
+          {
+            slotIndex: 1,
+            category: 'bottom',
+            kind: 'garment',
+            itemId: 'shell-garment-2',
+          },
+          {
+            slotIndex: 2,
+            category: 'shoes',
+            kind: 'catalog',
+            itemId: expect.stringMatching(/^sample:g:/),
+          },
+        ],
+      })
+
+      await expect(page.getByTestId('status-bar-action-undo')).toBeVisible()
+      await page.getByTestId('status-bar-action-view').click()
+      const look = writes.created()[0]!
+      await expect(page.getByTestId('saved-look-detail')).toHaveAttribute(
+        'data-saved-look-id',
+        look.id
+      )
+      const slots = await page
+        .getByTestId('saved-look-detail')
+        .locator('[data-slot-item-id]')
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getAttribute('data-slot-item-id'))
+        )
+      expect(slots).toEqual(input.composition.map(({ itemId }) => itemId))
+
+      fixture.setScreen('looks')
+      await page.getByTestId('app-top-bar-back').click()
+      await expect(page.getByTestId(`saved-look-card-${look.id}`)).toBeVisible()
+      expect(
+        writes.listQueries.some(
+          (query) => new URLSearchParams(query).get('includeToday') === 'true'
+        )
+      ).toBe(true)
+      expect(unexpectedErrors()).toEqual([])
+    }
+  )
+
   test('[P0] [7.12-E2E-020] save on Today, tap View: the look opens at its address and back lands on Saved', async ({
     page,
     interceptNetworkCall,

@@ -143,12 +143,25 @@ describe('AffiliateClickController', () => {
     expect(clickService.recordClick).not.toHaveBeenCalled()
   })
 
+  it('[7.14-PIC-003] forwards the web Today surface to the attributed click service', async () => {
+    const body = { ...validBody, surface: 'web_hero' }
+    clickService.recordClick.mockResolvedValue({
+      redirectUrl: 'https://partner.couturecast.test/shop?cc=tok',
+      created: true,
+    })
+
+    expect((await post(body)).status).toBe(201)
+    expect(clickService.recordClick).toHaveBeenCalledWith(
+      expect.objectContaining({ ...body, userId: 'user-1' })
+    )
+  })
+
   it.each([
     {
       name: 'a missing offerId',
       body: { recommendationId: 'rec-1', surface: 'mobile_hero' },
     },
-    { name: 'an unknown surface', body: { ...validBody, surface: 'web_hero' } },
+    { name: 'an unknown surface', body: { ...validBody, surface: 'other_hero' } },
     { name: 'a client-supplied scenario', body: { ...validBody, scenario: 'morning' } },
     {
       name: 'a client-supplied localeRegion',

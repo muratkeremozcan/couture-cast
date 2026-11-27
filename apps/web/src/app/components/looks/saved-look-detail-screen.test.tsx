@@ -235,6 +235,22 @@ afterEach(() => {
 })
 
 describe('7.12 saved look detail (D5)', () => {
+  it('[7.14-PIC-005] shows the worn date and forecast condition for a saved Today look', async () => {
+    signInFixtureMember()
+    api.get.mockResolvedValue(
+      homeSampleLook({
+        title: 'Rain-ready look',
+        lookId: 'today:2026-11-20:rec-1',
+        weather: 'rain',
+        wornOn: '2026-11-20',
+      })
+    )
+    renderDetail()
+    const detail = await screen.findByTestId('saved-look-detail')
+    expect(screen.getByTestId('app-top-bar-title')).toHaveTextContent('Rain-ready look')
+    expect(detail).toHaveTextContent(/Rain.*From Today.*Nov 20, 2026/i)
+  })
+
   it('7.12-UNIT-040a reads the one look with the bearer and shows its pieces in stored slot order under its name', async () => {
     signInFixtureMember()
     const base = makeExactEditorLook()

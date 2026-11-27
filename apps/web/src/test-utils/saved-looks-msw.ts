@@ -90,8 +90,9 @@ function buildMswCreatedSavedLook(
   return {
     id,
     ownerUserId: owner,
-    source: parsed.source,
+    source: parsed.source === 'today' ? 'home_sample' : parsed.source,
     lookId: parsed.lookId,
+    ...(parsed.wornOn ? { wornOn: parsed.wornOn } : {}),
     weather: parsed.weather,
     title: parsed.title ?? null,
     anchorGarmentId: parsed.anchorGarmentId ?? null,
@@ -181,6 +182,7 @@ export function createSavedLooksMswHandlers(
       const owner = ownerFromRequest(request)
       const url = new URL(request.url)
       const source = url.searchParams.get('source')
+      const includeToday = url.searchParams.get('includeToday') === 'true'
       const anchorGarmentId = url.searchParams.get('anchorGarmentId')
       const limit = Number(url.searchParams.get('limit') ?? '50')
       const offset = Number(url.searchParams.get('offset') ?? '0')
@@ -188,7 +190,10 @@ export function createSavedLooksMswHandlers(
       const filtered = sourceItems.filter(
         (item) =>
           item.ownerUserId === owner &&
-          (!source || item.source === source) &&
+          (item.wornOn
+            ? source === 'today' ||
+              (includeToday && (!source || source === 'home_sample'))
+            : !source || item.source === source) &&
           (!anchorGarmentId || item.anchorGarmentId === anchorGarmentId)
       )
       const page = filtered

@@ -7,6 +7,7 @@ import {
   savedLookResponseSchema,
   type CreateSavedLookInput,
   type GarmentItemContract,
+  type ListSavedLooksQuery,
   type SavedLookContract,
   type SavedLookListSort,
   type SavedLookSource,
@@ -703,7 +704,8 @@ export async function listSavedLooksPageFromWeb(
     owner?: string | null
     accessToken?: string
     garments?: readonly GarmentItemContract[]
-    source?: SavedLookSource
+    source?: ListSavedLooksQuery['source']
+    includeToday?: boolean
     anchorGarmentId?: string
     /** Story CC-7.12 D3: `created_desc` for the Looks tab's newest-first feed. */
     sort?: SavedLookListSort
@@ -737,6 +739,7 @@ export async function listSavedLooksPageFromWeb(
         client.apiV1WardrobeSavedLooksGet(
           {
             source: options.source,
+            includeToday: options.includeToday ? 'true' : undefined,
             anchorGarmentId: options.anchorGarmentId,
             sort: options.sort,
             limit: options.limit,
@@ -756,7 +759,7 @@ export async function listSavedLooksFromWeb(
     owner?: string | null
     accessToken?: string
     garments?: readonly GarmentItemContract[]
-    source?: SavedLookSource
+    source?: ListSavedLooksQuery['source']
     anchorGarmentId?: string
     limit?: number
     offset?: number

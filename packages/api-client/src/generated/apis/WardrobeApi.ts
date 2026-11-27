@@ -59,6 +59,7 @@ export interface ApiV1WardrobeGarmentsGarmentIdUsageGetRequest {
 
 export interface ApiV1WardrobeGarmentsGetRequest {
   xCoutureGarmentColor?: ApiV1WardrobeGarmentsGetXCoutureGarmentColorEnum
+  xCoutureTodayWardrobe?: ApiV1WardrobeGarmentsGetXCoutureTodayWardrobeEnum
 }
 
 export interface ApiV1WardrobeGarmentsPostRequest {
@@ -116,6 +117,7 @@ export interface ApiV1WardrobeOwnerUserIdCapsulesPostRequest {
 
 export interface ApiV1WardrobeSavedLooksGetRequest {
   source?: ApiV1WardrobeSavedLooksGetSourceEnum
+  includeToday?: ApiV1WardrobeSavedLooksGetIncludeTodayEnum
   anchorGarmentId?: string
   sort?: ApiV1WardrobeSavedLooksGetSortEnum
   limit?: number
@@ -469,6 +471,12 @@ export class WardrobeApi extends runtime.BaseAPI {
     if (requestParameters['xCoutureGarmentColor'] != null) {
       headerParameters['x-couture-garment-color'] = String(
         requestParameters['xCoutureGarmentColor']
+      )
+    }
+
+    if (requestParameters['xCoutureTodayWardrobe'] != null) {
+      headerParameters['x-couture-today-wardrobe'] = String(
+        requestParameters['xCoutureTodayWardrobe']
       )
     }
 
@@ -1294,6 +1302,10 @@ export class WardrobeApi extends runtime.BaseAPI {
       queryParameters['source'] = requestParameters['source']
     }
 
+    if (requestParameters['includeToday'] != null) {
+      queryParameters['includeToday'] = requestParameters['includeToday']
+    }
+
     if (requestParameters['anchorGarmentId'] != null) {
       queryParameters['anchorGarmentId'] = requestParameters['anchorGarmentId']
     }
@@ -2095,6 +2107,14 @@ export type ApiV1WardrobeGarmentsGetXCoutureGarmentColorEnum =
 /**
  * @export
  */
+export const ApiV1WardrobeGarmentsGetXCoutureTodayWardrobeEnum = {
+  _1: '1',
+} as const
+export type ApiV1WardrobeGarmentsGetXCoutureTodayWardrobeEnum =
+  (typeof ApiV1WardrobeGarmentsGetXCoutureTodayWardrobeEnum)[keyof typeof ApiV1WardrobeGarmentsGetXCoutureTodayWardrobeEnum]
+/**
+ * @export
+ */
 export const ApiV1WardrobeOwnerUserIdCapsulesGetOccasionEnum = {
   work: 'work',
   casual: 'casual',
@@ -2133,9 +2153,18 @@ export type ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum =
 export const ApiV1WardrobeSavedLooksGetSourceEnum = {
   style_piece: 'style_piece',
   home_sample: 'home_sample',
+  today: 'today',
 } as const
 export type ApiV1WardrobeSavedLooksGetSourceEnum =
   (typeof ApiV1WardrobeSavedLooksGetSourceEnum)[keyof typeof ApiV1WardrobeSavedLooksGetSourceEnum]
+/**
+ * @export
+ */
+export const ApiV1WardrobeSavedLooksGetIncludeTodayEnum = {
+  true: 'true',
+} as const
+export type ApiV1WardrobeSavedLooksGetIncludeTodayEnum =
+  (typeof ApiV1WardrobeSavedLooksGetIncludeTodayEnum)[keyof typeof ApiV1WardrobeSavedLooksGetIncludeTodayEnum]
 /**
  * @export
  */

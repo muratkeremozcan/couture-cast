@@ -151,7 +151,7 @@ export const mockRitualResponse = {
       {
         id: 'morning-outfit-id',
         scenario: 'morning' as const,
-        garmentIds: ['classic-trench-coat', 'navy-chinos'],
+        garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
         reasoningBadges: [
           {
             key: 'breeze-guard',
@@ -168,7 +168,7 @@ export const mockRitualResponse = {
       {
         id: 'midday-outfit-id',
         scenario: 'midday' as const,
-        garmentIds: ['casual-tee', 'navy-chinos'],
+        garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
         reasoningBadges: [],
         comfortNotes: 'Warm and sunny midday. Light tee is perfect.',
         shopThisLook: null,
@@ -176,7 +176,7 @@ export const mockRitualResponse = {
       {
         id: 'evening-outfit-id',
         scenario: 'evening' as const,
-        garmentIds: ['crewneck-sweater', 'navy-chinos'],
+        garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
         reasoningBadges: [],
         comfortNotes: 'Cool evening ahead. Sweater recommended.',
         shopThisLook: null,
@@ -191,7 +191,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'morning-outfit-id',
       scenario: 'morning',
-      garmentIds: ['classic-trench-coat', 'navy-chinos'],
+      garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
       reasoningBadges: [
         {
           key: 'breeze-guard',
@@ -208,7 +208,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'midday-outfit-id',
       scenario: 'midday',
-      garmentIds: ['casual-tee', 'navy-chinos'],
+      garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Sıcak ve güneşli öğle vakti. Hafif tişört mükemmeldir.',
       shopThisLook: null,
@@ -216,7 +216,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'evening-outfit-id',
       scenario: 'evening',
-      garmentIds: ['crewneck-sweater', 'navy-chinos'],
+      garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Serin akşam. Kazak önerilir.',
       shopThisLook: null,
@@ -226,7 +226,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'morning-outfit-id',
       scenario: 'morning',
-      garmentIds: ['classic-trench-coat', 'navy-chinos'],
+      garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
       reasoningBadges: [
         {
           key: 'breeze-guard',
@@ -243,7 +243,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'midday-outfit-id',
       scenario: 'midday',
-      garmentIds: ['casual-tee', 'navy-chinos'],
+      garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Mediodía cálido y soleado. Camiseta ligera es perfecta.',
       shopThisLook: null,
@@ -251,7 +251,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'evening-outfit-id',
       scenario: 'evening',
-      garmentIds: ['crewneck-sweater', 'navy-chinos'],
+      garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Noche fresca por delante. Suéter recomendado.',
       shopThisLook: null,
@@ -261,7 +261,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'morning-outfit-id',
       scenario: 'morning',
-      garmentIds: ['classic-trench-coat', 'navy-chinos'],
+      garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
       reasoningBadges: [
         {
           key: 'breeze-guard',
@@ -278,7 +278,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'midday-outfit-id',
       scenario: 'midday',
-      garmentIds: ['casual-tee', 'navy-chinos'],
+      garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Midi chaud et ensoleillé. Un T-shirt léger est parfait.',
       shopThisLook: null,
@@ -286,7 +286,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'evening-outfit-id',
       scenario: 'evening',
-      garmentIds: ['crewneck-sweater', 'navy-chinos'],
+      garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Soirée fraîche à venir. Chandail recommandé.',
       shopThisLook: null,
@@ -296,7 +296,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'morning-outfit-id',
       scenario: 'morning',
-      garmentIds: ['classic-trench-coat', 'navy-chinos'],
+      garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
       reasoningBadges: [
         {
           key: 'breeze-guard',
@@ -313,7 +313,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'midday-outfit-id',
       scenario: 'midday',
-      garmentIds: ['casual-tee', 'navy-chinos'],
+      garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Warmer und sonniger Mittag. Ein leichtes T-Shirt ist perfekt.',
       shopThisLook: null,
@@ -321,7 +321,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'evening-outfit-id',
       scenario: 'evening',
-      garmentIds: ['crewneck-sweater', 'navy-chinos'],
+      garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Kühler Abend steht bevor. Pullover empfohlen.',
       shopThisLook: null,
@@ -331,7 +331,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'morning-outfit-id',
       scenario: 'morning',
-      garmentIds: ['classic-trench-coat', 'navy-chinos'],
+      garmentIds: ['sample:g:trench-coat', 'sample:g:chinos'],
       reasoningBadges: [
         {
           key: 'breeze-guard',
@@ -348,7 +348,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'midday-outfit-id',
       scenario: 'midday',
-      garmentIds: ['casual-tee', 'navy-chinos'],
+      garmentIds: ['sample:g:cotton-tee', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Mezzogiorno caldo e soleggiato. T-shirt leggera ideale.',
       shopThisLook: null,
@@ -356,7 +356,7 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
     {
       id: 'evening-outfit-id',
       scenario: 'evening',
-      garmentIds: ['crewneck-sweater', 'navy-chinos'],
+      garmentIds: ['sample:g:merino-sweater', 'sample:g:chinos'],
       reasoningBadges: [],
       comfortNotes: 'Serata fresca in arrivo. Consigliato maglione.',
       shopThisLook: null,

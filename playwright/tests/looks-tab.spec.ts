@@ -342,6 +342,7 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
   }) => {
     const fixture = await openLooksFixture(page, interceptNetworkCall, {
       looks: [
+        { id: 'worn-1', created: 60, title: 'A look worn today', wornOn: '2026-11-20' },
         { id: 'home-1', created: 50, title: 'Today one' },
         { id: 'home-2', created: 30, title: 'Today two' },
         { id: 'piece-1', created: 40, title: 'Style piece', source: 'style_piece' },
@@ -354,9 +355,9 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
       'aria-pressed',
       'true'
     )
-    expect(await tileIds(page)).toHaveLength(4)
+    expect(await tileIds(page)).toHaveLength(5)
 
-    // Today: home samples only, read from the server by source (P2), no capsule read.
+    // Today includes worn looks and home samples. The filter fetches only the saved-look list.
     let before = fixture.listReads().length
     await page.getByTestId('looks-filter-today').click()
     await expect(page).toHaveURL(/filter=today/)
@@ -366,10 +367,16 @@ test.describe('CC-7.12 Saved grid, order and state lines @local-lane', () => {
     )
     await expect
       .poll(() => tileIds(page))
-      .toEqual(['saved-look-card-home-1', 'saved-look-card-home-2'])
+      .toEqual([
+        'saved-look-card-worn-1',
+        'saved-look-card-home-1',
+        'saved-look-card-home-2',
+      ])
     const todayReads = fixture.listReads().slice(before)
+    expect(todayReads.length).toBeGreaterThan(0)
     expect(todayReads.every((read) => read.startsWith('saved-looks?'))).toBe(true)
     expect(todayReads.every((read) => read.includes('source=home_sample'))).toBe(true)
+    expect(todayReads.every((read) => read.includes('includeToday=true'))).toBe(true)
 
     // Capsules: with the capsule read held, no saved look tile may show (T1).
     const release = fixture.hold('capsules')

@@ -224,18 +224,17 @@ describe('attributed click request', () => {
     // to be added here on purpose.
     expect(affiliateSurfaceSchema.options).toEqual([
       'mobile_hero',
+      'web_hero',
       'palette_advisor',
       'community_feed',
       'community_spotlight',
       'home_teaser',
     ])
-    expect(() =>
-      affiliateClickRequestSchema.parse(
-        createAffiliateClickRequestFixture({
-          surface: 'web_hero' as never,
-        })
-      )
-    ).toThrow()
+    const webHero = createAffiliateClickRequestFixture({ surface: 'web_hero' })
+    expect(affiliateClickRequestSchema.parse(webHero)).toEqual(webHero)
+    expect(
+      affiliateClickRequestSchema.safeParse({ ...webHero, surface: 'other_hero' }).success
+    ).toBe(false)
   })
 
   it.each([
@@ -725,7 +724,7 @@ describe('analytics property allowlists', () => {
     // The union split must leave both recommendation members intact: a garment
     // offer clicked on the advisor surface carries a scenario and a
     // recommendation id exactly like the hero click.
-    it.each(['mobile_hero', 'palette_advisor'] as const)(
+    it.each(['mobile_hero', 'web_hero', 'palette_advisor'] as const)(
       '6.7b-CON-006 the %s recommendation click parses through the schema and the event wrapper',
       (surface) => {
         const properties = { ...validProperties.affiliate_cta_clicked, surface }

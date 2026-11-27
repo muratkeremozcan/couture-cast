@@ -121,7 +121,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-01 renders the CTA from a network payload and emits one impression', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await screen.findByTestId('shop-this-look-block')
 
@@ -142,7 +142,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-02 emits nothing more when the user toggles scenario away and back', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
     await waitFor(() => {
       expect(affiliateImpressions()).toHaveLength(1)
@@ -193,7 +193,7 @@ describe('TabOneScreen affiliate CTA', () => {
     )
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
     await waitFor(() => {
       expect(affiliateImpressions()).toHaveLength(1)
@@ -224,7 +224,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-03 renders no CTA and emits no impression on a scenario with no offer', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
 
     fireEvent.click(screen.getByTestId('scenario-picker'))
@@ -240,7 +240,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-04 strips the affiliate block out of every device cache write', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
 
     await waitFor(() => {
@@ -249,22 +249,22 @@ describe('TabOneScreen affiliate CTA', () => {
     expectNoPersistedOffers()
   })
 
-  it('5.1-MOB-HERO-05 keeps stripping on the garment-swap cache write', async () => {
+  it('5.1-MOB-HERO-05 conceals the original offer after a picture slot is swapped', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
-    saveRitualCacheMock.mockClear()
-
-    fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+    fireEvent.click(screen.getByTestId('today-outfit-slot-0'))
     await waitFor(() => {
-      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
     })
-    fireEvent.click(screen.getByTestId('swap-option-denim-jacket'))
+    fireEvent.click(screen.getByTestId('today-outfit-swap-option-1'))
 
     await waitFor(() => {
-      expect(saveRitualCacheMock).toHaveBeenCalled()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /denim jacket/i
+      )
+      expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
     })
-    // A swap rewrites a network payload, so this write can carry a block too.
     expectNoPersistedOffers()
   })
 
@@ -274,10 +274,12 @@ describe('TabOneScreen affiliate CTA', () => {
     await seedRitualCache({ data: eligibleRitual, timestamp: Date.now() })
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await waitFor(() => {
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
     expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
     expect(affiliateImpressions()).toHaveLength(0)
@@ -291,7 +293,7 @@ describe('TabOneScreen affiliate CTA', () => {
     server.use(http.get('*/api/v1/ritual', () => new HttpResponse(null, { status: 503 })))
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await waitFor(() => {
       expect(screen.getByTestId('stale-cache-banner')).toBeTruthy()
@@ -304,7 +306,7 @@ describe('TabOneScreen affiliate CTA', () => {
 
   it('5.1-MOB-HERO-08 drops the CTA on the next load once the user opts out', async () => {
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
 
     // What the server sends after `affiliate_ctas_enabled` flips to false: the
@@ -337,7 +339,7 @@ describe('TabOneScreen affiliate CTA', () => {
     await i18n.changeLanguage('es-419')
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
     await screen.findByTestId('shop-this-look-block')
 
     await waitFor(() => {

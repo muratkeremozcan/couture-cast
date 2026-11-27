@@ -1,5 +1,7 @@
 // Learning path Step 66: One app shell and visual system.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
+// Learning path Step 71: Today's outfit as a picture.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 // Story CC-7.9 test owner (TEA): 7.9-VIS-001..008, AC6 and spec D11.
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 //
@@ -21,6 +23,7 @@ import {
   SHELL_TABS,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
+import { serveTodayPhoto } from '../support/helpers/today-outfit-photo'
 
 test.use({
   authSessionEnabled: false,
@@ -34,11 +37,11 @@ test.use({
 })
 
 const VIS_ID: Record<string, string> = {
-  'home-light': '7.9-VIS-001',
+  'home-light': '7.14-VIS-001',
   'closet-light': '7.9-VIS-002',
   'community-light': '7.9-VIS-003',
   'profile-light': '7.9-VIS-004',
-  'home-dark': '7.9-VIS-005',
+  'home-dark': '7.14-VIS-001',
   'closet-dark': '7.9-VIS-006',
   'community-dark': '7.9-VIS-007',
   'profile-dark': '7.9-VIS-008',
@@ -46,6 +49,11 @@ const VIS_ID: Record<string, string> = {
   'looks-light': '7.11-VIS-001',
   'looks-dark': '7.11-VIS-002',
 }
+
+const todayVariants = [
+  { name: 'home-empty-closet-light', mode: 'empty-closet', fail: false },
+  { name: 'home-missing-photo-light', mode: 'populated', fail: true },
+] as const
 
 test.describe('CC-7.9 tab snapshots @local-lane', () => {
   for (const scheme of SCHEMES) {
@@ -57,9 +65,11 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
       }) => {
         await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' })
         await page.clock.setFixedTime(FIXED_NOW)
+        const photo = screen === 'home' ? await serveTodayPhoto(page) : undefined
         const { router } = await openFixtureShell(page, interceptNetworkCall, {
           mode: 'populated',
           screen,
+          todayPhotoUrl: photo?.url,
         })
 
         await page.goto(SHELL_TABS[screen].path)
@@ -67,6 +77,10 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
         // A failed session also opens the gate: the snapshot must be the member's screen.
         await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
         await expect(page.getByTestId('app-header')).toBeVisible()
+        if (screen === 'home') {
+          await expect(page.getByTestId('today-outfit-photo-0')).toBeVisible()
+          await expect(page.getByTestId('today-outfit-catalog-1')).toBeVisible()
+        }
 
         await expect(page).toHaveScreenshot(`${name}.png`, {
           animations: 'disabled',
@@ -82,5 +96,39 @@ test.describe('CC-7.9 tab snapshots @local-lane', () => {
         )
       })
     }
+  }
+
+  for (const { name, mode, fail } of todayVariants) {
+    test(`[P1] [7.14-VIS-001] ${name} matches its baseline at 390 x 844`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' })
+      await page.clock.setFixedTime(FIXED_NOW)
+      const photo = fail ? await serveTodayPhoto(page, { fail }) : undefined
+      const { router } = await openFixtureShell(page, interceptNetworkCall, {
+        mode,
+        screen: 'home',
+        todayPhotoUrl: photo?.url,
+      })
+
+      await page.goto('/')
+      await waitForShellSettled(page, router)
+      await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
+      await expect(page.getByTestId('today-outfit-catalog-0')).toBeVisible()
+      await expect(page.getByTestId('today-outfit-catalog-1')).toBeVisible()
+      await expect(page.getByTestId('today-outfit-catalog-2')).toBeVisible()
+      await expect(page.getByTestId('today-outfit-photo-0')).toBeHidden()
+      if (fail) {
+        await photo?.requested
+        await expect(page.getByTestId('home-closet-strip')).toBeVisible()
+      } else await expect(page.getByTestId('home-add-garment')).toBeVisible()
+
+      await expect(page).toHaveScreenshot(`${name}.png`, {
+        animations: 'disabled',
+        caret: 'hide',
+        maxDiffPixelRatio: 0.01,
+      })
+    })
   }
 })

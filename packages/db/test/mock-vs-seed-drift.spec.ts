@@ -110,12 +110,12 @@ describe('E2E flows never assert unit-test mock data', () => {
     // below vacuously true.
     expect(seedSource).toContain('-garment-${i + 1}')
     expect(maestroSource).toContain('appId:')
-    expect(mockSource).toContain('classic-trench-coat')
+    expect(mockSource).toContain('morning-outfit-id')
   })
 
   it('collected a meaningful set of mock-only literals', () => {
     expect(mockOnlyLiterals.length).toBeGreaterThan(5)
-    expect(mockOnlyLiterals).toContain('classic-trench-coat')
+    expect(mockOnlyLiterals).toContain('morning-outfit-id')
     expect(mockOnlyLiterals).toContain('Warm and sunny midday. Light tee is perfect.')
   })
 

@@ -17,6 +17,7 @@ import {
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
   type ResolveCommunityTargetsInput,
+  type ShopThisLook,
 } from '@couture/api-client/contracts/http'
 
 /**
@@ -190,7 +191,16 @@ function feedItem(id: string, title: string) {
   }
 }
 
-export function bodies(memberId: string, populated: boolean, teenPending = false) {
+export function bodies(
+  memberId: string,
+  populated: boolean,
+  teenPending = false,
+  options: {
+    emptyCloset?: boolean
+    todayPhotoUrl?: string
+    todayOffer?: ShopThisLook
+  } = {}
+) {
   // Community content is other members' posts, so a pending teen with nothing of their own still
   // sees it (CC-7.10 D1).
   const community = populated || teenPending
@@ -247,11 +257,36 @@ export function bodies(memberId: string, populated: boolean, teenPending = false
       outfits: (['morning', 'midday', 'evening'] as const).map((scenario) => ({
         id: `${scenario}-recommendation`,
         scenario,
-        garmentIds: ['shell-garment-1'],
-        displayGarments: [{ id: 'shell-garment-1', category: 'top' }],
-        reasoningBadges: [],
+        garmentIds: options.emptyCloset
+          ? ['default-top', 'default-bottom', 'default-shoes']
+          : ['shell-garment-1', 'default-bottom', 'default-shoes'],
+        displayGarments: options.emptyCloset
+          ? []
+          : [
+              {
+                id: 'shell-garment-1',
+                category: 'top',
+                ...(options.todayPhotoUrl
+                  ? {
+                      imageAccess: {
+                        url: options.todayPhotoUrl,
+                        expiresAt: '2026-11-20T15:15:00.000Z',
+                      },
+                    }
+                  : {}),
+              },
+            ],
+        reasoningBadges: options.todayOffer
+          ? [
+              {
+                key: 'warm-layer',
+                label: 'Warm layer',
+                bullets: ['A layer helps when it cools down.'],
+              },
+            ]
+          : [],
         comfortNotes: `${scenario} ${ownerMarker(memberId)}`,
-        shopThisLook: null,
+        shopThisLook: options.todayOffer ?? null,
       })),
       badges: [],
     },
@@ -548,6 +583,8 @@ const NO_CITY = {
 export function createShellRouter(options: {
   mode: ShellMode
   screen: () => ShellScreen
+  todayPhotoUrl?: string
+  todayOffer?: ShopThisLook
   /**
    * A member run: a stubbed read without a fixture bearer answers 401 instead of member data,
    * so a member who lost the bearer cannot pass on fixture content (Codex P2-10). A signed-out
@@ -567,7 +604,14 @@ export function createShellRouter(options: {
     // Only reached with a fixture bearer (the handler refuses the rest), so no fallback owner.
     const owner = fixtureOwner(request.headers()['authorization'])!
     if (!bodiesByOwner.has(owner))
-      bodiesByOwner.set(owner, bodies(owner, populated, teenPending))
+      bodiesByOwner.set(
+        owner,
+        bodies(owner, populated, teenPending, {
+          emptyCloset: mode === 'empty-closet',
+          todayPhotoUrl: options.todayPhotoUrl,
+          todayOffer: options.todayOffer,
+        })
+      )
     return bodiesByOwner.get(owner)!
   }
   let open = 0

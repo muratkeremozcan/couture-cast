@@ -14,6 +14,7 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants'
 import { createGarmentTagSuggestionSnapshotFixture } from '@couture/api-client/testing/wardrobe-fixtures'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ZodError } from 'zod'
+import type { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import type { RequestAuthContext } from '../auth/security.types'
 import { WardrobeController } from './wardrobe.controller'
 import { WardrobeGarmentRemovalController } from './wardrobe-garment-removal.controller'
@@ -69,6 +70,7 @@ function garmentItemResponse(overrides: Record<string, unknown> = {}) {
 }
 
 const mockListGarments = vi.fn()
+const canTeenViewPrivateGarmentPhotos = vi.fn()
 const mockCreateUploadUrl = vi.fn()
 const mockCommitGarment = vi.fn()
 const mockRequestDeletion = vi.fn()
@@ -88,7 +90,9 @@ const mockRetentionService = {
 } as unknown as WardrobeRetentionService
 
 describe('WardrobeController', () => {
-  const controller = new WardrobeController(mockWardrobeService)
+  const controller = new WardrobeController(mockWardrobeService, {
+    canTeenViewPrivateGarmentPhotos,
+  } as unknown as GuardianConsentStateService)
   // Story CC-7.6 D8: the garment DELETE moved to its own controller without the upload guard.
   const removalController = new WardrobeGarmentRemovalController(
     mockWardrobeService,
@@ -104,7 +108,31 @@ describe('WardrobeController', () => {
     mockListGarments.mockResolvedValue({ data: [] })
     const result = await controller.listGarments(mockAuth)
     expect(result).toEqual({ data: [] })
-    expect(mockListGarments).toHaveBeenCalledWith('user_123')
+    expect(mockListGarments).toHaveBeenCalledWith('user_123', undefined)
+    expect(canTeenViewPrivateGarmentPhotos).not.toHaveBeenCalled()
+  })
+
+  it('[7.14-PIC-002] a pending teen negotiates an empty Today wardrobe without reading photo records', async () => {
+    canTeenViewPrivateGarmentPhotos.mockResolvedValue(false)
+
+    await expect(controller.listGarments(mockAuth, '1', '1')).resolves.toEqual({
+      data: [],
+    })
+    expect(canTeenViewPrivateGarmentPhotos).toHaveBeenCalledExactlyOnceWith('user_123')
+    expect(mockListGarments).not.toHaveBeenCalled()
+  })
+
+  it('[7.14-PIC-001] an active teen can read the Today wardrobe with category colors', async () => {
+    canTeenViewPrivateGarmentPhotos.mockResolvedValue(true)
+    mockListGarments.mockResolvedValue({ data: [] })
+
+    await expect(controller.listGarments(mockAuth, '1', '1')).resolves.toEqual({
+      data: [],
+    })
+    expect(mockListGarments).toHaveBeenCalledExactlyOnceWith('user_123', {
+      includeColor: true,
+      today: true,
+    })
   })
 
   it('validates upload url allocation payload and idempotency key', async () => {
@@ -455,7 +483,7 @@ describe('WardrobeController', () => {
           header
         )
 
-        expect(mockListGarments).toHaveBeenCalledWith('user_123')
+        expect(mockListGarments).toHaveBeenCalledWith('user_123', undefined)
         expect(mockUpdateGarmentTags).toHaveBeenCalledWith(
           'user_123',
           'teen',

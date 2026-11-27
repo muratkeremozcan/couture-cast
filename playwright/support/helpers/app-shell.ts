@@ -9,6 +9,7 @@
 // fell back to.
 // Story CC-7.12 (Step 69): the capsules list fallback route moved into the shell router.
 import { colorRoles, hexToChannels } from '@couture/utils'
+import type { ShopThisLook } from '@couture/api-client/contracts/http'
 import { expect, type Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { seedWebSession } from './commerce-session'
@@ -52,6 +53,8 @@ export async function openFixtureShell(
     mode: ShellMode
     screen: ShellScreen
     memberId?: string
+    todayPhotoUrl?: string
+    todayOffer?: ShopThisLook
     /**
      * A returning member's stored session that the app still has to verify (`pending`, CC-7.7
      * D1), instead of the fixture bearer that is a member at first paint.
@@ -65,6 +68,8 @@ export async function openFixtureShell(
     mode: options.mode,
     screen: () => active,
     requireBearer: true,
+    todayPhotoUrl: options.todayPhotoUrl,
+    todayOffer: options.todayOffer,
   })
   // Story CC-7.12 (Step 69): the capsules list is a shell read now (Looks merges it into Saved,
   // and /looks/capsules reads it), so the router serves it and its own fallback route is gone.

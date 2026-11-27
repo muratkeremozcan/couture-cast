@@ -11,6 +11,7 @@ import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { TelemetryModule } from '../telemetry/telemetry.module.js'
 import { SupabaseWardrobeStorageAdapter } from '../wardrobe/wardrobe-storage.adapter.js'
 import { RitualController } from './ritual.controller.js'
+import { RitualGarmentPhotoService } from './ritual-garment-photo.service.js'
 import { RitualService, RITUAL_REDIS_CLIENT } from './ritual.service.js'
 import { RITUAL_CACHE_INVALIDATOR } from './ritual-cache.js'
 import { ComfortController } from './comfort.controller.js'
@@ -38,6 +39,7 @@ import { getRedisConfig, redisOptionsFromConfig } from '../../config/redis.js'
   controllers: [RitualController, ComfortController, PlannerController],
   providers: [
     RitualService,
+    RitualGarmentPhotoService,
     ComfortService,
     PlannerService,
     // Story 5.5: also provided directly by CommerceModule and WardrobeModule,

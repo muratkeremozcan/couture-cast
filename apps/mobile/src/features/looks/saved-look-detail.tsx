@@ -7,6 +7,7 @@
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 import { router, Stack } from 'expo-router'
+import { Image as ExpoImage } from 'expo-image'
 import {
   useCallback,
   useEffect,
@@ -31,7 +32,9 @@ import type {
 } from '@couture/api-client/contracts/http'
 import {
   createAnnouncementToken,
+  formatTodayWornOn,
   getGuestPreviewStrings,
+  getTodayOutfitStrings,
   isOfflineError,
   SAMPLE_CATALOG,
   sampleGarmentText,
@@ -62,6 +65,7 @@ import {
   restoreSavedLookFromMobile,
 } from '@/src/lib/saved-looks'
 import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
+import { usePhotoBeforeExpiry } from '@/src/hooks/use-photo-before-expiry'
 import { useTokens } from '@/src/theme/tokens'
 import { PreviewButton, SampleGarmentArt } from '../preview/guest-preview-parts'
 import { focusStylePieceControl, StylePiecePanel } from '../wardrobe/style-piece-panel'
@@ -81,6 +85,19 @@ type DetailState =
 
 function sortedSlots(look: SavedLookContract) {
   return [...look.composition].sort((a, b) => a.slotIndex - b.slotIndex)
+}
+
+function nextTodayPhotoExpiry(state: DetailState): number | undefined {
+  if (state.kind !== 'ready' || !state.look.wornOn) return
+  const current = Date.now()
+  let nextExpiry: number | undefined
+  for (const { imageAccess } of state.look.composition) {
+    const expiresAt = Date.parse(imageAccess?.expiresAt ?? '')
+    if (expiresAt > current && (nextExpiry === undefined || expiresAt < nextExpiry)) {
+      nextExpiry = expiresAt
+    }
+  }
+  return nextExpiry
 }
 
 function isSlotImageValid(
@@ -141,6 +158,7 @@ function MemberSavedLookDetail({
   const [state, setState] = useState<DetailState>(() =>
     savedLookId ? { kind: 'loading' } : { kind: 'gone' }
   )
+  usePhotoBeforeExpiry(nextTodayPhotoExpiry(state))
   const [attempt, setAttempt] = useState(0)
   const [removing, setRemoving] = useState(false)
   const [failedImageKeys, setFailedImageKeys] = useState<Set<string>>(() => new Set())
@@ -392,7 +410,7 @@ function MemberSavedLookDetail({
     else router.dismissTo(savedLooksRoute(from ?? 'all'))
   }
 
-  const renderSlot = (lookId: string, slot: Slot) => {
+  const renderSlot = (lookId: string, slot: Slot, isToday: boolean) => {
     const key = `${slot.slotIndex}-${slot.itemId}`
     const categoryLabel = samples.values.category[slot.category]
     if (slot.kind === 'catalog') {
@@ -431,6 +449,7 @@ function MemberSavedLookDetail({
     const photoKey = slot.imageAccess?.url
       ? `${lookId}:${slot.slotIndex}:${slot.imageAccess.url}`
       : null
+    const PieceImage = isToday ? ExpoImage : Image
     return (
       <View
         key={key}
@@ -438,8 +457,9 @@ function MemberSavedLookDetail({
         style={[styles.slotChip, { borderColor: colors.lineStrong }]}
       >
         {photoUsable && slot.imageAccess ? (
-          <Image
+          <PieceImage
             source={{ uri: slot.imageAccess.url }}
+            {...(isToday ? { cachePolicy: 'none' as const, recyclingKey: photoKey } : {})}
             accessible={false}
             style={styles.slotImage}
             onError={() => {
@@ -498,7 +518,9 @@ function MemberSavedLookDetail({
           {t('savedLooks.slotOrderLabel')}
         </Text>
         <View style={styles.slotsRow}>
-          {sortedSlots(look).map((slot) => renderSlot(look.id, slot))}
+          {sortedSlots(look).map((slot) =>
+            renderSlot(look.id, slot, Boolean(look.wornOn))
+          )}
         </View>
         {anchor ? (
           <PreviewButton
@@ -552,14 +574,20 @@ function DetailHeader({ look }: { look: SavedLookContract }) {
   const { t, i18n } = useTranslation()
   const { colors } = useTokens()
   const samples = getGuestPreviewStrings(i18n.language)
-  const weather = samples.values.weather[look.weather as SampleWeatherKey] ?? look.weather
-  const source =
-    look.source === 'style_piece'
-      ? t('savedLooks.sourceStylePiece')
-      : t('savedLooks.sourceHomeSample')
+  const weather = look.wornOn
+    ? t(`hero.conditions.${look.weather}`)
+    : (samples.values.weather[look.weather as SampleWeatherKey] ?? look.weather)
+  const source = look.wornOn
+    ? getTodayOutfitStrings(i18n.language).source
+    : t(
+        look.source === 'style_piece'
+          ? 'savedLooks.sourceStylePiece'
+          : 'savedLooks.sourceHomeSample'
+      )
+  const date = look.wornOn ? ` · ${formatTodayWornOn(look.wornOn, i18n.language)}` : ''
   return (
     <>
-      <Text style={{ color: colors.inkMuted }}>{`${weather} · ${source}`}</Text>
+      <Text style={{ color: colors.inkMuted }}>{`${weather} · ${source}${date}`}</Text>
       {look.availabilityStatus === 'missing_garment' ? (
         <Text testID="saved-look-detail-missing" style={{ color: colors.noticeInk }}>
           {t('savedLooks.missingPieceDetail')}

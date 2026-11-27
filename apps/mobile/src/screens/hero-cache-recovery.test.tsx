@@ -124,7 +124,9 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     await renderScreen()
 
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
     expect(ritualRequestCount).toBe(0)
     // `ritual_created` marks a freshly generated ritual; emitting it from a
@@ -144,7 +146,9 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     await renderScreen()
 
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
     // A signed-out user still gets the offline ritual under a non-empty owner, even
     // with no analytics id; an empty owner would key `ritual::en-US:...`.
@@ -230,35 +234,36 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   it('3.3-MOB-HERO-16 returns focus to the garment that opened the swap sheet when it is cancelled', async () => {
     await renderScreen()
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
 
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
-    const tile = screen.getByTestId('garment-tile-classic-trench-coat')
+    const tile = screen.getByTestId('today-outfit-slot-0')
     tile.focus()
     fireEvent.click(tile)
     await waitFor(() => {
-      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
     })
     // Story 6.15 review P3-1: the swap sheet is the accessibility modal view, so the modal's
     // live-font marker sits inside it, where iOS keeps it in the XCUITest hierarchy.
     expect(liveFontMarkerPlacement()).toEqual({
       markerInside: true,
-      host: 'garment-swap-modal',
+      host: 'today-outfit-swap',
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
 
     await waitFor(() => {
-      expect(screen.queryByTestId('garment-swap-modal')).toBeNull()
+      expect(screen.queryByTestId('today-outfit-swap')).toBeNull()
     })
     // Dropping focus to the document body after a dismissed sheet strands a
     // keyboard or screen-reader user at the top of the page.
     await waitFor(() => {
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveFocus()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveFocus()
     })
     // Cancelling must not mutate the outfit.
-    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/trench coat/i)
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })

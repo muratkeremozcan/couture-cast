@@ -18,7 +18,8 @@ import { useTranslation } from 'react-i18next'
 type OutfitRecommendationCardProps = {
   onExport?: (recommendationId: string, opener: () => number | null) => void
   outfit?: ScenarioOutfit
-  onSwapGarment: (garmentId: string, trigger?: number | { focus?: () => void }) => void
+  onSwapGarment?: (garmentId: string, trigger?: number | { focus?: () => void }) => void
+  isCurrent?: () => boolean
   onGarmentRef?: (
     garmentId: string,
     element: ComponentRef<typeof Pressable> | null
@@ -33,11 +34,46 @@ type OutfitRecommendationCardProps = {
   isCacheServed?: boolean
 }
 
+function RecommendationGarments({
+  outfit,
+  onSwap,
+  onRef,
+}: {
+  outfit: ScenarioOutfit
+  onSwap: OutfitRecommendationCardProps['onSwapGarment']
+  onRef: OutfitRecommendationCardProps['onGarmentRef']
+}) {
+  if (!onSwap) return null
+  return (
+    <View style={styles.garmentsList}>
+      {outfit.garmentIds.map((garmentId) => (
+        <GarmentItemTile
+          key={garmentId}
+          garmentId={garmentId}
+          category={
+            outfit.displayGarments?.find((garment) => garment.id === garmentId)?.category
+          }
+          onSwap={onSwap}
+          onRef={onRef}
+        />
+      ))}
+    </View>
+  )
+}
+
+function recommendationOfferKey(
+  outfit: ScenarioOutfit | undefined,
+  offer: ReturnType<typeof resolveRenderableShopThisLook>
+): string | null {
+  return outfit && offer ? `${outfit.id}:${offer.offerId}` : null
+}
+
 export function OutfitRecommendationCard({
   outfit,
   onExport,
   onSwapGarment,
   onGarmentRef,
+  isCurrent,
   isLoading,
   nested = false,
   isCacheServed = false,
@@ -55,8 +91,12 @@ export function OutfitRecommendationCard({
   // synchronously, so the second press is dropped before it reaches the network.
   const shareOpener = useRef<ComponentRef<typeof Pressable>>(null)
   const ctaActivationInFlight = useRef(false)
+  const currentOffer = useRef<string | null>(null)
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const shopThisLook = resolveRenderableShopThisLook(outfit, isCacheServed)
+  const offerKey = recommendationOfferKey(outfit, shopThisLook)
+  currentOffer.current = offerKey
 
   if (isLoading) {
     return (
@@ -82,7 +122,6 @@ export function OutfitRecommendationCard({
 
   const activeBadgeInfo = outfit.reasoningBadges?.find((b) => b.key === selectedBadgeKey)
 
-  const shopThisLook = resolveRenderableShopThisLook(outfit, isCacheServed)
   const activationForThisCard =
     ctaActivation?.outfitId === outfit.id ? ctaActivation.status : null
   const isActivatingCta = activationForThisCard === 'pending'
@@ -99,7 +138,7 @@ export function OutfitRecommendationCard({
   const opensInBrowserLabel = t('commerce.shopThisLook.opensInBrowser')
 
   const handleShopThisLookPress = async () => {
-    if (!shopThisLook || ctaActivationInFlight.current) {
+    if (!shopThisLook || ctaActivationInFlight.current || isCurrent?.() === false) {
       return
     }
 
@@ -112,6 +151,7 @@ export function OutfitRecommendationCard({
         recommendationId: outfit.id,
         surface: 'mobile_hero',
       })
+      if (isCurrent?.() === false || currentOffer.current !== offerKey) return
       // Only navigate once the click is attributed. Traffic the partner cannot
       // attribute is worth nothing to them and cannot be audited by us, so a
       // failed mint stops here. A handoff that fails after a successful mint
@@ -227,21 +267,11 @@ export function OutfitRecommendationCard({
         </View>
       )}
 
-      {/* Garments List */}
-      <View style={styles.garmentsList}>
-        {outfit.garmentIds.map((garmentId) => (
-          <GarmentItemTile
-            key={garmentId}
-            garmentId={garmentId}
-            category={
-              outfit.displayGarments?.find((garment) => garment.id === garmentId)
-                ?.category
-            }
-            onSwap={onSwapGarment}
-            onRef={onGarmentRef}
-          />
-        ))}
-      </View>
+      <RecommendationGarments
+        outfit={outfit}
+        onSwap={onSwapGarment}
+        onRef={onGarmentRef}
+      />
 
       {/* Affiliate "Shop this look" block. Reading order is the requirement,
           not a layout preference: PRD FR5.1 accepts only a disclosure that is

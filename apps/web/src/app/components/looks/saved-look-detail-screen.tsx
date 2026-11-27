@@ -16,7 +16,9 @@ import type {
 } from '@couture/api-client/contracts/http'
 import {
   createAnnouncementToken,
+  formatTodayWornOn,
   getGuestPreviewStrings,
+  getTodayOutfitStrings,
   isOfflineError,
   parseLooksFilter,
   SAMPLE_CATALOG,
@@ -146,6 +148,30 @@ function SlotRow({
   )
 }
 
+function SavedLookSummary({ look }: { look: SavedLookContract }) {
+  const { t, i18n } = useTranslation('translation', {
+    i18n: getI18n(),
+    useSuspense: false,
+  })
+  const samples = getGuestPreviewStrings(i18n.language)
+  const weather = look.wornOn
+    ? t(`home.today.conditions.${look.weather}`)
+    : (samples.values.weather[look.weather as SampleWeatherKey] ?? look.weather)
+  const source = look.wornOn
+    ? getTodayOutfitStrings(i18n.language).source
+    : t(
+        look.source === 'style_piece'
+          ? 'savedLooks.sourceStylePiece'
+          : 'savedLooks.sourceHomeSample'
+      )
+  return (
+    <p className="text-sm text-ink-soft">
+      {weather} · {source}
+      {look.wornOn && ` · ${formatTodayWornOn(look.wornOn, i18n.language)}`}
+    </p>
+  )
+}
+
 function DetailBody({
   owner,
   savedLookId,
@@ -163,7 +189,6 @@ function DetailBody({
     i18n: getI18n(),
     useSuspense: false,
   })
-  const samples = getGuestPreviewStrings(i18n.language)
   const router = useRouter()
   const statusBar = useStatusBar()
   const statusBarRef = useRef(statusBar)
@@ -355,19 +380,13 @@ function DetailBody({
   }
 
   const anchor = reopenAnchorFor(look, garments)
-  const weather = samples.values.weather[look.weather as SampleWeatherKey] ?? look.weather
   return (
     <div
       data-testid="saved-look-detail"
       data-saved-look-id={savedLookId}
       className="space-y-4"
     >
-      <p className="text-sm text-ink-soft">
-        {weather} ·{' '}
-        {look.source === 'style_piece'
-          ? t('savedLooks.sourceStylePiece')
-          : t('savedLooks.sourceHomeSample')}
-      </p>
+      <SavedLookSummary look={look} />
       {look.availabilityStatus === 'missing_garment' && (
         <p
           role="status"

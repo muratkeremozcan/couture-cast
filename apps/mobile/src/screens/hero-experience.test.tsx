@@ -10,7 +10,7 @@
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
-import { act, screen, fireEvent, waitFor } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vitest'
 import { userEvent } from 'vitest/browser'
@@ -105,7 +105,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     const unregister = registerShareCardHeading('outfit', () => 77)
     try {
       await render(<TabOneScreen />)
-      await userEvent.click(await screen.findByTestId('today-primary-action'))
+      await userEvent.click(await screen.findByTestId('today-outfit-details'))
       await userEvent.click(await screen.findByTestId('outfit-share-card-open'))
       await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
       setFocus.mockClear()
@@ -150,7 +150,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
           <TabOneScreen />
         </AndroidShareCardPresentation>
       )
-      await userEvent.click(await screen.findByTestId('today-primary-action'))
+      await userEvent.click(await screen.findByTestId('today-outfit-details'))
       const opener = await screen.findByTestId('outfit-share-card-open')
       await userEvent.click(opener)
       await waitFor(() => expect(screen.getByTestId('share-card-title')).toBeVisible())
@@ -198,15 +198,14 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     expect(screen.getByText('Clear Sky')).toBeTruthy()
 
     expect(screen.queryByTestId('hourly-forecast-ribbon')).toBeNull()
-    await userEvent.click(await screen.findByTestId('today-primary-action'))
+    await userEvent.click(await screen.findByTestId('today-outfit-details'))
 
     expect(
       screen.getByText('Mild morning with gentle winds. Trench coat recommended.')
     ).toBeTruthy()
 
-    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveAttribute(
-      'aria-label',
-      'Classic Trench Coat: outerwear'
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /swap.*outer layer.*trench coat/i
     )
 
     expect(screen.getByText('Breeze Guard')).toBeTruthy()
@@ -222,13 +221,15 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
 
-    await userEvent.click(await screen.findByTestId('today-primary-action'))
+    await userEvent.click(await screen.findByTestId('today-outfit-details'))
     fireEvent.click(screen.getByTestId('scenario-picker'))
     const eveningToggle = screen.getByTestId('scenario-toggle-evening')
     fireEvent.click(eveningToggle)
 
     expect(screen.getByText('Cool evening ahead. Sweater recommended.')).toBeTruthy()
-    expect(screen.getByTestId('garment-tile-crewneck-sweater')).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /merino sweater/i
+    )
 
     // Asserted with `toHaveBeenCalledWith`: the morning card's affiliate impression
     // is emitted from a passive effect that can flush after this click, so the order
@@ -256,93 +257,71 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     await render(<TabOneScreen />)
 
     await waitFor(() => {
-      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     })
 
-    await userEvent.click(await screen.findByTestId('today-primary-action'))
-    const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
+    const swapButton = screen.getByTestId('today-outfit-slot-0')
     swapButton.focus()
     fireEvent.click(swapButton)
 
-    expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
-    expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('role', 'dialog')
-    expect(screen.getByTestId('garment-swap-modal')).toHaveAttribute('aria-modal', 'true')
-    expect(screen.getByText(/Choose alternate outerwear/i)).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-swap')).toHaveAttribute('role', 'dialog')
+    expect(screen.getByTestId('today-outfit-swap')).toHaveAttribute('aria-modal', 'true')
+    expect(screen.getByText(/swap.*outer layer/i)).toBeTruthy()
 
     await waitFor(() => {
-      expect(screen.getByTestId('swap-option-classic-trench-coat')).toHaveFocus()
+      expect(screen.getByTestId('today-outfit-swap-option-0')).toHaveFocus()
     })
 
-    const leatherJacketOption = screen.getByTestId('swap-option-leather-jacket')
-    // Focus returns on a 400 ms timer after the modal closes; fake time removes the race.
-    const focusReturnDelayMs = 400
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    try {
-      fireEvent.click(leatherJacketOption)
+    const denimJacketOption = screen.getByTestId('today-outfit-swap-option-1')
+    expect(denimJacketOption).toHaveAccessibleName(/denim jacket/i)
+    fireEvent.click(denimJacketOption)
 
-      expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
-      expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
-      // The modal leaves on its real exit animation; only the app's focus timer is faked.
-      // expect.poll and vi.waitFor advance fake timers between retries, which would fire
-      // that timer early, so the exit is awaited on real animation frames instead.
-      for (
-        let frames = 0;
-        frames < 300 && screen.queryByTestId('garment-swap-modal');
-        frames += 1
-      ) {
-        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      }
-      expect(screen.queryByTestId('garment-swap-modal')).toBeNull()
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(focusReturnDelayMs - 1)
-      })
-      expect(screen.getByTestId('garment-tile-leather-jacket')).not.toHaveFocus()
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1)
-      })
-      expect(screen.getByTestId('garment-tile-leather-jacket')).toHaveFocus()
-    } finally {
-      vi.useRealTimers()
-    }
-
-    expect(mockCapture).toHaveBeenLastCalledWith('hero_interaction', {
+    await waitFor(() => expect(screen.queryByTestId('today-outfit-swap')).toBeNull())
+    await waitFor(() => expect(swapButton).toHaveFocus())
+    expect(swapButton).toHaveAccessibleName(/denim jacket/i)
+    expect(mockCapture).toHaveBeenCalledWith('hero_interaction', {
       interactionType: 'garment_swap',
       scenario: 'morning',
-      itemId: 'leather-jacket',
+      itemId: 'sample:g:denim-jacket',
     })
   })
 
   it('[Codex 7.11 #3] [7.11-NAT-032] a swipe down on the swap sheet title closes it, keeps the garment and refocuses its tile', async () => {
     await render(<TabOneScreen />)
-    await screen.findByText('Classic Trench Coat')
+    await screen.findByTestId('today-outfit-slot-0')
 
-    await userEvent.click(await screen.findByTestId('today-primary-action'))
-    const swapButton = screen.getByTestId('garment-tile-classic-trench-coat')
+    const swapButton = screen.getByTestId('today-outfit-slot-0')
     swapButton.focus()
     fireEvent.click(swapButton)
-    const sheet = screen.getByTestId('garment-swap-modal')
-    const title = screen.getByText(/Choose alternate outerwear/i)
+    const sheet = screen.getByTestId('today-outfit-swap')
+    const title = screen.getByRole('heading', { name: /swap the outer layer/i })
     expect(sheet.contains(title)).toBe(true)
     const handle = title.closest<HTMLElement>('[data-testid="layer-swipe-handle"]')
     expect(handle, 'the title sits in the swipe handle').not.toBeNull()
+    await waitFor(() =>
+      expect(screen.getByTestId('today-outfit-swap-option-0')).toHaveFocus()
+    )
     mockCapture.mockClear()
 
     await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX / 2 })
-    expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-swap')).toBeTruthy()
 
     await dragFrom(title, { dy: LAYER_SWIPE_CLOSE_PX + 40 })
-    await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
+    await waitFor(() => expect(screen.queryByTestId('today-outfit-swap')).toBeNull())
     // Closed without a choice: the garment stays and no swap is recorded.
-    expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
-    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/trench coat/i)
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /denim jacket/i
+    )
     expect(mockCapture).not.toHaveBeenCalledWith(
       'hero_interaction',
       expect.objectContaining({ interactionType: 'garment_swap' })
     )
     // D13: the tile that opened the sheet takes focus back (returnFocusRef).
-    await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toHaveFocus()
-    )
+    await waitFor(() => expect(screen.getByTestId('today-outfit-slot-0')).toHaveFocus())
   })
 
   it('verifies offline fallback banner and stale state display when API request fails', async () => {
@@ -364,7 +343,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
       expect(screen.getByTestId('stale-cache-banner')).toBeTruthy()
     })
     expect(screen.getByText('Using recently cached weather data')).toBeTruthy()
-    expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/trench coat/i)
   })
 
   it('renders a complete retry state when recommendations cannot be loaded', async () => {
@@ -411,7 +390,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
     await render(<TabOneScreen />)
 
-    await userEvent.click(await screen.findByTestId('today-primary-action'))
+    await userEvent.click(await screen.findByTestId('today-outfit-details'))
     await waitFor(() => {
       expect(
         screen.getByText('Hafif rüzgarlı serin sabah. Trençkot önerilir.')

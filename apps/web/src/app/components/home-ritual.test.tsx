@@ -608,27 +608,24 @@ it('shows the city and garment entry links beside an editable sample when the me
   const rotated = look()
   expect(rotated).not.toBe(initial)
 
-  const swap = screen.getByRole('button', { name: /^Swap top:/i })
-  const originalName = swap.getAttribute('aria-label')
-  await user.click(swap)
+  const editorTop = () =>
+    within(screen.getByTestId('guest-preview-outfit')).getByRole('button', {
+      name: /^Swap top:/i,
+    })
+  const originalName = editorTop().getAttribute('aria-label')
+  await user.click(editorTop())
   expect(screen.getByRole('dialog', { name: /swap the top/i })).toBeVisible()
   await user.keyboard('{Escape}')
   expect(screen.queryByRole('dialog')).toBeNull()
-  expect(swap).toHaveFocus()
-  await user.click(swap)
+  expect(editorTop()).toHaveFocus()
+  await user.click(editorTop())
   const [option] = within(screen.getByRole('dialog')).getAllByRole('radio', {
     checked: false,
   })
   await user.click(option!)
-  expect(screen.getByRole('button', { name: /^Swap top:/i })).not.toHaveAttribute(
-    'aria-label',
-    originalName
-  )
+  expect(editorTop()).not.toHaveAttribute('aria-label', originalName)
   await user.click(screen.getByRole('button', { name: 'Undo swaps' }))
-  expect(screen.getByRole('button', { name: /^Swap top:/i })).toHaveAttribute(
-    'aria-label',
-    originalName
-  )
+  expect(editorTop()).toHaveAttribute('aria-label', originalName)
 
   view.unmount()
   renderHome()
@@ -665,15 +662,19 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
     await within(screen.getByTestId('weather-header')).findByText(homeCity.label)
   ).toBeVisible()
   expect(within(screen.getByTestId('weather-header')).getByText('70°F')).toBeVisible()
-  await user.click(within(live).getByTestId('today-primary-action'))
+  await user.click(within(live).getByTestId('today-outfit-details'))
   expect(within(live).queryByRole('button', { name: 'Morning' })).toBeNull()
   expect(within(live).getByRole('button', { name: 'Midday' })).toHaveAttribute(
     'aria-pressed',
     'true'
   )
-  expect(within(live).getByText('Outerwear')).toBeVisible()
-  expect(within(live).getByText('Outfit')).toBeVisible()
-  expect(within(live).queryByText('uncategorized-id')).toBeNull()
+  expect(within(live).getByRole('button', { name: /swap.*outer layer/i })).toBeVisible()
+  expect(within(live).getByTestId('today-outfit-slot-1')).toHaveAccessibleName(
+    /swap.*top/i
+  )
+  expect(within(live).getByTestId('today-outfit-slot-1')).not.toHaveAccessibleName(
+    /uncategorized-id/i
+  )
   expect(screen.getByText('Wind advisory')).toBeVisible()
   await user.click(within(live).getByRole('button', { name: 'Evening' }))
   expect(within(live).getByText('evening comfort note')).toBeVisible()
@@ -706,13 +707,12 @@ it('shows the starter wardrobe entry even when saved-city lookup fails', async (
   publishMember('starter-member')
   renderHome()
 
-  await userEvent.setup().click(await screen.findByTestId('today-primary-action'))
-  expect(await screen.findByText('Starter wardrobe pick')).toBeVisible()
+  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
   expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
-  expect(screen.getByText('Top')).toBeVisible()
+  expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(/swap.*top/i)
   expect(screen.queryByTestId('home-outfit-retry')).toBeNull()
   await waitFor(() =>
     expect(reads).toHaveBeenCalledExactlyOnceWith('Bearer bearer-starter-member')
@@ -883,4 +883,73 @@ it('7.7-CMP-004 a failed ritual shows the sample with the failure copy and Retry
   expect(await screen.findByTestId('home-outfit-retry')).toBeVisible()
   expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
   expect(screen.getByTestId('home-outfit-retry')).toBeVisible()
+})
+
+it('[7.14-PIC-005] retries the same dated save, keeps a second composition, and undoes only that save', async () => {
+  const user = userEvent.setup()
+  const { store, handlers } = createSavedLooksMswHandlers()
+  const answers = [503, 201, 409, 201]
+  const keys: (string | null)[] = []
+  store.onPost = (request) => {
+    keys.push(request.headers.get('Idempotency-Key'))
+  }
+  store.nextPostError = () => {
+    const status = answers.shift()
+    return status === 503 || status === 409
+      ? HttpResponse.json({ message: 'Fixture save error' }, { status })
+      : null
+  }
+  const starter = ritual(true)
+  useMswHandlers(
+    http.get('/api/v1/ritual', () => HttpResponse.json(starter)),
+    ...handlers
+  )
+  publishMember('today-saver')
+  renderHome()
+
+  const wear = await screen.findByTestId('today-primary-action')
+  await user.click(wear)
+  await user.click(await screen.findByTestId('status-bar-action-retry'))
+  await waitFor(() => expect(wear).toHaveAttribute('data-save-state', 'saved'))
+  expect(store.items).toHaveLength(1)
+  expect(keys[0]).toBeTruthy()
+  expect(keys[1]).toBe(keys[0])
+  const first = store.items[0]!
+  expect(first.wornOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  await user.click(screen.getByTestId('status-bar-action-view'))
+  expect(router.push).toHaveBeenCalledWith(`/looks/saved/${first.id}`)
+
+  const slot = screen.getByTestId('today-outfit-slot-0')
+  await user.click(slot)
+  await user.click(screen.getByTestId('today-outfit-swap-option-1'))
+  await user.click(wear)
+  await user.click(await screen.findByTestId('status-bar-action-retry'))
+  await waitFor(() => expect(wear).toHaveAttribute('data-save-state', 'saved'))
+  expect(keys).toHaveLength(4)
+  expect(keys[3]).not.toBe(keys[2])
+  expect(store.items).toHaveLength(2)
+  expect(store.items[0]?.composition[0]?.itemId).not.toBe(first.composition[0]?.itemId)
+
+  await user.click(screen.getByTestId('status-bar-action-undo'))
+  await waitFor(() => expect(store.items.map(({ id }) => id)).toEqual([first.id]))
+  await waitFor(() =>
+    expect(screen.getByTestId('status-feedback-bar')).toHaveTextContent('Change undone.')
+  )
+})
+
+it('[7.14-PIC-002/003] the guardian-pending catalog outfit has no recommendation-bound actions', async () => {
+  const pending = ritual(true)
+  pending.data.outfits = pending.data.outfits.map((outfit) => ({
+    ...outfit,
+    recommendationActionsAvailable: false,
+  }))
+  useMswHandlers(http.get('/api/v1/ritual', () => HttpResponse.json(pending)))
+  publishMember('pending-today-member')
+  renderHome()
+  expect(await screen.findByTestId('today-outfit-catalog-0')).toBeVisible()
+  expect(screen.getByTestId('today-outfit-picture').querySelector('img')).toBeNull()
+  await userEvent.setup().click(screen.getByTestId('today-outfit-details'))
+  expect(screen.getByText('morning comfort note')).toBeVisible()
+  expect(screen.queryByTestId('share-card-open')).toBeNull()
+  expect(screen.queryByTestId('shop-this-look-block')).toBeNull()
 })

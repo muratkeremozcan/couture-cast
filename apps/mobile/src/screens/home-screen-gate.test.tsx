@@ -192,15 +192,19 @@ function pinClock(iso: string) {
   })
 }
 
-/** Swaps the morning outfit's trench coat for the leather jacket in the garment swap modal. */
-async function swapTrenchForLeatherJacket() {
-  fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
-  fireEvent.click(await screen.findByTestId('swap-option-leather-jacket'))
+/** Swaps the morning outfit's trench coat for the denim jacket in the garment swap modal. */
+async function swapTrenchForDenimJacket() {
+  fireEvent.click(screen.getByTestId('today-outfit-slot-0'))
+  fireEvent.click(await screen.findByTestId('today-outfit-swap-option-1'))
   await waitFor(() =>
-    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /denim jacket/i
+    )
   )
-  expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
-  await waitFor(() => expect(screen.queryByTestId('garment-swap-modal')).toBeNull())
+  expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+    /trench coat/i
+  )
+  await waitFor(() => expect(screen.queryByTestId('today-outfit-swap')).toBeNull())
 }
 
 const placeholder = () => screen.queryByTestId('screen-placeholder')
@@ -423,23 +427,28 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     )
     const temperature = screen.getByTestId('current-temperature').textContent
 
     leaveAndReturn()
     await waitFor(() => expect(ritual.requests()).toBe(2))
-    await swapTrenchForLeatherJacket()
+    await swapTrenchForDenimJacket()
 
     // The read begun before the swap lands with new weather and the server's unswapped outfit.
     await ritual.release(1, HttpResponse.json(warmerRitual))
     await waitFor(() =>
       expect(screen.getByTestId('current-temperature').textContent).not.toBe(temperature)
     )
-    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
-    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /denim jacket/i
+    )
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /trench coat/i
+    )
 
     // Two hours later, same day: a read begun after the swap keeps it as well.
     vi.setSystemTime(new Date('2026-07-22T18:00:00.000Z'))
@@ -448,8 +457,12 @@ describe('Home screen gate (native)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('current-temperature').textContent).toBe(temperature)
     )
-    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
-    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /denim jacket/i
+    )
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /trench coat/i
+    )
   })
 
   // CodeRabbit r3: an unchanged answer across the 08:00 rollover is the next day's ritual. A
@@ -460,9 +473,10 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     )
 
     await waitFor(() => expect(ritualCache.saves).toBe(1))
@@ -473,7 +487,7 @@ describe('Home screen gate (native)', () => {
     leaveAndReturn()
     await ritual.release(1, HttpResponse.json(mockRitualResponse))
     await waitFor(() => expect(ritualCache.saves).toBe(2))
-    await swapTrenchForLeatherJacket()
+    await swapTrenchForDenimJacket()
 
     // 10:30, the same day: a read with new weather keeps the swap.
     vi.setSystemTime(new Date('2026-07-22T17:30:00.000Z'))
@@ -483,8 +497,12 @@ describe('Home screen gate (native)', () => {
     await waitFor(() =>
       expect(screen.getByTestId('current-temperature').textContent).not.toBe(temperature)
     )
-    expect(screen.getByTestId('garment-tile-leather-jacket')).toBeVisible()
-    expect(screen.queryByTestId('garment-tile-classic-trench-coat')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+      /denim jacket/i
+    )
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /trench coat/i
+    )
   })
 
   it('7.7-NAT-016 a return read for another day or another location replaces the swap', async () => {
@@ -493,28 +511,37 @@ describe('Home screen gate (native)', () => {
     const ritual = heldRitualAnswers()
     await renderHome()
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     )
-    await swapTrenchForLeatherJacket()
+    await swapTrenchForDenimJacket()
 
     // 08:30: the ritual rolled to tomorrow, so the swap made on today's goes.
     vi.setSystemTime(new Date('2026-07-22T15:30:00.000Z'))
     leaveAndReturn()
     await ritual.release(1, HttpResponse.json(mockRitualResponse))
     await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     )
-    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /denim jacket/i
+    )
 
     // A swap on tomorrow's ritual, then a read for another saved location: the swap goes.
-    await swapTrenchForLeatherJacket()
+    await swapTrenchForDenimJacket()
     leaveAndReturn()
     await ritual.release(2, HttpResponse.json(otherLocationRitual))
     await waitFor(() =>
-      expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
+      expect(screen.getByTestId('today-outfit-slot-0')).toHaveAccessibleName(
+        /trench coat/i
+      )
     )
-    expect(screen.queryByTestId('garment-tile-leather-jacket')).toBeNull()
+    expect(screen.getByTestId('today-outfit-slot-0')).not.toHaveAccessibleName(
+      /denim jacket/i
+    )
   })
 })

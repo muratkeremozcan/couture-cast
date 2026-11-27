@@ -33,7 +33,8 @@ tags:
     retryTapIfNoChange: true
 - assertVisible: 'Bugün'
 
-# Story CC-7.11 D16: the scenario toggles and the hourly ribbon follow the outfit card.
+# Story CC-7.14: the forecast-period label is inside Outfit details.
+- runFlow: subflows/open-today-outfit-details.yaml
 - scrollUntilVisible:
     element: 'Sabah gezisi'
     direction: DOWN

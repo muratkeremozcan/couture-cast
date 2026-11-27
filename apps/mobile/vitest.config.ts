@@ -95,6 +95,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: /^expo-image$/,
+        replacement: path.resolve(__dirname, './src/test-utils/mocks/expo-image.tsx'),
+      },
+      {
         find: /^expo-constants\/exponent-constants-web$/,
         replacement: expoConstantsWebModule,
       },

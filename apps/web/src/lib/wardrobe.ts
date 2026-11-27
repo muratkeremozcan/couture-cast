@@ -519,13 +519,20 @@ export async function uploadGarmentImageFromWeb({
  * `x-couture-garment-color: 1`, so photos carry color plus category alt text ("Blue top").
  */
 export async function listGarmentsFromWeb(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  { today = false }: { today?: boolean } = {}
 ): Promise<GarmentWithColor[]> {
   const accessToken = readAccessToken()
   try {
     const response = await createWebApiClient({
       accessToken,
-    }).apiV1WardrobeGarmentsGet({ xCoutureGarmentColor: '1' }, { signal })
+    }).apiV1WardrobeGarmentsGet(
+      {
+        xCoutureGarmentColor: '1',
+        ...(today ? { xCoutureTodayWardrobe: '1' as const } : {}),
+      },
+      { signal }
+    )
     return parseGarmentListWithColorResponse(response).data
   } catch (error) {
     throw await actionableWardrobeError(error, 'Unable to load your wardrobe.')

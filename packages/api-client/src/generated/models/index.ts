@@ -185,6 +185,7 @@ export interface AffiliateClickRequest {
  */
 export const AffiliateClickRequestSurfaceEnum = {
   mobile_hero: 'mobile_hero',
+  web_hero: 'web_hero',
   palette_advisor: 'palette_advisor',
   community_feed: 'community_feed',
   community_spotlight: 'community_spotlight',
@@ -248,6 +249,7 @@ export type AffiliateConversionStatus =
  */
 export const AffiliateSurface = {
   mobile_hero: 'mobile_hero',
+  web_hero: 'web_hero',
   palette_advisor: 'palette_advisor',
   community_feed: 'community_feed',
   community_spotlight: 'community_spotlight',
@@ -6609,7 +6611,7 @@ export interface CreateSavedLocationResponse {
   data: ListSavedLocationsResponseDataInner
 }
 /**
- * Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot; home_sample omits both anchors and cannot reference wardrobe garment slots.
+ * Composition slotIndex values must be unique and sequential starting from 0. style_piece requires anchorGarmentId and a matching anchorSnapshot. home_sample uses catalog slots. today requires wornOn and a dated lookId.
  * @export
  * @interface CreateSavedLookInput
  */
@@ -6632,6 +6634,12 @@ export interface CreateSavedLookInput {
    * @memberof CreateSavedLookInput
    */
   weather: string
+  /**
+   * Today date in the forecast timezone.
+   * @type {string}
+   * @memberof CreateSavedLookInput
+   */
+  wornOn?: string
   /**
    * Trimmed and NFC-normalized title bounded to 80 extended grapheme clusters; blank strings normalize to null.
    * @type {string}
@@ -6682,6 +6690,7 @@ export interface CreateSavedLookInput {
 export const CreateSavedLookInputSourceEnum = {
   style_piece: 'style_piece',
   home_sample: 'home_sample',
+  today: 'today',
 } as const
 export type CreateSavedLookInputSourceEnum =
   (typeof CreateSavedLookInputSourceEnum)[keyof typeof CreateSavedLookInputSourceEnum]
@@ -15734,6 +15743,12 @@ export interface PlannerDayResultOneOfOutfitsInner {
    */
   comfortNotes: string
   /**
+   * False when the requesting member receives a catalog projection of a private recommendation.
+   * @type {boolean}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  recommendationActionsAvailable?: boolean
+  /**
    * Optional capsule ID if recommendation came from an outfit capsule.
    * @type {string}
    * @memberof PlannerDayResultOneOfOutfitsInner
@@ -18147,6 +18162,12 @@ export interface RitualResponseDataOutfitsInner {
    */
   comfortNotes: string
   /**
+   * False when the requesting member receives a catalog projection of a private recommendation.
+   * @type {boolean}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  recommendationActionsAvailable?: boolean
+  /**
    * Optional capsule ID if recommendation came from an outfit capsule.
    * @type {string}
    * @memberof RitualResponseDataOutfitsInner
@@ -18621,6 +18642,12 @@ export interface SavedLookResponseData {
    */
   weather: string
   /**
+   * Present on Today snapshots, which use the home_sample response source for compatibility.
+   * @type {string}
+   * @memberof SavedLookResponseData
+   */
+  wornOn?: string
+  /**
    *
    * @type {string}
    * @memberof SavedLookResponseData
@@ -18903,6 +18930,12 @@ export interface ScenarioOutfit {
    */
   comfortNotes: string
   /**
+   * False when the requesting member receives a catalog projection of a private recommendation.
+   * @type {boolean}
+   * @memberof ScenarioOutfit
+   */
+  recommendationActionsAvailable?: boolean
+  /**
    * Optional capsule ID if recommendation came from an outfit capsule.
    * @type {string}
    * @memberof ScenarioOutfit
@@ -18957,6 +18990,12 @@ export interface ScenarioOutfitDisplayGarmentsInner {
    * @memberof ScenarioOutfitDisplayGarmentsInner
    */
   category: ScenarioOutfitDisplayGarmentsInnerCategoryEnum | null
+  /**
+   *
+   * @type {ScenarioOutfitDisplayGarmentsInnerImageAccess}
+   * @memberof ScenarioOutfitDisplayGarmentsInner
+   */
+  imageAccess?: ScenarioOutfitDisplayGarmentsInnerImageAccess
 }
 
 /**
@@ -18973,6 +19012,25 @@ export const ScenarioOutfitDisplayGarmentsInnerCategoryEnum = {
 export type ScenarioOutfitDisplayGarmentsInnerCategoryEnum =
   (typeof ScenarioOutfitDisplayGarmentsInnerCategoryEnum)[keyof typeof ScenarioOutfitDisplayGarmentsInnerCategoryEnum]
 
+/**
+ * Ephemeral photo access scoped to the requesting wardrobe owner.
+ * @export
+ * @interface ScenarioOutfitDisplayGarmentsInnerImageAccess
+ */
+export interface ScenarioOutfitDisplayGarmentsInnerImageAccess {
+  /**
+   *
+   * @type {string}
+   * @memberof ScenarioOutfitDisplayGarmentsInnerImageAccess
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof ScenarioOutfitDisplayGarmentsInnerImageAccess
+   */
+  expiresAt: string
+}
 /**
  *
  * @export

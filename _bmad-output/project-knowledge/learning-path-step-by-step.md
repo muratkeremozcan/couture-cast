@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-26.
-Added Steps 40 to 67:
+Added Steps 40 to 71:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -34,7 +34,8 @@ Added Steps 40 to 67:
 - Step 67: Story 7.10, screen budget guard, `4e5702c3` (PR #294), merged on 2026-11-26.
 - Step 68: Story 7.11, five-tab navigation and back pattern, `a8863b05` (PR #295), merged on 2026-11-26.
 - Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
-- Step 70: Story 7.13, Calm Today with one primary job, on `feat/epic7-story-7-13-calm-today-one-primary-job`.
+- Step 70: Story 7.13, Calm Today with one primary job, `a519243d` (PR #297), merged on 2026-11-26.
+- Step 71: Story 7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -42,6 +43,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 71 for Story CC-7.14 (Today's outfit as a picture) and moved Step 70 to merged (`a519243d`, PR #297).
 Added Step 70 for Story CC-7.13 (Calm Today with one primary job) and moved Step 69 to merged (`0d3b82a3`, PR #296).
 Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR was in review, and moved Step 68 to merged (`a8863b05`, PR #295).
 Added Step 68 for Story CC-7.11 (five-tab navigation and back pattern) while its PR is in review, and moved Step 67 to merged (`4e5702c3`, PR #294).
@@ -166,10 +168,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 70, Story CC-7.13, Calm Today with one primary job, on `feat/epic7-story-7-13-calm-today-one-primary-job`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-13-calm-today-one-primary-job.md`.
+- Latest step: Step 71, Story CC-7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-14-todays-outfit-as-picture.md`.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 69, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.12, merged on `main` (the last, Step 69, as `0d3b82a3`, PR #296).
+- Previous completed steps: Steps 59 to 70, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.13, merged on `main` (the last, Step 70, as `a519243d`, PR #297).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -22286,3 +22288,35 @@ Sign out is in Profile.
 - [Step 65](#step-65-signed-in-shell-without-flashes) covers owner-scoped rendering.
   [Step 67](#step-67-screen-budget-guard) covers the budget harness.
   [Step 69](#step-69-looks-tab-for-saved-looks-ideas-and-plans) covers the Plan destination.
+
+## Step 71: Today's outfit as a picture
+
+Today puts the clothes and one weather reason in the first view. Tap a piece to swap it, or tap
+Wear this to keep the current outfit in Looks. The card reserves its media space so a late photo
+and its catalog fallback have the same bounds.
+
+### Sequence to follow
+
+1. Start at the live and sample Today entry points in `apps/web/src/app/components/home-ritual.tsx` and
+   `apps/mobile/app/(tabs)/index.tsx`. Follow a slot from its illustration to the loaded photo and
+   from its Swap target to the updated composition.
+2. Follow the ritual response through `apps/api/src/modules/personalization/ritual.controller.ts`.
+   Trace the guardian and garment ownership checks that run before the response can carry a
+   private photo URL.
+3. Open outfit details for comfort notes, badges, sharing, and the affiliate disclosure.
+4. Follow Wear this into the CC-7.2 saved-looks service and open the result from Looks > Saved.
+   The saved snapshot carries the date and ordered slot IDs. View, Undo and Retry use the shared
+   CC-7.1 save feedback.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-14-todays-outfit-as-picture.md) and
+  [acceptance plan](../test-artifacts/test-design-7-14-todays-outfit-as-picture.md).
+- [Web acceptance](../../playwright/tests/today-outfit-picture.spec.ts) covers the picture,
+  delayed photos, Swap and Wear this. [API coverage](../../apps/api/src/modules/personalization/ritual-garment-photo.service.spec.ts)
+  exercises the owner and guardian boundary for photo access.
+- The visual matrix covers a full closet, an empty closet, a failed photo, and dark mode at
+  390 x 844 CSS px in Chromium and 360 x 640 dp on Android.
+- [Step 60](#step-60-saved-looks-follow-the-account) covers the save contract.
+  [Step 65](#step-65-signed-in-shell-without-flashes) covers layout stability.
+  [Step 70](#step-70-calm-today-with-one-primary-job) covers the Today shell and weather fallback.

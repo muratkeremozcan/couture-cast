@@ -335,6 +335,7 @@ export const updateGarmentTagsResponseSchema = z
  * included, also keeps the legacy shape.
  */
 export const WARDROBE_GARMENT_COLOR_HEADER = 'x-couture-garment-color'
+export const TODAY_WARDROBE_HEADER = 'x-couture-today-wardrobe'
 
 /** The color families `classifyRgbColorFamily` in `@couture/utils` names. */
 export const garmentColorFamilyEnum = z.enum(GARMENT_COLOR_FAMILIES)
@@ -417,6 +418,15 @@ const garmentColorHeaderSchema = z.object({
     description:
       'Opt in to colorFamily on each garment. Omission, or any other value, preserves the strict legacy response.',
   }),
+})
+
+const garmentListHeaderSchema = garmentColorHeaderSchema.extend({
+  [TODAY_WARDROBE_HEADER]: z
+    .enum(['1'])
+    .optional()
+    .describe(
+      'Today wardrobe read with private photos gated on active guardian consent.'
+    ),
 })
 
 const garmentIdBadRequestErrorSchema = z
@@ -1378,7 +1388,7 @@ export function registerWardrobeContracts(
     summary: 'List persisted garments for the authenticated wardrobe',
     security: [{ bearerAuth: [] }],
     request: {
-      headers: garmentColorHeaderSchema,
+      headers: garmentListHeaderSchema,
     },
     responses: {
       200: {

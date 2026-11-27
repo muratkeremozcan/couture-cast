@@ -14,13 +14,13 @@ import {
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
-  sampleGarmentText,
   sampleLookText,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
   savedLookMatchesHomeSample,
   savedLookToSampleBookmark,
   swapMemberSampleGarment,
+  todayCatalogSlot,
   undoMemberSampleSwaps,
   updateMemberSampleOutfit,
   type SampleBookmark,
@@ -28,6 +28,7 @@ import {
   type SampleOutfitResult,
 } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { TodayOutfitPicture } from '@/components/home/today-outfit-picture'
 import {
   checkNetworkOnlineForAction,
   getNetworkOnline,
@@ -54,12 +55,7 @@ import {
 import { savedLookRoute } from '@/src/features/looks/looks-routes'
 import { NavRow } from '@/src/components/nav-row'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
-import {
-  PreviewButton,
-  PreviewOutfit,
-  PreviewSwapSheet,
-  SampleGarmentArt,
-} from './guest-preview-parts'
+import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
 
 function buildMobileSampleAttemptKey(
@@ -695,16 +691,30 @@ export function MemberSampleOutfit({
           ? sampleLookText(result.look, strings).name
           : strings.firstUse.outfitIdea}
       </Text>
-      <View style={styles.sampleArt}>
-        {result.garments.map((garment) => (
-          <SampleGarmentArt
-            key={garment.id}
-            garment={garment}
-            label={sampleGarmentText(garment, strings).description}
-            size={40}
-          />
-        ))}
-      </View>
+      <Text testID="today-outfit-weather-reason" style={{ color: palette.inkMuted }}>
+        {strings.values.weather[result.context.weather]}
+      </Text>
+      <TodayOutfitPicture
+        slots={result.garments.map(todayCatalogSlot)}
+        strings={strings}
+        getOptions={(index) => {
+          const current = result.garments[index]
+          if (!current) return []
+          const alternatives = sampleSwapCandidates(
+            SAMPLE_CATALOG,
+            current.category,
+            result.input
+          ).filter((piece) => piece.id !== current.id)
+          return [current, ...alternatives].map(todayCatalogSlot)
+        }}
+        onChoose={(_, slot) =>
+          pushUndoAndUpdate(
+            swapMemberSampleGarment(result, slot.category, slot.itemId),
+            t('feedback.pieceSwapped'),
+            'swap'
+          )
+        }
+      />
       {!weatherAvailable && (
         <PreviewButton
           label={strings.firstUse.setCity}
@@ -747,6 +757,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   sampleTitle: { fontSize: 20, fontWeight: '700' },
-  sampleArt: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   plan: { marginHorizontal: TAB_BODY_INSET },
 })

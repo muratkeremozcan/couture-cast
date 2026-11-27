@@ -2,6 +2,8 @@
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
 # Learning path Step 70: Calm Today with one primary job.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
+# Learning path Step 71: Today's outfit as a picture.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-71-todays-outfit-as-a-picture
 # Story CC-7.9 test owner (TEA): 7.9-NVIS-001..008, AC2 and AC6, spec D11.
 # Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 #
@@ -26,6 +28,9 @@ onFlowComplete:
       file: subflows/set-system-appearance.js
       env: { APPEARANCE_ROUTE: 'status-bar', APPEARANCE_VALUE: 'false' }
 ---
+- runScript:
+    file: subflows/set-today-visual-fixture.js
+    env: { TODAY_VARIANT: 'full' }
 - runScript:
     file: subflows/set-system-appearance.js
     env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
@@ -70,3 +75,27 @@ onFlowComplete:
     notVisible:
       id: 'hourly-forecast-ribbon'
     timeout: 10000
+
+- runScript:
+    file: subflows/set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'night', APPEARANCE_VALUE: 'no' }
+- runFlow:
+    file: subflows/today-outfit-visual-variant.yaml
+    env: { TODAY_VARIANT: 'missing', NAME: 'home-missing-photo' }
+- runFlow:
+    file: subflows/today-outfit-visual-variant.yaml
+    env: { TODAY_VARIANT: 'empty', NAME: 'home-empty-closet' }
+
+# 7.14-PIC-005. The empty-closet member can wear the catalog look through the real API.
+- tapOn:
+    id: 'today-primary-action'
+- extendedWaitUntil:
+    visible:
+      id: 'status-bar-action-view'
+    timeout: 15000
+- tapOn:
+    id: 'status-bar-action-view'
+- extendedWaitUntil:
+    visible:
+      id: 'saved-look-detail'
+    timeout: 15000

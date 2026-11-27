@@ -555,7 +555,7 @@ describe('7.7 Home screen gate', () => {
     const { answer } = useServedSpotlight()
     const firstVisit = renderHomeGate()
     await answer(0, cityPage())
-    const primary = await screen.findByTestId('today-primary-action')
+    const primary = await screen.findByTestId('today-outfit-details')
     await waitFor(() => expect(primary).toBeVisible())
     fireEvent.click(primary)
     expect(screen.getByText('morning fixture A')).toBeVisible()
@@ -584,7 +584,7 @@ describe('7.7 Home screen gate', () => {
     )
     await answer(1, cityPage())
     await waitFor(() => expect(ritualBearers).toHaveLength(2))
-    fireEvent.click(screen.getByTestId('today-primary-action'))
+    fireEvent.click(screen.getByTestId('today-outfit-details'))
     expect(screen.getByText('morning fixture A')).toBeVisible()
     expect(screen.getByTestId('home-spotlight-teaser-link')).toBeVisible()
 

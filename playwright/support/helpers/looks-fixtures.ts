@@ -29,6 +29,7 @@ export interface LookSeed {
   created: number
   /** Default `home_sample` (the Today filter). */
   source?: 'home_sample' | 'style_piece'
+  wornOn?: string
   title?: string | null
   /** Garments of this look the member no longer has. */
   missing?: number
@@ -59,7 +60,8 @@ function lookContract(memberId: string, seed: LookSeed) {
     id: seed.id,
     ownerUserId: memberId,
     source: seed.source ?? 'home_sample',
-    lookId: `sample:l:${seed.id}`,
+    lookId: seed.wornOn ? `today:${seed.wornOn}:${seed.id}` : `sample:l:${seed.id}`,
+    ...(seed.wornOn ? { wornOn: seed.wornOn } : {}),
     weather: 'mild-dry',
     title: seed.title ?? null,
     anchorGarmentId: null,
@@ -199,7 +201,12 @@ export async function openLooksFixture(
     const sort = url.searchParams.get('sort')
     const limit = Number(url.searchParams.get('limit') ?? '50')
     const offset = Number(url.searchParams.get('offset') ?? '0')
-    const rows = [...looks.values()].filter((look) => !source || look.source === source)
+    const includeToday = url.searchParams.get('includeToday') === 'true'
+    const rows = [...looks.values()]
+      .filter((look) => !look.wornOn || includeToday || source === 'today')
+      .filter(
+        (look) => !source || look.source === source || (source === 'today' && look.wornOn)
+      )
     const ordered = sort === 'created_desc' ? createdDesc(rows) : updatedDesc(rows)
     const body = savedLookListResponseSchema.parse({
       data: ordered.slice(offset, offset + limit),

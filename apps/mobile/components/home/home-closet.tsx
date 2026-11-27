@@ -2,7 +2,10 @@ import { router, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { GarmentCategory } from '@couture/api-client/contracts/http'
+import type {
+  GarmentCategory,
+  GarmentWithColor,
+} from '@couture/api-client/contracts/http'
 import { formatGarmentAlt, formatLocalizedList } from '@couture/utils'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import {
@@ -14,11 +17,12 @@ import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
 
-export function useRecentHomePieces(owner: string | null, enabled: boolean) {
+export function useHomeWardrobe(owner: string | null, enabled: boolean) {
   const epoch = mobileIdentityEpoch()
   const [result, setResult] = useState<{
     epoch: number
     pieces: (GarmentCategory | null)[] | null
+    wardrobe: GarmentWithColor[]
   } | null>(null)
   useFocusEffect(
     useCallback(() => {
@@ -34,7 +38,9 @@ export function useRecentHomePieces(owner: string | null, enabled: boolean) {
           mobileIdentityEpoch() === epoch
         void resolveMobileAccessToken()
           .then((token) =>
-            token && current() ? listGarmentsFromMobile(token, request.signal) : null
+            token && current()
+              ? listGarmentsFromMobile(token, request.signal, { today: true })
+              : null
           )
           .then((garments) => {
             if (!current()) return
@@ -44,16 +50,16 @@ export function useRecentHomePieces(owner: string | null, enabled: boolean) {
                   .slice(0, 3)
                   .map(({ category }) => category)
               : null
-            setResult({ epoch, pieces })
+            setResult({ epoch, pieces, wardrobe: garments ?? [] })
           })
           .catch(() => {
-            if (current()) setResult({ epoch, pieces: null })
+            if (current()) setResult({ epoch, pieces: null, wardrobe: [] })
           })
       }
       read()
       const unsubscribe = onWardrobeChanged(() => {
         setResult((current) =>
-          current?.epoch === epoch ? { epoch, pieces: null } : current
+          current?.epoch === epoch ? { epoch, pieces: null, wardrobe: [] } : current
         )
         read()
       })
@@ -68,7 +74,7 @@ export function useRecentHomePieces(owner: string | null, enabled: boolean) {
       }
     }, [enabled, epoch, owner])
   )
-  return enabled && result?.epoch === epoch ? result.pieces : undefined
+  return enabled && result?.epoch === epoch ? result : undefined
 }
 
 export function HomeCloset({

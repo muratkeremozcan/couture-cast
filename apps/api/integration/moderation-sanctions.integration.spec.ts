@@ -109,6 +109,7 @@ import { PrismaLocationPreferencesRepository } from '../src/modules/location-pre
 import { PushRegistrationController } from '../src/modules/notifications/push-registration.controller.js'
 import { PushRegistrationService } from '../src/modules/notifications/push-registration.service.js'
 import { RitualController } from '../src/modules/personalization/ritual.controller.js'
+import { RitualGarmentPhotoService } from '../src/modules/personalization/ritual-garment-photo.service.js'
 import { RitualService } from '../src/modules/personalization/ritual.service.js'
 import { ShareCardRenderer } from '../src/modules/share-cards/share-card-renderer.js'
 import { ShareCardSourceRepository } from '../src/modules/share-cards/share-card-source.repository.js'
@@ -275,6 +276,10 @@ async function bootWire() {
       },
       { provide: WardrobeRetentionService, useValue: {} },
       { provide: RitualService, useValue: ritual },
+      {
+        provide: RitualGarmentPhotoService,
+        useValue: { resolve: () => Promise.resolve(new Map()) },
+      },
       { provide: AffiliateOfferService, useValue: {} },
       { provide: FeatureFlagsService, useValue: flags },
       { provide: AccessTokenIdentityService, useValue: identities },

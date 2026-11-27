@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { Prisma, PrismaClient, type SavedLook } from '@prisma/client'
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   HttpException,
@@ -16,6 +17,7 @@ import {
   savedLookComfortSchema,
   savedLookCompositionSlotInputSchema,
   savedLookSchema,
+  weatherConditionSchema,
   type ListSavedLooksQuery,
   type ParsedCreateSavedLookInput,
   type SavedLookAvailabilityStatus,
@@ -24,6 +26,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   doesSavedLookResolve,
+  SAMPLE_CATALOG,
   type ComfortRange,
   type SampleGarmentCategory,
 } from '@couture/utils'
@@ -137,6 +140,7 @@ export function computeSavedLookPayloadHash(input: ParsedCreateSavedLookInput): 
     source: input.source,
     lookId: input.lookId,
     weather: input.weather,
+    ...(input.wornOn ? { wornOn: input.wornOn } : {}),
     title: input.title ?? null,
     anchorGarmentId: input.anchorGarmentId ?? null,
     anchorSnapshot: input.anchorSnapshot
@@ -191,6 +195,13 @@ function collectGarmentIdsFromRow(
   return Array.from(ids)
 }
 
+function savedLookResponseOrigin(row: Pick<SavedLook, 'source' | 'worn_on'>) {
+  return {
+    source: row.source === 'today' ? 'home_sample' : row.source,
+    ...(row.worn_on ? { wornOn: row.worn_on.toISOString().slice(0, 10) } : {}),
+  }
+}
+
 @Injectable()
 export class WardrobeSavedLookService {
   private readonly logger = createBaseLogger().child({ feature: 'wardrobe-saved-look' })
@@ -202,8 +213,16 @@ export class WardrobeSavedLookService {
     private readonly guardianConsentStateService: GuardianConsentStateService
   ) {}
 
-  private async canAccessGarmentPhotos(actor: RequestAuthContext): Promise<boolean> {
+  private async canAccessGarmentPhotos(
+    actor: RequestAuthContext,
+    source: SavedLook['source']
+  ): Promise<boolean> {
     if (actor.role !== 'teen') return true
+    if (source === 'today') {
+      return this.guardianConsentStateService.canTeenViewPrivateGarmentPhotos(
+        actor.userId
+      )
+    }
     return this.guardianConsentStateService.canTeenAccess(actor.userId)
   }
 
@@ -293,19 +312,29 @@ export class WardrobeSavedLookService {
       garments.map((garment) => [garment.id, garment])
     )
 
-    const allowPhotoSigning =
-      garments.length > 0 ? await this.canAccessGarmentPhotos(actor) : false
-
-    const objectPaths = allowPhotoSigning
-      ? garments
-          .filter(
-            (garment) =>
-              this.isGarmentAvailable(garment) &&
-              garment.object_path &&
-              this.isSignableGarment(garment)
-          )
-          .map((garment) => garment.object_path as string)
-      : []
+    const idsFor = (today: boolean) =>
+      rows
+        .filter((row) => (row.source === 'today') === today)
+        .flatMap(collectGarmentIdsFromRow)
+    const todayIds = idsFor(true)
+    const legacyIds = idsFor(false)
+    const [allowTodayPhotos, allowLegacyPhotos] = await Promise.all([
+      todayIds.length > 0 && this.canAccessGarmentPhotos(actor, 'today'),
+      legacyIds.length > 0 && this.canAccessGarmentPhotos(actor, 'style_piece'),
+    ])
+    const allowedIds = new Set([
+      ...(allowLegacyPhotos ? legacyIds : []),
+      ...(allowTodayPhotos ? todayIds : []),
+    ])
+    const objectPaths = garments
+      .filter(
+        (garment) =>
+          allowedIds.has(garment.id) &&
+          this.isGarmentAvailable(garment) &&
+          garment.object_path &&
+          this.isSignableGarment(garment)
+      )
+      .map((garment) => garment.object_path as string)
 
     const signedAtMs = Date.now()
     const signedUrls =
@@ -352,7 +381,9 @@ export class WardrobeSavedLookService {
             imageAccess: null,
           }
         }
-        const url = live?.object_path ? signedUrls.get(live.object_path) : undefined
+        const allowPhoto = row.source === 'today' ? allowTodayPhotos : allowLegacyPhotos
+        const url =
+          allowPhoto && live?.object_path ? signedUrls.get(live.object_path) : undefined
         return {
           slotIndex: slot.slotIndex,
           category: slot.category,
@@ -406,7 +437,7 @@ export class WardrobeSavedLookService {
       return savedLookSchema.parse({
         id: row.id,
         ownerUserId: row.user_id,
-        source: row.source,
+        ...savedLookResponseOrigin(row),
         lookId: row.look_id,
         weather: row.weather,
         title: row.title,
@@ -505,6 +536,7 @@ export class WardrobeSavedLookService {
         id: { in: ids },
         upload_status: 'ready',
         retention_status: 'active',
+        ...(input.source === 'today' ? { deletion_requested_at: null } : {}),
       },
       select: {
         id: true,
@@ -514,6 +546,17 @@ export class WardrobeSavedLookService {
     })
     if (ownedGarments.length !== ids.length) {
       throw new NotFoundException('GARMENT_NOT_FOUND')
+    }
+    if (input.source === 'today') {
+      const categoryById = new Map(ownedGarments.map((item) => [item.id, item.category]))
+      if (
+        input.composition.some(
+          (slot) =>
+            slot.kind === 'garment' && categoryById.get(slot.itemId) !== slot.category
+        )
+      ) {
+        throw new NotFoundException('GARMENT_NOT_FOUND')
+      }
     }
     if (input.source !== 'style_piece' || !input.anchorGarmentId) {
       return null
@@ -552,6 +595,7 @@ export class WardrobeSavedLookService {
       source: input.source,
       look_id: input.lookId,
       weather: input.weather,
+      ...(input.wornOn ? { worn_on: new Date(`${input.wornOn}T00:00:00Z`) } : {}),
       title: input.title ?? null,
       anchor_garment_id: input.anchorGarmentId ?? null,
       anchor_snapshot:
@@ -583,7 +627,7 @@ export class WardrobeSavedLookService {
 
     if (
       (input.source === 'style_piece' || referencedGarmentIds.length > 0) &&
-      !(await this.canAccessGarmentPhotos(actor))
+      !(await this.canAccessGarmentPhotos(actor, input.source))
     ) {
       throw new ForbiddenException('Guardian consent required before continuing')
     }
@@ -591,6 +635,25 @@ export class WardrobeSavedLookService {
     if (idempotencyKey) {
       const replay = await this.findIdempotentReplay(actor, idempotencyKey, payloadHash)
       if (replay) return replay
+    }
+
+    if (
+      input.source === 'today' &&
+      canonicalSlots.some(
+        (slot) =>
+          slot.kind === 'catalog' &&
+          !SAMPLE_CATALOG.garments.some(
+            (piece) => piece.id === slot.itemId && piece.category === slot.category
+          )
+      )
+    ) {
+      throw new BadRequestException('Invalid Today catalog slot')
+    }
+    if (
+      input.source === 'today' &&
+      !weatherConditionSchema.safeParse(input.weather).success
+    ) {
+      throw new BadRequestException('Invalid Today weather condition')
     }
 
     const authoritativeSnapshot = await this.verifyOwnedGarmentsAndSnapshot(
@@ -651,10 +714,14 @@ export class WardrobeSavedLookService {
     limit: number
     offset: number
   }> {
+    const source: Prisma.SavedLookWhereInput['source'] =
+      query.includeToday && query.source === 'home_sample'
+        ? { in: ['home_sample', 'today'] }
+        : (query.source ?? (query.includeToday ? undefined : { not: 'today' }))
     const where: Prisma.SavedLookWhereInput = {
       user_id: actor.userId,
       deleted_at: null,
-      ...(query.source ? { source: query.source } : {}),
+      ...(source ? { source } : {}),
       ...(query.anchorGarmentId ? { anchor_garment_id: query.anchorGarmentId } : {}),
     }
 

@@ -119,7 +119,7 @@ describe('Widget Deep Link Hydration', () => {
     mockParams = params
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await waitFor(() => {
       expect(screen.getByText(expectedCopy)).toBeTruthy()
@@ -142,7 +142,7 @@ describe('Widget Deep Link Hydration', () => {
   it('tracks a later widget link while the tab remains mounted', async () => {
     mockParams = { source: 'widget', size: 'small', slot: 'now' }
     const view = await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await waitFor(() => {
       expect(mockCapture).toHaveBeenCalledWith(
@@ -177,7 +177,7 @@ describe('Widget Deep Link Hydration', () => {
     mockParams = params
 
     await render(<TabOneScreen />)
-    fireEvent.click(await screen.findByTestId('today-primary-action'))
+    fireEvent.click(await screen.findByTestId('today-outfit-details'))
 
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()

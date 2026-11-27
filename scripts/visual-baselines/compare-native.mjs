@@ -18,10 +18,13 @@ import sharp from 'sharp'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
-export const NATIVE_SCREENS = ['light', 'dark'].flatMap((scheme) =>
-  // Story CC-7.11 D1: the Looks tab joins the native shell snapshots.
-  ['home', 'wardrobe', 'looks', 'community', 'profile'].map((tab) => `${scheme}-${tab}`)
-)
+export const NATIVE_SCREENS = [
+  ...['light', 'dark'].flatMap((scheme) =>
+    ['home', 'wardrobe', 'looks', 'community', 'profile'].map((tab) => `${scheme}-${tab}`)
+  ),
+  'light-home-empty-closet',
+  'light-home-missing-photo',
+]
 /** A channel moving by this much or less is antialiasing noise, not a change. */
 export const CHANNEL_TOLERANCE = 16
 /** Share of pixels allowed to differ beyond the tolerance (the flow's former 99% threshold). */

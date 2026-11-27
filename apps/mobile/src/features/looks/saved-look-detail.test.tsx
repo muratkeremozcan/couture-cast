@@ -297,6 +297,39 @@ describe('Saved look screen (native, Story CC-7.12 D5)', () => {
     vi.clearAllMocks()
   })
 
+  it('[7.14-PIC-005] displays a dated Today look with an uncached private garment photo', async () => {
+    const original = exactEditorLook()
+    lib.getSavedLookFromMobile.mockResolvedValue(
+      exactEditorLook({
+        source: 'home_sample',
+        title: 'Rain-ready look',
+        anchorGarmentId: null,
+        anchorSnapshot: null,
+        lookId: 'today:2026-11-20:rec-1',
+        weather: 'rain',
+        wornOn: '2026-11-20',
+        composition: [
+          {
+            ...original.composition[0]!,
+            imageAccess: {
+              url: 'https://photos.example.test/today.png',
+              expiresAt: new Date(Date.now() + 900_000).toISOString(),
+            },
+          },
+          ...original.composition.slice(1),
+        ],
+      })
+    )
+    renderDetail('sl-m1')
+    const detail = await screen.findByTestId('saved-look-detail')
+    expect(stackTitles.at(-1)).toBe('Rain-ready look')
+    expect(detail.textContent).toMatch(/Rain.*From Today.*Nov 20, 2026/i)
+    expect(detail.querySelector('img[data-cache-policy="none"]')).toHaveAttribute(
+      'src',
+      'https://photos.example.test/today.png'
+    )
+  })
+
   it('[P0] [7.12-NAT-020] reads the one look and names it in the top bar; the body has no heading of its own', async () => {
     renderDetail('sl-m1')
     // Loading first, untitled: no name can show before the read proves the look is this member's.
