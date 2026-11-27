@@ -1,4 +1,5 @@
 // Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story CC-7.12 (Step 69): the locked planner's Get Premium became the Plan segment's free
 // preview with one Upgrade, so 3.6-E2E-016 measures that Upgrade and the preview's text.
@@ -533,8 +534,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       // Negative controls beside the link: the same words visually hidden (sr-only), and full-size
       // but clipped away (clip-path: inset(50%)). Neither paints a pixel of text.
       await signIn.evaluate((link) => {
+        const probeSurface = document.createElement('div')
+        probeSurface.style.cssText = 'position:relative;padding:16px'
+        link.after(probeSurface)
         const controls: [string, string][] = [
-          ['tea-sr-only-control', ''],
+          ['tea-sr-only-control', 'top:8px;left:8px'],
           ['tea-clipped-control', 'display:inline-block;clip-path:inset(50%)'],
           [
             'tea-partly-clipped-control',
@@ -543,11 +547,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
         ]
         for (const [id, css] of controls) {
           const control = document.createElement('span')
-          if (!css) control.className = 'sr-only'
+          if (id === 'tea-sr-only-control') control.className = 'sr-only'
           control.setAttribute('style', css)
           control.dataset.testid = id
           control.textContent = link.textContent
-          link.parentElement!.append(control)
+          probeSurface.append(control)
         }
       })
       const clipped = await inkOfText(page.getByTestId('tea-clipped-control'))

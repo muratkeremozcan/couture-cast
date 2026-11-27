@@ -1,4 +1,5 @@
 // Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored "Shop this look" CTA on feed cards, spotlight cards
 // and the detail dialog, through the real web transport and MSW.
@@ -260,7 +261,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     signIn()
     const clicks = clickHandler(minted)
     useMswHandlers(
-      sponsoredFeedHandler({ items: [sponsoredItem({ id: 'spot-1' })] }),
+      sponsoredFeedHandler({ items: [sponsoredItem()] }),
       sponsoredSpotlight([ranked(1, { sponsorship: SPONSORSHIP })]),
       http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
       clicks.handler
@@ -269,17 +270,17 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     renderGrid()
 
     // From the feed.
-    await user.click(await screen.findByTestId('lookbook-open-spot-1'))
+    await user.click(await screen.findByTestId('lookbook-open-post-1'))
     let detail = await screen.findByTestId('community-detail')
     expect(
-      within(within(detail).getByTestId('community-detail-sponsored-spot-1')).getByText(
+      within(within(detail).getByTestId('community-detail-sponsored-post-1')).getByText(
         'Partnered with Atelier North'
       )
     ).toHaveClass('sr-only')
-    await user.click(within(detail).getByTestId('community-detail-sponsored-cta-spot-1'))
+    await user.click(within(detail).getByTestId('community-detail-sponsored-cta-post-1'))
     await waitFor(() => expect(clicks.bodies).toHaveLength(1))
     expect(clicks.bodies[0]).toMatchObject({
-      recommendationId: 'spot-1',
+      recommendationId: 'post-1',
       surface: 'community_feed',
     })
     await user.keyboard('{Escape}')
@@ -419,19 +420,19 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
   it('6.7b-WEB-019 emits one strict shown event per block per visit, keyed by surface', async () => {
     signIn()
     useMswHandlers(
-      sponsoredFeedHandler({ items: [sponsoredItem({ id: 'spot-1' })] }),
+      sponsoredFeedHandler({ items: [sponsoredItem()] }),
       sponsoredSpotlight([ranked(1, { sponsorship: SPONSORSHIP })]),
       http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true }))
     )
     const user = userEvent.setup()
     renderGrid()
 
-    await screen.findByTestId('sponsored-cta-spot-1')
+    await screen.findByTestId('sponsored-cta-post-1')
     await screen.findByTestId('spotlight-sponsored-cta-spot-1')
     // Opening the detail re-renders both cards and adds the dialog's copy of the
     // feed block, none of which is a new block.
-    await user.click(screen.getByTestId('lookbook-open-spot-1'))
-    await screen.findByTestId('community-detail-sponsored-cta-spot-1')
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    await screen.findByTestId('community-detail-sponsored-cta-post-1')
     await user.keyboard('{Escape}')
     await waitFor(() =>
       expect(screen.queryByTestId('community-detail')).not.toBeInTheDocument()
@@ -456,7 +457,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         locale_region: 'US',
       })
       expect(JSON.stringify(event.properties)).not.toMatch(
-        /spot-1|Explorer|Spotlight look|test-token-access/
+        /post-1|spot-1|Explorer|Spotlight look|test-token-access/
       )
     }
   })

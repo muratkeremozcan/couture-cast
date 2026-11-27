@@ -150,22 +150,26 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
           expect(computed, `${name} is not the ${other} variant`).not.toBe(otherSurface)
           // Read painted card fill at the edge of the transparent title button.
           const title = card.getByRole('heading').getByRole('button')
-          // On screen first: the pixel is shot in viewport coordinates.
-          await title.scrollIntoViewIfNeeded()
+          // Center the sample above the fixed bottom nav, which can cover a title in the viewport.
+          await title.evaluate((button) =>
+            button.scrollIntoView({ block: 'center', behavior: 'instant' })
+          )
           expect(await surfacePixel(title, 2), `${name} painted surface`).toBe(
             expectedSurface
           )
           await measureThroughOverlays(page)
-          const actions = card.getByTestId('community-card-actions')
           const report = card.getByRole('button', { name: enUS.community.card.report })
           await expect(report).toBeHidden()
           expect(await textContrastFailures(card), `${name} text`).toEqual([])
-          await actions.click()
-          await expect(report).toBeVisible()
-          expect(await textContrastFailures(report), `${name} Report`).toEqual([])
-          await actions.press('Escape')
-          await expect(report).toBeHidden()
         }
+        const ranked = community.getByTestId('spotlight-lookbook-card-shell-spot-1')
+        const actions = ranked.getByTestId('community-card-actions')
+        const report = ranked.getByRole('button', { name: enUS.community.card.report })
+        await actions.click()
+        await expect(report).toBeVisible()
+        expect(await textContrastFailures(report), 'open Report action').toEqual([])
+        await actions.press('Escape')
+        await expect(report).toBeHidden()
 
         // The planner, reached from Home in the same document. Story CC-7.12 D11: Plan week links
         // to the Looks Plan segment, which keeps the palette through the client navigation.

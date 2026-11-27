@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight under realtime removals and the D3 hide, through
 // the real web transport and MSW.
@@ -34,7 +35,7 @@ setupCommunityGridClock()
 describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
   setupCommunityGridSurface()
 
-  it('6.6-WEB-033 a realtime unavailable target removes the spotlight copy as well as the feed copy (R10)', async () => {
+  it('6.6-WEB-033 realtime removes an unavailable ranked look without revealing its duplicate (R10)', async () => {
     signIn()
     const catchUp = captureSync()
     let phase: 'ready' | 'removed' = 'ready'
@@ -95,19 +96,17 @@ describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    await screen.findByTestId('lookbook-card-spot-1')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
     await catchUp()
     phase = 'removed'
     await catchUp()
 
     await waitFor(() =>
-      expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
-    )
-    await waitFor(() =>
       expect(
         screen.queryByTestId('spotlight-lookbook-card-spot-1')
       ).not.toBeInTheDocument()
     )
+    expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
     expect(screen.getByTestId('spotlight-lookbook-card-spot-2')).toBeInTheDocument()
     // Evicted in place: no spotlight re-read stood in for the realtime removal.
     expect(spotlightReads).toBe(1)

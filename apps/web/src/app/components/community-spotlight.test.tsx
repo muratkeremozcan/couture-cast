@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight module through the real web transport and MSW.
 // Paging lives in community-spotlight.paging.test.tsx and realtime in
@@ -353,7 +354,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     expect(opened).toEqual([{ postId: 'post-1', body: { experimentVariant: 'auto' } }])
   })
 
-  it('6.6-WEB-083 the keyboard opens the detail from a spotlight card and Escape returns focus to that copy (AC4)', async () => {
+  it('6.6-WEB-083 opens ranked detail by keyboard and returns focus to the ranked card (AC4)', async () => {
     signIn()
     useMswHandlers(
       feedHandler({ items: [item({ id: 'spot-2' })] }),
@@ -364,7 +365,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     renderGrid()
 
     const open = await screen.findByTestId('spotlight-lookbook-open-spot-2')
-    const feedOpen = await screen.findByTestId('lookbook-open-spot-2')
+    expect(screen.queryByTestId('lookbook-open-spot-2')).not.toBeInTheDocument()
     open.focus()
     await user.keyboard('{Enter}')
 
@@ -379,6 +380,5 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     expect(document.activeElement).toBe(
       screen.getByTestId('spotlight-lookbook-open-spot-2')
     )
-    expect(document.activeElement).not.toBe(feedOpen)
   })
 })

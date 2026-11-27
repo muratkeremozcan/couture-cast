@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: City Spotlight paging, View more and the row layout, through the
 // real web transport and MSW.
@@ -377,16 +378,16 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     ).toEqual(['1', '2', '3'])
   })
 
-  // --- Story 6.6 R42: one horizontal row above the feed -----------------------
+  // Story 6.6 R42, migrated to the inline ranked feed in CC-7.15.
 
-  it("6.6-WEB-071 the row is an ordered list named by the heading with each look's position and the loaded count (R42)", async () => {
+  it('6.6-WEB-071 keeps matching ranked looks in order across pages', async () => {
     signIn()
     useMswHandlers(
       feedHandler({ items: [] }),
       http.get(SPOTLIGHT_PATH, ({ request }) =>
         new URL(request.url).searchParams.get('cursor') === null
           ? spotlightBody({
-              items: [ranked(1), ranked(2), ranked(4)],
+              items: [ranked(1), ranked(2), ranked(4, { climateBand: 'temperate_wet' })],
               nextCursor: 'cursor-2',
             })
           : spotlightBody({ items: [ranked(5)], nextCursor: null })
