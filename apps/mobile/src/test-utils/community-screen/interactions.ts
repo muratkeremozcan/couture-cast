@@ -2,6 +2,7 @@ import type { CommunityFeedMode } from '@couture/api-client/contracts/http'
 import { screen, within } from '@testing-library/react'
 import i18n from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
+import { communityGateOpen } from './harness'
 
 export async function openCommunityClimate() {
   press(await screen.findByTestId('community-climate-filter'))
@@ -18,6 +19,7 @@ export function closeCommunityClimate() {
 }
 
 export async function openCommunityCardActions(postId: string) {
+  await communityGateOpen()
   const card = await screen.findByTestId(`community-post-card-${postId}`)
   press(within(card).getByTestId('community-card-actions'))
 }
