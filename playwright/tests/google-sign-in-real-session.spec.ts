@@ -166,8 +166,8 @@ test(
 )
 
 // Owner's production report (2026-11-15): a 14-year-old who finished signup signed in with
-// Google again and landed back on sign-in every time. The guardian lock answers the profile
-// check 403, which read as "no account"; the status now names awaiting_guardian.
+// Google originally looped on a guardian-locked profile check. The ordinary sign-in door
+// uses the federated status to show the invitation for a teen who still needs approval.
 async function createPendingTeen(page: Page, label: string) {
   const person = standInPerson(label)
   await armGoogleStandIn(page, person)
@@ -580,10 +580,12 @@ test(
     await page.goto('/preview')
     await page.getByTestId('guest-preview-birthdate').fill(birthdate(30))
     await page.getByTestId('guest-preview-gate-submit').click()
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await choose(page, 'guest-preview-thermal-cold')
     await choose(page, 'guest-preview-wind-low')
     await choose(page, 'guest-preview-rain-high')
-    await page.getByTestId('guest-preview-create-account').click()
+    await page.getByTestId('guest-preview-nav-preferences').click()
+    await page.getByTestId('guest-preview-garment-create-account').click()
     await expect(page).toHaveURL(`${WEB}/signup?from=preview`)
 
     const person = standInPerson('google-guest-conversion')

@@ -1,6 +1,7 @@
 # Learning path Step 56: Guest wardrobe and outfit preview.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
-# Story 6.16 owner: E-CONV-REAL-STACK on mobile, step 1 of 2.
+# CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
+# Real-stack mobile conversion, step 1 of 2.
 #
 # From a true first launch (signed-out shard), a visitor sets a comfort proposal in the
 # preview, creates an account for ${GUEST_PREVIEW_EMAIL} and requests a sign-in code. The
@@ -10,8 +11,8 @@
 # MAESTRO_OTP only, and checks the saved comfort row equals the proposal (cold, low, high).
 #
 # The sign-in screen's label text and its EditText share one accessible name, so index 1 is
-# the input (the same shape maestro/story65/signin-request.yaml drives). Signup's Email and
-# Birthdate fields have the same shape.
+# the input (the same shape maestro/story65/signin-request.yaml drives). Signup's Email
+# field has the same shape.
 appId: ${MAESTRO_APP_ID}
 name: 'Guest preview conversion'
 tags:
@@ -55,6 +56,12 @@ env:
 # The proposal the runner checks in the database afterwards.
 - scrollUntilVisible:
     element:
+      id: 'guest-preview-comfort-toggle'
+    direction: DOWN
+- tapOn:
+    id: 'guest-preview-comfort-toggle'
+- scrollUntilVisible:
+    element:
       id: 'guest-preview-thermal-cold'
     direction: DOWN
     centerElement: true
@@ -77,9 +84,13 @@ env:
 
 - scrollUntilVisible:
     element:
-      id: 'guest-preview-create-account'
-    direction: DOWN
+      id: 'sample-save-look'
+    direction: UP
     centerElement: true
+- tapOn:
+    id: 'sample-save-look'
+- assertVisible:
+    id: 'guest-preview-save-sheet'
 - tapOn:
     id: 'guest-preview-create-account'
 
@@ -96,13 +107,7 @@ env:
 - inputText: ${GUEST_PREVIEW_EMAIL}
 - hideKeyboard:
     optional: true
-- tapOn:
-    text: 'Birthdate'
-    index: 1
-- waitForAnimationToEnd
-- inputText: ${ADULT_BIRTHDATE}
-- hideKeyboard:
-    optional: true
+# The age gate already supplied the birthdate. Successful signup proves reuse.
 # CC-7.9 P2-8: the top bar title also reads "Create account" (and comes first in the hierarchy,
 # not clickable), so the submit button is tapped by its id (CI 3d7af2a2, shard 10).
 - tapOn:

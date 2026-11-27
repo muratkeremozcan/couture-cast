@@ -22,6 +22,7 @@ const route = vi.hoisted(() => ({
   router: {
     back: vi.fn(),
     replace: vi.fn(),
+    dismissTo: vi.fn(),
     push: vi.fn(),
     canGoBack: vi.fn(() => true),
   },
@@ -129,7 +130,7 @@ describe('native sign-in after the guest preview', () => {
       GUEST_PREVIEW_STRINGS['en-US'].conversionDetail.backToPreview
     )
     fireEvent.click(back)
-    expect(route.router.replace).toHaveBeenCalledWith('/preview')
+    expect(route.router.dismissTo).toHaveBeenCalledWith('/preview')
     route.params = { from: 'https://evil.example' }
     await view.rerender(<SignInScreen />)
     expect(screen.queryByTestId('signin-back-to-preview')).toBeNull()

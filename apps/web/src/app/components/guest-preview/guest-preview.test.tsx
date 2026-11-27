@@ -3,6 +3,7 @@
 // Story 6.16 W-GATE-*, W-* functional, W-STORAGE-DENIED, W-OFFLINE-AFTER-LOAD and
 // L-CROSS-TAB-* for the web guest preview, through the real store and policy.
 // CC-7.17 sample copy: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+// CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -267,21 +268,17 @@ describe('guest preview surfaces', () => {
     )
   })
 
-  it('saves School day in the preview and can reopen and remove it', async () => {
+  it('opens the account sheet and keeps the exact outfit after cancellation', async () => {
     const outfit = await passGate()
-    fireEvent.click(screen.getByTestId('sample-save-look'))
-    const saved = await screen.findByTestId('sample-saved-looks')
-    const schoolDay = within(saved).getByRole('button', { name: 'School day' })
-
     fireEvent.click(within(outfit).getByTestId('guest-preview-try-another'))
     expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
-    fireEvent.click(schoolDay)
-
-    const heading = within(outfit).getByRole('heading', { name: 'School day' })
-    await waitFor(() => expect(heading).toHaveFocus())
-    fireEvent.click(within(saved).getByRole('button', { name: 'Remove School day' }))
-    expect(screen.queryByTestId('sample-saved-looks')).not.toBeInTheDocument()
-    expect(heading).toBeVisible()
+    const pieces = garmentIds()
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const sheet = await screen.findByTestId('guest-preview-save-sheet')
+    fireEvent.click(within(sheet).getByTestId('guest-preview-save-cancel'))
+    await waitFor(() => expect(sheet).not.toBeInTheDocument())
+    expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
+    expect(garmentIds()).toEqual(pieces)
   })
 
   it('reports no alternative when only one look suits', async () => {
@@ -448,8 +445,9 @@ async function passGateOn(testId: string) {
 
 describe('guest preview lifecycle', () => {
   it('stores the conversion intent, reports a click and rotates the anonymous id', async () => {
-    await passGate()
-    const link = screen.getByTestId('guest-preview-create-account')
+    navigation.params = new URLSearchParams('view=preferences')
+    await passGateOn('guest-preview-conversion')
+    const link = screen.getByTestId('guest-preview-garment-create-account')
     expect(link.getAttribute('href')).toBe('/signup?from=preview')
     fireEvent.click(link)
     await waitFor(() =>
@@ -468,7 +466,7 @@ describe('guest preview lifecycle', () => {
       },
     })
     expect(window.__analyticsIdentityResets).toBe(1)
-    fireEvent.click(screen.getByTestId('guest-preview-sign-in'))
+    fireEvent.click(screen.getByTestId('guest-preview-garment-sign-in'))
     expect(window.__capturedAnalyticsEvents?.at(-1)?.properties).toMatchObject({
       action: 'sign_in',
     })
@@ -481,7 +479,7 @@ describe('guest preview lifecycle', () => {
     expect(garmentIds()[0]).toBe('sample:g:oxford-shirt')
     fireEvent.click(screen.getByTestId('guest-preview-exit'))
     await waitFor(() => expect(adapter.value()).toBeNull())
-    expect(navigation.push).toHaveBeenCalledWith('/')
+    expect(navigation.replace).toHaveBeenCalledWith('/')
   })
 
   it('discloses in-memory mode when storage fails (W-STORAGE-DENIED)', async () => {
@@ -495,7 +493,8 @@ describe('guest preview lifecycle', () => {
   })
 
   it('keeps working offline and says signup needs a connection (W-OFFLINE-AFTER-LOAD)', async () => {
-    await passGate()
+    navigation.params = new URLSearchParams('view=preferences')
+    await passGateOn('guest-preview-conversion')
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
     act(() => {
       window.dispatchEvent(new Event('offline'))
@@ -503,6 +502,8 @@ describe('guest preview lifecycle', () => {
     expect(screen.getByTestId('guest-preview-offline').textContent).toBe(
       en.chrome.connectionNeeded
     )
+    fireEvent.click(screen.getByTestId('guest-preview-comfort-toggle'))
+    navigation.params = new URLSearchParams()
     fireEvent.click(screen.getByTestId('guest-preview-thermal-cold'))
     expect(garmentIds()[0]).toBe('sample:g:fleece-zip')
     online.mockRestore()

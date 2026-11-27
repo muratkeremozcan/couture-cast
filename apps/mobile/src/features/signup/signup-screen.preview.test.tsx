@@ -8,7 +8,11 @@ import {
   SAMPLE_CATALOG,
 } from '@couture/utils'
 
-const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+const navigation = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  dismissTo: vi.fn(),
+}))
 vi.mock('expo-router', () => ({
   router: navigation,
   useLocalSearchParams: () => ({ from: 'preview' }),
@@ -96,7 +100,7 @@ describe('mobile signup from the guest preview', () => {
   it('passes the exact literal from the route and navigates through the router', () => {
     const { unmount } = render(<SignupRoute />)
     fireEvent.click(screen.getByTestId('signup-back-to-preview'))
-    expect(navigation.replace).toHaveBeenCalledWith('/preview')
+    expect(navigation.dismissTo).toHaveBeenCalledWith('/preview')
     unmount()
     render(<SignupScreen submitSignup={vi.fn()} />)
     expect(screen.queryByTestId('signup-back-to-preview')).toBeNull()

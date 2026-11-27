@@ -398,8 +398,16 @@ describe('Guardian emancipation sweep (integration)', () => {
       .get('/api/v1/user/profile')
       .set(createHeaders(pendingTeen.id, 'teen'))
 
-    expect(pendingTeenBeforeSweep.status).toBe(403)
-    forbiddenHttpErrorSchema.parse(pendingTeenBeforeSweep.body)
+    expect(pendingTeenBeforeSweep.status).toBe(200)
+    expect(userProfileResponseSchema.parse(pendingTeenBeforeSweep.body).user.id).toBe(
+      pendingTeen.id
+    )
+    const preferencesBeforeSweep = await request(baseUrl())
+      .put('/api/v1/user/preferences')
+      .set(createHeaders(pendingTeen.id, 'teen'))
+      .send({})
+    expect(preferencesBeforeSweep.status).toBe(403)
+    forbiddenHttpErrorSchema.parse(preferencesBeforeSweep.body)
 
     const sweepResult = await guardianService.emancipateEligibleTeens(now)
     expect(sweepResult).toEqual({
@@ -416,6 +424,12 @@ describe('Guardian emancipation sweep (integration)', () => {
     expect(pendingTeenAfterSweep.status).toBe(200)
     const pendingTeenBody = userProfileResponseSchema.parse(pendingTeenAfterSweep.body)
     expect(pendingTeenBody.user.id).toBe(pendingTeen.id)
+    // The guard now lets the same request reach the controller's input validation.
+    const preferencesAfterSweep = await request(baseUrl())
+      .put('/api/v1/user/preferences')
+      .set(createHeaders(pendingTeen.id, 'teen'))
+      .send({})
+    expect(preferencesAfterSweep.status).toBe(400)
 
     const consentedTeenAfterSweep = await request(baseUrl())
       .get('/api/v1/user/profile')

@@ -20,6 +20,7 @@ import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
 import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import {
+  classifyGuardedErrors,
   guardExpectedError,
   PLANNER_RESPONSE_URL,
   RITUAL_RESPONSE_URL,
@@ -70,6 +71,8 @@ const authSession = base.extend<AuthFixtures>({
 // depends on whether the probe lands before the test ends (P-Q-MEDIA on preview, 1 run in 25), so
 // deployed runs exclude it. Locally the feature is on and any 5xx from it still fails the test.
 export { RITUAL_RESPONSE_URL }
+const CAPSULE_LIST_URL = /^https?:\/\/[^/]+\/api\/v1\/wardrobe\/[^/?]+\/capsules(?:\?|$)/
+
 const networkErrorMonitor = base
   .extend(
     createNetworkErrorMonitorFixture({
@@ -77,6 +80,7 @@ const networkErrorMonitor = base
         RITUAL_RESPONSE_URL,
         // Story CC-7.12 D10: guarded below by plannerErrorGuard instead.
         PLANNER_RESPONSE_URL,
+        CAPSULE_LIST_URL,
         ...(environment.name === 'local'
           ? []
           : [/\/api\/v1\/moderation\/evidence-exports\/availability(\?|$)/]),
@@ -85,6 +89,7 @@ const networkErrorMonitor = base
   )
   .extend<{
     ritualErrorGuard: void
+    capsuleErrorGuard: void
     plannerErrorGuard: void
     allowPremiumPlannerRefusal: boolean
   }>({
@@ -127,6 +132,32 @@ const networkErrorMonitor = base
             )
           : failures
         expect(unexpected, 'unexpected ritual HTTP errors').toEqual([])
+      },
+      { auto: true },
+    ],
+    capsuleErrorGuard: [
+      async ({ context }, use, testInfo) => {
+        const guard = guardExpectedError(context, CAPSULE_LIST_URL)
+        await use()
+        if (testInfo.annotations.some(({ type }) => type === 'skipNetworkMonitoring'))
+          return
+        const errors = await guard.settle()
+        if (
+          testInfo.annotations.some(({ type }) => type === 'expectGuardianCapsuleRefusal')
+        ) {
+          const { allowedCount, unexpected } = classifyGuardedErrors(errors, {
+            method: 'GET',
+            status: 403,
+            code: 'Guardian consent required before continuing',
+          })
+          expect(
+            allowedCount,
+            'guardian-pending capsule lookup was refused'
+          ).toBeGreaterThan(0)
+          expect(unexpected, 'unexpected capsule HTTP errors').toEqual([])
+        } else {
+          expect(errors, 'unexpected capsule HTTP errors').toEqual([])
+        }
       },
       { auto: true },
     ],

@@ -153,7 +153,7 @@ test.describe('Jade first use on a phone', () => {
     await page.getByTestId('guest-preview-gate-submit').click()
 
     const outfit = page.getByTestId('guest-preview-outfit')
-    const nextLook = outfit.getByRole('button', { name: 'Try another look' })
+    const nextLook = outfit.getByRole('button', { name: 'Shuffle', exact: true })
     await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
     await expect(
       page.getByText(
@@ -187,12 +187,21 @@ test.describe('Jade first use on a phone', () => {
     await page.getByRole('dialog').getByRole('radio', { name: 'Ribbed socks' }).click()
     await expect(outfit.getByRole('heading', { name: 'Sample outfit' })).toBeVisible()
     await expect(outfit.getByText('Ribbed socks', { exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Save example look' }).click()
-    const saved = page.getByRole('region', { name: 'Saved on this device' })
-    await expect(saved.getByRole('button', { name: lookName, exact: true })).toBeVisible()
+    await page.getByTestId('sample-save-look').click()
+    const signup = page.getByTestId('guest-preview-save-sheet')
+    await expect(signup).toBeVisible()
+    await signup.getByTestId('guest-preview-save-cancel').click()
+    await expect(signup).toBeHidden()
+    await page.reload()
+    await expect(outfit.getByRole('heading', { name: 'Sample outfit' })).toBeVisible()
+    await expect(outfit.getByText('Ribbed socks', { exact: true })).toBeVisible()
+    await expect(outfit.getByTestId('guest-preview-weather-chip')).toHaveText(
+      'Mild and dry'
+    )
 
     await nextLook.click()
     await expect(outfit.getByRole('heading', { name: lookName })).toHaveCount(0)
+    await page.getByTestId('guest-preview-comfort-toggle').click()
     await page
       .getByRole('group', { name: 'Sample weather' })
       .getByText('Cool and windy', { exact: true })
@@ -200,17 +209,6 @@ test.describe('Jade first use on a phone', () => {
     await expect(outfit.getByTestId('guest-preview-weather-chip')).toHaveText(
       'Cool and windy'
     )
-    await page.reload()
-    await saved.getByRole('button', { name: lookName, exact: true }).click()
-    await expect(outfit.getByRole('heading', { name: 'Sample outfit' })).toBeVisible()
-    await expect(outfit.getByText('Ribbed socks', { exact: true })).toBeVisible()
-    await expect(outfit.getByTestId('guest-preview-weather-chip')).toHaveText(
-      'Mild and dry'
-    )
-    await saved.getByRole('button', { name: `Remove ${lookName}` }).click()
-    await page.reload()
-    await expect(outfit).toBeVisible()
-    await expect(saved).toHaveCount(0)
     expect(outsideGuestPreview, 'The sample flow stays local to the browser').toEqual([])
   })
 

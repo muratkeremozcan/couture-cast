@@ -12,13 +12,17 @@ import {
 import { afterEach, describe, expect, it } from 'vitest'
 import { AppModule } from '../../app.module'
 import { GuardianConsentPolicyGuard } from './guardian-consent-policy'
-import { API_TRANSACTIONAL_CONSENT_KEY } from './security.decorators'
+import {
+  API_ALLOW_PENDING_GUARDIAN_TEEN_KEY,
+  API_TRANSACTIONAL_CONSENT_KEY,
+} from './security.decorators'
 import { RequestAuthGuard } from './security.guards'
 
 type Route = {
   route: string
   handler: string
   guards: unknown[]
+  allowsPendingGuardianTeen: boolean
   consentCheckedInTransaction: boolean
 }
 
@@ -66,6 +70,10 @@ function collectRoutes(): Route[] {
           ...classGuards,
           ...((Reflect.getMetadata(GUARDS_METADATA, handler) ?? []) as unknown[]),
         ],
+        allowsPendingGuardianTeen:
+          (Reflect.getMetadata(API_ALLOW_PENDING_GUARDIAN_TEEN_KEY, handler) ??
+            Reflect.getMetadata(API_ALLOW_PENDING_GUARDIAN_TEEN_KEY, controller)) ===
+          true,
         consentCheckedInTransaction:
           Reflect.getMetadata(API_TRANSACTIONAL_CONSENT_KEY, handler) === true,
       })
@@ -145,6 +153,25 @@ describe.each(['off', 'required_13_15'] as const)(
         .map((route) => route.route)
         .sort()
       expect(unguarded).toEqual(Object.keys(OUTSIDE_THE_LOCK).sort())
+    })
+
+    // CC-7.21 Step 78: a pending teen can load their own profile and review comfort.
+    it('keeps pending-teen profile and comfort access scoped to the owner routes', () => {
+      const ownerRoutes = routes.filter(
+        ({ route }) =>
+          route.includes(' /api/v1/user/') ||
+          route.endsWith(' /api/v1/personalization/comfort')
+      )
+      expect(
+        ownerRoutes
+          .filter(({ allowsPendingGuardianTeen }) => allowsPendingGuardianTeen)
+          .map(({ route }) => route)
+          .sort()
+      ).toEqual([
+        'GET /api/v1/personalization/comfort',
+        'GET /api/v1/user/profile',
+        'PUT /api/v1/personalization/comfort',
+      ])
     })
 
     it('every guardian consent endpoint refuses before anything else while consent is off', () => {

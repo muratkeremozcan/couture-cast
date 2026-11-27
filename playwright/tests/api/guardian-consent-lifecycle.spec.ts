@@ -206,23 +206,24 @@ test.describe(
       expect(revokeBody.guardianId).toBe(acceptBody.guardianId)
 
       await log.step(
-        'Assert: teen profile access is blocked again after the last guardian revokes.'
+        'Assert: account preference changes are blocked after the last guardian revokes.'
       )
-      const revokedTeenProfileResponse = await apiRequest({
-        method: 'GET',
-        path: '/api/v1/user/profile',
+      const revokedTeenResponse = await apiRequest({
+        method: 'PUT',
+        path: '/api/v1/user/preferences',
         baseUrl,
         headers: authHeaders(signupBody.userId, 'teen'),
+        body: { locale: 'en-US' },
       })
 
-      expect(revokedTeenProfileResponse.status).toBe(403)
-      await validateSchema(forbiddenHttpErrorSchema, revokedTeenProfileResponse.body, {
+      expect(revokedTeenResponse.status).toBe(403)
+      await validateSchema(forbiddenHttpErrorSchema, revokedTeenResponse.body, {
         shape: {
           statusCode: 403,
           error: 'Forbidden',
         },
       })
-      expect(extractErrorMessage(revokedTeenProfileResponse.body)).toContain(
+      expect(extractErrorMessage(revokedTeenResponse.body)).toContain(
         'Guardian consent required before continuing'
       )
     })

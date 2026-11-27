@@ -1,8 +1,7 @@
 # Learning path Step 56: Guest wardrobe and outfit preview.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
-# Learning path Step 76: Garment subtypes.
-# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-76-garment-subtypes
-# Story 6.16 owner: E-CONV-REAL-STACK on mobile, step 2 of 2. Not a standalone flow: the
+# CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
+# Real-stack mobile conversion, step 2 of 2. The
 # signed-out runner runs it right after maestro/guest-preview-conversion.yaml, on the
 # sign-in screen that flow leaves open.
 #
@@ -21,7 +20,7 @@ env:
   PROPOSED_THERMAL: 'How warm you feel: I tend to feel cold'
   PROPOSED_WIND: 'How wind feels: Wind bothers me'
   PROPOSED_RAIN: 'When you pack for rain: I pack often'
-  SAVED: 'Your comfort preferences are saved.'
+  SAVED: 'Saved to your looks.'
 ---
 - extendedWaitUntil:
     visible:
@@ -56,69 +55,25 @@ env:
 - assertVisible: ${PROPOSED_THERMAL}
 - assertVisible: ${PROPOSED_WIND}
 - assertVisible: ${PROPOSED_RAIN}
-- tapOn:
-    id: 'guest-preview-review-use'
-- extendedWaitUntil:
-    visible:
-      id: 'guest-preview-review-result'
-      text: ${SAVED}
-    timeout: 20000
-    label: 'The proposal was saved to the account'
 - scrollUntilVisible:
     element:
-      id: 'guest-preview-review-continue'
+      id: 'guest-preview-review-use'
     direction: DOWN
     centerElement: true
 - tapOn:
-    id: 'guest-preview-review-continue'
+    id: 'guest-preview-review-use'
+- extendedWaitUntil:
+    visible: ${SAVED}
+    timeout: 20000
+    label: 'The first look has the shared save confirmation'
+- assertVisible:
+    id: 'looks-screen'
 - extendedWaitUntil:
     visible:
-      id: 'garment-capture-modal'
-    timeout: 20000
-    label: 'The verified guest enters direct garment capture'
+      id: 'saved-look-card-.+'
+    timeout: 25000
+    label: 'The first look appears in Saved'
+- tapOn:
+    id: 'saved-look-card-.+'
 - assertVisible:
-    id: 'garment-source-camera'
-- assertVisible:
-    id: 'garment-source-library'
-
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - tapOn:
-          id: 'garment-e2e-fixture-source'
-          label: 'Choose the bundled garment photo'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-crop-preview'
-          timeout: 15000
-      - tapOn:
-          id: 'garment-confirm-image'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-capture-complete'
-          timeout: 30000
-          label: 'The first garment uploaded successfully'
-      - tapOn:
-          id: 'garment-capture-done'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-tagging-modal'
-          timeout: 30000
-      - tapOn:
-          id: 'garment-tag-category-bottom'
-      - scrollUntilVisible:
-          element:
-            id: 'garment-tag-comfort-mild'
-          direction: DOWN
-      - tapOn:
-          id: 'garment-tag-comfort-mild'
-      - tapOn:
-          id: 'garment-tagging-save'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-open-.+'
-          timeout: 30000
-          label: 'The saved garment appears as ready in Wardrobe'
-      - assertVisible:
-          id: 'wardrobe-garment-list'
+    id: 'saved-look-detail'

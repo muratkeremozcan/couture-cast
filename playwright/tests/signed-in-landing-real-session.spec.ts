@@ -84,7 +84,7 @@ async function expectMemberLanding(page: Page) {
 async function expectPendingLanding(page: Page) {
   await expect(page.locator('html')).toHaveAttribute('data-session', 'pending')
   await expect(page.getByTestId('screen-placeholder')).toBeVisible()
-  for (const name of ['Sign in', 'Create account', 'Try sample looks'])
+  for (const name of ['Sign in', 'Create account', 'Show me looks'])
     await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByTestId('home-set-city')).toBeHidden()
 }
@@ -218,7 +218,7 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   )
 })
 
-test('L-2: a signed-out visitor sees Create account, Try sample looks and Sign in', async ({
+test('L-2: a signed-out visitor sees Create account, Show me looks and Sign in', async ({
   page,
 }) => {
   await recordLandingActions(page)

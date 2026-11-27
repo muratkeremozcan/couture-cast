@@ -337,8 +337,8 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
   describe('under policy required_13_15', () => {
     useGuardianConsentPolicy('required_13_15')
 
-    // The guardian lock refuses a pending teen's profile check (403), which a client read as
-    // "no account" and looped between sign-in and Google; the status names the state instead.
+    // The federated status retains the guardian invitation state while the owner can read
+    // their profile to verify a session and use the first-run sample look.
     it('A-FED-AWAITING-GUARDIAN: a pending teen answers awaiting_guardian with its account id', async () => {
       const email = address()
       const { bearer } = googleUser(email)
@@ -351,7 +351,10 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
         status: 'awaiting_guardian',
         accountId: userId,
       })
-      // The status names the state; the lock RequestAuthGuard applies is unchanged.
+      expect((await signedIn('GET', '/api/v1/user/profile', bearer)).status).toBe(200)
+      await expect(
+        signedIn('PUT', '/api/v1/user/preferences', bearer, { locale: 'en-US' })
+      ).resolves.toHaveProperty('status', 403)
       await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
         userId,
         role: 'teen',

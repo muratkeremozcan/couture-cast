@@ -1,6 +1,7 @@
 # Learning path Step 56: Guest wardrobe and outfit preview.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 # CC-7.17 copy acceptance: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
+# CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 # Story 6.16 owner: the signed-out mobile guest preview, from a true first launch.
 #
 # Runs only in the signed-out shard (`run-maestro.mjs --signed-out`): Metro serves a bundle
@@ -48,7 +49,7 @@ env:
 
 - assertVisible:
     id: 'home-try-sample'
-    text: 'Try sample looks'
+    text: 'Show me looks'
 - tapOn:
     id: 'home-try-sample'
 - extendedWaitUntil:
@@ -56,7 +57,6 @@ env:
       id: 'guest-preview-gate'
     timeout: 20000
 - assertVisible: 'Check your age'
-- assertVisible: 'Enter your birthdate. This device checks it. The app never saves or sends it.'
 
 # D2: the self-reported age gate refuses an under-13 birthdate and clears the field.
 - tapOn:
@@ -72,6 +72,8 @@ env:
       text: ${UNDERAGE_ERROR}
     timeout: 10000
     label: 'Under-13 birthdate shows the gate error'
+- assertNotVisible:
+    id: 'guest-preview-outfit'
 
 - tapOn:
     id: 'guest-preview-birthdate'
@@ -98,6 +100,12 @@ env:
     label: 'Default mild-dry look leads with the oxford shirt'
 
 # D5: thermal comfort changes the outfit.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-comfort-toggle'
+    direction: DOWN
+- tapOn:
+    id: 'guest-preview-comfort-toggle'
 - scrollUntilVisible:
     element:
       id: 'guest-preview-thermal-cold'
@@ -134,6 +142,25 @@ env:
     direction: DOWN
     centerElement: true
     label: 'The swap put white sneakers in the outfit'
+- scrollUntilVisible:
+    element:
+      id: 'sample-save-look'
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: 'sample-save-look'
+- assertVisible:
+    id: 'guest-preview-save-sheet'
+- tapOn:
+    id: 'guest-preview-save-cancel'
+- assertNotVisible:
+    id: 'guest-preview-save-sheet'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-garment-white-sneakers'
+    direction: DOWN
+    centerElement: true
+    label: 'The guest keeps the changed shoes after cancelling'
 - scrollUntilVisible:
     element:
       id: 'guest-preview-undo-swaps'
