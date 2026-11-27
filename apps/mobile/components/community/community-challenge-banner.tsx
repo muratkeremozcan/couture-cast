@@ -4,25 +4,19 @@ import { useTranslation } from 'react-i18next'
 import type { EmbeddedCommunityChallenge } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
-// Story CC-7.9 D3: the eyebrow badge is a marker (`inverse`) and Participate is a secondary
-// action on the Community screen, so it is a neutral outline button; gold stays with the roles.
-
 export interface CommunityChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
-  onParticipate: () => void
+  onParticipate: (opener: View | null) => void
+  onDismiss: () => void
 }
 
 export function CommunityChallengeBanner({
   challenge,
   onParticipate,
+  onDismiss,
 }: CommunityChallengeBannerProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
-
-  // One lookup keyed off the contract's own band values; no Title-Casing here.
-  const climateLabel = challenge.climateBand
-    ? t(`community.band.${challenge.climateBand}`)
-    : t('community.challenge.allClimates')
 
   return (
     <View
@@ -32,46 +26,39 @@ export function CommunityChallengeBanner({
         { backgroundColor: palette.card, borderColor: palette.line },
       ]}
     >
-      <View style={styles.headerRow}>
-        <View style={[styles.badgeContainer, { backgroundColor: palette.inverse }]}>
-          <Text style={[styles.badgeText, { color: palette.onInverse }]}>
-            {t('community.challenge.eyebrow')}
-          </Text>
-        </View>
-        <View style={[styles.climateTag, { borderColor: palette.inkMuted }]}>
-          <Text style={[styles.climateTagText, { color: palette.ink }]}>
-            {climateLabel}
-          </Text>
-        </View>
-      </View>
       <Text
+        accessibilityRole="header"
         style={[styles.title, { color: palette.ink }]}
         testID="community-challenge-title"
       >
-        {challenge.title}
+        {t('community.calm.thisWeek', { title: challenge.title })}
       </Text>
-      <Text
-        style={[styles.body, { color: palette.inkMuted }]}
-        testID="community-challenge-body"
-      >
-        {challenge.body}
-      </Text>
-      <TouchableOpacity
-        testID="community-challenge-cta"
-        accessibilityRole="button"
-        accessibilityLabel={t('community.challenge.participateLabel', {
-          title: challenge.title,
-        })}
-        style={[
-          styles.ctaButton,
-          { backgroundColor: palette.page, borderColor: palette.lineStrong },
-        ]}
-        onPress={onParticipate}
-      >
-        <Text style={[styles.ctaButtonText, { color: palette.ink }]}>
-          {t('community.challenge.participate')}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          testID="community-challenge-cta"
+          accessibilityRole="button"
+          accessibilityLabel={t('community.challenge.participateLabel', {
+            title: challenge.title,
+          })}
+          style={styles.button}
+          onPress={(event) =>
+            onParticipate(event.currentTarget as unknown as View | null)
+          }
+        >
+          <Text style={[styles.ctaText, { color: palette.ink }]}>
+            {t('community.challenge.participate')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="community-challenge-dismiss"
+          accessibilityRole="button"
+          accessibilityLabel={t('community.calm.dismissChallenge')}
+          style={styles.button}
+          onPress={onDismiss}
+        >
+          <Text style={[styles.dismiss, { color: palette.inkMuted }]}>×</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   )
 }
@@ -79,58 +66,31 @@ export function CommunityChallengeBanner({
 const styles = StyleSheet.create({
   banner: {
     marginHorizontal: 16,
-    marginVertical: 12,
-    padding: 16,
+    marginVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-  },
-  headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    marginBottom: 8,
+    gap: 4,
   },
-  badgeContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  title: { flexGrow: 1, flexShrink: 1, fontSize: 14, fontWeight: '600' },
+  actions: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    flexShrink: 1,
+    alignItems: 'center',
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  climateTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 9999,
-    borderWidth: 1,
-  },
-  climateTagText: {
-    fontSize: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  body: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  ctaButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
+  button: {
+    minWidth: 44,
     minHeight: 44,
-    alignItems: 'center',
+    flexShrink: 1,
+    paddingHorizontal: 8,
     justifyContent: 'center',
-    alignSelf: 'flex-start',
+    alignItems: 'center',
   },
-  ctaButtonText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  ctaText: { fontSize: 14, fontWeight: '600', textDecorationLine: 'underline' },
+  dismiss: { fontSize: 24 },
 })

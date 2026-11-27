@@ -5,6 +5,7 @@
 // R48: and only on Community, when access returns while another tab is on screen.
 // Story CC-7.9: an app resume (back from the in-app browser) gives back a place in the City
 // Spotlight above an empty feed, with the same list mounted throughout.
+import { openCommunityPostComments } from './interactions'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { actStep } from '@/src/test-utils/act-step'
@@ -16,7 +17,6 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import { TabTopBar } from '@/src/test-utils/tab-navigation'
 import i18n from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { press } from '@/src/test-utils/press'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import {
   COMMUNITY_BANNED_MESSAGE,
@@ -174,7 +174,7 @@ async function typeThroughStaleHide(whileHidden?: () => void) {
     )
   )
   await openVerifiedFeed(feed)
-  press(screen.getByTestId('community-card-comments-post-a'))
+  await openCommunityPostComments('post-a')
   const composer = await screen.findByTestId<HTMLInputElement>('comment-body')
   composer.focus()
   fireEvent.change(composer, { target: { value: 'Typing on a slow phone' } })
@@ -266,7 +266,7 @@ export function registerCommunityAvailabilityRestoreCases() {
     expect(screen.queryByTestId('community-banned-notice')).toBeNull()
     expect(screen.queryByTestId('community-feed-unavailable')).toBeNull()
     await waitFor(() =>
-      expect(screen.getByTestId('community-card-comments-post-a')).toBeVisible()
+      expect(screen.getByTestId('community-card-title-post-a')).toBeVisible()
     )
     await waitFor(() =>
       expect(screen.getByTestId('community-new-post-button')).toBeVisible()

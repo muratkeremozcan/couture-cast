@@ -5,6 +5,7 @@
 // full-page contrast scans. Test design:
 // _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 // Story CC-7.12 (Step 69): Plan week opens the Looks Plan segment (/looks?segment=plan).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -147,16 +148,28 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
           )
           expect(computed, `${name} computed surface`).toBe(expectedSurface)
           expect(computed, `${name} is not the ${other} variant`).not.toBe(otherSurface)
-          // Painted: the top edge of the comments row, where nothing but the card shows.
-          const comments = card.locator('[data-testid*="comments-button-"]').first()
-          // On screen first: the pixel is shot in viewport coordinates.
-          await comments.scrollIntoViewIfNeeded()
-          expect(await surfacePixel(comments, 2), `${name} painted surface`).toBe(
+          // Read painted card fill at the edge of the transparent title button.
+          const title = card.getByRole('heading').getByRole('button')
+          // Center the sample above the fixed bottom nav, which can cover a title in the viewport.
+          await title.evaluate((button) =>
+            button.scrollIntoView({ block: 'center', behavior: 'instant' })
+          )
+          expect(await surfacePixel(title, 2), `${name} painted surface`).toBe(
             expectedSurface
           )
           await measureThroughOverlays(page)
+          const report = card.getByRole('button', { name: enUS.community.card.report })
+          await expect(report).toBeHidden()
           expect(await textContrastFailures(card), `${name} text`).toEqual([])
         }
+        const ranked = community.getByTestId('spotlight-lookbook-card-shell-spot-1')
+        const actions = ranked.getByTestId('community-card-actions')
+        const report = ranked.getByRole('button', { name: enUS.community.card.report })
+        await actions.click()
+        await expect(report).toBeVisible()
+        expect(await textContrastFailures(report), 'open Report action').toEqual([])
+        await actions.press('Escape')
+        await expect(report).toBeHidden()
 
         // The planner, reached from Home in the same document. Story CC-7.12 D11: Plan week links
         // to the Looks Plan segment, which keeps the palette through the client navigation.

@@ -27,20 +27,12 @@ async function expectLookbookVocabulary(page: Page) {
     page.getByTestId('app-header').getByRole('heading', { level: 1 })
   ).toHaveText('Community')
 
-  const filters = community.getByRole('navigation', { name: 'Community filters' })
-  // Jade asked for the title to change from "Living Community Look book".
-  await expect(filters.getByRole('heading', { level: 2 })).toHaveText(
-    enUS.community.heading
-  )
   await expect(page.getByText('Living Community Lookbook')).toHaveCount(0)
-  // Jade asked what "Cold and wet" means: the explainer sits beside the band chips.
-  await expect(filters.getByTestId('community-filters-explainer')).toHaveText(
-    enUS.community.filters.explainer
-  )
-  await expect(filters).toHaveAccessibleDescription(enUS.community.filters.explainer)
-  await expect(filters.getByTestId('community-filter-cold_wet')).toHaveText(
-    'Cold and wet'
-  )
+  await expect(community.getByTestId('community-feed-signed-out')).toBeVisible()
+  await expect(community.getByTestId('community-clear-filters')).toHaveCount(0)
+  await expect(
+    community.getByRole('link', { name: enUS.community.notifications.signin })
+  ).toBeVisible()
 }
 
 test.describe('Jade community items, signed out, every environment', () => {

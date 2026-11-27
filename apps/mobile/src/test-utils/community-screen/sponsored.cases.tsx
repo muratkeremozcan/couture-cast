@@ -1,10 +1,12 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 D12 (TEA): the post detail's title and back are its app top bar's; the old detail
 // title and Back ids are gone, so presence and absence read the detail layer itself.
 // Story 6.7b owner: sponsored community CTAs on the Community screen, through the
 // real HTTP boundary. Each card is found by its loaded content first, so every
 // absence asserted below is an absence on a rendered card.
+import { openCommunityPostComments } from './interactions'
 import { feedJson, feedUrls, item, serveFeed, setMockParams } from './harness'
 import { mockCapture, refreshEvents, webBrowser } from './mock-state'
 import { act, screen, waitFor, within } from '@testing-library/react'
@@ -135,7 +137,7 @@ export function registerCommunitySponsoredCases() {
       feedJson({
         items: [
           item({ id: 'post-a', sponsorship: SPONSORSHIP }),
-          item({ id: 'post-b', caption: 'Plain look' }),
+          item({ id: 'post-b', title: 'Plain look' }),
         ],
       })
     )
@@ -143,7 +145,7 @@ export function registerCommunitySponsoredCases() {
     await render(<CommunityScreen />)
 
     const sponsored = await screen.findByTestId('community-post-card-post-a')
-    const plain = await screen.findByTestId('community-card-caption-post-b')
+    const plain = await screen.findByTestId('community-card-title-post-b')
     expect(plain.textContent).toBe('Plain look')
     expect(
       within(sponsored).getByTestId('community-card-partnered-post-a').textContent
@@ -164,7 +166,7 @@ export function registerCommunitySponsoredCases() {
       feedJson({
         items: [
           item({ id: 'post-a', sponsorship: SPONSORSHIP }),
-          item({ id: 'post-b', caption: 'Plain look' }),
+          item({ id: 'post-b', title: 'Plain look' }),
         ],
       })
     )
@@ -327,10 +329,8 @@ export function registerCommunitySponsoredCases() {
     await render(<CommunityScreen />)
 
     // The resolved copies landed: their captions replaced the live ones.
-    await screen.findByText('Resolved post-a')
-    await waitFor(() =>
-      expect(screen.getAllByText('Resolved spot-1').length).toBeGreaterThan(0)
-    )
+    await screen.findByTestId('community-card-title-post-a')
+    await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
     expect(sync.resolves()).toBeGreaterThan(0)
     expect(screen.getByTestId('community-card-shop-post-a').textContent).toBe(
       'Shop this look at Atelier North'
@@ -368,7 +368,7 @@ export function registerCommunitySponsoredCases() {
     await within(moduleItem).findByTestId('community-card-shop-spot-1')
 
     // The rebuild and the resolve both landed.
-    await screen.findByText('Resolved post-a')
+    await screen.findByTestId('community-card-title-post-a')
     await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
     await waitFor(() =>
       expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
@@ -405,24 +405,24 @@ export function registerCommunitySponsoredCases() {
             return HttpResponse.json({
               data: item({
                 id: 'post-a',
-                caption: 'Older read',
+                title: 'Older read',
                 sponsorship: SPONSORSHIP,
               }),
             })
           }
           // The refresh's re-read of the highlighted post.
           return HttpResponse.json({
-            data: item({ id: 'post-a', caption: 'Newer read' }),
+            data: item({ id: 'post-a', title: 'Newer read' }),
           })
         })
       )
       // The newer reads: a pull to refresh started after the older read went
       // out; the link ended in between, so they carry no block. Each read has
-      // its own caption, so the screen shows which one it rendered.
+      // its own title, so the screen shows which one it rendered.
       serveFeed((_url, index) =>
         feedJson({
           items: [
-            item({ id: 'post-a', caption: index === 0 ? 'First read' : 'Newer read' }),
+            item({ id: 'post-a', title: index === 0 ? 'First read' : 'Newer read' }),
           ],
         })
       )
@@ -432,7 +432,7 @@ export function registerCommunitySponsoredCases() {
         const read = vi.mocked(getCommunityPostFromMobile).mock.results[0]!
           .value as Promise<unknown>
         await expect(read).resolves.toMatchObject({
-          caption: 'Older read',
+          title: 'Older read',
           sponsorship: SPONSORSHIP,
         })
       }
@@ -455,10 +455,16 @@ export function registerCommunitySponsoredCases() {
       // Opening the comments retires the notification intent, so the older read
       // is not re-requested once it lands: its answer is the last word from
       // that call site, and only its start order can say it is stale.
-      press(screen.getByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       act(() => refreshEvents.onRefresh!())
       // The refresh's feed read and its re-read of the highlighted post both
-      // landed: the highlighted card shows their caption.
+      // landed: the highlighted card shows their title.
+      await waitFor(() => expect(postReads).toBe(2))
+      await act(async () => {
+        const refresh: unknown = vi.mocked(getCommunityPostFromMobile).mock.results[1]!
+          .value
+        await expect(refresh).resolves.toMatchObject({ title: 'Newer read' })
+      })
       const highlighted = await screen.findByTestId('highlighted-community-card-post-a')
       await within(highlighted).findByText('Newer read')
 
@@ -469,10 +475,14 @@ export function registerCommunitySponsoredCases() {
         await act(olderAnswer)
       }
 
-      const card = screen.getByTestId('community-post-card-post-a')
+      const card = within(
+        screen.getByTestId('highlighted-community-card-post-a')
+      ).getByTestId('community-post-card-post-a')
       expect(within(card).getByText('Newer read')).toBeInTheDocument()
-      expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
-      expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
+      await waitFor(() =>
+        expect(within(card).queryByTestId('community-card-shop-post-a')).toBeNull()
+      )
+      expect(within(card).queryByTestId('community-card-partnered-post-a')).toBeNull()
     }
   )
 
@@ -501,7 +511,7 @@ export function registerCommunitySponsoredCases() {
     press(reveal)
 
     // The revealed card is the resolved copy, with the rebuild's live answer.
-    await screen.findByText('Resolved post-new')
+    await screen.findByTestId('community-card-title-post-new')
     const card = screen.getByTestId('community-post-card-post-new')
     expect(
       within(card).getByTestId('community-card-partnered-post-new').textContent

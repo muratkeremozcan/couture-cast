@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: City Spotlight paging, View more and the row layout, through the
 // real web transport and MSW.
@@ -65,9 +66,9 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     })
     expect(liveRegionText()).toBe('Loaded 2 more spotlight looks.')
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2', '3', '5'])
     expect(cursors).toEqual([null, 'cursor-2'])
     // The last page carries no cursor, so the control retires.
@@ -118,9 +119,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
 
     const fresh = await screen.findByTestId('spotlight-lookbook-card-fresh-1')
     expect(screen.queryByTestId('spotlight-lookbook-card-spot-1')).not.toBeInTheDocument()
-    expect(screen.getByTestId('community-spotlight-heading').textContent).toBe(
-      'Spotlight in Lisboa'
-    )
+    expect(fresh).toHaveTextContent('Near you')
     await waitFor(() => {
       expect(document.activeElement).toBe(fresh)
     })
@@ -213,9 +212,9 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     )
     expect(announcements.seen.filter((text) => /Loaded/.test(text))).toEqual([])
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2'])
 
     // The remaining ranks stay reachable through the cursor the empty page returned.
@@ -299,7 +298,7 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
   it('6.6-WEB-037 an empty first page with a next cursor keeps View more and never shows the empty state (R12)', async () => {
     signIn()
     useMswHandlers(
-      feedHandler({ items: [] }),
+      feedHandler({ items: [], mode: 'all' }),
       http.get(SPOTLIGHT_PATH, ({ request }) =>
         new URL(request.url).searchParams.get('cursor') === null
           ? spotlightBody({ items: [], nextCursor: 'cursor-2' })
@@ -326,9 +325,8 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     )
     renderGrid()
 
-    expect(await screen.findByTestId('community-spotlight-empty')).toHaveTextContent(
-      'No spotlight near you yet'
-    )
+    await screen.findByTestId('community-feed-empty')
+    expect(screen.queryAllByTestId(/^spotlight-lookbook-card-/)).toHaveLength(0)
     expect(screen.queryByTestId('community-spotlight-view-more')).not.toBeInTheDocument()
   })
 
@@ -374,22 +372,22 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     // No page-one reload: the appended page, its ranks and the reader's place survive.
     expect(pageOneReads(cursors)).toBe(1)
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2', '3'])
   })
 
-  // --- Story 6.6 R42: one horizontal row above the feed -----------------------
+  // Story 6.6 R42, migrated to the inline ranked feed in CC-7.15.
 
-  it("6.6-WEB-071 the row is an ordered list named by the heading with each look's position and the loaded count (R42)", async () => {
+  it('6.6-WEB-071 keeps matching ranked looks in order across pages', async () => {
     signIn()
     useMswHandlers(
       feedHandler({ items: [] }),
       http.get(SPOTLIGHT_PATH, ({ request }) =>
         new URL(request.url).searchParams.get('cursor') === null
           ? spotlightBody({
-              items: [ranked(1), ranked(2), ranked(4)],
+              items: [ranked(1), ranked(2), ranked(4, { climateBand: 'temperate_wet' })],
               nextCursor: 'cursor-2',
             })
           : spotlightBody({ items: [ranked(5)], nextCursor: null })
@@ -398,32 +396,19 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     const user = userEvent.setup()
     renderGrid()
 
-    const list = await screen.findByRole('list', { name: 'Spotlight in Lisbon' })
-    expect(list.tagName).toBe('OL')
-    expect(list).toBe(screen.getByTestId('community-spotlight-list'))
-    const positions = () =>
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => [
-          entry.getAttribute('aria-posinset'),
-          entry.getAttribute('aria-setsize'),
-          within(entry).getByText(/^Rank \d+$/).textContent,
-        ])
-    // The position counts loaded looks; the rank keeps the number the server
-    // ranked, which skips a look it filtered.
-    expect(positions()).toEqual([
-      ['1', '3', 'Rank 1'],
-      ['2', '3', 'Rank 2'],
-      ['3', '3', 'Rank 4'],
+    await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    const ids = () =>
+      screen.getAllByTestId(/^spotlight-lookbook-card-/).map((card) => card.id)
+    expect(ids()).toEqual([
+      'spotlight-lookbook-card-spot-1',
+      'spotlight-lookbook-card-spot-2',
     ])
-
     await user.click(screen.getByTestId('community-spotlight-view-more'))
     await screen.findByTestId('spotlight-lookbook-card-spot-5')
-    expect(positions()).toEqual([
-      ['1', '4', 'Rank 1'],
-      ['2', '4', 'Rank 2'],
-      ['3', '4', 'Rank 4'],
-      ['4', '4', 'Rank 5'],
+    expect(ids()).toEqual([
+      'spotlight-lookbook-card-spot-1',
+      'spotlight-lookbook-card-spot-2',
+      'spotlight-lookbook-card-spot-5',
     ])
   })
 
@@ -438,20 +423,14 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-2')
-    const row = screen.getByTestId('community-spotlight-row')
-    const list = within(row).getByTestId('community-spotlight-list')
-    const viewMore = within(row).getByTestId('community-spotlight-view-more')
-    const entries = within(list).getAllByRole('listitem')
-    // Cards first, then View more as the row's last item.
-    expect(Array.from(row.children).at(0)).toBe(list)
-    expect(row.lastElementChild?.contains(viewMore)).toBe(true)
-    expect(entries.at(-1)?.getAttribute('data-rank')).toBe('2')
+    const grid = screen.getByTestId('community-card-grid')
+    const viewMore = screen.getByTestId('community-spotlight-view-more')
+    const cards = within(grid).getAllByTestId(/^spotlight-lookbook-card-/)
+    expect(cards).toHaveLength(2)
+    expect(grid).not.toContainElement(viewMore)
     expect(
-      entries.at(-1)!.compareDocumentPosition(viewMore) & Node.DOCUMENT_POSITION_FOLLOWING
+      cards[1]!.compareDocumentPosition(viewMore) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
-    expect(list.contains(viewMore)).toBe(false)
-    // The row scrolls through the buttons it holds and takes no tab stop itself.
-    expect(row).not.toHaveAttribute('tabindex')
   })
 
   it('6.6-WEB-073 View more scrolls the look it focuses to the start of the row (R42)', async () => {
@@ -512,12 +491,9 @@ describe('CommunitySpotlightSection paging (Story 6.6)', () => {
     )
     renderGrid()
 
-    const loading = await screen.findByTestId('community-spotlight-loading')
-    expect(loading).toHaveAttribute('aria-hidden', 'true')
-    expect(loading.children).toHaveLength(0)
-    expect(screen.getByTestId('community-spotlight-heading')).toBeInTheDocument()
-    expect(screen.getByTestId('community-spotlight')).toHaveAttribute('aria-busy', 'true')
-    expect(screen.queryByTestId('community-spotlight-row')).not.toBeInTheDocument()
+    await screen.findByTestId('community-feed-loading')
+    expect(screen.queryAllByTestId(/^spotlight-lookbook-card-/)).toHaveLength(0)
+    expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
 
     release()
     expect(

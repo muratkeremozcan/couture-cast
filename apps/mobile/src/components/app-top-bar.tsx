@@ -57,6 +57,7 @@ function NavigatorTopBar({
     <AppTopBar
       title={title}
       titleNode={titleNode}
+      wrapTitle={route.name === 'community'}
       trailing={trailing}
       onBack={showBack ? () => navigation.goBack() : undefined}
     />

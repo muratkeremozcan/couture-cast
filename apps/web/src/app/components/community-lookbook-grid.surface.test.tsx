@@ -1,6 +1,11 @@
 // Learning path Step 58: Production status and nightly health, production follow-ups.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Community grid journeys through the real web transport and MSW.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
+import {
+  openCommunityCardActions,
+  selectCommunityClimate,
+} from '../../test-utils/community-ui'
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -65,7 +70,7 @@ const TARGETS_PATH = '/api/v1/community/targets/resolve'
 describe('CommunityLookbookGrid (Story 6.1)', () => {
   setupCommunityGridSurface()
 
-  it('7.9-CMP-CARD-001 closes the feed card and the Spotlight card with Comments beside Report, after the author, words and reactions', async () => {
+  it('7.15-COM-002 orders the title, author and reaction row inside each compact card', async () => {
     signIn()
     useMswHandlers(
       http.get(FEED_PATH, () =>
@@ -81,35 +86,89 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
     )
     renderGrid()
 
-    /** The card's parts top to bottom: Comments follows the reaction row and shares Report's row. */
-    const expectCardOrder = async (scope: string, id: string) => {
-      const card = await screen.findByTestId(`${scope}lookbook-card-${id}`)
-      const order = [
-        `${scope}author-name-${id}`,
-        `${scope}title-${id}`,
-        `${scope}caption-${id}`,
-        `${scope}community-reactions-${id}`,
-        `${scope}comments-button-${id}`,
-        `${scope}report-button-${id}`,
-      ].map((testId) => within(card).getByTestId(testId))
-      // CI snapshot on 3d7af2a2: Comments sat alone above the author line.
-      order.slice(1).forEach((node, index) => {
-        expect(
-          order[index]!.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
-        ).toBeTruthy()
-      })
-      const comments = within(card).getByTestId(`${scope}comments-button-${id}`)
-      const report = within(card).getByTestId(`${scope}report-button-${id}`)
-      expect(comments.parentElement).not.toBeNull()
-      expect(comments.parentElement).toBe(report.parentElement)
+    for (const [scope, id] of [
+      ['', 'post-1'],
+      ['spotlight-', 'spot-1'],
+    ]) {
+      const card = within(await screen.findByTestId(scope + 'lookbook-card-' + id))
+      const title = card.getByTestId(scope + 'title-' + id)
+      const author = card.getByTestId(scope + 'author-name-' + id)
+      const reactions = card.getByTestId(scope + 'community-reactions-' + id)
+      expect(
+        title.compareDocumentPosition(author) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+      expect(
+        author.compareDocumentPosition(reactions) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+      expect(card.getByTestId('community-card-actions')).toBeVisible()
+      expect(card.queryByTestId(scope + 'comments-button-' + id)).toBeNull()
     }
+  })
 
-    await expectCardOrder('', 'post-1')
-    await expectCardOrder('spotlight-', 'spot-1')
+  it('7.15-COM-003 Escape closes card actions and the title opens detail by keyboard', async () => {
+    signIn()
+    useMswHandlers(feedHandler({ items: [item({ title: 'Rain layers' })] }))
+    const user = userEvent.setup()
+    renderGrid()
+
+    const card = within(await screen.findByTestId('lookbook-card-post-1'))
+    const trigger = card.getByTestId('community-card-actions')
+    const menu = trigger.closest('details')!
+    await user.click(trigger)
+    expect(menu).toHaveAttribute('open')
+    card.getByTestId('report-button-post-1').focus()
+    await user.keyboard('{Escape}')
+    expect(menu).not.toHaveAttribute('open')
+    expect(trigger).toHaveFocus()
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    card.getByRole('button', { name: 'Rain layers' }).focus()
+    await user.keyboard('{Enter}')
+    expect(await screen.findByRole('dialog', { name: 'Rain layers' })).toBeVisible()
+  })
+
+  it('7.15-COM-001 keeps Post out of the feed until the shell slot mounts', async () => {
+    signIn()
+    useMswHandlers(feedHandler({ items: [item()] }))
+    const view = renderGrid({ postActionSlot: null })
+
+    expect(await screen.findByTestId('lookbook-card-post-1')).toBeVisible()
+    expect(screen.queryByTestId('create-post-button')).toBeNull()
+
+    const slot = document.createElement('header')
+    view.container.prepend(slot)
+    view.rerender(<CommunityLookbookGrid showFilterNav postActionSlot={slot} />)
+    expect(within(slot).getByTestId('create-post-button')).toBeVisible()
   })
 
   describe('weekly challenge', () => {
     let restoreObjectUrl = () => undefined as void
+
+    it('7.15-COM-001 scopes dismissal to the shown challenge', async () => {
+      signIn()
+      const next = { ...CHALLENGE, id: 'challenge-next-week', title: 'Rain layers' }
+      useMswHandlers(
+        http.get(FEED_PATH, ({ request }) => {
+          const all = new URL(request.url).searchParams.get('mode') === 'all'
+          return feedBody({
+            mode: all ? 'all' : 'auto',
+            activeChallenge: all ? next : CHALLENGE,
+          })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      const first = await screen.findByTestId('weekly-challenge-banner')
+      expect(first).toHaveTextContent(CHALLENGE.title)
+      await user.click(within(first).getByTestId('community-challenge-dismiss'))
+      expect(screen.queryByTestId('weekly-challenge-banner')).toBeNull()
+
+      await selectCommunityClimate(user, 'all')
+      expect(await screen.findByTestId('weekly-challenge-banner')).toHaveTextContent(
+        next.title
+      )
+    })
 
     afterEach(() => {
       restoreObjectUrl()
@@ -133,14 +192,13 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       const banner = await screen.findByTestId('weekly-challenge-banner')
-      expect(banner).toHaveTextContent('Weekly style challenge')
       expect(banner).toHaveTextContent(CHALLENGE.title)
-      expect(banner).toHaveTextContent(CHALLENGE.body)
-      expect(screen.getByTestId('challenge-climate-band')).toHaveTextContent(
-        'Temperate and wet'
-      )
+      expect(banner).not.toHaveTextContent(CHALLENGE.body)
 
       await user.click(screen.getByTestId('challenge-participate-button'))
+      expect(await screen.findByTestId('post-challenge-instructions')).toHaveTextContent(
+        CHALLENGE.body
+      )
       await choosePhoto(user)
       await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
       expect(screen.getByTestId('post-challenge-select')).toHaveValue(CHALLENGE.id)
@@ -188,8 +246,9 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       renderGrid()
 
-      expect(await screen.findByTestId('challenge-climate-band')).toHaveTextContent(
-        'Every climate'
+      await userEvent.click(await screen.findByTestId('challenge-participate-button'))
+      expect(await screen.findByTestId('post-challenge-instructions')).toHaveTextContent(
+        CHALLENGE.body
       )
     })
 
@@ -215,7 +274,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       await screen.findByTestId('challenge-participate-button')
       expect(screen.getByTestId('create-post-button')).toBeInTheDocument()
 
-      await user.click(screen.getByTestId('community-filter-cold_dry'))
+      await selectCommunityClimate(user, 'cold_dry')
 
       expect(await screen.findByTestId('community-feed-signed-out')).toHaveTextContent(
         'Sign in to take part in the community.'
@@ -405,7 +464,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const user = userEvent.setup()
       const { rerender } = renderGrid({ activeTab: 'auto' })
 
-      await user.click(await screen.findByTestId('report-button-post-1'))
+      await openCommunityCardActions(user, 'post-1', '')
+      await user.click(screen.getByTestId('report-button-post-1'))
       await screen.findByTestId('report-reason-select')
 
       rerender(<CommunityLookbookGrid showFilterNav activeTab="cold_dry" />)
@@ -679,9 +739,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         const initialReads = detailReads
         refreshed = true
         try {
-          await user.click(
-            screen.getByTestId(append ? 'load-more-button' : 'community-filter-all')
-          )
+          if (append) await user.click(screen.getByTestId('load-more-button'))
+          else await selectCommunityClimate(user, 'all')
           await waitFor(() => expect(detailReads).toBeGreaterThan(initialReads))
           expect(
             within(screen.getByTestId('community-card-grid'))
@@ -800,7 +859,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const { rerender } = renderGrid({ onTabChange: vi.fn() })
 
       await screen.findByTestId('lookbook-card-post-1')
-      expect(screen.getByTestId('community-filter-auto').textContent).toBe(
+      expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
         'Your climate: Cold and wet'
       )
       // A caller that passes an inline arrow hands the grid a new function on
@@ -825,16 +884,17 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
       const card = await screen.findByTestId('lookbook-card-post-1')
       expect(card).toHaveAccessibleName('Look by Style Explorer 4F2A')
-      expect(screen.getByTestId('caption-post-1')).toHaveTextContent(
-        'Layered wool over a merino base for a damp commute.'
-      )
       expect(
         screen.getByAltText(
           'A charcoal wool coat over a cream knit, with black ankle boots.'
         )
       ).toBeInTheDocument()
-      expect(screen.getByTestId('climate-badge-post-1')).toHaveTextContent(
-        'Temperate and wet'
+      await userEvent.click(screen.getByTestId('lookbook-open-post-1'))
+      expect(await screen.findByTestId('community-detail-caption')).toHaveTextContent(
+        'Layered wool over a merino base for a damp commute.'
+      )
+      expect(screen.getByTestId('community-detail-band-post-1')).toHaveTextContent(
+        'Temperate and dry'
       )
     })
 
@@ -848,7 +908,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(grid).toHaveClass('grid-cols-1')
       // The tablet pill treatment is what the simulated device frame drops.
       expect(grid.className).not.toContain('min-[768px]:grid-cols-2')
-      expect(screen.getByTestId('community-filter-auto').className).not.toContain(
+      expect(screen.getByTestId('community-climate-filter').className).not.toContain(
         'min-[768px]:rounded-full'
       )
     })
@@ -911,6 +971,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const { container } = renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await openCommunityCardActions(user, 'post-1', '')
       await user.click(screen.getByTestId('report-button-post-1'))
       await screen.findByTestId('report-reason-select')
 

@@ -101,8 +101,9 @@ import {
 } from './community-sponsored-cta'
 import { useCommunityScrollRestore } from './community-scroll-restore'
 import {
-  CommunitySpotlightSection,
+  CommunitySpotlightPaging,
   SPOTLIGHT_CARD_SCOPE,
+  spotlightCardElementId,
   useCommunitySpotlight,
   type CommunitySpotlightState,
 } from './community-spotlight'
@@ -118,11 +119,17 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
-import { parseDeepLink, CLIMATE_BANDS } from '@couture/utils'
+import {
+  parseDeepLink,
+  CLIMATE_BANDS,
+  communityFeedClimate,
+  mergeCommunityLooks,
+} from '@couture/utils'
 import {
   CommunityPostTextLedger,
   communityModerationReasonCategories,
@@ -152,7 +159,7 @@ import {
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import { useDetailOpener } from './detail-opener'
-import { CHIP_NAVIGATION_HEIGHT_PX, type ChipCategory } from './chip-navigation'
+import type { ChipCategory } from './chip-navigation'
 
 /**
  * The filter type is the contract's own enum. A local union here is what let
@@ -328,6 +335,14 @@ function modeLabel(
   return t(`community.filters.mode.${mode}`)
 }
 
+function trackClimateSelection(mode: FilterCategory) {
+  try {
+    posthog.capture('layout_interaction', { action: 'filter_chip_click', target: mode })
+  } catch {
+    // Telemetry must never take the feed down with it.
+  }
+}
+
 /**
  * Null-safe on purpose: every caller holds a `Message | null`, and folding the
  * absent case in here keeps the branch out of each of the five call sites.
@@ -429,7 +444,7 @@ function composeValidationKey(input: {
  * `useTranslation` bound to this app's instance explicitly.
  *
  * `lookbook-prism-layout.tsx` mounts `I18nextProvider` around its two planner
- * slots only, and renders this component and {@link LookbookFilterNav} outside
+ * slots only, and renders this component outside
  * both, so there is no provider above this subtree. Naming the instance is what
  * makes `t` resolve here rather than depending on whichever component happened
  * to call `getI18n()` first.
@@ -446,179 +461,86 @@ function useResolvedLocale(language: string): SupportedLocale {
 }
 
 // ---------------------------------------------------------------------------
-// LookbookFilterNav
+// Community climate filter
 // ---------------------------------------------------------------------------
 
-export interface LookbookFilterNavProps {
-  activeTab: FilterCategory
-  isMobilePreview?: boolean
-  onTabChange: (tab: FilterCategory) => void
-  /** The band `auto` resolved to, so that chip can name it instead of saying "your climate". */
-  viewerBand?: ClimateBand | null
-  /** Story 6.11: a banned member has no feed to filter, so the nav and its heading leave the page. */
-  closed?: boolean
-  /**
-   * Where the nav sticks. Home stacks it under the sticky chip navigation; `/community` has no
-   * chip bar above it, so it sticks to the top edge there instead of floating under a gap.
-   */
-  stickyTop?: number
-  /**
-   * Production feedback 2026-11-19: the feed's own actions (New post, the notifications link) sit in
-   * the heading row, so nothing floats between the chips and the feed.
-   */
-  actions?: React.ReactNode
-  /**
-   * CI 7.7-E2E-005 member Home late on b25999ca: the first feed read is still out, so the active
-   * `auto` chip does not know its band yet and would widen to name it when the feed answers,
-   * pushing every chip after it. The row keeps its place, hidden, until that answer.
-   */
-  chipsPending?: boolean
-}
-
-/**
- * WCAG 2.4.11 (technique C43): the sticky stack (Home's chip bar, then this nav once it sticks)
- * covers the top of the page, so the page's scroll padding names how far down it reaches. A
- * focus scroll, keyboard or `focus()`, then never leaves a control under the stack: CI 48c7a01e
- * (community-reactions, 1280x720) focused a reaction button the stuck nav covered to its middle,
- * with half its focus ring hidden. Until the nav sticks, only the bar above it (`stickyTop`) is
- * in the way.
- */
-function useStickyStackScrollPadding(
-  navRef: React.RefObject<HTMLElement | null>,
-  stickyTop: number,
-  active: boolean
-) {
-  useEffect(() => {
-    const nav = navRef.current
-    if (!active || !nav) return
-    const root = document.documentElement
-    let frame = 0
-    const update = () => {
-      frame = 0
-      const box = nav.getBoundingClientRect()
-      const stuck = box.top <= stickyTop + 0.5 && box.bottom > stickyTop
-      root.style.scrollPaddingTop = `${Math.ceil(stuck ? box.bottom : stickyTop)}px`
-    }
-    const schedule = () => {
-      if (frame === 0) frame = requestAnimationFrame(update)
-    }
-    update()
-    window.addEventListener('scroll', schedule, { passive: true })
-    window.addEventListener('resize', schedule)
-    const resize =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule)
-    resize?.observe(nav)
-    return () => {
-      window.removeEventListener('scroll', schedule)
-      window.removeEventListener('resize', schedule)
-      resize?.disconnect()
-      if (frame !== 0) cancelAnimationFrame(frame)
-      root.style.scrollPaddingTop = ''
-    }
-  }, [navRef, stickyTop, active])
-}
-
-// A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
-// to. From 768 pixels the column has room for whole chips, so they wrap.
-const CHIP_ROW_SCROLL =
-  'flex items-center gap-2 overflow-x-auto pb-1 pr-6 scrollbar-thin [mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)]'
-const CHIP_ROW = `${CHIP_ROW_SCROLL} min-[768px]:flex-wrap min-[768px]:overflow-visible min-[768px]:pr-0 min-[768px]:[mask-image:none]`
-
-export function LookbookFilterNav({
+export function CommunityClimateFilter({
   activeTab,
-  isMobilePreview = false,
-  onTabChange,
   viewerBand = null,
-  closed = false,
-  stickyTop = CHIP_NAVIGATION_HEIGHT_PX,
-  actions,
-  chipsPending = false,
-}: LookbookFilterNavProps) {
+  onTabChange,
+  children,
+}: {
+  activeTab: FilterCategory
+  viewerBand?: ClimateBand | null
+  onTabChange: (mode: FilterCategory) => void
+  children?: React.ReactNode
+}) {
   const { t } = useCommunityTranslation()
-  // Per instance, so a nav only ever points at its own explainer.
-  const explainerId = useId()
-  const navRef = useRef<HTMLElement | null>(null)
-  useStickyStackScrollPadding(navRef, stickyTop, !closed)
-  if (closed) return null
-
-  const handleTabClick = (tab: FilterCategory) => {
-    onTabChange(tab)
-    try {
-      if (typeof window !== 'undefined' && typeof posthog.capture === 'function') {
-        posthog.capture('layout_interaction', {
-          action: 'filter_chip_click',
-          target: tab,
-        })
-      }
-    } catch {
-      // Telemetry must never take the feed down with it.
-    }
-  }
+  const [open, setOpen] = useState(false)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const dialogId = useId()
+  const titleId = `${dialogId}-title`
+  const descriptionId = `${dialogId}-description`
+  const label = (mode: FilterCategory) =>
+    mode === 'all'
+      ? t('community.calm.allClimates')
+      : modeLabel(mode, viewerBand, t, mode === activeTab)
 
   return (
-    <nav
-      ref={navRef}
-      aria-label={t('community.filters.label')}
-      aria-describedby={explainerId}
-      style={{ top: stickyTop }}
-      className="flex flex-col gap-3 border-b border-line bg-page/95 py-3 backdrop-blur min-[360px]:sticky min-[360px]:z-10"
-    >
-      {/* Translated actions can outgrow a 320 px row, so they wrap below the heading as a group. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h2
-          tabIndex={-1}
-          data-share-card-focus-fallback="community"
-          className="text-2xl font-semibold text-ink"
-        >
-          {t('community.heading')}
-        </h2>
-        {actions}
-      </div>
-      {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
-          climate band and nothing said what a band is, so one visible line does. */}
-      <p
-        id={explainerId}
-        data-testid="community-filters-explainer"
-        className="-mt-1 text-xs leading-snug text-ink-muted"
+    <div>
+      <button
+        ref={trigger}
+        type="button"
+        data-testid="community-climate-filter"
+        data-share-card-focus-fallback="community"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border border-line-strong bg-page px-4 py-2 text-left text-sm font-semibold text-ink"
       >
-        {t('community.filters.explainer')}
-      </p>
-      <div
-        data-testid="community-chip-row"
-        aria-hidden={chipsPending || undefined}
-        className={`${isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}${chipsPending ? ' invisible' : ''}`}
+        <span className="min-w-0 break-words">{label(activeTab)}</span>
+        <span aria-hidden="true" className="shrink-0">
+          ⌄
+        </span>
+      </button>
+      <AccessibleModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        invokingElementRef={trigger}
+        title={t('community.filters.label')}
+        titleId={titleId}
+        descriptionId={descriptionId}
       >
-        {COMMUNITY_FEED_MODES.map((mode) => {
-          const isActive = activeTab === mode
-          const tabletStyles = isMobilePreview
-            ? ''
-            : 'min-[768px]:rounded-full min-[768px]:border min-[768px]:px-4 min-[768px]:py-2'
-          // Selection is carried by weight and border thickness as well as
-          // colour, so it survives a monochrome or high-contrast rendering.
-          const activeStyles = isActive
-            ? 'border-inverse font-bold text-ink underline underline-offset-4'
-            : // CC-7.9: ink-soft, not ink-muted. Muted 12 px uppercase paints below 4.5:1 on the dark
-              // page once antialiased (measured 4.45 in CI); selection still reads by weight and border.
-              'border-transparent font-medium text-ink-soft min-[768px]:border-line-strong min-[768px]:bg-page'
-
-          return (
-            <button
-              key={mode}
-              type="button"
-              data-testid={`community-filter-${mode}`}
-              onClick={() => {
-                handleTabClick(mode)
-              }}
-              aria-pressed={isActive}
-              tabIndex={chipsPending ? -1 : undefined}
-              className={`min-h-11 shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none ${tabletStyles} ${activeStyles}`}
-            >
-              {modeLabel(mode, viewerBand, t, isActive)}
-            </button>
-          )
-        })}
-      </div>
-    </nav>
+        <div data-testid="community-climate-sheet" className="flex flex-col gap-4">
+          <p
+            id={descriptionId}
+            data-testid="community-filters-explainer"
+            className="text-sm text-ink-muted"
+          >
+            {t('community.filters.explainer')}
+          </p>
+          {children}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {COMMUNITY_FEED_MODES.map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                data-testid={`community-filter-${mode}`}
+                aria-pressed={mode === activeTab}
+                className="min-h-11 min-w-0 break-words rounded-md border border-line-strong px-3 py-2 text-left text-sm aria-pressed:border-ink aria-pressed:bg-inverse aria-pressed:font-semibold aria-pressed:text-on-inverse"
+                onClick={() => {
+                  setOpen(false)
+                  onTabChange(mode)
+                  trackClimateSelection(mode)
+                }}
+              >
+                {label(mode)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </AccessibleModal>
+    </div>
   )
 }
 
@@ -628,86 +550,56 @@ export function LookbookFilterNav({
 
 interface WeeklyChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
-  language: string
   t: Translate
   /** False for a reader who cannot post: the challenge still shows, without its entry button. */
   canParticipate: boolean
   onParticipate: (challenge: EmbeddedCommunityChallenge) => void
+  onDismiss: () => void
 }
 
 function WeeklyChallengeBanner({
   challenge,
-  language,
   t,
   canParticipate,
   onParticipate,
+  onDismiss,
 }: WeeklyChallengeBannerProps) {
-  const formattedDates = (() => {
-    try {
-      const format = new Intl.DateTimeFormat(language, {
-        month: 'short',
-        day: 'numeric',
-      })
-      return t('community.challenge.dateRange', {
-        start: format.format(new Date(challenge.startsAt)),
-        end: format.format(new Date(challenge.endsAt)),
-      })
-    } catch {
-      return t('community.challenge.activeThisWeek')
-    }
-  })()
-
   return (
     <aside
       data-testid="weekly-challenge-banner"
       aria-labelledby="weekly-challenge-title"
-      data-surface="card"
-      className="flex flex-col gap-3 rounded-xl border border-theme-card-border bg-theme-card-bg p-5 text-theme-card-text shadow-card motion-safe:transition-all"
+      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg border border-line bg-card px-3 py-1"
     >
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-theme-card-text">
-          {t('community.challenge.eyebrow')}
-        </span>
-        <div className="flex items-center gap-2">
-          <span
-            data-testid="challenge-climate-band"
-            className="rounded-md bg-inverse px-2 py-0.5 text-xs font-semibold uppercase text-on-inverse"
-          >
-            {challenge.climateBand
-              ? bandLabel(challenge.climateBand, t)
-              : t('community.challenge.allClimates')}
-          </span>
-          <span className="text-xs text-ink-muted">{formattedDates}</span>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <h3
-          id="weekly-challenge-title"
-          className="text-lg font-semibold text-theme-card-text"
-        >
-          {challenge.title}
-        </h3>
-        <p className="text-xs leading-relaxed text-ink-muted">{challenge.body}</p>
-      </div>
-
-      {canParticipate && (
-        <div className="flex justify-end pt-1">
+      <h2
+        id="weekly-challenge-title"
+        className="min-w-0 flex-1 break-words text-sm font-medium text-ink"
+      >
+        {t('community.calm.thisWeek', { title: challenge.title })}
+      </h2>
+      <div className="ml-auto flex items-center gap-1">
+        {canParticipate && (
           <button
             type="button"
             data-testid="challenge-participate-button"
             aria-label={t('community.challenge.participateLabel', {
               title: challenge.title,
             })}
-            onClick={() => {
-              onParticipate(challenge)
-            }}
-            className="min-h-11 rounded-full border border-line-strong bg-page text-ink px-5 py-2 text-xs font-semibold motion-safe:transition-colors"
+            className="min-h-11 px-2 text-sm font-semibold text-ink underline"
+            onClick={() => onParticipate(challenge)}
           >
             {t('community.challenge.participate')}
           </button>
-        </div>
-      )}
+        )}
+        <button
+          type="button"
+          data-testid="community-challenge-dismiss"
+          aria-label={t('community.calm.dismissChallenge')}
+          className="min-h-11 min-w-11 rounded-md text-xl text-ink-muted"
+          onClick={onDismiss}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
     </aside>
   )
 }
@@ -747,7 +639,7 @@ function LookbookCardImageSurface({
   return (
     <div
       data-testid={`${scope}lookbook-image-${item.id}`}
-      className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-theme-card-bg"
+      className="relative flex h-64 w-full items-center justify-center overflow-hidden rounded-t-xl bg-theme-card-bg"
     >
       {isFailedImage ? (
         <div
@@ -799,38 +691,15 @@ function LookbookCardImageSurface({
             onOpen(item)
           }}
           className="absolute inset-0 flex items-end justify-end p-3"
-        >
-          <span
-            aria-hidden="true"
-            className="rounded-full bg-page/95 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-ink shadow-card motion-safe:transition-colors"
-          >
-            {t('community.card.open')}
-          </span>
-        </button>
+        ></button>
       )}
 
-      {/*
-       * Bounded on the right so the badges wrap inside the card. A spotlight
-       * card also carries the rank pill in its top-right corner, so its badges
-       * stop short of it.
-       */}
-      <div
-        className={`pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-2 ${
-          scope === SPOTLIGHT_CARD_SCOPE ? 'right-14' : 'right-3'
-        }`}
-      >
-        {/*
-         * One band badge, not two. The old surface carried a `location-badge`
-         * beside this one, but `communityFeedItemSchema` publishes no location:
-         * authors are pseudonymous and the spec forbids exposing anything that
-         * would place them, so the second badge had nothing real to show.
-         */}
-        <span
-          data-testid={`${scope}climate-badge-${item.id}`}
-          className="rounded-md bg-inverse px-3 py-1 text-xs font-semibold uppercase text-on-inverse"
-        >
-          {bandLabel(item.climateBand, t)}
-        </span>
+      <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-center gap-2">
+        {scope === SPOTLIGHT_CARD_SCOPE && (
+          <span className="rounded-md bg-inverse px-3 py-1 text-xs font-semibold text-on-inverse">
+            {t('community.calm.nearYou')}
+          </span>
+        )}
         {item.status !== 'published' && (
           <span
             data-testid={`${scope}status-badge-${item.id}`}
@@ -869,122 +738,100 @@ interface LookbookCardContentProps {
   isReported: boolean
   canAct: boolean
   t: Translate
-  onComments: (item: CommunityFeedItem) => void
   onReport: (postId: string) => void
   onWithdraw: (postId: string) => void
 }
 
-/**
- * The CTA row shows exactly one moderation affordance.
- *
- * It used to render Withdraw *and* Report for the caller's own post, which
- * offered a self-report the server answers with 403.
- */
-function LookbookCardContent({
+function CompactLookbookCardContent({
   scope,
   reactionControls,
   item,
   isReported,
   canAct,
   t,
-  onComments,
+  onOpen,
   onReport,
   onWithdraw,
-}: LookbookCardContentProps) {
+}: LookbookCardContentProps & { onOpen: LookbookCardProps['onOpen'] }) {
+  const actions = useRef<HTMLDetailsElement>(null)
+  const trigger = useRef<HTMLElement>(null)
   const authorName = authorNameOf(item, t)
-
   return (
-    <div className="flex flex-1 flex-col justify-between gap-3 p-5">
-      <div className="space-y-2">
-        <h3 id={`${scope}lookbook-card-title-${item.id}`} className="sr-only">
-          {item.title || t('community.card.label', { author: authorName })}
-        </h3>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
+    <div className="flex flex-col gap-2 p-4">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <h3
+            id={`${scope}lookbook-card-title-${item.id}`}
+            className="text-base font-semibold"
+          >
+            <button
+              type="button"
+              data-testid={`${scope}title-${item.id}`}
+              className="min-h-11 w-full break-words text-left hover:underline"
+              onClick={() => onOpen(item)}
+            >
+              {item.title || t('community.card.label', { author: authorName })}
+            </button>
+          </h3>
+          <p
             data-testid={`${scope}author-name-${item.id}`}
-            className="block text-xs font-semibold text-theme-card-text"
+            className="break-words text-sm text-ink-muted"
           >
             {authorName}
-          </span>
-          {(item.textRevision ?? 0) > 0 && (
-            <span
-              data-testid={`${scope}edited-badge-${item.id}`}
-              className="text-xs font-medium text-ink-muted"
-            >
-              {t('community.card.edited')}
-            </span>
-          )}
+          </p>
         </div>
-
-        {item.title && (
-          <p
-            className="break-words text-base font-semibold"
-            data-testid={`${scope}title-${item.id}`}
+        {canAct && (
+          <details
+            ref={actions}
+            className="relative shrink-0"
+            onBlur={(event) => {
+              if (
+                event.relatedTarget &&
+                !event.currentTarget.contains(event.relatedTarget)
+              )
+                event.currentTarget.open = false
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape' || !event.currentTarget.open) return
+              event.stopPropagation()
+              event.currentTarget.open = false
+              trigger.current?.focus()
+            }}
           >
-            {item.title}
-          </p>
-        )}
-        {item.caption && (
-          <p
-            data-testid={`${scope}caption-${item.id}`}
-            className="text-xs leading-relaxed text-ink-muted line-clamp-3"
-          >
-            {item.caption}
-          </p>
+            <summary
+              ref={trigger}
+              aria-label={t('community.calm.cardActions')}
+              data-testid="community-card-actions"
+              className="grid min-h-11 min-w-11 cursor-pointer list-none place-items-center rounded-md text-xl [&::-webkit-details-marker]:hidden"
+            >
+              <span aria-hidden="true">⋯</span>
+            </summary>
+            <button
+              type="button"
+              data-testid={`${scope}${item.author.isSelf ? 'withdraw' : 'report'}-button-${item.id}`}
+              disabled={!item.author.isSelf && isReported}
+              className="absolute right-0 top-full z-10 min-h-11 rounded-md border border-line-strong bg-page px-3 py-2 text-sm font-semibold text-ink shadow-card disabled:text-ink-muted"
+              onClick={() => {
+                if (actions.current) actions.current.open = false
+                trigger.current?.focus()
+                if (item.author.isSelf) onWithdraw(item.id)
+                else onReport(item.id)
+              }}
+            >
+              {t(
+                item.author.isSelf
+                  ? 'community.card.withdraw'
+                  : isReported
+                    ? 'community.card.reported'
+                    : 'community.card.report'
+              )}
+            </button>
+          </details>
         )}
       </div>
-
-      {canAct &&
-        item.author.isSelf &&
-        item.status === 'published' &&
-        item.publishedAt !== null && (
-          <CommunityShareCardControl postId={item.id} scope={scope} />
-        )}
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
-      {/* Story CC-7.9 (CI snapshot): the comments affordance closes the card with its moderation
-          action, after the look it belongs to. Above the author line it read as a stray label
-          with a blank band under it. Signed out, it opens the read-only thread on its own. */}
-      <div className="flex items-center gap-3 border-t border-theme-card-border pt-3 text-xs">
-        <button
-          type="button"
-          className="min-h-11 text-sm font-medium"
-          data-testid={`${scope}comments-button-${item.id}`}
-          onClick={() => onComments(item)}
-        >
-          {t('community.comments.title')}
-        </button>
-        {canAct &&
-          (item.author.isSelf ? (
-            <button
-              type="button"
-              data-testid={`${scope}withdraw-button-${item.id}`}
-              onClick={() => {
-                onWithdraw(item.id)
-              }}
-              className="min-h-11 font-medium text-merlot-ink hover:underline"
-            >
-              {t('community.card.withdraw')}
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-testid={`${scope}report-button-${item.id}`}
-              disabled={isReported}
-              onClick={() => {
-                onReport(item.id)
-              }}
-              className={`min-h-11 font-medium transition-colors ${
-                isReported
-                  ? 'cursor-default text-theme-card-text'
-                  : 'text-ink-muted hover:underline'
-              }`}
-            >
-              {isReported ? t('community.card.reported') : t('community.card.report')}
-            </button>
-          ))}
-      </div>
     </div>
   )
 }
@@ -994,7 +841,6 @@ interface LookbookCardProps {
   scope?: string
   /** Story CC-7.11 P5: the feed's first card marks its photo as Community's first content. */
   firstContent?: boolean
-  onComments: (item: CommunityFeedItem) => void
   reactionControls: ReactionControls
   item: CommunityFeedItem
   isHighlighted: boolean
@@ -1055,7 +901,6 @@ function SponsoredCtaSlot({
 function LookbookCard({
   scope = '',
   firstContent = false,
-  onComments,
   reactionControls,
   item,
   isHighlighted,
@@ -1071,6 +916,27 @@ function LookbookCard({
   onWithdraw,
 }: LookbookCardProps) {
   const titleId = `${scope}lookbook-card-title-${item.id}`
+  const photo = (
+    <LookbookCardImageSurface
+      scope={scope}
+      item={item}
+      isFailedImage={isFailedImage}
+      t={t}
+      onImageError={onImageError}
+      onImageRetry={onImageRetry}
+      onOpen={onOpen}
+    />
+  )
+  const contentProps = {
+    scope,
+    reactionControls,
+    item,
+    isReported,
+    canAct,
+    t,
+    onReport,
+    onWithdraw,
+  }
   return (
     <article
       id={`${scope}lookbook-card-${item.id}`}
@@ -1081,35 +947,13 @@ function LookbookCard({
       }
       data-highlighted={isHighlighted ? 'true' : 'false'}
       data-surface="card"
-      className={`flex flex-col overflow-hidden rounded-xl border bg-theme-card-bg text-theme-card-text shadow-card motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
+      className={`flex flex-col rounded-xl border bg-theme-card-bg text-theme-card-text shadow-card motion-safe:transition-[border-color,box-shadow] motion-safe:duration-200 motion-reduce:transition-none ${
         isHighlighted
           ? 'border-inverse outline outline-2 outline-inverse ring-2 ring-line-strong ring-offset-2 shadow-overlay'
           : 'border-theme-card-border'
       }`}
     >
-      {firstContent ? (
-        <div data-testid="community-first-content">
-          <LookbookCardImageSurface
-            scope={scope}
-            item={item}
-            isFailedImage={isFailedImage}
-            t={t}
-            onImageError={onImageError}
-            onImageRetry={onImageRetry}
-            onOpen={onOpen}
-          />
-        </div>
-      ) : (
-        <LookbookCardImageSurface
-          scope={scope}
-          item={item}
-          isFailedImage={isFailedImage}
-          t={t}
-          onImageError={onImageError}
-          onImageRetry={onImageRetry}
-          onOpen={onOpen}
-        />
-      )}
+      {firstContent ? <div data-testid="community-first-content">{photo}</div> : photo}
       <SponsoredCtaSlot
         scope={scope}
         item={item}
@@ -1117,17 +961,7 @@ function LookbookCard({
         t={t}
         host={sponsored}
       />
-      <LookbookCardContent
-        scope={scope}
-        reactionControls={reactionControls}
-        item={item}
-        isReported={isReported}
-        canAct={canAct}
-        t={t}
-        onComments={onComments}
-        onReport={onReport}
-        onWithdraw={onWithdraw}
-      />
+      <CompactLookbookCardContent {...contentProps} onOpen={onOpen} />
     </article>
   )
 }
@@ -1173,15 +1007,7 @@ interface LookbookDetailDialogProps {
   onClose: () => void
 }
 
-/**
- * What a card opens into. The grid crops each look to a 256px `object-cover`
- * band and clamps its caption to three lines, so this is the only place the
- * whole photograph and the whole caption are readable.
- *
- * `object-contain` rather than the grid's `object-cover`: cropping is a grid
- * affordance, and a look the reader deliberately opened must not lose its hem
- * or its hat to the frame.
- */
+/** Shows the whole photograph, caption and secondary actions for the opened look. */
 function LookbookDetailDialog({
   suspended = false,
   focusComments,
@@ -1686,6 +1512,21 @@ interface PostCreationModalProps {
  * the author confirms it, so choosing a photo allocates and uploads, and
  * publishing sends the confirmed text. The client never invents a suggestion.
  */
+function ChallengeInstructions({
+  challenge,
+  selectedId,
+}: {
+  challenge: EmbeddedCommunityChallenge
+  selectedId: string | null
+}) {
+  if (selectedId !== challenge.id) return null
+  return (
+    <p className="text-sm text-ink-muted" data-testid="post-challenge-instructions">
+      {challenge.body}
+    </p>
+  )
+}
+
 function PostCreationModal({
   suspended = false,
   onClose,
@@ -1969,6 +1810,10 @@ function PostCreationModal({
               <option value="">{t('community.compose.challengeNone')}</option>
               <option value={activeChallenge.id}>{activeChallenge.title}</option>
             </select>
+            <ChallengeInstructions
+              challenge={activeChallenge}
+              selectedId={selectedChallengeId}
+            />
           </div>
         )}
 
@@ -2013,7 +1858,6 @@ interface CommunityHeaderActionsProps {
   /** New post works now (Community access is verified). */
   canShare: boolean
   onShare: () => void
-  settingsLink: React.ReactNode
   /** Story CC-7.9 D3: gold only where New post is the screen's main action. */
   newPostEmphasis: NewPostEmphasis
   t: Translate
@@ -2035,7 +1879,6 @@ function CommunityHeaderActions({
   showShare,
   canShare,
   onShare,
-  settingsLink,
   newPostEmphasis,
   t,
 }: CommunityHeaderActionsProps) {
@@ -2048,7 +1891,6 @@ function CommunityHeaderActions({
    */
   return (
     <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
-      {settingsLink}
       {showShare && (
         <button
           type="button"
@@ -2056,9 +1898,9 @@ function CommunityHeaderActions({
           aria-disabled={canShare ? undefined : 'true'}
           onClick={canShare ? onShare : undefined}
           data-gold={newPostEmphasis === 'primary' ? 'primary' : undefined}
-          className={`min-h-11 rounded-full px-4 py-2 text-xs font-semibold motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${NEW_POST_EMPHASIS_CLASSES[newPostEmphasis]}`}
+          className={`min-h-11 max-w-full break-words rounded-full px-3 py-2 text-xs font-semibold motion-safe:transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60 ${NEW_POST_EMPHASIS_CLASSES[newPostEmphasis]}`}
         >
-          {t('community.newPost')}
+          {t('community.calm.post')}
         </button>
       )}
     </div>
@@ -2136,14 +1978,19 @@ function CommunityNotices({
   )
 }
 
-function clearClimateFilters(
-  mode: FilterCategory,
+function climateEmptyAction(
+  mode: ClimateBand | null,
+  itemCount: number,
+  loading: boolean,
+  error: Message | null,
   onModeChange: (mode: FilterCategory) => void
 ) {
-  return mode === 'all' || mode === 'auto' ? undefined : () => onModeChange('all')
+  if (mode === null || itemCount > 0 || loading || error) return undefined
+  return () => onModeChange('all')
 }
 
 interface CommunityFeedStatesProps {
+  settled: boolean
   isLoading: boolean
   errorText: string | null
   /**
@@ -2163,6 +2010,7 @@ interface CommunityFeedStatesProps {
 }
 
 function CommunityFeedStates({
+  settled,
   isLoading,
   errorText,
   retryable,
@@ -2223,30 +2071,34 @@ function CommunityFeedStates({
         </div>
       )}
 
-      {!isLoading && errorText === null && itemCount === 0 && (
+      {settled && errorText === null && itemCount === 0 && (
         <div
           data-testid="community-feed-empty"
           data-surface="card"
-          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-10 text-center"
+          className="flex flex-col items-center justify-center rounded-xl border border-dashed border-theme-card-border bg-theme-card-bg p-4 text-center sm:p-8"
         >
           <p
             data-testid={firstContentTestId(firstContent)}
             className="text-sm font-semibold text-theme-card-text"
           >
-            {t('community.feed.emptyTitle')}
+            {t(
+              onClearFilters ? 'community.calm.climateEmpty' : 'community.feed.emptyTitle'
+            )}
           </p>
-          <p className="mt-1 text-xs text-ink-muted">{t('community.feed.emptyBody')}</p>
+          {!onClearFilters && (
+            <p className="mt-1 text-xs text-ink-muted">{t('community.feed.emptyBody')}</p>
+          )}
           {onClearFilters && (
             <button
               type="button"
-              className="min-h-11 px-3 text-sm font-semibold underline"
+              className="min-h-11 max-w-full break-words px-3 text-sm font-semibold underline"
               onClick={onClearFilters}
               data-testid="community-clear-filters"
             >
-              {t('community.feed.clearFilters')}
+              {t('community.calm.seeAllClimates')}
             </button>
           )}
-          {canShare && (
+          {canShare && !onClearFilters && (
             <button
               type="button"
               data-testid="community-feed-empty-share-button"
@@ -2359,8 +2211,8 @@ export interface CommunityLookbookGridProps {
   chipCategory?: ChipCategory
   highlightedCardId?: string
   showFilterNav?: boolean
-  /** Passed to {@link LookbookFilterNav}'s `stickyTop`. */
-  filterNavStickyTop?: number
+  /** App top bar portal. Null waits for its target. Omit to render Post inline. */
+  postActionSlot?: HTMLElement | null
   /** The route hosting this grid, where the add-location flow returns after the save. */
   returnPath?: string
   /**
@@ -2483,27 +2335,12 @@ function communityPresentation(
   }
 }
 
-/** Without the filter nav (a ban closes it) the feed actions keep a row of their own. */
-function StandaloneHeaderActions({
-  filterNavShown,
-  banned,
-  children,
-}: {
-  filterNavShown: boolean
-  banned: boolean
-  children: React.ReactNode
-}) {
-  return filterNavShown && !banned ? null : children
+function isRankedLook(item: CommunityFeedItem): item is CommunitySpotlightItem {
+  return 'rank' in item
 }
 
-/** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
 const communityAsideClass = (banned: boolean) =>
-  banned ? 'flex flex-col gap-6 pt-6' : 'flex flex-col gap-6'
-
-/** The City Spotlight section renders once its read left idle, wherever the feed may show. */
-function spotlightSectionShown(status: string, available: boolean): boolean {
-  return status !== 'idle' && available
-}
+  banned ? 'flex flex-col gap-4 pt-6' : 'flex flex-col gap-4'
 
 /** Story CC-7.11 P5: the id of Community's first own content, when this block is it. */
 function firstContentTestId(isFirst: boolean): string | undefined {
@@ -2543,7 +2380,7 @@ function CommunitySettingsLink({
       </Link>
     )
   }
-  // A member's link is a bell in the heading row; its name stays the full label for assistive
+  // A member's link is a bell in the footer; its name stays the full label for assistive
   // technology, and the tooltip shows it to a pointer.
   return (
     <Link
@@ -2717,8 +2554,8 @@ export function CommunityLookbookGrid({
   isMobilePreview = false,
   chipCategory = 'Personal',
   highlightedCardId,
-  showFilterNav = false,
-  filterNavStickyTop,
+  showFilterNav = true,
+  postActionSlot,
   returnPath = '/',
   newPostEmphasis = 'neutral',
   onBannedChange,
@@ -2764,6 +2601,7 @@ export function CommunityLookbookGrid({
   const feedScopeRef = useRef(0)
   const [isInsertingLooks, setIsInsertingLooks] = useState(false)
   const gridRef = useRef<HTMLDivElement>(null)
+  const withdrawnFocus = useRef<{ postId: string; opener: Element } | null>(null)
   // The cards the grid rendered last, so a D3 hide can capture where the reader was.
   const renderedItemsRef = useRef<CommunityFeedItem[]>([])
   const { capture: captureScroll, restore: restoreScroll } = useCommunityScrollRestore({
@@ -2887,6 +2725,8 @@ export function CommunityLookbookGrid({
     },
     [liveSponsorships]
   )
+  const [dismissedChallenges, setDismissedChallenges] = useState<Set<string>>(new Set())
+  const [teaserTarget, setTeaserTarget] = useState<string | null>(null)
   const [activeChallenge, setActiveChallenge] =
     useState<EmbeddedCommunityChallenge | null>(start.activeChallenge)
   const [isLoading, setIsLoading] = useState(false)
@@ -3059,6 +2899,7 @@ export function CommunityLookbookGrid({
   // sponsorship stamp, both taken as the read starts, in the token the hook
   // hands back with the page. Nothing is stored per read, so a failed, aborted
   // or superseded read leaves nothing behind.
+  const climate = communityFeedClimate(servedMode, viewerBand, bandResolved)
   const spotlight = useCommunitySpotlight<{
     ticket: number
     stamp: LiveReadStamp
@@ -3088,6 +2929,10 @@ export function CommunityLookbookGrid({
             ]
           : []
       })
+    },
+    visiblePage: (page) => {
+      if (!communityAvailable || bannedSanction || rowsMode !== currentMode) return []
+      return mergeCommunityLooks(page, [], climate, teaserTarget)
     },
     announce: (message) => {
       setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })
@@ -3172,6 +3017,7 @@ export function CommunityLookbookGrid({
     if (syncedTabRef.current === activeTab) return
     syncedTabRef.current = activeTab
     restoringRowsRef.current = false
+    setRestoring(false)
     setCurrentMode(activeTab)
   }, [activeTab])
 
@@ -3491,6 +3337,10 @@ export function CommunityLookbookGrid({
       postTextLedger.clear()
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
+      setTeaserTarget(null)
+      setDismissedChallenges(new Set())
+      withdrawnFocus.current = null
+      setActiveChallenge(null)
       setSpotlightNotice(null)
       // A sanction names one member's ban, its expiry and appeal, so it leaves with that member.
       setBannedSanction(null)
@@ -3654,6 +3504,8 @@ export function CommunityLookbookGrid({
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)
       setViewerBand(page.viewerBand)
+      setBandResolved(page.bandResolved)
+      setBandUnresolvedReason(page.bandUnresolvedReason)
       setActiveChallenge(page.activeChallenge)
       setIsLoadingMore(false)
       setIsLoading(false)
@@ -4199,6 +4051,21 @@ export function CommunityLookbookGrid({
     [deepLinkedItem, items]
   )
 
+  const spotlightItems = spotlight.state.items
+  const visibleRows = useMemo(() => {
+    if (rowsMode !== currentMode && isLoading) return []
+    return mergeCommunityLooks(spotlightItems, displayedItems, climate, teaserTarget)
+  }, [
+    climate,
+    currentMode,
+    displayedItems,
+    isLoading,
+    rowsMode,
+    spotlightItems,
+    teaserTarget,
+  ])
+
+  const available = feedVisible(communityAvailable, bannedSanction)
   const focusedTargetRef = useRef<string | null>(null)
   // Codex review P2-8: the deep-link focus is spent only once the screen gate shows the body and
   // the card took focus; a card still hidden under the placeholder would drop it.
@@ -4208,8 +4075,10 @@ export function CommunityLookbookGrid({
       focusedTargetRef.current = null
       return
     }
-    if (focusedTargetRef.current === highlightedCardId || !gateOpen) return
-    const cardElement = document.getElementById(`lookbook-card-${highlightedCardId}`)
+    if (focusedTargetRef.current === highlightedCardId || !gateOpen || !available) return
+    const cardElement =
+      document.getElementById(spotlightCardElementId(highlightedCardId)) ??
+      document.getElementById(`lookbook-card-${highlightedCardId}`)
     if (cardElement) {
       cardElement.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
       cardElement.focus()
@@ -4217,11 +4086,16 @@ export function CommunityLookbookGrid({
       focusedTargetRef.current = highlightedCardId
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, displayedItems, setAnnouncement, gateOpen])
+  }, [available, gateOpen, highlightedCardId, setAnnouncement, visibleRows])
 
   const handleModeChange = (mode: FilterCategory) => {
     // Another filter's first page replaces the restored rows.
-    if (mode !== currentMode) restoringRowsRef.current = false
+    if (mode !== currentMode) {
+      restoringRowsRef.current = false
+      setRestoring(false)
+      setIsLoading(true)
+    }
+    setTeaserTarget(null)
     setCurrentMode(mode)
     setNotice(null)
     setAnnouncement({ key: 'community.filters.announce', params: { filterMode: mode } })
@@ -4260,27 +4134,19 @@ export function CommunityLookbookGrid({
    * seeing a photograph. The event's `isSelf` is decided server-side from the
    * stored author id, so nothing here compares ids.
    */
-  const showDetail = (
-    item: CommunityFeedItem,
-    commentsFocus: boolean,
-    surface: AffiliateCommunitySurface
-  ) => {
+  const showDetail = (item: CommunityFeedItem, surface: AffiliateCommunitySurface) => {
     notificationIntentRef.current++
     setDetailSurface(surface)
-    detailOpener.record(surface, commentsFocus, item.id)
-    setFocusComments(commentsFocus)
+    detailOpener.record(surface, item.id)
+    setFocusComments(false)
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
   }
 
-  const handleOpenCard = (
-    item: CommunityFeedItem,
-    commentsFocus = false,
-    surface: AffiliateCommunitySurface = 'community_feed'
-  ) => {
-    showDetail(item, commentsFocus, surface)
-    if (commentsFocus || experimentVariant === null) {
+  const handleOpenCard = (item: CommunityFeedItem) => {
+    showDetail(item, 'community_feed')
+    if (experimentVariant === null) {
       return
     }
     void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)
@@ -4294,7 +4160,7 @@ export function CommunityLookbookGrid({
    */
   const handleOpenSpotlightCard = (item: CommunitySpotlightItem) => {
     const { rank, ...post } = item
-    showDetail(post, false, 'community_spotlight')
+    showDetail(post, 'community_spotlight')
     const { level } = spotlight.state
     if (level === 'none') return
     void openCommunitySpotlightPostFromWeb(item.id, rank, level).catch(() => undefined)
@@ -4409,9 +4275,13 @@ export function CommunityLookbookGrid({
   const handleWithdrawPost = async (postId: string): Promise<void> => {
     if (!communityAvailable) return
     const action = beginAction()
+    const opener = document.activeElement
     try {
       await withdrawCommunityPostFromWeb(postId, action.signal)
       if (action.signal.aborted) return
+      if (opener?.getAttribute('data-testid') === 'community-card-actions') {
+        withdrawnFocus.current = { postId, opener }
+      }
       // No optimistic removal: `items` is published rows only, and a withdrawn
       // post moves to `authorStates` on the next read. Filtering it out locally
       // is what made it reappear on the following refresh.
@@ -4565,7 +4435,6 @@ export function CommunityLookbookGrid({
 
   const spotlightStatus = spotlight.state.status
   const spotlightLevel = spotlight.state.level
-  const spotlightItems = spotlight.state.items
   const focusSpotlightEntry = spotlight.focusEntry
   useEffect(() => {
     if (!gateOpen || !pendingFocus) return
@@ -4591,6 +4460,7 @@ export function CommunityLookbookGrid({
       spotlightItems.some((post) => post.id === pendingFocus.cardId)
     ) {
       setPendingFocus(null)
+      setTeaserTarget(pendingFocus.cardId)
       focusSpotlightEntry(pendingFocus.cardId)
       setAnnouncement({
         key: 'community.feed.announceFocused',
@@ -4676,10 +4546,10 @@ export function CommunityLookbookGrid({
   ])
 
   const presentation = communityPresentation(
-    feedVisible(communityAvailable, bannedSanction),
+    available,
     memberSession,
     isSessionPending(sessionState.status),
-    displayedItems,
+    visibleRows,
     authorStates,
     nextCursor,
     newLooks,
@@ -4691,201 +4561,207 @@ export function CommunityLookbookGrid({
     restoreScroll(presentation.items)
   }, [communityAvailable, presentation.items, restoreScroll])
 
+  useLayoutEffect(() => {
+    const withdrawn = withdrawnFocus.current
+    if (!available || !withdrawn || withdrawn.opener.isConnected) return
+    if (presentation.items.some((item) => item.id === withdrawn.postId)) return
+    withdrawnFocus.current = null
+    if (document.activeElement === document.body) {
+      document
+        .querySelector<HTMLElement>('[data-testid="community-climate-filter"]')
+        ?.focus()
+    }
+  }, [available, presentation.items])
+
   const { shareHost, shareDialog } = useCommunityShareHost(
     presentation.items,
     presentation.detail,
-    spotlight.state.items,
+    spotlightItems,
     presentation.canAct
   )
 
-  const headerActions = (
+  const postAction = (
     <CommunityHeaderActions
       showShare={shareSlotShown(memberSession, banned)}
       canShare={presentation.canAct}
       onShare={openCreateModal}
       newPostEmphasis={newPostEmphasis}
-      settingsLink={
-        <CommunitySettingsLink
-          banned={banned}
-          href={presentation.settingsHref}
-          label={t(presentation.settingsLabel)}
-          signIn={presentation.settingsSignIn}
-          // A refused stored session still reads as a member to the landing script, so its
-          // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
-          guestOnly={!hasSession}
-        />
-      }
       t={t}
     />
   )
+  // A warm ScreenGate restores scroll before the header ref update commits.
+  // Keep Post out of the feed until the portal is ready so that commit has the settled height.
+  const headerPostAction = postActionSlot
+    ? createPortal(postAction, postActionSlot)
+    : postActionSlot === undefined
+      ? postAction
+      : null
+  const waitingForLooks =
+    firstLoadShowing(isLoading || !feedSettled, restoring) ||
+    (spotlightStatus === 'loading' && visibleRows.length === 0)
+  const settledClimate =
+    available && memberSession && !isLoading && feedSettled ? climate : null
+  const handleShowAllClimates = climateEmptyAction(
+    settledClimate,
+    presentation.items.length,
+    waitingForLooks,
+    feedError,
+    handleModeChange
+  )
+  const climateEmpty = Boolean(handleShowAllClimates)
 
-  const spotlightShown = spotlightSectionShown(
-    spotlight.state.status,
-    feedVisible(communityAvailable, bannedSanction)
+  const settingsLink = (
+    <CommunitySettingsLink
+      banned={banned}
+      href={presentation.settingsHref}
+      label={t(presentation.settingsLabel)}
+      signIn={presentation.settingsSignIn}
+      guestOnly={!hasSession}
+    />
+  )
+  const renderSettingsFooter = () => {
+    if (banned || (refusedScope !== undefined && refusedScope === sessionScope))
+      return null
+    if (!memberSession && snapshotScope === null) return null
+    const returning = restored && initialScope === snapshotScope
+    // Keep the whole footer out of view while the feed hides. A trusted return still needs the
+    // footer's height and gap to restore its offset. A focused bell stays reachable in a recheck.
+    const pending = returning
+      ? 'invisible focus-within:visible'
+      : 'hidden focus-within:block'
+    return (
+      <div className={`min-h-11 ${available && !waitingForLooks ? '' : pending}`}>
+        {!presentation.settingsSignIn && settingsLink}
+      </div>
+    )
+  }
+
+  const renderHeader = () => (
+    <>
+      {headerPostAction}
+      {showFilterNav && !banned && (
+        <CommunityClimateFilter
+          activeTab={displayedMode}
+          viewerBand={bandResolved ? viewerBand : null}
+          onTabChange={handleModeChange}
+        >
+          <CommunityNotices
+            bandUnresolvedReason={bandNoticeReason}
+            canAddLocation={hasSession}
+            returnPath={returnPath}
+            notice={null}
+            noticeText={null}
+            t={t}
+          />
+        </CommunityClimateFilter>
+      )}
+      {available && activeChallenge && !dismissedChallenges.has(activeChallenge.id) && (
+        <WeeklyChallengeBanner
+          challenge={activeChallenge}
+          t={t}
+          canParticipate={presentation.canAct}
+          onParticipate={openCreateModal}
+          onDismiss={() => {
+            setDismissedChallenges((previous) =>
+              new Set(previous).add(activeChallenge.id)
+            )
+            document
+              .querySelector<HTMLElement>('[data-testid="community-climate-filter"]')
+              ?.focus()
+          }}
+        />
+      )}
+      {presentation.settingsSignIn && settingsLink}
+
+      {/* A failed session check: the grid re-checks the session like every member section. */}
+      <SessionRetryButton
+        session={sessionState}
+        testId="community-session-retry"
+        className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4 text-sm font-semibold"
+      />
+
+      <CommunityNotices
+        bandUnresolvedReason={null}
+        canAddLocation={hasSession}
+        returnPath={returnPath}
+        notice={notice}
+        noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
+        t={t}
+      />
+    </>
   )
 
-  return (
-    <ShareCardHostContext.Provider value={shareHost}>
-      <aside
-        aria-label={t('community.sectionLabel')}
-        className={communityAsideClass(banned)}
-      >
-        <SpotlightFocusNotice notice={spotlightNotice} t={t} />
-        {/* Story CC-7.11 P5, AC2: Community's first own content is the City Spotlight when it
-            renders; otherwise the first feed card or the feed's empty state carries the id. */}
-        <div data-testid={firstContentTestId(spotlightShown)}>
-          <CommunitySpotlightSection
-            state={spotlight.state}
-            available={feedVisible(communityAvailable, bannedSanction)}
-            isMobilePreview={isMobilePreview}
-            t={t}
-            onLoadMore={() => {
-              void spotlight.loadMore()
-            }}
-            onRetry={() => {
-              void spotlight.retry()
-            }}
-            onFocused={spotlight.clearFocusTarget}
-            renderCard={(item) => (
-              <LookbookCard
-                scope={SPOTLIGHT_CARD_SCOPE}
-                reactionControls={reactionState.controls(item.id)}
-                item={item}
-                isHighlighted={false}
-                isFailedImage={
-                  failedImages.spotlight[item.id]?.url === item.imageAccess.url
-                }
-                isReported={reportedPostIds.has(item.id)}
-                canAct={presentation.canAct}
-                t={t}
-                sponsored={sponsoredHost('community_spotlight')}
-                onImageError={handleSpotlightImageError}
-                onImageRetry={handleSpotlightImageRetry}
-                onOpen={() => {
-                  handleOpenSpotlightCard(item)
-                }}
-                onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
-                onReport={(postId) => {
-                  setReportError(null)
-                  setReportingPostId(postId)
-                }}
-                onWithdraw={(postId) => {
-                  void handleWithdrawPost(postId)
-                }}
-              />
-            )}
-          />
-        </div>
-
-        {showFilterNav && (
-          <LookbookFilterNav
-            activeTab={displayedMode}
-            isMobilePreview={isMobilePreview}
-            onTabChange={handleModeChange}
-            viewerBand={viewerBand}
-            closed={banned}
-            stickyTop={filterNavStickyTop}
-            actions={headerActions}
-            chipsPending={!feedSettled}
-          />
-        )}
-
-        <StandaloneHeaderActions filterNavShown={showFilterNav} banned={banned}>
-          {headerActions}
-        </StandaloneHeaderActions>
-
-        {/* A failed session check: the grid re-checks the session like every member section. */}
-        <SessionRetryButton
-          session={sessionState}
-          testId="community-session-retry"
-          className="min-h-11 self-start rounded-md border border-line-strong bg-page text-ink px-4 text-sm font-semibold"
-        />
-
-        <CommunityNotices
-          bandUnresolvedReason={bandNoticeReason}
-          canAddLocation={hasSession}
-          returnPath={returnPath}
-          notice={notice}
-          noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
+  const renderFeed = () => (
+    <>
+      {bannedSanction ? (
+        <CommunityBannedNotice sanction={bannedSanction} language={i18n.language} t={t} />
+      ) : (
+        <CommunityFeedStates
+          settled={available && !waitingForLooks}
+          isLoading={available && waitingForLooks}
+          errorText={renderMessage(feedError, t, viewerBand)}
+          retryable={feedError?.key !== FAILURE_KEYS.signed_out}
+          itemCount={presentation.items.length}
+          gridColumns={gridColumns}
+          canShare={presentation.canAct}
+          onRetry={handleRetry}
+          onClearFilters={handleShowAllClimates}
+          onShare={openCreateModal}
+          firstContent
           t={t}
         />
+      )}
 
-        {activeChallenge && (
-          <WeeklyChallengeBanner
-            challenge={activeChallenge}
-            language={i18n.language}
-            t={t}
-            canParticipate={presentation.canAct}
-            onParticipate={openCreateModal}
-          />
-        )}
-
-        {bannedSanction ? (
-          <CommunityBannedNotice
-            sanction={bannedSanction}
-            language={i18n.language}
-            t={t}
-          />
-        ) : (
-          <CommunityFeedStates
-            isLoading={firstLoadShowing(isLoading, restoring)}
-            errorText={renderMessage(feedError, t, viewerBand)}
-            retryable={feedError?.key !== FAILURE_KEYS.signed_out}
-            itemCount={displayedItems.length}
-            gridColumns={gridColumns}
-            canShare={presentation.canAct}
-            onRetry={handleRetry}
-            onClearFilters={clearClimateFilters(currentMode, handleModeChange)}
-            onShare={openCreateModal}
-            firstContent={!spotlightShown}
-            t={t}
-          />
-        )}
-
-        {/* Story CC-7.7 D4: the new-looks pill is an overlay pinned to the top of the list. It
+      {/* Story CC-7.7 D4: the new-looks pill is an overlay pinned to the top of the list. It
             used to sit below the cards and push everything after it down when realtime looks
             arrived; now it takes no space, and the cards never move for it. */}
-        <div className="relative">
-          <div className="pointer-events-none sticky top-20 z-20 h-0">
-            {presentation.showNewLooks && (
-              <div className="flex justify-center pt-2">
-                <button
-                  type="button"
-                  data-testid="community-new-looks-pill"
-                  className="pointer-events-auto rounded-full border border-line-strong bg-page px-4 py-3 text-ink shadow-overlay"
-                  disabled={isInsertingLooks}
-                  onClick={() => {
-                    void insertNewLooks()
-                  }}
-                >
-                  {t('community.realtime.showNewLooks', { count: newLooks.length })}
-                </button>
-              </div>
-            )}
-          </div>
-          <div
-            ref={gridRef}
-            data-testid="community-card-grid"
-            data-chip-category={chipCategory}
-            aria-busy={isLoading || isLoadingMore}
-            className={`grid gap-6 ${gridColumns}`}
-          >
-            {presentation.items.map((item, index) => (
+      <div className="relative">
+        <div className="pointer-events-none sticky top-20 z-20 h-0">
+          {presentation.showNewLooks && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                data-testid="community-new-looks-pill"
+                className="pointer-events-auto rounded-full border border-line-strong bg-page px-4 py-3 text-ink shadow-overlay"
+                disabled={isInsertingLooks}
+                onClick={() => {
+                  void insertNewLooks()
+                }}
+              >
+                {t('community.realtime.showNewLooks', { count: newLooks.length })}
+              </button>
+            </div>
+          )}
+        </div>
+        <div
+          ref={gridRef}
+          data-testid="community-card-grid"
+          data-chip-category={chipCategory}
+          aria-busy={isLoading || isLoadingMore}
+          className={`grid gap-6 ${gridColumns}`}
+        >
+          {presentation.items.map((item, index) => {
+            const ranked = isRankedLook(item)
+            const surface = ranked ? 'community_spotlight' : 'community_feed'
+            const imageSurface = ranked ? 'spotlight' : 'feed'
+            return (
               <LookbookCard
-                firstContent={index === 0 && !spotlightShown}
+                scope={ranked ? SPOTLIGHT_CARD_SCOPE : undefined}
+                firstContent={index === 0}
                 reactionControls={reactionState.controls(item.id)}
                 key={item.id}
                 item={item}
                 isHighlighted={item.id === highlightedCardId}
-                isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
+                isFailedImage={
+                  failedImages[imageSurface][item.id]?.url === item.imageAccess.url
+                }
                 isReported={reportedPostIds.has(item.id)}
                 canAct={presentation.canAct}
                 t={t}
-                sponsored={sponsoredHost('community_feed')}
-                onImageError={handleImageError}
-                onImageRetry={handleImageRetry}
-                onOpen={handleOpenCard}
-                onComments={(item) => handleOpenCard(item, true)}
+                sponsored={sponsoredHost(surface)}
+                onImageError={ranked ? handleSpotlightImageError : handleImageError}
+                onImageRetry={ranked ? handleSpotlightImageRetry : handleImageRetry}
+                onOpen={ranked ? () => handleOpenSpotlightCard(item) : handleOpenCard}
                 onReport={(postId) => {
                   setReportError(null)
                   setReportingPostId(postId)
@@ -4894,11 +4770,26 @@ export function CommunityLookbookGrid({
                   void handleWithdrawPost(postId)
                 }}
               />
-            ))}
-          </div>
+            )
+          })}
         </div>
+      </div>
 
-        <AuthorStatesSection states={presentation.authorStates} t={t} />
+      {available && !climateEmpty && (
+        <CommunitySpotlightPaging
+          state={spotlightState}
+          t={t}
+          onLoadMore={() => {
+            void spotlight.loadMore()
+          }}
+          onRetry={() => {
+            void spotlight.retry()
+          }}
+          onFocused={spotlight.clearFocusTarget}
+        />
+      )}
+      <AuthorStatesSection states={presentation.authorStates} t={t} />
+      {!climateEmpty && (
         <CommunityExampleInspiration
           available={feedVisible(communityAvailable, bannedSanction)}
           loading={isLoading}
@@ -4908,16 +4799,111 @@ export function CommunityLookbookGrid({
           items={presentation.items}
           locale={i18n.language}
         />
+      )}
 
-        <LoadMoreControl
-          nextCursor={presentation.nextCursor}
-          isLoading={firstLoadShowing(isLoading, restoring)}
-          isRefreshing={isLoading}
-          isLoadingMore={isLoadingMore}
-          onLoadMore={handleLoadMore}
+      <LoadMoreControl
+        nextCursor={climateEmpty ? null : presentation.nextCursor}
+        isLoading={firstLoadShowing(isLoading, restoring)}
+        isRefreshing={isLoading}
+        isLoadingMore={isLoadingMore}
+        onLoadMore={handleLoadMore}
+        t={t}
+      />
+
+      {renderSettingsFooter()}
+    </>
+  )
+
+  const renderDialogs = () => (
+    <>
+      {presentation.detail && (
+        <LookbookDetailDialog
+          suspended={!communityAvailable}
+          comments={comments}
+          focusComments={focusComments}
+          commentTarget={
+            presentation.detail.id === highlightedCardId ? commentTarget : undefined
+          }
+          reactionControls={reactionState.controls(presentation.detail.id)}
+          reactionFeedback={reactionFeedback}
+          item={presentation.detail}
+          canAct={presentation.canAct}
+          sponsored={sponsoredHost(detailSurface)}
+          t={t}
+          restoreFocus={detailOpener.restoreFocus}
+          onTextSaved={(postId, text) => {
+            postTextLedger.record({ id: postId, ...text, status: 'published' })
+            const update = (post: CommunityFeedItem | null) =>
+              post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
+                ? { ...post, ...text }
+                : post
+            newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
+            setNewLooks(newLooksRef.current)
+            setItems((previous) => previous.map((item) => update(item)!))
+            setOpenedItem(update)
+            setDeepLinkedItem(update)
+            applySpotlight(update)
+          }}
+          onTextStatus={(key) => {
+            const id = ++reactionAnnouncementId.current
+            setReactionFeedback({ key, id })
+          }}
+          onClose={() => {
+            notificationIntentRef.current++
+            comments.retireFocus(presentation.detail!.id)
+            setCommentTarget(undefined)
+            setOpenedItem(null)
+          }}
+        />
+      )}
+
+      {reportingPostId !== null && (
+        <CommunityReportModal
+          suspended={!communityAvailable}
+          onClose={closeReportModal}
+          onSubmit={(reason, details) => {
+            void handleReportSubmit(reason, details)
+          }}
+          isSubmitting={isSubmittingReport}
+          errorMessage={renderMessage(reportError, t, viewerBand)}
           t={t}
         />
+      )}
 
+      {isCreateModalOpen && (
+        <PostCreationModal
+          key={sessionScope}
+          suspended={!communityAvailable}
+          onClose={closeCreateModal}
+          onSelectPhoto={(file) => {
+            void handleSelectPhoto(file)
+          }}
+          onPublish={(params) => {
+            void handlePublishPost(params)
+          }}
+          photoPreview={photoPreview}
+          altTextSuggestion={altTextSuggestion}
+          describeDraft={describeDraftRequest(allocated, sessionScope)}
+          isPreparing={isPreparingPhoto}
+          isPublishing={isPublishing}
+          activeChallenge={activeChallenge}
+          errorMessage={renderMessage(composeError, t, viewerBand)}
+          t={t}
+        />
+      )}
+      {shareDialog}
+    </>
+  )
+
+  return (
+    <ShareCardHostContext.Provider value={shareHost}>
+      <aside
+        aria-label={t('community.sectionLabel')}
+        className={communityAsideClass(banned)}
+      >
+        <SpotlightFocusNotice notice={spotlightNotice} t={t} />
+        {renderHeader()}
+        {renderFeed()}
         {/* The one polite live region on this surface. */}
         <div
           aria-live="polite"
@@ -4940,82 +4926,7 @@ export function CommunityLookbookGrid({
           ))}
         </div>
 
-        {presentation.detail && (
-          <LookbookDetailDialog
-            suspended={!communityAvailable}
-            comments={comments}
-            focusComments={focusComments}
-            commentTarget={
-              presentation.detail.id === highlightedCardId ? commentTarget : undefined
-            }
-            reactionControls={reactionState.controls(presentation.detail.id)}
-            reactionFeedback={reactionFeedback}
-            item={presentation.detail}
-            canAct={presentation.canAct}
-            sponsored={sponsoredHost(detailSurface)}
-            t={t}
-            restoreFocus={detailOpener.restoreFocus}
-            onTextSaved={(postId, text) => {
-              postTextLedger.record({ id: postId, ...text, status: 'published' })
-              const update = (post: CommunityFeedItem | null) =>
-                post?.id === postId && (post.textRevision ?? 0) <= text.textRevision
-                  ? { ...post, ...text }
-                  : post
-              newLooksRef.current = newLooksRef.current.map((item) => update(item)!)
-              setNewLooks(newLooksRef.current)
-              setItems((previous) => previous.map((item) => update(item)!))
-              setOpenedItem(update)
-              setDeepLinkedItem(update)
-              applySpotlight(update)
-            }}
-            onTextStatus={(key) => {
-              const id = ++reactionAnnouncementId.current
-              setReactionFeedback({ key, id })
-            }}
-            onClose={() => {
-              notificationIntentRef.current++
-              comments.retireFocus(presentation.detail!.id)
-              setCommentTarget(undefined)
-              setOpenedItem(null)
-            }}
-          />
-        )}
-
-        {reportingPostId !== null && (
-          <CommunityReportModal
-            suspended={!communityAvailable}
-            onClose={closeReportModal}
-            onSubmit={(reason, details) => {
-              void handleReportSubmit(reason, details)
-            }}
-            isSubmitting={isSubmittingReport}
-            errorMessage={renderMessage(reportError, t, viewerBand)}
-            t={t}
-          />
-        )}
-
-        {isCreateModalOpen && (
-          <PostCreationModal
-            key={sessionScope}
-            suspended={!communityAvailable}
-            onClose={closeCreateModal}
-            onSelectPhoto={(file) => {
-              void handleSelectPhoto(file)
-            }}
-            onPublish={(params) => {
-              void handlePublishPost(params)
-            }}
-            photoPreview={photoPreview}
-            altTextSuggestion={altTextSuggestion}
-            describeDraft={describeDraftRequest(allocated, sessionScope)}
-            isPreparing={isPreparingPhoto}
-            isPublishing={isPublishing}
-            activeChallenge={activeChallenge}
-            errorMessage={renderMessage(composeError, t, viewerBand)}
-            t={t}
-          />
-        )}
-        {shareDialog}
+        {renderDialogs()}
       </aside>
     </ShareCardHostContext.Provider>
   )

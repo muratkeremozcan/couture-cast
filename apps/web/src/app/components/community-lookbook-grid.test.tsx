@@ -4,6 +4,10 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in `apps/web/src/app/components/community-lookbook-grid.test.tsx`
 // Community grid journeys through the real web transport and MSW.
+import {
+  openCommunityClimate,
+  selectCommunityClimate,
+} from '../../test-utils/community-ui'
 import { delay, http, HttpResponse } from 'msw'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -81,7 +85,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
     it('6.1-WEB-002 renders the localized empty state with its share call to action', async () => {
       signIn()
-      useMswHandlers(feedHandler())
+      useMswHandlers(feedHandler({ mode: 'all' }))
       renderGrid()
 
       const empty = await screen.findByTestId('community-feed-empty')
@@ -254,6 +258,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         )
         renderGrid()
 
+        await openCommunityClimate(userEvent.setup())
         const notice = await screen.findByTestId('community-band-unresolved')
         expect(notice).toHaveTextContent(UNRESOLVED_COPY[reason])
       }
@@ -299,6 +304,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         )
         renderGrid()
 
+        await openCommunityClimate(userEvent.setup())
         const notice = await screen.findByTestId('community-band-unresolved')
         const action = within(notice).queryByTestId('community-add-location')
         if (reason === 'no_location') {
@@ -329,6 +335,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       renderGrid()
 
+      await openCommunityClimate(userEvent.setup())
       const notice = await screen.findByTestId('community-band-unresolved')
       expect(within(notice).getByTestId('community-add-location')).toBeInTheDocument()
 
@@ -362,6 +369,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
       await screen.findByTestId('lookbook-card-post-1')
 
+      await openCommunityClimate(userEvent.setup())
       expect([...COMMUNITY_FEED_MODES]).toEqual(['auto', 'all', ...CLIMATE_BANDS])
       for (const mode of COMMUNITY_FEED_MODES) {
         const chip = screen.getByTestId(`community-filter-${mode}`)
@@ -374,9 +382,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
         'Your climate: Warm and wet'
       )
-      expect(screen.getByTestId('community-filter-all')).toHaveTextContent(
-        'Every climate'
-      )
+      expect(screen.getByTestId('community-filter-all')).toHaveTextContent('All climates')
       expect(screen.getByTestId('community-filter-cold_dry')).toHaveTextContent(
         'Cold and dry'
       )
@@ -399,6 +405,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       renderGrid()
 
+      await openCommunityClimate(userEvent.setup())
       await screen.findByTestId('community-band-unresolved')
       expect(screen.getByTestId('community-filter-auto')).toHaveTextContent(
         'Your climate'
@@ -439,7 +446,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(pagedUrl.searchParams.get('mode')).toBe('auto')
       expect(pagedUrl.searchParams.get('cursor')).toBe(cursorFor())
 
-      await user.click(screen.getByTestId('community-filter-cold_dry'))
+      await selectCommunityClimate(user, 'cold_dry')
       await screen.findByTestId('lookbook-card-post-3')
 
       // The cursor is bound to the mode it was minted under and the server
@@ -448,9 +455,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(filteredUrl.searchParams.get('mode')).toBe('cold_dry')
       expect(filteredUrl.searchParams.get('cursor')).toBeNull()
       expect(filteredUrl.searchParams.get('limit')).toBe('12')
-      expect(screen.getByTestId('community-filter-cold_dry')).toHaveAttribute(
-        'aria-pressed',
-        'true'
+      expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+        'Cold and dry'
       )
       expect(posthogMocks.capture).toHaveBeenCalledWith('layout_interaction', {
         action: 'filter_chip_click',
@@ -478,13 +484,12 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
-      await user.click(screen.getByTestId('community-filter-all'))
+      await selectCommunityClimate(user, 'all')
 
       await screen.findByTestId('lookbook-card-every-climate-post')
       expect(modes).toEqual(['auto', 'all'])
-      expect(screen.getByTestId('community-filter-all')).toHaveAttribute(
-        'aria-pressed',
-        'true'
+      expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+        'All climates'
       )
     })
 
@@ -505,10 +510,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
       await screen.findByTestId('lookbook-card-post-1')
 
-      expect(screen.getByTestId('community-filter-all')).toHaveAttribute(
-        'aria-pressed',
-        'true'
+      expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+        'All climates'
       )
+      await openCommunityClimate(userEvent.setup())
       expect(screen.getByTestId('community-filter-auto')).toHaveAttribute(
         'aria-pressed',
         'false'
@@ -547,7 +552,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid({ onTabChange })
 
       await screen.findByTestId('lookbook-card-post-1')
-      await user.click(screen.getByTestId('community-filter-warm_dry'))
+      await selectCommunityClimate(user, 'warm_dry')
 
       expect(onTabChange).toHaveBeenCalledWith('warm_dry')
       // The announcement follows the feed read for the chosen filter.
@@ -587,8 +592,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
-      await user.click(screen.getByTestId('community-filter-cold_dry'))
-      await user.click(screen.getByTestId('community-filter-warm_wet'))
+      await selectCommunityClimate(user, 'cold_dry')
+      await selectCommunityClimate(user, 'warm_wet')
       await screen.findByTestId('lookbook-card-fresh-post')
 
       // Wait until the abandoned filter's own response has been produced. The
@@ -598,9 +603,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         expect(screen.getByTestId('lookbook-card-fresh-post')).toBeInTheDocument()
       )
       expect(screen.queryByTestId('lookbook-card-stale-post')).not.toBeInTheDocument()
-      expect(screen.getByTestId('community-filter-warm_wet')).toHaveAttribute(
-        'aria-pressed',
-        'true'
+      expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+        'Warm and wet'
       )
     })
   })

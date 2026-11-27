@@ -6,6 +6,7 @@ import path from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  MOCK_OIDC_PORT,
   MOCK_OIDC_URL,
   mockOidcContainerArgs,
 } from '../../../scripts/e2e-real-session/mock-oidc-container.mjs'
@@ -58,17 +59,17 @@ describe('ticketedMockUrl', () => {
   it('keeps the mock URL GoTrue answered with and adds the ticket', () => {
     expect(
       ticketedMockUrl(
-        'http://127.0.0.1:53052/realms/cc/protocol/openid-connect/auth?client_id=c&state=s',
+        'http://127.0.0.1:23052/realms/cc/protocol/openid-connect/auth?client_id=c&state=s',
         't-1'
       )
     ).toBe(
-      'http://127.0.0.1:53052/realms/cc/protocol/openid-connect/auth?client_id=c&state=s&login_hint=t-1'
+      'http://127.0.0.1:23052/realms/cc/protocol/openid-connect/auth?client_id=c&state=s&login_hint=t-1'
     )
   })
 
   it('refuses any other origin', () => {
-    expect(ticketedMockUrl('http://127.0.0.1:530520/realms/cc', 't')).toBeNull()
-    expect(ticketedMockUrl('http://localhost:53052/realms/cc', 't')).toBeNull()
+    expect(ticketedMockUrl('http://127.0.0.1:23053/realms/cc', 't')).toBeNull()
+    expect(ticketedMockUrl('http://localhost:23052/realms/cc', 't')).toBeNull()
     expect(
       ticketedMockUrl('http://couturecast-mock-oidc:8080/realms/cc/protocol', 't')
     ).toBeNull()
@@ -87,6 +88,7 @@ describe('mock OIDC topology', () => {
     const keycloak = /\[auth\.external\.keycloak\][^[]*?\nurl = "([^"]+)"/.exec(config)
     expect(keycloak?.[1]).toBe(`${MOCK_OIDC_URL}/realms/cc`)
     expect(MOCK_OIDC_ORIGIN).toBe(MOCK_OIDC_URL)
+    expect(MOCK_OIDC_PORT).toBeLessThan(32768)
   })
 
   it("runs the mock in GoTrue's namespace and publishes it on host loopback only", () => {
@@ -95,8 +97,8 @@ describe('mock OIDC topology', () => {
     expect(mock).not.toContain('-p')
     expect(mock.join(' ')).toContain('MOCK_OIDC_HOST=0.0.0.0')
     expect(forwarder.join(' ')).toContain('--network supabase_network_couture-cast')
-    expect(forwarder.join(' ')).toContain('-p 127.0.0.1:53052:53052')
-    expect(forwarder.at(-1)).toContain('net.connect(53052, "supabase_auth_couture-cast")')
+    expect(forwarder.join(' ')).toContain('-p 127.0.0.1:23052:23052')
+    expect(forwarder.at(-1)).toContain('net.connect(23052, "supabase_auth_couture-cast")')
   })
 })
 

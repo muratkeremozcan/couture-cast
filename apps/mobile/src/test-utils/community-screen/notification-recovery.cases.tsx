@@ -1,4 +1,5 @@
 // T05: actual screen/coordinator/HTTP wiring; only the external socket and native surfaces are controlled.
+import { openCommunityPostComments } from './interactions'
 import { CommunitySyncState } from '@couture/api-client'
 import type { ResolveCommunityTargetsInput } from '@couture/api-client/contracts/http'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -149,7 +150,10 @@ function journey(
   })
   serveFeed(() =>
     feedJson({
-      items: [post(), ...(state.published ? [post('post-new')] : [post('post-b')])],
+      items: [
+        ...(state.hidden ? [] : [post()]),
+        state.published ? post('post-new') : post('post-b'),
+      ],
     })
   )
   server.use(
@@ -274,7 +278,7 @@ export function registerCommunityNotificationRecoveryCases() {
         await screen.findByTestId('community-post-card-post-a')
         await waitFor(() => expect(f.state.notificationCalls).toBe(1))
         if (opened !== 'current') {
-          press(screen.getByTestId(`community-card-comments-${opened}`))
+          await openCommunityPostComments(opened)
           await screen.findByRole('button', { name: 'Close comments' })
           fireEvent.change(screen.getByLabelText('Add a comment'), {
             target: { value: 'Unrelated owned draft' },
@@ -345,7 +349,7 @@ export function registerCommunityNotificationRecoveryCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
     await f.catchUp()
-    press(screen.getByTestId('community-card-comments-post-a'))
+    await openCommunityPostComments('post-a')
     await screen.findByText(rootComment.body)
     const before = f.rootRequests.length
     f.state.hidden = true
@@ -355,12 +359,14 @@ export function registerCommunityNotificationRecoveryCases() {
       expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
     )
     expect(f.rootRequests).toHaveLength(before)
-    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    )
     await communityGateOpen()
     await waitFor(() =>
       expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
     )
-    expect(screen.getByTestId('community-card-comments-post-b')).not.toHaveAttribute(
+    expect(screen.getByTestId('community-card-title-post-b')).not.toHaveAttribute(
       'aria-disabled',
       'true'
     )
@@ -556,7 +562,7 @@ export function registerCommunityNotificationRecoveryCases() {
           return kind === 'missing-card'
             ? errorEnvelope(404, 'Community post not found.')
             : HttpResponse.json({
-                data: { ...post(), caption: 'Independent late card stays authoritative' },
+                data: { ...post(), title: 'Independent late card stays authoritative' },
               })
         })
       )
@@ -567,7 +573,7 @@ export function registerCommunityNotificationRecoveryCases() {
             true
           )
         )
-        press(await screen.findByTestId('community-card-comments-post-a'))
+        await openCommunityPostComments('post-a')
         await screen.findByText(rootComment.body)
         press(screen.getByRole('button', { name: 'Close comments' }))
         const before = f.rootRequests.length
@@ -583,7 +589,9 @@ export function registerCommunityNotificationRecoveryCases() {
         expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
         expect(f.rootRequests).toHaveLength(before)
         if (kind === 'missing-card') {
-          expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+          await waitFor(() =>
+            expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+          )
           await communityGateOpen()
           await waitFor(() =>
             expect(screen.getByTestId('community-post-card-post-b')).toBeVisible()
@@ -591,7 +599,7 @@ export function registerCommunityNotificationRecoveryCases() {
         } else {
           if (kind === 'card')
             await screen.findByText('Independent late card stays authoritative')
-          press(screen.getAllByTestId('community-card-comments-post-a')[0]!)
+          await openCommunityPostComments('post-a')
           await screen.findByText(rootComment.body)
           await f.catchUp()
           expect(

@@ -129,7 +129,7 @@ it('F1 removal-marker rebuild preserves the mounted feed, sheet and focused comp
   await act(async () => {
     await syncs[0]!.catchUp()
   })
-  await user.click(screen.getByTestId('comments-button-post-1'))
+  await user.click(screen.getByTestId('lookbook-open-post-1'))
   await screen.findByText('Visible comment before removal.')
   const composer = screen.getByLabelText('Add a comment')
   await act(async () => {

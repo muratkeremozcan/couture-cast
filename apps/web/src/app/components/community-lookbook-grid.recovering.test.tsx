@@ -122,7 +122,7 @@ async function openVerifiedFeed(handlers: ReturnType<typeof useVerifiedFeedHandl
 it('keeps the feed, an open thread and its draft while recovering within the verification bound', async () => {
   const user = userEvent.setup()
   const view = await openVerifiedFeed(useVerifiedFeedHandlers())
-  await user.click(screen.getByTestId('comments-button-post-1'))
+  await user.click(screen.getByTestId('lookbook-open-post-1'))
   const composer = await screen.findByLabelText('Add a comment')
   await user.type(composer, 'Draft survives a reconnect')
   const dialog = screen.getByRole('dialog')

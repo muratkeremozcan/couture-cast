@@ -645,6 +645,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Posten",
+      "nearYou": "In deiner Nähe",
+      "climateEmpty": "Noch keine Looks in deiner Klimazone",
+      "seeAllClimates": "Alle Klimazonen ansehen",
+      "cardActions": "Beitragsoptionen",
+      "dismissChallenge": "Challenge ausblenden",
+      "thisWeek": "Diese Woche: {{title}}",
+      "allClimates": "Alle Klimazonen"
+    },
     "title": "Community",
     "heading": "Neueste Looks",
     "sectionLabel": "Community-Lookbook",
@@ -654,7 +664,7 @@
       "invalid": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar."
     },
     "filters": {
-      "label": "Community-Filter",
+      "label": "Klimafilter",
       "explainer": "Klimafilter ordnen Looks nach der Wochenvorhersage am gespeicherten Ort der teilenden Person, von kalt und feucht bis warm und trocken.",
       "announce": "Looks für {{filter}} werden angezeigt.",
       "mode": {

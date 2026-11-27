@@ -1,5 +1,7 @@
 // Learning path Step 41: Curated reactions.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+import { selectCommunityClimate } from './interactions'
 import {
   imageEvents,
   item,
@@ -127,7 +129,7 @@ export function registerCommunityReactionsCases() {
         return HttpResponse.json({
           data: {
             ...item(),
-            caption: 'Older native detail completed.',
+            title: 'Older native detail completed.',
             reactions: raceZero,
           },
         })
@@ -218,7 +220,7 @@ export function registerCommunityReactionsCases() {
     )
     await render(<CommunityScreen />)
     await screen.findByTestId('highlighted-community-card-post-a')
-    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await selectCommunityClimate('all')
     await waitFor(() => expect(feedUrls).toHaveLength(2))
     await screen.findByRole('button', { name: 'Applaud, 1' })
     expect(racePalette()).toEqual(confirmedPalette)
@@ -235,7 +237,7 @@ export function registerCommunityReactionsCases() {
           items: [
             {
               ...item(),
-              caption: index ? 'Remounted native feed completed.' : item().caption,
+              title: index ? 'Remounted native feed completed.' : item().title,
               reactions: raceZero,
             },
           ],
@@ -255,7 +257,7 @@ export function registerCommunityReactionsCases() {
       await waitFor(() => expect(sent).toBe(true))
       const mutation: unknown = vi.mocked(communityClient.setCommunityReactionFromMobile)
         .mock.results[0]!.value
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() =>
         expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
       )
@@ -307,7 +309,7 @@ export function registerCommunityReactionsCases() {
           items: [
             {
               ...item(),
-              caption: index ? 'Older native feed completed.' : item().caption,
+              title: index ? 'Older native feed completed.' : item().title,
               reactions: raceZero,
             },
           ],
@@ -323,7 +325,7 @@ export function registerCommunityReactionsCases() {
       await render(<CommunityScreen />)
       await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
       await screen.findByRole('button', { name: 'Applaud, 1' })
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() => expect(feedUrls).toHaveLength(2))
       gate.release()
       await screen.findByText('Older native feed completed.')
@@ -438,11 +440,11 @@ export function registerCommunityReactionsCases() {
         .mock.results[1]!.value
       // Attach before changing the filter, whose abort may reject this promise.
       const staleSettled = Promise.allSettled([staleDetail])
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() =>
-        expect(
-          screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
-        ).toBe('true')
+        expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+          'All climates'
+        )
       )
       // The superseded request may already be aborted, so it has no visible
       // completion. Await the real client's settlement and flush React.
@@ -450,9 +452,10 @@ export function registerCommunityReactionsCases() {
         gate.release()
         await staleSettled
       })
-      expect(
-        screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
-      ).toBe('true')
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'All climates'
+      )
+      await browserUser.click(await screen.findByTestId('community-feed-load-more'))
       await waitFor(() =>
         expect(
           feedUrls.some(
@@ -474,14 +477,14 @@ export function registerCommunityReactionsCases() {
       if (index) await gate.promise
       return HttpResponse.json({
         data: feed({
-          mode: index ? 'all' : 'auto',
+          nextCursor: index ? null : 'held-mutation-page',
           items: index
             ? [
                 first,
                 {
                   ...first,
                   id: 'native-feed-sentinel',
-                  caption: 'Fenced native feed completed.',
+                  title: 'Fenced native feed completed.',
                 },
               ]
             : [first],
@@ -495,17 +498,8 @@ export function registerCommunityReactionsCases() {
     )
     try {
       await render(<CommunityScreen />)
-      // Keep an independently mounted highlighted copy while the list remounts for filtering.
-      setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
-      server.use(
-        http.get('*/api/v1/community/posts/:postId', () =>
-          HttpResponse.json({ data: first })
-        )
-      )
-      // The second page is held, so the gate opens on the first page before the filter moves.
       await communityGateOpen()
-      await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
-      await screen.findByTestId('highlighted-community-card-post-a')
+      await browserUser.click(await screen.findByTestId('community-feed-load-more'))
       await waitFor(() => expect(feedUrls).toHaveLength(2))
       await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))
       await waitFor(() =>

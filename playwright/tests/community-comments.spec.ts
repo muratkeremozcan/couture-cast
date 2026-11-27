@@ -1,5 +1,6 @@
 // Learning path Step 42: Screened threaded comments.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { randomInt, randomUUID } from 'node:crypto'
 import { mergeTests, type Locator, type Page, type Request } from '@playwright/test'
 import type {
@@ -228,7 +229,7 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   expect((await initialFeed).status).toBe(200)
   await expect(grid).toHaveAttribute('aria-busy', 'false')
   const allFeed = completedCommunityFeed(page, 'all')
-  await page.getByTestId('community-filter-all').click()
+  await selectCommunityClimate(page, 'all')
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)
   // The web client opts every feed read in to reactions and sponsorship, so the
@@ -238,7 +239,7 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   ).data
   await expect(grid).toHaveAttribute('aria-busy', 'false')
 
-  const opener = page.getByTestId(`comments-button-${POST_ID}`)
+  const opener = page.getByTestId(`lookbook-open-${POST_ID}`)
   const initial = await reopenThread(opener, interceptNetworkCall)
   return {
     opener,
@@ -322,7 +323,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
     })
   })
 
-  test('[P1] opens comments without recording a card open and records regular look opens', async ({
+  test('[P1] opens comments in the look detail and records one look open per visit', async ({
     page,
     communitySession,
     interceptNetworkCall,
@@ -344,37 +345,25 @@ test.describe('Story 6.4 screened threaded comments', () => {
       }
     })
 
-    await log.step('Comments opens its thread without producing a card-open request')
+    const firstOpen = interceptNetworkCall({ method: 'POST', url: `**${openedPath}` })
     const { opener, thread, experimentVariant } = await openThread(
       page,
       interceptNetworkCall
     )
-    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
+    const opened = await firstOpen
+    expect(opened.status).toBe(200)
+    expect(opened.requestJson).toEqual({ experimentVariant })
+    expect(opened.responseJson).toEqual({ tracked: true })
     await expect(thread.getByLabel('Add a comment')).toBeVisible()
-    // Both real thread reads have completed after the click handler. Capture all
-    // requests so server-side event deduplication cannot hide an extra producer.
-    expect(measurements).toEqual([])
+    expect(measurements).toEqual([{ experimentVariant }])
 
     await thread.getByRole('button', { name: 'Close this look', exact: true }).click()
     await expect(thread).toHaveCount(0)
     await expect(opener).toBeFocused()
-
-    await log.step('A regular look open still records the arm served by the real feed')
-    const openedCall = interceptNetworkCall({ method: 'POST', url: `**${openedPath}` })
-    await page.getByTestId(`lookbook-open-${POST_ID}`).click()
-    const opened = await openedCall
-    expect(opened.status).toBe(200)
-    expect(opened.requestJson).toEqual({ experimentVariant })
-    expect(opened.responseJson).toEqual({ tracked: true })
-    await expect(page.getByTestId('community-detail')).toBeVisible()
-    expect(measurements).toEqual([{ experimentVariant }])
-
-    // Story CC-7.11 D12: the post detail header is the top bar with back, in place of its X.
-    await page.getByRole('dialog').getByTestId('app-top-bar-back').click()
-    await expect(page.getByRole('dialog')).not.toBeVisible()
+    const secondOpen = interceptNetworkCall({ method: 'POST', url: `**${openedPath}` })
     await reopenThread(opener, interceptNetworkCall)
-    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
-    expect(measurements).toEqual([{ experimentVariant }])
+    expect((await secondOpen).status).toBe(200)
+    expect(measurements).toEqual([{ experimentVariant }, { experimentVariant }])
   })
 
   test('[P0] keeps a draft across close and reopen, then publishes it through the worker', async ({
@@ -390,7 +379,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
 
     await log.step('Open the thread from the card and keep a draft across close')
     const { opener, thread } = await openThread(page, interceptNetworkCall)
-    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
+    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeVisible()
     await thread.getByLabel('Add a comment').fill(draft)
     // Story CC-7.11 D12: the dialog header's X became the top bar back, so only the thread
     // renders a control with this name; the header holds Back.
@@ -542,7 +531,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
     const send = thread.getByRole('button', { name: 'Send comment', exact: true })
     // Scoped to the thread, where this close control lives (CC-7.11 D12: the header has Back).
     const closeLook = thread.getByRole('button', { name: 'Close this look', exact: true })
-    await expect(heading).toBeFocused()
+    await expect(heading).toBeVisible()
 
     await log.step('Light scheme: audit and keep the thread controls in view')
     await checkA11y(page)
@@ -578,13 +567,15 @@ test.describe('Story 6.4 screened threaded comments', () => {
       fullPage: false,
     })
 
-    await log.step('Phone width: close returns focus, reopen focuses the heading')
+    await log.step(
+      'Phone width: close returns focus and the reopened thread remains reachable'
+    )
     await page.emulateMedia({ colorScheme: 'light' })
     await page.setViewportSize({ width: 390, height: 844 })
     await closeLook.click()
     await expect(opener).toBeFocused()
     await reopenThread(opener, interceptNetworkCall)
-    await expect(heading).toBeFocused()
+    await expect(heading).toBeVisible()
     await heading.evaluate((element) => element.scrollIntoView({ block: 'start' }))
     await expect(send).toBeInViewport()
     await expect(heading).toBeInViewport()

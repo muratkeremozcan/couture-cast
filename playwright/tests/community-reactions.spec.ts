@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 // Learning path Step 42: Screened threaded comments.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import type { Locator, Page } from '@playwright/test'
 import { contrastRatio } from '@couture/utils'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -78,7 +79,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'false'
     )
     const allFeed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
+    await selectCommunityClimate(page, 'all')
     const body = (await allFeed).responseJson as { data: { items: { id: string }[] } }
     // A seeded look past the first card. Looks other workers publish lead this
     // feed too and are deleted when their test ends, so one of those picked
@@ -96,7 +97,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'false'
     )
     const refreshed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
+    await selectCommunityClimate(page, 'all')
     const accepted = (await refreshed).responseJson as {
       data: { items: { id: string }[] }
     }
@@ -129,7 +130,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'false'
     )
     const allFeed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
+    await selectCommunityClimate(page, 'all')
     expect((await allFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -169,7 +170,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'false'
     )
     const reloadedAllFeed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
+    await selectCommunityClimate(page, 'all')
     expect((await reloadedAllFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -206,7 +207,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'false'
     )
     const allFeed = completedCommunityFeed(page, 'all')
-    await page.getByTestId('community-filter-all').click()
+    await selectCommunityClimate(page, 'all')
     expect((await allFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
@@ -348,7 +349,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'aria-busy',
       'false'
     )
-    await expect(page.getByTestId('community-filter-all')).toBeVisible()
+    await expect(page.getByTestId('community-climate-filter')).toBeVisible()
     await checkA11y(page)
   })
 })

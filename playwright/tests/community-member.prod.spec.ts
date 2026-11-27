@@ -6,6 +6,7 @@
 // answers 200 with a list, and the signed-in /community page renders the real grid instead of the
 // signed-out prompt. Read-only: nothing here posts, reacts or uploads (those run on the preview).
 // The bearer reaches only the production origins pinned in the helper.
+import { openCommunityClimate } from '../support/helpers/community-ui'
 import type { Page } from '@playwright/test'
 import { communityFeedResponseSchema } from '@couture/api-client/contracts/http'
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
@@ -68,13 +69,14 @@ test.describe('Community, as the production synthetic member', () => {
       expect((await feed).status()).toBe(200)
 
       const community = page.getByTestId('community-page')
-      const filters = community.getByRole('navigation', { name: 'Community filters' })
-      await expect(filters.getByRole('heading', { level: 2 })).toHaveText(
-        enUS.community.heading
-      )
+      await expect(
+        page.getByRole('heading', { name: 'Community', exact: true })
+      ).toBeVisible()
+      const filters = await openCommunityClimate(page)
       await expect(filters.getByTestId('community-filters-explainer')).toHaveText(
         enUS.community.filters.explainer
       )
+      await page.keyboard.press('Escape')
       // The member's grid, which renders only for a signed-in reader. A signed-out visitor
       // gets the sign-in prompt instead.
       await expect(community.getByTestId('community-card-grid')).toBeAttached()

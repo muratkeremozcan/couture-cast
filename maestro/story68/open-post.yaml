@@ -3,6 +3,7 @@ appId: ${MAESTRO_APP_ID}
 # Opens the owned post's Share card from the Community feed card. The walk is bounded and
 # every way the post can be missing fails with its own label instead of a kill at the
 # Maestro budget. The budget is derived from this file in story68-flow-timeouts.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 - tapOn:
     id: tab-community
 - extendedWaitUntil:
@@ -53,27 +54,23 @@ appId: ${MAESTRO_APP_ID}
       - assertVisible:
           id: community-card-author-${MAESTRO_POST_ID}
           label: 'post_not_within_3_up_5_down_swipes'
-      - repeat:
-          while:
-            notVisible:
-              id: community-share-card-open-${MAESTRO_POST_ID}
-          times: 2
-          commands:
-            - swipe:
-                start: 50%, 75%
-                end: 50%, 55%
-                duration: 800
-            - waitForAnimationToEnd
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - scrollUntilVisible:
-          element:
-            id: community-share-card-open-${MAESTRO_POST_ID}
-          direction: DOWN
-          timeout: 30000
-          centerElement: false
+- scrollUntilVisible:
+    element:
+      id: community-card-title-${MAESTRO_POST_ID}
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: community-card-title-${MAESTRO_POST_ID}
+- extendedWaitUntil:
+    visible:
+      id: community-post-detail
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: community-share-card-open-${MAESTRO_POST_ID}
+    direction: DOWN
+    timeout: 30000
 # AX can count the opener under the tab bar, and Maestro reports a tap on that edge as
 # completed although the app never received the press (run 40984431884: the opener spanned
 # the tab bar edge and no press reached the app). Each attempt lifts the list a short

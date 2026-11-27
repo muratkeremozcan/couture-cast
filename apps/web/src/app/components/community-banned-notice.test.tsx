@@ -3,6 +3,7 @@
 // Story 6.11 test owner: C-WEB-D-BANNED-NOTICE, the D14 author state, and the TEA-22 banned state in the grid and the teaser.
 // Fix round 1: the sanction leaves with the session that owned it, and a live ban takes the weekly challenge with it.
 // The grid runs through the real web transport and MSW.
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import {
   act,
   fireEvent,
@@ -322,11 +323,11 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     const state = { banned: false, reads: 0 }
     serve(state)
     renderGrid()
-    await screen.findByText(item().caption!)
+    await screen.findByTestId(`lookbook-card-${item().id}`)
     state.banned = true
-    await userEvent.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(userEvent.setup(), 'all')
     expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
-    expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+    expect(screen.queryByTestId(`lookbook-card-${item().id}`)).not.toBeInTheDocument()
     expect(cardsShown()).toBe(0)
     expect(screen.queryByTestId('community-example-inspiration')).not.toBeInTheDocument()
   })
@@ -338,7 +339,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     renderGrid()
     await screen.findByTestId('author-state-as-1')
     state.banned = true
-    await userEvent.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(userEvent.setup(), 'all')
     await screen.findByTestId('community-banned-notice')
     expect(screen.queryByTestId('community-author-states')).not.toBeInTheDocument()
   })
@@ -351,7 +352,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     await screen.findByTestId('create-post-button')
     expect(screen.getByTestId('weekly-challenge-banner')).toBeInTheDocument()
     state.banned = true
-    await userEvent.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(userEvent.setup(), 'all')
     await screen.findByTestId('community-banned-notice')
     expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
     expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
@@ -367,6 +368,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     await userEvent.click(await screen.findByTestId('create-post-button'))
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
     state.banned = true
+    fireEvent.click(screen.getByTestId('community-climate-filter'))
     fireEvent.click(screen.getByTestId('community-filter-all'))
     await screen.findByTestId('community-banned-notice')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -382,7 +384,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     // The grid reports the ban from an effect after commit, which can trail the notice's paint.
     await waitFor(() => expect(onBannedChange).toHaveBeenLastCalledWith(true))
     const reads = state.reads
-    expect(screen.queryByTestId('community-filter-all')).toBeNull()
+    expect(screen.queryByTestId('community-climate-filter')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
     await settle()
     expect(state.reads).toBe(reads)
@@ -404,7 +406,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     await screen.findByTestId('community-banned-notice')
     state.banned = false
     rerender(<CommunityLookbookGrid showFilterNav activeTab="all" />)
-    await screen.findByText(item().caption!)
+    await screen.findByTestId(`lookbook-card-${item().id}`)
     expect(queryNotice()).not.toBeInTheDocument()
   })
 
@@ -473,9 +475,9 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       expectNoSanctionOnPage()
       expect(onBannedChange).toHaveBeenLastCalledWith(false)
       act(() => release())
-      await screen.findByText(item().caption!)
+      await screen.findByTestId(`lookbook-card-${item().id}`)
       expectNoSanctionOnPage()
-      expect(screen.getByTestId('community-filter-all')).toBeInTheDocument()
+      expect(screen.getByTestId('community-climate-filter')).toBeInTheDocument()
     })
 
     it('shows the next account its own error and retry, with no old sanction', async () => {
@@ -494,7 +496,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       expectNoSanctionOnPage()
       expect(onBannedChange).toHaveBeenLastCalledWith(false)
       await userEvent.click(screen.getByTestId('community-feed-retry-button'))
-      await screen.findByText(item().caption!)
+      await screen.findByTestId(`lookbook-card-${item().id}`)
       expect(reads).toBe(2)
       expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
     })
@@ -614,7 +616,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
       expect(document.body.textContent).not.toContain(CHALLENGE.title)
       expect(screen.queryByTestId('lookbook-card-post-1')).not.toBeInTheDocument()
-      expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+      expect(screen.queryByTestId(`lookbook-card-${item().id}`)).not.toBeInTheDocument()
       expect(cardsShown()).toBe(0)
     })
   })
@@ -662,7 +664,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       const state = { banned: false, reads: 0, denied: false }
       serveWithEvents(state)
       renderGrid()
-      await screen.findByText(item().caption!)
+      await screen.findByTestId(`lookbook-card-${item().id}`)
       const readsBefore = state.reads
       state.banned = true
       state.denied = true
@@ -670,7 +672,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
         await sync().catchUp()
       })
       expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
-      expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+      expect(screen.queryByTestId(`lookbook-card-${item().id}`)).not.toBeInTheDocument()
       await passRetryWindow(FEED_RETRY_WINDOW_MS)
       expect(state.reads).toBe(readsBefore + 1)
     })
@@ -719,7 +721,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
         const sync = captureSync()
         const onBannedChange = vi.fn()
         renderGrid({ onBannedChange })
-        await screen.findByText(item().caption!)
+        await screen.findByTestId(`lookbook-card-${item().id}`)
         await act(async () => {
           await sync().catchUp()
         })
@@ -756,7 +758,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       const state = { banned: false, reads: 0, denied: false }
       serveWithEvents(state)
       renderGrid()
-      await screen.findByText(item().caption!)
+      await screen.findByTestId(`lookbook-card-${item().id}`)
       const readsBefore = state.reads
       state.denied = true
       await act(async () => {
@@ -765,7 +767,7 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       await waitFor(() => expect(state.reads).toBe(readsBefore + 1))
       await settle()
       expect(queryNotice()).not.toBeInTheDocument()
-      expect(screen.queryByText(item().caption!)).not.toBeInTheDocument()
+      expect(screen.queryByTestId(`lookbook-card-${item().id}`)).not.toBeInTheDocument()
     })
   })
 })

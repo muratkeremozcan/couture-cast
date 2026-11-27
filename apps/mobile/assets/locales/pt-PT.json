@@ -720,6 +720,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Publicar",
+      "nearYou": "Perto de ti",
+      "climateEmpty": "Ainda não há looks para o teu clima",
+      "seeAllClimates": "Ver todos os climas",
+      "cardActions": "Opções da publicação",
+      "dismissChallenge": "Ocultar desafio",
+      "thisWeek": "Esta semana: {{title}}",
+      "allClimates": "Todos os climas"
+    },
     "title": "Comunidade",
     "heading": "Visuais mais recentes",
     "sectionLabel": "Álbum de visuais da comunidade",

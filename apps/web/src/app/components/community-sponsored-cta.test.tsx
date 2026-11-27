@@ -1,7 +1,9 @@
 // Learning path Step 47: Sponsored community highlights.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored "Shop this look" CTA on feed cards, spotlight cards
 // and the detail dialog, through the real web transport and MSW.
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { act, screen, waitFor, within } from '@testing-library/react'
@@ -259,7 +261,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     signIn()
     const clicks = clickHandler(minted)
     useMswHandlers(
-      sponsoredFeedHandler({ items: [sponsoredItem({ id: 'spot-1' })] }),
+      sponsoredFeedHandler({ items: [sponsoredItem()] }),
       sponsoredSpotlight([ranked(1, { sponsorship: SPONSORSHIP })]),
       http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
       clicks.handler
@@ -268,17 +270,17 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     renderGrid()
 
     // From the feed.
-    await user.click(await screen.findByTestId('lookbook-open-spot-1'))
+    await user.click(await screen.findByTestId('lookbook-open-post-1'))
     let detail = await screen.findByTestId('community-detail')
     expect(
-      within(within(detail).getByTestId('community-detail-sponsored-spot-1')).getByText(
+      within(within(detail).getByTestId('community-detail-sponsored-post-1')).getByText(
         'Partnered with Atelier North'
       )
     ).toHaveClass('sr-only')
-    await user.click(within(detail).getByTestId('community-detail-sponsored-cta-spot-1'))
+    await user.click(within(detail).getByTestId('community-detail-sponsored-cta-post-1'))
     await waitFor(() => expect(clicks.bodies).toHaveLength(1))
     expect(clicks.bodies[0]).toMatchObject({
-      recommendationId: 'spot-1',
+      recommendationId: 'post-1',
       surface: 'community_feed',
     })
     await user.keyboard('{Escape}')
@@ -418,19 +420,19 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
   it('6.7b-WEB-019 emits one strict shown event per block per visit, keyed by surface', async () => {
     signIn()
     useMswHandlers(
-      sponsoredFeedHandler({ items: [sponsoredItem({ id: 'spot-1' })] }),
+      sponsoredFeedHandler({ items: [sponsoredItem()] }),
       sponsoredSpotlight([ranked(1, { sponsorship: SPONSORSHIP })]),
       http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true }))
     )
     const user = userEvent.setup()
     renderGrid()
 
-    await screen.findByTestId('sponsored-cta-spot-1')
+    await screen.findByTestId('sponsored-cta-post-1')
     await screen.findByTestId('spotlight-sponsored-cta-spot-1')
     // Opening the detail re-renders both cards and adds the dialog's copy of the
     // feed block, none of which is a new block.
-    await user.click(screen.getByTestId('lookbook-open-spot-1'))
-    await screen.findByTestId('community-detail-sponsored-cta-spot-1')
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    await screen.findByTestId('community-detail-sponsored-cta-post-1')
     await user.keyboard('{Escape}')
     await waitFor(() =>
       expect(screen.queryByTestId('community-detail')).not.toBeInTheDocument()
@@ -455,7 +457,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         locale_region: 'US',
       })
       expect(JSON.stringify(event.properties)).not.toMatch(
-        /spot-1|Explorer|Spotlight look|test-token-access/
+        /post-1|spot-1|Explorer|Spotlight look|test-token-access/
       )
     }
   })
@@ -736,8 +738,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await screen.findByTestId('spotlight-lookbook-card-spot-2')
       // Only now does the older feed read answer, about the same post.
       releaseFeed()
-      await screen.findByTestId('lookbook-card-spot-2')
-      expect(answered).toEqual(['spotlight', 'feed'])
+      await waitFor(() => expect(answered).toEqual(['spotlight', 'feed']))
       await waitFor(() =>
         expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
           'aria-busy',
@@ -745,17 +746,13 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         )
       )
 
-      for (const scope of ['', 'spotlight-']) {
-        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
-        const badge = screen.queryByTestId(`${scope}sponsored-badge-spot-2`)
-        if (newerHasBlock) {
-          expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
-          expect(badge, `${scope || 'feed '}badge`).toBeInTheDocument()
-        } else {
-          expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
-          expect(badge, `${scope || 'feed '}badge`).not.toBeInTheDocument()
-        }
-      }
+      expect(screen.queryByTestId('lookbook-card-spot-2')).toBeNull()
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-cta-spot-2'))).toBe(
+        newerHasBlock
+      )
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-badge-spot-2'))).toBe(
+        newerHasBlock
+      )
     }
   )
 
@@ -800,7 +797,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       renderGrid()
 
       await user.click(await screen.findByTestId('community-spotlight-view-more'))
-      await user.click(screen.getByTestId('community-filter-all'))
+      await selectCommunityClimate(user, 'all')
       await screen.findByTestId('lookbook-card-spot-2')
 
       // From here on, any frame that shows the stale answer is recorded.
@@ -811,7 +808,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         )
         if (
           newerHasBlock
-            ? badges.length < 2 &&
+            ? badges.length !== 1 &&
               document.querySelector('[data-testid="spotlight-lookbook-card-spot-2"]')
             : badges.length > 0
         )
@@ -820,20 +817,13 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       observer.observe(document.body, { childList: true, subtree: true })
       releaseSpotlight()
       await screen.findByTestId('spotlight-lookbook-card-spot-2')
-      await waitFor(() =>
-        expect(screen.getByTestId('community-spotlight')).toHaveAttribute(
-          'aria-busy',
-          'false'
-        )
-      )
       observer.disconnect()
       expect(staleFrames).toEqual([])
 
-      for (const scope of ['', 'spotlight-']) {
-        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
-        if (newerHasBlock) expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
-        else expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
-      }
+      expect(screen.queryByTestId('lookbook-card-spot-2')).toBeNull()
+      expect(Boolean(screen.queryByTestId('spotlight-sponsored-cta-spot-2'))).toBe(
+        newerHasBlock
+      )
     }
   )
 

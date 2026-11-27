@@ -76,12 +76,12 @@ tags:
 # The module heads the Community list, so the spotlight copy is the first match.
 - extendedWaitUntil:
     visible:
-      id: 'community-spotlight-rank-seed-spotlight-1'
+      id: 'community-card-near-you-seed-spotlight-1'
     timeout: 20000
     label: 'The teaser entry is shown in the City Spotlight'
 - assertVisible:
-    id: 'community-spotlight-rank-seed-spotlight-1'
-    text: 'Rank 1, Position 1 of 6'
+    id: 'community-card-near-you-seed-spotlight-1'
+    text: 'Near you'
 - assertNotVisible:
     id: 'deep-link-info-banner'
     # The spotlight notices and the invalid-link message share this banner.
@@ -125,7 +125,7 @@ tags:
           label: 'Open the entry again'
       - extendedWaitUntil:
           visible:
-            id: 'community-spotlight-rank-seed-spotlight-1'
+            id: 'community-card-near-you-seed-spotlight-1'
           timeout: 20000
       - back
       - extendedWaitUntil:

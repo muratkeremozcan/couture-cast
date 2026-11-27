@@ -1,25 +1,8 @@
 # Learning path Step 44: Community city spotlight.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-# Story 6.6: the City Spotlight module heading the Community tab.
-#
-# DATA. `run-maestro.mjs` signs up a fresh member whose only saved location is
-# Chicago, Illinois, United States. The spotlight resolves that member's area
-# from it, so this flow reads the shared, read-only cohort the database seed
-# publishes (`packages/db/prisma/seeds/community-spotlight.ts`, posts
-# `seed-spotlight-1` through `seed-spotlight-7`) and therefore requires that
-# cohort to sit in the same area as the harness location. The seed publishes
-# relative to its own run time, so CI's `db:reset` keeps every post inside the
-# seven-day window. The flow never reacts, so it can share the cohort with every
-# other device and stays out of `USER_SCOPED_FLOWS`.
-#
-# ORDER. `seed-spotlight-1` is the freshest post with the most non-author
-# reactions, so it ranks first deterministically.
-#
-# SELECTORS. A spotlight post can also appear in the feed below. iOS does not
-# expose the spotlight item container as a parent in its accessibility tree, so
-# `childOf` never matches there. The module heads the list, so the spotlight
-# copy is the first match (`index: 0`); inside the detail sheet, the reused
-# card is located geometrically below the detail's rank.
+# Learning path Step 72: Calm Community with an empty state.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
+# The isolated CI API seeds a read-only Chicago cohort with seven ranked looks.
 appId: ${MAESTRO_APP_ID}
 name: 'Community City Spotlight'
 tags:
@@ -31,188 +14,58 @@ tags:
     appId: ${MAESTRO_APP_ID}
     clearState: true
     stopApp: false
-
 - runFlow: subflows/open-app.yaml
-
+- runFlow: subflows/open-community-tab.yaml
 - tapOn:
-    id: 'tab-community'
-    retryTapIfNoChange: true
-    label: 'Open the community tab from the bottom navigation'
-
-- extendedWaitUntil:
-    visible:
-      id: 'community-screen'
-    timeout: 15000
-    label: 'Community screen is the one on top'
-
-# The loaded marker: the ranked list replaces the loading state only after a
-# real page arrived from the API.
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-item-seed-spotlight-1'
-    timeout: 20000
-    label: 'The first ranked spotlight card loaded over the real API'
-
-- assertVisible:
-    id: 'community-spotlight-heading'
-    text: 'Spotlight in Chicago'
-    label: "The heading names the viewer's own place at the ranked level"
-
-# The badge is one accessible element whose label is the localized rank, then
-# its position among the loaded looks and their count.
-- assertVisible:
-    id: 'community-spotlight-rank-seed-spotlight-1'
-    text: 'Rank 1, Position 1 of 6'
-    label: 'The freshest, most loved seeded post ranks first'
-
-# The image element exists before its bytes arrive; the loaded marker appears
-# only after onLoad fires, so this proves the signed image actually loaded.
+    id: 'community-climate-filter'
+- tapOn:
+    id: 'community-filter-chip-all'
 - extendedWaitUntil:
     visible:
       id: 'community-card-image-loaded-seed-spotlight-1'
-      index: 0
     timeout: 20000
-    label: 'The reused card loaded its signed image'
-
-- assertNotVisible:
-    id: 'community-spotlight-empty'
-- assertNotVisible:
-    id: 'community-spotlight-error'
-- assertNotVisible:
-    id: 'community-spotlight-disabled'
-
-# View more. The seeded cohort holds seven posts and a page holds six, so the
-# second page always exists and appends exactly `seed-spotlight-7`. The looks
-# sit in one horizontal carousel whose trailing item is View more, and one
-# full-width swipe moves one card. The swipes run at 62% of the screen height,
-# which is inside the carousel on a phone. Maestro's swipe from the carousel
-# element moved it one card in eight tries on an Android emulator. Under host
-# load a swipe that lands while the last one is still snapping moves nothing (a
-# 2026-10-23 run stopped on #5 after eight swipes), so each swipe waits for the
-# carousel to settle, and the loop, which ends as soon as View more shows,
-# allows twice the swipes the cohort needs. A swipe can also land as a tap and
-# open a look's detail, so a detail a swipe opened is closed before the next one.
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-row'
-    timeout: 10000
-- repeat:
-    while:
-      notVisible:
-        id: 'community-spotlight-view-more'
-    times: 16
-    commands:
-      # Story CC-7.11 D12: an accidentally opened detail layer closes with its top bar back.
-      - runFlow:
-          when:
-            visible:
-              id: 'community-spotlight-detail-rank'
-          commands:
-            - tapOn:
-                id: 'app-top-bar-back'
-            - waitForAnimationToEnd
-      - swipe:
-          start: '90%, 62%'
-          end: '5%, 62%'
-          duration: 400
-      - waitForAnimationToEnd
-- tapOn:
-    id: 'community-spotlight-view-more'
-    label: 'Append the next spotlight page'
-- extendedWaitUntil:
-    notVisible:
-      id: 'community-spotlight-loading-more'
-    timeout: 15000
-    label: 'The next page landed'
-- assertNotVisible:
-    id: 'community-spotlight-more-error'
-# The module scrolls the carousel to the first appended look itself.
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-rank-seed-spotlight-7'
-    timeout: 15000
-    label: 'The seventh ranked look was appended and brought into view'
+- scrollUntilVisible:
+    element:
+      id: 'community-card-near-you-seed-spotlight-1'
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - assertVisible:
-    id: 'community-spotlight-rank-seed-spotlight-7'
-    text: 'Rank 7, Position 7 of 7'
-- assertNotVisible:
-    id: 'community-spotlight-view-more'
-# Back to the start the same way (a 2026-10-23 run opened Rank 3's detail here).
-- repeat:
-    while:
-      notVisible:
-        id: 'community-spotlight-rank-seed-spotlight-1'
-    times: 16
-    commands:
-      # Story CC-7.11 D12: an accidentally opened detail layer closes with its top bar back.
-      - runFlow:
-          when:
-            visible:
-              id: 'community-spotlight-detail-rank'
-          commands:
-            - tapOn:
-                id: 'app-top-bar-back'
-            - waitForAnimationToEnd
-      - swipe:
-          start: '10%, 62%'
-          end: '95%, 62%'
-          duration: 400
-      - waitForAnimationToEnd
-- assertVisible:
-    id: 'community-spotlight-rank-seed-spotlight-1'
-    text: 'Rank 1, Position 1 of 7'
-    label: 'Appending kept the first page in place'
-
-# --- Opening a card into its detail and back --------------------------------
-
+    id: 'community-card-near-you-seed-spotlight-1'
+    text: 'Near you'
 - tapOn:
-    id: 'community-card-open-seed-spotlight-1'
-    index: 0
-    label: 'Open the first spotlight card'
-
-# Story CC-7.11 D12: the detail is a layer whose header is the top bar with a back arrow and the
-# post's title, so the rank line is the detail's own anchor.
+    id: 'community-card-title-seed-spotlight-1'
 - extendedWaitUntil:
     visible:
       id: 'community-spotlight-detail-rank'
     timeout: 10000
-    label: 'The detail opened on top of the module'
-- assertVisible:
-    id: 'app-top-bar-back'
-    label: 'The detail layer has the top bar back arrow'
-
 - assertVisible:
     id: 'community-spotlight-detail-rank'
     text: 'Rank 1'
-    label: 'The detail names the rank it was opened from'
-
 - assertVisible:
     id: 'community-post-card-seed-spotlight-1'
     below:
       id: 'community-spotlight-detail-rank'
-    label: 'The detail shows the reused card for the same post'
-
 - tapOn:
     id: 'app-top-bar-back'
-    label: 'Return from the detail'
-
 - extendedWaitUntil:
     notVisible:
       id: 'community-spotlight-detail-rank'
     timeout: 10000
-    label: 'The detail closed'
-
-- assertVisible:
-    id: 'community-spotlight-rank-seed-spotlight-1'
-    text: 'Rank 1, Position 1 of 7'
-    label: 'The module is back where the member left it'
-
 - scrollUntilVisible:
     element:
-      id: 'community-spotlight-heading'
+      id: 'community-spotlight-view-more'
+    direction: DOWN
+    timeout: 60000
+- tapOn:
+    id: 'community-spotlight-view-more'
+- scrollUntilVisible:
+    element:
+      id: 'community-card-near-you-seed-spotlight-7'
     direction: UP
     timeout: 30000
 - assertVisible:
-    id: 'community-spotlight-heading'
-    text: 'Spotlight in Chicago'
-    label: 'The heading still names the viewer place after the round trip'
+    id: 'community-card-near-you-seed-spotlight-7'
+    text: 'Near you'
+- assertNotVisible:
+    id: 'community-spotlight-view-more'

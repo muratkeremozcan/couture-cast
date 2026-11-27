@@ -288,6 +288,25 @@ export interface CommunityPostSheetProps {
   returnFocusRef?: LayerFocusTarget | null
 }
 
+function ChallengeInstructions({
+  challenge,
+  selected,
+}: {
+  challenge: EmbeddedCommunityChallenge
+  selected: boolean
+}) {
+  const palette = useHeroPalette()
+  if (!selected) return null
+  return (
+    <Text
+      testID="community-post-challenge-instructions"
+      style={[styles.helperText, { color: palette.inkMuted }]}
+    >
+      {challenge.body}
+    </Text>
+  )
+}
+
 export function CommunityPostSheet({
   visible,
   suspended = false,
@@ -853,6 +872,7 @@ export function CommunityPostSheet({
                   }
                   onToggle={() => setJoinChallenge((prev) => !prev)}
                 />
+                <ChallengeInstructions challenge={challenge} selected={joinChallenge} />
               </View>
             ) : null}
 

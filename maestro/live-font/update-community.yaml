@@ -2,11 +2,8 @@
 # A React update after the scale change. Show every band, then return to the viewer's band (revert-community.yaml).
 appId: ${MAESTRO_APP_ID}
 ---
-- scrollUntilVisible:
-    element:
-      id: community-filter-chip-all
-    direction: DOWN
-    timeout: 20000
+- tapOn:
+    id: community-climate-filter
 - tapOn:
     id: community-filter-chip-all
 - waitForAnimationToEnd

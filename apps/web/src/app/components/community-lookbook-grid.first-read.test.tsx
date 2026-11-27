@@ -1,3 +1,4 @@
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -52,7 +53,7 @@ describe('Story 6.3 highlighted target while the first feed read is in flight', 
     // The deep link resolves on its own while the first feed read is held.
     await screen.findByTestId('lookbook-card-post-1')
     hidden = true
-    await user.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(user, 'all')
     release()
     await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
   })

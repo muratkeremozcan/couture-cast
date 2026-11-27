@@ -6,13 +6,13 @@
  * its authorize endpoint: a Playwright browser on the host, Custom Tabs on an Android emulator
  * (through `adb reverse`) or ASWebAuthenticationSession on an iOS simulator (the host's
  * loopback). A Docker network name such as `http://couturecast-mock-oidc:8080` resolves for
- * GoTrue only, so the base URL is `http://127.0.0.1:53052` and two containers make it true
+ * GoTrue only, so the base URL is `http://127.0.0.1:23052` and two containers make it true
  * everywhere:
  *
  * - The mock joins the GoTrue container's network namespace (`--network container:...`) and
- *   listens on 53052 there, so GoTrue's own loopback reaches it.
- * - A forwarder on the Supabase network publishes `127.0.0.1:53052` on the host and relays each
- *   connection to the GoTrue container's 53052. A container that shares another's network
+ *   listens on that port there, so GoTrue's own loopback reaches it.
+ * - A forwarder on the Supabase network publishes the same port on the host and relays each
+ *   connection to GoTrue. A container that shares another's network
  *   namespace cannot publish ports itself.
  *
  * `127.0.0.1` over `localhost`: the forwarder publishes IPv4 only, and a client that tries `::1`
@@ -32,7 +32,8 @@ const run = promisify(execFile)
 
 export const MOCK_OIDC_CONTAINER = 'couturecast-mock-oidc'
 export const MOCK_OIDC_FORWARDER_CONTAINER = 'couturecast-mock-oidc-forward'
-export const MOCK_OIDC_PORT = 53052
+// A runner's outgoing socket can take a port in Linux's ephemeral range before Docker binds it.
+export const MOCK_OIDC_PORT = 23052
 /** The one origin GoTrue, the host and both device browsers use; `config.toml` names it. */
 export const MOCK_OIDC_URL = `http://127.0.0.1:${MOCK_OIDC_PORT}`
 const IMAGE = 'node:24-slim'
@@ -49,7 +50,7 @@ export function supabaseAuthContainer(projectId = 'couture-cast') {
 }
 
 /**
- * The forwarder's program: every connection to 53052 is piped to `target`'s 53052, and an error
+ * The forwarder's program: every connection is piped to the same port on `target`, and an error
  * on either side ends both and is logged for the run's evidence.
  * @param {string} target
  */

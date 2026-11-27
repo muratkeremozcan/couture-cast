@@ -12,6 +12,7 @@
 // RESTRICT key.
 // The flags stay at the seeded value (RG5), so a disabled state on a local stack is a routed answer plus the
 // real flag in the API integration suite.
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -448,7 +449,7 @@ async function openCommunity(page: Page, postId: string) {
       url.searchParams.get('mode') === 'all'
     )
   })
-  await page.getByTestId('community-filter-all').click()
+  await selectCommunityClimate(page, 'all')
   expect((await answered).status()).toBe(200)
   // Looks seeded by parallel workers since can push this one past the first page, so walk until it shows.
   const grid = page.getByTestId('community-card-grid')
@@ -1317,7 +1318,7 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
       ).toHaveCount(0)
 
       // The filters and the notifications link leave with the feed, and nothing reads it again.
-      await expect(page.getByTestId('community-filter-all')).toHaveCount(0)
+      await expect(page.getByTestId('community-climate-filter')).toHaveCount(0)
       await expect(
         page.getByRole('link', { name: 'Community notifications' })
       ).toHaveCount(0)
@@ -1483,11 +1484,9 @@ test.describe('Moderation decisions, seeded (Story 6.11)', () => {
     )
     await browserView.goto(COMMUNITY_URL)
     await expect(
-      browserView.getByTestId(`community-spotlight-item-${plan.expectedOrder[1]!}`)
+      browserView.getByTestId(`spotlight-lookbook-card-${plan.expectedOrder[1]!}`)
     ).toBeVisible()
-    await expect(browserView.getByTestId(`community-spotlight-item-${top}`)).toHaveCount(
-      0
-    )
+    await expect(browserView.getByTestId(`spotlight-lookbook-card-${top}`)).toHaveCount(0)
   })
 
   // Programmatic focus never shows a focus-visible ring, so every control is reached with real key presses.

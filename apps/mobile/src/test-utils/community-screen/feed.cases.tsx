@@ -1,4 +1,5 @@
 // Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
@@ -7,6 +8,13 @@
 // `community.feed.detailTitle` label when it has none); top bar back, system back and a header
 // swipe close it, accessibility focus returns to the card, and the open is recorded once.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+import {
+  closeCommunityClimate,
+  openCommunityCardActions,
+  openCommunityClimate,
+  openCommunityPostComments,
+  selectCommunityClimate,
+} from './interactions'
 import {
   mockCapture,
   SDK_ERROR_MESSAGE,
@@ -32,6 +40,7 @@ import {
   type CommunityFeedMode,
 } from '@couture/api-client/contracts/http'
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
+import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
@@ -122,14 +131,16 @@ export function registerCommunityFeedCases() {
       expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
       // The published row proves the detail renders the opener in the same pass, so the
       // other rows check its absence at the moment it would exist.
-      if (exportable)
+      expect(
+        within(detail).queryByTestId('community-share-card-open-own-private')
+      ).toBeNull()
+      if (exportable) {
+        press(within(detail).getByTestId('community-card-open-own-private'))
+        const post = await screen.findByTestId('community-post-detail')
         expect(
-          within(detail).getByTestId('community-share-card-open-own-private')
+          within(post).getByTestId('community-share-card-open-own-private')
         ).toBeVisible()
-      else
-        expect(
-          within(detail).queryByTestId('community-share-card-open-own-private')
-        ).toBeNull()
+      }
     }
   )
 
@@ -148,6 +159,7 @@ export function registerCommunityFeedCases() {
     const unregister = registerShareCardHeading('community', () => 88)
     try {
       await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-open-post-a'))
       await browserUser.click(
         await screen.findByTestId('community-share-card-open-post-a')
       )
@@ -216,7 +228,7 @@ export function registerCommunityFeedCases() {
         await render(<CommunityScreen />)
         await screen.findByTestId('community-post-card-post-b')
         await waitFor(() => expect(requests).toBeGreaterThan(0))
-        press(await screen.findByTestId(`community-card-comments-${openedPost}`))
+        await openCommunityPostComments(openedPost)
         await screen.findByRole('button', { name: 'Close comments' })
         fireEvent.change(screen.getByLabelText('Add a comment'), {
           target: { value: 'Owned discussion draft' },
@@ -269,7 +281,7 @@ export function registerCommunityFeedCases() {
     }
   )
 
-  it('restores close focus to the actual highlighted Comments control', async () => {
+  it('restores focus to the highlighted title when Comments onShow arrives during close', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
@@ -279,25 +291,38 @@ export function registerCommunityFeedCases() {
       )
     )
     await render(<CommunityScreen />)
-    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-    const invoker = within(highlight).getByTestId('community-card-comments-post-a')
+    await screen.findByTestId('highlighted-community-card-post-a')
     // The deep-link focus lands on the card itself first, under its own handle.
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
-    press(invoker)
-    press(await screen.findByRole('button', { name: 'Close comments' }))
-    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(invoker))
-    const invokerHandle = handleOf(invoker)
-    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-      invokerHandle
+    await openCommunityPostComments('post-a')
+    const comments = within(await screen.findByTestId('comments-sheet'))
+    const heading = comments.getByText('Comments', { exact: true })
+    const close = comments.getByRole('button', { name: 'Close comments' })
+    const lateOnShow = modalRenders.findLast((props) => props.visible === true)
+      ?.onShow as (() => void) | undefined
+    expect(lateOnShow).toBeTypeOf('function')
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    act(() => {
+      press(close)
+      lateOnShow!()
+    })
+    await waitFor(() => expect(close).not.toBeInTheDocument())
+    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+    const liveInvoker = within(highlight).getByTestId('community-card-title-post-a')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handleOf(liveInvoker)
+      )
     )
-    expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls[0]).not.toEqual([
-      invokerHandle,
-    ])
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
+      handleOf(heading)
+    )
+    expect(liveInvoker).toBeVisible()
   })
 
-  it('restores close focus to the feed Comments control while a highlighted card is drawn', async () => {
+  it('restores close focus to the ordinary card title while a highlighted card is drawn', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
@@ -309,25 +334,35 @@ export function registerCommunityFeedCases() {
     )
     await render(<CommunityScreen />)
     const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-    const highlightInvoker = within(highlight).getByTestId(
-      'community-card-comments-post-a'
-    )
-    const feedInvoker = await screen.findByTestId('community-card-comments-post-b')
+    const highlightInvoker = within(highlight).getByTestId('community-card-title-post-a')
+    const feedInvoker = await screen.findByTestId('community-card-title-post-b')
     expect(highlight.contains(feedInvoker)).toBe(false)
     // Settle the deep-link focus first, so the close restore is the last focus call.
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
     )
-    press(feedInvoker)
-    press(await screen.findByRole('button', { name: 'Close comments' }))
-    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(feedInvoker))
-    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
-      handleOf(feedInvoker)
+    await openCommunityPostComments('post-b')
+    const comments = within(await screen.findByTestId('comments-sheet'))
+    const heading = comments.getByText('Comments', { exact: true })
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handleOf(heading)
+      )
     )
-    expect(findNodeHandle).not.toHaveBeenCalledWith(highlightInvoker)
+    const close = comments.getByRole('button', { name: 'Close comments' })
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    press(close)
+    await waitFor(() => expect(close).not.toBeInTheDocument())
+    const liveInvoker = screen.getByTestId('community-card-title-post-b')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handleOf(liveInvoker)
+      )
+    )
+    expect(liveInvoker).not.toBe(highlightInvoker)
   })
 
-  it('restores close focus to the live highlighted copy when the feed invoker unmounted', async () => {
+  it('restores close focus to the same card after a held link resolves while comments are open', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     const handleOf = distinctNodeHandles()
     let release!: () => void
@@ -353,17 +388,13 @@ export function registerCommunityFeedCases() {
     )
     try {
       await render(<CommunityScreen />)
-      const feedInvoker = await screen.findByTestId('community-card-comments-post-a')
-      press(feedInvoker)
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       release()
       const highlight = await screen.findByTestId('highlighted-community-card-post-a')
-      const liveInvoker = within(highlight).getByTestId('community-card-comments-post-a')
-      // The feed copy of A is filtered out once the highlighted copy is drawn.
-      expect(feedInvoker.isConnected).toBe(false)
-      expect(screen.getAllByTestId('community-card-comments-post-a')).toEqual([
-        liveInvoker,
-      ])
+      const liveInvoker = within(highlight).getByTestId('community-card-title-post-a')
+      expect(screen.getAllByTestId('community-card-title-post-a')).toHaveLength(1)
+      expect(screen.getAllByTestId('community-card-title-post-a')).toEqual([liveInvoker])
       // Settle the deep-link focus first, so the close restore is the last focus call.
       await waitFor(() =>
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
@@ -380,16 +411,9 @@ export function registerCommunityFeedCases() {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       })
       const liveHandle = handleOf(liveInvoker)
-      expect(liveHandle).not.toBe(handleOf(feedInvoker))
       expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.lastCall).toEqual([
         liveHandle,
       ])
-      // The linked post arrived while the reader was in the sheet, so its card focus never
-      // runs: not behind the open sheet, and not after the close took focus back.
-      const card = within(highlight).getByTestId('community-post-card-post-a')
-      expect(
-        vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls
-      ).not.toContainEqual([handleOf(card)])
     } finally {
       release()
     }
@@ -417,7 +441,7 @@ export function registerCommunityFeedCases() {
     }
     try {
       await render(<CommunityScreen />)
-      press(await screen.findByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       fireEvent.change(screen.getByLabelText('Add a comment'), {
         target: { value: 'Saved through storage failure' },
@@ -447,7 +471,7 @@ export function registerCommunityFeedCases() {
       identity = 'next-session-token'
       await nextRead()
       await nextRead()
-      press(screen.getByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       expect(screen.getByLabelText('Add a comment')).toHaveValue('')
     } finally {
@@ -471,7 +495,7 @@ export function registerCommunityFeedCases() {
   })
 
   it('6.1-MOB-002 renders the localized empty state and its share CTA', async () => {
-    serveFeed(() => feedJson({ items: [] }))
+    serveFeed(() => feedJson({ items: [], mode: 'all' }))
 
     await render(<CommunityScreen />)
 
@@ -522,6 +546,7 @@ export function registerCommunityFeedCases() {
 
       await render(<CommunityScreen />)
 
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       // The whole panel, exactly: the reason's copy, plus the Story 1.2b
       // add-location action that only the no_location panel carries.
@@ -541,6 +566,7 @@ export function registerCommunityFeedCases() {
 
       await render(<CommunityScreen />)
 
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       const action = within(notice).queryByTestId('community-add-location')
       if (reason !== 'no_location') {
@@ -572,6 +598,7 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityClimate()
     await screen.findByTestId('community-add-location')
 
     // The save happens on the Locations screen; this tab only hears
@@ -603,6 +630,7 @@ export function registerCommunityFeedCases() {
     setMobileApplicationUserId('member-a')
     try {
       await render(<CommunityScreen />)
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       await communityGateOpen()
       expect(within(notice).getByTestId('community-add-location')).toBeVisible()
@@ -662,7 +690,8 @@ export function registerCommunityFeedCases() {
     expect(
       screen.getByTestId('community-card-image-post-a').getAttribute('aria-label')
     ).toBe(item().altText)
-    expect(screen.getByTestId('community-card-report-post-a')).toBeTruthy()
+    await openCommunityCardActions('post-a')
+    expect(screen.getByTestId('community-card-report-post-a')).toBeVisible()
 
     // The same look is also on the first feed page. It is drawn once, at the top.
     expect(screen.getAllByTestId('community-post-card-post-a')).toHaveLength(1)
@@ -709,6 +738,7 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
+    await openCommunityClimate()
     for (const mode of ['auto', 'all', ...CLIMATE_BANDS]) {
       const chip = screen.getByTestId(`community-filter-chip-${mode}`)
       expect(chip.getAttribute('aria-disabled')).not.toBe('true')
@@ -722,10 +752,8 @@ export function registerCommunityFeedCases() {
       'aria-pressed',
       'false'
     )
-    expect(autoChip.style.borderWidth).toBe('2px')
     // The resolved band rides on the `auto` chip's own label.
     expect(autoChip.textContent).toBe('Your climate: Temperate and dry')
-    expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe('1px')
   })
 
   it('6.1-MOB-007 sends mode=<band> and drops the held cursor when the filter changes', async () => {
@@ -744,7 +772,7 @@ export function registerCommunityFeedCases() {
     press(await screen.findByTestId('community-feed-load-more'))
     await screen.findByTestId('community-post-card-post-b')
 
-    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await selectCommunityClimate('warm_wet')
     await screen.findByTestId('community-post-card-post-warm')
 
     const latest = feedUrls[feedUrls.length - 1]
@@ -772,16 +800,16 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
-    press(screen.getByTestId('community-filter-chip-cold_wet'))
-    press(screen.getByTestId('community-filter-chip-warm_dry'))
+    await selectCommunityClimate('cold_wet')
+    await selectCommunityClimate('warm_dry')
 
     await screen.findByTestId('community-post-card-post-warm')
     await delay(400)
 
     expect(screen.queryByTestId('community-post-card-post-cold')).toBeNull()
     expect(screen.getByTestId('community-post-card-post-warm')).toBeTruthy()
-    expect(screen.getByTestId('community-filter-chip-warm_dry').style.borderWidth).toBe(
-      '2px'
+    expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+      'Warm and dry'
     )
   })
 
@@ -889,6 +917,7 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-self')
     press(await screen.findByTestId('community-card-withdraw-post-self'))
     const panel = await screen.findByTestId('community-action-error')
     expect(panel.textContent).toBe(enUS.community.error.withdraw)
@@ -932,6 +961,7 @@ export function registerCommunityFeedCases() {
     )
     try {
       await render(<CommunityScreen />)
+      await openCommunityCardActions('post-self')
       press(await screen.findByTestId('community-card-withdraw-post-self'))
       const panel = await screen.findByTestId('community-action-error')
       expect(panel.textContent).toBe(enUS.community.error.withdraw)
@@ -1002,8 +1032,15 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
-    expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe('2px')
-    expect(screen.getByTestId('community-filter-chip-auto').style.borderWidth).toBe('1px')
+    const sheet = await openCommunityClimate()
+    expect(sheet.getByTestId('community-filter-chip-all')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(sheet.getByTestId('community-filter-chip-auto')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
     expect(screen.getByTestId('community-filter-chip-auto').textContent).toBe(
       enUS.community.filters.mode.auto
     )
@@ -1025,20 +1062,28 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityClimate()
     await screen.findByTestId('community-band-unresolved')
+    closeCommunityClimate()
 
-    press(screen.getByTestId('community-filter-chip-warm_dry'))
+    await selectCommunityClimate('warm_dry')
     await waitFor(() =>
-      expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
-    )
-
-    press(screen.getByTestId('community-filter-chip-all'))
-    await waitFor(() =>
-      expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe(
-        '2px'
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'Warm and dry'
       )
     )
-    expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+    const warmSheet = await openCommunityClimate()
+    expect(warmSheet.queryByTestId('community-band-unresolved')).toBeNull()
+    closeCommunityClimate()
+
+    await selectCommunityClimate('all')
+    await waitFor(() =>
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'All climates'
+      )
+    )
+    const allSheet = await openCommunityClimate()
+    expect(allSheet.queryByTestId('community-band-unresolved')).toBeNull()
   })
 
   it('6.1-MOB-092 records a card open with the arm the feed was served in', async () => {
@@ -1087,6 +1132,7 @@ export function registerCommunityFeedCases() {
     vi.mocked(findNodeHandle).mockReturnValue(55)
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
     await screen.findByTestId('community-report-modal')
 
@@ -1197,7 +1243,7 @@ export function registerCommunityFeedCases() {
       await waitFor(() =>
         expect(screen.queryByTestId('community-post-detail')).toBeNull()
       )
-      const card = screen.getByTestId('community-post-card-post-b')
+      const card = screen.getByTestId('community-card-title-post-b')
       await waitFor(() => {
         expect(handles.get(card)).toBeTypeOf('number')
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(

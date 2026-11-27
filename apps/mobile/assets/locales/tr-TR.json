@@ -720,6 +720,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Paylaş",
+      "nearYou": "Yakınında",
+      "climateEmpty": "İkliminde henüz kombin yok",
+      "seeAllClimates": "Tüm iklimleri gör",
+      "cardActions": "Gönderi seçenekleri",
+      "dismissChallenge": "Yarışmayı gizle",
+      "thisWeek": "Bu hafta: {{title}}",
+      "allClimates": "Tüm iklimler"
+    },
     "title": "Topluluk",
     "heading": "En yeni kombinler",
     "sectionLabel": "Topluluk lookbook’u",

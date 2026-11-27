@@ -37,9 +37,14 @@ import {
 } from '../lib/deep-link-handler'
 
 export default function CommunityPage() {
+  const [postActionSlot, setPostActionSlot] = useState<HTMLDivElement | null>(null)
   return (
     <AppPage className="overflow-x-clip">
-      <AppTopBar titleKey="nav.community" />
+      <AppTopBar
+        titleKey="nav.community"
+        wrapTitle
+        trailing={<div className="min-w-0" ref={setPostActionSlot} />}
+      />
       <main
         id="main-content"
         tabIndex={-1}
@@ -51,7 +56,7 @@ export default function CommunityPage() {
           reads={COMMUNITY_GATE_READS}
           placeholderClassName="min-h-[60vh] w-full rounded-xl bg-card-muted"
         >
-          <CommunityContent />
+          <CommunityContent postActionSlot={postActionSlot} />
         </ScreenGate>
       </main>
       <StickyBottomNav />
@@ -67,7 +72,7 @@ type NotificationAnswer = {
   announcement?: string
 }
 
-function CommunityContent() {
+function CommunityContent({ postActionSlot }: { postActionSlot: HTMLElement | null }) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const [query, setQuery] = useState<string | null>(null)
   const scope = useWebSessionScope()
@@ -127,8 +132,7 @@ function CommunityContent() {
         </p>
       )}
       <CommunityLookbookGrid
-        showFilterNav
-        filterNavStickyTop={0}
+        postActionSlot={postActionSlot}
         returnPath="/community"
         newPostEmphasis="primary"
         highlightedCardId={current?.cardId}

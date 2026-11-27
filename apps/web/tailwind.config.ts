@@ -119,7 +119,10 @@ export default {
         'top-bar': `${shell.topBarHeight}px`,
         'tab-bar': `${shell.tabBarHeight}px`,
       },
-      minHeight: { touch: `${shell.touchTarget}px` },
+      minHeight: {
+        touch: `${shell.touchTarget}px`,
+        'top-bar': `${shell.topBarHeight}px`,
+      },
       minWidth: { touch: `${shell.touchTarget}px` },
       borderColor: {
         DEFAULT: 'rgb(var(--cc-line))',

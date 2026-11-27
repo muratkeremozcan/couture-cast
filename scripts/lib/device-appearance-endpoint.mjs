@@ -11,6 +11,8 @@
  * - `POST /status-bar` `{ device, demo: true | false }` enters or leaves SystemUI demo mode with
  *   a fixed clock, full battery, full Wi-Fi and no notification icons, so a screenshot of the
  *   whole screen does not change with the time of the run.
+ * - `POST /community-text` `{ device, enlarged: true | false }` switches the
+ *   isolated visual emulator between the Community text proof and its standard profile.
  *
  * Only these fixed commands run, only on a device this run drives, and the server listens on
  * 127.0.0.1 only.
@@ -109,6 +111,7 @@ export function appearanceCommands(route, body, devices) {
     device,
     mode,
     demo: demoMode,
+    enlarged,
   } = /** @type {Record<string, unknown>} */ (body ?? {})
   if (typeof device !== 'string' || !devices.includes(device))
     // A fixed diagnostic: a non-string device is never stringified (Codex P3-3).
@@ -128,6 +131,25 @@ export function appearanceCommands(route, body, devices) {
     if (typeof demoMode !== 'boolean')
       return { status: 400, message: 'demo must be a boolean' }
     return { commands: statusBarDemoCommands(device, demoMode) }
+  }
+  if (route === '/community-text') {
+    if (typeof enlarged !== 'boolean')
+      return { status: 400, message: 'enlarged must be a boolean' }
+    return {
+      commands: [
+        ['-s', device, 'shell', 'wm', 'size', enlarged ? '640x1280' : '720x1280'],
+        [
+          '-s',
+          device,
+          'shell',
+          'settings',
+          'put',
+          'system',
+          'font_scale',
+          enlarged ? '2.0' : '1.0',
+        ],
+      ],
+    }
   }
   return { status: 404, message: `No route ${typeof route === 'string' ? route : ''}` }
 }

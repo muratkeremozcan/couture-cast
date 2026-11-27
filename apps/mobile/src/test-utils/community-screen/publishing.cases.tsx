@@ -11,7 +11,7 @@ import {
   feedUrls,
   serveFeed,
 } from './harness'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
@@ -50,11 +50,14 @@ export function registerCommunityPublishingCases() {
 
     await render(<CommunityScreen />)
     const title = await screen.findByTestId('community-card-title-own-text')
-    const caption = screen.getByTestId('community-card-caption-own-text')
+
     expect(title).toHaveTextContent(original.title!)
     expect(screen.getByTestId('community-card-title-foreign-text')).toHaveTextContent(
       'Autumn outfit'
     )
+    press(screen.getByTestId('community-card-open-own-text'))
+    const detail = await screen.findByTestId('community-post-detail')
+    const caption = within(detail).getByTestId('community-card-caption-own-text')
     expect(screen.getAllByTestId('community-edit-text')).toHaveLength(1)
     await userEvent.click(screen.getByTestId('community-edit-text'))
     const draftTitle = screen.getByTestId('community-edit-title')
@@ -81,16 +84,16 @@ export function registerCommunityPublishingCases() {
       expect(edits).toEqual(Array(2).fill({ ...updated, baseRevision: 0 }))
     )
     await waitFor(() =>
-      expect(screen.getByTestId('community-card-title-own-text')).toHaveTextContent(
-        updated.title
-      )
+      expect(
+        within(detail).getByTestId('community-card-title-own-text')
+      ).toHaveTextContent(updated.title)
     )
-    expect(screen.getByTestId('community-card-caption-own-text')).toHaveTextContent(
-      updated.caption
-    )
-    expect(screen.getByTestId('community-card-edited-own-text')).toHaveTextContent(
-      enUS.community.card.edited
-    )
+    expect(
+      within(detail).getByTestId('community-card-caption-own-text')
+    ).toHaveTextContent(updated.caption)
+    expect(
+      within(detail).getByTestId('community-card-edited-own-text')
+    ).toHaveTextContent(enUS.community.card.edited)
     expect(screen.getByTestId('community-edit-status')).toHaveTextContent(
       enUS.community.compose.editSaved
     )
@@ -302,6 +305,9 @@ export function registerCommunityPublishingCases() {
     const banner = await screen.findByTestId('community-challenge-banner')
     expect(banner.textContent).toContain(CHALLENGE.title)
     press(screen.getByTestId('community-challenge-cta'))
+    expect(
+      await screen.findByTestId('community-post-challenge-instructions')
+    ).toHaveTextContent(CHALLENGE.body)
 
     await screen.findByTestId('community-post-sheet')
     press(screen.getByTestId('community-pick-image-button'))

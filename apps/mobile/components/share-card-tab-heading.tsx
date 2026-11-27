@@ -13,10 +13,12 @@ export function ShareCardTabHeading({
   children,
   tintColor,
   scope,
+  wrapTitle = false,
 }: {
   children: string
   tintColor?: string
   scope: ShareCardHeadingScope
+  wrapTitle?: boolean
 }) {
   const title = useRef<Text>(null)
   // No headerTintColor is set, so React Navigation passes no tint; its own default title
@@ -34,7 +36,7 @@ export function ShareCardTabHeading({
       ref={title}
       testID="app-top-bar-title"
       accessibilityRole="header"
-      numberOfLines={1}
+      numberOfLines={wrapTitle ? undefined : 1}
       style={{
         color: tintColor ?? colors.text,
         fontSize: type.lg.fontSize,

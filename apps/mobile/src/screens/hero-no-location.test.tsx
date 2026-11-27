@@ -132,6 +132,7 @@ describe('TabOneScreen without a saved location', () => {
     await render(<TabOneScreen />)
 
     const action = await screen.findByTestId('home-set-city')
+    await waitFor(() => expect(action).toBeVisible())
     expect(action).toHaveAccessibleName('Set your city')
     // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
     expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)

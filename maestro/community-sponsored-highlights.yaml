@@ -1,13 +1,14 @@
 # Learning path Step 47: Sponsored community highlights.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 # Story 6.7b: the Partnered disclosure and "Shop this look" CTA on a sponsored
-# community post, on the Home teaser and on the City Spotlight module card.
+# community post, on the Home teaser and on the inline Spotlight card.
 #
 # DATA. `run-maestro.mjs` signs up a fresh member whose only saved location is
 # Chicago, Illinois, United States, the area of the shared, read-only cohort the
 # database seed publishes (`packages/db/prisma/seeds/community-spotlight.ts`).
-# `seed-spotlight-1` ranks first, so it is the teaser's entry and the module's
-# first card. `seedCommunitySponsorship` (`packages/db/prisma/seeds/commerce.ts`)
+# `seed-spotlight-1` ranks first, so it is the teaser's entry and the first
+# ranked card. `seedCommunitySponsorship` (`packages/db/prisma/seeds/commerce.ts`)
 # links that post to the first `sample-partner` garment offer, which publishes
 # at `locale_region: '*'`, with no end date, so every member reads the block
 # while `commerce_affiliate_enabled` is on. A fresh member has no commerce
@@ -29,9 +30,7 @@
 # SELECTORS. The Partnered pill is one accessible element whose label names the
 # partner, and the CTA's label names the action and the partner, so both are
 # read by id with their full label. The teaser link is one accessible element:
-# its label carries the disclosure. A spotlight post can also appear in the feed
-# below the module; the module heads the list, so its copy is the first match
-# (`index: 0`).
+# its label carries the disclosure. Community merges the ranked and feed rows by post ID.
 appId: ${MAESTRO_APP_ID}
 name: 'Community sponsored highlights'
 tags:
@@ -115,9 +114,15 @@ tags:
     id: 'home-spotlight-teaser-shop-error'
     label: 'An accepted click shows no error'
 
-# --- City Spotlight module card ----------------------------------------------
+# --- Inline Spotlight card ---------------------------------------------------
 
 - runFlow: subflows/open-community-tab.yaml
+
+# Automatic follows the emulator's live Chicago weather. All climates includes the seeded post.
+- tapOn:
+    id: 'community-climate-filter'
+- tapOn:
+    id: 'community-filter-chip-all'
 
 # The loaded markers: the ranked list replaces the loading state only after a
 # real page arrived, and the card's image marker only after onLoad fired.
@@ -129,13 +134,11 @@ tags:
 - extendedWaitUntil:
     visible:
       id: 'community-card-image-loaded-seed-spotlight-1'
-      index: 0
     timeout: 20000
     label: 'The spotlight card loaded its signed image'
 
 - assertVisible:
     id: 'community-card-partnered-seed-spotlight-1'
-    index: 0
     text: 'Partnered with Sample Partner'
     label: 'The spotlight card shows the Partnered disclosure in its header'
 
@@ -145,7 +148,6 @@ tags:
 - scrollUntilVisible:
     element:
       id: 'community-card-shop-seed-spotlight-1'
-      index: 0
     direction: DOWN
     centerElement: true
     timeout: 30000
@@ -153,14 +155,12 @@ tags:
 - waitForAnimationToEnd
 - assertVisible:
     id: 'community-card-shop-seed-spotlight-1'
-    index: 0
     text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
 - takeScreenshot:
     path: maestro/artifacts/community-sponsored-spotlight-card
 
 - tapOn:
     id: 'community-card-shop-seed-spotlight-1'
-    index: 0
     label: 'Shop the spotlight look'
 
 - runFlow: subflows/dismiss-chrome-first-run.yaml
@@ -171,7 +171,6 @@ tags:
 - extendedWaitUntil:
     visible:
       id: 'community-card-shop-seed-spotlight-1'
-      index: 0
       text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
     timeout: 15000
     label: 'Community is back with the CTA at rest'

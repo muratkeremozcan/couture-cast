@@ -26,39 +26,24 @@ describe('7.11 Community first content and post detail layer', () => {
     signIn()
   })
 
-  // Story CC-7.11 P5, AC2: Community opens on its City Spotlight, so the Spotlight section is the
-  // first content whenever it renders (the default fixture answers level `none`, which still
-  // renders the section); the first feed card photo or the empty title carries the id only when
-  // no Spotlight shows.
-  it('7.11-CMP-COMM-001 marks the City Spotlight section as the first content, never a feed card beside it', async () => {
-    useMswHandlers(
-      feedHandler({ items: [item(), item({ id: 'post-2', caption: 'Second look.' })] })
-    )
+  it('7.11-CMP-COMM-001 marks the first displayed card photo', async () => {
+    useMswHandlers(feedHandler({ items: [item(), item({ id: 'post-2' })] }))
     renderGrid()
     await screen.findByTestId('lookbook-card-post-2')
-    const spotlight = await screen.findByTestId('community-spotlight')
 
-    const marked = screen.getAllByTestId('community-first-content')
-    expect(marked).toHaveLength(1)
-    expect(marked[0]).toContainElement(spotlight)
-    expect(marked[0]).not.toContainElement(screen.getByTestId('lookbook-card-post-1'))
-    expect(
-      within(screen.getByTestId('lookbook-card-post-1')).queryByTestId(
-        'community-first-content'
-      )
-    ).toBeNull()
+    const first = screen.getByTestId('lookbook-card-post-1')
+    const marker = screen.getByTestId('community-first-content')
+    expect(first).toContainElement(marker)
+    expect(within(marker).getByRole('img')).toBeVisible()
   })
 
-  it('7.11-CMP-COMM-001 with an empty feed the Spotlight section stays the first content and the empty title is not marked', async () => {
-    useMswHandlers(feedHandler({ items: [] }))
+  it('7.11-CMP-COMM-001 marks the empty title when the feed has no cards', async () => {
+    useMswHandlers(feedHandler({ items: [], mode: 'all' }))
     renderGrid()
-    const emptyTitle = await screen.findByText('No looks shared here yet')
-    const spotlight = await screen.findByTestId('community-spotlight')
 
-    const marked = screen.getAllByTestId('community-first-content')
-    expect(marked).toHaveLength(1)
-    expect(marked[0]).toContainElement(spotlight)
-    expect(marked[0]).not.toContainElement(emptyTitle)
+    expect(await screen.findByTestId('community-first-content')).toHaveTextContent(
+      'No looks shared here yet'
+    )
   })
 
   it('7.11-CMP-COMM-002 opens a post as a full-height layer whose back arrow closes it and returns focus', async () => {

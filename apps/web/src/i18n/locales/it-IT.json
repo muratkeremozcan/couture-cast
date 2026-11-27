@@ -645,6 +645,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Pubblica",
+      "nearYou": "Vicino a te",
+      "climateEmpty": "Non ci sono ancora look per il tuo clima",
+      "seeAllClimates": "Vedi tutti i climi",
+      "cardActions": "Opzioni del post",
+      "dismissChallenge": "Nascondi la sfida",
+      "thisWeek": "Questa settimana: {{title}}",
+      "allClimates": "Tutti i climi"
+    },
     "title": "Community",
     "heading": "Ultimi look",
     "sectionLabel": "Lookbook della community",

@@ -1,9 +1,10 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight under realtime removals and the D3 hide, through
 // the real web transport and MSW.
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -34,7 +35,7 @@ setupCommunityGridClock()
 describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
   setupCommunityGridSurface()
 
-  it('6.6-WEB-033 a realtime unavailable target removes the spotlight copy as well as the feed copy (R10)', async () => {
+  it('6.6-WEB-033 realtime removes an unavailable ranked look without revealing its duplicate (R10)', async () => {
     signIn()
     const catchUp = captureSync()
     let phase: 'ready' | 'removed' = 'ready'
@@ -95,19 +96,17 @@ describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-1')
-    await screen.findByTestId('lookbook-card-spot-1')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
     await catchUp()
     phase = 'removed'
     await catchUp()
 
     await waitFor(() =>
-      expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
-    )
-    await waitFor(() =>
       expect(
         screen.queryByTestId('spotlight-lookbook-card-spot-1')
       ).not.toBeInTheDocument()
     )
+    expect(screen.queryByTestId('lookbook-card-spot-1')).not.toBeInTheDocument()
     expect(screen.getByTestId('spotlight-lookbook-card-spot-2')).toBeInTheDocument()
     // Evicted in place: no spotlight re-read stood in for the realtime removal.
     expect(spotlightReads).toBe(1)
@@ -288,9 +287,9 @@ describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
       await screen.findByTestId('spotlight-lookbook-card-spot-1')
     ).toBeInTheDocument()
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2'])
     // The kept pages come back as they were: no spotlight read stood in for them.
     expect(cursors).toEqual([null, 'cursor-2'])

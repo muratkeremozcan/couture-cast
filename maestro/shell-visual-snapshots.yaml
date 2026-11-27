@@ -99,3 +99,7 @@ onFlowComplete:
     visible:
       id: 'saved-look-detail'
     timeout: 15000
+
+- tapOn:
+    id: 'app-top-bar-back'
+- runFlow: subflows/calm-community-enlarged-text.yaml

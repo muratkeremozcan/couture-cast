@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-26.
-Added Steps 40 to 71:
+Updated: 2026-11-27.
+Added Steps 40 to 72:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -35,7 +35,8 @@ Added Steps 40 to 71:
 - Step 68: Story 7.11, five-tab navigation and back pattern, `a8863b05` (PR #295), merged on 2026-11-26.
 - Step 69: Story 7.12, Looks tab for saved looks, ideas and plans, `0d3b82a3` (PR #296), merged on 2026-11-26.
 - Step 70: Story 7.13, Calm Today with one primary job, `a519243d` (PR #297), merged on 2026-11-26.
-- Step 71: Story 7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
+- Step 71: Story 7.14, Today's outfit as a picture, `53adbe2f` (PR #298), merged on 2026-11-27.
+- Step 72: Story 7.15, Calm Community with an empty state (PR #299).
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -43,6 +44,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 72 for Story CC-7.15 (Calm Community with an empty state) and moved Step 71 to merged (`53adbe2f`, PR #298).
 Added Step 71 for Story CC-7.14 (Today's outfit as a picture) and moved Step 70 to merged (`a519243d`, PR #297).
 Added Step 70 for Story CC-7.13 (Calm Today with one primary job) and moved Step 69 to merged (`0d3b82a3`, PR #296).
 Added Step 69 for Story CC-7.12 (Looks tab for saved looks, ideas and plans) while its PR was in review, and moved Step 68 to merged (`a8863b05`, PR #295).
@@ -168,10 +170,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest step: Step 71, Story CC-7.14, Today's outfit as a picture, on `feat/epic7-story-7-14-todays-outfit-as-picture`.
-  Its plan is `_bmad-output/implementation-artifacts/spec-7-14-todays-outfit-as-picture.md`.
+- Latest step: Step 72, Story CC-7.15, Calm Community with an empty state.
+  Its plan is `_bmad-output/implementation-artifacts/spec-7-15-calm-community-empty-state.md`.
   `epic-7` is `in-progress` in `sprint-status.yaml`; CC-7.8 is `done` as dropped by owner decision.
-- Previous completed steps: Steps 59 to 70, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.13, merged on `main` (the last, Step 70, as `a519243d`, PR #297).
+- Previous completed steps: Steps 59 to 71, Stories CC-7.1 to CC-7.7 and CC-7.9 to CC-7.14, merged on `main` (the last, Step 71, as `53adbe2f`, PR #298).
 - Previous completed step: Step 58, production status and nightly health, the project close on 2026-11-19, merged on `main` (including its production follow-ups: image uploads straight to storage, hosted wardrobe workers and manual tagging, community lookbook fix, advisor erase and planner week races, and production profile/location checks).
   It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
   Delivery for Epic 6 stays `in-progress` while `6-15b-expo-sdk-55-58-upgrade` stays `backlog`.
@@ -7775,7 +7777,7 @@ Sequence to follow:
 6. `apps/api/src/modules/community/community-spotlight-invalidator.ts`, then the hook in `community-engagement.runtime.ts`.
 7. `apps/api/src/modules/community/community-spotlight-cursor.ts` and `community-spotlight.service.ts`: level resolution, snapshot freshness, later pages and the open path.
 8. `packages/api-client/src/contracts/http/community.ts`: the spotlight schemas and the refined opened body.
-9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/components/community/community-spotlight-module.tsx`.
+9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/src/features/community/community-screen.tsx`.
 
 Task owner map:
 
@@ -7796,7 +7798,7 @@ Task owner map:
 - Story 6.6 retry owner: one bounded retry after the read gate's unavailable 503 in `packages/api-client/src/community-unavailable-retry.ts`.
 - Story 6.6 web owner: the module, View more, focus and announcements in `apps/web/src/app/components/community-spotlight.tsx`.
 - Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`.
-- Story 6.6 mobile module owner: the horizontal carousel in `apps/mobile/components/community/community-spotlight-module.tsx`.
+- The mobile screen renders ranked cards inline as of [Step 72](#step-72-calm-community-with-an-empty-state).
 - Story 6.6 mobile detail owner: the detail a spotlight card opens in `apps/mobile/components/community/community-spotlight-detail.tsx`.
 - Story 6.6 fixture owner: the shared seeded cohort in `packages/db/prisma/seeds/community-spotlight.ts` and per-test cohorts in `packages/testing/src/factories/community-spotlight.factory.ts`.
 
@@ -7848,7 +7850,7 @@ Web component tests:
 
 Mobile component and screen tests:
 
-- [`apps/mobile/components/community/community-spotlight-module.test.tsx`](../../apps/mobile/components/community/community-spotlight-module.test.tsx): heading, rank labels, carousel layout and sizing, View more scroll and focus, and axe.
+- [Native Community screen](../../apps/mobile/src/screens/community-screen.test.tsx) covers ranked rows, paging and focus in the unified feed.
 - [`apps/mobile/src/features/community/community-spotlight-detail.test.tsx`](../../apps/mobile/src/features/community/community-spotlight-detail.test.tsx): the detail takes focus and announces once per open.
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx) runs [`spotlight.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight.cases.tsx) and [`spotlight-review.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight-review.cases.tsx): `6.6-MOB-001` to `081` cover every state, identity changes, realtime eviction, image re-reads, focus return and the failed first identity resolution.
 
@@ -15387,7 +15389,7 @@ Sequence to follow:
 6. `apps/api/src/modules/community/community-spotlight-invalidator.ts`, then the hook in `community-engagement.runtime.ts`.
 7. `apps/api/src/modules/community/community-spotlight-cursor.ts` and `community-spotlight.service.ts`: level resolution, snapshot freshness, later pages and the open path.
 8. `packages/api-client/src/contracts/http/community.ts`: the spotlight schemas and the refined opened body.
-9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/components/community/community-spotlight-module.tsx`.
+9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/src/features/community/community-screen.tsx`.
 
 Task owner map:
 
@@ -15408,7 +15410,7 @@ Task owner map:
 - Story 6.6 retry owner: one bounded retry after the read gate's unavailable 503 in `packages/api-client/src/community-unavailable-retry.ts`.
 - Story 6.6 web owner: the module, View more, focus and announcements in `apps/web/src/app/components/community-spotlight.tsx`.
 - Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`.
-- Story 6.6 mobile module owner: the horizontal carousel in `apps/mobile/components/community/community-spotlight-module.tsx`.
+- The mobile screen renders ranked cards inline as of [Step 72](#step-72-calm-community-with-an-empty-state).
 - Story 6.6 mobile detail owner: the detail a spotlight card opens in `apps/mobile/components/community/community-spotlight-detail.tsx`.
 - Story 6.6 fixture owner: the shared seeded cohort in `packages/db/prisma/seeds/community-spotlight.ts` and per-test cohorts in `packages/testing/src/factories/community-spotlight.factory.ts`.
 
@@ -15460,7 +15462,7 @@ Web component tests:
 
 Mobile component and screen tests:
 
-- [`apps/mobile/components/community/community-spotlight-module.test.tsx`](../../apps/mobile/components/community/community-spotlight-module.test.tsx): heading, rank labels, carousel layout and sizing, View more scroll and focus, and axe.
+- [Native Community screen](../../apps/mobile/src/screens/community-screen.test.tsx) covers ranked rows, paging and focus in the unified feed.
 - [`apps/mobile/src/features/community/community-spotlight-detail.test.tsx`](../../apps/mobile/src/features/community/community-spotlight-detail.test.tsx): the detail takes focus and announces once per open.
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx) runs [`spotlight.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight.cases.tsx) and [`spotlight-review.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight-review.cases.tsx): `6.6-MOB-001` to `081` cover every state, identity changes, realtime eviction, image re-reads, focus return and the failed first identity resolution.
 
@@ -22320,3 +22322,33 @@ and its catalog fallback have the same bounds.
 - [Step 60](#step-60-saved-looks-follow-the-account) covers the save contract.
   [Step 65](#step-65-signed-in-shell-without-flashes) covers layout stability.
   [Step 70](#step-70-calm-today-with-one-primary-job) covers the Today shell and weather fallback.
+
+## Step 72: Calm Community with an empty state
+
+Community opens with Post, one climate control, the weekly challenge and the feed.
+Eligible ranked looks carry a Near you label inside the feed.
+When a climate has no looks, See all climates broadens the feed in one tap.
+The card menu keeps Report and Withdraw within reach.
+
+### Sequence to follow
+
+1. Open the web Community route or `apps/mobile/src/features/community/community-screen.tsx`.
+   Follow the climate trigger into the sheet and select a band to see which feed mode is served.
+2. Follow the ranked and ordinary reads into the feed.
+   An eligible ranked result wins when both reads return the same post ID.
+   The teaser keeps its existing focused entry and outcome notice.
+3. Open a card from its photo or title, then return to the same feed.
+   Open the card menu and follow Report into the existing reason form.
+4. Compare the settled climate empty state with an unavailable feed and an all-climate empty
+   feed. Confirm the climate action is available only when it can broaden the results.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-15-calm-community-empty-state.md) and
+  [acceptance plan](../test-artifacts/test-design-7-15-calm-community-empty-state.md).
+- [Web acceptance](../../playwright/tests/calm-community.spec.ts) and
+  [native acceptance](../../apps/mobile/src/test-utils/community-screen/calm.cases.tsx).
+- [Android feed journey](../../maestro/community-feed.yaml) and
+  [Android Spotlight journey](../../maestro/community-spotlight.yaml).
+- [Step 65](#step-65-signed-in-shell-without-flashes) covers read readiness and session scope.
+  [Step 68](#step-68-five-tab-navigation-and-back-pattern) covers screen layers and focus return.

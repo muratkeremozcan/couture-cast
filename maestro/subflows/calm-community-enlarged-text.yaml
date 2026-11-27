@@ -1,0 +1,49 @@
+# Learning path Step 72: Calm Community with an empty state.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    file: set-locale.yaml
+    env: { LOCALE: 'de-DE' }
+- runScript:
+    file: set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'true' }
+- runFlow: open-community-tab.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'community-new-post-button'
+    timeout: 20000
+- assertVisible:
+    id: 'app-top-bar-title'
+    text: 'Community'
+- assertVisible:
+    text: 'Posten'
+- takeScreenshot:
+    path: maestro/artifacts/community-accessibility/de-large-header
+- tapOn:
+    id: 'community-climate-filter'
+- extendedWaitUntil:
+    visible:
+      id: 'community-climate-sheet'
+    timeout: 10000
+- assertVisible:
+    text: 'Klimafilter'
+- takeScreenshot:
+    path: maestro/artifacts/community-accessibility/de-large-filter
+- scrollUntilVisible:
+    element:
+      id: 'community-filter-chip-warm_dry'
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: 'community-filter-chip-warm_dry'
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-climate-sheet'
+    timeout: 10000
+- runScript:
+    file: set-system-appearance.js
+    env: { APPEARANCE_ROUTE: 'community-text', APPEARANCE_VALUE: 'false' }
+- runFlow:
+    file: set-locale.yaml
+    env: { LOCALE: 'en-US' }

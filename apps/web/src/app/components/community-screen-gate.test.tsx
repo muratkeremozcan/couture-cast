@@ -21,6 +21,7 @@
 // New post in its header slot (CI 7.7-E2E-005 late on d67800d2). CodeRabbit on PR 292 (post-cap):
 // 7.7-CMP-055 a withdrawn post leaves the restored rows, 7.7-CMP-056 and 7.7-CMP-057 a restored
 // row without a cursor takes the refresh's.
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -340,7 +341,7 @@ describe('7.7 Community screen gate', () => {
     const firstVisit = renderCommunity()
     const gate = () => screen.getByTestId('screen-gate')
     await waitFor(() => expect(gate()).toHaveAttribute('data-ready', 'true'))
-    await user.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(user, 'all')
     await waitFor(() => expect(reads.at(-1)).toEqual({ mode: 'all', cursor: false }))
     await user.click(await screen.findByTestId('load-more-button'))
     expect(await screen.findByTestId('lookbook-card-post-4')).toBeVisible()
@@ -368,6 +369,7 @@ describe('7.7 Community screen gate', () => {
         .getAllByRole('article')
         .map((card) => card.id)
     const pagedRows = [
+      'spotlight-lookbook-card-spot-1',
       'lookbook-card-post-1',
       'lookbook-card-post-2',
       'lookbook-card-post-3',
@@ -376,9 +378,8 @@ describe('7.7 Community screen gate', () => {
 
     expect(gate()).toHaveAttribute('data-ready', 'true')
     expect(scrolledTo).toEqual([900])
-    expect(screen.getByTestId('community-filter-all')).toHaveAttribute(
-      'aria-pressed',
-      'true'
+    expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+      'All climates'
     )
     expect(rowIds()).toEqual(pagedRows)
     expect(screen.queryByTestId('lookbook-card-skeleton')).toBeNull()
@@ -392,9 +393,8 @@ describe('7.7 Community screen gate', () => {
     expect(await screen.findByTestId('community-new-looks-pill')).toBeVisible()
     expect(rowIds()).toEqual(pagedRows)
     expect(screen.queryByTestId('lookbook-card-post-new')).toBeNull()
-    expect(screen.getByTestId('community-filter-all')).toHaveAttribute(
-      'aria-pressed',
-      'true'
+    expect(screen.getByTestId('community-climate-filter')).toHaveAccessibleName(
+      'All climates'
     )
     expect(scrolledTo).toEqual([900])
   })
@@ -465,9 +465,9 @@ describe('7.7 Community screen gate', () => {
     )
     const user = userEvent.setup()
     const ranks = () =>
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
 
     // First visit: the member pages the Spotlight to its second page.
     const firstVisit = renderCommunity()
@@ -534,7 +534,7 @@ describe('7.7 Community screen gate', () => {
 
     // The member picks All; its first page fails, so the rows on screen are still the first
     // filter's rows.
-    await user.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(user, 'all')
     expect(await screen.findByTestId('community-feed-error')).toBeVisible()
     expect(screen.getByTestId('lookbook-card-post-1')).toBeInTheDocument()
 
@@ -607,12 +607,12 @@ describe('7.7 Community screen gate', () => {
         screen.getByTestId(id)
       ),
       spotlight: ['spot-1', 'spot-2'].map((id) =>
-        screen.getByTestId(`community-spotlight-item-${id}`)
+        screen.getByTestId(`spotlight-lookbook-card-${id}`)
       ),
       spotlightReactions: ['spot-1', 'spot-2'].map(
         (id) =>
           screen
-            .getByTestId(`community-spotlight-item-${id}`)
+            .getByTestId(`spotlight-lookbook-card-${id}`)
             .querySelector(`[data-testid$="community-reactions-${id}"]`)!
       ),
       loadMore: screen.getByTestId('load-more-button'),
@@ -678,9 +678,9 @@ describe('7.7 Community screen gate', () => {
     )
     const user = userEvent.setup()
     const ranks = () =>
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
 
     // First visit: the member pages the Lisbon Spotlight to its second page.
     const firstVisit = renderCommunity()
@@ -712,7 +712,9 @@ describe('7.7 Community screen gate', () => {
 
     // The Porto page replaces the row: no Lisbon card, and no Lisbon cursor behind View more.
     await waitFor(() => expect(ranks()).toEqual(['7']))
-    expect(screen.getByTestId('community-spotlight-heading')).toHaveTextContent('Porto')
+    expect(screen.getByTestId('community-card-grid')).not.toHaveTextContent(
+      'Spotlight in Porto'
+    )
     expect(screen.queryByTestId('spotlight-lookbook-card-spot-3')).toBeNull()
     expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
   })
@@ -836,6 +838,11 @@ describe('7.7 Community screen gate', () => {
     renderCommunity()
     const kept = screen.getByTestId('lookbook-card-post-1')
     await waitFor(() => expect(returnReads).toBe(1))
+    fireEvent.click(
+      within(screen.getByTestId('lookbook-card-self-post')).getByTestId(
+        'community-card-actions'
+      )
+    )
     fireEvent.click(screen.getByTestId('withdraw-button-self-post'))
 
     expect(await screen.findByTestId('community-action-notice')).toHaveAttribute(

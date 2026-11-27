@@ -1,4 +1,5 @@
 // Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story CC-7.12 (Step 69): the locked planner's Get Premium became the Plan segment's free
 // preview with one Upgrade, so 3.6-E2E-016 measures that Upgrade and the preview's text.
@@ -43,13 +44,10 @@ import {
 const DARK_SURFACE = roleRgb('dark', 'page')
 const LIGHT_SURFACE = roleRgb('light', 'page')
 
-const filtersOf = (page: Page) =>
-  page
-    .getByTestId('community-page')
-    .getByRole('navigation', { name: 'Community filters' })
-
 const heading = (page: Page) =>
-  filtersOf(page).getByRole('heading', { name: enUS.community.heading, exact: true })
+  page
+    .getByTestId('app-header')
+    .getByRole('heading', { name: enUS.nav.community, exact: true })
 
 /**
  * The page surface Community sits on and the color its heading is drawn in. Story CC-7.9 D7: the
@@ -59,8 +57,9 @@ const heading = (page: Page) =>
 async function surfaceAndInk(page: Page) {
   const read = await page.getByTestId('community-page').evaluate((section) => {
     const surface = section.closest('[data-surface="page"]')
-    const title = section.querySelector('nav h2')
-    if (!surface || !title) return { missing: !surface ? 'page surface' : 'nav h2' }
+    const title = document.querySelector('[data-testid="app-header"] h1')
+    if (!surface || !title)
+      return { missing: !surface ? 'page surface' : 'Community title' }
     return {
       surface: getComputedStyle(surface).backgroundColor,
       ink: getComputedStyle(title).color,
@@ -108,7 +107,7 @@ test.describe('Community lookbook under the system color scheme (production foll
     })
   })
 
-  test('3.6-E2E-009: a signed-out reader under a dark system setting gets a dark lookbook with Sign in in the heading row', async ({
+  test('3.6-E2E-009: a signed-out reader under a dark system setting gets a dark lookbook with a readable Sign in link', async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
@@ -121,13 +120,12 @@ test.describe('Community lookbook under the system color scheme (production foll
     expect(surface).toBe(DARK_SURFACE)
     expect(contrastRatio(ink, surface)).toBeGreaterThanOrEqual(4.5)
 
-    const signIn = filtersOf(page).getByRole('link', {
+    const signIn = page.getByTestId('community-page').getByRole('link', {
       name: enUS.community.notifications.signin,
       exact: true,
     })
     await expect(signIn).toBeVisible()
     await expect(signIn).toHaveAttribute('href', '/signin')
-    await expectInHeadingRow(page, signIn)
     await expect(page.getByTestId('create-post-button')).toHaveCount(0)
     // The label that repeated the heading is gone from the page.
     await expect(page.getByText('Community inspirations')).toHaveCount(0)
@@ -135,7 +133,7 @@ test.describe('Community lookbook under the system color scheme (production foll
     await checkA11y(page)
   })
 
-  test('3.6-E2E-010: a member under a dark system setting gets New post and a named bell in the heading row', async ({
+  test('3.6-E2E-010: a member under a dark system setting gets Post in the heading row and a named notifications link', async ({
     page,
     communitySession,
   }) => {
@@ -151,7 +149,7 @@ test.describe('Community lookbook under the system color scheme (production foll
     expect(surface).toBe(DARK_SURFACE)
     expect(contrastRatio(ink, surface)).toBeGreaterThanOrEqual(4.5)
 
-    const bell = filtersOf(page).getByRole('link', {
+    const bell = page.getByTestId('community-page').getByRole('link', {
       name: enUS.community.notifications.title,
       exact: true,
     })
@@ -161,10 +159,9 @@ test.describe('Community lookbook under the system color scheme (production foll
     // it meets the 3:1 non-text contrast on the surface it sits on.
     const glyph = await bell.evaluate((link) => getComputedStyle(link).color)
     expect(contrastRatio(glyph, surface)).toBeGreaterThanOrEqual(3)
-    await expectInHeadingRow(page, bell)
 
-    const newPost = filtersOf(page).getByRole('button', {
-      name: enUS.community.newPost,
+    const newPost = page.getByTestId('app-header').getByRole('button', {
+      name: enUS.community.calm.post,
       exact: true,
     })
     await expect(newPost).toBeVisible()
@@ -358,9 +355,7 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       const panelSurface = (dialog: Locator) =>
         surfacePixel(dialog.locator(':scope > div').first())
 
-      await filtersOf(page)
-        .getByRole('button', { name: enUS.community.newPost, exact: true })
-        .click()
+      await page.getByTestId('create-post-button').click()
       const compose = page.getByRole('dialog')
       await expect(compose).toBeVisible()
       // Empty first: each field's prompt is read before anything is typed.
@@ -375,7 +370,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       await page.keyboard.press('Escape')
       await expect(compose).toBeHidden()
 
-      await page.locator('[data-testid^="report-button-"]').first().click()
+      const card = page.getByTestId('community-card-grid').locator('article').first()
+      await card.getByTestId('community-card-actions').click()
+      await card
+        .getByRole('button', { name: enUS.community.card.report, exact: true })
+        .click()
       const report = page.getByRole('dialog')
       await expect(report).toBeVisible()
       expect(await placeholderContrastFailures(report)).toEqual([])
@@ -451,8 +450,8 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
   }
 
   const NEW_POST: Record<'fr-FR' | 'es-419', string> = {
-    'fr-FR': frFR.community.newPost,
-    'es-419': es419.community.newPost,
+    'fr-FR': frFR.community.calm.post,
+    'es-419': es419.community.calm.post,
   }
   for (const locale of ['fr-FR', 'es-419'] as const) {
     test.describe(`at 320 CSS pixels in ${locale}`, () => {
@@ -499,7 +498,7 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
 
   // The monitor is off: the 401 is the refused session under test.
   test(
-    '3.6-E2E-015: a refused stored session paints Sign in as visible text in the heading row',
+    '3.6-E2E-015: a refused stored session paints Sign in as visible text',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page, communitySession }) => {
       expect(communitySession.userId).toBeTruthy()
@@ -514,9 +513,10 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       )
       await page.goto('/community')
       await refused
+      await expect(page.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
       await expect(page.getByTestId('community-feed-signed-out')).toBeVisible()
 
-      const signIn = filtersOf(page).getByRole('link', {
+      const signIn = page.getByTestId('community-page').getByRole('link', {
         name: enUS.community.notifications.signin,
         exact: true,
       })
@@ -524,7 +524,6 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       await expect(signIn).toHaveAttribute('href', '/signin')
       await expect(signIn).toHaveText(enUS.community.notifications.signin)
       await expect(signIn.locator('svg')).toHaveCount(0)
-      await expectInHeadingRow(page, signIn)
       // Painted, not only present: legibly, and all of it, against an unclipped clone in its font.
       const label = await inkOfText(signIn)
       expect(label!.painted).toBeGreaterThan(20)
@@ -535,8 +534,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       // Negative controls beside the link: the same words visually hidden (sr-only), and full-size
       // but clipped away (clip-path: inset(50%)). Neither paints a pixel of text.
       await signIn.evaluate((link) => {
+        const probeSurface = document.createElement('div')
+        probeSurface.style.cssText = 'position:relative;padding:16px'
+        link.after(probeSurface)
         const controls: [string, string][] = [
-          ['tea-sr-only-control', ''],
+          ['tea-sr-only-control', 'top:8px;left:8px'],
           ['tea-clipped-control', 'display:inline-block;clip-path:inset(50%)'],
           [
             'tea-partly-clipped-control',
@@ -545,11 +547,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
         ]
         for (const [id, css] of controls) {
           const control = document.createElement('span')
-          if (!css) control.className = 'sr-only'
+          if (id === 'tea-sr-only-control') control.className = 'sr-only'
           control.setAttribute('style', css)
           control.dataset.testid = id
           control.textContent = link.textContent
-          link.parentElement!.append(control)
+          probeSurface.append(control)
         }
       })
       const clipped = await inkOfText(page.getByTestId('tea-clipped-control'))

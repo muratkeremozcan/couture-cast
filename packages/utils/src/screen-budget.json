@@ -102,54 +102,6 @@
   "known": [
     {
       "platform": "native",
-      "screen": "community",
-      "fixture": "empty",
-      "rule": "paragraph-lines",
-      "value": 1,
-      "elements": [
-        {
-          "key": "community-filters-explainer",
-          "lines": 3
-        }
-      ],
-      "story": "7.15",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
-      "screen": "community",
-      "fixture": "guardian-pending",
-      "rule": "paragraph-lines",
-      "value": 1,
-      "elements": [
-        {
-          "key": "community-filters-explainer",
-          "lines": 3
-        }
-      ],
-      "story": "7.15",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
-      "screen": "community",
-      "fixture": "populated",
-      "rule": "paragraph-lines",
-      "value": 1,
-      "elements": [
-        {
-          "key": "community-filters-explainer",
-          "lines": 3
-        }
-      ],
-      "story": "7.15",
-      "decision": "D-KNOWN-7.10",
-      "decidedIn": "7.10"
-    },
-    {
-      "platform": "native",
       "screen": "profile",
       "fixture": "empty",
       "rule": "chip-rows",

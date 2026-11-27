@@ -720,6 +720,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Publicar",
+      "nearYou": "Cerca de ti",
+      "climateEmpty": "Aún no hay looks en tu clima",
+      "seeAllClimates": "Ver todos los climas",
+      "cardActions": "Opciones de la publicación",
+      "dismissChallenge": "Ocultar el reto",
+      "thisWeek": "Esta semana: {{title}}",
+      "allClimates": "Todos los climas"
+    },
     "title": "Comunidad",
     "heading": "Looks más recientes",
     "sectionLabel": "Lookbook de la comunidad",

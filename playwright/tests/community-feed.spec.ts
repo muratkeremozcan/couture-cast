@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
+// Learning path Step 72: Calm Community with an empty state.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 //
 // WHAT THE FIXTURE SCREENER DOES AND DOES NOT BUY. It clears every image without
 // looking at the bytes, and it is the only reason a published post is reachable
@@ -13,6 +15,10 @@ import { randomUUID } from 'node:crypto'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
 import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
+import {
+  openCommunityClimate,
+  selectCommunityClimate,
+} from '../support/helpers/community-ui'
 import {
   communityTest,
   deleteCommunityRowsForUser,
@@ -87,7 +93,6 @@ test.describe('6.1 community feed by climate band', () => {
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
-
     /*
      * The grid container renders unconditionally for a signed-in reader, but with
      * zero items it has no layout box and `toBeVisible` fails on a zero-height
@@ -114,6 +119,7 @@ test.describe('6.1 community feed by climate band', () => {
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
+    const sheet = await openCommunityClimate(page)
 
     /*
      * KEYED ON THE TEST ID. The `auto` chip names the resolved band when there is
@@ -132,19 +138,17 @@ test.describe('6.1 community feed by climate band', () => {
       'warm_dry',
     ]
     for (const mode of modes) {
-      await expect(page.getByTestId(`community-filter-${mode}`)).toBeVisible()
+      await expect(sheet.getByTestId(`community-filter-${mode}`)).toBeVisible()
     }
 
     // Eight, and only eight. Story 6.1 deleted `New`, `Following`, `Near me` and
     // `Brands` because they had no server behavior, and the spec forbids an active
     // chip without one. A ninth chip reappearing is that regression.
-    await expect(page.locator('[data-testid^="community-filter-"]')).toHaveCount(
+    await expect(sheet.locator('[data-testid^="community-filter-"]')).toHaveCount(
       modes.length
     )
 
-    await expect(
-      page.getByRole('navigation', { name: 'Community filters' })
-    ).toBeVisible()
+    await expect(page.getByRole('dialog', { name: 'Community filters' })).toBeVisible()
   })
 
   test('6.1-E2E-03 restarts paging when the filter changes', async ({
@@ -161,7 +165,7 @@ test.describe('6.1 community feed by climate band', () => {
       method: 'GET',
       url: `**/api/v1/community/feed?*mode=${SEEDED_BAND}*`,
     })
-    await page.getByTestId(`community-filter-${SEEDED_BAND}`).click()
+    await selectCommunityClimate(page, SEEDED_BAND)
     const banded = await bandRequest
 
     /*
@@ -239,10 +243,7 @@ test.describe('6.1 community feed by climate band', () => {
 
     const card = page.getByTestId(`lookbook-card-${ownLook.postId}`)
     await expect(card, 'The look this test published is on the first page').toBeVisible()
-    await expect(page.getByTestId(`caption-${ownLook.postId}`)).toHaveText(
-      ownLook.caption
-    )
-    await expect(page.getByTestId(`climate-badge-${ownLook.postId}`)).toBeVisible()
+    await expect(card.locator('img')).toBeVisible()
 
     // PSEUDONYMITY IS ASSERTED POSITIVELY, AS THE ALIAS FORMAT. This was
     // `not.toHaveText(/[0-9a-f]{8}-[0-9a-f]{4}/)`, which only excludes a lowercase
@@ -256,8 +257,12 @@ test.describe('6.1 community feed by climate band', () => {
     await expect(authorName).toBeVisible()
     await expect(authorName).toHaveText(/^Style Explorer [0-9A-F]{8}$/)
 
+    await card.getByTestId('community-card-actions').click()
     await expect(page.getByTestId(`report-button-${ownLook.postId}`)).toBeVisible()
     await expect(page.getByTestId(`withdraw-button-${ownLook.postId}`)).toHaveCount(0)
+    await page.keyboard.press('Escape')
+    await card.getByTestId(`lookbook-open-${ownLook.postId}`).click()
+    await expect(page.getByTestId('community-detail-caption')).toHaveText(ownLook.caption)
   })
 
   test('6.1-E2E-07 report modal passes axe and records one report', async ({
@@ -268,6 +273,10 @@ test.describe('6.1 community feed by climate band', () => {
 
     // Reports land on a look this test owns: reports on a seeded look outlive the
     // run and pile up across runs on a shared database.
+    await page
+      .getByTestId(`lookbook-card-${ownLook.postId}`)
+      .getByTestId('community-card-actions')
+      .click()
     await page.getByTestId(`report-button-${ownLook.postId}`).click()
     await expect(page.getByTestId('report-reason-select')).toBeVisible()
     await checkA11y(page)

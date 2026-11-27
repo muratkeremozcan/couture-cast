@@ -27,8 +27,8 @@ test('other platforms and flows use their derived budget', () => {
     flowTimeoutMs(OPEN_APP_FLOW)
   )
   assert.ok(flowTimeoutMs(OPEN_APP_FLOW) > 120_000)
+  // The open-post flow's waits and margin are checked in story68-flow-timeouts.test.mjs.
   assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), flowTimeoutMs(OPEN_POST))
-  assert.equal(nativeFlowTimeoutMs(OPEN_POST, 'ios'), 283_750)
   assert.equal(nativeFlowTimeoutMs('maestro/story68/cancel.yaml', 'ios'), 120_000)
 })
 

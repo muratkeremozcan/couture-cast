@@ -1,19 +1,25 @@
-import React from 'react'
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import {
+  AccessibilityInfo,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { CLIMATE_BANDS } from '@couture/utils'
 import type { ClimateBand, CommunityFeedMode } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useTokens } from '@/src/theme/tokens'
+import {
+  EdgeToEdgeModal,
+  LayerSwipeHandle,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
-// Story CC-7.9 D3: a selected chip is `inverse` with `onInverse` ink, the same on web and
-// native, so gold stays with the five gold roles.
-
-/**
- * The filter strip is the feed's `mode` query parameter, nothing else. It is
- * built straight off `communityFeedModeSchema`'s own shape -- `auto`, `all` and
- * the six real `CLIMATE_BANDS` -- so there is no alias table to drift. The
- * invented arctic/subtropical/tropical/hyperarid ids never existed on the server.
- */
 export const COMMUNITY_FILTER_MODES: readonly CommunityFeedMode[] = [
   'auto',
   'all',
@@ -23,139 +29,182 @@ export const COMMUNITY_FILTER_MODES: readonly CommunityFeedMode[] = [
 export interface CommunityFilterChipsProps {
   selectedMode: CommunityFeedMode
   onSelectMode: (mode: CommunityFeedMode) => void
-  /** Resolved viewer band, folded into the `auto` chip's label when present. */
   viewerBand?: ClimateBand | null
-}
-
-/**
- * Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a climate band
- * and nothing said what a band is, so one line says it. Story CC-7.11 AC2, D16: it follows the
- * Community's first content (the Spotlight or the first post), so no explanation comes first.
- */
-export function CommunityFiltersExplainer() {
-  const { t } = useTranslation()
-  const palette = useHeroPalette()
-  return (
-    <Text
-      testID="community-filters-explainer"
-      style={[styles.explainer, { color: palette.inkMuted }]}
-    >
-      {t('community.filters.explainer')}
-    </Text>
-  )
+  active?: boolean
+  triggerRef?: RefObject<View | null>
+  children?: ReactNode
 }
 
 export function CommunityFilterChips({
   selectedMode,
   onSelectMode,
   viewerBand,
+  active = true,
+  triggerRef,
+  children,
 }: CommunityFilterChipsProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const { scrim } = useTokens()
+  const insets = useModalInsets()
+  const [open, setOpen] = useState(false)
+  const localTrigger = useRef<View>(null)
+  const trigger = triggerRef ?? localTrigger
+  const heading = useRef<Text>(null)
+  const close = () => setOpen(false)
+
+  useEffect(() => {
+    if (!active) setOpen(false)
+  }, [active])
+
+  const label = (mode: CommunityFeedMode) => {
+    if (mode === 'all') return t('community.calm.allClimates')
+    if (mode === 'auto' && mode === selectedMode && viewerBand)
+      return t('community.filters.mode.autoWithBand', {
+        band: t(`community.band.${viewerBand}`),
+      })
+    return t(`community.filters.mode.${mode}`)
+  }
 
   return (
-    <View
-      testID="community-sticky-filter-chips"
-      accessibilityLabel={t('community.filters.label')}
-      style={[
-        styles.stickyHeader,
-        { backgroundColor: palette.page, borderBottomColor: palette.line },
-      ]}
-    >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+    <View style={styles.filter}>
+      <TouchableOpacity
+        ref={trigger}
+        testID="community-climate-filter"
+        accessibilityRole="button"
+        accessibilityLabel={label(selectedMode)}
+        accessibilityState={{ expanded: open }}
+        style={[styles.trigger, { borderColor: palette.lineStrong }]}
+        onPress={() => setOpen(true)}
       >
-        {COMMUNITY_FILTER_MODES.map((mode) => {
-          const isActive = selectedMode === mode
-          // The band qualifier is tied to `isActive`, not just to `mode === 'auto'`.
-          // The experiment can serve `all` to a viewer who requested `auto`, and
-          // `viewerBand` is resolved independently of what was served, so without
-          // this the auto chip would promise "Your climate: X" while a completely
-          // different, unfiltered feed sits on screen and the `all` chip is the
-          // one actually pressed.
-          const label =
-            isActive && mode === 'auto' && viewerBand
-              ? t('community.filters.mode.autoWithBand', {
-                  band: t(`community.band.${viewerBand}`),
-                })
-              : t(`community.filters.mode.${mode}`)
-
-          return (
-            <TouchableOpacity
-              key={mode}
-              testID={`community-filter-chip-${mode}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isActive }}
-              // `accessibilityState` is native-only: react-native-web's
-              // forwardedProps table has no entry for the object form, so without
-              // an `aria-*` prop the selected chip is not announced as selected on
-              // the web target (`app.json` ships one). It is `aria-pressed` rather
-              // than `aria-selected` because ARIA allows `aria-selected` only on
-              // option/tab/row/gridcell/treeitem, never on a button -- axe rejects
-              // it as `aria-allowed-attr`. A toggle button takes `aria-pressed`,
-              // which is what the web chip strip uses too, so the two surfaces
-              // announce selection the same way.
-              aria-pressed={isActive}
-              accessibilityLabel={label}
-              onPress={() => onSelectMode(mode)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: isActive ? palette.inverse : palette.page,
-                  // Selection never rides on colour alone: the active chip also
-                  // doubles its border weight and bolds its label.
-                  borderColor: isActive ? palette.inverse : palette.inkMuted,
-                  borderWidth: isActive ? 2 : 1,
-                },
-              ]}
-            >
+        <Text style={[styles.triggerLabel, { color: palette.ink }]}>
+          {label(selectedMode)}
+        </Text>
+        <Text accessible={false} style={{ color: palette.ink }}>
+          ⌄
+        </Text>
+      </TouchableOpacity>
+      <EdgeToEdgeModal
+        visible={open && active}
+        animationType="slide"
+        scrim={scrim}
+        onRequestClose={close}
+        returnFocusRef={trigger}
+        onShow={() => {
+          const handle = safeFindNodeHandle(heading.current)
+          if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
+        }}
+      >
+        <View style={[styles.sheetPosition, { paddingTop: insets.top }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={close} accessible={false} />
+          <View
+            testID="community-climate-sheet"
+            accessibilityViewIsModal
+            style={[
+              styles.sheet,
+              { backgroundColor: palette.page, paddingBottom: insets.bottom },
+            ]}
+          >
+            <LayerSwipeHandle>
+              <View style={styles.headingRow}>
+                <Text
+                  ref={heading}
+                  accessibilityRole="header"
+                  style={[styles.heading, { color: palette.ink }]}
+                >
+                  {t('community.filters.label')}
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={t('shell.close')}
+                  style={styles.close}
+                  onPress={close}
+                >
+                  <Text style={[styles.closeLabel, { color: palette.ink }]}>×</Text>
+                </TouchableOpacity>
+              </View>
+            </LayerSwipeHandle>
+            <ScrollView contentContainerStyle={styles.options}>
               <Text
-                style={[
-                  styles.chipText,
-                  {
-                    color: isActive ? palette.onInverse : palette.ink,
-                    fontWeight: isActive ? '700' : '500',
-                  },
-                ]}
+                testID="community-filters-explainer"
+                style={{ color: palette.inkMuted }}
               >
-                {label}
+                {t('community.filters.explainer')}
               </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
+              {children}
+              {COMMUNITY_FILTER_MODES.map((mode) => {
+                const selected = mode === selectedMode
+                return (
+                  <TouchableOpacity
+                    key={mode}
+                    testID={`community-filter-chip-${mode}`}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    aria-pressed={selected}
+                    style={[
+                      styles.option,
+                      {
+                        backgroundColor: selected ? palette.inverse : palette.page,
+                        borderColor: selected ? palette.inverse : palette.lineStrong,
+                      },
+                    ]}
+                    onPress={() => {
+                      close()
+                      onSelectMode(mode)
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selected ? palette.onInverse : palette.ink,
+                        fontWeight: selected ? '700' : '500',
+                      }}
+                    >
+                      {label(mode)}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </EdgeToEdgeModal>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  stickyHeader: {
-    borderBottomWidth: 1,
-    paddingVertical: 12,
-    zIndex: 10,
-  },
-  explainer: {
-    fontSize: 14,
-    lineHeight: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
+  filter: { marginHorizontal: 16, marginTop: 8, marginBottom: 4 },
+  trigger: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  chip: {
+    gap: 8,
+    minHeight: 44,
+    maxWidth: '100%',
+    borderWidth: 1,
+    borderRadius: 9999,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 9999,
-    minHeight: 44,
-    justifyContent: 'center',
   },
-  chipText: {
-    fontSize: 14,
+  triggerLabel: { flexShrink: 1, fontSize: 14, fontWeight: '600' },
+  sheetPosition: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { maxHeight: '100%', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  headingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  heading: { flex: 1, fontSize: 18, fontWeight: '700' },
+  close: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
+  closeLabel: { fontSize: 24 },
+  options: { padding: 16, gap: 8 },
+  option: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: 'center',
   },
 })

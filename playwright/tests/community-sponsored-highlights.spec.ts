@@ -9,6 +9,7 @@
 // changed. The opt-out test changes only its own fresh account's preference and
 // restores it. The Show new looks journey links a look it publishes itself, on
 // the isolated local database, and removes the link and the look afterwards.
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import type { BrowserContext, Page, Request } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
@@ -166,9 +167,10 @@ async function recordShownEvents(page: Page) {
 }
 
 async function settledSpotlight(page: Page) {
-  const module = page.getByTestId('community-spotlight')
-  await expect(module).toHaveAttribute('aria-busy', 'false')
-  await expect(module).toHaveAttribute('data-level', 'city')
+  await selectCommunityClimate(page, 'all')
+  await expect(
+    page.getByTestId(`spotlight-lookbook-card-${SPONSORED_POST_ID}`)
+  ).toBeVisible()
 }
 
 test.describe('Story 6.7b sponsored community highlights', () => {
@@ -318,10 +320,8 @@ test.describe('Story 6.7b sponsored community highlights', () => {
   }) => {
     await assertSeededSpotlight()
     const offerId = await assertSeededSponsorship()
-    const removeLocation = await placeViewerInArea(
-      communitySession.userId,
-      SEEDED_SPOTLIGHT_AREA
-    )
+    // A fresh reader without a saved area gets the ordinary feed projection.
+    expect(communitySession.userId).toBeTruthy()
     try {
       const referers = await stubPartnerSite(context)
       // A deep link puts the sponsored post at the head of the feed, wherever its
@@ -386,7 +386,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       expect(referers).toEqual([null, null])
     } finally {
       await page.goto('about:blank')
-      await removeLocation()
     }
   })
 

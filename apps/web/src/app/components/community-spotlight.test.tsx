@@ -1,8 +1,10 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6: the City Spotlight module through the real web transport and MSW.
 // Paging lives in community-spotlight.paging.test.tsx and realtime in
 // community-spotlight.realtime.test.tsx.
+import { openCommunityCardActions } from '../../test-utils/community-ui'
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor, within } from '@testing-library/react'
@@ -56,31 +58,15 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     renderGrid()
 
-    const section = await screen.findByTestId('community-spotlight')
-    // The section mounts while the spotlight loads, under the fallback heading.
-    const heading = await within(section).findByRole('heading', {
-      level: 2,
-      name: 'Spotlight in Lisbon',
-    })
-    expect(heading.textContent).toBe('Spotlight in Lisbon')
-    expect(section).toHaveAttribute('data-level', 'city')
-    const list = await within(section).findByTestId('community-spotlight-list')
-    const entries = within(list).getAllByRole('listitem')
-    expect(entries.map((entry) => entry.getAttribute('data-rank'))).toEqual([
-      '1',
-      '2',
-      '3',
+    await screen.findByTestId('spotlight-lookbook-card-spot-1')
+    const cards = screen.getAllByTestId(/^spotlight-lookbook-card-/)
+    expect(cards.map((card) => card.id)).toEqual([
+      'spotlight-lookbook-card-spot-1',
+      'spotlight-lookbook-card-spot-2',
+      'spotlight-lookbook-card-spot-3',
     ])
-    expect(
-      entries.map((entry) => within(entry).getByText(/^Rank \d+$/).textContent)
-    ).toEqual(['Rank 1', 'Rank 2', 'Rank 3'])
-    // The spotlight copy of a post never shares an id with its feed copy.
-    expect(screen.getByTestId('spotlight-lookbook-card-spot-1')).toBeInTheDocument()
-    expect(await screen.findByTestId('lookbook-card-spot-1')).toBeInTheDocument()
-    expect(document.querySelectorAll('#lookbook-card-spot-1')).toHaveLength(1)
-    expect(document.querySelectorAll('#spotlight-lookbook-card-spot-1')).toHaveLength(1)
-    // The module is the first thing in the community section.
-    expect(section.parentElement?.firstElementChild).toBe(section)
+    for (const card of cards) expect(card).toHaveTextContent('Near you')
+    expect(screen.queryByTestId('lookbook-card-spot-1')).toBeNull()
     expect(headers).toEqual(['1'])
   })
 
@@ -138,12 +124,9 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     renderGrid()
 
-    const empty = await screen.findByTestId('community-spotlight-empty')
-    expect(empty).toHaveTextContent('No spotlight near you yet')
-    expect(screen.getByTestId('community-spotlight-heading').textContent).toBe(
-      'City Spotlight'
-    )
-    expect(screen.queryByTestId('community-spotlight-list')).not.toBeInTheDocument()
+    await screen.findByTestId('community-feed-empty')
+    expect(screen.queryAllByTestId(/^spotlight-lookbook-card-/)).toHaveLength(0)
+    expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
   })
 
   it('6.6-WEB-005 renders the localized disabled state for the read rollout refusal', async () => {
@@ -159,9 +142,8 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     renderGrid()
 
-    expect((await screen.findByTestId('community-spotlight-disabled')).textContent).toBe(
-      'The City Spotlight is temporarily unavailable.'
-    )
+    await screen.findByTestId('community-feed-empty')
+    expect(screen.queryAllByTestId(/^spotlight-lookbook-card-/)).toHaveLength(0)
     expect(screen.queryByTestId('community-spotlight-error')).not.toBeInTheDocument()
   })
 
@@ -169,7 +151,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     signIn()
     let attempts = 0
     useMswHandlers(
-      feedHandler({ items: [] }),
+      feedHandler({ items: [], mode: 'all' }),
       http.get(SPOTLIGHT_PATH, () => {
         attempts += 1
         return attempts === 1
@@ -235,16 +217,15 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     renderGrid()
 
-    expect((await screen.findByTestId('community-spotlight-disabled')).textContent).toBe(
-      'The City Spotlight is temporarily unavailable.'
-    )
+    await screen.findByTestId('community-feed-empty')
+    expect(screen.queryAllByTestId(/^spotlight-lookbook-card-/)).toHaveLength(0)
     expect(screen.queryByTestId('community-spotlight-error')).not.toBeInTheDocument()
     expect(
       screen.queryByTestId('community-spotlight-retry-button')
     ).not.toBeInTheDocument()
   })
 
-  it('6.6-WEB-031 a reaction on the spotlight copy updates the feed copy of the same post (R10)', async () => {
+  it('6.6-WEB-031 a reaction on the deduplicated ranked look also appears in its detail (R10)', async () => {
     signIn()
     let summary = ZERO
     const requests: SetCommunityReactionInput[] = []
@@ -278,16 +259,20 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     const spotlightCopy = await screen.findByTestId(
       'spotlight-community-reactions-spot-1'
     )
-    const feedCopy = await screen.findByTestId('community-reactions-spot-1')
+    expect(screen.queryByTestId('community-reactions-spot-1')).toBeNull()
     await user.click(within(spotlightCopy).getByRole('button', { name: 'Applaud, 0' }))
 
-    for (const copy of [spotlightCopy, feedCopy])
-      await waitFor(() =>
-        expect(within(copy).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
-          'aria-pressed',
-          'true'
-        )
-      )
+    await waitFor(() =>
+      expect(
+        within(spotlightCopy).getByRole('button', { name: 'Applaud, 1' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    )
+    await user.click(screen.getByTestId('spotlight-lookbook-open-spot-1'))
+    const detail = await screen.findByTestId('community-detail')
+    expect(within(detail).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
     expect(requests.map((request) => request.selection)).toEqual(['applause'])
   })
 
@@ -316,6 +301,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     renderGrid()
 
     await screen.findByTestId('spotlight-lookbook-card-spot-self')
+    await openCommunityCardActions(user, 'spot-self', 'spotlight-')
     await user.click(screen.getByTestId('spotlight-withdraw-button-spot-self'))
 
     await waitFor(() => expect(withdrawn).toBe('spot-self'))
@@ -326,9 +312,9 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     expect(screen.getByTestId('spotlight-lookbook-card-spot-1')).toBeInTheDocument()
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1'])
   })
 
@@ -368,7 +354,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     expect(opened).toEqual([{ postId: 'post-1', body: { experimentVariant: 'auto' } }])
   })
 
-  it('6.6-WEB-083 the keyboard opens the detail from a spotlight card and Escape returns focus to that copy (AC4)', async () => {
+  it('6.6-WEB-083 opens ranked detail by keyboard and returns focus to the ranked card (AC4)', async () => {
     signIn()
     useMswHandlers(
       feedHandler({ items: [item({ id: 'spot-2' })] }),
@@ -379,7 +365,7 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     renderGrid()
 
     const open = await screen.findByTestId('spotlight-lookbook-open-spot-2')
-    const feedOpen = await screen.findByTestId('lookbook-open-spot-2')
+    expect(screen.queryByTestId('lookbook-open-spot-2')).not.toBeInTheDocument()
     open.focus()
     await user.keyboard('{Enter}')
 
@@ -394,6 +380,5 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     expect(document.activeElement).toBe(
       screen.getByTestId('spotlight-lookbook-open-spot-2')
     )
-    expect(document.activeElement).not.toBe(feedOpen)
   })
 })

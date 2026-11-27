@@ -1,5 +1,6 @@
 // Learning path Step 62: Community post edits persist.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-62-community-post-edits-persist
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import {
   COMMUNITY_POST_TEXT_SCREENING_UNAVAILABLE_MESSAGE,
   editCommunityPostTextResponseSchema,
@@ -86,22 +87,23 @@ test(
       const secondPage = await secondContext.newPage()
       await secondPage.goto('/community')
       const secondFeed = completedCommunityFeed(secondPage, 'all')
-      await secondPage.getByRole('button', { name: 'Every climate', exact: true }).click()
+      await selectCommunityClimate(secondPage, 'all')
       expect((await secondFeed).status).toBe(200)
       await expect(secondPage.getByTestId(`lookbook-card-${postId}`)).toBeVisible()
 
       await page.reload()
       const initialFeed = completedCommunityFeed(page, 'all')
-      await page.getByRole('button', { name: 'Every climate', exact: true }).click()
+      await selectCommunityClimate(page, 'all')
       expect((await initialFeed).status).toBe(200)
       const card = page.getByTestId(`lookbook-card-${postId}`)
       await expect(card.getByTestId(`title-${postId}`)).toHaveText(original.title)
-      await expect(card.getByTestId(`caption-${postId}`)).toHaveText(original.caption)
-      await expect(card.getByTestId(`edited-badge-${postId}`)).toHaveCount(0)
       await card.getByTestId(`lookbook-open-${postId}`).click()
 
       const detail = page.getByRole('dialog')
       await expect(detail).toHaveAccessibleName(original.title)
+      await expect(detail.getByTestId('community-detail-caption')).toHaveText(
+        original.caption
+      )
       await expect(detail.getByTestId('community-detail-edited')).toHaveCount(0)
       const edit = detail.getByTestId('community-edit-text')
       const editTitle = detail.getByTestId('community-edit-title')
@@ -224,11 +226,9 @@ test(
       await test.step('Reload proves both combined editor-saved fields persist before advancing revision', async () => {
         await page.reload()
         const postSaveFeed = completedCommunityFeed(page, 'all')
-        await page.getByRole('button', { name: 'Every climate', exact: true }).click()
+        await selectCommunityClimate(page, 'all')
         expect((await postSaveFeed).status).toBe(200)
         await expect(card.getByTestId(`title-${postId}`)).toHaveText(updated.title)
-        await expect(card.getByTestId(`caption-${postId}`)).toHaveText(updated.caption)
-        await expect(card.getByTestId(`edited-badge-${postId}`)).toHaveText('Edited')
         await card.getByTestId(`lookbook-open-${postId}`).click()
         await expect(detail).toHaveAccessibleName(updated.title)
         await expect(detail.getByTestId('community-detail-caption')).toHaveText(
@@ -243,10 +243,12 @@ test(
           updated.title,
           { timeout: 10_000 }
         )
-        await expect(secondCard.getByTestId(`caption-${postId}`)).toHaveText(
+        await secondCard.getByTestId(`lookbook-open-${postId}`).click()
+        const secondDetail = secondPage.getByRole('dialog', { name: updated.title })
+        await expect(secondDetail.getByTestId('community-detail-caption')).toHaveText(
           updated.caption
         )
-        await expect(secondCard.getByTestId(`edited-badge-${postId}`)).toHaveText(
+        await expect(secondDetail.getByTestId('community-detail-edited')).toHaveText(
           'Edited'
         )
 
@@ -285,13 +287,11 @@ test(
         await page.reload()
         await expect(page.locator('html')).toHaveCSS('font-size', '32px')
         const refreshedFeed = completedCommunityFeed(page, 'all')
-        await page.getByRole('button', { name: 'Every climate', exact: true }).click()
+        await selectCommunityClimate(page, 'all')
         expect((await refreshedFeed).status).toBe(200)
         await expect(card.getByTestId(`title-${postId}`)).toHaveText(
           'Second client newest title'
         )
-        await expect(card.getByTestId(`caption-${postId}`)).toHaveText(updated.caption)
-        await expect(card.getByTestId(`edited-badge-${postId}`)).toHaveText('Edited')
         await card.getByTestId(`lookbook-open-${postId}`).click()
         await expect(detail).toHaveAccessibleName('Second client newest title')
         await expect(detail.getByTestId('community-detail-caption')).toHaveText(

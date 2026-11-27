@@ -1,4 +1,5 @@
 // Learning path Step 44: Community city spotlight.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 6.6 owner: the mobile City Spotlight module through the real HTTP boundary.
 // Learning path Step 68: Five-tab navigation and back pattern.
@@ -6,7 +7,14 @@
 // Story CC-7.11 test owner (TEA): 7.11-NAT-030..032 on the Community screen: the post detail layer
 // (D12) closes by its top bar back, system back or a header swipe, and focus returns to its card.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
-import { item, errorEnvelope, feedJson, imageEvents, serveFeed } from './harness'
+import {
+  communityGateOpen,
+  item,
+  errorEnvelope,
+  feedJson,
+  imageEvents,
+  serveFeed,
+} from './harness'
 import { refreshEvents } from './mock-state'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -14,7 +22,8 @@ import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { dragFrom } from '@/src/test-utils/layer-swipe'
 import { LAYER_SWIPE_CLOSE_PX } from '@/components/edge-to-edge-modal'
-import { expect, it, vi } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
+import { userEvent as browserUser } from 'vitest/browser'
 import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   COMMUNITY_CURSOR_INVALID_MESSAGE,
@@ -127,41 +136,32 @@ function captureCatchUp() {
 }
 
 export function registerCommunitySpotlightCases() {
-  it('6.6-MOB-001 heads the list with the area heading and ranked reused cards', async () => {
+  it('6.6-MOB-001 keeps the ranked feed in the server order and negotiates reactions', async () => {
     const { requests } = serveSpotlight(() => page())
     await render(<CommunityScreen />)
     const first = await screen.findByTestId('community-spotlight-item-spot-1')
-    const heading = screen.getByTestId('community-spotlight-heading')
-    expect(heading.textContent).toBe('Spotlight in Lisbon')
-    expect(heading.getAttribute('role')).toBe('heading')
-    expect(within(first).getByTestId('community-post-card-spot-1')).toBeVisible()
-    expect(screen.getByTestId('community-spotlight-rank-spot-1').textContent).toBe('#1')
-    expect(
-      screen.getByTestId('community-spotlight-rank-spot-2').getAttribute('aria-label')
-    ).toBe('Rank 2, Position 2 of 2')
-    // One horizontal carousel: the second card sits beside the first.
     const second = screen.getByTestId('community-spotlight-item-spot-2')
-    expect(second.getBoundingClientRect().top).toBe(first.getBoundingClientRect().top)
-    expect(second.getBoundingClientRect().left).toBeGreaterThan(
-      first.getBoundingClientRect().left
+    expect(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(within(first).getByTestId('community-card-near-you-spot-1')).toHaveTextContent(
+      'Near you'
     )
     expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
-    // Reaction summaries are negotiated exactly like the feed.
     expect(requests[0]?.headers.get('x-couture-reactions')).toBe('1')
     expect(requests[0]?.headers.get('x-couture-platform')).toBe('mobile')
   })
 
-  it('6.6-MOB-002 renders the empty state for level none without a heading place', async () => {
+  it('6.6-MOB-002 leaves the ordinary feed available without an eligible area', async () => {
     serveSpotlight(() => page({ level: 'none', label: null, items: [] }))
     await render(<CommunityScreen />)
-    const empty = await screen.findByTestId('community-spotlight-empty')
-    expect(empty.textContent).toContain('No spotlight near you yet')
-    expect(screen.getByTestId('community-spotlight-heading').textContent).toBe(
-      'City Spotlight'
-    )
+    await communityGateOpen()
+    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
+    expect(screen.queryAllByTestId(/^community-spotlight-item-/)).toHaveLength(0)
   })
 
-  it('6.6-MOB-003 shows the localized disabled state for the read rollout refusal', async () => {
+  it('6.6-MOB-003 hides ranked rows on the Spotlight rollout refusal', async () => {
     serveSpotlight(() =>
       HttpResponse.json(
         { statusCode: 403, code: 'denied', message: COMMUNITY_FEED_DISABLED_MESSAGE },
@@ -169,8 +169,9 @@ export function registerCommunitySpotlightCases() {
       )
     )
     await render(<CommunityScreen />)
-    const disabled = await screen.findByTestId('community-spotlight-disabled')
-    expect(disabled.textContent).toBe('The City Spotlight is temporarily unavailable.')
+    await communityGateOpen()
+    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    expect(screen.queryAllByTestId(/^community-spotlight-item-/)).toHaveLength(0)
     expect(screen.queryByTestId('community-spotlight-error')).toBeNull()
   })
 
@@ -201,12 +202,10 @@ export function registerCommunitySpotlightCases() {
     )
     await render(<CommunityScreen />)
     const viewMore = await screen.findByTestId('community-spotlight-view-more')
-    const row = screen.getByTestId('community-spotlight-row')
-    // View more trails the cards inside the carousel.
-    expect(row.contains(viewMore)).toBe(true)
-    const scroll = vi.spyOn(row, 'scroll')
+    const list = screen.getByTestId('community-feed-list')
+    expect(list).toContainElement(viewMore)
     press(viewMore)
-    const newRank = await screen.findByTestId('community-spotlight-rank-spot-3')
+    const newRank = await screen.findByTestId('community-card-title-spot-3')
     await waitFor(() =>
       expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
     )
@@ -215,17 +214,6 @@ export function registerCommunitySpotlightCases() {
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
       handles.get(newRank)
     )
-    // The carousel brought the first new card to its start before focus moved.
-    const firstNew = screen.getByTestId('community-spotlight-item-spot-3')
-    const firstCard = screen.getByTestId('community-spotlight-item-spot-1')
-    const offset = Math.round(
-      firstNew.getBoundingClientRect().left - firstCard.getBoundingClientRect().left
-    )
-    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ left: offset, top: 0 }))
-    expect(scroll.mock.invocationCallOrder.at(-1)).toBeLessThan(
-      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.invocationCallOrder.at(-1)!
-    )
-    expect(newRank.getAttribute('aria-label')).toBe('Rank 3, Position 3 of 4')
     const announcements = vi
       .mocked(AccessibilityInfo.announceForAccessibility)
       .mock.calls.filter(([text]) => text === 'Loaded 2 more spotlight looks.')
@@ -532,7 +520,9 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.getByTestId('community-spotlight-item-spot-3')).toBeVisible()
     )
-    expect(screen.getByTestId('community-spotlight-rank-spot-1').textContent).toBe('#1')
+    expect(screen.getByTestId('community-card-near-you-spot-1')).toHaveTextContent(
+      'Near you'
+    )
   })
 
   it('6.6-MOB-076 a reaction 404 on a spotlight card evicts that copy in place', async () => {
@@ -660,7 +650,7 @@ export function registerCommunitySpotlightCases() {
     expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
 
     press(screen.getByTestId('cancel-report-button'))
-    const rank = screen.getByTestId('community-spotlight-rank-spot-2')
+    const rank = screen.getByTestId('community-card-title-spot-2')
     await waitFor(() => {
       expect(handles.get(rank)).toBeTypeOf('number')
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
@@ -677,8 +667,9 @@ export function registerCommunitySpotlightCases() {
       )
     )
     await render(<CommunityScreen />)
-    const disabled = await screen.findByTestId('community-spotlight-disabled')
-    expect(disabled.textContent).toBe('The City Spotlight is temporarily unavailable.')
+    await communityGateOpen()
+    expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+    expect(screen.queryAllByTestId(/^community-spotlight-item-/)).toHaveLength(0)
     expect(screen.queryByTestId('community-spotlight-error')).toBeNull()
     expect(screen.queryByTestId('community-spotlight-retry')).toBeNull()
   })
@@ -705,7 +696,7 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     press(await screen.findByTestId('community-spotlight-view-more'))
 
-    const rank = await screen.findByTestId('community-spotlight-rank-new-1')
+    const rank = await screen.findByTestId('community-card-title-new-1')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -766,7 +757,7 @@ export function registerCommunitySpotlightCases() {
     await render(<CommunityScreen />)
     press(await screen.findByTestId('community-spotlight-view-more'))
 
-    const third = await screen.findByTestId('community-spotlight-rank-spot-3')
+    const third = await screen.findByTestId('community-card-title-spot-3')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(third)
@@ -815,7 +806,7 @@ export function registerCommunitySpotlightCases() {
     await waitFor(() =>
       expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
     )
-    const rank = screen.getByTestId('community-spotlight-rank-spot-2')
+    const rank = screen.getByTestId('community-card-title-spot-2')
     await waitFor(() =>
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
         handles.get(rank)
@@ -864,7 +855,7 @@ export function registerCommunitySpotlightCases() {
       await waitFor(() =>
         expect(screen.queryByTestId('community-spotlight-detail')).toBeNull()
       )
-      const rank = screen.getByTestId('community-spotlight-rank-spot-2')
+      const rank = screen.getByTestId('community-card-title-spot-2')
       await waitFor(() =>
         expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
           handles.get(rank)
@@ -961,9 +952,12 @@ export function registerCommunitySpotlightCases() {
     const spotlightHeld = new Promise<void>((resolve) => {
       releaseSpotlight = resolve
     })
+    onTestFinished(() => releaseSpotlight())
+    let spotlightReads = 0
     serveFeed(() => feedJson({ items: [base] }))
     server.use(
       http.get(SPOTLIGHT_ROUTE, async () => {
+        if (++spotlightReads === 1) return page({ items: [] })
         await spotlightHeld
         return page({ items: [{ ...base, rank: 1 }] })
       }),
@@ -979,10 +973,15 @@ export function registerCommunitySpotlightCases() {
     )
 
     await render(<CommunityScreen />)
+    await communityGateOpen()
     expect(await screen.findByTestId('community-card-title-spot-edit')).toHaveTextContent(
       'Initial spotlight title'
     )
-    press(screen.getByTestId('community-edit-text'))
+    act(() => refreshEvents.onRefresh!())
+    await waitFor(() => expect(spotlightReads).toBe(2))
+    await browserUser.click(screen.getByTestId('community-card-open-spot-edit'))
+    const ordinaryDetail = await screen.findByTestId('community-post-detail')
+    press(within(ordinaryDetail).getByTestId('community-edit-text'))
     const titleInput = screen.getByTestId('community-edit-title')
     const captionInput = screen.getByTestId('community-edit-description')
     act(() => {
@@ -992,23 +991,23 @@ export function registerCommunitySpotlightCases() {
     fireEvent.change(captionInput, { target: { value: 'Updated spotlight caption' } })
     press(screen.getByTestId('community-edit-save'))
     await waitFor(() =>
-      expect(screen.getByTestId('community-card-title-spot-edit')).toHaveTextContent(
-        'Updated spotlight title'
-      )
+      expect(
+        within(ordinaryDetail).getByTestId('community-card-title-spot-edit')
+      ).toHaveTextContent('Updated spotlight title')
     )
 
-    // Delayed Spotlight first-page response carries stale textRevision: 0.
+    press(within(ordinaryDetail).getByTestId('app-top-bar-back'))
+    await waitFor(() => expect(ordinaryDetail).not.toBeInTheDocument())
+
+    // The held Spotlight refresh carries the text revision from before the edit.
     releaseSpotlight()
     const spotCard = await screen.findByTestId('community-spotlight-item-spot-edit')
     expect(
       within(spotCard).getByTestId('community-card-title-spot-edit')
     ).toHaveTextContent('Updated spotlight title')
-    expect(
-      within(spotCard).getByTestId('community-card-edited-spot-edit')
-    ).toHaveTextContent('Edited')
 
     // Open Spotlight detail and confirm it renders the updated title and Edited label.
-    press(within(spotCard).getByTestId('community-card-open-spot-edit'))
+    await browserUser.click(within(spotCard).getByTestId('community-card-open-spot-edit'))
     const detail = await screen.findByTestId('community-spotlight-detail')
     // Codex 7.11 #10 (D12): a titled look names the layer's top bar, the edited title included.
     expect(within(detail).getByTestId('app-top-bar-title').textContent).toBe(
@@ -1135,8 +1134,10 @@ export function registerCommunitySpotlightCases() {
     expect(
       within(spotCard).getByTestId('community-card-title-spot-viewer')
     ).toHaveTextContent('Realtime viewer title')
+    press(within(spotCard).getByTestId('community-card-open-spot-viewer'))
+    const detail = await screen.findByTestId('community-spotlight-detail')
     expect(
-      within(spotCard).getByTestId('community-card-caption-spot-viewer')
+      within(detail).getByTestId('community-card-caption-spot-viewer')
     ).toHaveTextContent('Realtime viewer caption')
   })
 }
