@@ -177,19 +177,22 @@ export function GuestPreviewReviewScreen() {
   useEffect(() => {
     mounted.current = true
     let active = true
+    let isLookReview = false
     const discard = () => {
       client.current = null
       scopeIsCurrent.current = null
       setLookReview(null)
       setStatus({ kind: 'loading' })
       store.clear()
-      router.dismissTo('/')
+      if (isLookReview) router.dismissTo('/')
+      else router.replace('/')
     }
     void (async () => {
       const snapshot = await store.load()
       if (!active) return
       const conversion = snapshot.state?.conversion
       const draft = guestPreviewReviewProposal(snapshot.state)
+      isLookReview = Boolean(draft?.intent)
       garmentIntent.current = conversion?.intent === GUEST_PREVIEW_GARMENT_INTENT
       if (!draft) {
         router.replace('/')
