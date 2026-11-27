@@ -16,6 +16,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Learning path Step 58: Production status and nightly health.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
+// Learning path Step 72: Calm Community with an empty state.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '../test-utils/edge-to-edge-modal'
@@ -155,6 +157,7 @@ import {
 } from '../test-utils/community-screen/harness'
 import { registerCommunityRootRestorationCases } from '../test-utils/community-screen/root-restoration.cases'
 import { registerCommunityFeedCases } from '../test-utils/community-screen/feed.cases'
+import { registerCalmCommunityCases } from '../test-utils/community-screen/calm.cases'
 import { registerCommunityModerationCases } from '../test-utils/community-screen/moderation.cases'
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
 import { registerCommunityReactionsCases } from '../test-utils/community-screen/reactions.cases'
@@ -234,6 +237,7 @@ describe('Mobile community screen (Story 6.1)', () => {
 
   registerCommunityRootRestorationCases()
   registerCommunityFeedCases()
+  registerCalmCommunityCases()
   registerCommunityModerationCases()
   registerCommunityPublishingCases()
   registerCommunityReactionsCases()

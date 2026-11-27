@@ -645,6 +645,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Post",
+      "nearYou": "Near you",
+      "climateEmpty": "No looks in your climate yet",
+      "seeAllClimates": "See all climates",
+      "cardActions": "Post actions",
+      "dismissChallenge": "Dismiss challenge",
+      "thisWeek": "This week: {{title}}",
+      "allClimates": "All climates"
+    },
     "title": "Community",
     "heading": "Latest looks",
     "sectionLabel": "Community lookbook",

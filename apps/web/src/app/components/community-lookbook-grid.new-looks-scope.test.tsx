@@ -3,6 +3,7 @@
 // Story 6.5 (PR #157 review P2): new looks buffered under one feed filter never land in
 // another. A filter change drops the buffer and retires an insertion already under way;
 // target resolution itself stays filter-agnostic.
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -112,7 +113,7 @@ function useTwoFilterFeeds() {
 async function bufferColdLook(feeds: ReturnType<typeof useTwoFilterFeeds>) {
   const user = userEvent.setup()
   renderGrid()
-  await user.click(await screen.findByTestId('community-filter-cold_dry'))
+  await selectCommunityClimate(user, 'cold_dry')
   await screen.findByTestId('lookbook-card-post-cold')
   await act(async () => {
     await feeds.syncs.at(-1)!.catchUp()
@@ -128,7 +129,7 @@ async function bufferColdLook(feeds: ReturnType<typeof useTwoFilterFeeds>) {
 it('drops looks buffered under the previous filter when the filter changes', async () => {
   const feeds = useTwoFilterFeeds()
   const user = await bufferColdLook(feeds)
-  await user.click(screen.getByTestId('community-filter-warm_wet'))
+  await selectCommunityClimate(user, 'warm_wet')
   await screen.findByTestId('lookbook-card-post-warm')
   expect(screen.queryByRole('button', { name: 'Show 1 new looks' })).toBeNull()
   expect(screen.queryByTestId('lookbook-card-post-cold-new')).toBeNull()
@@ -142,7 +143,7 @@ it('never inserts looks from an insertion started before the filter changed', as
     release = resolve
   })
   await user.click(screen.getByRole('button', { name: 'Show 1 new looks' }))
-  await user.click(screen.getByTestId('community-filter-warm_wet'))
+  await selectCommunityClimate(user, 'warm_wet')
   await screen.findByTestId('lookbook-card-post-warm')
   release()
   await act(async () => {
@@ -160,7 +161,7 @@ it('7.7-CMP-008 the new-looks pill is an overlay over the list, and the list doe
   const feeds = useTwoFilterFeeds()
   const user = userEvent.setup()
   renderGrid()
-  await user.click(await screen.findByTestId('community-filter-cold_dry'))
+  await selectCommunityClimate(user, 'cold_dry')
   await screen.findByTestId('lookbook-card-post-cold')
   const grid = screen.getByTestId('community-card-grid')
   const overlayHost = grid.previousElementSibling as HTMLElement

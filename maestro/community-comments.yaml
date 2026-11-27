@@ -60,6 +60,8 @@ tags:
     visible:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
+- tapOn:
+    id: 'community-card-open-lookbook-5'
 # Centred, slowly: iOS reports a control under the tab bar as visible, and the
 # highlighted card's actions start there (Story 6.7b R17 iOS run 1, where the tap
 # landed on the tab bar). The highlighted card heads the list, so centring never
@@ -164,6 +166,8 @@ tags:
     path: maestro/artifacts/community-comments-keyboard
 - tapOn:
     id: 'comments-close'
+- tapOn:
+    id: 'community-card-open-lookbook-5'
 - tapOn:
     id: 'community-card-comments-lookbook-5'
 - assertVisible: ${output.commentRoot}

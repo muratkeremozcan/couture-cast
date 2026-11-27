@@ -720,6 +720,16 @@
     }
   },
   "community": {
+    "calm": {
+      "post": "Posten",
+      "nearYou": "In deiner Nähe",
+      "climateEmpty": "Noch keine Looks in deiner Klimazone",
+      "seeAllClimates": "Alle Klimazonen ansehen",
+      "cardActions": "Beitragsoptionen",
+      "dismissChallenge": "Challenge ausblenden",
+      "thisWeek": "Diese Woche: {{title}}",
+      "allClimates": "Alle Klimazonen"
+    },
     "title": "Community",
     "heading": "Neueste Looks",
     "sectionLabel": "Community-Lookbook",

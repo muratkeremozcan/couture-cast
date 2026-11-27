@@ -209,7 +209,84 @@ function CommunityCardActions({
   )
 }
 
+function CommunityFeedCardSummary({
+  item,
+  authorName,
+  onOpen,
+  nearYou,
+  titleRef,
+  onReport,
+  ...actions
+}: Omit<CommunityCardActionsProps, 'onReport'> & {
+  authorName: string
+  onOpen: () => void
+  nearYou: boolean
+  titleRef?: React.Ref<View>
+  onReport: CommunityCardProps['onReport']
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const [actionsOpen, setActionsOpen] = useState(false)
+  const actionsButton = useRef<View>(null)
+  const closeActions =
+    (action: CommunityCardActionsProps['onReport']) => (post: CommunityFeedItem) => {
+      setActionsOpen(false)
+      return action(post)
+    }
+  return (
+    <View style={styles.feedSummary}>
+      <View style={styles.feedSummaryRow}>
+        <View style={styles.feedTitleGroup}>
+          {nearYou && (
+            <Text
+              testID={`community-card-near-you-${item.id}`}
+              style={[styles.nearYou, { color: palette.inkMuted }]}
+            >
+              {t('community.calm.nearYou')}
+            </Text>
+          )}
+          <Pressable
+            ref={titleRef}
+            accessibilityRole="button"
+            onPress={onOpen}
+            style={styles.feedOpenTitle}
+            testID={`community-card-title-${item.id}`}
+          >
+            <Text style={[styles.feedTitle, { color: palette.ink }]}>
+              {item.title || t('community.card.label', { author: authorName })}
+            </Text>
+          </Pressable>
+          <CommunityCardAuthorMeta item={item} authorName={authorName} />
+        </View>
+        <Pressable
+          ref={actionsButton}
+          testID="community-card-actions"
+          accessibilityRole="button"
+          accessibilityLabel={t('community.calm.cardActions')}
+          accessibilityState={{ expanded: actionsOpen }}
+          style={styles.moreActions}
+          onPress={() => setActionsOpen(!actionsOpen)}
+        >
+          <Text style={[styles.moreGlyph, { color: palette.ink }]}>⋯</Text>
+        </Pressable>
+      </View>
+      {actionsOpen && (
+        <View style={styles.feedActions}>
+          <CommunityCardActions
+            item={item}
+            isReported={actions.isReported}
+            onReport={closeActions((post) => onReport(post, actionsButton.current))}
+            onWithdraw={closeActions(actions.onWithdraw)}
+          />
+        </View>
+      )}
+    </View>
+  )
+}
+
 export interface CommunityCardProps {
+  feedCard?: boolean
+  feedTitleRef?: React.Ref<View>
   onTextSaved?: (postId: string, text: SavedCommunityText) => void
   textEditingEnabled?: boolean
   onExport?: (postId: string, opener: () => number | null) => void
@@ -232,7 +309,7 @@ export interface CommunityCardProps {
   isHighlighted?: boolean
   /** Lets the screen return accessibility focus here when a modal closes. */
   containerRef?: React.Ref<View>
-  onReport: (item: CommunityFeedItem) => void | Promise<void>
+  onReport: (item: CommunityFeedItem, opener?: View | null) => void | Promise<void>
   onWithdraw: (item: CommunityFeedItem) => void | Promise<void>
   onImageExpiry?: (item: CommunityFeedItem) => void | Promise<void>
   /** Records a card open. Measurement only; there is no detail view to navigate to yet. */
@@ -347,6 +424,8 @@ function CommunityCardAuthorMeta({
 }
 
 export function CommunityCard({
+  feedCard = false,
+  feedTitleRef,
   onTextSaved,
   textEditingEnabled,
   onExport,
@@ -504,6 +583,121 @@ export function CommunityCard({
     item.caption?.trim() ||
     t('community.card.label', { author: authorName })
 
+  const disclosure = sponsoredAnnounce && (
+    <View
+      testID={`community-card-partnered-${item.id}`}
+      accessible
+      accessibilityLabel={sponsoredAnnounce}
+      style={[styles.sponsoredPill, { backgroundColor: palette.inverse }]}
+    >
+      <Text style={[styles.sponsoredPillText, { color: palette.onInverse }]}>
+        {t('community.card.sponsored')}
+      </Text>
+    </View>
+  )
+
+  const renderHeader = () => (
+    <>
+      {!feedCard && (
+        <View style={styles.header}>
+          <View style={styles.authorRow}>
+            <View
+              style={[
+                styles.avatarPlaceholder,
+                avatarBox,
+                { backgroundColor: palette.cardMuted },
+              ]}
+            >
+              <Text style={[styles.avatarText, { color: palette.ink }]}>
+                {authorName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <CommunityCardAuthorMeta item={item} authorName={authorName} />
+          </View>
+
+          <View style={styles.headerTags}>
+            {disclosure}
+            <View
+              style={[styles.climatePill, { borderColor: palette.inkMuted }]}
+              testID={`community-card-climate-pill-${item.id}`}
+            >
+              <Text style={[styles.climatePillText, { color: palette.ink }]}>
+                {climateLabel}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
+    </>
+  )
+  const renderBody = () => (
+    <>
+      {feedCard ? (
+        <View>
+          {disclosure && <View style={styles.feedDisclosure}>{disclosure}</View>}
+          <CommunityFeedCardSummary
+            item={item}
+            authorName={authorName}
+            nearYou={shopSurface === 'community_spotlight'}
+            titleRef={feedTitleRef}
+            onOpen={handleOpen}
+            isReported={isReported}
+            onReport={onReport}
+            onWithdraw={onWithdraw}
+          />
+        </View>
+      ) : (
+        <CommunityCardText
+          item={item}
+          onTextSaved={onTextSaved}
+          textEditingEnabled={textEditingEnabled}
+        />
+      )}
+
+      {sponsorship ? (
+        // A sibling of the photo's open target.
+        <CommunitySponsoredShop
+          postId={item.id}
+          sponsorship={sponsorship}
+          surface={shopSurface}
+          testID={`community-card-shop-${item.id}`}
+          errorTestID={`community-card-shop-error-${item.id}`}
+          opensTestID={`community-card-shop-opens-${item.id}`}
+          style={styles.shop}
+        />
+      ) : null}
+
+      {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
+      {!feedCard && (
+        <>
+          <CommunityShareAction item={item} onExport={onExport} />
+          <View style={styles.actionsRow}>
+            {onComments && (
+              <TouchableOpacity
+                ref={commentsButtonRef}
+                accessibilityRole="button"
+                accessibilityLabel={t('community.comments.title')}
+                testID={`community-card-comments-${item.id}`}
+                style={[styles.secondaryButton, { borderColor: palette.inkMuted }]}
+                onPress={() => onComments(item)}
+              >
+                <Text style={[styles.secondaryButtonText, { color: palette.ink }]}>
+                  {t('community.comments.title')}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <CommunityCardActions
+              item={item}
+              isReported={isReported}
+              onReport={onReport}
+              onWithdraw={onWithdraw}
+            />
+          </View>
+        </>
+      )}
+    </>
+  )
+
   return (
     <View
       ref={containerRef}
@@ -521,46 +715,7 @@ export function CommunityCard({
         isHighlighted && { borderColor: palette.inverse, borderWidth: 2 },
       ]}
     >
-      <View style={styles.header}>
-        <View style={styles.authorRow}>
-          <View
-            style={[
-              styles.avatarPlaceholder,
-              avatarBox,
-              { backgroundColor: palette.cardMuted },
-            ]}
-          >
-            <Text style={[styles.avatarText, { color: palette.ink }]}>
-              {authorName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <CommunityCardAuthorMeta item={item} authorName={authorName} />
-        </View>
-
-        <View style={styles.headerTags}>
-          {sponsoredAnnounce && (
-            <View
-              testID={`community-card-partnered-${item.id}`}
-              accessible
-              accessibilityLabel={sponsoredAnnounce}
-              style={[styles.sponsoredPill, { backgroundColor: palette.inverse }]}
-            >
-              <Text style={[styles.sponsoredPillText, { color: palette.onInverse }]}>
-                {t('community.card.sponsored')}
-              </Text>
-            </View>
-          )}
-          <View
-            style={[styles.climatePill, { borderColor: palette.inkMuted }]}
-            testID={`community-card-climate-pill-${item.id}`}
-          >
-            <Text style={[styles.climatePillText, { color: palette.ink }]}>
-              {climateLabel}
-            </Text>
-          </View>
-        </View>
-      </View>
-
+      {renderHeader()}
       <CommunityCardMedia
         postId={item.id}
         imageUri={item.imageAccess.url}
@@ -573,54 +728,27 @@ export function CommunityCard({
         onOpen={handleOpen}
       />
 
-      <CommunityCardText
-        item={item}
-        onTextSaved={onTextSaved}
-        textEditingEnabled={textEditingEnabled}
-      />
-
-      {sponsorship ? (
-        // A sibling of the photo's open target.
-        <CommunitySponsoredShop
-          postId={item.id}
-          sponsorship={sponsorship}
-          surface={shopSurface}
-          testID={`community-card-shop-${item.id}`}
-          errorTestID={`community-card-shop-error-${item.id}`}
-          opensTestID={`community-card-shop-opens-${item.id}`}
-          style={styles.shop}
-        />
-      ) : null}
-
-      {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
-      <CommunityShareAction item={item} onExport={onExport} />
-      <View style={styles.actionsRow}>
-        {onComments && (
-          <TouchableOpacity
-            ref={commentsButtonRef}
-            accessibilityRole="button"
-            accessibilityLabel={t('community.comments.title')}
-            testID={`community-card-comments-${item.id}`}
-            style={[styles.secondaryButton, { borderColor: palette.inkMuted }]}
-            onPress={() => onComments(item)}
-          >
-            <Text style={[styles.secondaryButtonText, { color: palette.ink }]}>
-              {t('community.comments.title')}
-            </Text>
-          </TouchableOpacity>
-        )}
-        <CommunityCardActions
-          item={item}
-          isReported={isReported}
-          onReport={onReport}
-          onWithdraw={onWithdraw}
-        />
-      </View>
+      {renderBody()}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
+  feedSummary: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 4 },
+  feedSummaryRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  feedTitleGroup: { flex: 1 },
+  feedOpenTitle: { minHeight: 44, justifyContent: 'center' },
+  feedTitle: { fontSize: 16, fontWeight: '700' },
+  feedActions: { alignItems: 'flex-end' },
+  feedDisclosure: { alignSelf: 'flex-start', marginHorizontal: 16, marginTop: 8 },
+  nearYou: { fontSize: 12, fontWeight: '600' },
+  moreActions: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  moreGlyph: { fontSize: 24 },
   card: {
     borderRadius: 16,
     borderWidth: 1,

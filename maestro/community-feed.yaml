@@ -1,82 +1,9 @@
 # Learning path Step 38: Community feed by climate band.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
-# Learning path Step 41: Curated reactions.
-# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
-# Learning path Step 44: Community city spotlight.
-# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-# Story 6.1 Task 6: the community feed tab on mobile.
-#
-# HONEST SCOPE, stated the way premium-planner.yaml and palette-advisor.yaml
-# state theirs. `run-maestro.mjs` signs up a FRESH public-API user and bakes that
-# user's token into the Metro bundle via `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before
-# the Expo server starts; no Maestro flow in this repo signs in through the UI,
-# and the app has no runtime token override. So the harness user owns no posts,
-# holds no guardian consent, and has no moderation history.
-#
-# WHAT THAT DOES *NOT* MEAN IS AN EMPTY FEED, and this is worth stating because
-# it is the opposite of the obvious assumption. The community feed is a PUBLIC
-# read: `packages/db/prisma/seeds/rituals.ts` upserts five already-published
-# `LookbookPost` rows with stable ids `lookbook-1` through `lookbook-5`,
-# captions `Look N — weather-ready layers`, and `climate_band` alternating
-# `temperate_dry` / `cold_dry`. They are published a minute apart in id order, so
-# `lookbook-5` is the NEWEST of these and leads them in `published_at DESC`; this flow
-# anchors on it for that reason. CI runs `npm run db:reset` before the shards
-# (.github/workflows/pr-mobile-e2e.yml), so those rows are present and every
-# device sees them. Asserting `community-feed-empty` here would FAIL. This flow
-# therefore proves a populated feed against real seeded data, which is a great
-# deal more than the shell.
-#
-# THIS FLOW IS NOT USER-SCOPED and must stay out of `USER_SCOPED_FLOWS` in
-# scripts/run-maestro.mjs. The ids below are literals in this file, not `-e`
-# parameters, and they name PUBLIC rows every shard's user can read — unlike
-# `${CAPSULE_ID}` or `${GARMENT_A_ID}`, which are seeded for one device's user
-# and are the reason that list exists.
-#
-# WHAT IT CANNOT REACH, and why those journeys live elsewhere:
-#   - Publishing. It would enqueue a real ADR-013 moderation job and consume one
-#     of the ten daily submissions for a user shared across every flow on this
-#     device. The compose sheet is opened and closed here; the publish journey is
-#     `community-screen.test.tsx` through MSW and `playwright/tests/` end to end.
-#   - Withdrawing or the author's own in-progress states. Both need posts the
-#     harness user authored, and it has none. `assertNotVisible` on the withdraw
-#     control below is the honest inverse: the control must NOT be offered on
-#     someone else's post.
-#   - The teen consent gate. It needs an account with a guardian relationship,
-#     which a fresh public signup does not have.
-#
-# A SELECTOR TRAP THIS FLOW ALREADY FELL INTO, worth knowing before editing it.
-# `assertVisible` with BOTH an `id` and a `text` requires ONE node carrying both.
-# The caption's `testID` sits on the `Text` element itself, so the combined form
-# works there. The climate pill's sits on a wrapping `View` with the label on a
-# child `Text` (`apps/mobile/components/community/community-card.tsx`), so the
-# combined form fails against a perfectly correct card. One assertion passing and
-# the next failing on the same card reads as a data problem and is not one; the
-# pill is asserted as two separate steps below for that reason.
-#
-# THIS FLOW PRODUCED NO JUNIT ENTRY AND NO ARTIFACTS in the 4-way sharded run of
-# 2026-09-05 while the other four flows on its device ran and passed, and it
-# passes solo. Ruled out: tag filtering (there is no `maestro/config.yaml`, and
-# these tags match the sibling shape); the duration ESTIMATE affecting shard
-# packing (`resolve-maestro-shard.mjs` is CI-only, and the local sharded path
-# uses Maestro's own `--shard-split`); a harness timeout (the parallel path calls
-# `runMaestroCommand` with no watchdog, unlike the serial path); and flow
-# discovery (the runner handed Maestro 18 paths and reported "ran 18, report
-# described 17"). What remains is Maestro's own `--shard-split`, which this repo
-# already documents as unreliable in `runShardedFlows` — "observed exiting 0
-# while its own summary printed `Passed: 16/17`". The missing-flow guard catches
-# it and turns the suite red, so it is a known open question rather than a hole.
-#
-# SPLIT IN STORY 6.7B (R15). This flow and its reactions journey together cost
-# about 290 s in CI against the runner's 360 s per-flow cap. The reactions, with
-# their cold relaunch, now run in `community-reactions.yaml`; this flow keeps the
-# shell, the filters, the feed walk with its card and ordering checks, the report
-# keyboard check and the compose sheet.
-#
-# The `all` filter is selected before asserting on cards, deliberately. Under
-# `auto` the result depends on whether the shared fixture user happens to have a
-# saved location by the time this flow runs — another flow on the same device may
-# have created one — so `auto` is exactly the kind of order-dependent assertion
-# this suite's shared-user rule warns about. `all` returns every band regardless.
+# Learning path Step 72: Calm Community with an empty state.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
+# The runner signs in a synthetic member against the isolated CI API. The seeded
+# Spotlight cohort is shared and read-only. Cancel the report without creating one.
 appId: ${MAESTRO_APP_ID}
 name: 'Community feed by climate band'
 tags:
@@ -88,303 +15,65 @@ tags:
     appId: ${MAESTRO_APP_ID}
     clearState: true
     stopApp: false
-
 - runFlow: subflows/open-app.yaml
-
-# --- The tab and its shell ---------------------------------------------------
-
-- tapOn:
-    id: 'tab-community'
-    retryTapIfNoChange: true
-    label: 'Open the community tab from the bottom navigation'
-
+- runFlow: subflows/open-community-tab.yaml
 - extendedWaitUntil:
     visible:
-      id: 'community-screen'
-    timeout: 15000
-    label: 'Community screen is the one on top'
-
+      id: 'community-new-post-button'
+    timeout: 20000
 - assertVisible:
-    id: 'community-new-post-button'
-    text: 'New post'
-    label: 'Localized compose entry point, not a literal'
+    text: 'Post'
 
-# --- AC: the defined filters are present and the future ones are not ---------
-
-- assertVisible:
-    id: 'community-sticky-filter-chips'
-    label: 'Filter chips render with the feed'
-
+- tapOn:
+    id: 'community-climate-filter'
+- extendedWaitUntil:
+    visible:
+      id: 'community-climate-sheet'
+    timeout: 10000
 - assertVisible:
     id: 'community-filter-chip-auto'
-    label: 'The viewer-climate filter is offered'
-
 - assertVisible:
     id: 'community-filter-chip-all'
-    label: 'The every-climate filter is offered'
-
-# THE VIEWER'S CLIMATE BAND RESOLVED, and until the seed carried daily summaries
-# it could not.
-#
-# `CommunityService.resolveViewerBand` classifies from
-# `WeatherSnapshot.daily_summaries` and from nothing else. That column was never
-# seeded, so every run of this flow resolved `viewerBand: null` with
-# `bandUnresolvedReason: 'weather_malformed'` and this banner was the permanent
-# state of the screen -- the `auto` feed quietly served every region instead of
-# the viewer's band, which is the behaviour this whole flow is named after.
-# `packages/db/prisma/seeds/weather.ts` now seeds an eight-day Celsius forecast
-# per location, and `chicago-il` (the location `run-maestro.mjs` creates for this
-# device's user) classifies `cold_wet`.
-#
-# Read the strength of this assertion honestly: the banner renders only under
-# `servedMode === 'auto' && !bandResolved` (`community-screen.tsx`), so in the
-# `all` arm of the experiment it is absent whatever the band does and this passes
-# without proving anything. In the `auto` arm it is a real guard, and it is the
-# half that used to fail: seeding regressed away, the banner returns, and this
-# turns red on the next `auto` run.
 - assertNotVisible:
     id: 'community-band-unresolved'
-    label: "The viewer's climate band resolved from the seeded daily forecast"
-
-# THE TAP IS BRACKETED BY TWO ASSERTIONS, AND THAT IS THE POINT.
-#
-# `tapOn` reports COMPLETED whether or not anything handled the touch, so a tap
-# with no assertion after it proves nothing. This one used to sit alone: if it
-# no-opped the feed stayed on `auto`, and because `auto` falls back to every
-# region when the device user has no saved location, every card assertion below
-# would still have passed. The flow would have been green while testing a filter
-# it never applied.
-#
-# THE `before` HALF OF THAT BRACKET CANNOT NAME A CHIP, and the reason is the
-# beta experiment rather than anything about this flow.
-#
-# This assertion used to read `community-filter-chip-auto`, `selected: true`,
-# on the stated premise that "the screen opens on `auto`
-# (`useState<CommunityFeedMode>('auto')`)". That premise is only true for the
-# frames before the first response lands. The chip strip renders `servedMode`,
-# not the requested mode (`community-screen.tsx` sets it from `feed.mode`), and
-# the server resolves a requested `auto` to the viewer's experiment arm:
-# `resolveEffectiveMode` returns the variant, and `resolveCommunityExperimentVariant`
-# is `sha256('community-experiment:' + userId).readUInt8(0) % 2` -- a 50/50
-# split on the user id (`community-analytics.ts`). `run-maestro.mjs` used to
-# sign up a FRESH random user per run, so that split was re-rolled on every CI
-# run and the `auto` chip was selected in roughly half of them. Since Story 1.2b
-# it signs up until the member is on `auto`, because `location-capture.yaml`
-# has to read the resolved band; the assertions below still hold in either arm.
-#
-# That is not a hypothesis. Run 34060302593 passed with user
-# `cmtqbf8ao00004xn6d0a20kfb`, which hashes to the `auto` arm; run 34062456272
-# failed here with user `cmtqcy39f00004xkt00wrf3yq`, which hashes to `all`, and
-# the chip was correctly unselected. In the `all` arm the strip can never show
-# `auto` selected at all, because tapping `auto` re-requests `auto` and the
-# server resolves it straight back to `all`.
-#
-# So the `before` half asserts only that SOMETHING is selected, which holds in
-# both arms and still catches a strip that opens with no selection. The regex
-# id form is the one `accessibility-hardening.yaml` already uses for
-# `swap-option-.*`. The stronger claim the old assertion was reaching for --
-# that a tap MOVES the selection, from a known state that is not the target --
-# is asserted deterministically one tier down, where MSW controls the arm:
-# `6.1-MOB-091` in `apps/mobile/src/screens/community-screen.test.tsx` taps
-# `warm_dry` and then `all`, and pins the `all` chip becoming selected. That is
-# the right home for it; an arm this flow cannot choose is not something it can
-# assert a transition against.
-- assertVisible:
-    id: 'community-filter-chip-.*'
-    selected: true
-    label: 'Precondition: the strip opens with a filter selected, whichever arm
-      the experiment served this run'
-
-# ONE TAP, NO `retryTapIfNoChange`. In the `auto` arm with a resolved band the
-# active chip reads "Your climate: Cold and wet"; the tap moves the selection,
-# that chip shrinks to "Your climate", and the whole strip slides left. When
-# Maestro judged the first tap a no-op and retapped the same point, the second
-# tap landed on `cold_wet`, which had slid under it (local run 2026-10-22,
-# step 43 screenshot). The selected-state assertion below catches a tap that
-# truly did nothing.
 - tapOn:
     id: 'community-filter-chip-all'
-    label: 'Pin the feed to every climate so the result does not depend on this
-      device user having a saved location'
-# The chip refetches the feed, and while it loads the list renders empty, which
-# resets any scroll; scrolling starts only once the page is in.
 - extendedWaitUntil:
     notVisible:
-      id: 'community-feed-skeleton'
-    timeout: 20000
-
-- assertVisible:
-    id: 'community-filter-chip-all'
-    selected: true
-    label: 'The feed is pinned to every climate. In the auto arm this also proves
-      the tap moved the selection; in the all arm it was already there, which is
-      why the transition itself is pinned in 6.1-MOB-091 instead'
-
-# --- The feed renders real seeded rows, in publication order -----------------
-
-# LOOKBOOK-5, NOT LOOKBOOK-1, AND THE CHOICE IS THE ASSERTION.
-#
-# The feed is ordered `published_at DESC, id DESC`, and the seed stamps
-# `lookbook-N` at `SEEDED_PUBLICATION_EPOCH_MS + idx * 60_000`, so `lookbook-5`
-# is the NEWEST post and therefore the first card. `lookbook-1` is the oldest and
-# sits at the bottom, off-screen without scrolling — asserting on it was a bug in
-# this flow that read as a broken feed, and it is exactly the mistake the
-# ordering contract exists to catch.
-#
-# Story 6.6: the City Spotlight module now heads the list, and the seeded
-# spotlight cohort publishes relative to the seed run, so its posts are newer
-# than every `lookbook-N` row and lead the all-climates feed. The flow scrolls to
-# the newest feed-seed post instead of expecting it in the first viewport. The
-# spotlight carousel and seven newer feed cards, each nearly a screen tall, sit
-# above it. A fast scroll command opened the card under it on Android, so the
-# card is reached with straight swipes instead. A card is
-# taller than the space between the header and the tab bar on a phone, so the
-# checks below walk it top to bottom, scrolling each part into view before
-# asserting it: a part asserted earlier may already have scrolled away.
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-heading'
-    timeout: 20000
-    label: 'The spotlight header rendered above the feed, over the real API'
-# TWO PHASES, SO THE CARD ARRIVES FROM THE BOTTOM, AUTHOR ROW FIRST.
-#
-# Above `lookbook-5` sit the seven spotlight cohort posts, `seed-spotlight-1`
-# (newest) to `seed-spotlight-7` (oldest, directly above it). Fast swipes cover
-# the distance until `seed-spotlight-6` shows. Each moves the list less than one
-# card plus the list's height, so no card is skipped; the module's own copy of
-# that post sits off screen in its horizontal row. From there `seed-spotlight-7`,
-# a whole card, separates the list from `lookbook-5`, so short, slow swipes take
-# over: each drags 40% of the screen over 1.5 s, carries little fling and moves
-# the list less than its own height (list [750,2752] on a 2992 px Android
-# screen, 233-784 pt on an iPhone 17 Pro). The card is checked before every
-# swipe, so when it first shows, its author row, the card's topmost part, is in
-# the list or just past its bottom edge, never above the list top.
-#
-# History. Fast swipes all the way could carry the author row from below the
-# list to above its top (CI job 120208110948, Android), and the UP walk added for
-# that ran the wrong way when the row sat just below the bottom edge (CI job
-# 120691261993, Android; and twice in a row on an iPhone 17 Pro in Story 6.7b,
-# where iOS counted the clipped row as visible, skipped the corrective drag, and
-# the UP walk ran to the top of the feed). Slow swipes all the way pushed the
-# flow past the runner's six-minute budget on iOS.
-- repeat:
-    while:
-      notVisible:
-        id: 'community-post-card-seed-spotlight-6'
-    times: 20
-    commands:
-      - swipe:
-          start: '50%, 85%'
-          end: '50%, 25%'
-          duration: 500
-- repeat:
-    while:
-      notVisible:
-        id: 'community-post-card-lookbook-5'
-    times: 12
-    commands:
-      - swipe:
-          start: '50%, 85%'
-          end: '50%, 45%'
-          duration: 1500
-- extendedWaitUntil:
-    visible:
-      id: 'community-post-card-lookbook-5'
+      id: 'community-climate-sheet'
     timeout: 10000
-    label: 'The newest feed-seed post renders in the feed'
-# The card can stop with its author row on the list's bottom edge. Maestro counts
-# a clipped node as visible: CI job 139596881183 reported the author row and the
-# climate pill visible at 3 px and 11 px tall (list ending at y 2190), while the
-# band label inside the pill had no height and its text assertion failed. A
-# visibility check on the row cannot tell that apart, so the pill is scrolled to
-# the middle of the screen, fully shown, slowly so the scroll cannot overshoot it
-# under the filter strip.
-- scrollUntilVisible:
-    element:
-      id: 'community-card-climate-pill-lookbook-5'
-    direction: DOWN
-    centerElement: true
-    visibilityPercentage: 100
-    speed: 10
-    timeout: 20000
 - assertVisible:
-    id: 'community-card-author-lookbook-5'
-    label: 'The author line renders a pseudonym rather than being absent'
-
-# TWO ASSERTIONS, NOT ONE WITH BOTH `id` AND `text`.
-#
-# `assertVisible` with an `id` and a `text` requires ONE node carrying both, and
-# the pill does not have one: `community-card-climate-pill-<id>` is the `testID`
-# on the wrapping `View` (community-card.tsx), while the band label lives on a
-# child `<Text>`. The combined form therefore fails against a perfectly correct
-# card. The caption below is not affected because its `testID` sits on the
-# `Text` element itself.
-- assertVisible:
-    id: 'community-card-climate-pill-lookbook-5'
-    label: 'The climate band pill renders on the card'
-
-- assertVisible:
-    text: 'Temperate and dry'
-    label: 'The seeded band renders through the locale catalog, not as a raw enum'
-
-# The signed image URL is minted per request and the card renders it. A post
-# whose object could not be signed is dropped from the feed entirely, so this
-# also proves the seeded object exists in the bucket. Half the image on screen
-# puts its top edge, where the loaded marker sits, on screen too.
-- scrollUntilVisible:
-    element:
-      id: 'community-card-image-lookbook-5'
-    direction: DOWN
-    visibilityPercentage: 50
-    timeout: 20000
-- assertVisible:
-    id: 'community-card-image-lookbook-5'
-    label: 'The card rendered its signed image rather than the unavailable state'
-
-# The image element exists before its bytes arrive, so the assertion above cannot
-# tell a loaded image from a blank placeholder: it passed for months while the
-# emulator had no route to local Supabase storage. The loaded marker appears only
-# after the image's onLoad fires.
+    text: 'All climates'
 - extendedWaitUntil:
     visible:
-      id: 'community-card-image-loaded-lookbook-5'
+      id: 'community-card-image-loaded-seed-spotlight-1'
     timeout: 20000
-    label: 'The signed image actually loaded on the device'
-
 - assertNotVisible:
-    id: 'community-card-image-unavailable-lookbook-5'
+    id: 'community-feed-empty'
+- assertNotVisible:
+    id: 'community-feed-error'
+- takeScreenshot:
+    path: maestro/artifacts/community-feed-populated
 
 - scrollUntilVisible:
     element:
-      id: 'community-card-caption-lookbook-5'
-    direction: DOWN
-    timeout: 20000
-- assertVisible:
-    id: 'community-card-caption-lookbook-5'
-    text: 'Look 5 — weather-ready layers'
-    label: 'The caption is the seeded row, so this is live data and not a fixture'
-
-# Centred, slowly, before it is tapped: iOS reports a control under the tab bar
-# as visible, and a tap there lands on the Settings tab (Story 6.7b iOS run 6). A
-# centring scroll at the default speed overshot the row under the filter strip.
-- scrollUntilVisible:
-    element:
-      id: 'community-card-report-lookbook-5'
+      id: 'community-card-title-seed-spotlight-1'
     direction: DOWN
     centerElement: true
-    speed: 10
     timeout: 20000
+- tapOn:
+    id: 'community-card-actions'
+    index: 0
 - assertVisible:
-    id: 'community-card-report-lookbook-5'
-    text: 'Report'
-    label: 'Reporting is offered on another member post'
-
+    id: 'community-card-report-seed-spotlight-1'
+- assertNotVisible:
+    id: 'community-card-withdraw-seed-spotlight-1'
 # Story 6.7 R57: the report dialog with the keyboard up. Its translucent window is
 # edge to edge, so only the dialog's own keyboard view keeps its buttons above the
 # keyboard. Cancel sits below the details field: a tap that landed on the keyboard
 # instead would leave the dialog open, and the assertion after it would fail.
 - tapOn:
-    id: 'community-card-report-lookbook-5'
+    id: 'community-card-report-seed-spotlight-1'
 - extendedWaitUntil:
     visible:
       id: 'submit-report-button'
@@ -422,52 +111,6 @@ tags:
     label: 'Cancel, with the keyboard still up, sends nothing'
 - assertNotVisible:
     id: 'report-details-input'
-- assertVisible:
-    id: 'community-card-report-lookbook-5'
-
-# The withdraw control belongs to the author alone. It must not appear on a post
-# this user did not write, and it is the only ownership control on the card.
-- assertNotVisible:
-    id: 'community-card-withdraw-lookbook-5'
-
-# A populated feed is neither the empty state nor an error state. Asserting the
-# absence of both stops a silently degraded feed from passing the checks above.
-- assertNotVisible:
-    id: 'community-feed-empty'
-- assertNotVisible:
-    id: 'community-feed-error'
-- assertNotVisible:
-    id: 'community-action-error'
-
-# ORDERING. The feed-seed rows publish a minute apart, so `lookbook-5` must sit
-# above `lookbook-4` in the `published_at DESC` feed. A feed that lost
-# its ordering, or fell back to creation time (which moderation stamps long
-# before publication), puts `lookbook-4` first and fails here. Each card is
-# almost a screen tall, so the next card is scrolled in and asserted below the
-# one still on screen above it.
-- scrollUntilVisible:
-    element:
-      id: 'community-post-card-lookbook-4'
-    direction: DOWN
-    visibilityPercentage: 50
-    timeout: 20000
-- assertVisible:
-    id: 'community-post-card-lookbook-4'
-    below:
-      id: 'community-post-card-lookbook-5'
-    label: 'The newest feed-seed post sits above the next one'
-- scrollUntilVisible:
-    element:
-      id: 'community-card-caption-lookbook-5'
-    direction: UP
-    timeout: 20000
-
-# Story 6.3's reactions (add, replace, a cold relaunch, remove) live in
-# `community-reactions.yaml`, which reaches this card through the notification
-# deep link (Story 6.7b R15).
-
-- takeScreenshot:
-    path: maestro/artifacts/community-feed-populated
 
 # --- The compose entry point opens and closes -------------------------------
 

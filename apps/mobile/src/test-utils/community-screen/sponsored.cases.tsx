@@ -5,6 +5,7 @@
 // Story 6.7b owner: sponsored community CTAs on the Community screen, through the
 // real HTTP boundary. Each card is found by its loaded content first, so every
 // absence asserted below is an absence on a rendered card.
+import { openCommunityPostComments } from './interactions'
 import { feedJson, feedUrls, item, serveFeed, setMockParams } from './harness'
 import { mockCapture, refreshEvents, webBrowser } from './mock-state'
 import { act, screen, waitFor, within } from '@testing-library/react'
@@ -455,7 +456,7 @@ export function registerCommunitySponsoredCases() {
       // Opening the comments retires the notification intent, so the older read
       // is not re-requested once it lands: its answer is the last word from
       // that call site, and only its start order can say it is stale.
-      press(screen.getByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       act(() => refreshEvents.onRefresh!())
       // The refresh's feed read and its re-read of the highlighted post both
       // landed: the highlighted card shows their caption.

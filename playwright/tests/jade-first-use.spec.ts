@@ -1,3 +1,4 @@
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import type { Locator, Page } from '@playwright/test'
 import {
   createGarmentUploadUrlInputSchema,
@@ -318,13 +319,13 @@ test.describe('Jade first use on a phone', () => {
       await expect(examples.getByText('Garment illustrations')).toBeVisible()
       await expect(examples.getByText('Sample weather · Mild and dry')).toHaveCount(3)
 
-      await page.getByTestId('community-filter-cold_wet').click()
+      await selectCommunityClimate(page, 'cold_wet')
       await expect(card).toHaveCount(0)
       await expect(rows).toHaveCount(0)
       await expect(page.getByTestId('community-feed-empty')).toBeVisible()
       await expect(examples.getByText('Sample weather · Cool and rainy')).toHaveCount(3)
 
-      await page.getByTestId('community-filter-all').click()
+      await selectCommunityClimate(page, 'all')
       await expect(card).toBeVisible()
       await expect(rows).toHaveCount(1)
     }
@@ -619,7 +620,8 @@ privateCommunityTest.describe('Jade Community composer @local-lane', () => {
       )
       expect(terminal.status).toBe('published')
       await page.reload()
-      await expect(page.getByTestId(`caption-${postId}`)).toHaveText(edited)
+      await page.getByTestId(`lookbook-open-${postId}`).click()
+      await expect(page.getByTestId('community-detail-caption')).toHaveText(edited)
     }
   )
 

@@ -17,6 +17,7 @@ export interface AppTopBarProps {
   /** Replaces the plain title text (the share card focus heading registers itself this way). */
   titleNode?: ReactNode
   trailing?: ReactNode
+  wrapTitle?: boolean
   /**
    * Whether the bar sits under the status bar and pads by the top safe-area inset (a header, a
    * full-height layer). Default true.
@@ -35,6 +36,7 @@ export function AppTopBar({
   onBack,
   titleNode,
   trailing,
+  wrapTitle = false,
   safeAreaTop = true,
   titleRef,
 }: AppTopBarProps) {
@@ -49,8 +51,10 @@ export function AppTopBar({
       testID="app-top-bar"
       style={[
         styles.bar,
+        wrapTitle
+          ? { minHeight: shell.topBarHeight + topInset }
+          : { height: shell.topBarHeight + topInset },
         {
-          height: shell.topBarHeight + topInset,
           paddingTop: topInset,
           paddingHorizontal: space[2],
           backgroundColor: colors.page,
@@ -91,7 +95,7 @@ export function AppTopBar({
             ref={titleRef}
             testID="app-top-bar-title"
             accessibilityRole="header"
-            numberOfLines={1}
+            numberOfLines={wrapTitle ? undefined : 1}
             style={{
               color: colors.ink,
               fontSize: type.lg.fontSize,
@@ -103,7 +107,11 @@ export function AppTopBar({
           </Text>
         )}
       </View>
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
+      {trailing ? (
+        <View style={[styles.trailing, wrapTitle && styles.trailingWrap]}>
+          {trailing}
+        </View>
+      ) : null}
     </View>
   )
 }
@@ -123,6 +131,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  trailingWrap: { maxWidth: '45%', flexShrink: 1 },
   trailing: {
     flexDirection: 'row',
     alignItems: 'center',

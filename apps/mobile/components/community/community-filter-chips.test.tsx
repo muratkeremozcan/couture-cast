@@ -10,7 +10,7 @@
 import React, { createElement } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import type { CommunityFeedMode } from '@couture/api-client/contracts/http'
@@ -50,11 +50,7 @@ touchableSpy.createElement = createElement
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n, supportedLocales } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
-import {
-  COMMUNITY_FILTER_MODES,
-  CommunityFilterChips,
-  CommunityFiltersExplainer,
-} from './community-filter-chips'
+import { COMMUNITY_FILTER_MODES, CommunityFilterChips } from './community-filter-chips'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
@@ -87,9 +83,11 @@ describe('CommunityFilterChips (Story 6.1)', () => {
     expect(COMMUNITY_FILTER_MODES).toEqual(['auto', 'all', ...CLIMATE_BANDS])
 
     renderChips()
+    expect(screen.queryByTestId('community-climate-sheet')).toBeNull()
+    press(screen.getByTestId('community-climate-filter'))
     expect(
-      screen.getByTestId('community-sticky-filter-chips').getAttribute('aria-label')
-    ).toBe(enUS.community.filters.label)
+      screen.getByRole('heading', { name: enUS.community.filters.label })
+    ).toBeVisible()
 
     for (const mode of COMMUNITY_FILTER_MODES) {
       const chip = screen.getByTestId(`community-filter-chip-${mode}`)
@@ -99,7 +97,7 @@ describe('CommunityFilterChips (Story 6.1)', () => {
       })
     }
     expect(screen.getByTestId('community-filter-chip-all').textContent).toBe(
-      enUS.community.filters.mode.all
+      enUS.community.calm.allClimates
     )
     expect(screen.getByTestId('community-filter-chip-temperate_dry').textContent).toBe(
       enUS.community.filters.mode.temperate_dry
@@ -108,6 +106,7 @@ describe('CommunityFilterChips (Story 6.1)', () => {
 
   it('6.1-MOB-043 announces which chip is selected and never leans on colour alone', () => {
     renderChips({ selectedMode: 'cold_wet' })
+    press(screen.getByTestId('community-climate-filter'))
 
     expect(
       touchableSpy.props.get('community-filter-chip-cold_wet')?.accessibilityState
@@ -130,15 +129,13 @@ describe('CommunityFilterChips (Story 6.1)', () => {
     // bolder label.
     const active = screen.getByTestId('community-filter-chip-cold_wet')
     const inactive = screen.getByTestId('community-filter-chip-auto')
-    expect(active.style.borderWidth).toBe('2px')
-    expect(inactive.style.borderWidth).toBe('1px')
     expect((active.firstElementChild as HTMLElement).style.fontWeight).toBe('700')
     expect((inactive.firstElementChild as HTMLElement).style.fontWeight).toBe('500')
   })
 
   it('6.1-MOB-044 folds a resolved viewer band into the auto chip, and copes without one', () => {
     const { rerender, onSelectMode } = renderChips()
-    expect(screen.getByTestId('community-filter-chip-auto').textContent).toBe(
+    expect(screen.getByTestId('community-climate-filter').textContent).toContain(
       'Your climate: Temperate and dry'
     )
 
@@ -149,7 +146,7 @@ describe('CommunityFilterChips (Story 6.1)', () => {
         viewerBand={null}
       />
     )
-    expect(screen.getByTestId('community-filter-chip-auto').textContent).toBe(
+    expect(screen.getByTestId('community-climate-filter').textContent).toContain(
       enUS.community.filters.mode.auto
     )
   })
@@ -159,15 +156,16 @@ describe('CommunityFilterChips (Story 6.1)', () => {
 
     const tapped: CommunityFeedMode[] = ['all', 'warm_wet']
     for (const mode of tapped) {
+      press(screen.getByTestId('community-climate-filter'))
       press(screen.getByTestId(`community-filter-chip-${mode}`))
     }
     expect(onSelectMode.mock.calls).toEqual(tapped.map((mode) => [mode]))
   })
 
   it('6.1-MOB-046 has no axe violations', async () => {
-    const { container } = renderChips()
-
-    const results = await runAxe(container, {
+    renderChips()
+    press(screen.getByTestId('community-climate-filter'))
+    const results = await runAxe(screen.getByTestId('community-climate-sheet'), {
       runOnly: { type: 'tag', values: AXE_TAGS },
     })
 
@@ -204,24 +202,14 @@ describe('CommunityFilterChips (Story 6.1)', () => {
         ).toBe(true)
         await i18n.changeLanguage(locale)
 
-        render(<CommunityFiltersExplainer />)
+        renderChips()
+        expect(screen.queryByTestId('community-filters-explainer')).toBeNull()
+        press(screen.getByTestId('community-climate-filter'))
 
         const line = screen.getByTestId('community-filters-explainer')
         expect(line).toHaveTextContent(i18n.t('community.filters.explainer'))
         expect(line).toBeVisible()
       }
     )
-
-    it('[7.11 D16] the sticky chip strip carries no explainer above the first content', () => {
-      renderChips()
-
-      const strip = screen.getByTestId('community-sticky-filter-chips')
-      expect(within(strip).queryByTestId('community-filters-explainer')).toBeNull()
-      expect(within(strip).queryByText(i18n.t('community.filters.explainer'))).toBeNull()
-      // The strip is the chips alone: the first thing in it is the first chip.
-      expect(
-        within(strip).getByTestId(`community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`)
-      ).toBeVisible()
-    })
   })
 })

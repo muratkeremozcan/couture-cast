@@ -1,5 +1,6 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { randomInt, randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
 import {
@@ -614,7 +615,7 @@ test.describe('Story 6.5 real engagement transport', () => {
         { timeout: 10_000 }
       )
       await expect(thread(page)).toHaveCount(0)
-      await page.getByTestId('community-filter-all').click()
+      await selectCommunityClimate(page, 'all')
       await openComments(page, other.postId)
       await thread(page).getByLabel('Add a comment').fill('New owner draft')
     } finally {

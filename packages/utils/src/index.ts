@@ -97,6 +97,7 @@ export type { Lab, SkinDepth, SkinUndertone } from './skin-tone'
 
 export { CLIMATE_BANDS, ORDERED_CLIMATE_BANDS, classifyClimateBand } from './climate-band'
 export type { ClimateBand, ClimateBandDay } from './climate-band'
+export { communityFeedClimate, mergeCommunityLooks } from './community-feed'
 
 export {
   canonicalCountryCode,

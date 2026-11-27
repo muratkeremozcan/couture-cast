@@ -1,9 +1,11 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
-// Story 6.6: the City Spotlight module that heads the Community tab.
+// Learning path Step 72: Calm Community with an empty state.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 import type { Page } from '@playwright/test'
 import { COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT } from '@couture/api-client/contracts/http'
 import { checkA11y } from '../support/helpers/accessibility'
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { communityTest as test, expect } from '../support/helpers/community-session'
 import {
   SEEDED_SPOTLIGHT_POST_IDS,
@@ -13,24 +15,18 @@ import {
 } from '../support/helpers/community-spotlight'
 import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 
-const spotlight = (page: Page) => page.getByTestId('community-spotlight')
+const rankedCards = (page: Page) =>
+  page.getByTestId('community-card-grid').getByTestId(/^spotlight-lookbook-card-/)
 
 async function loadedSpotlight(page: Page) {
   await page.goto('/community')
-  await expect(spotlight(page)).toHaveAttribute('aria-busy', 'false')
-  await expect(spotlight(page)).toHaveAttribute(
-    'data-level',
-    /^(city|region|country|none)$/
-  )
+  await selectCommunityClimate(page, 'all')
+  await expect(rankedCards(page).first()).toBeVisible()
 }
 
 async function rankedIds(page: Page): Promise<string[]> {
-  const entries = spotlight(page).getByRole('listitem')
-  return entries.evaluateAll((items) =>
-    items.map(
-      (item) =>
-        item.getAttribute('data-testid')?.replace(/^community-spotlight-item-/, '') ?? ''
-    )
+  return rankedCards(page).evaluateAll((items) =>
+    items.map((item) => item.id.replace(/^spotlight-lookbook-card-/, ''))
   )
 }
 
@@ -45,7 +41,7 @@ test.describe('Story 6.6 City Spotlight', () => {
     })
   })
 
-  test('[P1] heads the community section with the viewer area and the ranked seeded cohort', async ({
+  test('[P1] shows the ranked seeded cohort at the front of the feed with Near you labels', async ({
     page,
     communitySession,
   }) => {
@@ -58,27 +54,21 @@ test.describe('Story 6.6 City Spotlight', () => {
     try {
       await loadedSpotlight(page)
 
-      await expect(spotlight(page)).toHaveAttribute('data-level', 'city')
-      await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
-        `Spotlight in ${SEEDED_SPOTLIGHT_AREA.city}`
-      )
-      // The module is the first thing in the community section. Story CC-7.11 P5: it sits in
-      // the section's first-content block, the anchor the fold checks measure.
-      const firstBlock = page.getByTestId('community-first-content')
-      await expect(firstBlock).toBeVisible()
-      await expect(firstBlock.locator(':scope > *').first()).toHaveAttribute(
-        'data-testid',
-        'community-spotlight'
-      )
       const firstPage = SEEDED_SPOTLIGHT_POST_IDS.slice(
         0,
         COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT
       )
+      await expect(rankedCards(page)).toHaveCount(firstPage.length)
       expect(await rankedIds(page)).toEqual(firstPage)
-      for (const [index, postId] of firstPage.entries()) {
+      const first = page.getByTestId('community-card-grid').locator('article').first()
+      await expect(first).toHaveAttribute('id', `spotlight-lookbook-card-${firstPage[0]}`)
+      for (const postId of firstPage) {
         await expect(
-          page.getByTestId(`community-spotlight-item-${postId}`)
-        ).toHaveAttribute('data-rank', String(index + 1))
+          page
+            .getByTestId(`spotlight-lookbook-card-${postId}`)
+            .getByText('Near you', { exact: true })
+        ).toBeVisible()
+        await expect(page.getByTestId(`lookbook-card-${postId}`)).toHaveCount(0)
       }
       await expect(page.getByTestId('community-spotlight-view-more')).toBeVisible()
       await checkA11y(page)
@@ -101,9 +91,6 @@ test.describe('Story 6.6 City Spotlight', () => {
     )
     try {
       await loadedSpotlight(page)
-      await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
-        `Spotlight in ${SEEDED_SPOTLIGHT_AREA.city}`
-      )
       expect(await rankedIds(page)).toEqual(
         SEEDED_SPOTLIGHT_POST_IDS.slice(0, COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT)
       )
@@ -127,10 +114,6 @@ test.describe('Story 6.6 City Spotlight', () => {
       const firstNew = SEEDED_SPOTLIGHT_POST_IDS[COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT]!
       await expect(page.getByTestId(`spotlight-lookbook-card-${firstNew}`)).toBeFocused()
       expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS)
-      // Page two continues the ranking: its first look is rank 7, not a fresh rank 1.
-      await expect(
-        page.getByTestId(`community-spotlight-item-${firstNew}`)
-      ).toHaveAttribute('data-rank', String(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT + 1))
       await expect(page.getByTestId('community-live-region')).toHaveText(
         'Loaded 1 more spotlight look.'
       )
@@ -203,12 +186,10 @@ test.describe('Story 6.6 City Spotlight', () => {
     { width: 390, height: 844 },
     { width: 1280, height: 800 },
   ]) {
-    test(`[P1] lays the ranked looks out in one horizontal row at ${viewport.width}px`, async ({
+    test(`[P1] the inline ranked cards stay inside the feed at ${viewport.width}px`, async ({
       page,
       communitySession,
     }) => {
-      // R42: six stacked cards pushed the first feed card several screens down.
-      // One row keeps the feed within a card's height of the module.
       await assertSeededSpotlight()
       const removeLocation = await placeViewerInArea(
         communitySession.userId,
@@ -217,32 +198,15 @@ test.describe('Story 6.6 City Spotlight', () => {
       try {
         await page.setViewportSize(viewport)
         await loadedSpotlight(page)
-        const row = page.getByTestId('community-spotlight-row')
-        await expect(row).toBeVisible()
-        const layout = await row.evaluate((element) => {
-          const items = Array.from(
-            element.querySelectorAll<HTMLElement>(
-              '[data-testid^="community-spotlight-item-"]'
-            ),
-            (item) => item.getBoundingClientRect()
-          )
-          const module = document
-            .querySelector('[data-testid="community-spotlight"]')!
-            .getBoundingClientRect()
-          return {
-            rowScrolls: element.scrollWidth > element.clientWidth,
-            pageScrollsSideways: document.documentElement.scrollWidth > window.innerWidth,
-            tops: items.map((item) => Math.round(item.top)),
-            cardHeight: Math.max(...items.map((item) => item.height)),
-            moduleHeight: module.height,
-          }
-        })
-        expect(layout.tops).toHaveLength(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT)
-        expect(new Set(layout.tops).size).toBe(1)
-        expect(layout.rowScrolls).toBe(true)
-        expect(layout.pageScrollsSideways).toBe(false)
-        // Heading, row and View more: the module is one card tall plus chrome.
-        expect(layout.moduleHeight).toBeLessThan(layout.cardHeight + 200)
+        await expect(rankedCards(page)).toHaveCount(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT)
+        for (const card of await rankedCards(page).all()) {
+          const bounds = (await card.boundingBox())!
+          expect(bounds.x).toBeGreaterThanOrEqual(0)
+          expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width)
+        }
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth)
+        ).toBeLessThanOrEqual(viewport.width)
         await checkA11y(page)
       } finally {
         await page.goto('about:blank')
@@ -251,21 +215,17 @@ test.describe('Story 6.6 City Spotlight', () => {
     })
   }
 
-  test('[P2] shows the localized empty state for a viewer with no saved location', async ({
+  test('[P2] a viewer with no saved location sees the feed without an empty Spotlight module', async ({
     page,
     communitySession,
   }) => {
     expect(communitySession.userId).toBeTruthy()
-    await loadedSpotlight(page)
-
-    await expect(spotlight(page)).toHaveAttribute('data-level', 'none')
-    await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
-      'City Spotlight'
-    )
-    await expect(page.getByTestId('community-spotlight-empty')).toContainText(
-      'No spotlight near you yet'
-    )
-    await expect(page.getByTestId('community-spotlight-list')).toHaveCount(0)
+    await page.goto('/community')
+    await expect(
+      page.getByTestId('community-card-grid').locator('article').first()
+    ).toBeVisible()
+    await expect(rankedCards(page)).toHaveCount(0)
+    await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
     await checkA11y(page)
   })
 })

@@ -31,11 +31,17 @@ export function useDetailOpener(opened: { id: string } | null) {
     if (openedId === null) setOpener(null)
   }, [openedId])
   const record = useCallback(
-    (surface: AffiliateCommunitySurface, commentsFocus: boolean, postId: string) =>
+    (surface: AffiliateCommunitySurface, commentsFocus: boolean, postId: string) => {
+      const scope = surface === 'community_spotlight' ? SPOTLIGHT_CARD_SCOPE : ''
+      const title = `${scope}title-${postId}`
+      const invokedByTitle = document.activeElement?.getAttribute('data-testid') === title
       setOpener({
         postId,
-        selector: detailOpenerSelector(surface, commentsFocus, postId),
-      }),
+        selector: invokedByTitle
+          ? `[data-testid="${title}"]`
+          : detailOpenerSelector(surface, commentsFocus, postId),
+      })
+    },
     []
   )
   const clear = useCallback(() => setOpener(null), [])

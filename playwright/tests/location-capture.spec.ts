@@ -12,6 +12,7 @@
 // Each management test seeds its own saved rows through the API (search, then
 // save, as the web does), so every test starts on the state it is about and
 // they run in parallel.
+import { openCommunityClimate } from '../support/helpers/community-ui'
 import type { Locator, Page } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
@@ -125,7 +126,8 @@ test.describe('1.2b client location capture @local-lane', () => {
       await page.goto(COMMUNITY_ROUTE)
       const firstBody = (await firstFeed).responseJson as FeedBody
       expect(firstBody.data.bandUnresolvedReason).toBe('no_location')
-      const notice = page.getByTestId('community-band-unresolved')
+      const sheet = await openCommunityClimate(page)
+      const notice = sheet.getByTestId('community-band-unresolved')
       await expect(notice).toBeVisible()
       const action = notice.getByTestId('community-add-location')
       await expect(action).toHaveText('Add a location')
@@ -154,8 +156,9 @@ test.describe('1.2b client location capture @local-lane', () => {
       await expect(page).toHaveURL(COMMUNITY_ROUTE)
       const returnedBody = (await returnedFeed).responseJson as FeedBody
       expect(returnedBody.data.bandResolved).toBe(true)
-      await expect(page.getByTestId('community-band-unresolved')).toHaveCount(0)
-      await expect(page.getByTestId('community-filter-auto')).toContainText(
+      const returnedSheet = await openCommunityClimate(page)
+      await expect(returnedSheet.getByTestId('community-band-unresolved')).toHaveCount(0)
+      await expect(returnedSheet.getByTestId('community-filter-auto')).toContainText(
         'Your climate:'
       )
 

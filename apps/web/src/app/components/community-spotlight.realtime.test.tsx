@@ -3,7 +3,7 @@
 // Story 6.6: the City Spotlight under realtime removals and the D3 hide, through
 // the real web transport and MSW.
 import { http, HttpResponse } from 'msw'
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -288,9 +288,9 @@ describe('CommunitySpotlightSection realtime (Story 6.6)', () => {
       await screen.findByTestId('spotlight-lookbook-card-spot-1')
     ).toBeInTheDocument()
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2'])
     // The kept pages come back as they were: no spotlight read stood in for them.
     expect(cursors).toEqual([null, 'cursor-2'])

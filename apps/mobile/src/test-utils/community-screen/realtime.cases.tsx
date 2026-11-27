@@ -1,5 +1,10 @@
 // Learning path Step 58: Production status and nightly health.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
+import {
+  openCommunityCardActions,
+  openCommunityPostComments,
+  selectCommunityClimate,
+} from './interactions'
 import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { press } from '@/src/test-utils/press'
 /* eslint-disable @typescript-eslint/await-thenable */
@@ -185,7 +190,7 @@ function twoFilterFeeds() {
 /** Opens cold_dry, then lets a catch-up buffer the newly published look. */
 async function bufferColdLook(feeds: ReturnType<typeof twoFilterFeeds>) {
   await render(<CommunityScreen />)
-  press(await screen.findByTestId('community-filter-chip-cold_dry'))
+  await selectCommunityClimate('cold_dry')
   await screen.findByTestId('community-post-card-post-cold')
   await act(async () => {
     await feeds.syncs.at(-1)!.catchUp()
@@ -365,6 +370,7 @@ export function registerCommunityRealtimeCases() {
       })
     )
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
     press(await screen.findByTestId('report-reason-spam'))
     fireEvent.change(screen.getByTestId('report-details-input'), {
@@ -376,6 +382,7 @@ export function registerCommunityRealtimeCases() {
     await act(recover)
     release()
     await waitFor(() => expect(screen.queryByTestId('community-report-modal')).toBeNull())
+    await openCommunityCardActions('post-a')
     expect(screen.getByTestId('community-card-report-post-a').textContent).toBe(
       'Reported'
     )
@@ -593,7 +600,7 @@ export function registerCommunityRealtimeCases() {
     await act(async () => {
       await syncs[0]!.catchUp()
     })
-    press(await screen.findByTestId('community-card-comments-post-a'))
+    await openCommunityPostComments('post-a')
     await screen.findByText('Previously visible thread comment.')
     const composer = screen.getByTestId<HTMLInputElement>('comment-body')
     composer.focus()
@@ -738,7 +745,7 @@ export function registerCommunityRealtimeCases() {
   it('7.7-NAT-004 shows the new-looks pill as an overlay that leaves the list where it was', async () => {
     const feeds = twoFilterFeeds()
     await render(<CommunityScreen />)
-    press(await screen.findByTestId('community-filter-chip-cold_dry'))
+    await selectCommunityClimate('cold_dry')
     const card = await screen.findByTestId('community-post-card-post-cold')
     await waitFor(() => expect(card).toBeVisible())
     const listTop = screen.getByTestId('community-feed-list').getBoundingClientRect().top
@@ -762,7 +769,7 @@ export function registerCommunityRealtimeCases() {
   it('drops new looks buffered under the previous filter when the filter changes', async () => {
     const feeds = twoFilterFeeds()
     await bufferColdLook(feeds)
-    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await selectCommunityClimate('warm_wet')
     await screen.findByTestId('community-post-card-post-warm')
     expect(screen.queryByRole('button', { name: 'Show 1 new looks' })).toBeNull()
     expect(screen.queryByTestId('community-post-card-post-cold-new')).toBeNull()
@@ -775,7 +782,7 @@ export function registerCommunityRealtimeCases() {
       release = resolve
     })
     press(screen.getByRole('button', { name: 'Show 1 new looks' }))
-    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await selectCommunityClimate('warm_wet')
     await screen.findByTestId('community-post-card-post-warm')
     release()
     await act(async () => {

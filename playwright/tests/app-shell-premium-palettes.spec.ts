@@ -147,11 +147,11 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
           )
           expect(computed, `${name} computed surface`).toBe(expectedSurface)
           expect(computed, `${name} is not the ${other} variant`).not.toBe(otherSurface)
-          // Painted: the top edge of the comments row, where nothing but the card shows.
-          const comments = card.locator('[data-testid*="comments-button-"]').first()
+          // Read painted card fill at the edge of the transparent title button.
+          const title = card.getByRole('heading').getByRole('button')
           // On screen first: the pixel is shot in viewport coordinates.
-          await comments.scrollIntoViewIfNeeded()
-          expect(await surfacePixel(comments, 2), `${name} painted surface`).toBe(
+          await title.scrollIntoViewIfNeeded()
+          expect(await surfacePixel(title, 2), `${name} painted surface`).toBe(
             expectedSurface
           )
           await measureThroughOverlays(page)

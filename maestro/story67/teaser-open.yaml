@@ -21,6 +21,6 @@ appId: ${MAESTRO_APP_ID}
     label: 'Activate the teaser'
 - extendedWaitUntil:
     visible:
-      id: 'community-spotlight-rank-.*'
+      id: 'community-card-near-you-.*'
     timeout: 20000
     label: 'Community shows the City Spotlight entry'

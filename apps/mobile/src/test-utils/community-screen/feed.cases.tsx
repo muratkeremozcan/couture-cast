@@ -8,6 +8,13 @@
 // swipe close it, accessibility focus returns to the card, and the open is recorded once.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
 import {
+  closeCommunityClimate,
+  openCommunityCardActions,
+  openCommunityClimate,
+  openCommunityPostComments,
+  selectCommunityClimate,
+} from './interactions'
+import {
   mockCapture,
   SDK_ERROR_MESSAGE,
   item,
@@ -216,7 +223,7 @@ export function registerCommunityFeedCases() {
         await render(<CommunityScreen />)
         await screen.findByTestId('community-post-card-post-b')
         await waitFor(() => expect(requests).toBeGreaterThan(0))
-        press(await screen.findByTestId(`community-card-comments-${openedPost}`))
+        await openCommunityPostComments(openedPost)
         await screen.findByRole('button', { name: 'Close comments' })
         fireEvent.change(screen.getByLabelText('Add a comment'), {
           target: { value: 'Owned discussion draft' },
@@ -417,7 +424,7 @@ export function registerCommunityFeedCases() {
     }
     try {
       await render(<CommunityScreen />)
-      press(await screen.findByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       fireEvent.change(screen.getByLabelText('Add a comment'), {
         target: { value: 'Saved through storage failure' },
@@ -447,7 +454,7 @@ export function registerCommunityFeedCases() {
       identity = 'next-session-token'
       await nextRead()
       await nextRead()
-      press(screen.getByTestId('community-card-comments-post-a'))
+      await openCommunityPostComments('post-a')
       await screen.findByRole('button', { name: 'Close comments' })
       expect(screen.getByLabelText('Add a comment')).toHaveValue('')
     } finally {
@@ -471,7 +478,7 @@ export function registerCommunityFeedCases() {
   })
 
   it('6.1-MOB-002 renders the localized empty state and its share CTA', async () => {
-    serveFeed(() => feedJson({ items: [] }))
+    serveFeed(() => feedJson({ items: [], mode: 'all' }))
 
     await render(<CommunityScreen />)
 
@@ -522,6 +529,7 @@ export function registerCommunityFeedCases() {
 
       await render(<CommunityScreen />)
 
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       // The whole panel, exactly: the reason's copy, plus the Story 1.2b
       // add-location action that only the no_location panel carries.
@@ -541,6 +549,7 @@ export function registerCommunityFeedCases() {
 
       await render(<CommunityScreen />)
 
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       const action = within(notice).queryByTestId('community-add-location')
       if (reason !== 'no_location') {
@@ -572,6 +581,7 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityClimate()
     await screen.findByTestId('community-add-location')
 
     // The save happens on the Locations screen; this tab only hears
@@ -603,6 +613,7 @@ export function registerCommunityFeedCases() {
     setMobileApplicationUserId('member-a')
     try {
       await render(<CommunityScreen />)
+      await openCommunityClimate()
       const notice = await screen.findByTestId('community-band-unresolved')
       await communityGateOpen()
       expect(within(notice).getByTestId('community-add-location')).toBeVisible()
@@ -662,7 +673,8 @@ export function registerCommunityFeedCases() {
     expect(
       screen.getByTestId('community-card-image-post-a').getAttribute('aria-label')
     ).toBe(item().altText)
-    expect(screen.getByTestId('community-card-report-post-a')).toBeTruthy()
+    await openCommunityCardActions('post-a')
+    expect(screen.getByTestId('community-card-report-post-a')).toBeVisible()
 
     // The same look is also on the first feed page. It is drawn once, at the top.
     expect(screen.getAllByTestId('community-post-card-post-a')).toHaveLength(1)
@@ -709,6 +721,7 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
+    await openCommunityClimate()
     for (const mode of ['auto', 'all', ...CLIMATE_BANDS]) {
       const chip = screen.getByTestId(`community-filter-chip-${mode}`)
       expect(chip.getAttribute('aria-disabled')).not.toBe('true')
@@ -722,10 +735,8 @@ export function registerCommunityFeedCases() {
       'aria-pressed',
       'false'
     )
-    expect(autoChip.style.borderWidth).toBe('2px')
     // The resolved band rides on the `auto` chip's own label.
     expect(autoChip.textContent).toBe('Your climate: Temperate and dry')
-    expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe('1px')
   })
 
   it('6.1-MOB-007 sends mode=<band> and drops the held cursor when the filter changes', async () => {
@@ -744,7 +755,7 @@ export function registerCommunityFeedCases() {
     press(await screen.findByTestId('community-feed-load-more'))
     await screen.findByTestId('community-post-card-post-b')
 
-    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await selectCommunityClimate('warm_wet')
     await screen.findByTestId('community-post-card-post-warm')
 
     const latest = feedUrls[feedUrls.length - 1]
@@ -772,16 +783,16 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
-    press(screen.getByTestId('community-filter-chip-cold_wet'))
-    press(screen.getByTestId('community-filter-chip-warm_dry'))
+    await selectCommunityClimate('cold_wet')
+    await selectCommunityClimate('warm_dry')
 
     await screen.findByTestId('community-post-card-post-warm')
     await delay(400)
 
     expect(screen.queryByTestId('community-post-card-post-cold')).toBeNull()
     expect(screen.getByTestId('community-post-card-post-warm')).toBeTruthy()
-    expect(screen.getByTestId('community-filter-chip-warm_dry').style.borderWidth).toBe(
-      '2px'
+    expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+      'Warm and dry'
     )
   })
 
@@ -889,6 +900,7 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-self')
     press(await screen.findByTestId('community-card-withdraw-post-self'))
     const panel = await screen.findByTestId('community-action-error')
     expect(panel.textContent).toBe(enUS.community.error.withdraw)
@@ -932,6 +944,7 @@ export function registerCommunityFeedCases() {
     )
     try {
       await render(<CommunityScreen />)
+      await openCommunityCardActions('post-self')
       press(await screen.findByTestId('community-card-withdraw-post-self'))
       const panel = await screen.findByTestId('community-action-error')
       expect(panel.textContent).toBe(enUS.community.error.withdraw)
@@ -1002,8 +1015,15 @@ export function registerCommunityFeedCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
 
-    expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe('2px')
-    expect(screen.getByTestId('community-filter-chip-auto').style.borderWidth).toBe('1px')
+    const sheet = await openCommunityClimate()
+    expect(sheet.getByTestId('community-filter-chip-all')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(sheet.getByTestId('community-filter-chip-auto')).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
     expect(screen.getByTestId('community-filter-chip-auto').textContent).toBe(
       enUS.community.filters.mode.auto
     )
@@ -1025,20 +1045,28 @@ export function registerCommunityFeedCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityClimate()
     await screen.findByTestId('community-band-unresolved')
+    closeCommunityClimate()
 
-    press(screen.getByTestId('community-filter-chip-warm_dry'))
+    await selectCommunityClimate('warm_dry')
     await waitFor(() =>
-      expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
-    )
-
-    press(screen.getByTestId('community-filter-chip-all'))
-    await waitFor(() =>
-      expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe(
-        '2px'
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'Warm and dry'
       )
     )
-    expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+    const warmSheet = await openCommunityClimate()
+    expect(warmSheet.queryByTestId('community-band-unresolved')).toBeNull()
+    closeCommunityClimate()
+
+    await selectCommunityClimate('all')
+    await waitFor(() =>
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'All climates'
+      )
+    )
+    const allSheet = await openCommunityClimate()
+    expect(allSheet.queryByTestId('community-band-unresolved')).toBeNull()
   })
 
   it('6.1-MOB-092 records a card open with the arm the feed was served in', async () => {
@@ -1087,6 +1115,7 @@ export function registerCommunityFeedCases() {
     vi.mocked(findNodeHandle).mockReturnValue(55)
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
     await screen.findByTestId('community-report-modal')
 

@@ -1,5 +1,6 @@
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
+import { selectCommunityClimate } from './interactions'
 import {
   imageEvents,
   item,
@@ -218,7 +219,7 @@ export function registerCommunityReactionsCases() {
     )
     await render(<CommunityScreen />)
     await screen.findByTestId('highlighted-community-card-post-a')
-    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await selectCommunityClimate('all')
     await waitFor(() => expect(feedUrls).toHaveLength(2))
     await screen.findByRole('button', { name: 'Applaud, 1' })
     expect(racePalette()).toEqual(confirmedPalette)
@@ -255,7 +256,7 @@ export function registerCommunityReactionsCases() {
       await waitFor(() => expect(sent).toBe(true))
       const mutation: unknown = vi.mocked(communityClient.setCommunityReactionFromMobile)
         .mock.results[0]!.value
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() =>
         expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
       )
@@ -323,7 +324,7 @@ export function registerCommunityReactionsCases() {
       await render(<CommunityScreen />)
       await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
       await screen.findByRole('button', { name: 'Applaud, 1' })
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() => expect(feedUrls).toHaveLength(2))
       gate.release()
       await screen.findByText('Older native feed completed.')
@@ -438,11 +439,11 @@ export function registerCommunityReactionsCases() {
         .mock.results[1]!.value
       // Attach before changing the filter, whose abort may reject this promise.
       const staleSettled = Promise.allSettled([staleDetail])
-      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await waitFor(() =>
-        expect(
-          screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
-        ).toBe('true')
+        expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+          'All climates'
+        )
       )
       // The superseded request may already be aborted, so it has no visible
       // completion. Await the real client's settlement and flush React.
@@ -450,9 +451,9 @@ export function registerCommunityReactionsCases() {
         gate.release()
         await staleSettled
       })
-      expect(
-        screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
-      ).toBe('true')
+      expect(screen.getByTestId('community-climate-filter')).toHaveTextContent(
+        'All climates'
+      )
       await waitFor(() =>
         expect(
           feedUrls.some(
@@ -504,7 +505,7 @@ export function registerCommunityReactionsCases() {
       )
       // The second page is held, so the gate opens on the first page before the filter moves.
       await communityGateOpen()
-      await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
+      await selectCommunityClimate('all')
       await screen.findByTestId('highlighted-community-card-post-a')
       await waitFor(() => expect(feedUrls).toHaveLength(2))
       await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))

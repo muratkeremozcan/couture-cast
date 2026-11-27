@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
 // Story 6.7b: the sponsored "Shop this look" CTA on feed cards, spotlight cards
 // and the detail dialog, through the real web transport and MSW.
+import { selectCommunityClimate } from '../../test-utils/community-ui'
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { act, screen, waitFor, within } from '@testing-library/react'
@@ -800,7 +801,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       renderGrid()
 
       await user.click(await screen.findByTestId('community-spotlight-view-more'))
-      await user.click(screen.getByTestId('community-filter-all'))
+      await selectCommunityClimate(user, 'all')
       await screen.findByTestId('lookbook-card-spot-2')
 
       // From here on, any frame that shows the stale answer is recorded.

@@ -108,10 +108,9 @@ describe('Community look text editing', () => {
     expect(detail.queryByText(description)).toBeNull()
     await user.keyboard('{Escape}')
     expect(screen.getByTestId('title-post-1')).toHaveTextContent('Winter layers')
-    expect(screen.getByTestId('edited-badge-post-1')).toHaveTextContent('Edited')
   })
 
-  it('updates both cards when the owner edits a look from City Spotlight', async () => {
+  it('updates the single ranked card when the owner edits it from City Spotlight', async () => {
     signIn()
     const user = userEvent.setup()
     const post = ownedPost()
@@ -129,7 +128,6 @@ describe('Community look text editing', () => {
       })
     )
     renderGrid()
-    await screen.findByTestId('lookbook-card-post-1')
     await user.click(await screen.findByTestId('spotlight-lookbook-open-post-1'))
     const detail = within(await screen.findByRole('dialog', { name: original }))
     await user.click(detail.getByRole('button', { name: EDIT }))
@@ -150,12 +148,11 @@ describe('Community look text editing', () => {
     })
     await user.keyboard('{Escape}')
 
-    expect(screen.getByTestId('caption-post-1')).toHaveTextContent(revisedDescription)
-    expect(screen.getByTestId('spotlight-caption-post-1')).toHaveTextContent(
+    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    await user.click(screen.getByTestId('spotlight-lookbook-open-post-1'))
+    expect(await screen.findByTestId('community-detail-caption')).toHaveTextContent(
       revisedDescription
     )
-    expect(screen.queryByTestId('title-post-1')).toBeNull()
-    expect(screen.queryByTestId('spotlight-title-post-1')).toBeNull()
   })
 
   it.each([
@@ -561,10 +558,6 @@ describe('Community look text editing', () => {
     expect(screen.getByTestId(`title-${stalePost.id}`)).toHaveTextContent(
       'Saved newer title'
     )
-    expect(screen.getByTestId(`caption-${stalePost.id}`)).toHaveTextContent(
-      'Saved newer caption'
-    )
-    expect(screen.getByTestId(`edited-badge-${stalePost.id}`)).toHaveTextContent('Edited')
   })
 
   it('prevents a delayed Spotlight first-page load from reverting a newer author edit', async () => {
@@ -612,12 +605,11 @@ describe('Community look text editing', () => {
     expect(await screen.findByTestId(`spotlight-title-${base.id}`)).toHaveTextContent(
       'Fresh Spotlight title'
     )
-    expect(screen.getByTestId(`spotlight-caption-${base.id}`)).toHaveTextContent(
+    await user.click(screen.getByTestId(`spotlight-lookbook-open-${base.id}`))
+    expect(await screen.findByTestId('community-detail-caption')).toHaveTextContent(
       'Fresh Spotlight caption'
     )
-    expect(screen.getByTestId(`spotlight-edited-badge-${base.id}`)).toHaveTextContent(
-      'Edited'
-    )
+    expect(screen.getByTestId('community-detail-edited')).toHaveTextContent('Edited')
   })
 
   it('prevents a delayed non-author Spotlight image refresh from overwriting newer realtime text', async () => {
@@ -749,7 +741,8 @@ describe('Community look text editing', () => {
     expect(screen.getByTestId(`spotlight-title-${viewerPost.id}`)).toHaveTextContent(
       'Realtime non-author title'
     )
-    expect(screen.getByTestId(`spotlight-caption-${viewerPost.id}`)).toHaveTextContent(
+    await userEvent.click(screen.getByTestId(`spotlight-lookbook-open-${viewerPost.id}`))
+    expect(await screen.findByTestId('community-detail-caption')).toHaveTextContent(
       'Realtime non-author caption'
     )
   })

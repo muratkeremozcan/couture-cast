@@ -15,6 +15,7 @@
 // New post is the top bar's trailing action (TabTopBar draws what the screen sets), and the
 // climate explainer follows the first content.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+import { openCommunityClimate } from '@/src/test-utils/community-screen/interactions'
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import React from 'react'
@@ -265,33 +266,12 @@ describe('Screen budget: native Community', () => {
       expect(
         within(screen.getByTestId('app-top-bar')).getByTestId('community-new-post-button')
       ).toBeVisible()
-      // D16: the climate explainer follows the first content (Spotlight, first post or empty
-      // state), outside it and below it.
-      const explainers = screen.getAllByTestId('community-filters-explainer')
-      expect(explainers, 'one climate explainer').toHaveLength(1)
-      const explainer = explainers[0]!
-      expect(explainer).toBeVisible()
-      expect(first).not.toContainElement(explainer)
-      expect(
-        first.compareDocumentPosition(explainer) & Node.DOCUMENT_POSITION_FOLLOWING,
-        'the explainer follows the first content'
-      ).toBeTruthy()
-      expect(
-        explainer.getBoundingClientRect().top,
-        'the explainer sits below the first content'
-      ).toBeGreaterThanOrEqual(first.getBoundingClientRect().bottom - 1)
-      // D16: a member with no city reads the band notice after the first content.
-      const notice = screen.queryByTestId('community-band-unresolved')
-      if (hasSavedLocation(fixture)) {
-        expect(notice).toBeNull()
-      } else {
-        expect(notice).toBeVisible()
-        expect(first).not.toContainElement(notice)
-        expect(
-          first.compareDocumentPosition(notice!) & Node.DOCUMENT_POSITION_FOLLOWING,
-          'the band notice follows the first content'
-        ).toBeTruthy()
-      }
+      expect(screen.queryByTestId('community-filters-explainer')).toBeNull()
+      const sheet = await openCommunityClimate()
+      expect(sheet.getByTestId('community-filters-explainer')).toBeVisible()
+      const notice = sheet.queryByTestId('community-band-unresolved')
+      if (hasSavedLocation(fixture)) expect(notice).toBeNull()
+      else expect(notice).toBeVisible()
     }, 30_000)
   }
 })

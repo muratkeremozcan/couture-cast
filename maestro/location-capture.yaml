@@ -142,16 +142,13 @@ tags:
     visible:
       id: 'community-screen'
     timeout: 20000
-- extendedWaitUntil:
-    visible:
-      id: 'community-filter-chip-auto'
-    timeout: 20000
+- tapOn:
+    id: 'community-climate-filter'
 - tapOn:
     id: 'community-filter-chip-auto'
     label: 'Select the Your climate filter'
 - extendedWaitUntil:
     visible:
-      id: 'community-filter-chip-auto'
       text: 'Your climate: .*'
     timeout: 20000
     label: 'The auto chip names the resolved band'

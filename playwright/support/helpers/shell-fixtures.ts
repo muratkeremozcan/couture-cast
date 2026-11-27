@@ -3,6 +3,7 @@ import {
   communityCommentsResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityEventsResponseSchema,
+  communityFeedModeSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   listSavedLocationsResponseSchema,
@@ -16,6 +17,10 @@ import {
   trackedResponseSchema,
   userProfileResponseSchema,
   wardrobeOnboardingStateResponseSchema,
+  type CommunityFeedMode,
+  type CommunityReactionFeed,
+  type CommunityReactionFeedItem,
+  type CommunityReactionSpotlight,
   type ResolveCommunityTargetsInput,
   type ShopThisLook,
 } from '@couture/api-client/contracts/http'
@@ -60,6 +65,10 @@ export type ShellMode =
   | 'ritual-503'
   | 'guardian-pending'
 export type ShellScreen = 'home' | 'closet' | 'looks' | 'community' | 'profile'
+export type ShellCommunityFixture = {
+  feed: (mode: CommunityFeedMode) => CommunityReactionFeed
+  spotlight: CommunityReactionSpotlight
+}
 
 export const DELAY_MS = 3000
 /** The Community sync channel's slow answer: late, and half its ~2 s deadline. */
@@ -188,6 +197,53 @@ function feedItem(id: string, title: string) {
       revision: 0,
       generation: 0,
     },
+  } satisfies CommunityReactionFeedItem & { title: string }
+}
+
+/** CC-7.15 fixture members share two approved looks across the feed and Spotlight. */
+export function calmCommunityFixture(startsEmpty: boolean): ShellCommunityFixture {
+  const outfits = [
+    {
+      ...feedItem('calm-community-peer-1', 'Blue layers'),
+      author: { isSelf: false, displayName: 'Style Explorer CC7150A1' },
+    },
+    {
+      ...feedItem('calm-community-peer-2', 'Rain shell'),
+      author: { isSelf: false, displayName: 'Style Explorer CC7150B2' },
+    },
+  ] as const
+  const [nearby] = outfits
+  return {
+    feed: (mode) => ({
+      items: startsEmpty && mode !== 'all' ? [] : [outfits[1], outfits[0]],
+      authorStates: [],
+      nextCursor: null,
+      mode,
+      viewerBand: startsEmpty ? 'cold_dry' : 'temperate_dry',
+      bandResolved: true,
+      bandUnresolvedReason: null,
+      experimentVariant: 'auto',
+      activeChallenge: startsEmpty
+        ? null
+        : {
+            id: 'calm-community-challenge',
+            slug: 'weekend-layers',
+            climateBand: 'temperate_dry',
+            title: 'Weekend Layers Challenge',
+            body: 'Put together a look for a cool weekend.',
+            startsAt: '2026-11-16T00:00:00.000Z',
+            endsAt: '2026-11-23T00:00:00.000Z',
+            timeZone: 'America/Chicago',
+          },
+    }),
+    spotlight: startsEmpty
+      ? { level: 'none', label: null, items: [], nextCursor: null }
+      : {
+          level: 'city',
+          label: 'Chicago',
+          items: [{ ...nearby, rank: 1 }],
+          nextCursor: null,
+        },
   }
 }
 
@@ -199,6 +255,7 @@ export function bodies(
     emptyCloset?: boolean
     todayPhotoUrl?: string
     todayOffer?: ShopThisLook
+    community?: ShellCommunityFixture
   } = {}
 ) {
   // Community content is other members' posts, so a pending teen with nothing of their own still
@@ -222,14 +279,16 @@ export function bodies(
   }
   // The Spotlight needs a saved city (community-spotlight.service.ts resolveViewer): a member
   // without one gets level none, whatever the feed holds.
-  const spotlight = populated
-    ? {
-        level: 'city',
-        label: 'Chicago',
-        items: [{ ...feedItem('shell-spot-1', 'Spotlight look'), rank: 1 }],
-        nextCursor: null,
-      }
-    : { level: 'none', label: null, items: [], nextCursor: null }
+  const spotlight =
+    options.community?.spotlight ??
+    (populated
+      ? {
+          level: 'city',
+          label: 'Chicago',
+          items: [{ ...feedItem('shell-spot-1', 'Spotlight look'), rank: 1 }],
+          nextCursor: null,
+        }
+      : { level: 'none', label: null, items: [], nextCursor: null })
   const ritual = {
     data: {
       weather: {
@@ -525,7 +584,10 @@ export function bodies(
   const resolve = (request: Request) => {
     const { targets } = request.postDataJSON() as ResolveCommunityTargetsInput
     const posts = new Map(
-      [...feedItems, ...spotlight.items].map((item) => [item.id, item] as const)
+      [
+        ...spotlight.items.map(({ rank: _rank, ...post }) => post),
+        ...(options.community?.feed('all').items ?? feedItems),
+      ].map((item) => [item.id, item] as const)
     )
     const body = {
       data: {
@@ -537,7 +599,7 @@ export function bodies(
             key,
             status: 'available',
             communityRevision: '0',
-            post: feedItem(post.id, post.title),
+            post,
             comment: null,
             parent: null,
             pageCursor: null,
@@ -585,6 +647,7 @@ export function createShellRouter(options: {
   screen: () => ShellScreen
   todayPhotoUrl?: string
   todayOffer?: ShopThisLook
+  community?: ShellCommunityFixture
   /**
    * A member run: a stubbed read without a fixture bearer answers 401 instead of member data,
    * so a member who lost the bearer cannot pass on fixture content (Codex P2-10). A signed-out
@@ -610,6 +673,7 @@ export function createShellRouter(options: {
           emptyCloset: mode === 'empty-closet',
           todayPhotoUrl: options.todayPhotoUrl,
           todayOffer: options.todayOffer,
+          community: options.community,
         })
       )
     return bodiesByOwner.get(owner)!
@@ -650,6 +714,13 @@ export function createShellRouter(options: {
       // The page names the filter it was asked for, as the API does.
       const feed = json[key] as { data: Record<string, unknown> }
       const requested = new URL(request.url()).searchParams.get('mode') ?? 'auto'
+      if (options.community) {
+        return {
+          json: checked(communityReactionFeedResponseSchema, {
+            data: options.community.feed(communityFeedModeSchema.parse(requested)),
+          }),
+        }
+      }
       return { json: { data: { ...feed.data, mode: requested } } }
     }
     return { json: json[key] }

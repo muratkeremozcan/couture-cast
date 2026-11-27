@@ -132,16 +132,14 @@ tags:
     timeout: 15000
     label: 'Community screen is on top again'
 - tapOn:
+    id: 'community-climate-filter'
+- tapOn:
     id: 'community-filter-chip-all'
 # The chip refetches the feed, and while it loads the list renders empty, which
 # resets any scroll; the link opens only once the page is in.
 - extendedWaitUntil:
     notVisible:
       id: 'community-feed-skeleton'
-    timeout: 20000
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-heading'
     timeout: 20000
 - runFlow:
     file: subflows/open-link.yaml

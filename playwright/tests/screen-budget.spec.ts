@@ -56,7 +56,9 @@ test.describe('CC-7.10 screen budget on web @local-lane', () => {
         // A member with no saved city sees the Add location action the API's no_location answer
         // brings (Codex #9): the audit measures the screen production shows that member.
         if (screen === 'community' && fixture !== 'populated')
-          await expect(page.getByTestId('community-add-location')).toBeVisible()
+          await page.getByTestId('community-climate-filter').click()
+        await expect(page.getByTestId('community-add-location')).toBeVisible()
+        await page.keyboard.press('Escape')
         // Story CC-7.11 D8: Looks is audited on its first content, so the anchor must render.
         if (screen === 'looks')
           await expect(page.getByTestId('looks-first-content')).toBeVisible()

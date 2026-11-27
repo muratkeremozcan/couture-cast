@@ -1,6 +1,7 @@
 // Learning path Step 40: Community screening release gate and hosted worker.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Community grid journeys through the real web transport and MSW.
+import { openCommunityCardActions } from '../../test-utils/community-ui'
 import { http, HttpResponse } from 'msw'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -271,6 +272,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await openCommunityCardActions(user, 'post-1', '')
       await user.click(screen.getByTestId('report-button-post-1'))
       await user.selectOptions(
         await screen.findByTestId('report-reason-select'),
@@ -330,6 +332,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await openCommunityCardActions(user, 'post-1', '')
       await user.click(screen.getByTestId('report-button-post-1'))
       await user.click(await screen.findByTestId('report-submit-button'))
 
@@ -363,6 +366,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await openCommunityCardActions(user, 'post-1', '')
       await user.click(screen.getByTestId('report-button-post-1'))
       await user.click(await screen.findByTestId('report-submit-button'))
 
@@ -417,6 +421,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         renderGrid()
 
         await screen.findByTestId('lookbook-card-post-1')
+        await openCommunityCardActions(user, 'post-1', '')
         await user.click(screen.getByTestId('report-button-post-1'))
         await user.click(await screen.findByTestId('report-submit-button'))
 
@@ -440,6 +445,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await openCommunityCardActions(user, 'post-1', '')
       await user.click(screen.getByTestId('report-button-post-1'))
       await user.click(await screen.findByRole('button', { name: 'Cancel' }))
 
@@ -496,6 +502,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-self-post')
+      await openCommunityCardActions(user, 'self-post', '')
       await user.click(screen.getByTestId('withdraw-button-self-post'))
 
       const notice = await screen.findByTestId('community-action-notice')
@@ -527,6 +534,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       await screen.findByTestId('lookbook-card-self-post')
+      await openCommunityCardActions(user, 'self-post', '')
       await user.click(screen.getByTestId('withdraw-button-self-post'))
 
       const notice = await screen.findByTestId('community-action-notice')

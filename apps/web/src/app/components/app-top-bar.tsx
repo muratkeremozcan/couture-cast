@@ -24,6 +24,8 @@ export type AppTopBarProps = AppTopBarTitle & {
   onBack?: () => void
   /** Actions that fit the one row. Anything that does not moves to the body's first row. */
   trailing?: ReactNode
+  /** Let long text in the title and action wrap at narrow widths. */
+  wrapTitle?: boolean
 }
 
 /**
@@ -54,6 +56,7 @@ export function AppTopBar({
   parentHref,
   onBack,
   trailing,
+  wrapTitle = false,
 }: AppTopBarProps) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const heading = title ?? t(titleKey ?? '')
@@ -77,13 +80,13 @@ export function AppTopBar({
   return (
     <header
       data-testid="app-header"
-      className="h-top-bar w-full shrink-0 border-b border-line bg-page text-ink"
+      className={`${wrapTitle ? 'min-h-top-bar' : 'h-top-bar'} w-full shrink-0 border-b border-line bg-page text-ink`}
     >
       {/* CC-7.11 P5: `app-top-bar` and `app-top-bar-title` name the same parts on web and
           native; `app-header` stays on the landmark. */}
       <div
         data-testid="app-top-bar"
-        className="mx-auto flex h-full max-w-6xl items-center gap-2 px-4"
+        className={`mx-auto flex max-w-6xl items-center gap-2 ${wrapTitle ? 'min-h-top-bar px-3 py-1' : 'h-full px-4'}`}
       >
         {parentHref !== undefined ? (
           <Link
@@ -108,11 +111,13 @@ export function AppTopBar({
         ) : null}
         <h1
           data-testid="app-top-bar-title"
-          className="min-w-0 flex-1 truncate text-lg font-semibold"
+          className={`min-w-0 flex-1 text-lg font-semibold ${wrapTitle ? 'break-words' : 'truncate'}`}
         >
           {heading}
         </h1>
-        <div className="flex shrink-0 items-center gap-2">
+        <div
+          className={`flex shrink-0 items-center gap-2 ${wrapTitle ? 'max-w-[45%] md:max-w-none' : ''}`}
+        >
           {trailing}
           <nav
             aria-label={t('nav.primaryLabel')}

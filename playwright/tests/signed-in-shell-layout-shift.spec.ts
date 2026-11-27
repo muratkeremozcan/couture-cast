@@ -10,6 +10,7 @@
 // fails and names what moved. The production measurement is the .prod.spec.ts beside this file.
 // Story CC-7.12 (Step 69): Looks opens on Saved (look and capsule tiles) or, with nothing saved,
 // on Ideas with the empty line.
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { randomUUID } from 'node:crypto'
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
@@ -812,9 +813,9 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
       fromMs: 0,
       inflight: router.inflight,
     })
-    const filter = page.getByTestId('community-filter-all')
-    await filter.click()
-    await expect(filter).toHaveAttribute('aria-pressed', 'true')
+    const filter = page.getByTestId('community-climate-filter')
+    await selectCommunityClimate(page, 'all')
+    await expect(filter).toHaveAccessibleName('All climates')
     const filteredAt = await meterNow(page)
     await settleTransition(page, {
       screen: 'community',
@@ -849,10 +850,7 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
     expect(firstFrame?.ready ?? []).toContain('community')
     expect(sightings(snapshot.frames, ['screen-placeholder'], returnedAt)).toEqual({})
     // After the refresh settled: same filter, and the anchored card where the member left it.
-    await expect(page.getByTestId('community-filter-all')).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    await expect(filter).toHaveAccessibleName('All climates')
     const anchorTopAfter = await anchor.evaluate(
       (node) => node.getBoundingClientRect().top
     )

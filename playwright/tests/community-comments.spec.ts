@@ -1,5 +1,6 @@
 // Learning path Step 42: Screened threaded comments.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
+import { selectCommunityClimate } from '../support/helpers/community-ui'
 import { randomInt, randomUUID } from 'node:crypto'
 import { mergeTests, type Locator, type Page, type Request } from '@playwright/test'
 import type {
@@ -228,7 +229,7 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   expect((await initialFeed).status).toBe(200)
   await expect(grid).toHaveAttribute('aria-busy', 'false')
   const allFeed = completedCommunityFeed(page, 'all')
-  await page.getByTestId('community-filter-all').click()
+  await selectCommunityClimate(page, 'all')
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)
   // The web client opts every feed read in to reactions and sponsorship, so the
@@ -238,7 +239,7 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   ).data
   await expect(grid).toHaveAttribute('aria-busy', 'false')
 
-  const opener = page.getByTestId(`comments-button-${POST_ID}`)
+  const opener = page.getByTestId(`lookbook-open-${POST_ID}`)
   const initial = await reopenThread(opener, interceptNetworkCall)
   return {
     opener,

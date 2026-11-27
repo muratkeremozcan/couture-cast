@@ -3,7 +3,7 @@
 // Story 6.6 code review round 2: spotlight single-post refresh and per-surface
 // image failures, through the real web transport and MSW.
 import { http } from 'msw'
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -72,9 +72,9 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     )
     expect(reads).toEqual(['spot-1'])
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['2'])
   })
 
@@ -189,9 +189,9 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
     // Refreshed in place: no page-one reload, every loaded rank kept.
     expect(cursors).toEqual([null, 'c2'])
     expect(
-      within(screen.getByTestId('community-spotlight-list'))
-        .getAllByRole('listitem')
-        .map((entry) => entry.getAttribute('data-rank'))
+      screen
+        .getAllByTestId(/^spotlight-lookbook-card-/)
+        .map((card) => card.id.split('-').at(-1))
     ).toEqual(['1', '2', '3'])
     // The feed copy keeps the URL it was served with.
     expect(

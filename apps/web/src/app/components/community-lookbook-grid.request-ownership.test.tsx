@@ -8,6 +8,10 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+import {
+  openCommunityCardActions,
+  selectCommunityClimate,
+} from '../../test-utils/community-ui'
 import * as communityClient from '../../lib/community'
 import {
   CommunitySyncState,
@@ -874,6 +878,7 @@ describe('Story 6.3 screen request ownership', () => {
     await act(async () => {
       await journey.sync().catchUp()
     })
+    await openCommunityCardActions(user, 'post-1', '')
     await user.click(screen.getByTestId('report-button-post-1'))
     await user.click(await screen.findByTestId('report-submit-button'))
     await waitFor(() => expect(calls).toBe(1))
@@ -1130,7 +1135,7 @@ describe('Story 6.3 screen request ownership', () => {
       const user = userEvent.setup()
       renderGrid()
       const controls = await screen.findByTestId('community-reactions-post-1')
-      await user.click(screen.getByTestId('community-filter-all'))
+      await selectCommunityClimate(user, 'all')
       await waitFor(() => expect(reads).toBe(2))
       await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
       await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
@@ -1173,7 +1178,7 @@ describe('Story 6.3 screen request ownership', () => {
       const user = userEvent.setup()
       renderGrid()
       const controls = await screen.findByTestId('community-reactions-post-1')
-      await user.click(screen.getByTestId('community-filter-all'))
+      await selectCommunityClimate(user, 'all')
       await waitFor(() => expect(reads).toBe(2))
       await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
       await within(controls).findByRole('button', { name: 'Applaud, 1' })
@@ -1282,7 +1287,7 @@ describe('Story 6.3 screen request ownership', () => {
     renderGrid({ highlightedCardId: 'post-1' })
     await screen.findByTestId('lookbook-card-post-1')
     hidden = true
-    await user.click(screen.getByTestId('community-filter-all'))
+    await selectCommunityClimate(user, 'all')
     await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
   })
   it('6.3-WEB-026 refresh evicts an ordinary open modal when detail returns 404', async () => {

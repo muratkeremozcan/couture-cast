@@ -5,6 +5,7 @@
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
+import { openCommunityClimate } from '../support/helpers/community-ui'
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import {
   communityTest as test,
@@ -89,51 +90,32 @@ test.describe('Sticky bottom navigation (Story 3.6)', () => {
       page.getByTestId('app-header').getByRole('heading', { level: 1 })
     ).toHaveText('Community')
 
-    const filters = communityPage.getByRole('navigation', { name: 'Community filters' })
-    await expect(filters.getByRole('heading', { level: 2 })).toHaveText('Latest looks')
+    const filters = await openCommunityClimate(page)
     const explainer = filters.getByTestId('community-filters-explainer')
     await expect(explainer).toHaveText(enUS.community.filters.explainer)
-    await expect(filters).toHaveAccessibleDescription(enUS.community.filters.explainer)
+    await expect(
+      page.getByRole('dialog', { name: 'Community filters' })
+    ).toHaveAccessibleDescription(enUS.community.filters.explainer)
     await expect(filters.getByTestId('community-filter-cold_wet')).toHaveText(
       'Cold and wet'
     )
 
+    await page.keyboard.press('Escape')
     // A real card inside the card grid; the loading skeletons sit outside it.
     await expectCommunityFeedLoaded(page, communityPage)
     await expect(communityPage.getByTestId('community-feed-empty')).toHaveCount(0)
   })
 
-  /*
-   * Two layout guarantees of the new `/community` page that only a real browser
-   * shows. The bottom nav hides from 768 px, so a desktop reader needs the brand
-   * link back to Home. And `/community` has no chip bar above the filters, so the
-   * sticky filter nav must pin flush to the top of the viewport: offset by the
-   * chip bar height it would float with a gap, and inside an `overflow-x-hidden`
-   * wrapper it would stick to that wrapper and scroll away with the feed.
-   */
-  test('3.6-E2E-008: /community pins its filters to the top and links back to Today on desktop', async ({
+  test('3.6-E2E-008: /community keeps its filter and links back to Today on desktop', async ({
     page,
     communitySession,
-    recurse,
   }) => {
     expect(communitySession.userId).toBeTruthy()
-    await page.setViewportSize({ width: 448, height: 900 })
     const feedOnCommunity = completedCommunityFeed(page)
     await page.goto('/community')
     expect((await feedOnCommunity).status).toBe(200)
     await expectCommunityFeedLoaded(page)
-
-    const filters = page
-      .getByTestId('community-page')
-      .getByRole('navigation', { name: 'Community filters' })
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-    // Wrapped in an object: recurse rejects a falsy final value, and a nav pinned
-    // flush to the top reports exactly `y === 0`.
-    await recurse(
-      async () => ({ y: (await filters.boundingBox())?.y }),
-      ({ y }) => y !== undefined && Math.abs(y) <= 1
-    )
-    await expect(filters).toBeInViewport()
+    await expect(page.getByTestId('community-climate-filter')).toBeVisible()
 
     await page.setViewportSize({ width: 1280, height: 800 })
     await expect(page.getByTestId('sticky-bottom-nav')).toBeHidden()

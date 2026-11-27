@@ -35,13 +35,15 @@ function challenge(
 
 function renderBanner(overrides: Partial<EmbeddedCommunityChallenge> = {}) {
   const onParticipate = vi.fn()
+  const onDismiss = vi.fn()
   const utils = render(
     <CommunityChallengeBanner
       challenge={challenge(overrides)}
       onParticipate={onParticipate}
+      onDismiss={onDismiss}
     />
   )
-  return { ...utils, onParticipate }
+  return { ...utils, onParticipate, onDismiss }
 }
 
 describe('CommunityChallengeBanner (Story 6.1)', () => {
@@ -50,35 +52,16 @@ describe('CommunityChallengeBanner (Story 6.1)', () => {
     await i18n.changeLanguage('en-US')
   })
 
-  it('6.1-MOB-047 renders the editorial copy the server sent, with the eyebrow', () => {
-    renderBanner()
+  it('7.15-COM-001 shows the title in one row and offers dismissal', () => {
+    const { onDismiss } = renderBanner()
 
     const banner = screen.getByTestId('community-challenge-banner')
-    expect(banner.textContent).toContain(enUS.community.challenge.eyebrow)
-    expect(screen.getByTestId('community-challenge-title').textContent).toBe(
-      challenge().title
+    expect(banner).toHaveTextContent(
+      enUS.community.calm.thisWeek.replace('{{title}}', challenge().title)
     )
-    expect(screen.getByTestId('community-challenge-body').textContent).toBe(
-      challenge().body
-    )
-  })
-
-  it('6.1-MOB-048 labels the band from the one catalogue lookup, both restricted and not', () => {
-    const { rerender, onParticipate } = renderBanner()
-    // One lookup keyed off the contract's own band values; no Title-Casing here.
-    expect(screen.getByTestId('community-challenge-banner').textContent).toContain(
-      enUS.community.band.temperate_dry
-    )
-
-    rerender(
-      <CommunityChallengeBanner
-        challenge={challenge({ climateBand: null })}
-        onParticipate={onParticipate}
-      />
-    )
-    expect(screen.getByTestId('community-challenge-banner').textContent).toContain(
-      enUS.community.challenge.allClimates
-    )
+    expect(banner).not.toHaveTextContent(challenge().body)
+    press(screen.getByRole('button', { name: enUS.community.calm.dismissChallenge }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
   it('6.1-MOB-049 names the challenge in the CTA label and reports the tap', () => {

@@ -1,5 +1,6 @@
 // Learning path Step 40: Community screening release gate and hosted worker.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
+import { openCommunityCardActions, selectCommunityClimate } from './interactions'
 import {
   SDK_ERROR_MESSAGE,
   item,
@@ -85,11 +86,11 @@ export function registerCommunityModerationCases() {
     await render(<CommunityTab />)
     await screen.findByTestId('community-post-card-post-a')
     refuse = true
-    press(await screen.findByTestId('community-filter-chip-all'))
+    await selectCommunityClimate('all')
     await screen.findByTestId('community-banned-notice')
     expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
     expect(screen.queryByTestId('community-new-post-button')).toBeNull()
-    expect(screen.queryByTestId('community-filter-chip-all')).toBeNull()
+    expect(screen.queryByTestId('community-climate-filter')).toBeNull()
     expect(screen.queryByTestId('community-example-inspiration')).toBeNull()
   })
 
@@ -205,9 +206,11 @@ export function registerCommunityModerationCases() {
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-self')
 
-    expect(screen.getByTestId('community-card-report-post-a')).toBeTruthy()
+    await openCommunityCardActions('post-a')
+    expect(screen.getByTestId('community-card-report-post-a')).toBeVisible()
     expect(screen.queryByTestId('community-card-withdraw-post-a')).toBeNull()
-    expect(screen.getByTestId('community-card-withdraw-post-self')).toBeTruthy()
+    await openCommunityCardActions('post-self')
+    expect(screen.getByTestId('community-card-withdraw-post-self')).toBeVisible()
     expect(screen.queryByTestId('community-card-report-post-self')).toBeNull()
   })
 
@@ -221,6 +224,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
 
     await screen.findByTestId('community-report-modal')
@@ -235,6 +239,7 @@ export function registerCommunityModerationCases() {
     )
     await waitFor(() => expect(screen.queryByTestId('community-report-modal')).toBeNull())
 
+    await openCommunityCardActions('post-a')
     const control = screen.getByTestId('community-card-report-post-a')
     expect(control.textContent).toBe(enUS.community.card.reported)
     expect(control.getAttribute('aria-disabled')).toBe('true')
@@ -260,6 +265,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
 
     await screen.findByTestId('community-report-modal')
@@ -268,6 +274,7 @@ export function registerCommunityModerationCases() {
 
     await waitFor(() => expect(screen.queryByTestId('community-report-modal')).toBeNull())
 
+    await openCommunityCardActions('post-a')
     const control = screen.getByTestId('community-card-report-post-a')
     expect(control.textContent).toBe(enUS.community.card.reported)
     expect(control.getAttribute('aria-disabled')).toBe('true')
@@ -289,6 +296,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
 
     await screen.findByTestId('community-report-modal')
@@ -311,6 +319,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
 
     await screen.findByTestId('community-report-modal')
@@ -330,6 +339,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-a')
     press(await screen.findByTestId('community-card-report-post-a'))
 
     await screen.findByTestId('community-report-modal')
@@ -366,6 +376,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-self')
     press(await screen.findByTestId('community-card-withdraw-post-self'))
 
     await waitFor(() => expect(withdrawnPostId).toBe('post-self'))
@@ -390,6 +401,7 @@ export function registerCommunityModerationCases() {
     )
 
     await render(<CommunityScreen />)
+    await openCommunityCardActions('post-self')
     press(await screen.findByTestId('community-card-withdraw-post-self'))
 
     const panel = await screen.findByTestId('community-action-error')

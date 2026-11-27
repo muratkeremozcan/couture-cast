@@ -7775,7 +7775,7 @@ Sequence to follow:
 6. `apps/api/src/modules/community/community-spotlight-invalidator.ts`, then the hook in `community-engagement.runtime.ts`.
 7. `apps/api/src/modules/community/community-spotlight-cursor.ts` and `community-spotlight.service.ts`: level resolution, snapshot freshness, later pages and the open path.
 8. `packages/api-client/src/contracts/http/community.ts`: the spotlight schemas and the refined opened body.
-9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/components/community/community-spotlight-module.tsx`.
+9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/src/features/community/community-screen.tsx`.
 
 Task owner map:
 
@@ -7796,7 +7796,7 @@ Task owner map:
 - Story 6.6 retry owner: one bounded retry after the read gate's unavailable 503 in `packages/api-client/src/community-unavailable-retry.ts`.
 - Story 6.6 web owner: the module, View more, focus and announcements in `apps/web/src/app/components/community-spotlight.tsx`.
 - Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`.
-- Story 6.6 mobile module owner: the horizontal carousel in `apps/mobile/components/community/community-spotlight-module.tsx`.
+- The mobile screen renders ranked cards inline as of [Step 72](#step-72-calm-community-with-an-empty-state).
 - Story 6.6 mobile detail owner: the detail a spotlight card opens in `apps/mobile/components/community/community-spotlight-detail.tsx`.
 - Story 6.6 fixture owner: the shared seeded cohort in `packages/db/prisma/seeds/community-spotlight.ts` and per-test cohorts in `packages/testing/src/factories/community-spotlight.factory.ts`.
 
@@ -7848,7 +7848,7 @@ Web component tests:
 
 Mobile component and screen tests:
 
-- [`apps/mobile/components/community/community-spotlight-module.test.tsx`](../../apps/mobile/components/community/community-spotlight-module.test.tsx): heading, rank labels, carousel layout and sizing, View more scroll and focus, and axe.
+- [Native Community screen](../../apps/mobile/src/screens/community-screen.test.tsx) covers ranked rows, paging and focus in the unified feed.
 - [`apps/mobile/src/features/community/community-spotlight-detail.test.tsx`](../../apps/mobile/src/features/community/community-spotlight-detail.test.tsx): the detail takes focus and announces once per open.
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx) runs [`spotlight.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight.cases.tsx) and [`spotlight-review.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight-review.cases.tsx): `6.6-MOB-001` to `081` cover every state, identity changes, realtime eviction, image re-reads, focus return and the failed first identity resolution.
 
@@ -15387,7 +15387,7 @@ Sequence to follow:
 6. `apps/api/src/modules/community/community-spotlight-invalidator.ts`, then the hook in `community-engagement.runtime.ts`.
 7. `apps/api/src/modules/community/community-spotlight-cursor.ts` and `community-spotlight.service.ts`: level resolution, snapshot freshness, later pages and the open path.
 8. `packages/api-client/src/contracts/http/community.ts`: the spotlight schemas and the refined opened body.
-9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/components/community/community-spotlight-module.tsx`.
+9. `apps/web/src/app/components/community-spotlight.tsx`, then `apps/mobile/src/features/community/use-community-spotlight.ts` and `apps/mobile/src/features/community/community-screen.tsx`.
 
 Task owner map:
 
@@ -15408,7 +15408,7 @@ Task owner map:
 - Story 6.6 retry owner: one bounded retry after the read gate's unavailable 503 in `packages/api-client/src/community-unavailable-retry.ts`.
 - Story 6.6 web owner: the module, View more, focus and announcements in `apps/web/src/app/components/community-spotlight.tsx`.
 - Story 6.6 mobile state owner: paging, identity changes and eviction in `apps/mobile/src/features/community/use-community-spotlight.ts`.
-- Story 6.6 mobile module owner: the horizontal carousel in `apps/mobile/components/community/community-spotlight-module.tsx`.
+- The mobile screen renders ranked cards inline as of [Step 72](#step-72-calm-community-with-an-empty-state).
 - Story 6.6 mobile detail owner: the detail a spotlight card opens in `apps/mobile/components/community/community-spotlight-detail.tsx`.
 - Story 6.6 fixture owner: the shared seeded cohort in `packages/db/prisma/seeds/community-spotlight.ts` and per-test cohorts in `packages/testing/src/factories/community-spotlight.factory.ts`.
 
@@ -15460,7 +15460,7 @@ Web component tests:
 
 Mobile component and screen tests:
 
-- [`apps/mobile/components/community/community-spotlight-module.test.tsx`](../../apps/mobile/components/community/community-spotlight-module.test.tsx): heading, rank labels, carousel layout and sizing, View more scroll and focus, and axe.
+- [Native Community screen](../../apps/mobile/src/screens/community-screen.test.tsx) covers ranked rows, paging and focus in the unified feed.
 - [`apps/mobile/src/features/community/community-spotlight-detail.test.tsx`](../../apps/mobile/src/features/community/community-spotlight-detail.test.tsx): the detail takes focus and announces once per open.
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx) runs [`spotlight.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight.cases.tsx) and [`spotlight-review.cases.tsx`](../../apps/mobile/src/test-utils/community-screen/spotlight-review.cases.tsx): `6.6-MOB-001` to `081` cover every state, identity changes, realtime eviction, image re-reads, focus return and the failed first identity resolution.
 
@@ -22320,3 +22320,33 @@ and its catalog fallback have the same bounds.
 - [Step 60](#step-60-saved-looks-follow-the-account) covers the save contract.
   [Step 65](#step-65-signed-in-shell-without-flashes) covers layout stability.
   [Step 70](#step-70-calm-today-with-one-primary-job) covers the Today shell and weather fallback.
+
+## Step 72: Calm Community with an empty state
+
+Community opens with Post, one climate control, the weekly challenge and the feed.
+Eligible ranked looks carry a Near you label inside the feed.
+When a climate has no looks, See all climates broadens the feed in one tap.
+The card menu keeps Report and Withdraw within reach.
+
+### Sequence to follow
+
+1. Open the web Community route or `apps/mobile/src/features/community/community-screen.tsx`.
+   Follow the climate trigger into the sheet and select a band to see which feed mode is served.
+2. Follow the ranked and ordinary reads into the feed.
+   An eligible ranked result wins when both reads return the same post ID.
+   The teaser keeps its existing focused entry and outcome notice.
+3. Open a card from its photo or title, then return to the same feed.
+   Open the card menu and follow Report into the existing reason form.
+4. Compare the settled climate empty state with an unavailable feed and an all-climate empty
+   feed. Confirm the climate action is available only when it can broaden the results.
+
+### Story and evidence
+
+- [Story spec](../implementation-artifacts/spec-7-15-calm-community-empty-state.md) and
+  [acceptance plan](../test-artifacts/test-design-7-15-calm-community-empty-state.md).
+- [Web acceptance](../../playwright/tests/calm-community.spec.ts) and
+  [native acceptance](../../apps/mobile/src/test-utils/community-screen/calm.cases.tsx).
+- [Android feed journey](../../maestro/community-feed.yaml) and
+  [Android Spotlight journey](../../maestro/community-spotlight.yaml).
+- [Step 65](#step-65-signed-in-shell-without-flashes) covers read readiness and session scope.
+  [Step 68](#step-68-five-tab-navigation-and-back-pattern) covers screen layers and focus return.
