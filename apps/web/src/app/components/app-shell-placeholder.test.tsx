@@ -17,13 +17,14 @@ import CommunityPage from '../community/page'
 import SettingsPage from '../settings/page'
 
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/',
   useRouter: () => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }),
 }))
 vi.mock('./lookbook-prism-layout', () => ({ LookbookPrismLayout: () => <section /> }))
 vi.mock('./guest-preview/guest-preview-entry', () => ({
   GuestPreviewEntry: () => <section />,
-  MemberWardrobeActions: () => null,
+  ProfileSignOut: () => null,
 }))
 vi.mock('./analytics-event-actions', () => ({ AnalyticsEventActions: () => null }))
 vi.mock('./posthog-click-tracker', () => ({ PostHogClickTracker: () => null }))

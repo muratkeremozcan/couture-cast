@@ -8,6 +8,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import { http, HttpResponse } from 'msw'
 import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
 import { SPOTLIGHT_TEASER_READ_FLOOR_MS } from '@couture/api-client'
@@ -30,10 +31,15 @@ vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // Passthrough spies: reads stay on the real HTTP boundary, and the wrapper's own
 // promises tell a test when a teaser read has settled.
 vi.mock('../../lib/community', { spy: true })
-vi.mock('next/navigation', () => {
-  const router = { push: vi.fn(), replace: vi.fn() }
-  return { usePathname: () => '/', useRouter: () => router }
-})
+const router = vi.hoisted(() => ({
+  push: vi.fn<(href: string) => void>(),
+  replace: vi.fn(),
+  back: vi.fn(),
+  forward: vi.fn(),
+  refresh: vi.fn(),
+  prefetch: vi.fn(),
+}))
+vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => router }))
 
 /** The `Retry-After` hint, in seconds, the 429 case answers with. */
 const RETRY_AFTER_S = 90
@@ -242,20 +248,55 @@ describe('6.7 web Home spotlight teaser', () => {
     expect(teaserNodes()).toEqual([])
   })
 
-  it('6.7-WEB-021 posts one Home Spotlight open with rank and level', async () => {
+  it('6.7-WEB-012 returns focus to Today when its selected Spotlight row is removed', async () => {
     signIn()
+    useMswHandlers(
+      http.get('/api/v1/ritual', () =>
+        HttpResponse.json(
+          { message: 'No location preferences found for user' },
+          { status: 400 }
+        )
+      )
+    )
+    const { answer } = useServedSpotlight()
+    render(<LookbookPrismLayout />)
+    await answer(0, cityPage())
+    const primary = await screen.findByTestId('home-set-city')
+    const link = await screen.findByTestId('home-spotlight-teaser-link')
+    act(() => link.focus())
+    expect(link).toHaveFocus()
+    fireEvent.error(screen.getByTestId('home-spotlight-teaser-image'))
+    await waitFor(() => expect(primary).toHaveFocus())
+    expect(screen.queryByTestId('home-spotlight-teaser-link')).toBeNull()
+  })
+
+  it('6.7-WEB-021 posts one Home open and creates a fresh focus token per activation', async () => {
+    signIn()
+    router.push.mockClear()
     const opens = useRecordedOpens()
     const { answer } = useServedSpotlight()
-    const view = render(<LookbookPrismLayout />)
+    render(
+      <AppRouterContext.Provider value={router}>
+        <LookbookPrismLayout />
+      </AppRouterContext.Provider>
+    )
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
-    view.container.addEventListener('click', (event) => event.preventDefault())
-    await userEvent.setup().click(link)
+    const user = userEvent.setup()
+    await user.click(link)
     await waitFor(() =>
       expect(opens).toEqual([
         { postId: 'look-1', body: { surface: 'home_teaser', rank: 1, level: 'city' } },
       ])
     )
+    await user.click(link)
+    await waitFor(() => expect(opens).toHaveLength(2))
+    const tokens = router.push.mock.calls.map(([url]) =>
+      new URL(url, 'http://local.test').searchParams.get('focusToken')
+    )
+    expect(tokens).toHaveLength(2)
+    expect(tokens.every((token) => token?.startsWith('today-') === true)).toBe(true)
+    expect(new Set(tokens).size).toBe(2)
   })
 
   it('6.7-WEB-014 the page becoming visible again re-reads only after 60 seconds', async () => {

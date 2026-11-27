@@ -160,6 +160,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
@@ -182,6 +183,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
 
     await renderScreen()
 
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-tile-crewneck-sweater')).toBeTruthy()
     })
@@ -247,6 +249,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
 
     await waitFor(() => {
@@ -269,6 +272,7 @@ describe('TabOneScreen degraded and native-only paths', () => {
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
     await waitFor(() => {
       expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()

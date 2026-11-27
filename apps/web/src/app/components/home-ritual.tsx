@@ -736,7 +736,16 @@ function SampleOutfitInner({
       </ul>
       {actions}
       <details className="space-y-3">
-        <summary className="flex min-h-11 w-fit cursor-pointer items-center text-sm font-semibold underline underline-offset-4">
+        <summary
+          data-testid="home-edit-sample"
+          data-primary-action={actions === null ? 'true' : undefined}
+          data-gold={actions === null ? 'primary' : undefined}
+          className={
+            actions === null
+              ? `${primaryLinkClass} cursor-pointer`
+              : linkClass + ' cursor-pointer'
+          }
+        >
           {t('home.today.editSample')}
         </summary>
         {editor}
@@ -835,6 +844,31 @@ function LiveOutfit({
 }
 
 type RitualFailure = 'missing-city' | 'failed'
+
+function SetCityAction({
+  label,
+  failure,
+  retry,
+}: {
+  label: string
+  failure: RitualFailure | null
+  retry: ReactNode
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Link
+        href={SET_CITY_FROM_HOME}
+        data-testid="home-set-city"
+        data-gold="primary"
+        data-primary-action="true"
+        className={primaryLinkClass}
+      >
+        {label}
+      </Link>
+      {failure === 'failed' && retry}
+    </div>
+  )
+}
 
 /** Story CC-7.7 D5: what a return to Home shows in its first frame, per member. */
 type RitualSnapshot = {
@@ -1035,18 +1069,13 @@ function MemberRitual({
             locale={locale}
             strings={strings}
             actions={
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={SET_CITY_FROM_HOME}
-                  data-testid="home-set-city"
-                  data-gold="primary"
-                  data-primary-action="true"
-                  className={primaryLinkClass}
-                >
-                  {strings.firstUse.setCity}
-                </Link>
-                {failure === 'failed' && retry}
-              </div>
+              ritual ? null : (
+                <SetCityAction
+                  label={strings.firstUse.setCity}
+                  failure={failure}
+                  retry={retry}
+                />
+              )
             }
           />
         </section>

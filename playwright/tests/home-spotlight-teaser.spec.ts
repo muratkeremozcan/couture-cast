@@ -101,7 +101,13 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
 
       await link.focus()
       await page.keyboard.press('Enter')
-      await expect(page).toHaveURL(`${href.pathname}${href.search}`)
+      await expect(page).toHaveURL(
+        (url) =>
+          url.pathname === '/community' &&
+          url.searchParams.get('cardId') === top &&
+          url.searchParams.get('focus') === 'spotlight' &&
+          url.searchParams.get('focusToken')?.startsWith('today-') === true
+      )
       await expect(page.getByTestId(`spotlight-lookbook-card-${top}`)).toBeFocused()
       await expect(page.getByTestId('community-live-region')).toHaveText(
         'Focused on the highlighted look.'

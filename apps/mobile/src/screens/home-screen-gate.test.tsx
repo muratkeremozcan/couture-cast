@@ -422,6 +422,7 @@ describe('Home screen gate (native)', () => {
     pinClock('2026-07-22T16:00:00.000Z')
     const ritual = heldRitualAnswers()
     await renderHome()
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
@@ -458,6 +459,7 @@ describe('Home screen gate (native)', () => {
     pinClock('2026-07-22T14:30:00.000Z')
     const ritual = heldRitualAnswers()
     await renderHome()
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()
@@ -490,6 +492,7 @@ describe('Home screen gate (native)', () => {
     pinClock('2026-07-22T14:30:00.000Z')
     const ritual = heldRitualAnswers()
     await renderHome()
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     await ritual.release(0, HttpResponse.json(mockRitualResponse))
     await waitFor(() =>
       expect(screen.getByTestId('garment-tile-classic-trench-coat')).toBeVisible()

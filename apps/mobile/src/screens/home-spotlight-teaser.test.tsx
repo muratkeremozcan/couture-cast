@@ -319,16 +319,16 @@ describe('6.7 mobile Home spotlight teaser', () => {
     const failed = await renderHome()
     await answer(1, cityPage())
     const afterError = await screen.findByTestId('home-spotlight-teaser-link')
-    expect(follows(await screen.findByTestId('hero-error-state'), afterError)).toBe(true)
+    expect(follows(await screen.findByTestId('hero-retry'), afterError)).toBe(true)
     await failed.unmount()
 
     server.use(http.get('*/api/v1/ritual', noLocationResponse))
     await renderHome()
     await answer(2, cityPage())
     const afterNoLocation = await screen.findByTestId('home-spotlight-teaser-link')
-    expect(
-      follows(await screen.findByTestId('hero-no-location-state'), afterNoLocation)
-    ).toBe(true)
+    expect(follows(await screen.findByTestId('home-set-city'), afterNoLocation)).toBe(
+      true
+    )
   })
 
   it('6.7-MOB-006 a cold start reads nothing until the member resolves, then reads at once', async () => {

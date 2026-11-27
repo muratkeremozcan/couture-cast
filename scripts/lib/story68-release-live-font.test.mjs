@@ -289,7 +289,9 @@ describe('Release live-font text and process preservation', () => {
       hierarchy: async () => {
         const value = tree({ height: reads++ === 0 ? 92 : 138 })
         if (reads > 1)
-          value.children.push({ attributes: { 'resource-id': 'hero-error-state' } })
+          value.children.push({
+            attributes: { 'resource-id': 'home-session-unavailable' },
+          })
         return value
       },
     })

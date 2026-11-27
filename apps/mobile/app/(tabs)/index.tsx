@@ -164,6 +164,25 @@ function focusAccessibilityTarget(
   }
 }
 
+function CachedWeatherNotice({ visible }: { visible: boolean }) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  if (!visible) return null
+  return (
+    <View
+      style={[
+        styles.staleBanner,
+        { backgroundColor: palette.noticeSurface, borderBottomColor: palette.noticeLine },
+      ]}
+      testID="stale-cache-banner"
+    >
+      <Text style={[styles.staleText, { color: palette.noticeInk }]}>
+        {t('hero.offline_toast', { defaultValue: 'Using recently cached weather data' })}
+      </Text>
+    </View>
+  )
+}
+
 function InvalidDeepLinkBanner({
   visible,
   message,
@@ -281,7 +300,8 @@ function localDateAndHourIn(timeZone: string) {
 function hasDistinctForecastPeriods(
   weather: RitualResponse['data']['weather'],
   locale: ReturnType<typeof activeHomeLocale>,
-  readAt: number
+  readAt: number,
+  availableScenarios: readonly ScenarioType[]
 ): boolean {
   const { timezone, hourly } = weather
   const localDateAndHour = localDateAndHourIn(timezone)
@@ -302,15 +322,17 @@ function hasDistinctForecastPeriods(
       ? anchorPeriods
       : [...byDay.values()].reverse().find((day) => day.size === 3)
   if (!periods) return false
+  const periodHour = { morning: 8, midday: 13, evening: 19 } as const
   return (
     new Set(
-      [...periods.values()].map((entry) =>
-        JSON.stringify([
+      availableScenarios.map((scenario) => {
+        const entry = periods.get(periodHour[scenario])!
+        return JSON.stringify([
           entry.condition,
           formatTemperature(entry.temperature, locale),
           Math.round(entry.precipitationProbability * 100),
         ])
-      )
+      })
     ).size > 1
   )
 }
@@ -1072,12 +1094,20 @@ export default function TabOneScreen() {
   const weather = ritual?.data.weather
   const hasHourly = Boolean(weather?.hourly.length)
   const readAt = ownedRitual?.readAt
+  const availableScenarios = useMemo(
+    () =>
+      ritual?.data.outfits
+        .filter(({ garmentIds }) => garmentIds.length > 0)
+        .map(({ scenario }) => scenario) ?? [],
+    [ritual]
+  )
   const showPeriods = useMemo(
     () =>
       weather &&
       readAt !== undefined &&
-      hasDistinctForecastPeriods(weather, activeLocale, readAt),
-    [activeLocale, readAt, weather]
+      availableScenarios.length > 1 &&
+      hasDistinctForecastPeriods(weather, activeLocale, readAt, availableScenarios),
+    [activeLocale, availableScenarios, readAt, weather]
   )
 
   const { category: swapCategory, options: swapOptions } = resolveGarmentSwap(
@@ -1218,12 +1248,15 @@ export default function TabOneScreen() {
                   error={error}
                   busy={isLoading}
                   onRetry={handleRetry}
+                  weatherAvailable={Boolean(weather)}
                 />
               )}
             </NativeView>
+            <CachedWeatherNotice visible={isStale} />
             {activeOutfit && showPeriods && (
               <ScenarioToggles
                 activeScenario={activeScenario}
+                availableScenarios={availableScenarios}
                 onScenarioChange={handleScenarioChange}
               />
             )}
@@ -1301,26 +1334,6 @@ export default function TabOneScreen() {
           ready={homeGateReady(sessionState, ritualSettled && recentPieces !== undefined)}
         >
           {renderHero()}
-
-          {/* Story CC-7.11 D4, AC2: the cached-data notice follows the outfit. */}
-          {isStale && (
-            <View
-              style={[
-                styles.staleBanner,
-                {
-                  backgroundColor: palette.noticeSurface,
-                  borderBottomColor: palette.noticeLine,
-                },
-              ]}
-              testID="stale-cache-banner"
-            >
-              <Text style={[styles.staleText, { color: palette.noticeInk }]}>
-                {t('hero.offline_toast', {
-                  defaultValue: 'Using recently cached weather data',
-                })}
-              </Text>
-            </View>
-          )}
 
           {/*
           Story 6.7: after the whole hero conditional, so it follows in focus

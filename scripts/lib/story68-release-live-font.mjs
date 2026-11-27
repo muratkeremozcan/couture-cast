@@ -53,7 +53,9 @@ function height(bounds) {
 function noErrorSurface(tree) {
   return !nodes(tree).some(
     (node) =>
-      /hero-error-state|share-card-error|logbox/i.test(node['resource-id'] ?? '') ||
+      /home-session-unavailable|share-card-error|logbox/i.test(
+        node['resource-id'] ?? ''
+      ) ||
       /configured linking in multiple|uncaught error|typeerror:|referenceerror:/i.test(
         `${node.text ?? ''} ${node.accessibilityText ?? ''}`
       )

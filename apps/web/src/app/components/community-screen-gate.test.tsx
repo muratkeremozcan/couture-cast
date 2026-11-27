@@ -61,6 +61,7 @@ vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 // Story CC-7.11 D11: the top bar reads the router for its history-aware back.
 const router = vi.hoisted(() => ({ back: vi.fn(), replace: vi.fn(), push: vi.fn() }))
 vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
   usePathname: () => '/community',
   useRouter: () => router,
 }))

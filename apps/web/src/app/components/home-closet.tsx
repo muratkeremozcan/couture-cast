@@ -10,26 +10,22 @@ import { isLiveScope } from '../../lib/use-web-session'
 import { listGarmentsFromWeb } from '../../lib/wardrobe'
 import { useScreenGateRead, useSectionSnapshot } from './screen-gate'
 
-const recentReadIntervalMs = 60_000
-
 export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
-  const { restored, beginRead, remember } = useSectionSnapshot<boolean>(
-    'recent-pieces',
-    owner
+  const { restored, beginRead, remember } = useSectionSnapshot<
+    (GarmentCategory | null)[]
+  >('recent-pieces', owner)
+  // The snapshot holds display categories only, scoped to the active member.
+  const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null | undefined>(
+    restored
   )
-  const [pieces, setPieces] = useState<(GarmentCategory | null)[] | null>()
-  const [pending, setPending] = useState(true)
-  useScreenGateRead('closet', restored !== undefined || pieces !== undefined)
+  useScreenGateRead('closet', pieces !== undefined)
 
   useEffect(() => {
     let controller: AbortController | undefined
-    let refresh: ReturnType<typeof setTimeout> | undefined
     const read = () => {
       if (!isLiveScope(scope) || document.visibilityState === 'hidden') return
       controller?.abort()
-      clearTimeout(refresh)
-      setPending(true)
       beginRead()
       const request = new AbortController()
       controller = request
@@ -41,45 +37,26 @@ export function HomeCloset({ owner, scope }: { owner: string; scope: string }) {
             .slice(0, 3)
             .map(({ category }) => category)
           setPieces(recent)
-          remember(true)
+          remember(recent)
         })
         .catch(() => {
           if (!request.signal.aborted && isLiveScope(scope)) {
             setPieces(null)
-            remember(false)
+            remember(undefined)
           }
         })
-        .finally(() => {
-          if (request.signal.aborted || !isLiveScope(scope)) return
-          setPending(false)
-          refresh = setTimeout(read, recentReadIntervalMs)
-        })
-    }
-    const onVisibility = () => {
-      if (document.visibilityState !== 'hidden') {
-        read()
-        return
-      }
-      controller?.abort()
-      clearTimeout(refresh)
-      setPending(true)
-      setPieces((current) => (current === undefined ? undefined : null))
     }
     read()
     window.addEventListener('focus', read)
-    document.addEventListener('visibilitychange', onVisibility)
+    document.addEventListener('visibilitychange', read)
     return () => {
       controller?.abort()
-      clearTimeout(refresh)
       window.removeEventListener('focus', read)
-      document.removeEventListener('visibilitychange', onVisibility)
+      document.removeEventListener('visibilitychange', read)
     }
   }, [beginRead, remember, scope])
 
-  if (pending) {
-    return restored || pieces ? <div className="min-h-touch" aria-hidden="true" /> : null
-  }
-  if (!pieces) return null
+  if (!pieces || !isLiveScope(scope)) return null
   const recentLabel = t('home.today.recentPieces')
   const garments = formatLocalizedList(
     pieces.map((category) => formatGarmentAlt(i18n.language, { category })),

@@ -317,6 +317,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           },
         })
         await page.goto('/')
+        await page.getByTestId('home-edit-sample').click()
         const sampleSave = page.getByTestId('sample-save-look')
         await expect(sampleSave).toBeVisible()
         await sampleSave.click()

@@ -9,6 +9,7 @@ type ScenarioType = 'morning' | 'midday' | 'evening'
 type ScenarioTogglesProps = {
   activeScenario: ScenarioType
   onScenarioChange: (scenario: ScenarioType) => void
+  availableScenarios?: readonly ScenarioType[]
 }
 
 const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[] = [
@@ -20,9 +21,13 @@ const scenarios: { key: ScenarioType; labelKey: string; defaultLabel: string }[]
 export function ScenarioToggles({
   activeScenario,
   onScenarioChange,
+  availableScenarios,
 }: ScenarioTogglesProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const tabs = availableScenarios
+    ? scenarios.filter(({ key }) => availableScenarios.includes(key))
+    : scenarios
 
   return (
     <View style={styles.container} testID="scenario-toggles" accessibilityRole="tablist">
@@ -33,7 +38,7 @@ export function ScenarioToggles({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {scenarios.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeScenario === tab.key
           return (
             <Pressable

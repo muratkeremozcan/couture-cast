@@ -158,11 +158,13 @@ export function MemberSampleOutfit({
   error,
   busy,
   onRetry,
+  weatherAvailable = false,
 }: {
   owner: string | null
   error: 'no-location' | 'generic' | null
   busy: boolean
   onRetry: () => void
+  weatherAvailable?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const statusBar = useStatusBar()
@@ -703,14 +705,16 @@ export function MemberSampleOutfit({
           />
         ))}
       </View>
-      <PreviewButton
-        label={strings.firstUse.setCity}
-        testID="home-set-city"
-        palette={palette}
-        onPress={() => router.push('/locations?guided=1')}
-        primary
-        todayPrimary
-      />
+      {!weatherAvailable && (
+        <PreviewButton
+          label={strings.firstUse.setCity}
+          testID="home-set-city"
+          palette={palette}
+          onPress={() => router.push('/locations?guided=1')}
+          primary
+          todayPrimary
+        />
+      )}
       {error === 'generic' && (
         <PreviewButton
           label={strings.chrome.retry}
@@ -726,6 +730,8 @@ export function MemberSampleOutfit({
         palette={palette}
         expanded={editorOpen}
         onPress={() => setEditorOpen((open) => !open)}
+        primary={weatherAvailable}
+        todayPrimary={weatherAvailable}
       />
       {editorOpen && editor}
     </View>

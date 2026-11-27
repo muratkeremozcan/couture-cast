@@ -2,7 +2,7 @@ import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
 import { http, HttpResponse } from 'msw'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -10,6 +10,9 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { mockCommunityFeedItem } from '../../test-utils/msw/handlers'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import CommunityPage from '../community/page'
+import { createWebSpotlightActivation } from '../lib/deep-link-handler'
+import { currentWebSessionScope } from '../../lib/use-web-session'
+import { cityPage } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 const captureMock = vi.fn()
@@ -217,6 +220,59 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
       expect(authorizations).toEqual(['Bearer test-access-token'])
       expect(screen.queryByTestId('lookbook-card-unavailable-look')).toBeNull()
       expect(router.replace).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['Today', LookbookPrismLayout],
+    ['Community', CommunityPage],
+  ] as const)(
+    'reports a signed-out notification on %s without a member probe',
+    async (_entry, Entry) => {
+      const probe = vi.fn(() => new HttpResponse(null, { status: 403 }))
+      useMswHandlers(http.get('/api/v1/community/posts/unavailable-look', probe))
+      setLocationSearch('?source=notification&type=community&cardId=unavailable-look')
+      render(<Entry />)
+
+      const banner = await screen.findByTestId('deep-link-info-banner')
+      expect(banner).toHaveTextContent(
+        'This link is invalid, expired, or no longer available.'
+      )
+      expect(captureMock).toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+      expect(probe).not.toHaveBeenCalled()
+      expect(router.replace).not.toHaveBeenCalled()
+      fireEvent.click(within(banner).getByRole('button'))
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+    }
+  )
+
+  it.each([true, false])(
+    'only the account that opened the Spotlight gets programmatic focus (same owner: %s)',
+    async (sameOwner) => {
+      signIn()
+      const scope = currentWebSessionScope()!
+      const token = createWebSpotlightActivation(
+        'look-1',
+        sameOwner ? scope : `${scope}-previous`
+      )
+      useMswHandlers(
+        http.get('/api/v1/community/spotlight', () =>
+          HttpResponse.json({ data: cityPage() })
+        )
+      )
+      setLocationSearch(
+        `?source=app&type=community&cardId=look-1&focus=spotlight&focusToken=${token}`
+      )
+      render(<CommunityPage />)
+
+      const card = await screen.findByTestId('spotlight-lookbook-card-look-1')
+      if (sameOwner) await waitFor(() => expect(card).toHaveFocus())
+      else {
+        await waitFor(() =>
+          expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
+        )
+        expect(card).not.toHaveFocus()
+      }
     }
   )
 

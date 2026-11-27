@@ -4,11 +4,11 @@ appId: ${MAESTRO_APP_ID}
 ---
 - scrollUntilVisible:
     element:
-      id: ribbon-expand-toggle
-    direction: DOWN
+      id: weather-header
+    direction: UP
     timeout: 20000
 - tapOn:
-    id: ribbon-expand-toggle
+    id: weather-header
 - scrollUntilVisible:
     element:
       id: current-temperature

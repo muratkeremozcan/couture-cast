@@ -14,8 +14,6 @@ import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'
 
-const recentReadIntervalMs = 60_000
-
 export function useRecentHomePieces(owner: string | null, enabled: boolean) {
   const epoch = mobileIdentityEpoch()
   const [result, setResult] = useState<{
@@ -26,16 +24,8 @@ export function useRecentHomePieces(owner: string | null, enabled: boolean) {
     useCallback(() => {
       if (!enabled) return
       let controller: AbortController | undefined
-      let refresh: ReturnType<typeof setTimeout> | undefined
-      const clear = () => {
-        controller?.abort()
-        clearTimeout(refresh)
-        setResult((current) =>
-          current?.epoch === epoch ? { epoch, pieces: null } : current
-        )
-      }
       const read = () => {
-        clear()
+        controller?.abort()
         const request = new AbortController()
         controller = request
         const current = () =>
@@ -59,18 +49,20 @@ export function useRecentHomePieces(owner: string | null, enabled: boolean) {
           .catch(() => {
             if (current()) setResult({ epoch, pieces: null })
           })
-          .finally(() => {
-            if (current()) refresh = setTimeout(read, recentReadIntervalMs)
-          })
       }
       read()
-      const unsubscribe = onWardrobeChanged(read)
+      const unsubscribe = onWardrobeChanged(() => {
+        setResult((current) =>
+          current?.epoch === epoch ? { epoch, pieces: null } : current
+        )
+        read()
+      })
       const appState = AppState.addEventListener('change', (state) => {
         if (state === 'active') read()
-        else clear()
+        else controller?.abort()
       })
       return () => {
-        clear()
+        controller?.abort()
         unsubscribe()
         appState.remove()
       }

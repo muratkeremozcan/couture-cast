@@ -382,7 +382,7 @@ export async function verifyNativeOtp(email: string, token: string) {
 export async function signOutNativeSession() {
   const client = await nativeSupabase()
   const secure = await import('expo-secure-store')
-  // The SDK still needs the stored session to revoke its refresh token. A cold launch
+  // The SDK uses the stored credential to sign out this device's session. A cold launch
   // seeing this marker clears it locally before any credentials can be restored.
   await secure.setItemAsync(logoutMarkerKey, '1', {
     keychainAccessible: secure.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,

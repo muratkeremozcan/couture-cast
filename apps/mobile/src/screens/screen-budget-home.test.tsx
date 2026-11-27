@@ -182,7 +182,7 @@ function expectBelow(upper: HTMLElement, lower: HTMLElement) {
   ).toBeGreaterThanOrEqual(upper.getBoundingClientRect().bottom - 1)
 }
 
-function serveTodayForecast(differs: boolean) {
+function serveTodayForecast(differs: boolean, usableOutfitCount = 3) {
   const firstHour = Date.parse('2026-07-25T07:00:00.000Z')
   vi.setSystemTime(new Date(firstHour + 9 * 3_600_000))
   const basis = mockRitualResponse.data.weather.hourly[0]!
@@ -191,6 +191,7 @@ function serveTodayForecast(differs: boolean) {
       HttpResponse.json({
         data: {
           ...mockRitualResponse.data,
+          outfits: mockRitualResponse.data.outfits.slice(0, usableOutfitCount),
           weather: {
             ...mockRitualResponse.data.weather,
             fetchedAt: new Date(firstHour).toISOString(),
@@ -411,6 +412,15 @@ describe('Screen budget: native Today', () => {
       'true'
     )
     expect(screen.getByTestId('outfit-comfort-notes').textContent).toMatch(/light tee/i)
+  }, 30_000)
+
+  it('[P0] [7.13-NAT-002] varying weather does not offer a period selector with one outfit', async () => {
+    serveScreenBudgetFixture('populated', MEMBER)
+    serveTodayForecast(true, 1)
+    renderToday()
+    await todaySettled('populated')
+    expect(screen.queryByTestId('scenario-toggles')).toBeNull()
+    expect(screen.getByTestId('today-primary-action')).toBeVisible()
   }, 30_000)
 
   it('[P0] [7.13-NAT-004] a wardrobe change removes old categories until the current closet is verified', async () => {

@@ -124,7 +124,8 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     test(
       `[P0] [7.13-WEB-002/005] ${mode}: actionable outfit and a Today height of at most 1,688 px`,
       {
-        annotation: mode === 'ritual-503' ? [{ type: 'skipNetworkMonitoring' }] : [],
+        annotation:
+          mode === 'ritual-503' ? [{ type: 'expectTodayForecastUnavailable' }] : [],
       },
       async ({ page, interceptNetworkCall }) => {
         const { router, setScreen } = await openFixtureShell(page, interceptNetworkCall, {
@@ -145,6 +146,7 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
           plan(page)
         )
         await expect(emptyCloset ? closet(page) : add(page)).toHaveCount(0)
+        if (mode === 'empty') await expect(spotlight(page)).toHaveCount(0)
         if (emptyCloset) {
           await expect(add(page)).toHaveText(/Add your first piece/)
           await expect(add(page)).toHaveAttribute('href', '/wardrobe?entry=add')
@@ -166,68 +168,73 @@ test.describe('CC-7.13 Calm Today @local-lane', () => {
     )
   }
 
-  test(
-    '[P0] [7.13-WEB-002] an unresolved or failed closet read shows no empty-closet prompt',
-    { annotation: [{ type: 'skipNetworkMonitoring' }] },
-    async ({ page, interceptNetworkCall, recurse }) => {
-      const { router } = await openFixtureShell(page, interceptNetworkCall, {
-        mode: 'closet-503',
-        screen: 'home',
-      })
-      const release = router.hold('garments')
-      try {
-        await page.goto('/')
-        await recurse(
-          () => Promise.resolve(router.calls('garments')),
-          (count) => count > 0
-        )
-        await expect(page.getByTestId('screen-placeholder')).toBeVisible()
-        await expect(add(page)).toHaveCount(0)
-      } finally {
-        release()
-      }
-      await waitForShellSettled(page, router)
-      await expect(primary(page)).toBeVisible()
-      await expect(plan(page)).toBeVisible()
-      await expect(add(page)).toHaveCount(0)
-      await expect(closet(page)).toHaveCount(0)
-    }
-  )
-
-  for (const mode of ['populated', 'empty'] as const) {
-    test(`[P0] [7.13-WEB-005] ${mode}: Today controls remain reachable at 320 px and 200% text`, async ({
-      page,
-      interceptNetworkCall,
-    }) => {
-      await page.setViewportSize({ width: 320, height: 640 })
-      const { router } = await openFixtureShell(page, interceptNetworkCall, {
-        mode,
-        screen: 'home',
-      })
-      await page.goto('/')
-      await waitForShellSettled(page, router)
-      await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
-      await expect(page.locator('html')).toHaveCSS('font-size', '32px')
-      await expect(mode === 'populated' ? primary(page) : setCity(page)).toBeVisible()
-      const controls = page
-        .locator(
-          'main :is(a[href], button, summary), [data-testid="sticky-bottom-nav"] a'
-        )
-        .filter({ visible: true })
-      expect(await controls.count()).toBeGreaterThanOrEqual(8)
-      for (const control of await controls.all()) {
-        await control.click({ trial: true })
-        const box = (await control.boundingBox())!
-        expect(box.x, `${control.toString()} left edge`).toBeGreaterThanOrEqual(-1)
-        expect(box.x + box.width, `${control.toString()} right edge`).toBeLessThanOrEqual(
-          321
-        )
-      }
-      const documentWidths = await page.evaluate(() => ({
-        content: document.documentElement.scrollWidth,
-        viewport: document.documentElement.clientWidth,
-      }))
-      expect(documentWidths.content).toBeLessThanOrEqual(documentWidths.viewport + 1)
+  test('[P0] [7.13-WEB-002] an unresolved or failed closet read shows no empty-closet prompt', async ({
+    page,
+    interceptNetworkCall,
+    recurse,
+  }) => {
+    const { router } = await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'closet-unavailable',
+      screen: 'home',
     })
+    const release = router.hold('garments')
+    try {
+      await page.goto('/')
+      await recurse(
+        () => Promise.resolve(router.calls('garments')),
+        (count) => count > 0
+      )
+      await expect(page.getByTestId('screen-placeholder')).toBeVisible()
+      await expect(add(page)).toHaveCount(0)
+    } finally {
+      release()
+    }
+    await waitForShellSettled(page, router)
+    await expect(primary(page)).toBeVisible()
+    await expect(plan(page)).toBeVisible()
+    await expect(add(page)).toHaveCount(0)
+    await expect(closet(page)).toHaveCount(0)
+  })
+
+  for (const mode of ['populated', 'empty', 'ritual-503'] as const) {
+    test(
+      `[P0] [7.13-WEB-005] ${mode}: Today controls remain reachable at 320 px and 200% text`,
+      {
+        annotation:
+          mode === 'ritual-503' ? [{ type: 'expectTodayForecastUnavailable' }] : [],
+      },
+      async ({ page, interceptNetworkCall }) => {
+        await page.setViewportSize({ width: 320, height: 640 })
+        const { router } = await openFixtureShell(page, interceptNetworkCall, {
+          mode,
+          screen: 'home',
+        })
+        await page.goto('/')
+        await waitForShellSettled(page, router)
+        await page.addStyleTag({ content: 'html { font-size: 200% !important; }' })
+        await expect(page.locator('html')).toHaveCSS('font-size', '32px')
+        await expect(mode === 'populated' ? primary(page) : setCity(page)).toBeVisible()
+        const controls = page
+          .locator(
+            'main :is(a[href], button, summary), [data-testid="sticky-bottom-nav"] a'
+          )
+          .filter({ visible: true })
+        expect(await controls.count()).toBeGreaterThanOrEqual(8)
+        for (const control of await controls.all()) {
+          await control.click({ trial: true })
+          const box = (await control.boundingBox())!
+          expect(box.x, `${control.toString()} left edge`).toBeGreaterThanOrEqual(-1)
+          expect(
+            box.x + box.width,
+            `${control.toString()} right edge`
+          ).toBeLessThanOrEqual(321)
+        }
+        const documentWidths = await page.evaluate(() => ({
+          content: document.documentElement.scrollWidth,
+          viewport: document.documentElement.clientWidth,
+        }))
+        expect(documentWidths.content).toBeLessThanOrEqual(documentWidths.viewport + 1)
+      }
+    )
   }
 })

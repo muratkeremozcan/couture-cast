@@ -235,6 +235,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
 
+    fireEvent.click(await screen.findByTestId('today-primary-action'))
     const tile = screen.getByTestId('garment-tile-classic-trench-coat')
     tile.focus()
     fireEvent.click(tile)

@@ -3,14 +3,16 @@ title: 'Story CC-7.13: Calm Today with one primary job'
 type: feature
 ticket: '7-13-calm-today-one-primary-job'
 created: '2026-11-26'
-status: in-review
+status: built
 baseline_revision: '0d3b82a3ba9e76be509ddd816817f48a44292485'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran:
+  - 'independent-correctness'
+  - 'codex-security'
 review_loop_iteration: 0
 context:
   - 'AGENTS.md'
@@ -115,6 +117,27 @@ controls, including guest preview, account recovery and the Android share flow.
 ## Plan Change Log
 
 ## Review Triage Log
+
+The independent review covered `0d3b82a3ba9e76be509ddd816817f48a44292485` through
+`2e71d4855e768633f7b79eaab7b0dd3f416811ff`. The same round covered all six Playwright files in
+`2e71d4855e768633f7b79eaab7b0dd3f416811ff..b34db2a2bb4c77095d44107e0d93ffe055d8d06b`.
+The Codex Security scan of the pinned base and head covered all 77 source-like paths in
+the 104-path diff. It recorded 27 inventory exclusions, three suppressions and zero reportable
+findings. This was static coverage of the pinned range. CI verifies the subsequent fixes.
+
+- P1-1 to P1-4. Migrate the remaining test mocks, disclosure actions, Community routes and Maestro
+  anchors to the production entry points.
+- P1-5. Keep signed-out notification feedback and bind Community target reads to the original
+  account. Settle the link before revealing the feed and announce its outcome.
+- P1-6. Keep only categories in the closet strip and restore them for the same session. Refresh in
+  place on focus and clear on denial or wardrobe invalidation. Remove routine polling.
+- P2-1 and P2-2. Place the native cached-weather notice immediately after the card. If the forecast
+  is usable and the outfit is missing, make Edit sample the primary action. Offer period selection
+  only across usable outfits with differing forecasts.
+- P2-3 and P2-4. Cover Spotlight focus, native Profile sign-out, and the unavailable forecast at
+  enlarged text. Limit expected network failures to the affected requests.
+- P3-1 to P3-3. Record completion with the Android capture, update diagnostic anchors, add the web
+  sample editor anchor and issue a fresh Spotlight focus token on activation.
 
 ## Verification
 

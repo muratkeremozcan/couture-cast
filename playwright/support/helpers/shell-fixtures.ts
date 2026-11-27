@@ -42,7 +42,7 @@ import {
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
  *   empty-closet populated except for the garment list, so Today can test an empty closet
  *                independently of weather and Community
- *   closet-503 populated, but the user's recent garments read fails
+ *   closet-unavailable populated, but the user's recent garments read fails
  *   guardian-pending  Story CC-7.10 D1: a 14 year old teen whose one linked guardian is still
  *              `pending`. Under the production consent policy `off` the API lets a teen waiting on
  *              a guardian through on every read (`teenAccessBlocked(prefs, 'off')` is false), so
@@ -52,7 +52,7 @@ import {
 export type ShellMode =
   | 'empty'
   | 'empty-closet'
-  | 'closet-503'
+  | 'closet-unavailable'
   | 'populated'
   | 'delayed'
   | 'late'
@@ -600,8 +600,6 @@ export function createShellRouter(options: {
     if (key === 'ritual' && mode === 'ritual-503')
       return { status: 503, json: { statusCode: 503, message: 'Unavailable' } }
     if (key === 'garments' && mode === 'empty-closet') return { json: { data: [] } }
-    if (key === 'garments' && mode === 'closet-503')
-      return { status: 503, json: { statusCode: 503, message: 'Unavailable' } }
     if (key === 'saved-look' && savedLookMissing(request, populated))
       return { status: 404, json: SAVED_LOOK_NOT_FOUND }
     if (key === 'community-feed') {
@@ -639,7 +637,8 @@ export function createShellRouter(options: {
       if (gate) await gate
       const delay = delayFor(key)
       if (delay > 0) await new Promise((resolveDelay) => setTimeout(resolveDelay, delay))
-      await route.fulfill(answerFor(key, request))
+      if (key === 'garments' && mode === 'closet-unavailable') await route.abort()
+      else await route.fulfill(answerFor(key, request))
     } catch {
       // The page closed or navigated while the stub waited: nothing to answer.
     } finally {

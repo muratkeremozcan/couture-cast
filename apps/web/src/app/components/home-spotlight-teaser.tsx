@@ -6,7 +6,6 @@
 import React, {
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useRef,
   useState,
@@ -14,6 +13,7 @@ import React, {
 } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   SPOTLIGHT_TEASER_EXPIRY_MS,
   SpotlightTeaserState,
@@ -28,7 +28,7 @@ import {
   sponsorshipOf,
 } from '../../lib/community'
 import { getI18n } from '../../i18n'
-import { rememberWebSpotlightActivation } from '../lib/deep-link-handler'
+import { createWebSpotlightActivation } from '../lib/deep-link-handler'
 import {
   CommunitySponsoredCta,
   useSponsoredShownRegistry,
@@ -309,7 +309,7 @@ export function useHomeSpotlightTeaser({
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
-  open: (focusToken: string) => boolean
+  open: () => string | null
   isCurrent: () => boolean
 }
 
@@ -321,21 +321,18 @@ export function useHomeSpotlightTeaserLink(): HomeSpotlightTeaserLink {
     () => scope !== null && currentWebSessionScope() === scope,
     [scope]
   )
-  const open = useCallback(
-    (focusToken: string) => {
-      if (!value || !scope || !isCurrent()) return false
-      rememberWebSpotlightActivation(focusToken, scope)
-      void openCommunitySpotlightPostFromWeb(
-        value.item.id,
-        value.item.rank,
-        value.level,
-        undefined,
-        'home_teaser'
-      ).catch(() => undefined)
-      return true
-    },
-    [isCurrent, scope, value]
-  )
+  const open = useCallback(() => {
+    if (!value || !scope || !isCurrent()) return null
+    const focusToken = createWebSpotlightActivation(value.item.id, scope)
+    void openCommunitySpotlightPostFromWeb(
+      value.item.id,
+      value.item.rank,
+      value.level,
+      undefined,
+      'home_teaser'
+    ).catch(() => undefined)
+    return focusToken
+  }, [isCurrent, scope, value])
   return { ...teaser, open, isCurrent }
 }
 
@@ -350,7 +347,7 @@ export interface HomeSpotlightTeaserProps {
   value: SpotlightTeaserValue
   t: Translate
   sponsoredShown: SponsoredShownRegistry
-  onOpen: (focusToken: string) => boolean
+  onOpen: () => string | null
   isCurrent: () => boolean
   onImageError: () => void
   /** Called when the teaser leaves while its link holds focus. */
@@ -373,14 +370,17 @@ export function HomeSpotlightTeaser({
   const leaveRef = useRef(onLeaveWhileFocused)
   leaveRef.current = onLeaveWhileFocused
   const { item, label } = value
-  const focusToken = useId()
-  const destination = new URLSearchParams({
-    source: 'app',
-    type: 'community',
-    cardId: item.id,
-    focus: 'spotlight',
-    focusToken,
-  })
+  const router = useRouter()
+  const spotlightHref = (focusToken: string) => {
+    const destination = new URLSearchParams({
+      source: 'app',
+      type: 'community',
+      cardId: item.id,
+      focus: 'spotlight',
+      focusToken,
+    })
+    return `/community?${destination.toString()}`
+  }
   const count = item.reactions?.total ?? 0
   const author = teaserAuthorName(value, t)
   // Story 6.7b: the block exactly as the live teaser read returned it.
@@ -412,11 +412,19 @@ export function HomeSpotlightTeaser({
       className="flex flex-col gap-3"
     >
       <Link
-        href={`/community?${destination.toString()}`}
+        href={spotlightHref(`link-${item.id}`)}
         prefetch={false}
         data-testid="home-spotlight-teaser-link"
         onClick={(event) => {
-          if (!onOpen(focusToken)) event.preventDefault()
+          if (!isCurrent()) {
+            event.preventDefault()
+            return
+          }
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          const focusToken = onOpen()
+          if (event.defaultPrevented) return
+          event.preventDefault()
+          if (focusToken) router.push(spotlightHref(focusToken))
         }}
         className="group flex min-h-11 items-center gap-4 border-t border-line pt-4 text-left"
       >

@@ -384,7 +384,7 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       }
 
       const feedReads = watchFeedReads(page)
-      await page.goto('/')
+      await page.goto('/community')
       // The grid container renders for every signed-in reader; the denial is the status copy.
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
@@ -454,7 +454,7 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await expect(page.getByTestId('premium-theme-gallery')).toHaveCount(0)
 
       const feedReads = watchFeedReads(page)
-      await page.goto('/')
+      await page.goto('/community')
       await expect(
         page.getByRole('status').filter({ hasText: COPY.feedDisabled })
       ).toBeVisible()

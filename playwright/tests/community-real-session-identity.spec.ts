@@ -247,7 +247,7 @@ test('N1 a late profile response from the previous session cannot replace the sw
   )
 
   await expect(page).toHaveURL(/\/signin$/)
-  await page.goto('/')
+  await page.goto('/community')
   await expectCommunityFeedLoaded(page)
   // The restored session stores its bearer once canonical verification completes.
   await expect

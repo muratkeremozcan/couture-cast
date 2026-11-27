@@ -13,7 +13,7 @@ import {
   useWebSession,
   useWebSessionScope,
 } from '../../lib/use-web-session'
-import { processWebDeepLink } from '../lib/deep-link-handler'
+import { processWebDeepLink, rememberWebCommunityHandoff } from '../lib/deep-link-handler'
 import { GuestPreviewEntry } from './guest-preview/guest-preview-entry'
 import { HomeRitual } from './home-ritual'
 import {
@@ -31,6 +31,12 @@ type TodayLinkState = {
   announcement: string | null
 }
 
+const TODAY_ACTION = [
+  '[data-testid="today-primary-action"]',
+  '[data-testid="home-set-city"]',
+  '[data-testid="home-edit-sample"][data-primary-action="true"]',
+].join(', ')
+
 export function LookbookPrismLayout() {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const router = useRouter()
@@ -38,7 +44,7 @@ export function LookbookPrismLayout() {
   const { status } = useWebSession()
   const alertRef = useRef<HTMLDivElement>(null)
   const todayRef = useRef<HTMLDivElement>(null)
-  const linkScopeRef = useRef<string | null | undefined>(undefined)
+  const linkScopeRef = useRef<string | null | undefined>(scope ?? undefined)
   const [link, setLink] = useState<TodayLinkState | null>(null)
   const input = link?.scope === scope ? link : null
   // A link that already resolved for another scope must not replay when the account changes.
@@ -48,11 +54,6 @@ export function LookbookPrismLayout() {
     const params = new URLSearchParams(window.location.search)
     const rawParams = Object.fromEntries(params)
     const parsed = parseDeepLink(rawParams)
-    if (parsed.valid && parsed.payload?.type === 'community' && parsed.payload.cardId) {
-      router.replace(`/community?${params.toString()}`)
-      return
-    }
-
     const linkScope = currentWebSessionScope()
     if (hasDeepLinkIntent(rawParams)) {
       if (status === 'checking') return
@@ -61,6 +62,17 @@ export function LookbookPrismLayout() {
         return
       }
       linkScopeRef.current = linkScope
+    }
+    if (
+      linkScope &&
+      parsed.valid &&
+      parsed.payload?.type === 'community' &&
+      parsed.payload.cardId
+    ) {
+      const query = params.toString()
+      rememberWebCommunityHandoff(query, linkScope)
+      router.replace(`/community?${query}`)
+      return
     }
     const controller = new AbortController()
     const answer: TodayLinkState = {
@@ -93,6 +105,7 @@ export function LookbookPrismLayout() {
         answer.invalid = invalid
       },
       signal: controller.signal,
+      communityScope: linkScope,
     })
       .catch(() => {
         answer.invalid = true
@@ -107,7 +120,7 @@ export function LookbookPrismLayout() {
         )
       })
     return () => controller.abort()
-  }, [router, status])
+  }, [router, scope, status])
 
   const gateOpen = useScreenGateOpen()
   const focusedAlert = input?.alert
@@ -157,10 +170,11 @@ export function LookbookPrismLayout() {
               type="button"
               className="min-h-11"
               onClick={() => {
-                const action = todayRef.current?.querySelector<HTMLElement>(
-                  '[data-testid="today-primary-action"], [data-testid="home-set-city"]'
-                )
-                if (action?.getAttribute('aria-expanded') === 'false') action.click()
+                const action = todayRef.current?.querySelector<HTMLElement>(TODAY_ACTION)
+                const closedSample = action?.closest('details:not([open])')
+                if (action?.getAttribute('aria-expanded') === 'false' || closedSample) {
+                  action?.click()
+                }
                 action?.focus()
               }}
             >
@@ -175,7 +189,7 @@ export function LookbookPrismLayout() {
           </div>
         </div>
       )}
-      {input?.announcement && (
+      {input?.announcement && !input.invalid && (
         <p aria-live="polite" role="status" className="sr-only">
           {input.announcement}
         </p>
@@ -184,9 +198,7 @@ export function LookbookPrismLayout() {
       <TodaySpotlight
         key={scope}
         onLeaveWhileFocused={() => {
-          const primary = todayRef.current?.querySelector<HTMLElement>(
-            '[data-testid="today-primary-action"], [data-testid="home-set-city"]'
-          )
+          const primary = todayRef.current?.querySelector<HTMLElement>(TODAY_ACTION)
           const target = primary ?? todayRef.current
           target?.focus()
         }}
