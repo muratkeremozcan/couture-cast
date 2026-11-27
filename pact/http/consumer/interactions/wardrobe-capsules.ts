@@ -198,6 +198,59 @@ export async function verifyListCapsulesInteraction(
     })
 }
 
+/**
+ * Story CC-7.12 D3 (7.12-PACT-002): the Looks tab pages capsules newest saved first with
+ * `sort=created_desc`; the provider double rejects any other order for this state.
+ */
+export async function verifyListCapsulesCreatedOrderInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'Capsules exist for owner in created order',
+        params: { userId: CAPSULE_OWNER_ID },
+      })
+    )
+    .uponReceiving('a request to list outfit capsules newest saved first')
+    .withRequest(
+      'GET',
+      `/api/v1/wardrobe/${CAPSULE_OWNER_ID}/capsules`,
+      setJsonContent({
+        headers: pactEventHeaders,
+        query: { sort: 'created_desc', limit: '50', offset: '0' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          data: eachLike(capsuleBody(1)),
+          total: like(1),
+          limit: like(50),
+          offset: like(0),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1WardrobeOwnerUserIdCapsulesGet(
+        {
+          ownerUserId: CAPSULE_OWNER_ID,
+          sort: 'created_desc',
+          limit: 50,
+          offset: 0,
+        }
+      )
+
+      expect(outfitCapsuleListResponseSchema.parse(response).data.length).toBeGreaterThan(
+        0
+      )
+    })
+}
+
 export async function verifyCapsuleDetailInteraction(
   pact: PactV4,
   createClient: CreateClient

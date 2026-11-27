@@ -6,6 +6,12 @@
 // the guardian and teen dashboards (D7, D10) beside the existing sub-screens, under the shared
 // stack top bar, with the tab group's anchor listeners.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-020 (D5), the root stack registers the saved look
+// screen untitled (it titles itself with the look's name once read) under the shared top bar with
+// its back control; the planner route is a redirect the stack gives no screen entry (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 /**
  * Story 6.9 G01: the root layout runs the share-card startup sweeps.
  *
@@ -331,6 +337,21 @@ describe('RootLayout startup', () => {
     expect(
       layout.screens.filter((screen) => screen.name === '(tabs)').at(-1)
     ).toMatchObject({ listeners: tabsAnchorListeners })
+  })
+
+  it('[P1] [7.12-NAT-020] registers the saved look screen untitled under the shared top bar, with back', async () => {
+    await mountLayout()
+
+    const options = layout.screens
+      .filter((screen) => screen.name === 'saved-look/[savedLookId]')
+      .at(-1)?.options
+    // Untitled until the screen reads the look; gone and signed out stay untitled (TEA P6).
+    expect(options?.title).toBe('')
+    expect(options?.headerShown, 'saved look header').not.toBe(false)
+    expect(options?.headerBackVisible, 'saved look back').not.toBe(false)
+    // D11: `planner` is a redirect to Looks on Plan, so the stack titles no planner screen.
+    expect(layout.screens.some((screen) => screen.name === 'planner')).toBe(false)
+    expect(layout.stackOptions.at(-1)?.header).toBe(renderStackTopBar)
   })
 
   it('still sends screen views elsewhere', async () => {

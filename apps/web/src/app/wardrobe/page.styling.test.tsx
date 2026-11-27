@@ -1,3 +1,9 @@
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-IMPORT-001 (D8: the device-saved looks import moved
+// with the saved looks read from the Closet to Looks; TEA W2: the grid that showed both tiles
+// never leaves) and 7.12-UNIT-VIEW-001 (D7, Codex 7.12 #1).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): router stub for the history-aware top bar back (D11)
@@ -20,7 +26,7 @@ import userEvent from '@testing-library/user-event'
 import { HttpResponse, http } from 'msw'
 import type * as ReactJsxDevRuntime from 'react/jsx-dev-runtime'
 import { I18nextProvider } from 'react-i18next'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { screenSnapshot } from '../../lib/screen-snapshot'
 import {
   createCompletedOnboardingStateFixture,
@@ -30,12 +36,19 @@ import { stylePieceStorageKey, type StylePieceRecipe } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/browser-persistence'
 import type * as WebSession from '../../lib/web-session'
+import {
+  notifySavedLooksChanged,
+  resetWebLegacySavedLooksImportState,
+  subscribeSavedLooksChanged,
+} from '../../lib/saved-looks'
+import { currentWebSessionOwner, currentWebSessionScope } from '../../lib/use-web-session'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   createSavedLooksMswHandlers,
   type SavedLooksMswStore,
 } from '../../test-utils/saved-looks-msw'
 import { HomeRitual } from '../components/home-ritual'
+import LooksPage from '../looks/page'
 import WardrobePage from './page'
 
 const photoErrors = vi.hoisted(() => new Map<string, () => void>())
@@ -207,8 +220,11 @@ beforeEach(() => {
   )
 })
 
+const startUrl = window.location.href
+
 afterEach(() => {
   cleanup()
+  window.history.replaceState(null, '', startUrl)
   photoErrors.clear()
   vi.useRealTimers()
   vi.restoreAllMocks()
@@ -320,6 +336,38 @@ describe('Wardrobe styling', () => {
     )
     expect(readRecipes()).toEqual([])
     expect(selectedWeather).toHaveFocus()
+  })
+
+  // Story CC-7.12 D7 and Codex 7.12 #1: View on the save confirmation opens the saved look's
+  // detail, both for a new save and for a save that confirmed the look already saved.
+  it('7.12-UNIT-VIEW-001 View opens the saved look, and after a duplicate save opens the existing look', async () => {
+    router.push.mockClear()
+    publishOwner(owner)
+    render(<WardrobePage />)
+    const { user, dialog } = await startStyling()
+    const save = within(dialog).getAllByTestId('style-piece-save')[0]!
+    await waitFor(() => expect(save).toBeEnabled())
+    await user.click(save)
+    await waitFor(() => expect(savedLooksStore.items).toHaveLength(1))
+    const savedId = savedLooksStore.items[0]!.id
+
+    await user.click(await within(dialog).findByTestId('status-bar-action-view'))
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${savedId}`)
+
+    // Reopen the panel: the first look is the same composition, so Save confirms the existing
+    // look instead of creating a second one, and View opens that look.
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog', dialogName)).toBeNull())
+    const { dialog: reopened } = await startStyling()
+    await within(reopened).findByRole('button', { name: /open saved look/i })
+    const again = within(reopened).getAllByTestId('style-piece-save')[0]!
+    await waitFor(() => expect(again).toBeEnabled())
+    router.push.mockClear()
+    await user.click(again)
+    await user.click(await within(reopened).findByTestId('status-bar-action-view'))
+
+    expect(router.push).toHaveBeenCalledExactlyOnceWith(`/looks/saved/${savedId}`)
+    expect(savedLooksStore.items.map((item) => item.id)).toEqual([savedId])
   })
 
   it('reuses the same Idempotency-Key on retry and saves even when localStorage is blocked', async () => {
@@ -940,8 +988,10 @@ describe('Wardrobe styling', () => {
     expect(savedLooksStore.items).toHaveLength(1)
   })
 
-  it('imports pre-CC-7.2 device-saved looks for the active member on Closet load, marks unresolved looks Needs review, and preserves other members and guest storage', async () => {
-    const user = userEvent.setup()
+  // Story CC-7.12 D8: the Closet no longer reads saved looks, so the one-time import of
+  // pre-CC-7.2 device-saved looks runs when the member opens Looks (the saved looks read starts
+  // it), and its looks land as Saved tiles. Was "on Closet load" with the Closet saved looks row.
+  it('7.12-UNIT-IMPORT-001 imports pre-CC-7.2 device-saved looks for the active member on Looks load, marks unresolved looks Needs review, and preserves other members and guest storage', async () => {
     const changedGarment = createReadyGarmentFixture({
       id: 'style-jacket-changed',
       category: 'outerwear',
@@ -951,6 +1001,9 @@ describe('Wardrobe styling', () => {
         expiresAt: '2090-01-01T00:00:00.000Z',
       },
     })
+    // The import keeps its acknowledged entries and the run in flight per member in module
+    // memory, and earlier tests here read saved looks for this member, so it starts clean.
+    resetWebLegacySavedLooksImportState()
     inventory.mockImplementation(() => list(garment, changedGarment))
     savedLooksStore.unownedGarmentIds.add('tampered-other-garment')
 
@@ -994,16 +1047,163 @@ describe('Wardrobe styling', () => {
       ])
     )
 
-    publishOwner(owner)
-    render(<WardrobePage />)
-
-    const row = await screen.findByTestId('closet-saved-looks-row')
-    await waitFor(() => expect(row).toHaveTextContent('2 saved'))
-    await user.click(row)
-
-    expect(await screen.findByTestId('saved-look-needs-review')).toHaveTextContent(
-      'Needs review'
+    // Every saved looks list read is counted, then answered by the store's handler.
+    let listReads = 0
+    useMswHandlers(
+      http.get(`${api}/wardrobe/:ownerUserId/capsules`, () =>
+        HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
+      ),
+      http.get(`${api}/wardrobe/saved-looks`, () => {
+        listReads += 1
+      })
     )
+    // The import's change notice, and how many list reads were out when it came. TEA round 4
+    // #4: at the notice the ready look gets a server-side title, so only a list response served
+    // after the notice names it; a tile with that name proves the import-triggered refresh
+    // committed before the focus refresh below starts.
+    const REFRESHED_TITLE = 'Import refresh check'
+    let readsAtNotice: number | null = null
+    onTestFinished(
+      subscribeSavedLooksChanged((changed) => {
+        if (changed !== owner || readsAtNotice !== null) return
+        readsAtNotice = listReads
+        const readyLook = savedLooksStore.items.find(
+          (item) => item.availabilityStatus === 'ready'
+        )
+        if (readyLook) readyLook.title = REFRESHED_TITLE
+      })
+    )
+    // TEA W2 no-vanish. The member and scope are set before the first render and the profile id
+    // is the member, so no owner settles here: once the grid has shown both tiles, every DOM
+    // change keeps that same grid on screen, visible, with both tiles and no error line. Each
+    // break is traced with the session owner and scope, the address, the gates and the segment,
+    // so a failure names whether the body, the segment or the panel branch remounted.
+    let shownGrid: Element | null = null
+    const gaps: string[] = []
+    const replaced: string[] = []
+    const label = (node: Node) => {
+      if (!(node instanceof Element)) return node.nodeName
+      const id = node.getAttribute('data-testid')
+      const body = node.hasAttribute('data-screen-body') ? '[data-screen-body]' : ''
+      return `${node.tagName.toLowerCase()}${id ? `[${id}]` : ''}${body}`
+    }
+    const gridNow = () => document.querySelector('[data-testid="looks-saved-grid"]')
+    const tileCount = (grid: Element | null) =>
+      grid?.querySelectorAll('[data-testid^="saved-look-card-"]').length ?? 0
+    const frame = () => {
+      const grid = gridNow()
+      return [
+        `owner=${currentWebSessionOwner()}`,
+        `scope=${currentWebSessionScope()}`,
+        `search=${window.location.search}`,
+        `gates=${document.querySelectorAll('[data-testid="screen-gate"]').length}`,
+        `segment=${document.querySelector('[role="tab"][aria-selected="true"]')?.textContent ?? 'none'}`,
+        `grid=${grid ? (grid === shownGrid ? 'same' : 'new') : 'none'}`,
+        `hidden=${grid?.closest('[hidden], [style*="display: none"]') ? 'yes' : 'no'}`,
+        `tiles=${tileCount(grid)}`,
+        `first=${label(document.querySelector('[data-testid="looks-first-content"]') ?? document)}`,
+        `retry=${document.querySelector('[data-testid="saved-looks-retry"]') ? 'yes' : 'no'}`,
+      ].join(' ')
+    }
+    // TEA round 4 #4: the gate hides its body with a `hidden` attribute (screen-gate.tsx), so a
+    // hide and show that keeps the same nodes changes attributes only. Each attribute record on
+    // the grid, the gate body, the gate or any ancestor is replayed in order: the value after a
+    // record is the next record's old value for that element and attribute, else the live one.
+    const hides: string[] = []
+    const hidesBy = (name: string, value: string | null) => {
+      if (value === null) return false
+      if (name === 'hidden') return true
+      if (name === 'style')
+        return /display\s*:\s*none|visibility\s*:\s*hidden/.test(value)
+      if (name === 'class') return /(^|\s)(hidden|invisible)(\s|$)/.test(value)
+      return false
+    }
+    const checkHides = (records: MutationRecord[], grid: Element) => {
+      const attributeRecords = records.filter(
+        (mutation) =>
+          mutation.type === 'attributes' &&
+          mutation.target instanceof Element &&
+          mutation.target.contains(grid)
+      )
+      attributeRecords.forEach((mutation, index) => {
+        const target = mutation.target as Element
+        const name = mutation.attributeName!
+        const next = attributeRecords
+          .slice(index + 1)
+          .find((later) => later.target === target && later.attributeName === name)
+        const after = next ? next.oldValue : target.getAttribute(name)
+        if (hidesBy(name, after))
+          hides.push(`${label(target)} ${name}=${JSON.stringify(after)}; ${frame()}`)
+      })
+    }
+    const checkGrid = (records: MutationRecord[]) => {
+      if (!shownGrid) {
+        const grid = gridNow()
+        // The first grid on screen with at least both tiles is the one that must stay.
+        if (grid && tileCount(grid) >= 2) shownGrid = grid
+        return
+      }
+      const grid = shownGrid
+      checkHides(records, grid)
+      for (const mutation of records)
+        for (const node of Array.from(mutation.removedNodes))
+          if (node === grid || node.contains(grid))
+            replaced.push(`${label(node)} left ${label(mutation.target)}; ${frame()}`)
+      const now = gridNow()
+      if (
+        now !== grid ||
+        tileCount(now) < 2 ||
+        now.closest('[hidden], [style*="display: none"]') ||
+        document.querySelector('[data-testid="saved-looks-retry"]')
+      ) {
+        const state = frame()
+        if (gaps.at(-1) !== state) gaps.push(state)
+      }
+    }
+    const observer = new MutationObserver(checkGrid)
+    // From the root element, so the gate's ancestors up to <html> are watched too.
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden', 'style', 'class'],
+      attributeOldValue: true,
+    })
+    onTestFinished(() => observer.disconnect())
+    window.history.replaceState(null, '', '/looks?segment=saved')
+    // The address keeps segment=saved through the import: any write that drops it is recorded
+    // with its caller's stack, so a failure names the code that stripped the query.
+    const addressDrops: string[] = []
+    for (const method of ['pushState', 'replaceState'] as const) {
+      const write = window.history[method].bind(window.history)
+      vi.spyOn(window.history, method).mockImplementation((...args) => {
+        const next = new URL(
+          String(args[2] ?? window.location.href),
+          window.location.href
+        )
+        if (next.searchParams.get('segment') !== 'saved')
+          addressDrops.push(
+            `${method}(${next.pathname}${next.search}) from ${new Error().stack?.split('\n').slice(2, 7).join(' | ')}`
+          )
+        write(...args)
+      })
+    }
+    publishOwner(owner)
+    render(<LooksPage />)
+
+    // Both of the member's own device looks land as Saved tiles without a reload, one of them
+    // Needs review. The import posts them one after another (garments read, one POST each, the
+    // tampered one refused) and its change notice reads Looks again. The deadline is longer than
+    // the default because the import is several requests long; it is a ceiling, never a sleep.
+    await waitFor(
+      () => {
+        const grid = within(screen.getByTestId('looks-saved-grid'))
+        expect(grid.getAllByTestId(/^saved-look-card-/)).toHaveLength(2)
+        expect(grid.getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+      },
+      { timeout: 3000 }
+    )
+    expect(savedLooksStore.items).toHaveLength(2)
     await waitFor(() => {
       expect(localStorage.getItem(ownValidKey)).toBeNull()
       expect(localStorage.getItem(ownUnresolvedKey)).toBeNull()
@@ -1011,5 +1211,74 @@ describe('Wardrobe styling', () => {
     })
     expect(localStorage.getItem('couturecast.guest-preview.v1')).toBe(guestState)
     expect(localStorage.getItem(otherOwnerKey)).not.toBeNull()
+
+    // The notice read Looks again, and the grid that showed both tiles is still the one on
+    // screen, with no error line or Retry.
+    const originalTiles = within(screen.getByTestId('looks-saved-grid'))
+      .getAllByTestId(/^saved-look-card-/)
+      .map((tile) => tile.getAttribute('data-testid'))
+      .sort()
+    await waitFor(() => {
+      expect(readsAtNotice).not.toBeNull()
+      expect(listReads).toBeGreaterThan(readsAtNotice ?? Infinity)
+    })
+    // The import-triggered response has committed (its tile carries the title set at the
+    // notice) with both original tiles and exactly one Needs review, before the focus refresh.
+    await waitFor(() => {
+      const grid = within(screen.getByTestId('looks-saved-grid'))
+      expect(
+        grid.getByRole('link', { name: new RegExp(`^${REFRESHED_TITLE}, `) })
+      ).toBeVisible()
+      expect(
+        grid
+          .getAllByTestId(/^saved-look-card-/)
+          .map((tile) => tile.getAttribute('data-testid'))
+          .sort()
+      ).toEqual(originalTiles)
+      expect(grid.getAllByRole('link', { name: /, Needs review$/ })).toHaveLength(1)
+    })
+    // The trace and hide records go first, so a failure names its cause before the identity
+    // check reports only that the node changed.
+    checkGrid(observer.takeRecords())
+    expect(hides, hides.join('\n')).toEqual([])
+    expect(gaps, gaps.join('\n')).toEqual([])
+    expect(replaced, replaced.join('\n')).toEqual([])
+    expect(addressDrops, addressDrops.join('\n')).toEqual([])
+    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
+    // A focused tile keeps focus across a refresh: another save for this member is a third look
+    // in the account, and its notice reads Looks again with the tile still focused.
+    const focused = within(screen.getByTestId('looks-saved-grid')).getAllByRole(
+      'link'
+    )[0]!
+    act(() => focused.focus())
+    const ready = savedLooksStore.items.find(
+      (item) => item.availabilityStatus === 'ready'
+    )!
+    savedLooksStore.items.push({
+      ...ready,
+      id: 'saved-look-third',
+      createdAt: new Date(Date.parse(ready.createdAt) + 60_000).toISOString(),
+    })
+    act(() => notifySavedLooksChanged(owner))
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('looks-saved-grid')).getAllByTestId(/^saved-look-card-/)
+      ).toHaveLength(3)
+    )
+    expect(
+      within(screen.getByTestId('looks-saved-grid')).getAllByRole('link', {
+        name: /, Needs review$/,
+      })
+    ).toHaveLength(1)
+    checkGrid(observer.takeRecords())
+    observer.disconnect()
+    expect(gaps, gaps.join('\n')).toEqual([])
+    expect(replaced, replaced.join('\n')).toEqual([])
+    expect(addressDrops, addressDrops.join('\n')).toEqual([])
+    expect(hides, hides.join('\n')).toEqual([])
+    expect(screen.getByTestId('looks-saved-grid')).toBe(shownGrid)
+    expect(document.activeElement).toBe(focused)
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
   })
 })

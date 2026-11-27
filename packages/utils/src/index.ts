@@ -134,6 +134,7 @@ export type { GarmentColorFamily } from './garment-color'
 export * from './sample-wardrobe'
 export * from './federated-signin'
 export * from './save-feedback'
+export * from './looks-feed'
 export * from './wardrobe/deferred-garment-deletion'
 
 export {

@@ -1,18 +1,22 @@
 'use client'
+// Story CC-7.12 D6: moved from `/wardrobe/capsules`, which now redirects to Looks.
 // Story 4.3 Task 5 step 2 owner: implement web wardrobe capsules page in apps/web/src/app/wardrobe/capsules/page.tsx
 
 import { getGuestPreviewStrings } from '@couture/utils'
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
+import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../../i18n'
 import {
   isLiveOwner,
   MemberScope,
   useMountSignal,
+  useWebSessionScope,
   type MemberSession,
 } from '../../../lib/use-web-session'
 import {
   listCapsulesFromWeb,
+  getCapsuleFromWeb,
   createCapsuleFromWeb,
   updateCapsuleFromWeb,
   favoriteCapsuleFromWeb,
@@ -52,6 +56,24 @@ const CAPSULE_OCCASIONS: readonly CapsuleOccasion[] = [
 /** The strong entity tag the API issues and requires back on every mutation. */
 function capsuleETag(capsule: OutfitCapsuleContract): string {
   return `"capsule:${capsule.id}:${capsule.revision}"`
+}
+
+/**
+ * Codex #4: the capsule a Looks tile opened, read on its own when the loaded page lacks it. A
+ * failed or missing read pins nothing.
+ */
+async function readPinnedCapsule(
+  ownerUserId: string,
+  capsuleId: string | null,
+  loaded: readonly OutfitCapsuleContract[],
+  signal: AbortSignal
+): Promise<OutfitCapsuleContract | null> {
+  if (!capsuleId || loaded.some((capsule) => capsule.id === capsuleId)) return null
+  try {
+    return await getCapsuleFromWeb(ownerUserId, capsuleId, signal)
+  } catch {
+    return null
+  }
 }
 
 function CapsuleErrorBanner({
@@ -96,13 +118,30 @@ export default function WardrobeCapsulesPage() {
       {/* Story CC-7.9 D6, D7, D8: the shared top bar and page surface render outside the
           member scope, so the bar sits in its final place while the session is read. */}
       <AppPage>
-        <AppTopBar titleKey="wardrobe.capsules.title" parentHref="/looks" />
-        <MemberScope>{(session) => <CapsulesView session={session} />}</MemberScope>
+        {/* Story CC-7.12 D6: the manager lives under Looks; back returns to Saved > Capsules. */}
+        <AppTopBar
+          titleKey="wardrobe.capsules.title"
+          parentHref="/looks?segment=saved&filter=capsules"
+        />
+        <Suspense fallback={null}>
+          <MemberScope>
+            {(session) => <ScopedCapsulesView session={session} />}
+          </MemberScope>
+        </Suspense>
         {/* Story CC-7.11 (TEA e): the tab bar, as on every other sub-screen. */}
         <StickyBottomNav />
       </AppPage>
     </I18nextProvider>
   )
+}
+
+/**
+ * Story CC-7.12 (TEA, Codex round 3 #1): the manager is keyed by session scope, so any identity
+ * change, a fixture bearer switch included, drops the previous member's grid at once.
+ */
+function ScopedCapsulesView({ session }: { session: MemberSession }) {
+  const scope = useWebSessionScope()
+  return <CapsulesView key={scope ?? 'no-scope'} session={session} />
 }
 
 function CapsulesView({ session }: { session: MemberSession }) {
@@ -114,6 +153,17 @@ function CapsulesView({ session }: { session: MemberSession }) {
     [owner]
   )
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
+  // Story CC-7.12 D6: the capsule a Looks tile opened, read once from the address.
+  // Fable review P1: read through `useSearchParams`, since a client navigation renders this page
+  // before `window.location` holds its URL.
+  const focusCapsuleId = useSearchParams()?.get('capsule') || null
+  // Codex #4: a capsule outside the first page is read on its own and shown first, so the tile
+  // always lands on its card. It shows only while no search or filter narrows the list.
+  const [pinnedCapsule, setPinnedCapsule] = useState<OutfitCapsuleContract | null>(null)
+  /** The `capsule` id the last landed read was made for (TEA W1). */
+  const [loadedForCapsule, setLoadedForCapsule] = useState<string | null>(null)
+  /** A first read has landed, so later reads keep the grid on screen. */
+  const [hasShownCapsules, setHasShownCapsules] = useState(false)
   const [capsules, setCapsules] = useState<OutfitCapsuleContract[]>([])
   const [total, setTotal] = useState(0)
   const [garments, setGarments] = useState<GarmentItemContract[]>([])
@@ -201,7 +251,20 @@ function CapsulesView({ session }: { session: MemberSession }) {
         return
       }
       setCapsules(page.items)
+      setHasShownCapsules(true)
       setTotal(page.total)
+      // Every read refreshes the pinned capsule too, so an edit, favorite or delete shows.
+      const unfilteredRead = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
+      const pinned = await readPinnedCapsule(
+        ownerUserId,
+        unfilteredRead ? focusCapsuleId : null,
+        page.items,
+        controller.signal
+      )
+      if (reading()) {
+        setPinnedCapsule(pinned)
+        setLoadedForCapsule(focusCapsuleId)
+      }
       setGarments(garmentList)
     } catch (err: unknown) {
       if (!reading()) {
@@ -213,13 +276,44 @@ function CapsulesView({ session }: { session: MemberSession }) {
         setIsLoading(false)
       }
     }
-  }, [current, mountSignal, ownerUserId, searchQuery, selectedOccasion, favoriteOnly, t])
+  }, [
+    current,
+    mountSignal,
+    ownerUserId,
+    searchQuery,
+    selectedOccasion,
+    favoriteOnly,
+    focusCapsuleId,
+    t,
+  ])
 
   useEffect(() => {
     void fetchCapsules()
   }, [fetchCapsules])
 
   useEffect(() => () => inFlightRef.current?.abort(), [])
+
+  // Story CC-7.12 D6: a Looks capsule tile opens the manager on its card. The id is matched by
+  // equality against the loaded capsules (TEA P7). TEA W1: focus waits for the read made for
+  // that id, and each id is focused once, so a second tile's id gets its own focus.
+  const focusedCapsuleRef = useRef<string | null>(null)
+  const cardRefs = useRef(new Map<string, HTMLDivElement>())
+  const unfiltered = !searchQuery && selectedOccasion === 'all' && !favoriteOnly
+  const shownCapsules = useMemo(() => {
+    if (!pinnedCapsule || !unfiltered) return capsules
+    const fresh = capsules.find((capsule) => capsule.id === pinnedCapsule.id)
+    return fresh ? capsules : [pinnedCapsule, ...capsules]
+  }, [capsules, pinnedCapsule, unfiltered])
+  useEffect(() => {
+    if (!focusCapsuleId || focusedCapsuleRef.current === focusCapsuleId) return
+    if (isLoading || loadedForCapsule !== focusCapsuleId) return
+    const match = shownCapsules.find((capsule) => capsule.id === focusCapsuleId)
+    if (!match) return
+    focusedCapsuleRef.current = focusCapsuleId
+    const card = cardRefs.current.get(match.id)
+    card?.scrollIntoView({ block: 'center' })
+    card?.focus({ preventScroll: true })
+  }, [focusCapsuleId, shownCapsules, isLoading, loadedForCapsule])
 
   /**
    * Another client's committed changes appear on refocus, which is the
@@ -304,7 +398,10 @@ function CapsulesView({ session }: { session: MemberSession }) {
     () => Math.max(0, total - capsules.length),
     [total, capsules]
   )
-  const loading = status === 'checking' || (status === 'signed_in' && isLoading)
+  // A refetch (a new tile id, a mutation) keeps the shown grid in place; only the first read
+  // shows the loading line (TEA W1).
+  const loading =
+    status === 'checking' || (status === 'signed_in' && isLoading && !hasShownCapsules)
 
   return (
     /*
@@ -393,7 +490,7 @@ function CapsulesView({ session }: { session: MemberSession }) {
         >
           {t('wardrobe.capsules.loading')}
         </div>
-      ) : !owner ? null : capsules.length === 0 ? (
+      ) : !owner ? null : shownCapsules.length === 0 ? (
         <div
           className="mt-12 text-center text-sm text-ink-muted"
           data-testid="capsule-empty-state"
@@ -407,9 +504,14 @@ function CapsulesView({ session }: { session: MemberSession }) {
             className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
             data-testid="capsule-grid"
           >
-            {capsules.map((capsule) => (
+            {shownCapsules.map((capsule) => (
               <div
                 key={capsule.id}
+                ref={(element) => {
+                  if (element) cardRefs.current.set(capsule.id, element)
+                  else cardRefs.current.delete(capsule.id)
+                }}
+                tabIndex={capsule.id === focusCapsuleId ? -1 : undefined}
                 data-surface="card"
                 className="flex flex-col justify-between rounded-xl border border-line bg-card p-5 shadow-card"
                 data-testid={`capsule-card-${capsule.id}`}

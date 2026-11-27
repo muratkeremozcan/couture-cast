@@ -75,6 +75,8 @@ export const savedLookAvailabilityStatusEnum = z.enum([
   'missing_garment',
   'needs_review',
 ])
+/** Story CC-7.12 D3: `created_desc` orders by created_at desc, then id asc. */
+export const savedLookListSortEnum = z.enum(['created_desc'])
 export const savedLookSlotKindEnum = z.enum(['garment', 'catalog'])
 export const savedLookNeedsReviewReasonEnum = z.enum([
   'category_changed',
@@ -246,6 +248,8 @@ export const listSavedLooksQuerySchema = z
   .object({
     source: savedLookSourceEnum.optional(),
     anchorGarmentId: nonEmptyStringSchema.max(128).optional(),
+    // Story CC-7.12 D3: opt-in newest-saved order for the Looks tab; omitted keeps updated_at desc.
+    sort: savedLookListSortEnum.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
     offset: z.coerce.number().int().min(0).max(10000).default(0),
   })
@@ -317,6 +321,7 @@ export const savedLookPreconditionRequiredErrorSchema = z
 
 export type SavedLookSource = z.infer<typeof savedLookSourceEnum>
 export type SavedLookAvailabilityStatus = z.infer<typeof savedLookAvailabilityStatusEnum>
+export type SavedLookListSort = z.infer<typeof savedLookListSortEnum>
 export type SavedLookSlotKind = z.infer<typeof savedLookSlotKindEnum>
 export type SavedLookNeedsReviewReason = z.infer<typeof savedLookNeedsReviewReasonEnum>
 export type SavedLookCompositionSlotInput = z.infer<

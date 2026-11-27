@@ -4,6 +4,7 @@
 // Test design: _bmad-output/test-artifacts/test-design-7-7-signed-in-shell-without-flashes.md.
 // The browser half runs in playwright/tests/signed-in-shell-layout-shift.spec.ts, whose
 // positive control (7.7-E2E-007) proves the observer sees a real shift.
+// Story CC-7.12 (Step 69): readKey names the capsules list and the one-saved-look read.
 import { describe, expect, it } from 'vitest'
 import {
   describeShifts,
@@ -213,6 +214,20 @@ describe('readKey', () => {
     )
   })
 
+  it('names the Looks capsules list and the one saved look apart from the saved looks list', () => {
+    expect(
+      readKey(
+        `${api}/wardrobe/member-1/capsules?sort=created_desc&limit=50&offset=0`,
+        'GET'
+      )
+    ).toBe('capsules')
+    expect(readKey(`${api}/wardrobe/saved-looks/shell-saved-look-1`, 'GET')).toBe(
+      'saved-look'
+    )
+    expect(readKey(`${api}/wardrobe/member-1/capsules/capsule-1`, 'GET')).toBeNull()
+    expect(readKey(`${api}/wardrobe/member-1/capsules`, 'POST')).toBeNull()
+  })
+
   it('serves only the resolve POST and leaves every other write and unknown read alone', () => {
     expect(readKey(`${api}/community/targets/resolve`, 'POST')).toBe('community-resolve')
     expect(readKey(`${api}/wardrobe/garments`, 'POST')).toBeNull()
@@ -229,6 +244,7 @@ describe('readKey', () => {
       `${api}/wardrobe/onboarding`,
       `${api}/wardrobe/garments`,
       `${api}/wardrobe/saved-looks?limit=50&offset=0`,
+      `${api}/wardrobe/member-1/capsules?sort=created_desc&limit=50&offset=0`,
       `${api}/locations`,
       `${api}/commerce/preferences`,
       `${api}/commerce/subscription`,

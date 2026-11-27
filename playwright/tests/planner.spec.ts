@@ -11,6 +11,9 @@
 // `test.describe.configure({ mode: 'serial' })`. There is no reset step: every
 // assertion reads its expectation from the live response it just captured, so a row
 // left behind by an earlier run is a valid starting point.
+//
+// Story CC-7.12 (Step 69): Plan is the Looks Plan segment (`/looks?segment=plan`, no back arrow);
+// `/looks/plan` redirects there, and back assertions became segment and history assertions.
 import type { Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -50,9 +53,10 @@ function firstDisplayGarmentId(day: PlannerReadyDay): string | null {
 }
 
 /**
- * Story CC-7.11 D9: Plan is the `/looks/plan` route. `navigate` reaches it (the Today
- * "Plan week" link, a direct entry or a reload) and this returns the real GET the route
- * triggers. The watch is registered before `navigate`, so the route's first read is caught.
+ * Story CC-7.12 D11: Plan is the Looks Plan segment. `navigate` reaches it (the Today
+ * "Plan week" link, a direct entry, the `/looks/plan` redirect or a reload) and this returns the
+ * real GET the segment triggers. The watch is registered before `navigate`, so the first read is
+ * caught.
  */
 async function openPlanner(
   page: Page,
@@ -62,18 +66,25 @@ async function openPlanner(
 ): Promise<{ status: number; data: PlannerResponse['data'] | undefined }> {
   const load = interceptNetworkCall({ method: 'GET', url: PLANNER_URL })
   await navigate()
-  // Story CC-7.11 D9: the planner lives on its own route under Looks, not a drawer on Today.
-  await expect(page).toHaveURL('/looks/plan')
+  // Story CC-7.12 D11: the planner lives in the Looks Plan segment, not a drawer on Today.
+  await expect(page).toHaveURL('/looks?segment=plan')
   const loaded = await load
   const body = loaded.responseJson as { data: PlannerResponse['data'] } | null
   return { status: loaded.status, data: body?.data }
 }
 
-/** Story CC-7.11 D9, D10: Plan's top bar carries the title and back, so the rail has no X. */
-async function expectPlanTopBar(page: Page) {
+/**
+ * Story CC-7.12 D1, D11: Plan is a Looks segment. The Looks top bar carries the tab title and no
+ * back arrow (it is a tab, not a sub-screen), the Plan segment is the selected tab, and the rail
+ * has no X.
+ */
+async function expectPlanSegment(page: Page) {
   const header = page.getByTestId('app-header')
-  await expect(header.getByRole('heading', { level: 1 })).toHaveText(enUS.looks.plan)
-  await expect(header.getByTestId('app-top-bar-back')).toBeVisible()
+  await expect(header.getByRole('heading', { level: 1 })).toHaveText(enUS.nav.looks)
+  await expect(header.getByTestId('app-top-bar-back')).toHaveCount(0)
+  await expect(
+    page.getByRole('tab', { name: enUS.looks.segments.plan, selected: true })
+  ).toBeVisible()
   await expect(page.getByRole('button', { name: 'Close planner' })).toHaveCount(0)
 }
 
@@ -148,7 +159,7 @@ premiumSeededTest.describe(
     })
 
     premiumSeededTest(
-      '[P0] 5.5-E2E-01 Plan week on Today opens the Plan route below 1440px and renders the live seven-day week, +axe',
+      '[P0] 5.5-E2E-01 Plan week on Today opens the Looks Plan segment below 1440px and renders the live seven-day week, +axe',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         // Matches `lookbook-prism.spec.ts`'s own overlay-boundary width.
         await page.setViewportSize({ width: 1280, height: 900 })
@@ -165,10 +176,12 @@ premiumSeededTest.describe(
         if (!data) throw new Error('Planner GET returned no data')
         await expect(planner).toBeVisible()
 
-        // Story CC-7.11 D9: the focus-trapped drawer on Today is gone. In its place the route
-        // renders the rail as page content under a top bar with back and the Plan title.
-        await log.step('Assert the Plan route renders the inline rail under its top bar')
-        await expectPlanTopBar(page)
+        // Story CC-7.11 D9: the focus-trapped drawer on Today is gone. Story CC-7.12 D11: the
+        // rail renders as page content in the Looks Plan segment.
+        await log.step(
+          'Assert the Plan segment renders the inline rail under the Looks top bar'
+        )
+        await expectPlanSegment(page)
         await expect(planner).not.toHaveCSS('position', 'fixed')
         await expect(page.getByTestId('lookbook-prism-grid')).toHaveCount(0)
 
@@ -181,13 +194,17 @@ premiumSeededTest.describe(
     )
 
     premiumSeededTest(
-      '[P0] 5.5-E2E-02 a direct entry to the Plan route at 1440px renders the inline rail and the live seven-day week, +axe',
+      '[P0] 5.5-E2E-02 the old /looks/plan address opens the Plan segment at 1440px with the inline rail and the live seven-day week, +axe',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         await page.setViewportSize({ width: 1440, height: 900 })
 
         const planner = page.getByRole('complementary', { name: 'Planner Rail' })
 
-        await log.step('Enter /looks/plan directly and capture the live GET')
+        // Story CC-7.12 D11: the CC-7.11 address redirects to the Plan segment (openPlanner
+        // asserts the landing URL).
+        await log.step(
+          'Enter /looks/plan directly, land on the Plan segment, capture the GET'
+        )
         const { status, data } = await openPlanner(page, interceptNetworkCall, () =>
           page.goto('/looks/plan')
         )
@@ -201,7 +218,7 @@ premiumSeededTest.describe(
         await log.step(
           'Assert the rail renders inline under the top bar, not focus-trapped'
         )
-        await expectPlanTopBar(page)
+        await expectPlanSegment(page)
         await expect(planner).not.toHaveCSS('position', 'fixed')
         expect(
           await planner.evaluate((node) => node.contains(document.activeElement)),
@@ -237,12 +254,12 @@ premiumSeededTest.describe(
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
         await page.setViewportSize({ width: 1440, height: 900 })
 
-        // Story CC-7.11 D9: the planner is the Plan route; enter it directly.
-        await log.step('Open the Plan route and pick the first ready day')
+        // Story CC-7.12 D11: the planner is the Looks Plan segment; enter it directly.
+        await log.step('Open the Plan segment and pick the first ready day')
         const { status: loadStatus, data } = await openPlanner(
           page,
           interceptNetworkCall,
-          () => page.goto('/looks/plan')
+          () => page.goto('/looks?segment=plan')
         )
         await waitForAccessibilityReady(page)
         expect(loadStatus).toBe(200)
@@ -296,8 +313,8 @@ premiumSeededTest.describe(
           dayLocator.getByTestId(`planner-reshuffle-${target.planDate}`)
         ).not.toBeDisabled()
 
-        // Story CC-7.11 D9: a reload of the Plan route reads the week again on its own.
-        await log.step('Reload the Plan route and assert the reshuffle persisted')
+        // Story CC-7.12 D11: a reload of the Plan segment reads the week again on its own.
+        await log.step('Reload the Plan segment and assert the reshuffle persisted')
         const { status: reloadStatus, data: reloadedData } = await openPlanner(
           page,
           interceptNetworkCall,
@@ -398,8 +415,8 @@ premiumSeededTest.describe(
         await page.goto('/')
         await waitForAccessibilityReady(page)
         await page.getByTestId('planner-open-control').click()
-        // Story CC-7.11 D9: Plan week is a link to the Plan route.
-        await expect(page).toHaveURL('/looks/plan')
+        // Story CC-7.12 D11: Plan week is a link to the Looks Plan segment.
+        await expect(page).toHaveURL('/looks?segment=plan')
         await expect(page.getByTestId('planner-days')).toBeVisible()
 
         const errorCard = plannerDayLocator(page, targetDate)
@@ -432,34 +449,40 @@ premiumSeededTest.describe(
     )
 
     premiumSeededTest(
-      '[P1] 5.5-E2E-05 back from Plan returns to Today through in-app history and to Looks on a direct entry',
+      '[P1] 5.5-E2E-05 Plan is a Looks segment: browser back from Plan returns to Today, and another segment replaces Plan in place',
       async ({ premiumSession: _premiumSession, page, interceptNetworkCall }) => {
-        // Story CC-7.11 D9, D11: the overlay with its Escape and X (and focus return to the
-        // opener) is gone; Plan is a route whose top bar back is the exit. These assert
-        // where back lands in both entry modes in place of the overlay close paths.
+        // Story CC-7.11 D9, D11: the overlay with its Escape and X is gone. Story CC-7.12 D1, D11:
+        // Plan is a Looks segment, a tab with no top bar back arrow, so the CC-7.11 "back arrow
+        // returns to Today / replaces to Looks" checks become: browser back from Plan returns to
+        // Today, and a segment switch replaces the entry (one back still leaves Looks).
         await page.setViewportSize({ width: 1280, height: 900 })
         await page.goto('/')
         await waitForAccessibilityReady(page)
         const planner = page.getByRole('complementary', { name: 'Planner Rail' })
         const back = page.getByTestId('app-header').getByTestId('app-top-bar-back')
 
-        await log.step('From Today, back steps back through in-app history to Today')
+        await log.step(
+          'From Today, Plan has no back arrow and browser back returns to Today'
+        )
         const fromToday = await openPlanner(page, interceptNetworkCall)
         expect(fromToday.status).toBe(200)
         await expect(planner).toBeVisible()
-        await back.click()
+        await expect(back).toHaveCount(0)
+        await page.goBack()
         await expect(page).toHaveURL('/')
         await expect(page.getByTestId('planner-open-control')).toBeVisible()
         await expect(planner).toHaveCount(0)
 
-        await log.step('Entered directly, back replaces to the parent tab, Looks')
-        const direct = await openPlanner(page, interceptNetworkCall, () =>
-          page.goto('/looks/plan')
+        await log.step(
+          'From Plan, the Saved segment replaces Plan; one back returns to Today'
         )
-        expect(direct.status).toBe(200)
-        await back.click()
-        await expect(page).toHaveURL('/looks')
+        const again = await openPlanner(page, interceptNetworkCall)
+        expect(again.status).toBe(200)
+        await page.getByRole('tab', { name: enUS.looks.segments.saved }).click()
+        await expect(page).toHaveURL(/\/looks\?segment=saved$/)
         await expect(planner).toHaveCount(0)
+        await page.goBack()
+        await expect(page).toHaveURL('/')
       }
     )
   }

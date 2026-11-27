@@ -20,7 +20,17 @@ import { setViewport } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
+// Story CC-7.12 D7: the Home sample outfit's View pushes the saved look through the app router.
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+}))
 
 const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
 const OPENED_PATH = '/api/v1/community/posts/:postId/opened'

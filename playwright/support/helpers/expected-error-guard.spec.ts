@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   classifyGuardedErrors,
   guardExpectedError,
+  unexpectedPlannerErrors,
   unexpectedRitualErrors,
   type GuardedError,
 } from './expected-error-guard'
@@ -140,4 +141,33 @@ it('retains ritual errors outside the missing-city recovery', () => {
       otherMethod,
     ])
   ).toEqual([missingCity, wrongMessage, unavailable, otherMethod])
+})
+
+// Story CC-7.12 (Step 69): Plan's free preview rests on the planner's Premium-required 403.
+it('[7.12] unexpectedPlannerErrors with the opt-in keeps only the exact Premium-required GET 403', () => {
+  const premium = 'Premium subscription required'
+  const url = 'http://127.0.0.1:3005/api/v1/commerce/premium/planner'
+  const free: GuardedError = { method: 'GET', status: 403, code: premium, url }
+  const unreadable: GuardedError = {
+    method: 'GET',
+    status: 403,
+    url,
+    bodyUnreadable: true,
+  }
+  const otherForbidden: GuardedError = {
+    method: 'GET',
+    status: 403,
+    code: 'LOCATION_NOT_OWNED',
+    url,
+  }
+  const outage: GuardedError = { method: 'GET', status: 503, code: 'Unavailable', url }
+  const reshuffle: GuardedError = { method: 'POST', status: 403, code: premium, url }
+  expect(
+    unexpectedPlannerErrors(
+      [free, unreadable, otherForbidden, outage, reshuffle],
+      premium
+    )
+  ).toEqual([unreadable, otherForbidden, outage, reshuffle])
+  // Without the opt-in every planner error is unexpected.
+  expect(unexpectedPlannerErrors([free, outage], null)).toEqual([free, outage])
 })

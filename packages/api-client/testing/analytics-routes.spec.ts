@@ -58,6 +58,38 @@ describe('analytics routes match the apps', () => {
     expect([...MOBILE_ANALYTICS_ROUTES].sort()).toEqual(mobileRoutesOnDisk())
   })
 
+  // Story CC-7.12 D5, D6, D11 (Plan Change Log, builder as built): the capsule manager and a
+  // saved look's screen live under Looks on web, Plan is a segment of the tab, and native gains a
+  // saved look screen. The old web addresses redirect, so analytics never names them again.
+  it('[7.12-UNIT-061] names the CC-7.12 Looks routes and drops the redirected ones', () => {
+    expect(WEB_ANALYTICS_ROUTES).toEqual(
+      expect.arrayContaining(['/looks', '/looks/capsules', '/looks/saved/[savedLookId]'])
+    )
+    expect(WEB_ANALYTICS_ROUTES).not.toContain('/looks/plan')
+    expect(WEB_ANALYTICS_ROUTES).not.toContain('/wardrobe/capsules')
+    expect(MOBILE_ANALYTICS_ROUTES).toEqual(
+      expect.arrayContaining([
+        '/looks',
+        '/saved-look/[savedLookId]',
+        '/wardrobe-capsules',
+      ])
+    )
+    // The native planner address is a redirect screen to Looks on Plan, still a route file.
+    expect(MOBILE_ANALYTICS_ROUTES).toContain('/planner')
+
+    expect(templateAnalyticsRoute('/looks/saved/look-123?from=today', 'web')).toBe(
+      '/looks/saved/:param'
+    )
+    expect(templateAnalyticsRoute('/looks/capsules?capsule=cap-1', 'web')).toBe(
+      '/looks/capsules'
+    )
+    expect(templateAnalyticsRoute('/looks/plan', 'web')).toBe('/:unknown')
+    expect(templateAnalyticsRoute('/wardrobe/capsules', 'web')).toBe('/:unknown')
+    expect(templateAnalyticsRoute('/saved-look/look-123', 'mobile')).toBe(
+      '/saved-look/:param'
+    )
+  })
+
   it('keeps static segments, sends :param for dynamic ones and /:unknown otherwise', () => {
     expect(templateAnalyticsRoute('/', 'web')).toBe('/')
     expect(templateAnalyticsRoute('/guardian/accept/?token=x#y', 'web')).toBe(

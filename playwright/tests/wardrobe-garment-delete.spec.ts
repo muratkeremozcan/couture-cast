@@ -9,6 +9,8 @@
 //   at once against the real API (R7).
 // - E2E-004 mocks the wardrobe to pin AC3 (same grid scroll, focus on the next card) and runs axe
 //   on the confirm dialog and the Deleted notice (R9).
+// Story CC-7.12 (Step 69): E2E-002 reads the missing piece on the Looks Saved tiles and the saved
+// look detail, since the Closet saved looks row is gone.
 // Learning path Step 64: Garment delete.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-64-garment-delete
 import { randomUUID } from 'node:crypto'
@@ -368,10 +370,27 @@ realTest.describe('Garment delete against the local API', () => {
           expect(capsule.status).toBe(200)
           expect(capsule.body.data.availabilityStatus).toBe('needs_repair')
 
-          await page.reload()
-          await page.getByTestId('closet-saved-looks-row').click()
+          // Story CC-7.12 D2, D5: Looks > Saved shows both looks and the capsule with their
+          // missing piece, and the look's own screen marks the slot.
+          await page.goto('/looks')
+          await expect(page.getByTestId('looks-segment-saved')).toHaveAttribute(
+            'aria-selected',
+            'true'
+          )
+          for (const id of savedLookIds.looks)
+            await expect(page.getByTestId(`saved-look-card-${id}`)).toHaveAccessibleName(
+              /, 1 piece missing$/
+            )
+          await expect(
+            page.getByTestId(`looks-capsule-card-${savedLookIds.capsuleId}`)
+          ).toHaveAccessibleName(/, 1 piece missing$/)
+          await page.getByTestId(`saved-look-card-${savedLookIds.looks[1]!}`).click()
+          await expect(page).toHaveURL(
+            new RegExp(`/looks/saved/${savedLookIds.looks[1]!}\\?from=all$`)
+          )
+          await expect(page.getByTestId('saved-look-detail-missing')).toBeVisible()
           const slot = page
-            .getByTestId(`saved-look-card-${savedLookIds.looks[1]!}`)
+            .getByTestId('saved-look-detail')
             .locator(`[data-slot-item-id="${topId}"]`)
           await expect(slot).toContainText('Missing piece')
         }

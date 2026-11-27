@@ -155,13 +155,17 @@ let usageById: Map<string, Usage | 'missing' | 'route-404' | 'error'>
 let deleteRequests: { id: string; keepalive: boolean; authorization: string | null }[]
 /** The next DELETE answers these statuses in order; then 204. */
 let deleteStatuses: number[]
+/**
+ * Story CC-7.12: saved looks live in Looks, so the Closet must send no saved looks read. Every
+ * read the API sees is counted here so a test can pin that.
+ */
 let savedLookReads: number
+/** Each delete the controller reported committed, in order: the send landed. */
+let committedIds: string[]
 /** While set, every DELETE waits for it before answering (an in-flight send). */
 let deleteGate: Promise<void> | null
 /** While set, every usage read waits for it before answering (a delete check in flight). */
 let usageGate: Promise<void> | null
-/** While set, every saved looks list read waits for it before answering. */
-let savedLooksGate: Promise<void> | null
 /** Each tag save the detail sent (CC-7.5 Done and its Undo). */
 let tagRequests: { id: string; category: unknown; authorization: string | null }[]
 let manual: ReturnType<typeof createManualTimer>
@@ -230,19 +234,23 @@ beforeEach(() => {
   deleteRequests = []
   deleteStatuses = []
   savedLookReads = 0
+  committedIds = []
   deleteGate = null
   usageGate = null
-  savedLooksGate = null
   tagRequests = []
   manual = createManualTimer()
   // Every new member session gets its own controller on the manual timer, as production does.
-  injectWardrobeGarmentDeletionForTests(() =>
-    createDeferredGarmentDeletion({ timer: manual.timer })
-  )
+  // The extra listener records each committed delete, so a test can wait on the landed send.
+  injectWardrobeGarmentDeletionForTests(() => {
+    const controller = createDeferredGarmentDeletion({ timer: manual.timer })
+    controller.subscribe((event) => {
+      if (event.type === 'committed') committedIds.push(event.id)
+    })
+    return controller
+  })
   const savedLooks = createSavedLooksMswHandlers([], `${api}/wardrobe/saved-looks`)
-  savedLooks.store.onGet = async () => {
+  savedLooks.store.onGet = () => {
     savedLookReads += 1
-    if (savedLooksGate) await savedLooksGate
   }
   useMswHandlers(
     http.get(`${api}/wardrobe/garments`, () => HttpResponse.json({ data: closet })),
@@ -456,14 +464,12 @@ describe('Closet garment delete', () => {
     const user = userEvent.setup()
     render(<WardrobePage />)
     signIn()
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
-    const readsBefore = savedLookReads
 
     await openAndDelete(user, 'black-shoes')
     const undo = await screen.findByTestId('status-bar-action-undo')
     await manual.advance(WINDOW_MS)
-    // A committed delete reloads saved looks: the send has landed.
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(readsBefore))
+    // The controller reported the delete committed: the send has landed.
+    await waitFor(() => expect(committedIds).toEqual(['black-shoes']))
     await user.click(undo)
 
     expect(await statusBar()).toHaveTextContent('Deleted')
@@ -1460,47 +1466,39 @@ describe('Closet garment delete', () => {
     expect(screen.queryByTestId('garment-card-black-shoes')).toBeNull()
   })
 
-  it('[P1] [7.6-CMP-011] a committed delete reloads saved looks so they show the missing piece', async () => {
+  /**
+   * Story CC-7.12 moved saved looks to Looks: the Closet no longer reloads them after a delete.
+   * Looks reads them fresh on every entry (looks/page.test.tsx 7.12-UNIT-020b and 022a) and a
+   * tile shows the missing piece (components/looks/looks-tile.test.tsx).
+   */
+  it('[P1] [7.6-CMP-011] [7.12] a committed delete sends no saved looks read from the Closet', async () => {
     const user = userEvent.setup()
     render(<WardrobePage />)
     signIn()
     await screen.findByTestId('garment-open-black-shoes')
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
-    const readsBefore = savedLookReads
 
     await openAndDelete(user, 'black-shoes')
-    expect(savedLookReads).toBe(readsBefore)
     await manual.advance(WINDOW_MS)
 
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(readsBefore))
+    await waitFor(() => expect(committedIds).toEqual(['black-shoes']))
+    expect(deleteRequests.map((request) => request.id)).toEqual(['black-shoes'])
+    expect(savedLookReads).toBe(0)
   })
 
-  it('[P2] [7.6-CMP-011] a saved looks read cut short by the reload after a delete shows no load error', async () => {
+  it('[P2] [7.6-CMP-011] [7.12] a delete sent at once sends no saved looks read and shows no saved looks error', async () => {
     const user = userEvent.setup()
-    let releaseFirstRead: () => void = () => undefined
-    savedLooksGate = new Promise<void>((resolve) => {
-      releaseFirstRead = resolve
-    })
     usageById.set('blue-top', 'missing')
     render(<WardrobePage />)
     signIn()
     await screen.findByTestId('garment-open-blue-top')
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(0))
-    const readsBefore = savedLookReads
-    // The first read stays out; the reload the delete starts answers at once.
-    savedLooksGate = null
 
     await openAndDelete(user, 'blue-top')
     await waitFor(() =>
       expect(deleteRequests.map((request) => request.id)).toEqual(['blue-top'])
     )
-    await waitFor(() => expect(savedLookReads).toBeGreaterThan(readsBefore))
+    await waitFor(() => expect(committedIds).toEqual(['blue-top']))
 
-    // The reload abandoned the first read: its late end reports nothing.
-    await act(async () => {
-      releaseFirstRead()
-      await new Promise<void>((resolve) => setTimeout(resolve, 0))
-    })
+    expect(savedLookReads).toBe(0)
     expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
     expect(deleteRequests).toHaveLength(1)
   })

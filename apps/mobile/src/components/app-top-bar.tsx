@@ -75,6 +75,8 @@ export function renderTabTopBar(props: NavigatorHeaderProps) {
 export const PARENT_TAB: Readonly<Record<string, Href>> = {
   // Story CC-7.11 D10: Capsules and Plan live under Looks; Style under Profile.
   'wardrobe-capsules': '/looks',
+  // Story CC-7.12 D5: a saved look's direct entry goes back to Looks on Saved.
+  'saved-look/[savedLookId]': { pathname: '/looks', params: { segment: 'saved' } },
   locations: '/settings',
   'notification-settings': '/settings',
   'palette-advisor': '/settings',
@@ -159,8 +161,14 @@ export function renderStackTopBar(props: NavigatorHeaderProps) {
   const below = routeBelow(props)
   if (below?.name === TABS_ANCHOR && !seenTabAnchors.has(below.key))
     coldLinkParents.set(below.key, parent)
+  // Story CC-7.12 (TEA T4): a saved look opened by View (no `from`) returns to Looks Saved, not
+  // to the screen that saved it; a Saved tile's entry goes back to its caller as usual.
+  const viewEntry =
+    props.route.name === 'saved-look/[savedLookId]' &&
+    !(props.route as { params?: { from?: string } }).params?.from
   const goBack = () => {
-    if (props.back !== undefined && hasCallerBelow(props)) props.navigation.goBack()
+    if (viewEntry) router.dismissTo(parent)
+    else if (props.back !== undefined && hasCallerBelow(props)) props.navigation.goBack()
     else router.replace(parent)
   }
   return (

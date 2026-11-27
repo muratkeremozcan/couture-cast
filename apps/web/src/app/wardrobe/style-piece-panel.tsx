@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { withRequestDeadline } from '@couture/api-client'
 import type {
@@ -39,6 +40,7 @@ import {
   type StylePieceSelection,
   type StylePieceRecipe,
 } from '@couture/utils'
+import { savedLookHref } from '../components/looks/looks-address'
 import { getI18n } from '../../i18n'
 import {
   createSavedLookFromWeb,
@@ -338,6 +340,7 @@ function StylePieceIdeas({
   onSavedLooksChanged?: () => void
 }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
+  const router = useRouter()
   const statusBar = useStatusBar()
   const { category, comfortRange } = piece
   const photo = anchor?.photo
@@ -372,6 +375,8 @@ function StylePieceIdeas({
   const swapRevisionRef = useRef(0)
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<Record<string, SavedLookContract>>({})
+  /** Story CC-7.12 D7: the look the last accepted save confirmed, created or existing. */
+  const viewLookIdRef = useRef<string | null>(null)
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
   const statusBarRef = useRef(statusBar)
@@ -612,6 +617,7 @@ function StylePieceIdeas({
               const attemptKey = `${recipeKey}:${compositionKey}`
               if (existingMatch) {
                 delete lastCreatedRef.current[attemptKey]
+                viewLookIdRef.current = existingMatch.id
                 setSavedState('ready')
                 if (swapRevisionRef.current === startSwapRevision) {
                   swapUndoStackRef.current = []
@@ -644,6 +650,7 @@ function StylePieceIdeas({
               deletedIdsRef.current.delete(created.id)
               mutationVersionRef.current += 1
               lastCreatedRef.current[attemptKey] = created
+              viewLookIdRef.current = created.id
               setSaved((current) => [
                 created,
                 ...current.filter((item) => item.id !== created.id),
@@ -684,8 +691,10 @@ function StylePieceIdeas({
               return true
             }}
             onViewSaved={() => {
-              savedSectionRef.current?.scrollIntoView?.({ block: 'nearest' })
-              savedSectionRef.current?.focus()
+              // Story CC-7.12 D7: View opens the saved look in Looks.
+              // Codex #1: a save that confirmed an existing look views that look.
+              const id = viewLookIdRef.current
+              if (id) router.push(savedLookHref(id))
             }}
             onSwap={(category, id) => {
               draftRevision.current += 1

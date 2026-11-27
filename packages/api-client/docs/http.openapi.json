@@ -24972,6 +24972,17 @@
           },
           {
             "schema": {
+              "type": "string",
+              "enum": [
+                "created_desc"
+              ]
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          },
+          {
+            "schema": {
               "type": "integer",
               "minimum": 1,
               "maximum": 100,
@@ -26092,6 +26103,17 @@
             },
             "required": false,
             "name": "anchorGarmentId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "created_desc"
+              ]
+            },
+            "required": false,
+            "name": "sort",
             "in": "query"
           },
           {

@@ -49,10 +49,6 @@
       "errorNoWebSubscription": "Su questo account non c'è nessun abbonamento web da gestire.",
       "errorSubscribeDisabled": "I nuovi abbonamenti Premium sono sospesi al momento. Riprova tra poco.",
       "signedOutHint": "Accedi per abbonarti o gestire Premium",
-      "plannerLocked": {
-        "title": "Il planner di 7 giorni è una funzione Premium",
-        "cta": "Ottieni Premium"
-      },
       "planner": {
         "sectionTitle": "Pianificatore outfit di 7 giorni",
         "openControl": "Pianifica la settimana",
@@ -1687,7 +1683,39 @@
   },
   "looks": {
     "empty": "Salva un look per vederlo qui",
-    "capsules": "Capsule",
-    "plan": "Piano"
+    "segments": {
+      "label": "Sezioni dei look",
+      "saved": "Salvati",
+      "ideas": "Idee",
+      "plan": "Piano"
+    },
+    "filters": {
+      "label": "Filtra i look salvati",
+      "all": "Tutti",
+      "today": "Oggi",
+      "capsules": "Capsule"
+    },
+    "filterEmpty": {
+      "today": "Ancora nessun look da Oggi",
+      "capsules": "Ancora nessuna capsula"
+    },
+    "manageCapsules": "Gestisci capsule",
+    "state": {
+      "missing_one": "Manca 1 capo",
+      "missing_other": "Mancano {{count}} capi",
+      "needsReview": "Da rivedere",
+      "savedOn": "Salvato il {{date}}"
+    },
+    "detail": {
+      "gone": "Questo look non è più salvato",
+      "signIn": "Accedi per vedere i tuoi look salvati",
+      "signInAction": "Accedi"
+    },
+    "freePlan": {
+      "week": "Settimana di esempio",
+      "line": "Premium pianifica tutta la tua settimana in base al meteo.",
+      "upgrade": "Passa a Premium"
+    },
+    "loadMore": "Mostra altri"
   }
 }

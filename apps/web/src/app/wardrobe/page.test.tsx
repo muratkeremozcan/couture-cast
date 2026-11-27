@@ -1,3 +1,8 @@
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-CLOSET-001 and the screen gate (D8: the Closet shows
+// no saved looks row, reads no saved looks and its gate waits on the closet only).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): 7.11-CMP-CLOSET-001 to 7.11-CMP-CLOSET-009 (D4 to D6: setup and
@@ -1448,173 +1453,43 @@ describe('WardrobePage commit deduplication', () => {
     )
   })
 
-  it('loads, paginates, refreshes on change notifications, and retries failed Closet saved looks', async () => {
-    const user = userEvent.setup()
+  // Story CC-7.12 D8 (7.12-E2E-016 at unit level): saved looks left the Closet for Looks, so the
+  // Closet shows no saved looks row and sends no saved looks read, even for a member with looks.
+  // Replaces the CC-7.2 "loads, paginates, refreshes on change notifications, and retries failed
+  // Closet saved looks" case; that behaviour is on the Looks tab (app/looks/page.test.tsx) and
+  // the saved look detail (components/looks/saved-look-detail-screen.test.tsx).
+  it('7.12-UNIT-CLOSET-001 shows no saved looks row and reads no saved looks', async () => {
     verifiedSession.owner = 'member-saved-looks'
     window.sessionStorage.setItem(
       WEB_ACCESS_TOKEN_STORAGE_KEY,
       'test-token-member-saved-looks'
     )
     window.dispatchEvent(new Event('couture:session'))
-    const anchorGarment: GarmentItemContract = {
-      ...persistedGarment,
-      id: 'garment-anchor-1',
-      status: 'ready',
-      category: 'top',
-      material: 'cotton',
-      comfortRange: 'mild',
-      imageAccess: {
-        url: 'https://example.test/anchor.png',
-        expiresAt: '2099-01-01T00:00:00.000Z',
-      },
-    }
-    listGarmentsFromWeb.mockResolvedValue([anchorGarment])
-    const { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } = await import(
-      '@couture/utils'
-    )
-    const piece = stylePieceAnchor(anchorGarment)!
-    const exactLook = stylePieceLooks(piece, 'mild-dry', SAMPLE_CATALOG).looks[0]!
-
-    const makeSavedLook = (id: string, isStylePiece = false) =>
-      isStylePiece
-        ? {
-            id,
-            ownerUserId: 'member-saved-looks',
-            source: 'style_piece' as const,
-            lookId: exactLook.recipe.lookId,
-            weather: 'mild-dry',
-            title: `Look ${id}`,
-            anchorGarmentId: anchorGarment.id,
-            anchorSnapshot: {
-              category: 'top' as const,
-              comfortRange: 'mild' as const,
-            },
-            composition: [
-              {
-                slotIndex: 0,
-                category: 'top' as const,
-                kind: 'garment' as const,
-                itemId: anchorGarment.id,
-                label: null,
-                missing: false,
-                imageAccess: anchorGarment.imageAccess,
-              },
-              ...exactLook.companions.map((companion, idx) => ({
-                slotIndex: idx + 1,
-                category: companion.category,
-                kind: 'catalog' as const,
-                itemId: companion.id,
-                label: null,
-                missing: false,
-                imageAccess: null,
-              })),
-            ],
-            swaps: {},
-            collection: null,
-            comfort: null,
-            availabilityStatus: 'ready' as const,
-            missingGarmentIds: [],
-            needsReviewReasons: [],
-            revision: 0,
-            createdAt: '2026-11-22T01:00:00.000Z',
-            updatedAt: '2026-11-22T01:00:00.000Z',
-          }
-        : {
-            id,
-            ownerUserId: 'member-saved-looks',
-            source: 'home_sample' as const,
-            lookId: 'sample:l:silk-midi',
-            weather: 'warm-rainy',
-            title: `Look ${id}`,
-            anchorGarmentId: null,
-            anchorSnapshot: null,
-            composition: [
-              {
-                slotIndex: 0,
-                category: 'top' as const,
-                kind: 'catalog' as const,
-                itemId: 'sample:g:knit-tee',
-                label: null,
-                missing: false,
-                imageAccess: null,
-              },
-            ],
-            swaps: {},
-            collection: 'all',
-            comfort: null,
-            availabilityStatus: 'ready' as const,
-            missingGarmentIds: [],
-            needsReviewReasons: [],
-            revision: 0,
-            createdAt: '2026-11-22T01:00:00.000Z',
-            updatedAt: '2026-11-22T01:00:00.000Z',
-          }
-
-    savedLooksMocks.listSavedLooksPageFromWeb
-      .mockRejectedValueOnce(new Error('Saved looks temporarily unavailable'))
-      .mockResolvedValueOnce({
-        data: [makeSavedLook('sl-1')],
-        total: 2,
-        limit: 50,
-        offset: 0,
-      })
-      .mockResolvedValueOnce({
-        data: [makeSavedLook('sl-2', true)],
-        total: 2,
-        limit: 50,
-        offset: 1,
-      })
-      .mockResolvedValue({
-        data: [makeSavedLook('sl-1'), makeSavedLook('sl-2', true)],
-        total: 2,
-        limit: 50,
-        offset: 0,
-      })
-
+    savedLooksMocks.listSavedLooksPageFromWeb.mockClear()
+    listGarmentsFromWeb.mockReset().mockResolvedValue([persistedGarment])
     try {
       render(<WardrobePage />)
-      await user.click(await screen.findByTestId('saved-looks-retry'))
-      await waitFor(() =>
-        expect(screen.getByTestId('closet-saved-looks-row')).toHaveTextContent('2')
-      )
-
-      await user.click(screen.getByTestId('closet-saved-looks-row'))
-      await user.click(await screen.findByTestId('saved-looks-load-more'))
-      await waitFor(() => expect(screen.getByText('Look sl-2')).toBeInTheDocument())
-
-      // Reopen exact style_piece look in StylePiecePanel from ClosetSavedLooksRow, then remove a look.
-      const reopenBtns = screen.getAllByTestId('saved-look-reopen')
-      await user.click(reopenBtns[1]!)
       expect(
-        await screen.findByRole('dialog', { name: 'Style this piece' })
-      ).toBeVisible()
-      await user.click(screen.getAllByTestId('saved-look-remove')[0]!)
+        await screen.findByTestId(`garment-card-${persistedGarment.id}`)
+      ).toBeInTheDocument()
 
       act(() => {
-        for (const listener of savedLooksMocks.listeners) {
-          listener('member-saved-looks')
-        }
+        for (const listener of savedLooksMocks.listeners) listener('member-saved-looks')
       })
-      await waitFor(() =>
-        expect(
-          savedLooksMocks.listSavedLooksPageFromWeb.mock.calls.length
-        ).toBeGreaterThanOrEqual(4)
-      )
+      expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
+      expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
+      expect(screen.queryByTestId('saved-looks-load-more')).toBeNull()
+      expect(screen.queryByTestId('saved-looks-retry')).toBeNull()
+      expect(savedLooksMocks.listSavedLooksPageFromWeb).not.toHaveBeenCalled()
     } finally {
       verifiedSession.owner = null
       window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
-      savedLooksMocks.listSavedLooksPageFromWeb.mockReset().mockResolvedValue({
-        data: [],
-        total: 0,
-        limit: 50,
-        offset: 0,
-      })
     }
   })
 })
 
-// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet and the saved looks
-// have answered, so nothing is inserted above the grid afterwards. The measured budget is
+// Story CC-7.7 D3 (7.7-CMP-006): the Closet body appears once the closet has answered (CC-7.12
+// D8: the saved looks read left the Closet), so nothing is inserted above the grid afterwards. The measured budget is
 // 7.7-E2E-001. Story CC-7.11 D4, D5 and TEA d: the setup banner left the body; the setup progress
 // only names the top bar More menu's Closet setup item, which sits outside the gate and updates
 // in place, and the account and setup notices sit below the closet, so neither the setup progress
@@ -1677,11 +1552,10 @@ describe('WardrobePage screen gate', () => {
     expect(screen.getByTestId('wardrobe-closet-view')).toBeVisible()
   })
 
-  // A total only the answered page can carry, so "3 saved" proves the read landed (the row
-  // starts at "0 saved" and reads "…" while it loads).
-  const SAVED_LOOKS_PAGE = { data: [], total: 3, limit: 50, offset: 0 }
-  type GateRead = 'garments' | 'onboarding' | 'profile' | 'savedLooks'
-  const GATE_READS: GateRead[] = ['garments', 'onboarding', 'profile', 'savedLooks']
+  // Story CC-7.12 D8: the Closet no longer reads saved looks, so the gate waits on the closet
+  // read only (the saved looks read and its "3 saved" evidence left with the row).
+  type GateRead = 'garments' | 'onboarding' | 'profile'
+  const GATE_READS: GateRead[] = ['garments', 'onboarding', 'profile']
 
   /**
    * Holds one of the gate's four reads (or none, the control); the others answer at once with
@@ -1714,9 +1588,7 @@ describe('WardrobePage screen gate', () => {
     resolveCurrentUserId
       .mockReset()
       .mockImplementation(() => answer('profile', 'user-hub-1'))
-    savedLooksMocks.listSavedLooksPageFromWeb.mockImplementationOnce(() =>
-      answer('savedLooks', SAVED_LOOKS_PAGE)
-    )
+    savedLooksMocks.listSavedLooksPageFromWeb.mockClear()
     return held
   }
 
@@ -1745,10 +1617,6 @@ describe('WardrobePage screen gate', () => {
         // nothing here; its answer having been handed to the page is the evidence.
         expect(resolveCurrentUserId).toHaveBeenCalled()
         expect(answered.has('profile')).toBe(true)
-        return
-      case 'savedLooks':
-        expect(savedLooksMocks.listSavedLooksPageFromWeb).toHaveBeenCalled()
-        expect(screen.getByText('3 saved')).toBeInTheDocument()
     }
   }
 
@@ -1765,10 +1633,13 @@ describe('WardrobePage screen gate', () => {
     expect(
       screen.queryByRole('link', { name: 'Set up your closet', hidden: true })
     ).toBeNull()
+    // CC-7.12 D8: the gate opened with no saved looks read at all.
+    expect(savedLooksMocks.listSavedLooksPageFromWeb).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
   })
 
-  // CC-7.7 D3: the closet and the saved looks row are the reads the gate waits for.
-  const HOLDING_READS: GateRead[] = ['garments', 'savedLooks']
+  // CC-7.7 D3, CC-7.12 D8: the closet is the one read the gate waits for.
+  const HOLDING_READS: GateRead[] = ['garments']
   // CC-7.11 TEA d: the setup progress and the account read land after the reveal, in place.
   const LATE_READS: GateRead[] = ['onboarding', 'profile']
 

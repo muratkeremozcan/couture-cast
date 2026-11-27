@@ -716,10 +716,6 @@
         },
         "openControl": "Planificar la semana"
       },
-      "plannerLocked": {
-        "title": "El planificador de 7 días es una función Premium",
-        "cta": "Obtener Premium"
-      },
       "signedOutHint": "Inicia sesión para suscribirte o administrar Premium"
     }
   },
@@ -1263,7 +1259,39 @@
   },
   "looks": {
     "empty": "Guarda un look para verlo aquí",
-    "capsules": "Cápsulas",
-    "plan": "Plan"
+    "segments": {
+      "label": "Secciones de looks",
+      "saved": "Guardados",
+      "ideas": "Ideas",
+      "plan": "Plan"
+    },
+    "filters": {
+      "label": "Filtrar looks guardados",
+      "all": "Todos",
+      "today": "Hoy",
+      "capsules": "Cápsulas"
+    },
+    "filterEmpty": {
+      "today": "Aún no hay looks de Hoy",
+      "capsules": "Aún no hay cápsulas"
+    },
+    "manageCapsules": "Administrar cápsulas",
+    "state": {
+      "missing_one": "Falta 1 prenda",
+      "missing_other": "Faltan {{count}} prendas",
+      "needsReview": "Revisar",
+      "savedOn": "Guardado el {{date}}"
+    },
+    "detail": {
+      "gone": "Este look ya no está guardado",
+      "signIn": "Inicia sesión para ver tus looks guardados",
+      "signInAction": "Iniciar sesión"
+    },
+    "freePlan": {
+      "week": "Semana de ejemplo",
+      "line": "Premium planifica toda tu semana según tu pronóstico.",
+      "upgrade": "Mejorar"
+    },
+    "loadMore": "Mostrar más"
   }
 }

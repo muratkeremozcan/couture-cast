@@ -6,17 +6,24 @@
 // by wardrobe-garment-detail.spec.ts (7.5-E2E-001); its direct entry is a row here.
 // Native twin: apps/mobile/src/components/app-top-bar.routing.test.tsx.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Story CC-7.12 (Step 69): capsules moved to /looks/capsules (back to Saved > Capsules), the saved
+// look detail /looks/saved/ID is a new row, and Plan is a Looks segment reached by redirect.
 import type { Page } from '@playwright/test'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { expect, RITUAL_RESPONSE_URL, test } from '../support/fixtures/merged-fixtures'
 import {
   openFixtureShell,
   SHELL_TABS,
   VISUAL_MEMBER_ID,
   waitForShellSettled,
 } from '../support/helpers/app-shell'
+import {
+  guardExpectedError,
+  unexpectedRitualErrors,
+} from '../support/helpers/expected-error-guard'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
 import {
   bodies,
+  SHELL_SAVED_LOOK_ID,
   type ShellMode,
   type ShellScreen,
 } from '../support/helpers/shell-fixtures'
@@ -36,6 +43,13 @@ type SubScreen = {
   title: RegExp
   /** How a member reaches it from its parent tab; null when no in-app link exists on web. */
   enter: ((page: Page) => Promise<void>) | null
+  /** Story CC-7.12: the address an in-app entry lands on, when it is not `path` itself. */
+  enteredPath?: RegExp
+  /**
+   * Story CC-7.12 D5, D6: where back lands, when it is not the parent tab's bare path. An in-app
+   * entry steps back to the entry below it; a direct entry replaces to the top bar's parent.
+   */
+  backTo?: { inApp: RegExp; direct: RegExp }
   /**
    * Codex 7.11 #15: the screen's own content, so a direct entry proves more than a header
    * outside its gate. Rows without one fall back to visible text in the page body.
@@ -87,20 +101,37 @@ const SUB_SCREENS: SubScreen[] = [
     content: (page) => page.getByTestId('silhouette-settings-panel'),
   },
   {
+    // Story CC-7.12 D6: the manager moved under Looks and is entered from Saved > Capsules.
     name: 'capsules',
-    path: '/wardrobe/capsules',
+    path: '/looks/capsules',
     parent: 'looks',
     title: /^Outfit capsules$/,
-    enter: viaTestId('looks-capsules-row'),
+    enter: async (page) => {
+      await page.getByTestId('looks-filter-capsules').click()
+      await expect(page).toHaveURL(/\/looks\?segment=saved&filter=capsules$/)
+      await page.getByTestId('looks-manage-capsules').click()
+    },
     content: (page) => page.getByTestId('create-capsule-button'),
+    backTo: {
+      inApp: /\/looks\?segment=saved&filter=capsules$/,
+      direct: /\/looks\?segment=saved&filter=capsules$/,
+    },
   },
   {
-    name: 'plan',
-    path: '/looks/plan',
+    // Story CC-7.12 D5: the saved look's own screen replaced the CC-7.11 Plan row (Plan is a
+    // Looks segment now; its redirect is the test after this table's loops).
+    name: 'saved look detail',
+    path: `/looks/saved/${SHELL_SAVED_LOOK_ID}`,
     parent: 'looks',
-    title: /^Plan$/,
-    enter: viaTestId('looks-plan-row'),
-    content: (page) => page.getByRole('complementary', { name: 'Planner Rail' }),
+    title: /\S/,
+    enter: viaTestId(`saved-look-card-${SHELL_SAVED_LOOK_ID}`),
+    enteredPath: new RegExp(`/looks/saved/${SHELL_SAVED_LOOK_ID}\\?from=all$`),
+    // A guardian-pending teen has no saved look, so the id reads like a removed one (P6).
+    content: (page, mode) =>
+      mode === 'guardian-pending'
+        ? page.getByTestId('saved-look-detail-gone')
+        : page.getByTestId('saved-look-detail'),
+    backTo: { inApp: /\/looks$/, direct: /\/looks\?segment=saved$/ },
   },
   {
     name: 'style',
@@ -220,6 +251,35 @@ async function expectOwnContent(page: Page, sub: SubScreen, mode: ShellMode) {
 
 const scrollY = (page: Page) => page.evaluate(() => Math.round(window.scrollY))
 
+/**
+ * A guardian-pending teen has no saved look, so the one-look read answers 404 (CC-7.12 P6). The
+ * test opts out of the library monitor and the shared ritual guard for that one answer; this puts
+ * both back for everything else. The exact read must answer 404, every other 4xx or 5xx fails the
+ * test, and ritual errors keep the shared guard's rule. Entries read `METHOD STATUS /path`.
+ */
+function guardSavedLookRefusal(page: Page) {
+  const refusal = new RegExp(
+    `^GET 404 /api/v1/wardrobe/saved-looks/${SHELL_SAVED_LOOK_ID}$`
+  )
+  const refusals: string[] = []
+  const unexpected: string[] = []
+  page.context().on('response', (response) => {
+    // The ritual URL belongs to the ritual guard below, as it does in merged-fixtures.ts.
+    if (response.status() < 400 || RITUAL_RESPONSE_URL.test(response.url())) return
+    const entry = `${response.request().method()} ${response.status()} ${new URL(response.url()).pathname}`
+    ;(refusal.test(entry) ? refusals : unexpected).push(entry)
+  })
+  const ritual = guardExpectedError(page.context(), RITUAL_RESPONSE_URL)
+  return async () => {
+    expect(refusals.length, 'the saved look read answers 404').toBeGreaterThan(0)
+    expect(unexpected, 'unexpected HTTP errors').toEqual([])
+    expect(
+      unexpectedRitualErrors(await ritual.settle()),
+      'unexpected ritual HTTP errors'
+    ).toEqual([])
+  }
+}
+
 test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
   for (const sub of SUB_SCREENS.filter((row) => row.enter !== null)) {
     test(`[P0] [7.11-E2E-020] ${sub.name}: in-app from ${sub.parent}, top bar with back and title, back returns to ${sub.parent}`, async ({
@@ -231,13 +291,17 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
       await waitForShellSettled(page, router)
 
       await sub.enter!(page)
-      await expect(page).toHaveURL(new RegExp(`${sub.path.replace(/[?]/g, '\\?')}$`))
+      await expect(page).toHaveURL(
+        sub.enteredPath ?? new RegExp(`${sub.path.replace(/[?]/g, '\\?')}$`)
+      )
       await expectTopBar(page, sub.title)
 
       setScreen(sub.parent)
       await page.getByTestId('app-top-bar-back').click()
       // Style is entered through Profile; palette-style two-level rows are E2E-033.
-      await expect(page).toHaveURL(new RegExp(`${SHELL_TABS[sub.parent].path}$`))
+      await expect(page).toHaveURL(
+        sub.backTo?.inApp ?? new RegExp(`${SHELL_TABS[sub.parent].path}$`)
+      )
       await expect(page.getByTestId(SHELL_TABS[sub.parent].nav)).toHaveAttribute(
         'aria-current',
         'page'
@@ -247,28 +311,75 @@ test.describe('CC-7.11 back on every sub-screen @local-lane', () => {
 
   for (const mode of ['populated', 'guardian-pending'] as const) {
     for (const sub of SUB_SCREENS) {
-      test(`[P0] [7.11-E2E-021/036/060] ${sub.name}, ${mode}: direct entry, back replaces to ${sub.parent}`, async ({
-        page,
-        interceptNetworkCall,
-      }) => {
-        const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
-        await page.goto(sub.path)
-        await expectTopBar(page, sub.title)
-        await expectOwnContent(page, sub, mode)
-        const entries = await page.evaluate(() => history.length)
+      const refusalScoped =
+        sub.name === 'saved look detail' && mode === 'guardian-pending'
+      // The monitor reads annotations when the test is declared, so the opt-out is static here.
+      test(
+        `[P0] [7.11-E2E-021/036/060] ${sub.name}, ${mode}: direct entry, back replaces to ${sub.parent}`,
+        refusalScoped
+          ? {
+              annotation: [
+                {
+                  type: 'skipNetworkMonitoring',
+                  description:
+                    'The teen has no saved look, so the one-look read answers 404; guardSavedLookRefusal keeps every other answer guarded (CC-7.12 P6).',
+                },
+              ],
+            }
+          : {},
+        async ({ page, interceptNetworkCall }) => {
+          const verifyRefusalOnly = refusalScoped ? guardSavedLookRefusal(page) : null
+          const { router } = await open(page, interceptNetworkCall, sub.parent, mode, sub)
+          await page.goto(sub.path)
+          await expectTopBar(page, sub.title)
+          await expectOwnContent(page, sub, mode)
+          const entries = await page.evaluate(() => history.length)
 
-        await page.getByTestId('app-top-bar-back').click()
-        await expect(page).toHaveURL(new RegExp(`${SHELL_TABS[sub.parent].path}$`))
-        await waitForShellSettled(page, router)
-        await expect(page.getByTestId(SHELL_TABS[sub.parent].nav)).toHaveAttribute(
-          'aria-current',
-          'page'
-        )
-        // A replace, not a push: the back arrow never grows history on a cold entry.
-        expect(await page.evaluate(() => history.length)).toBe(entries)
-      })
+          await page.getByTestId('app-top-bar-back').click()
+          await expect(page).toHaveURL(
+            sub.backTo?.direct ?? new RegExp(`${SHELL_TABS[sub.parent].path}$`)
+          )
+          await waitForShellSettled(page, router)
+          await expect(page.getByTestId(SHELL_TABS[sub.parent].nav)).toHaveAttribute(
+            'aria-current',
+            'page'
+          )
+          // A replace, not a push: the back arrow never grows history on a cold entry.
+          expect(await page.evaluate(() => history.length)).toBe(entries)
+          await verifyRefusalOnly?.()
+        }
+      )
     }
   }
+
+  test('[P0] [7.11-E2E-020/021] [7.12-E2E-035] Plan: /looks/plan opens the Looks Plan segment, a tab with no back arrow', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    // Story CC-7.12 D11: the CC-7.11 Plan sub-screen (top bar back, title Plan) became a Looks
+    // segment. Its old address redirects there, and the planner renders inside Looks.
+    const { router } = await open(page, interceptNetworkCall, 'looks')
+    await page.goto('/looks/plan')
+    await expect(page).toHaveURL(/\/looks\?segment=plan$/)
+    await waitForShellSettled(page, router)
+    await expect(page.getByTestId('looks-segment-plan')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
+    await expect(
+      page.getByTestId('app-header').getByTestId('app-top-bar-back')
+    ).toHaveCount(0)
+    await expect(page.getByTestId('app-top-bar-title')).toHaveText(/^Looks$/)
+    await expect(page.getByTestId(SHELL_TABS.looks.nav)).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+    await expect(
+      page
+        .getByTestId('looks-first-content')
+        .getByRole('complementary', { name: 'Planner Rail' })
+    ).toBeVisible()
+  })
 })
 
 test.describe('CC-7.11 parent scroll on return @local-lane', () => {
@@ -395,12 +506,13 @@ test.describe('CC-7.11 parent scroll on return @local-lane', () => {
     const [opened] = await Promise.all([
       context.waitForEvent('page'),
       page.evaluate(() => {
-        window.open('/wardrobe/capsules', '_blank')
+        window.open('/looks/capsules', '_blank')
       }),
     ])
     await opened.waitForLoadState()
     await expect(opened.getByTestId('app-top-bar-back')).toBeVisible()
     await opened.getByTestId('app-top-bar-back').click()
-    await expect(opened).toHaveURL(/\/looks$/)
+    // Story CC-7.12 D6: the manager's parent is Looks > Saved with the Capsules filter.
+    await expect(opened).toHaveURL(/\/looks\?segment=saved&filter=capsules$/)
   })
 })

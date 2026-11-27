@@ -59,6 +59,7 @@ import {
   type MemberSession,
 } from '../../lib/use-web-session'
 import { acquireScrollLock } from './modal-stack'
+import { FreePlanPreview } from './looks/free-plan-preview'
 
 export interface PlannerRailProps {
   isOpen: boolean
@@ -382,20 +383,9 @@ function LockedPanel({
     )
   }
 
-  return (
-    <div className="space-y-3" data-testid="planner-rail-locked">
-      <p className="text-sm font-medium text-theme-card-text">
-        {t('commerce.premium.plannerLocked.title')}
-      </p>
-      <a
-        href="/settings"
-        className="inline-block min-h-11 rounded-lg border border-theme-card-border px-4 py-2 text-xs font-semibold text-theme-card-text"
-        data-testid="planner-rail-get-premium"
-      >
-        {t('commerce.premium.plannerLocked.cta')}
-      </a>
-    </div>
-  )
+  // Story CC-7.12 D10: a free or signed-out member sees the sample week and one Upgrade, never
+  // a lock.
+  return <FreePlanPreview />
 }
 
 function ErrorPanel({ onRetry, t }: { onRetry: () => void; t: (key: string) => string }) {

@@ -2,6 +2,12 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 // Story CC-7.11 test owner (TEA): 7.11-CMP-PLAN-001 (the rail without its header on the Plan route)
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-050 (locked and signed-out render the free preview:
+// seven sample days, one line, exactly one Upgrade, no lock ids) and 7.12-UNIT-051 (entitled,
+// disabled, error, loading and set-city states unchanged; the existing cases below).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Story 5.5 Task 7 owner: component tests for the live seven-day planner rail.
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -117,7 +123,7 @@ describe('PlannerRail', () => {
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
   })
 
-  it('renders the locked upsell signed out with no request', () => {
+  it('renders the free preview signed out with no request', () => {
     const requested = vi.fn()
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -126,7 +132,7 @@ describe('PlannerRail', () => {
       })
     )
     renderRail()
-    expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-free-preview')).toBeInTheDocument()
     expect(requested).not.toHaveBeenCalled()
   })
 
@@ -147,8 +153,8 @@ describe('PlannerRail', () => {
     const plain = screen.getByRole('complementary', { name: /planner rail/i })
     expect(within(plain).queryByRole('heading', { level: 3 })).toBeNull()
     expect(within(plain).queryByRole('button', { name: /close planner/i })).toBeNull()
-    // The week body still renders: signed out, the locked upsell.
-    expect(within(plain).getByTestId('planner-rail-locked')).toBeInTheDocument()
+    // The week body still renders: signed out, the free preview.
+    expect(within(plain).getByTestId('plan-free-preview')).toBeInTheDocument()
   })
 
   it('shows a checking skeleton before the request resolves', async () => {
@@ -252,7 +258,7 @@ describe('PlannerRail', () => {
     )
   })
 
-  it('locks with the not-entitled upsell on a 403 from PremiumEntitlementGuard', async () => {
+  it('shows the free preview on a 403 from PremiumEntitlementGuard', async () => {
     signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -260,10 +266,10 @@ describe('PlannerRail', () => {
       )
     )
     renderRail()
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
   })
 
-  it('shows the disabled note (not the upsell) when the flag is off', async () => {
+  it('shows the disabled note (not the free preview) when the flag is off', async () => {
     signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -274,7 +280,7 @@ describe('PlannerRail', () => {
     )
     renderRail()
     expect(await screen.findByTestId('planner-rail-disabled')).toBeInTheDocument()
-    expect(screen.queryByTestId('planner-rail-locked')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('plan-free-preview')).not.toBeInTheDocument()
   })
 
   it('offers a localized retry on an unclassified failure', async () => {
@@ -483,7 +489,7 @@ describe('PlannerRail', () => {
         />
       </I18nextProvider>
     )
-    expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByTestId('plan-free-preview')).toBeInTheDocument()
 
     rerender(
       <I18nextProvider i18n={getI18n()}>
@@ -635,7 +641,7 @@ describe('PlannerRail', () => {
     expect(requestCount).toBe(1)
   })
 
-  it('locks with the not-entitled upsell when a reshuffle discovers entitlement lapsed', async () => {
+  it('shows the free preview when a reshuffle discovers entitlement lapsed', async () => {
     signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
@@ -653,7 +659,7 @@ describe('PlannerRail', () => {
     await waitFor(() => expect(screen.getByTestId('planner-days')).toBeInTheDocument())
 
     fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
   })
 
   it('shows the disabled note when a reshuffle discovers the flag went off', async () => {
@@ -685,7 +691,7 @@ describe('PlannerRail', () => {
     const onClose = vi.fn()
     renderRail({ variant: 'overlay', onClose })
     await waitFor(() =>
-      expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+      expect(screen.getByTestId('plan-free-preview')).toBeInTheDocument()
     )
 
     fireEvent.keyDown(screen.getByRole('complementary'), { key: 'a' })
@@ -696,17 +702,17 @@ describe('PlannerRail', () => {
   it('wraps Tab forward and Shift+Tab backward between the overlay endpoints', async () => {
     renderRail({ variant: 'overlay' })
     await waitFor(() =>
-      expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+      expect(screen.getByTestId('plan-free-preview')).toBeInTheDocument()
     )
 
     const overlay = screen.getByRole('complementary')
     const closeButton = screen.getByRole('button', { name: 'Close planner' })
-    const getPremiumLink = screen.getByTestId('planner-rail-get-premium')
+    const upgradeLink = screen.getByTestId('plan-upgrade')
     expect(document.activeElement).toBe(closeButton)
 
     // Shift+Tab from the first focusable element wraps to the last.
     fireEvent.keyDown(overlay, { key: 'Tab', shiftKey: true })
-    expect(document.activeElement).toBe(getPremiumLink)
+    expect(document.activeElement).toBe(upgradeLink)
 
     // Tab from the last focusable element wraps to the first.
     fireEvent.keyDown(overlay, { key: 'Tab' })
@@ -725,10 +731,10 @@ describe('PlannerRail', () => {
     ['rail' as const, 'desktop'],
     ['overlay' as const, 'phone'],
   ])('automated accessibility, %s variant (%s width)', (variant, _widthLabel) => {
-    it('passes signed out with the locked upsell', async () => {
+    it('passes signed out with the free preview', async () => {
       const { container } = renderRail({ variant })
       await waitFor(() =>
-        expect(screen.getByTestId('planner-rail-locked')).toBeInTheDocument()
+        expect(screen.getByTestId('plan-free-preview')).toBeInTheDocument()
       )
 
       const results = await axe.run(container, {
@@ -774,13 +780,13 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
     reshuffle.focus()
     expect(reshuffle).toHaveFocus()
 
-    // The member signs out in this tab: the week is replaced by the locked panel.
+    // The member signs out in this tab: the week is replaced by the free preview.
     act(() => {
       window.sessionStorage.clear()
       window.dispatchEvent(new Event('couture:session'))
     })
 
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close planner' })).toHaveFocus()
   })
 
@@ -800,7 +806,7 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
       window.dispatchEvent(new Event('couture:session'))
     })
 
-    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(await screen.findByTestId('plan-free-preview')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close planner' })).not.toHaveFocus()
   })
 
@@ -909,5 +915,165 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
     expect(screen.queryByTestId('planner-skeleton')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('Today: outfit updated.')
+  })
+})
+
+// Story CC-7.12 D10: the locked and signed-out states are the free preview, a sample week with one
+// line and one Upgrade, so no screen shows a Planner lock; every other state is unchanged.
+describe('7.12 PlannerRail free preview (D10)', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  const LOCK_IDS = ['planner-rail-locked', 'planner-rail-get-premium']
+
+  function expectFreePreview(upgradeHref: string) {
+    const preview = screen.getByTestId('plan-free-preview')
+    for (let day = 0; day < 7; day += 1) {
+      const row = within(preview).getByTestId(`plan-free-day-${day}`)
+      expect(row.textContent?.trim()).not.toBe('')
+    }
+    expect(within(preview).queryByTestId('plan-free-day-7')).toBeNull()
+    expect(
+      within(preview).getAllByText('Premium plans your whole week around your forecast.')
+    ).toHaveLength(1)
+    const upgrades = screen.getAllByTestId('plan-upgrade')
+    expect(upgrades).toHaveLength(1)
+    expect(upgrades[0]).toHaveAttribute('href', upgradeHref)
+    expect(upgrades[0]).toHaveTextContent('Upgrade')
+    // One Upgrade is the only control of the preview (one primary per screen).
+    expect(within(preview).getAllByRole('link')).toEqual(upgrades)
+    expect(within(preview).queryAllByRole('button')).toEqual([])
+    for (const id of LOCK_IDS) expect(screen.queryByTestId(id)).toBeNull()
+    expect(screen.queryByText('The 7-Day Planner is a Premium feature')).toBeNull()
+    expect(screen.queryByText('Get Premium')).toBeNull()
+  }
+
+  it('7.12-UNIT-050a signed out renders the free preview with Upgrade to sign-in and sends no read', () => {
+    const requested = vi.fn()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () => {
+        requested()
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    renderRail({ hideHeader: true })
+
+    expectFreePreview('/signin')
+    expect(screen.queryByTestId('planner-days')).toBeNull()
+    expect(requested).not.toHaveBeenCalled()
+  })
+
+  it("7.12-UNIT-050b a member without Premium gets the free preview with Upgrade to Profile's Premium section", async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(errorBody(403, PREMIUM_REQUIRED_MESSAGE), { status: 403 })
+      )
+    )
+    renderRail({ hideHeader: true })
+
+    await screen.findByTestId('plan-free-preview')
+    expectFreePreview('/settings#premium')
+    expect(screen.queryByTestId('planner-days')).toBeNull()
+  })
+
+  it('7.12-UNIT-050c the sample week rows follow the sample week order, today first', () => {
+    renderRail({ hideHeader: true })
+    const rows = Array.from({ length: 7 }, (_, day) =>
+      screen.getByTestId(`plan-free-day-${day}`)
+    )
+    for (let index = 1; index < rows.length; index += 1) {
+      expect(
+        rows[index - 1]!.compareDocumentPosition(rows[index]!) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy()
+    }
+    const today = new Intl.DateTimeFormat('en-US', { weekday: 'long' }).format(new Date())
+    expect(rows[0]).toHaveTextContent(today)
+    // P4: the line and Upgrade sit above the week.
+    const upgrade = screen.getByTestId('plan-upgrade')
+    expect(
+      upgrade.compareDocumentPosition(rows[0]!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('7.12-UNIT-051a an entitled member gets the week and no preview or Upgrade', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      )
+    )
+    renderRail({ hideHeader: true })
+
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
+    expect(screen.queryByTestId('plan-upgrade')).toBeNull()
+  })
+
+  it('7.12-UNIT-051b the disabled and error states keep their panels and show no preview', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(errorBody(503, PREMIUM_PLANNER_DISABLED_MESSAGE), {
+          status: 503,
+        })
+      )
+    )
+    const { unmount } = renderRail({ hideHeader: true })
+    expect(await screen.findByTestId('planner-rail-disabled')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
+    expect(screen.queryByTestId('plan-upgrade')).toBeNull()
+    unmount()
+
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(errorBody(500, 'boom'), { status: 500 })
+      )
+    )
+    renderRail({ hideHeader: true })
+    expect(await screen.findByTestId('planner-rail-error')).toBeInTheDocument()
+    expect(screen.getByTestId('planner-rail-retry')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
+  })
+
+  it('7.12-UNIT-051c a member with no city gets the set-city link back to Looks Plan, and no preview', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(errorBody(400, 'No location preferences found for user'), {
+          status: 400,
+        })
+      )
+    )
+    renderRail({ hideHeader: true })
+
+    const setCity = await screen.findByTestId('planner-set-city')
+    expect(setCity).toHaveAttribute(
+      'href',
+      '/settings?addLocation=1&returnTo=%2Flooks%3Fsegment%3Dplan#locations'
+    )
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
+  })
+
+  it('7.12-UNIT-051d the loading skeleton shows while the read is out, with no preview', async () => {
+    signInFixtureMember()
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useMswHandlers(
+      http.get(PLANNER_PATH, async () => {
+        await held
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    renderRail({ hideHeader: true })
+
+    expect(await screen.findByTestId('planner-skeleton')).toBeInTheDocument()
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
+    release()
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
   })
 })

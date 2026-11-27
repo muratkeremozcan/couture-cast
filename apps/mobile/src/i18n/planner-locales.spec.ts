@@ -1,5 +1,10 @@
 // Story 5.5 Task 8/9 owner: ten-locale parity for the mobile
-// `commerce.premium.planner.*` and `commerce.premium.plannerLocked.*` trees.
+// `commerce.premium.planner.*` tree. Story CC-7.12 test owner (TEA): 7.12-UNIT-071 (D10, D12),
+// the `commerce.premium.plannerLocked.*` tree left every catalog with the lock panel; the free
+// Plan preview reads `looks.freePlan.*` (audited in `looks-locales.spec.ts`).
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 //
 // A new feature area gets its own dedicated parity spec rather than an extension of
 // `premium-locales.spec.ts` (Decision 15, the same reasoning 5.2 through 5.4 recorded).
@@ -93,13 +98,11 @@ function placeholders(value: string): string[] {
 }
 
 const plannerReference = flatten(subtree(enUS as Catalog, 'planner'))
-const plannerLockedReference = flatten(subtree(enUS as Catalog, 'plannerLocked'))
 
 describe('5.5 mobile planner locale parity', () => {
-  it('5.5-I18N-MOB-01 ships 36 planner keys and 2 plannerLocked keys in the reference catalog', () => {
+  it('5.5-I18N-MOB-01 ships 36 planner keys in the reference catalog', () => {
     // CC-7.9: `openControl` joined the tree for the Home planner button.
     expect(plannerReference.size).toBe(36)
-    expect(plannerLockedReference.size).toBe(2)
   })
 
   it('5.5-I18N-MOB-02 uses an identical planner key tree in every locale', () => {
@@ -110,13 +113,14 @@ describe('5.5 mobile planner locale parity', () => {
     }
   })
 
-  it('5.5-I18N-MOB-03 uses an identical plannerLocked key tree in every locale', () => {
-    const expected = [...plannerLockedReference.keys()].sort()
+  // Replaces 5.5-I18N-MOB-03 (the plannerLocked tree parity): CC-7.12 D10 removed the lock panel,
+  // so no catalog may carry its strings, and nothing else reads them (7.12-NAT-032).
+  it('[7.12-UNIT-071] 5.5-I18N-MOB-03 ships no plannerLocked tree in any locale', () => {
     for (const locale of SUPPORTED_LOCALES) {
-      const actual = [
-        ...flatten(subtree(CATALOGS[locale], 'plannerLocked')).keys(),
-      ].sort()
-      expect(actual, `${locale} plannerLocked key tree`).toEqual(expected)
+      const commerce = (CATALOGS[locale].commerce ?? {}) as Record<string, unknown>
+      const premium = (commerce.premium ?? {}) as Record<string, unknown>
+      expect(premium, `${locale} commerce.premium`).not.toHaveProperty('plannerLocked')
+      expect(flatten(subtree(CATALOGS[locale], 'plannerLocked')).size, locale).toBe(0)
     }
   })
 
@@ -128,13 +132,6 @@ describe('5.5 mobile planner locale parity', () => {
           placeholders(englishValue)
         )
       }
-      const plannerLocked = flatten(subtree(CATALOGS[locale], 'plannerLocked'))
-      for (const [key, englishValue] of plannerLockedReference) {
-        expect(
-          placeholders(plannerLocked.get(key) ?? ''),
-          `${locale} plannerLocked.${key}`
-        ).toEqual(placeholders(englishValue))
-      }
     }
   })
 
@@ -145,12 +142,6 @@ describe('5.5 mobile planner locale parity', () => {
         .filter(([key, englishValue]) => planner.get(key) === englishValue)
         .map(([key]) => key)
       expect(untranslatedPlanner, `${locale} untranslated planner keys`).toEqual([])
-
-      const plannerLocked = flatten(subtree(CATALOGS[locale], 'plannerLocked'))
-      const untranslatedLocked = [...plannerLockedReference.entries()]
-        .filter(([key, englishValue]) => plannerLocked.get(key) === englishValue)
-        .map(([key]) => key)
-      expect(untranslatedLocked, `${locale} untranslated plannerLocked keys`).toEqual([])
     }
   })
 
@@ -158,9 +149,6 @@ describe('5.5 mobile planner locale parity', () => {
     for (const locale of SUPPORTED_LOCALES) {
       for (const [key, value] of flatten(subtree(CATALOGS[locale], 'planner'))) {
         expect(value.trim().length, `${locale} planner.${key}`).toBeGreaterThan(0)
-      }
-      for (const [key, value] of flatten(subtree(CATALOGS[locale], 'plannerLocked'))) {
-        expect(value.trim().length, `${locale} plannerLocked.${key}`).toBeGreaterThan(0)
       }
     }
   })

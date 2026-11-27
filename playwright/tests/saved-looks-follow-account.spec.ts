@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-account
 // Learning path Step 61: Import device-saved looks for the same member.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-61-import-device-saved-looks-for-the-same-member
+// Story CC-7.12 (Step 69): the Closet saved looks row is gone, so saved looks are read, reopened
+// and removed from the Looks Saved tiles and the /looks/saved/ID screen.
 import { PrismaClient } from '@prisma/client'
 import { interceptNetworkCall as interceptOnPage } from '@seontechnologies/playwright-utils/intercept-network-call'
 import {
@@ -91,6 +93,23 @@ function trackCreatedSavedLookIds(
       }
     }
   })
+}
+
+type SpecPage = Parameters<typeof interceptOnPage>[0]['page']
+
+/** The slot item ids the saved look's own screen lists, in order (CC-7.12 D5). */
+function detailSlotOrder(page: SpecPage) {
+  return page
+    .getByTestId('saved-look-detail')
+    .locator('[data-slot-item-id]')
+    .evaluateAll((els) => els.map((el) => el.getAttribute('data-slot-item-id') ?? ''))
+}
+
+/** Opens a Saved tile and lands on its screen (CC-7.12 D5: `?from=` names the filter). */
+async function openSavedTile(page: SpecPage, id: string) {
+  await page.getByTestId(`saved-look-card-${id}`).click()
+  await expect(page).toHaveURL(new RegExp(`/looks/saved/${id}\\?from=all$`))
+  await expect(page.getByTestId('saved-look-detail')).toBeVisible()
 }
 
 async function cleanupCreatedSavedLooks(
@@ -191,25 +210,22 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           const secondPage = await secondContext.newPage()
           trackCreatedSavedLookIds(secondPage, createdIds, capturedCompositions)
           stubReadyGarmentWithPhoto(secondPage, garmentId)
-          await secondPage.goto(`${baseURL}/wardrobe`)
-
-          // Member opens the Saved looks row in Closet in Context 2 (blocked storage). Story
-          // CC-7.11 D4: the row now sits below the garment grid.
-          const savedLooksRow = secondPage.getByTestId('closet-saved-looks-row')
-          await expect(savedLooksRow).toBeVisible()
-          await savedLooksRow.click()
-
-          // Verify exact stored composition slot IDs and ordering in Context 2.
+          // Story CC-7.12 D1: Looks opens on Saved in Context 2 (blocked storage), since the
+          // member has a saved look; the look is a tile there.
+          await secondPage.goto(`${baseURL}/looks`)
+          await expect(secondPage.getByTestId('looks-segment-saved')).toHaveAttribute(
+            'aria-selected',
+            'true'
+          )
           const card = secondPage.getByTestId(`saved-look-card-${firstSavedId}`)
           await expect(card).toBeVisible()
-          const renderedOrder = await card
-            .locator('[data-slot-item-id]')
-            .evaluateAll((els) =>
-              els.map((el) => el.getAttribute('data-slot-item-id') ?? '')
-            )
-          expect(renderedOrder).toEqual(expectedOrder)
 
-          await card.getByTestId('saved-look-reopen').click()
+          // Verify exact stored composition slot IDs and ordering in Context 2, on the look's
+          // own screen (D5).
+          await openSavedTile(secondPage, firstSavedId)
+          expect(await detailSlotOrder(secondPage)).toEqual(expectedOrder)
+
+          await secondPage.getByTestId('saved-look-reopen').click()
           const reopenedDialog = secondPage.getByRole('dialog', {
             name: 'Style this piece',
           })
@@ -224,16 +240,24 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           // Close dialog, remove this specific saved look, reload, and confirm it is gone.
           await reopenedDialog.getByRole('button', { name: 'Close' }).click()
           await expect(reopenedDialog).toBeHidden()
-          await card.getByTestId('saved-look-remove').click()
-          await expect(card).toBeHidden()
+          // D5, P10: Remove on the look's screen returns to Saved (the tile's filter) with Undo.
+          await secondPage.getByTestId('saved-look-detail-remove').click()
+          await expect(secondPage).toHaveURL(/\/looks$/)
+          await expect(secondPage.getByTestId('status-bar-action-undo')).toBeVisible()
+          await expect(card).toHaveCount(0)
 
           await secondPage.reload()
-          await secondPage.getByTestId('closet-saved-looks-row').click()
+          await expect(secondPage.getByTestId('looks-first-content')).toBeVisible()
           await expect(
             secondPage.getByTestId(`saved-look-card-${firstSavedId}`)
           ).toHaveCount(0)
+          // A deep link to the removed look reads like a removed one (D5).
+          await secondPage.goto(`${baseURL}/looks/saved/${firstSavedId}`)
+          await expect(secondPage.getByTestId('saved-look-detail-gone')).toBeVisible()
 
           // Verify saving and reloading directly inside the storage-blocked context (AC 3 & AC 6).
+          // Style this piece still opens from the Closet.
+          await secondPage.goto(`${baseURL}/wardrobe`)
           await secondPage.getByTestId('style-piece-open').first().click()
           const blockedDialog = secondPage.getByRole('dialog', {
             name: 'Style this piece',
@@ -248,11 +272,15 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           await expect.poll(() => createdIds.size).toBe(2)
           const secondSavedId = Array.from(createdIds)[1]!
           await blockedDialog.getByRole('button', { name: 'Close' }).click()
-          await secondPage.reload()
-          await secondPage.getByTestId('closet-saved-looks-row').click()
+          // A fresh document load of Looks reads the new look back from the account.
+          await secondPage.goto(`${baseURL}/looks`)
           await expect(
             secondPage.getByTestId(`saved-look-card-${secondSavedId}`)
           ).toBeVisible()
+          await openSavedTile(secondPage, secondSavedId)
+          expect(await detailSlotOrder(secondPage)).toEqual(
+            capturedCompositions.get(secondSavedId)
+          )
         } finally {
           await secondContext.close()
         }
@@ -268,7 +296,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
   )
 
   test(
-    '[P1] saves a Home sample look into the same account list and opens it in exact slot order from Closet Saved looks @local-lane',
+    '[P1] saves a Home sample look into the same account list and opens it in exact slot order from Looks Saved @local-lane',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ apiRequest, baseURL, browser, capsuleSession, page }) => {
       const apiBaseUrl = wardrobeOnboardingEnvironment.apiBaseUrl
@@ -314,24 +342,29 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
           await seedWebSession(secondContext, capsuleSession.accessToken)
           const secondPage = await secondContext.newPage()
           stubReadyGarmentWithPhoto(secondPage, SEEDED_GARMENT_IDS[0])
-          await secondPage.goto(`${baseURL}/wardrobe`)
-
-          await secondPage.getByTestId('closet-saved-looks-row').click()
+          // Story CC-7.12 D4: the Today filter holds the Home sample look.
+          await secondPage.goto(`${baseURL}/looks?segment=saved&filter=today`)
           const card = secondPage.getByTestId(`saved-look-card-${homeSavedId}`)
-          await expect(card).toContainText('From sample idea')
-          await card.getByTestId('saved-look-reopen').click()
+          await expect(card).toHaveAttribute(
+            'href',
+            `/looks/saved/${homeSavedId}?from=today`
+          )
+          await card.click()
+          await expect(secondPage).toHaveURL(
+            new RegExp(`/looks/saved/${homeSavedId}\\?from=today$`)
+          )
+          const detail = secondPage.getByTestId('saved-look-detail')
+          await expect(detail).toContainText('From sample idea')
+          expect(await detailSlotOrder(secondPage)).toEqual(expectedOrder)
+          // Only a Style this piece look reopens in an editor; a Home sample look stays here.
+          await expect(secondPage.getByTestId('saved-look-reopen')).toHaveCount(0)
 
-          const modal = secondPage.getByTestId('saved-look-detail-modal')
-          await expect(modal).toBeVisible()
-          const modalOrder = await modal
-            .locator('[data-slot-item-id]')
-            .evaluateAll((els) =>
-              els.map((el) => el.getAttribute('data-slot-item-id') ?? '')
-            )
-          expect(modalOrder).toEqual(expectedOrder)
-
+          // P10: Remove returns to the filter the look was opened from, and Undo restores it.
           await secondPage.getByTestId('saved-look-detail-remove').click()
+          await expect(secondPage).toHaveURL(/\/looks\?segment=saved&filter=today$/)
           await expect(card).toHaveCount(0)
+          await secondPage.getByTestId('status-bar-action-undo').click()
+          await expect(card).toBeVisible()
         } finally {
           await secondContext.close()
         }
@@ -524,19 +557,23 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         trackCreatedSavedLookIds(importPage, createdIds)
         stubReadyGarmentWithPhoto(importPage, garmentId)
 
-        await importPage.goto(`${baseURL}/wardrobe`)
+        // Story CC-7.12: the Closet no longer reads saved looks, so the import starts from the
+        // Looks Saved read. Saved is named in the address: the default segment is chosen on the
+        // first read, which may answer before the import lands.
+        const savedTiles = importPage.locator('[data-testid^="saved-look-card-"]')
+        await importPage.goto(`${baseURL}/looks?segment=saved`)
         await expect.poll(() => createdIds.size).toBe(3)
         await expect.poll(() => postStatuses.includes(404)).toBe(true)
 
-        const savedLooksRow = importPage.getByTestId('closet-saved-looks-row')
-        await expect(savedLooksRow).toBeVisible()
-        await expect(savedLooksRow).toContainText('3 saved')
-        await savedLooksRow.click()
-
+        // The import's change notice refreshes Saved: exactly the three imported looks.
+        await expect(savedTiles).toHaveCount(3)
         for (const id of createdIds) {
           await expect(importPage.getByTestId(`saved-look-card-${id}`)).toBeVisible()
         }
-        await expect(importPage.getByTestId('saved-look-needs-review')).toBeVisible()
+        // The unresolvable bookmark is the one tile whose state line reads Needs review (D2).
+        await expect(
+          savedTiles.and(importPage.getByRole('link', { name: /, Needs review$/ }))
+        ).toHaveCount(1)
 
         // Same-member device keys are removed while guest preview and teen-2 keys remain byte-for-byte intact
         await expect
@@ -571,9 +608,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         // Reloading settles with the exact same 3 account IDs and zero duplicate imports
         const expectedIds = [...createdIds].sort()
         await importPage.reload()
-        const reloadedRow = importPage.getByTestId('closet-saved-looks-row')
-        await expect(reloadedRow).toContainText('3 saved')
-        await reloadedRow.click()
+        await expect(savedTiles).toHaveCount(3)
         for (const id of expectedIds) {
           await expect(importPage.getByTestId(`saved-look-card-${id}`)).toBeVisible()
         }
@@ -608,7 +643,7 @@ test.describe('Saved looks follow the account (CC-7.2)', () => {
         )
         trackCreatedSavedLookIds(member2Page, otherCreatedIds)
         stubReadyGarmentWithPhoto(member2Page, otherMemberGarmentId)
-        await member2Page.goto(`${baseURL}/wardrobe`)
+        await member2Page.goto(`${baseURL}/looks?segment=saved`)
         await expect.poll(() => otherCreatedIds.size).toBe(2)
 
         await expect

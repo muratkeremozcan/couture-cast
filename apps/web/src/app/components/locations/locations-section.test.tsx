@@ -6,7 +6,8 @@
 // time and keyboard presses land on the focused element, as they do for a reader.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-// Story CC-7.11 test owner (TEA): guided city setup from the planner returns to /looks/plan (D9).
+// Story CC-7.11 test owner (TEA): guided city setup from the planner returns to the planner (D9;
+// Story CC-7.12 D11: the Looks Plan segment, /looks?segment=plan, its query kept).
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
@@ -658,7 +659,10 @@ describe('LocationsSection', () => {
 
   it('finds a city that was saved before the response failed and returns to Planner on retry', async () => {
     signIn()
-    searchParams = new URLSearchParams({ addLocation: '1', returnTo: '/looks/plan' })
+    searchParams = new URLSearchParams({
+      addLocation: '1',
+      returnTo: '/looks?segment=plan',
+    })
     const lists = vi.fn(() => HttpResponse.json({ data: saved }))
     const save = vi.fn(() => {
       saved = [location({ label: CANDIDATE.city })]
@@ -681,13 +685,15 @@ describe('LocationsSection', () => {
     expect(push).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Try again' }))
 
-    await waitFor(() => expect(push).toHaveBeenCalledExactlyOnceWith('/looks/plan'))
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledExactlyOnceWith('/looks?segment=plan')
+    )
     expect(lists).toHaveBeenCalledTimes(2)
     expect(save).toHaveBeenCalledTimes(1)
   })
 
   it.each([
-    ['/looks/plan', '/looks/plan'],
+    ['/looks?segment=plan', '/looks?segment=plan'],
     ['//evil.example', '/'],
   ])(
     'cancels guided city setup from %s without saving a selected city',

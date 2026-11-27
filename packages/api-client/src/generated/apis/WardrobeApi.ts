@@ -103,6 +103,7 @@ export interface ApiV1WardrobeOwnerUserIdCapsulesGetRequest {
   isFavorite?: boolean
   garmentId?: string
   comfortRange?: ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum
+  sort?: ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum
   limit?: number
   offset?: number | null
 }
@@ -116,6 +117,7 @@ export interface ApiV1WardrobeOwnerUserIdCapsulesPostRequest {
 export interface ApiV1WardrobeSavedLooksGetRequest {
   source?: ApiV1WardrobeSavedLooksGetSourceEnum
   anchorGarmentId?: string
+  sort?: ApiV1WardrobeSavedLooksGetSortEnum
   limit?: number
   offset?: number | null
 }
@@ -1133,6 +1135,10 @@ export class WardrobeApi extends runtime.BaseAPI {
       queryParameters['comfortRange'] = requestParameters['comfortRange']
     }
 
+    if (requestParameters['sort'] != null) {
+      queryParameters['sort'] = requestParameters['sort']
+    }
+
     if (requestParameters['limit'] != null) {
       queryParameters['limit'] = requestParameters['limit']
     }
@@ -1290,6 +1296,10 @@ export class WardrobeApi extends runtime.BaseAPI {
 
     if (requestParameters['anchorGarmentId'] != null) {
       queryParameters['anchorGarmentId'] = requestParameters['anchorGarmentId']
+    }
+
+    if (requestParameters['sort'] != null) {
+      queryParameters['sort'] = requestParameters['sort']
     }
 
     if (requestParameters['limit'] != null) {
@@ -2112,9 +2122,25 @@ export type ApiV1WardrobeOwnerUserIdCapsulesGetComfortRangeEnum =
 /**
  * @export
  */
+export const ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum = {
+  created_desc: 'created_desc',
+} as const
+export type ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum =
+  (typeof ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum)[keyof typeof ApiV1WardrobeOwnerUserIdCapsulesGetSortEnum]
+/**
+ * @export
+ */
 export const ApiV1WardrobeSavedLooksGetSourceEnum = {
   style_piece: 'style_piece',
   home_sample: 'home_sample',
 } as const
 export type ApiV1WardrobeSavedLooksGetSourceEnum =
   (typeof ApiV1WardrobeSavedLooksGetSourceEnum)[keyof typeof ApiV1WardrobeSavedLooksGetSourceEnum]
+/**
+ * @export
+ */
+export const ApiV1WardrobeSavedLooksGetSortEnum = {
+  created_desc: 'created_desc',
+} as const
+export type ApiV1WardrobeSavedLooksGetSortEnum =
+  (typeof ApiV1WardrobeSavedLooksGetSortEnum)[keyof typeof ApiV1WardrobeSavedLooksGetSortEnum]

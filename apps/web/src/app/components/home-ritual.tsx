@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -33,6 +34,7 @@ import {
   type SampleOutfitResult,
   type StatusBarNoticeInput,
 } from '@couture/utils'
+import { savedLookHref } from './looks/looks-address'
 import { getI18n } from '../../i18n'
 import { formatPlannerTemperature } from '../../lib/planner'
 import { captureLocationCredentials, listLocationsFromWeb } from '../../lib/locations'
@@ -191,6 +193,7 @@ function SampleOutfitInner({
   actions: ReactNode
 }) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
+  const router = useRouter()
   const statusBar = useStatusBar()
   const [result, setResult] = useState(() =>
     retainedSample?.owner === owner ? retainedSample.result : createMemberSampleOutfit()
@@ -203,6 +206,8 @@ function SampleOutfitInner({
   savedLooksRef.current = savedLooks
   const saveAttemptKeysRef = useRef<Map<string, string>>(new Map())
   const lastCreatedRef = useRef<SavedLookContract | null>(null)
+  /** Story CC-7.12 D7: the look the last accepted save confirmed, created or existing. */
+  const viewLookIdRef = useRef<string | null>(null)
   const saveRunSeqRef = useRef(0)
   const deletedIdsRef = useRef<Set<string>>(new Set())
   const mutationVersionRef = useRef(0)
@@ -458,7 +463,10 @@ function SampleOutfitInner({
             )
             if (!bookmarkOwnerMounted.current || !isLiveOwner(owner)) return false
             if (verified) {
-              if (saveRunSeqRef.current === saveSeq) lastCreatedRef.current = null
+              if (saveRunSeqRef.current === saveSeq) {
+                lastCreatedRef.current = null
+                viewLookIdRef.current = existingMatch.id
+              }
               setBookmarksPersistent(true)
               return { saved: true, undoable: false }
             }
@@ -489,6 +497,7 @@ function SampleOutfitInner({
           mutationVersionRef.current += 1
           if (saveRunSeqRef.current === saveSeq) {
             lastCreatedRef.current = created
+            viewLookIdRef.current = created.id
           }
           const next = [
             created,
@@ -527,9 +536,10 @@ function SampleOutfitInner({
           return true
         }}
         onViewSaved={() => {
-          document
-            .querySelector<HTMLElement>('[data-testid="sample-saved-looks"]')
-            ?.scrollIntoView?.({ block: 'nearest' })
+          // Story CC-7.12 D7: View opens the saved look in Looks.
+          // Codex #1: a save that confirmed an existing look views that look.
+          const id = viewLookIdRef.current
+          if (id) router.push(savedLookHref(id))
         }}
         onOpen={(bookmark) => {
           const selected = bookmark as SampleBookmark & {

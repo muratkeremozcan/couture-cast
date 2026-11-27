@@ -280,7 +280,7 @@ describe('the planner keeps a failed recheck retryable and closes every read', (
     await failRecheck(0)
     expect(await screen.findByTestId('planner-rail-error')).toBeInTheDocument()
     expect(await screen.findByTestId('planner-rail-retry')).toBeInTheDocument()
-    expect(screen.queryByTestId('planner-rail-locked')).toBeNull()
+    expect(screen.queryByTestId('plan-free-preview')).toBeNull()
 
     publish('token-1b')
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()

@@ -1,224 +1,563 @@
-// Story CC-7.11 D8 owner: the Looks tab. It opens on the member's saved looks (the same list the
-// Closet row shows, read through useSavedLooks), then a Capsules row and a Plan row. With no saved
-// looks it shows one line and the two rows. Segments, filters and Ideas are CC-7.12's.
-// Learning path Step 68: Five-tab navigation and back pattern.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-import { router, useFocusEffect, type Href } from 'expo-router'
+// Story CC-7.11 D8 owner: the Looks tab.
+// Story CC-7.12 D1 to D4, D9, D10, D13: three segments, Saved, Ideas and Plan, in the tab params
+// (`segment`, `filter`; a change is `setParams`). With no segment, Looks opens on Saved when the
+// member has a saved look or capsule and on Ideas otherwise, decided once per entry after both
+// first reads settle (TEA P1). Saved is one newest-first tile grid with All, Today and Capsules,
+// each read from the server (P2); Ideas shows the sample looks; Plan holds the planner, whose
+// locked states show the free preview. `looks-first-content` marks the open segment's first block.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
-  type ComponentRef,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import type {
-  GarmentItemContract,
-  SavedLookContract,
-} from '@couture/api-client/contracts/http'
-import type { StylePieceSelection } from '@couture/utils'
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import {
+  LOOKS_FILTERS,
+  LOOKS_SEGMENTS,
+  looksIdeas,
+  parseLooksFilter,
+  parseLooksSegment,
+  type LooksFilter,
+  type LooksSegment,
+} from '@couture/utils'
 import { ScreenGate } from '@/src/components/screen-gate'
+import { ShellIcon } from '@/src/components/shell-icons'
+import { PlannerBody } from '@/src/features/premium/planner-screen'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
-  resolveMobileAccessToken,
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import { onWardrobeChanged } from '@/src/lib/wardrobe-changes'
-import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
-import { ShellIcon } from '@/src/components/shell-icons'
 import { TAB_BODY_INSET, useTokens } from '@/src/theme/tokens'
-import { ClosetSavedLooksRow } from '@/src/features/wardrobe/saved-looks-row'
-import {
-  focusStylePieceControl,
-  StylePiecePanel,
-} from '@/src/features/wardrobe/style-piece-panel'
-import { useSavedLooks } from '@/src/features/wardrobe/use-saved-looks'
+import { savedLookRoute } from './looks-routes'
+import { CapsuleTile, IdeaTile, LooksTileGrid, SavedLookTile } from './looks-tile'
+import { useLooksFeed, type LooksFeedState } from './use-looks-feed'
 
-/** One member's Looks tab; a sign-in, sign-out or account switch mounts a fresh one. */
+/**
+ * One member's Looks tab; a sign-in, sign-out or account switch mounts a fresh one, so the
+ * first paint after a member change holds no tile of the previous member (CC-7.7 D5, TEA P9).
+ */
+/** A member latched on Ideas now has a first look in the All feed (fable review P2). */
+function isFirstSave(state: {
+  defaultSegment: LooksSegment | null
+  addressSegment: LooksSegment | null
+  filter: LooksFilter
+  owner: string | null
+  feed: { settled: boolean; failed: boolean; hasItems: boolean }
+}): boolean {
+  const latchedOnIdeas =
+    state.defaultSegment === 'ideas' &&
+    state.addressSegment === null &&
+    state.filter === 'all'
+  const firstLook = state.feed.settled && !state.feed.failed && state.feed.hasItems
+  return latchedOnIdeas && state.owner !== null && firstLook
+}
+
+/** Codex #11: whether Saved holds nothing at all, known from the All feed (or any item seen). */
+function useAllEmpty(
+  feed: { settled: boolean; failed: boolean; hasItems: boolean },
+  filter: LooksFilter
+): boolean | null {
+  // Codex round 4 #2: derived in render, so the first frame that shows the Ideas grid already
+  // knows whether the first-save line goes above it. An item seen in any filter rules it out.
+  const [seenItems, setSeenItems] = useState(false)
+  useEffect(() => {
+    if (feed.hasItems) setSeenItems(true)
+  }, [feed.hasItems])
+  if (feed.hasItems || seenItems) return false
+  if (filter === 'all' && feed.settled && !feed.failed) return true
+  return null
+}
+
 export function LooksScreen() {
   const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
   return <MemberLooks key={epoch} epoch={epoch} />
 }
 
-/**
- * The member's garments, for reopening a Style piece look in its editor (the editor needs the
- * anchor piece). The Looks gate never waits on it: without it a look opens in its detail.
- */
-function useClosetGarments(owner: string | null, epoch: number) {
-  const [garments, setGarments] = useState<GarmentItemContract[]>([])
-  const [attempt, setAttempt] = useState(0)
-
-  const loadInventory = useCallback(
-    async (signal?: AbortSignal) => {
-      const token = await resolveMobileAccessToken()
-      if (!token || signal?.aborted || epoch !== mobileIdentityEpoch()) return null
-      const next = await listGarmentsFromMobile(token, signal)
-      if (signal?.aborted || epoch !== mobileIdentityEpoch()) return null
-      setGarments(next)
-      return next
-    },
-    [epoch]
-  )
-
-  useEffect(() => {
-    if (!owner) {
-      setGarments([])
-      return
-    }
-    const controller = new AbortController()
-    void loadInventory(controller.signal).catch(() => undefined)
-    return () => controller.abort()
-  }, [attempt, loadInventory, owner])
-
-  const reload = useCallback(() => setAttempt((value) => value + 1), [])
-  return { garments, loadInventory, reload }
-}
-
 function MemberLooks({ epoch }: { epoch: number }) {
-  const { t, i18n } = useTranslation()
-  const { colors, shell, space, type } = useTokens()
+  const { colors, space } = useTokens()
   const owner = mobileApplicationUserId()
-  const looks = useSavedLooks({ owner, epoch })
-  const closet = useClosetGarments(owner, epoch)
-  const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
-  const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
-  const [styleClosing, setStyleClosing] = useState(false)
-  const styleOpener = useRef<ComponentRef<typeof Pressable> | null>(null)
+  const params = useLocalSearchParams<{ segment?: string; filter?: string }>()
+  const addressSegment = parseLooksSegment(params.segment)
+  const filter = parseLooksFilter(params.filter)
+  const feed = useLooksFeed({ owner, epoch, filter })
 
-  // A tag edit or a delete elsewhere changes which looks can reopen and their status.
-  const { reload: reloadLooks } = looks
-  const { reload: reloadCloset } = closet
+  // P1: decided once per entry; removing the last look while on Saved keeps Saved. A Today or
+  // Capsules filter in the address belongs to Saved, so it opens Saved; an empty filtered feed
+  // never says the member has nothing (Codex #11).
+  const [defaultSegment, setDefaultSegment] = useState<LooksSegment | null>(() =>
+    owner ? (filter === 'all' ? null : 'saved') : 'ideas'
+  )
+  useEffect(() => {
+    if (defaultSegment || addressSegment || filter !== 'all' || !feed.settled) return
+    setDefaultSegment(feed.failed || feed.hasItems ? 'saved' : 'ideas')
+  }, [addressSegment, defaultSegment, filter, feed.failed, feed.hasItems, feed.settled])
+
+  const allEmpty = useAllEmpty(feed, filter)
+
+  const segment = addressSegment ?? defaultSegment
+  // TEA M2: Saved and Ideas both wait for the first reads, so Ideas' first-save line never
+  // lands above a grid already on screen (a CC-7.7 shift).
+  const ready = segment !== null && (segment === 'plan' || feed.settled)
+
+  // A tag edit or a garment delete elsewhere changes a look's state line.
+  const { reload } = feed
   useEffect(
     () =>
       onWardrobeChanged(() => {
-        if (epoch !== mobileIdentityEpoch()) return
-        reloadCloset()
-        reloadLooks()
+        if (epoch === mobileIdentityEpoch()) reload()
       }),
-    [epoch, reloadCloset, reloadLooks]
+    [epoch, reload]
   )
 
-  // Tabs stay mounted, so a return to Looks is a focus: it reads the looks again in place, and
-  // the list and its scroll offset stay (as the Closet does, CC-7.7 D5).
+  // Tabs stay mounted, so a return to Looks is a focus: it reads the feed again in place, and
+  // the tiles and the scroll offset stay (as the Closet does, CC-7.7 D5).
   const leftRef = useRef(false)
+  // Fable review P2: Looks latched on Ideas for a member with nothing saved switches to Saved
+  // once a first look exists, while the tab is away or as it comes back, never under the finger.
+  const firstSaveRef = useRef(false)
+  firstSaveRef.current = isFirstSave({
+    defaultSegment,
+    addressSegment,
+    filter,
+    owner,
+    feed,
+  })
+  // TEA N2: the refetch a return starts can land after the tab is back; that read may switch
+  // too, unless the member picked a segment on this visit (the address then holds it).
+  const refocusReadRef = useRef(false)
+  useEffect(() => {
+    if (firstSaveRef.current && (leftRef.current || refocusReadRef.current))
+      setDefaultSegment('saved')
+  }, [feed.hasItems, feed.settled])
   useFocusEffect(
     useCallback(() => {
-      if (leftRef.current && epoch === mobileIdentityEpoch()) reloadLooks()
+      refocusReadRef.current = leftRef.current
+      if (leftRef.current && epoch === mobileIdentityEpoch()) reload()
+      if (leftRef.current && firstSaveRef.current) setDefaultSegment('saved')
       leftRef.current = false
       return () => {
         leftRef.current = true
       }
-    }, [epoch, reloadLooks])
+    }, [epoch, reload])
   )
 
-  const empty = looks.settled && looks.savedLooks.length === 0 && !looks.error
-  const row = [
-    styles.row,
-    {
-      minHeight: shell.touchTarget,
-      gap: space[3],
-      paddingVertical: space[3],
-      borderBottomColor: colors.line,
-    },
-  ]
-  const rowText = { color: colors.ink, fontSize: type.base.fontSize }
-  const linkRow = (testID: string, label: string, href: Href) => (
+  // A new segment or filter starts at its top.
+  const scrollRef = useRef<ScrollView | null>(null)
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false })
+  }, [segment, filter])
+
+  return (
+    <View style={styles.screen} testID="looks-screen">
+      <ScreenGate screen="looks" ready={ready} style={styles.gate}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.content,
+            { paddingVertical: space[4], gap: space[4] },
+          ]}
+        >
+          {segment ? (
+            <>
+              <SegmentControl
+                segment={segment}
+                onSelect={(next) => router.setParams({ segment: next })}
+              />
+              {segment === 'saved' ? (
+                <SavedPanel
+                  owner={owner}
+                  filter={filter}
+                  feed={feed}
+                  onFilter={(next) =>
+                    router.setParams({ segment: 'saved', filter: next })
+                  }
+                />
+              ) : null}
+              {segment === 'ideas' ? (
+                <IdeasSegment
+                  pending={owner !== null && !feed.settled}
+                  showEmptyLine={!owner || allEmpty === true}
+                />
+              ) : null}
+              {segment === 'plan' ? (
+                <View testID="looks-first-content" style={{ gap: space[3] }}>
+                  <PlannerBody />
+                </View>
+              ) : null}
+            </>
+          ) : (
+            // Codex #6: the gate's deadline opened it before the first reads answered; the
+            // default segment waits for them, so the member sees their progress meanwhile.
+            <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
+              <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
+            </View>
+          )}
+        </ScrollView>
+      </ScreenGate>
+    </View>
+  )
+}
+
+/**
+ * Codex round 3 #2: when the gate's deadline opens Ideas before the first reads answer, it shows
+ * progress, so the first-save line never lands above a grid already on screen.
+ */
+function IdeasSegment({
+  pending,
+  showEmptyLine,
+}: {
+  pending: boolean
+  showEmptyLine: boolean
+}) {
+  const { colors, space } = useTokens()
+  if (!pending) return <IdeasPanel showEmptyLine={showEmptyLine} />
+  return (
+    <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
+      <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
+    </View>
+  )
+}
+
+/** D1: Saved, Ideas and Plan as tabs. Not pill shaped, so the CC-7.10 guard sees no chip row. */
+function SegmentControl({
+  segment,
+  onSelect,
+}: {
+  segment: LooksSegment
+  onSelect: (segment: LooksSegment) => void
+}) {
+  const { t } = useTranslation()
+  const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  return (
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={t('looks.segments.label')}
+      testID="looks-segments"
+      style={[
+        styles.segments,
+        { borderRadius: radius.md, borderColor: colors.lineStrong, padding: space[0.5] },
+      ]}
+    >
+      {LOOKS_SEGMENTS.map((id) => {
+        const selected = id === segment
+        return (
+          <Pressable
+            key={id}
+            testID={`looks-segment-${id}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            aria-selected={selected}
+            onPress={() => {
+              if (!selected) onSelect(id)
+            }}
+            style={[
+              styles.segment,
+              {
+                minHeight: shell.touchTarget,
+                borderRadius: radius.sm,
+                backgroundColor: selected ? colors.inverse : undefined,
+              },
+            ]}
+          >
+            <Text
+              style={{
+                color: selected ? colors.onInverse : colors.ink,
+                fontSize: type.sm.fontSize,
+                fontWeight: selected ? fontWeight.semibold : fontWeight.medium,
+              }}
+            >
+              {t(`looks.segments.${id}`)}
+            </Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** D4: one chip row, each filter its own feed. */
+function FilterChips({
+  filter,
+  onSelect,
+}: {
+  filter: LooksFilter
+  onSelect: (filter: LooksFilter) => void
+}) {
+  const { t } = useTranslation()
+  const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  return (
+    <View
+      role="group"
+      accessibilityLabel={t('looks.filters.label')}
+      testID="looks-filters"
+      style={[styles.chips, { gap: space[2] }]}
+    >
+      {LOOKS_FILTERS.map((id) => {
+        const pressed = id === filter
+        return (
+          <Pressable
+            key={id}
+            testID={`looks-filter-${id}`}
+            accessibilityRole="button"
+            accessibilityState={{ selected: pressed }}
+            aria-pressed={pressed}
+            onPress={() => {
+              if (!pressed) onSelect(id)
+            }}
+            style={[
+              styles.chip,
+              {
+                minHeight: shell.touchTarget,
+                borderRadius: radius.full,
+                paddingHorizontal: space[4],
+                borderColor: pressed ? colors.inverse : colors.lineStrong,
+                backgroundColor: pressed ? colors.inverse : colors.page,
+              },
+            ]}
+          >
+            <Text
+              style={{
+                color: pressed ? colors.onInverse : colors.ink,
+                fontSize: type.sm.fontSize,
+                fontWeight: pressed ? fontWeight.semibold : fontWeight.medium,
+              }}
+            >
+              {t(`looks.filters.${id}`)}
+            </Text>
+          </Pressable>
+        )
+      })}
+    </View>
+  )
+}
+
+/** A neutral outline control (Load more, Retry, Sign in): the screen's primary is Plan's alone. */
+function OutlineButton({
+  label,
+  testID,
+  disabled = false,
+  onPress,
+}: {
+  label: string
+  testID: string
+  disabled?: boolean
+  onPress: () => void
+}) {
+  const { colors, radius, shell, space, type, fontWeight } = useTokens()
+  return (
     <Pressable
       testID={testID}
-      accessibilityRole="link"
-      style={row}
-      onPress={() => router.push(href)}
+      accessibilityRole="button"
+      aria-disabled={disabled}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.outline,
+        {
+          minHeight: shell.touchTarget,
+          borderRadius: radius.md,
+          borderColor: colors.lineStrong,
+          paddingHorizontal: space[3],
+          opacity: disabled ? 0.6 : 1,
+        },
+      ]}
     >
-      <Text style={[styles.rowLabel, rowText]}>{label}</Text>
-      <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
+      <Text
+        style={{
+          color: colors.ink,
+          fontSize: type.sm.fontSize,
+          fontWeight: fontWeight.semibold,
+        }}
+      >
+        {label}
+      </Text>
     </Pressable>
   )
+}
+
+function SavedPanel({
+  owner,
+  filter,
+  feed,
+  onFilter,
+}: {
+  owner: string | null
+  filter: LooksFilter
+  feed: LooksFeedState
+  onFilter: (filter: LooksFilter) => void
+}) {
+  const { t } = useTranslation()
+  const { colors, radius, shell, space, type } = useTokens()
+  const line = { color: colors.inkMuted, fontSize: type.base.fontSize }
+
+  // Signed out: one line and one way to sign in; nothing is read.
+  if (!owner) {
+    return (
+      <View testID="looks-first-content" style={{ gap: space[3] }}>
+        <Text style={line}>{t('looks.detail.signIn')}</Text>
+        <OutlineButton
+          label={t('looks.detail.signInAction')}
+          testID="looks-sign-in"
+          onPress={() => router.push('/signin')}
+        />
+      </View>
+    )
+  }
+
+  const manage =
+    filter === 'capsules' ? (
+      <Pressable
+        testID="looks-manage-capsules"
+        accessibilityRole="link"
+        onPress={() => router.push('/wardrobe-capsules')}
+        style={[
+          styles.row,
+          {
+            minHeight: shell.touchTarget,
+            gap: space[3],
+            borderTopColor: colors.line,
+            borderBottomColor: colors.line,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.rowLabel, { color: colors.ink, fontSize: type.base.fontSize }]}
+        >
+          {t('looks.manageCapsules')}
+        </Text>
+        <ShellIcon name="forward" size={type.sm.fontSize} color={colors.inkMuted} />
+      </Pressable>
+    ) : null
+
+  let body
+  if (!feed.settled) {
+    // TEA T1: a new filter's first read is in flight; no tile of the previous filter shows.
+    body = (
+      <View testID="looks-first-content" style={{ paddingVertical: space[6] }}>
+        <ActivityIndicator testID="looks-feed-loading" color={colors.ink} />
+      </View>
+    )
+  } else if (feed.failed) {
+    body = (
+      <View
+        testID="looks-first-content"
+        accessibilityRole="alert"
+        style={[
+          {
+            gap: space[2],
+            padding: space[3],
+            borderRadius: radius.lg,
+            backgroundColor: colors.dangerSurface,
+          },
+        ]}
+      >
+        <Text style={{ color: colors.dangerInk }}>{t('savedLooks.loadFailed')}</Text>
+        <OutlineButton
+          label={t('savedLooks.retry')}
+          testID="saved-looks-retry"
+          onPress={feed.reload}
+        />
+      </View>
+    )
+  } else if (feed.view.entries.length === 0 && feed.view.next === null) {
+    const empty =
+      filter === 'today'
+        ? t('looks.filterEmpty.today')
+        : filter === 'capsules'
+          ? t('looks.filterEmpty.capsules')
+          : t('looks.empty')
+    body = (
+      <View testID="looks-first-content">
+        <Text testID="looks-filter-empty" style={line}>
+          {empty}
+        </Text>
+      </View>
+    )
+  } else {
+    body = (
+      <>
+        <View testID="looks-first-content">
+          <LooksTileGrid testID="looks-saved-grid">
+            {feed.view.entries.map((entry) =>
+              entry.kind === 'look' ? (
+                <SavedLookTile
+                  key={`look:${entry.id}`}
+                  look={entry.item}
+                  onPress={() => router.push(savedLookRoute(entry.id, filter))}
+                />
+              ) : (
+                <CapsuleTile
+                  key={`capsule:${entry.id}`}
+                  capsule={entry.item}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/wardrobe-capsules',
+                      params: { capsule: entry.id },
+                    })
+                  }
+                />
+              )
+            )}
+          </LooksTileGrid>
+        </View>
+        {feed.view.next !== null ? (
+          <OutlineButton
+            label={feed.loadingMore ? '…' : t('looks.loadMore')}
+            testID="saved-looks-load-more"
+            disabled={feed.loadingMore}
+            onPress={feed.loadMore}
+          />
+        ) : null}
+      </>
+    )
+  }
 
   return (
     <>
-      <View style={styles.screen} testID="looks-screen">
-        <ScreenGate screen="looks" ready={looks.settled} style={styles.gate}>
-          <ScrollView
-            contentContainerStyle={[
-              styles.content,
-              { paddingVertical: space[5], gap: space[6] },
-            ]}
-          >
-            {empty || !owner ? (
-              <Text
-                testID="looks-first-content"
-                style={{ color: colors.inkMuted, fontSize: type.base.fontSize }}
-              >
-                {t('looks.empty')}
-              </Text>
-            ) : (
-              <View testID="looks-first-content">
-                <ClosetSavedLooksRow
-                  variant="list"
-                  owner={owner}
-                  savedLooks={looks.savedLooks}
-                  totalCount={looks.total}
-                  hasMore={looks.hasMore}
-                  isLoadingMore={looks.loadingMore}
-                  onLoadMore={looks.loadMore}
-                  isLoading={looks.loading && !looks.settled}
-                  loadError={looks.error}
-                  garments={closet.garments}
-                  onRetry={reloadLooks}
-                  onChanged={reloadLooks}
-                  onReopenStylePiece={(look, opener) => {
-                    const anchor = closet.garments.find(
-                      (item) => item.id === look.anchorGarmentId
-                    )
-                    if (!anchor || !anchor.category || !anchor.comfortRange) return
-                    if (styleSelection) return
-                    styleOpener.current = opener
-                    setInitialSavedLook(look)
-                    setStyleSelection({
-                      id: anchor.id,
-                      category: anchor.category,
-                      comfortRange: anchor.comfortRange,
-                    })
-                  }}
-                />
-              </View>
-            )}
-            {/* Neutral rows: Looks has no primary action of its own. */}
-            <View style={[styles.rows, { borderTopColor: colors.line }]}>
-              {linkRow('looks-capsules-row', t('looks.capsules'), '/wardrobe-capsules')}
-              {linkRow('looks-plan-row', t('looks.plan'), '/planner')}
-            </View>
-          </ScrollView>
-        </ScreenGate>
-      </View>
-
-      {owner && styleSelection && (
-        <StylePiecePanel
-          selection={styleSelection}
-          initialSavedLook={initialSavedLook}
-          inWardrobe={closet.garments.some(({ id }) => id === styleSelection.id)}
-          loadInventory={closet.loadInventory}
-          visible={!styleClosing}
-          owner={owner}
-          epoch={epoch}
-          locale={i18n.language}
-          onSavedLooksChanged={reloadLooks}
-          onClose={() => setStyleClosing(true)}
-          onDismiss={() => {
-            setStyleSelection(null)
-            setInitialSavedLook(null)
-            setStyleClosing(false)
-            // D13: the Reopen that opened the editor takes focus back once it has gone.
-            const opener = styleOpener.current
-            styleOpener.current = null
-            requestAnimationFrame(() => focusStylePieceControl(opener))
-          }}
-        />
-      )}
+      <FilterChips filter={filter} onSelect={onFilter} />
+      {body}
+      {manage}
     </>
+  )
+}
+
+/** D9: the sample looks as picture tiles; with nothing saved, the one line comes first. */
+function IdeasPanel({ showEmptyLine }: { showEmptyLine: boolean }) {
+  const { t } = useTranslation()
+  const { colors, space, type } = useTokens()
+  const ideas = useMemo(() => looksIdeas(), [])
+  return (
+    <View testID="looks-first-content" style={{ gap: space[3] }}>
+      {showEmptyLine ? (
+        <Text
+          testID="looks-ideas-empty-line"
+          style={{ color: colors.inkMuted, fontSize: type.base.fontSize }}
+        >
+          {t('looks.empty')}
+        </Text>
+      ) : null}
+      <LooksTileGrid testID="looks-ideas-grid">
+        {ideas.map((idea) => (
+          <IdeaTile key={idea.look.id} idea={idea} />
+        ))}
+      </LooksTileGrid>
+    </View>
   )
 }
 
@@ -226,10 +565,15 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   gate: { flex: 1 },
   content: { paddingHorizontal: TAB_BODY_INSET },
-  rows: { borderTopWidth: StyleSheet.hairlineWidth },
+  segments: { flexDirection: 'row', borderWidth: 1 },
+  segment: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  chips: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  outline: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   rowLabel: { flex: 1 },

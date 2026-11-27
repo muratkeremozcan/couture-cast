@@ -60,7 +60,7 @@ export class PlannerRequestError extends Error {
 
 /**
  * Fallback for a call made with no session. Developer-facing, with no catalog entry:
- * the screen reads the `signed_out` reason and renders its own translated locked panel.
+ * the screen reads the `signed_out` reason and renders its translated free preview.
  */
 export const PLANNER_SIGNED_OUT_MESSAGE = 'Sign in to use the 7-day planner.'
 

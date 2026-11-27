@@ -4,6 +4,11 @@
 // (D11, P1, P8): entry positions stamped into `history.state` (`__ccIdx`), never URL equality
 // (Codex 7.11 #1). Browser proof: playwright/tests/sub-screen-back.spec.ts.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12: the sub-screens here are the saved look detail and the capsules manager (D5,
+// D6), and the legacy planner redirect lands on the Looks Plan segment (D11).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as AppHistory from './app-history'
 
@@ -105,12 +110,12 @@ afterEach(() => {
 
 describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
   it('a direct entry has nothing below it, and its router state is stamped in place', async () => {
-    const history = await loadDocument('/wardrobe/capsules')
+    const history = await loadDocument('/looks/capsules')
 
     expect(history.hasAppHistoryBelow()).toBe(false)
     expect(history.currentAppHistoryIndex()).toBe(0)
     expect(window.history.state).toEqual({
-      ...routerState('/wardrobe/capsules'),
+      ...routerState('/looks/capsules'),
       [history.APP_HISTORY_INDEX_KEY]: 0,
     })
   })
@@ -118,12 +123,12 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
   it('a push stamps the next position beside the router keys, so back stays in the app', async () => {
     const history = await loadDocument('/looks')
 
-    push('/wardrobe/capsules')
+    push('/looks/capsules')
 
     expect(history.hasAppHistoryBelow()).toBe(true)
     expect(history.currentAppHistoryIndex()).toBe(1)
     expect(window.history.state).toEqual({
-      ...routerState('/wardrobe/capsules'),
+      ...routerState('/looks/capsules'),
       __ccIdx: 1,
     })
   })
@@ -148,13 +153,13 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
     expect(history.hasAppHistoryBelow()).toBe(true)
   })
 
-  it('[Codex 7.11 #1] Plan opened directly, then Today, then Plan again: back from Plan goes to Today', async () => {
-    const history = await loadDocument('/looks/plan')
+  it('[Codex 7.11 #1] a saved look opened directly, then Today, then the look again: back from it goes to Today', async () => {
+    const history = await loadDocument('/looks/saved/sl-1')
     push('/')
-    push('/looks/plan')
+    push('/looks/saved/sl-1')
 
-    // The second Plan has two entries below it. The old URL stack read the repeat Plan URL as a
-    // pop to the first one, found nothing below and replaced to Looks.
+    // The second visit has two entries below it. The old URL stack read the repeat URL as a pop
+    // to the first one, found nothing below and replaced to Looks.
     expect(history.currentAppHistoryIndex()).toBe(2)
     expect(history.hasAppHistoryBelow()).toBe(true)
 
@@ -164,8 +169,10 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
     expect(history.hasAppHistoryBelow()).toBe(true)
 
     await back()
-    expect(window.location.pathname).toBe('/looks/plan')
-    expect(history.hasAppHistoryBelow(), 'the first Plan is the direct entry').toBe(false)
+    expect(window.location.pathname).toBe('/looks/saved/sl-1')
+    expect(history.hasAppHistoryBelow(), 'the first visit is the direct entry').toBe(
+      false
+    )
   })
 
   it('[Codex 7.11 #1] a visit to the URL two entries back is a push, never a pop', async () => {
@@ -206,12 +213,15 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
 
   it('a replace keeps the position of the entry it replaces', async () => {
     const history = await loadDocument('/looks')
-    push('/wardrobe/capsules')
+    push('/looks/capsules')
 
-    replace('/looks/plan')
+    replace('/looks/saved/sl-1')
 
     expect(history.currentAppHistoryIndex()).toBe(1)
-    expect(window.history.state).toEqual({ ...routerState('/looks/plan'), __ccIdx: 1 })
+    expect(window.history.state).toEqual({
+      ...routerState('/looks/saved/sl-1'),
+      __ccIdx: 1,
+    })
     expect(history.hasAppHistoryBelow()).toBe(true)
     // The replaced capsules entry is gone: Looks is the entry below.
     await back()
@@ -220,35 +230,39 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
   })
 
   it('[Codex 7.11 #1] after the legacy /?planner=1 redirect (a replace), the next push is a push and back works', async () => {
-    // The server redirects /?planner=1 to /looks/plan with its query; Plan drops the query
-    // through a router replace.
-    const history = await loadDocument('/looks/plan?planner=1')
-    replace('/looks/plan')
+    // CC-7.12 D11: the server redirects /?planner=1 to /looks?segment=plan with its query; Looks
+    // drops the `planner` key through a router replace.
+    const history = await loadDocument('/looks?segment=plan&planner=1')
+    replace('/looks?segment=plan')
     expect(history.currentAppHistoryIndex()).toBe(0)
     expect(history.hasAppHistoryBelow()).toBe(false)
 
     // No replace flag outlives the redirect: the next navigation pushes.
-    push('/looks')
+    push('/looks/saved/sl-1')
     expect(history.currentAppHistoryIndex()).toBe(1)
     expect(history.hasAppHistoryBelow()).toBe(true)
 
     await back()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(`${window.location.pathname}${window.location.search}`).toBe(
+      '/looks?segment=plan'
+    )
     expect(history.hasAppHistoryBelow()).toBe(false)
   })
 
   it('[Codex 7.11 #1] the legacy redirect reached from inside the app keeps the entry below it', async () => {
     const history = await loadDocument('/looks')
-    push('/looks/plan?planner=1')
-    replace('/looks/plan')
+    push('/looks?segment=plan&planner=1')
+    replace('/looks?segment=plan')
     push('/')
 
     expect(history.currentAppHistoryIndex()).toBe(2)
     await back()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(`${window.location.pathname}${window.location.search}`).toBe(
+      '/looks?segment=plan'
+    )
     expect(history.hasAppHistoryBelow()).toBe(true)
     await back()
-    expect(window.location.pathname).toBe('/looks')
+    expect(`${window.location.pathname}${window.location.search}`).toBe('/looks')
     expect(history.hasAppHistoryBelow()).toBe(false)
   })
 
@@ -264,11 +278,11 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
 
   it('a reload is a direct entry: the stamped position it reloads at has nothing below', async () => {
     let history = await loadDocument('/looks')
-    push('/looks/plan')
+    push('/looks/saved/sl-1')
     expect(stateIndex()).toBe(1)
 
     // The browser keeps `history.state` across a reload, stamp included.
-    history = await loadDocument('/looks/plan', window.history.state)
+    history = await loadDocument('/looks/saved/sl-1', window.history.state)
     expect(history.currentAppHistoryIndex()).toBe(1)
     expect(history.hasAppHistoryBelow()).toBe(false)
 
@@ -306,7 +320,7 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
 
   it('the position is known before any other popstate listener reads it (capture)', async () => {
     const history = await loadDocument('/looks')
-    push('/looks/plan')
+    push('/looks/saved/sl-1')
     push('/')
     const seen: number[] = []
     const read = () => seen.push(history.currentAppHistoryIndex())
@@ -325,7 +339,7 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
     const wrapped: unknown = Reflect.get(window.history, 'pushState')
 
     history.installAppHistory()
-    push('/looks/plan')
+    push('/looks/saved/sl-1')
 
     expect(Reflect.get(window.history, 'pushState')).toBe(wrapped)
     expect(history.currentAppHistoryIndex()).toBe(1)
@@ -347,7 +361,7 @@ describe('7.11-UNIT-010 push, pop and replace by entry position (D11)', () => {
 describe('7.11-UNIT-011 clear (D11)', () => {
   it('clearAppHistory forgets every entry below; later pushes count again', async () => {
     const history = await loadDocument('/looks')
-    push('/looks/plan')
+    push('/looks/saved/sl-1')
     push('/settings')
 
     history.clearAppHistory()
@@ -359,7 +373,7 @@ describe('7.11-UNIT-011 clear (D11)', () => {
     expect(history.hasAppHistoryBelow()).toBe(false)
     // Back past the cleared point still finds nothing below.
     await back()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(window.location.pathname).toBe('/looks/saved/sl-1')
     expect(history.hasAppHistoryBelow()).toBe(false)
   })
 })

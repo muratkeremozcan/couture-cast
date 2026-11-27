@@ -5,6 +5,8 @@
 // history and the parent screen intact. Stacked layers: accessible-modal.stack.test.tsx.
 // Native twin: apps/mobile/components/edge-to-edge-modal.test.tsx.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Story CC-7.12 (Step 69): the saved look layer became the /looks/saved/ID screen, so its overlay
+// row is replaced by a test that a Saved tile opens that screen and back returns to Looks.
 import type { CDPSession, Locator, Page } from '@playwright/test'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -13,7 +15,8 @@ import {
   waitForShellSettled,
 } from '../support/helpers/app-shell'
 import { FOLD_VIEWPORT } from '../support/helpers/five-tab'
-import type { ShellScreen } from '../support/helpers/shell-fixtures'
+import { openLooksFixture, type LookSeed } from '../support/helpers/looks-fixtures'
+import { SHELL_SAVED_LOOK_ID, type ShellScreen } from '../support/helpers/shell-fixtures'
 
 test.use({
   authSessionEnabled: false,
@@ -47,13 +50,8 @@ const OVERLAYS: Overlay[] = [
     opener: (page) => page.getByTestId('lookbook-open-shell-look-1'),
     close: (dialog) => dialog.getByTestId('app-top-bar-back'),
   },
-  {
-    name: 'saved look layer',
-    screen: 'looks',
-    parentRead: 'saved-looks',
-    opener: (page) => page.getByTestId('saved-look-reopen').first(),
-    close: (dialog) => dialog.getByTestId('app-top-bar-back'),
-  },
+  // Story CC-7.12 D5: the CC-7.11 saved look layer is the saved look's own screen now; the test
+  // after the overlay loops proves a Saved tile opens it and back returns to Looks.
 ]
 
 async function openParent(
@@ -186,6 +184,95 @@ test.describe('CC-7.11 overlays close and return focus @local-lane', () => {
         'aria-current',
         'page'
       )
+    })
+  }
+})
+
+test.describe('CC-7.12 a saved look opens its own screen @local-lane', () => {
+  test('[P0] [7.11-E2E-040/042] [7.12-E2E-012] Saved tile opens /looks/saved/ID with no layer; back arrow and browser back return to Looks in the same document', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    const { router } = await openParent(page, interceptNetworkCall, 'looks')
+    const tile = page.getByTestId(`saved-look-card-${SHELL_SAVED_LOOK_ID}`)
+
+    for (const how of ['arrow', 'browser'] as const) {
+      await tile.click()
+      await expect(page).toHaveURL(
+        new RegExp(`/looks/saved/${SHELL_SAVED_LOOK_ID}\\?from=all$`)
+      )
+      await expect(page.getByTestId('saved-look-detail')).toBeVisible()
+      await expect(
+        page.getByRole('dialog'),
+        'the detail is a screen, not a layer'
+      ).toHaveCount(0)
+      await expect(page.getByTestId('app-top-bar-back')).toBeVisible()
+
+      if (how === 'arrow') await page.getByTestId('app-top-bar-back').click()
+      else await page.goBack()
+      await expect(page).toHaveURL(/\/looks$/)
+      await waitForShellSettled(page, router)
+      await expect(tile, `${how} back shows the Saved tile again`).toBeVisible()
+      expect(await sameDocument(page), `${how} back: same document`).toBe(true)
+    }
+  })
+
+  // Enough saves that the oldest tile sits well below the first screen at 390 x 664.
+  const DEEP_LOOKS: LookSeed[] = Array.from({ length: 16 }, (_, index) => ({
+    id: `deep-look-${index + 1}`,
+    created: 100 - index,
+    title: `Deep look ${index + 1}`,
+  }))
+  const DEEP_TILE_IDS = DEEP_LOOKS.map((look) => `saved-look-card-${look.id}`)
+  const savedTileIds = (page: Page) =>
+    page
+      .getByTestId('looks-saved-grid')
+      .locator('[data-testid^="saved-look-card-"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-testid') ?? ''))
+  const windowScrollY = (page: Page) => page.evaluate(() => window.scrollY)
+
+  for (const how of ['arrow', 'browser'] as const) {
+    test(`[P0] [7.11-E2E-031] [7.12-E2E-012] Saved scrolled to a tile below the fold, ${how} back: the feed settles at the same offset with the tile in place`, async ({
+      page,
+      interceptNetworkCall,
+    }) => {
+      const fixture = await openLooksFixture(page, interceptNetworkCall, {
+        looks: DEEP_LOOKS,
+      })
+      await page.goto('/looks')
+      await waitForShellSettled(page, fixture.router)
+      await expect.poll(() => savedTileIds(page)).toEqual(DEEP_TILE_IDS)
+      const last = DEEP_LOOKS.at(-1)!
+      const tile = page.getByTestId(`saved-look-card-${last.id}`)
+      await expect(tile, 'the tile starts below the first screen').not.toBeInViewport()
+      await tile.scrollIntoViewIfNeeded()
+      const depth = await windowScrollY(page)
+      expect(depth, 'the feed is scrolled well past the top').toBeGreaterThan(300)
+      const tileTop = (await tile.boundingBox())!.y
+
+      await tile.click()
+      await expect(page).toHaveURL(new RegExp(`/looks/saved/${last.id}\\?from=all$`))
+      await expect(page.getByTestId('saved-look-detail')).toHaveAttribute(
+        'data-saved-look-id',
+        last.id
+      )
+
+      if (how === 'arrow') await page.getByTestId('app-top-bar-back').click()
+      else await page.goBack()
+      await expect(page).toHaveURL(/\/looks$/)
+      // The feed's reads settle and every tile is back before the offset is read.
+      await waitForShellSettled(page, fixture.router)
+      await expect.poll(() => savedTileIds(page)).toEqual(DEEP_TILE_IDS)
+      await expect
+        .poll(async () => Math.abs((await windowScrollY(page)) - depth), {
+          message: `${how} back restores the Saved offset within 1 px`,
+        })
+        .toBeLessThanOrEqual(1)
+      await expect(tile).toBeInViewport()
+      expect(
+        Math.abs((await tile.boundingBox())!.y - tileTop),
+        'the tile sits where it was'
+      ).toBeLessThanOrEqual(1)
     })
   }
 })

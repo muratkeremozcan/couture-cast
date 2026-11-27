@@ -352,73 +352,34 @@ describe('Closet garment detail', () => {
     expect(await within(panel).findByRole('heading', { name: 'Look 1' })).toBeVisible()
   })
 
-  it('[P1] [7.5-CMP-016] a saved look anchored on the piece follows its tags through edit and Undo (Codex P2.7)', async () => {
+  /**
+   * Story CC-7.12 moved saved looks to Looks: the Closet shows no saved looks and reads none
+   * around a tag edit. The anchored look's saved date or Needs review now follows the edit and
+   * its Undo on Looks (looks/page.anchor-tags.test.tsx 7.12-UNIT-022e).
+   */
+  it('[P1] [7.5-CMP-016] [7.12] a tag edit and its Undo send no saved looks read from the Closet', async () => {
     const user = userEvent.setup()
-    const { SAMPLE_CATALOG, stylePieceAnchor, stylePieceLooks } = await import(
-      '@couture/utils'
-    )
-    const look = stylePieceLooks(stylePieceAnchor(blueTop)!, 'mild-dry', SAMPLE_CATALOG)
-      .looks[0]!
-    savedLooksStore.items.push({
-      id: 'look-on-blue-top',
-      ownerUserId: owner,
-      source: 'style_piece',
-      lookId: look.recipe.lookId,
-      weather: 'mild-dry',
-      title: 'Blue top look',
-      anchorGarmentId: blueTop.id,
-      anchorSnapshot: { garmentId: blueTop.id, category: 'top', comfortRange: 'mild' },
-      composition: [
-        {
-          slotIndex: 0,
-          category: 'top',
-          kind: 'garment',
-          itemId: blueTop.id,
-          label: null,
-          missing: false,
-          imageAccess: blueTop.imageAccess,
-        },
-        ...look.companions.map((companion, index) => ({
-          slotIndex: index + 1,
-          category: companion.category,
-          kind: 'catalog' as const,
-          itemId: companion.id,
-          label: null,
-          missing: false,
-          imageAccess: null,
-        })),
-      ],
-      swaps: {},
-      collection: null,
-      comfort: null,
-      availabilityStatus: 'ready',
-      missingGarmentIds: [],
-      needsReviewReasons: [],
-      revision: 0,
-      createdAt: '2026-11-22T01:00:00.000Z',
-      updatedAt: '2026-11-22T01:00:00.000Z',
-    })
+    let savedLookReads = 0
+    savedLooksStore.onGet = () => {
+      savedLookReads += 1
+    }
+    const category = () => closet.find((item) => item.id === blueTop.id)?.category
     render(<WardrobePage />)
     signIn()
-    // The toggle is named by its whole label ("Saved looks, 1 saved, Show saved looks").
-    await user.click(await screen.findByRole('button', { name: /Show saved looks/ }))
-    expect(await screen.findByText('Blue top look')).toBeInTheDocument()
-    expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
 
-    await user.click(screen.getByTestId('garment-open-blue-top'))
+    await user.click(await screen.findByTestId('garment-open-blue-top'))
     await user.click(await screen.findByTestId('garment-edit-tags'))
     await user.click(screen.getByTestId('garment-tag-option-category-outerwear'))
     await user.click(screen.getByTestId('garment-tag-done'))
-    // The committed edit refreshes saved looks: the look now needs review.
-    expect(await screen.findByTestId('saved-look-needs-review')).toBeInTheDocument()
+    await waitFor(() => expect(category()).toBe('outerwear'))
 
     await user.click(await screen.findByTestId('status-bar-action-undo'))
-    await waitFor(() =>
-      expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
-    )
+    await waitFor(() => expect(category()).toBe(blueTop.category))
     await user.click(topBarBack())
     await waitFor(() => expect(screen.queryByTestId('garment-detail')).toBeNull())
-    expect(screen.getByText('Blue top look')).toBeVisible()
+
+    expect(savedLookReads).toBe(0)
+    expect(screen.queryByTestId('closet-saved-looks-row')).toBeNull()
     expect(screen.queryByTestId('saved-look-needs-review')).toBeNull()
   })
 

@@ -14,6 +14,12 @@
 // five-tab-label-floor.test.tsx; the fold, the More sheet, Looks and Profile in the
 // screen-budget-*.test.tsx suites and five-tab-closet.test.tsx.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-020 (D5, PARENT_TAB sends a saved look's direct
+// entry to Looks on Saved; its top bar has back and the look's name) and 7.12-NAT-033 (D11, the
+// `planner` route is a redirect to Looks with `segment=plan` and declares no screen of its own).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import React, { type ReactNode } from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { APP_TABS, TAB_ICON_PATHS, type AppTabId } from '@couture/utils'
@@ -28,6 +34,7 @@ const captured = vi.hoisted(() => ({
   tabOptions: {} as Record<string, unknown>,
   tabs: [] as CapturedScreen[],
   stackScreens: [] as CapturedScreen[],
+  redirects: [] as unknown[],
 }))
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
@@ -35,6 +42,7 @@ const routerMock = vi.hoisted(() => ({
   navigate: vi.fn(),
   back: vi.fn(),
   setParams: vi.fn(),
+  dismissTo: vi.fn(),
 }))
 
 vi.mock('expo-router', () => {
@@ -57,9 +65,15 @@ vi.mock('expo-router', () => {
     captured.stackScreens.push(props)
     return null
   }
+  // Story CC-7.12 D11: `app/planner.tsx` renders a Redirect; the double records its target.
+  const Redirect = ({ href }: { href: unknown }) => {
+    captured.redirects.push(href)
+    return null
+  }
   return {
     Tabs,
     Stack,
+    Redirect,
     Link: ({ children }: { children: ReactNode }) => <>{children}</>,
     router: routerMock,
     useRouter: () => routerMock,
@@ -83,7 +97,6 @@ vi.mock('@/src/analytics/mobile-analytics', async () =>
   (await import('@/src/test-utils/mobile-analytics.js')).mobileAnalyticsModuleMock()
 )
 // The routes' own screens are not under test here, only the titles the routes declare.
-vi.mock('@/src/features/premium/planner-screen', () => ({ PlannerScreen: () => null }))
 vi.mock('@/src/features/premium/palette-advisor-screen', () => ({
   PaletteAdvisorScreen: () => null,
 }))
@@ -112,11 +125,16 @@ const ORDER: readonly AppTabId[] = ['home', 'wardrobe', 'looks', 'community', 's
 const EN_LABELS = ['Today', 'Closet', 'Looks', 'Community', 'Profile']
 
 /** Spec D10: every native sub-screen route and the tab a direct entry goes back to. */
-const D10_PARENTS: Readonly<Record<string, string>> = {
+const D10_PARENTS: Readonly<
+  Record<string, string | { pathname: string; params: Record<string, string> }>
+> = {
   'wardrobe-garment': '/wardrobe',
   'wardrobe-onboarding': '/wardrobe',
   'wardrobe-silhouette': '/wardrobe',
   'wardrobe-capsules': '/looks',
+  // Story CC-7.12 D5: a saved look's direct entry goes back to Looks on Saved.
+  'saved-look/[savedLookId]': { pathname: '/looks', params: { segment: 'saved' } },
+  // The `planner` route redirects before it shows (7.12-NAT-033); its entry stays a fallback.
   planner: '/looks',
   'settings-style': '/settings',
   'palette-advisor': '/settings',
@@ -157,7 +175,12 @@ function stackHeader(
   below: { key: string; name: string },
   goBack = vi.fn()
 ) {
-  const route = { key: `${name}-1`, name }
+  // A saved look opened from a Saved tile carries its filter (TEA T2); one opened by View has
+  // none and dismisses to Looks Saved (TEA T4, app-top-bar.test.tsx).
+  const route =
+    name === 'saved-look/[savedLookId]'
+      ? { key: `${name}-1`, name, params: { savedLookId: 'sl-1', from: 'all' } }
+      : { key: `${name}-1`, name }
   const view = render(
     renderStackTopBar({
       options: { title },
@@ -331,11 +354,24 @@ describe('CC-7.11 native five tabs and the back pattern', () => {
     }
   )
 
-  it('[P0] [7.11-NAT-021] each named sub-screen shows back and its title in the stack top bar', () => {
+  it('[P0] [7.12-NAT-033] the planner route redirects to Looks on Plan and declares no screen', () => {
+    captured.redirects.length = 0
+    captured.stackScreens.length = 0
+    render(<PlannerRoute />).unmount()
+
+    expect(captured.redirects).toEqual([
+      { pathname: '/looks', params: { segment: 'plan' } },
+    ])
+    // No planner title or top bar: Plan is a segment of the Looks tab (D10).
+    expect(captured.stackScreens).toEqual([])
+  })
+
+  it('[P0] [7.11-NAT-021] [7.12-NAT-020] each named sub-screen shows back and its title in the stack top bar', () => {
     // The titles the routes declare themselves, and those app/_layout.tsx registers (pinned
-    // there by root-layout-startup.test.tsx).
+    // there by root-layout-startup.test.tsx). Story CC-7.12: `planner` is a redirect (above);
+    // a saved look titles itself with the look's name once read.
     const titles: [string, string][] = [
-      ['planner', routeTitle(PlannerRoute)],
+      ['saved-look/[savedLookId]', 'Rainy commute'],
       ['palette-advisor', routeTitle(PaletteAdvisorRoute)],
       ['wardrobe-onboarding', routeTitle(WardrobeOnboardingRoute)],
       ['wardrobe-silhouette', routeTitle(WardrobeSilhouetteRoute)],
@@ -348,7 +384,7 @@ describe('CC-7.11 native five tabs and the back pattern', () => {
     ]
     // The builder and TEA title contract (spec Plan Change Log).
     expect(Object.fromEntries(titles)).toMatchObject({
-      planner: 'Plan',
+      'saved-look/[savedLookId]': 'Rainy commute',
       'palette-advisor': 'Color palette',
       'wardrobe-onboarding': 'Closet setup',
       'wardrobe-silhouette': 'Silhouette',
@@ -374,8 +410,9 @@ describe('CC-7.11 native five tabs and the back pattern', () => {
     }
   })
 
-  it('[P0] [7.11-NAT-022] back with a real caller below pops it, never replacing to the parent tab', () => {
-    const { goBack } = stackHeader('planner', 'Plan', {
+  it('[P0] [7.11-NAT-022] [7.12-NAT-020] back with a real caller below pops it, never replacing to the parent tab', () => {
+    // CC-7.12: the saved look screen stands in for the old planner screen, now a redirect.
+    const { goBack } = stackHeader('saved-look/[savedLookId]', 'Rainy commute', {
       key: 'caller-1',
       name: 'wardrobe-capsules',
     })
@@ -383,17 +420,19 @@ describe('CC-7.11 native five tabs and the back pattern', () => {
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
     expect(goBack).toHaveBeenCalledTimes(1)
     expect(routerMock.replace).not.toHaveBeenCalled()
+    expect(routerMock.dismissTo).not.toHaveBeenCalled()
   })
 
   it('[P0] [7.11-NAT-022] back over a tab the member came from pops to it', () => {
     const anchor = { key: 'seen-anchor', name: '(tabs)' }
     // The member was on a tab: pushing the screen blurred the anchor.
     tabsAnchorListeners({ route: anchor }).blur()
-    const { goBack } = stackHeader('planner', 'Plan', anchor)
+    const { goBack } = stackHeader('saved-look/[savedLookId]', 'Rainy commute', anchor)
 
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
     expect(goBack).toHaveBeenCalledTimes(1)
     expect(routerMock.replace).not.toHaveBeenCalled()
+    expect(routerMock.dismissTo).not.toHaveBeenCalled()
   })
 
   it.each(Object.entries(D10_PARENTS))(

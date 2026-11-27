@@ -4,6 +4,8 @@
 // above the fold, the Closet More menu, Profile > Style, the Looks tab and the Plan route.
 // Native twin: apps/mobile/src/screens/five-tab-navigation.test.tsx.
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
+// Story CC-7.12 (Step 69): Closet has no saved looks row; Looks has Saved, Ideas and Plan
+// segments with look and capsule tiles; Plan week and /?planner=1 open /looks?segment=plan.
 import { APP_TABS, TAB_ICON_PATHS } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -20,7 +22,12 @@ import {
   foldBand,
   visibleInBand,
 } from '../support/helpers/five-tab'
-import type { ShellMode, ShellScreen } from '../support/helpers/shell-fixtures'
+import {
+  SHELL_CAPSULE_ID,
+  SHELL_SAVED_LOOK_ID,
+  type ShellMode,
+  type ShellScreen,
+} from '../support/helpers/shell-fixtures'
 
 test.use({
   authSessionEnabled: false,
@@ -214,7 +221,7 @@ test.describe('CC-7.11 five tabs @local-lane', () => {
 })
 
 test.describe('CC-7.11 Closet opens on its grid @local-lane', () => {
-  test('[P0] [7.11-E2E-010/012] populated: four tiles in the fold, Add the one primary in the top bar, saved looks below the grid', async ({
+  test('[P0] [7.11-E2E-010/012] [7.12-E2E-016] populated: four tiles in the fold, Add the one primary in the top bar, no saved looks row', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -243,13 +250,14 @@ test.describe('CC-7.11 Closet opens on its grid @local-lane', () => {
     await expect(page.getByRole('link', { name: /^Capsules$/ })).toHaveCount(0)
     await expect(page.getByRole('link', { name: 'Set up your closet' })).toHaveCount(0)
 
-    const grid = await page.getByTestId('closet-garment-grid').boundingBox()
-    const savedLooks = await page.getByTestId('closet-saved-looks-row').boundingBox()
-    expect(grid).not.toBeNull()
-    expect(savedLooks, 'saved looks row still on Closet until CC-7.12').not.toBeNull()
-    expect(savedLooks!.y, 'saved looks row below the grid').toBeGreaterThanOrEqual(
-      grid!.y + grid!.height - 1
+    // Story CC-7.12 D8: the saved looks row left the Closet; the member's saved looks live on
+    // Looks > Saved. The populated member has one saved look, so an absent row is no empty state.
+    await expect(page.getByTestId('closet-garment-grid')).toBeVisible()
+    await expect(page.getByTestId('closet-saved-looks-row')).toHaveCount(0)
+    await expect(page.getByTestId(`saved-look-card-${SHELL_SAVED_LOOK_ID}`)).toHaveCount(
+      0
     )
+    expect(router.calls('saved-looks'), 'Closet sends no saved looks read').toBe(0)
   })
 
   test('[P0] [7.11-E2E-011] empty: the empty-state Add in the fold, no setup banner, no Capsules or Silhouette above the grid', async ({
@@ -377,9 +385,9 @@ test.describe('CC-7.11 More menu and Profile > Style @local-lane', () => {
   })
 })
 
-test.describe('CC-7.11 Looks tab and Plan @local-lane', () => {
+test.describe('CC-7.12 Looks tab and Plan @local-lane', () => {
   for (const mode of ['empty', 'populated'] as const) {
-    test(`[P0] [7.11-E2E-016] Looks, ${mode}: saved looks first, then Capsules and Plan rows`, async ({
+    test(`[P0] [7.11-E2E-016] [7.12-E2E-003] Looks, ${mode}: Saved, Ideas and Plan segments; opens on ${mode === 'empty' ? 'Ideas' : 'Saved'}`, async ({
       page,
       interceptNetworkCall,
     }) => {
@@ -395,27 +403,76 @@ test.describe('CC-7.11 Looks tab and Plan @local-lane', () => {
         'aria-current',
         'page'
       )
+      // D1: three segments in order, the open one selected; the CC-7.11 rows are gone.
+      await expect(page.getByRole('tab')).toHaveText(['Saved', 'Ideas', 'Plan'])
+      await expect(page.getByTestId('looks-capsules-row')).toHaveCount(0)
+      await expect(page.getByTestId('looks-plan-row')).toHaveCount(0)
       const first = page.getByTestId('looks-first-content')
-      if (mode === 'empty') await expect(first).toHaveText('Save a look to see it here')
-      else await expect(first.getByRole('button').first()).toBeVisible()
+      if (mode === 'empty') {
+        await expect(page.getByTestId('looks-segment-ideas')).toHaveAttribute(
+          'aria-selected',
+          'true'
+        )
+        await expect(first.getByTestId('looks-ideas-empty-line')).toHaveText(
+          'Save a look to see it here'
+        )
+      } else {
+        await expect(page.getByTestId('looks-segment-saved')).toHaveAttribute(
+          'aria-selected',
+          'true'
+        )
+        // D2, D3: newest first, the look (saved after the capsule) then the capsule.
+        const look = first.getByTestId(`saved-look-card-${SHELL_SAVED_LOOK_ID}`)
+        const capsule = first.getByTestId(`looks-capsule-card-${SHELL_CAPSULE_ID}`)
+        await expect(look).toHaveAttribute(
+          'href',
+          `/looks/saved/${SHELL_SAVED_LOOK_ID}?from=all`
+        )
+        await expect(capsule).toHaveAttribute(
+          'href',
+          `/looks/capsules?capsule=${SHELL_CAPSULE_ID}`
+        )
+        const lookBox = (await look.boundingBox())!
+        const capsuleBox = (await capsule.boundingBox())!
+        expect(
+          lookBox.y * 10_000 + lookBox.x,
+          'the newer look sits before the capsule'
+        ).toBeLessThan(capsuleBox.y * 10_000 + capsuleBox.x)
+      }
 
-      const firstBox = (await first.boundingBox())!
-      const capsules = (await page.getByTestId('looks-capsules-row').boundingBox())!
-      const plan = (await page.getByTestId('looks-plan-row').boundingBox())!
-      expect(capsules.y).toBeGreaterThanOrEqual(firstBox.y + firstBox.height - 1)
-      expect(plan.y).toBeGreaterThan(capsules.y)
-
-      await page.getByTestId('looks-capsules-row').click()
-      await expect(page).toHaveURL(/\/wardrobe\/capsules$/)
+      // Capsules is a Saved filter now, with the manager one row below the tiles.
+      await page.getByTestId('looks-segment-saved').click()
+      await page.getByTestId('looks-filter-capsules').click()
+      await expect(page).toHaveURL(/\/looks\?segment=saved&filter=capsules$/)
+      await expect(page.getByTestId('looks-filter-capsules')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      await page.getByTestId('looks-manage-capsules').click()
+      await expect(page).toHaveURL(/\/looks\/capsules$/)
+      await expect(page.getByTestId('app-top-bar-title')).toHaveText(/^Outfit capsules$/)
       await page.getByTestId('app-top-bar-back').click()
-      await expect(page).toHaveURL(/\/looks$/)
-      await page.getByTestId('looks-plan-row').click()
-      await expect(page).toHaveURL(/\/looks\/plan$/)
-      await expect(page.getByTestId('app-top-bar-back')).toBeVisible()
+      await expect(page).toHaveURL(/\/looks\?segment=saved&filter=capsules$/)
+
+      // Plan is a segment: the Looks top bar stays, with no back arrow.
+      await page.getByTestId('looks-segment-plan').click()
+      await expect(page).toHaveURL(/\/looks\?segment=plan$/)
+      await expect(page.getByTestId('looks-segment-plan')).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+      await expect(page.getByTestId('app-top-bar-title')).toHaveText(/^Looks$/)
+      await expect(page.getByTestId('app-top-bar-back')).toHaveCount(0)
+      // The planner renders inside the segment (free preview vs week is looks-plan.spec.ts).
+      await expect(
+        page
+          .getByTestId('looks-first-content')
+          .getByRole('complementary', { name: 'Planner Rail' })
+      ).toBeVisible()
     })
   }
 
-  test('[P1] [7.11-E2E-017] Today Plan week opens /looks/plan; /?planner=1 redirects there; no planner drawer on Today', async ({
+  test('[P1] [7.11-E2E-017] [7.12-E2E-034/035] Today Plan week opens /looks?segment=plan; /?planner=1 and /looks/plan redirect there; no planner drawer on Today', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -426,20 +483,27 @@ test.describe('CC-7.11 Looks tab and Plan @local-lane', () => {
     await page.goto(SHELL_TABS.home.path)
     await waitForShellSettled(page, router)
 
-    // D9: the planner is a route now; Today renders no Planner Rail. (Today still embeds the
-    // Community grid's own aside until CC-7.13, so the check names the rail.)
+    // D9: Today renders no Planner Rail. (Today still embeds the Community grid's own aside
+    // until CC-7.13, so the check names the rail.)
     await expect(page.getByRole('complementary', { name: 'Planner Rail' })).toHaveCount(0)
     const planLink = page.getByTestId('planner-open-control')
-    await expect(planLink).toHaveAttribute('href', '/looks/plan')
+    await expect(planLink).toHaveAttribute('href', '/looks?segment=plan')
     await expect(planLink).toBeVisible()
     await planLink.click()
-    await expect(page).toHaveURL(/\/looks\/plan$/)
+    await expect(page).toHaveURL(/\/looks\?segment=plan$/)
+    await expect(page.getByTestId('looks-segment-plan')).toHaveAttribute(
+      'aria-selected',
+      'true'
+    )
     await expect(page.getByTestId('bottom-nav-looks')).toHaveAttribute(
       'aria-current',
       'page'
     )
 
+    // D11: the Looks address drops the legacy `planner` key the redirect passes through.
     await page.goto('/?planner=1')
-    await expect(page).toHaveURL(/\/looks\/plan$/)
+    await expect(page).toHaveURL(/\/looks\?segment=plan$/)
+    await page.goto('/looks/plan')
+    await expect(page).toHaveURL(/\/looks\?segment=plan$/)
   })
 })

@@ -1,3 +1,5 @@
+// Story CC-7.12 (Step 69): the Looks segments, the Saved Capsules filter and the capsule manager
+// at /looks/capsules are the member routes in place of /wardrobe/capsules.
 // Story CC-7.11 D4: the Closet actions now live in the top bar (Add and More); the row that
 // broke below is gone and `wardrobeHeaderProblems` holds the new placement.
 // Owner report 2026-11-16, iPhone 16 Safari: the Wardrobe Hub header put its title and three
@@ -15,12 +17,16 @@ import { seedWebSession } from '../support/helpers/commerce-session'
 
 const WIDTHS = [393, 320] as const
 const SCHEMES = ['light', 'dark'] as const
-// Story CC-7.11 D1: Looks is the new tab; its capsules row opens `/wardrobe/capsules`.
+// Story CC-7.11 D1: Looks is the new tab. Story CC-7.12 D1, D4, D6: its segments, the Saved
+// filter row and the capsule manager, which moved from `/wardrobe/capsules` to `/looks/capsules`.
 const MEMBER_ROUTES = [
   '/',
   '/wardrobe',
   '/looks',
-  '/wardrobe/capsules',
+  '/looks?segment=saved&filter=capsules',
+  '/looks?segment=ideas',
+  '/looks?segment=plan',
+  '/looks/capsules',
   '/community',
   '/settings',
 ]
@@ -275,26 +281,32 @@ for (const locale of ['en-US', 'de-DE']) {
         'The signed-in fixture session exists only on the local stack.'
       )
       for (const route of MEMBER_ROUTES)
-        test(`O-1 ${route} fits a phone, signed in`, async ({
-          page,
-          authToken,
-        }, testInfo) => {
-          // TEA F3: the app's own bearer, so the landing really is the member landing.
-          await seedWebSession(page, authToken)
-          await open(page, route)
-          await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
-          await expectNoOverflow(page, route)
-          // TEA opens these before sign-off: the header the owner reported, at 393 px.
-          if (route === '/wardrobe')
-            for (const colorScheme of SCHEMES) {
-              await page.setViewportSize({ width: 393, height: 852 })
-              await page.emulateMedia({ colorScheme })
-              await settle(page)
-              await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
-                body: await page.locator('header').first().screenshot(),
-                contentType: 'image/png',
-              })
-            }
+        test.describe(route, () => {
+          // Story CC-7.12 D10: a free member's Plan rests on the planner's exact Premium-required
+          // 403 (the free preview); every other planner error stays fatal.
+          if (route === '/looks?segment=plan')
+            test.use({ allowPremiumPlannerRefusal: true })
+          test(`O-1 ${route} fits a phone, signed in`, async ({
+            page,
+            authToken,
+          }, testInfo) => {
+            // TEA F3: the app's own bearer, so the landing really is the member landing.
+            await seedWebSession(page, authToken)
+            await open(page, route)
+            await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
+            await expectNoOverflow(page, route)
+            // TEA opens these before sign-off: the header the owner reported, at 393 px.
+            if (route === '/wardrobe')
+              for (const colorScheme of SCHEMES) {
+                await page.setViewportSize({ width: 393, height: 852 })
+                await page.emulateMedia({ colorScheme })
+                await settle(page)
+                await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
+                  body: await page.locator('header').first().screenshot(),
+                  contentType: 'image/png',
+                })
+              }
+          })
         })
     })
 

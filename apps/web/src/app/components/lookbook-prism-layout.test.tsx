@@ -10,10 +10,14 @@ import { CommunitySyncState } from '@couture/api-client'
 // Story 3.5 Task 6 step 3 owner: Lookbook Prism responsive layout, comparison mode, and focus rings.
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
-// Story CC-7.11 test owner (TEA): 7.11-CMP-HOME-PLAN-01..04 (D9: Plan week links to /looks/plan,
-// the Home drawer and the 320 px rail column are gone). The /?planner=1 server redirect is
-// app/looks/plan/legacy-redirect.test.ts; the planner gate cases (5.2-WEB-RAIL-01..03) render on
-// the Plan route in app/looks/plan/page.test.tsx.
+// Story CC-7.11 test owner (TEA): 7.11-CMP-HOME-PLAN-01..04 (D9: the Home drawer and the 320 px
+// rail column are gone). Story CC-7.12 D11: Plan week opens Looks on Plan
+// (`/looks?segment=plan`) in one tap. The /?planner=1 server redirect is
+// app/looks/legacy-redirects.test.ts; the planner gate cases render on the Looks Plan segment in
+// app/looks/page.test.tsx.
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -28,8 +32,16 @@ vi.mock('posthog-js', () => ({
   },
 }))
 
+// Story CC-7.12 D7: the Home sample outfit's View pushes the saved look through the app router.
 vi.mock('next/navigation', () => ({
   usePathname: () => '/',
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 
 // Story CC-7.11 D9: Home no longer imports the planner; this stand-in proves it never mounts.
@@ -208,15 +220,16 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story CC-7.11 D9 replaced the Home drawer (Story 5.5 Decision 7): "Plan week" is a link to the
-   * Plan route under Looks, so pressing it navigates and Home never mounts the planner itself.
+   * Story CC-7.11 D9 replaced the Home drawer (Story 5.5 Decision 7): "Plan week" is a link to
+   * Looks (CC-7.12 D11: the Plan segment), so pressing it navigates and Home never mounts the
+   * planner itself.
    */
-  it('7.11-CMP-HOME-PLAN-01 Plan week is a link to /looks/plan and opens no planner on Home', () => {
+  it('7.11-CMP-HOME-PLAN-01 7.12-E2E-034 Plan week is a link to Looks on Plan and opens no planner on Home', () => {
     render(<LookbookPrismLayout />)
 
     const control = screen.getByTestId('planner-open-control')
     expect(control.tagName).toBe('A')
-    expect(control).toHaveAttribute('href', '/looks/plan')
+    expect(control).toHaveAttribute('href', '/looks?segment=plan')
     expect(control).toHaveTextContent('Plan week')
 
     fireEvent.click(control)
@@ -259,8 +272,8 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   })
 
   /**
-   * Story 5.2 Decision 2's gate now renders on the Plan route (5.2-WEB-RAIL-01..03 in
-   * app/looks/plan/page.test.tsx). Home's part is to mount no planner at all, at either width,
+   * Story 5.2 Decision 2's gate now renders on the Looks Plan segment (app/looks/page.test.tsx,
+   * the free preview since CC-7.12). Home's part is to mount no planner at all, at either width,
    * before or after Plan week is pressed.
    */
   it('7.11-CMP-HOME-PLAN-03 never mounts the planner on Home, narrow or wide', () => {

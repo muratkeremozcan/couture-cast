@@ -13,9 +13,11 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/community',
   '/guardian/accept',
   '/guardian/dashboard',
-  // Story CC-7.11 D8, D9: the Looks tab and its Plan route.
+  // Story CC-7.11 D8: the Looks tab. Story CC-7.12 D5, D6: a saved look and the capsule
+  // manager live under it; Plan is a segment of the tab.
   '/looks',
-  '/looks/plan',
+  '/looks/capsules',
+  '/looks/saved/[savedLookId]',
   '/moderation',
   '/moderation/cases/[caseId]',
   '/moderation/evidence',
@@ -34,7 +36,6 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/teen/dashboard',
   '/terms',
   '/wardrobe',
-  '/wardrobe/capsules',
   '/wardrobe/onboarding',
   // Story CC-7.11 D6: Silhouette as a route.
   '/wardrobe/silhouette',
@@ -56,6 +57,8 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/planner',
   '/preview',
   '/preview-continue',
+  // Story CC-7.12 D5: a saved look's own screen.
+  '/saved-look/[savedLookId]',
   '/settings',
   // Story CC-7.11 D7: Profile > Style.
   '/settings-style',

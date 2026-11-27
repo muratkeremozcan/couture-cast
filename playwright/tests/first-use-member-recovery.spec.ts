@@ -1,3 +1,5 @@
+// Story CC-7.12 (Step 69): Plan week opens the Looks Plan segment, city setup returns there, and
+// an entitled member sees no free preview in place of the removed lock panel.
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import {
@@ -139,8 +141,8 @@ test.describe('Member Home and Planner recovery', () => {
 
       const load = interceptNetworkCall({ method: 'GET', url: planner })
       await page.getByTestId('planner-open-control').click()
-      // Story CC-7.11 D9: Plan week links to the Plan route under Looks.
-      await expect(page).toHaveURL('/looks/plan')
+      // Story CC-7.12 D11: Plan week links to the Looks Plan segment.
+      await expect(page).toHaveURL('/looks?segment=plan')
       const response = await load
       expect(response.status).toBe(400)
       expect(response.responseJson).toMatchObject({
@@ -150,15 +152,18 @@ test.describe('Member Home and Planner recovery', () => {
       const rail = page.getByRole('complementary', { name: 'Planner Rail' })
       await expect(rail).toBeVisible()
       await expect(rail.getByTestId('planner-rail-error')).toHaveCount(0)
-      await expect(rail.getByTestId('planner-rail-locked')).toHaveCount(0)
+      // Story CC-7.12 D10: the lock panel is gone; what a non-entitled member sees in its place is
+      // the free preview, which an entitled member without a city must not get.
+      await expect(rail.getByTestId('plan-free-preview')).toHaveCount(0)
+      await expect(page.getByTestId('plan-upgrade')).toHaveCount(0)
       await rail.getByTestId('planner-set-city').click()
       await expect(
         page.getByRole('combobox', { name: 'Search for a city' })
       ).toBeVisible()
       const target = new URL(page.url())
       expect(target.pathname).toBe('/settings')
-      // Story CC-7.11 D9: city setup returns to the Plan route, which replaced `/?planner=1`.
-      expect(target.searchParams.get('returnTo')).toBe('/looks/plan')
+      // Story CC-7.12 D11: city setup returns to the Looks Plan segment (SET_CITY_FROM_PLANNER).
+      expect(target.searchParams.get('returnTo')).toBe('/looks?segment=plan')
     }
   )
 
@@ -184,8 +189,8 @@ test.describe('Member Home and Planner recovery', () => {
         fulfillResponse: unavailable,
       })
       await page.getByTestId('planner-open-control').click()
-      // Story CC-7.11 D9: Plan week links to the Plan route under Looks.
-      await expect(page).toHaveURL('/looks/plan')
+      // Story CC-7.12 D11: Plan week links to the Looks Plan segment.
+      await expect(page).toHaveURL('/looks?segment=plan')
       expect((await initial).status).toBe(503)
       const rail = page.getByRole('complementary', { name: 'Planner Rail' })
       await expect(rail.getByTestId('planner-rail-error')).toBeVisible()

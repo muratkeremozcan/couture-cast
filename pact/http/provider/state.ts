@@ -112,6 +112,8 @@ export type ProviderCapsuleState = {
   ownerUserId: string | null
   capsuleId: string | null
   scenario: ProviderCapsuleScenario
+  /** Story CC-7.12 D3: the list order the controller must hand the service, when set. */
+  sort: 'created_desc' | null
 }
 
 let providerCapsuleState: ProviderCapsuleState | null = null
@@ -120,11 +122,13 @@ export function configureProviderCapsuleState(state: {
   ownerUserId?: string
   capsuleId?: string
   scenario: ProviderCapsuleScenario
+  sort?: 'created_desc'
 }) {
   providerCapsuleState = {
     ownerUserId: state.ownerUserId ?? null,
     capsuleId: state.capsuleId ?? null,
     scenario: state.scenario,
+    sort: state.sort ?? null,
   }
 }
 

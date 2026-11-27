@@ -3,10 +3,13 @@
 // Story CC-7.9 test owner (TEA): 7.9-E2E-009, Wardrobe strings from the catalogs in de-DE (spec
 // D9). Split from app-shell-visual-system.spec.ts so the burn-in shards spread the suite.
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
+// Story CC-7.12 (Step 69): Looks Ideas and Plan segments, the saved look detail and the capsule
+// manager at /looks/capsules join the no-English check.
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import deDE from '../../apps/web/src/i18n/locales/de-DE.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { openFixtureShell } from '../support/helpers/app-shell'
+import { SHELL_SAVED_LOOK_ID } from '../support/helpers/shell-fixtures'
 
 test.use({
   authSessionEnabled: false,
@@ -63,11 +66,31 @@ test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
       fixture: 'looks',
       title: deDE.nav.looks,
     },
+    // Story CC-7.12 D1, D5, D6: the other two Looks segments, the saved look's own screen and
+    // the capsule manager (moved from /wardrobe/capsules) under the same rule.
+    {
+      name: 'Looks Ideas',
+      path: '/looks?segment=ideas',
+      fixture: 'looks',
+      title: deDE.nav.looks,
+    },
+    {
+      name: 'Looks Plan',
+      path: '/looks?segment=plan',
+      fixture: 'looks',
+      title: deDE.nav.looks,
+    },
+    {
+      name: 'saved look detail',
+      path: `/looks/saved/${SHELL_SAVED_LOOK_ID}`,
+      fixture: 'looks',
+      title: null,
+    },
     {
       name: 'capsules',
-      path: '/wardrobe/capsules',
-      fixture: 'closet',
-      title: null,
+      path: '/looks/capsules',
+      fixture: 'looks',
+      title: deDE.wardrobe.capsules.title,
     },
   ] as const) {
     test(`[P1] [7.9-E2E-009] ${screen.name} in de-DE shows no English`, async ({
@@ -132,9 +155,9 @@ test.describe('CC-7.9 Wardrobe strings from the catalogs @local-lane', () => {
   }) => {
     await openFixtureShell(page, interceptNetworkCall, {
       mode: 'populated',
-      screen: 'closet',
+      screen: 'looks',
     })
-    await page.goto('/wardrobe/capsules')
+    await page.goto('/looks/capsules')
     await expect(
       page.getByTestId('app-header').getByTestId('app-top-bar-back')
     ).toHaveAccessibleName(deDE.shell.back)

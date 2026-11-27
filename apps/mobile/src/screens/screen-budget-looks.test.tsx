@@ -1,30 +1,21 @@
 // Learning path Step 68: Five-tab navigation and back pattern.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
 // Story CC-7.11 test owner (TEA): 7.11-BUD-001 (the native Looks tab joins the CC-7.10 screen
 // budget, measured under the empty, populated and guardian-pending members, its `looksAnchors`
-// first content rendered), 7.11-NAT-010 and 040 (Looks' first content inside the 360 x 640 fold,
-// nothing before it, every fixture) and 7.11-NAT-014 (saved looks first, then the Capsules and
-// Plan rows; with no saved look one line, "Save a look to see it here", and the two rows).
-// The populated member has one saved look, as the web shell fixture does. [Codex 7.11 #8]
-// (D13): a Style this piece look reopened from the list returns focus to its Reopen on close.
-// Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md.
-import {
-  SAMPLE_CATALOG,
-  screenBudget,
-  stylePieceAnchor,
-  stylePieceLooks,
-} from '@couture/utils'
+// first content rendered) and 7.11-NAT-010 and 040 (Looks' first content inside the 360 x 640
+// fold, every fixture).
+// Story CC-7.12 test owner (TEA): 7.12-BUD-002 (the budget measures each segment, Saved, Ideas and
+// Plan, under every fixture, D13) and 7.12-NAT-010 (each segment's `looks-first-content` inside
+// the 360 x 640 band below the 56 pt top bar and above the tab bar, CC-7.11 P4; only the segment
+// and filter labels come before it; a free member's Plan Upgrade sits inside the band, TEA P4).
+// 7.11-NAT-014 (the Capsules and Plan rows) became the segments: those rows are gone (D1, D6).
+// The populated member has one saved look and one capsule a day older, as the web shell fixture.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
+import { screenBudget } from '@couture/utils'
 import React from 'react'
-import { userEvent } from 'vitest/browser'
-import {
-  act,
-  configure,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { configure, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
@@ -34,76 +25,27 @@ const routerMock = vi.hoisted(() => ({
   navigate: vi.fn(),
   setParams: vi.fn(),
 }))
+/** The `looks` tab params each case opens on. */
+const tabParams = vi.hoisted(() => ({ current: {} as Record<string, string> }))
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 vi.mock('expo-router', async () => ({
   router: routerMock,
-  useLocalSearchParams: () => ({}),
+  useLocalSearchParams: () => tabParams.current,
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
-// AppTopBar and the Looks rows' chevrons import the icon font, whose native module the browser
-// lacks.
+// AppTopBar and the Manage capsules chevron import the icon font, whose native module the
+// browser lacks.
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: () => null }))
-// The Style this piece editor a look reopens in reaches native Expo modules; the audit never
-// opens it.
-vi.mock('expo-image-picker', () => ({
-  requestCameraPermissionsAsync: vi.fn(),
-  requestMediaLibraryPermissionsAsync: vi.fn(),
-  launchCameraAsync: vi.fn(),
-  launchImageLibraryAsync: vi.fn(),
-}))
-vi.mock('expo-image-manipulator', () => ({
-  manipulateAsync: vi.fn(),
-  SaveFormat: { PNG: 'png' },
-}))
-vi.mock('expo-file-system', () => ({
-  Directory: class {
-    uri: string
-    constructor(uri: string) {
-      this.uri = uri
-    }
-    list() {
-      return []
-    }
-  },
-  File: class {
-    uri: string
-    constructor(uri: string, name?: string) {
-      this.uri = name ? `${uri}/${name}` : uri
-    }
-    readonly exists = false
-    readonly size = 0
-    textSync() {
-      return ''
-    }
-    write() {
-      return undefined
-    }
-    delete() {
-      return undefined
-    }
-    bytes() {
-      return Promise.resolve(new Uint8Array([1, 2, 3, 4]))
-    }
-  },
-  Paths: { cache: 'file:///cache/', document: 'file:///documents' },
-}))
-vi.mock('expo-crypto', () => ({
-  digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
-  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
-  randomUUID: vi.fn(() => 'idem-key-1'),
-}))
-// Real reads; the focus case awaits the closet read the editor needs before it presses Reopen.
-vi.mock('@/src/lib/wardrobe', { spy: true })
 
 import {
+  outfitCapsuleListResponseSchema,
+  plannerResponseSchema,
   savedLookListResponseSchema,
-  type SavedLookContract,
+  type PlannerReadyDay,
 } from '@couture/api-client/contracts/http'
-import { createReadyGarmentFixture } from '@couture/api-client/testing/wardrobe-fixtures'
-import { listGarmentsFromMobile } from '@/src/lib/wardrobe'
 import LooksRoute from '@/app/(tabs)/looks'
 import { SaveFeedbackProvider } from '@/components/save-feedback'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
@@ -118,12 +60,14 @@ import {
   WithFoldScene,
   chromeBefore,
   expectFirstContentInFold,
+  foldBand,
   setFoldViewport,
   textBefore,
 } from '@/src/test-utils/fold-band'
 import { screenFocus } from '@/src/test-utils/focus-effect'
 import { server } from '@/src/test-utils/msw/server'
 import {
+  SCREEN_BUDGET_MODES,
   serveScreenBudgetFixture,
   type ScreenBudgetMode,
 } from '@/src/test-utils/msw/screen-budget-fixtures'
@@ -137,19 +81,13 @@ import {
 
 const MEMBER = 'budget-member'
 const SAVED_LOOK_ID = 'budget-saved-look-1'
+const CAPSULE_ID = 'budget-capsule-1'
 const iso = '2026-11-20T12:00:00.000Z'
+const pixel =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
-const AUDITS: readonly (readonly [string, ScreenBudgetMode])[] = [
-  ['7.11-BUD-001', 'empty'],
-  ['7.11-BUD-001', 'populated'],
-  ['7.11-BUD-001', 'guardian-pending'],
-]
-
-const FOLD_CASES: readonly (readonly [string, ScreenBudgetMode])[] = [
-  ['7.11-NAT-010', 'empty'],
-  ['7.11-NAT-010', 'populated'],
-  ['7.11-NAT-040', 'guardian-pending'],
-]
+const SEGMENTS = ['saved', 'ideas', 'plan'] as const
+type Segment = (typeof SEGMENTS)[number]
 
 /** The web shell fixture's saved look (playwright/support/helpers/shell-fixtures.ts). */
 function savedLook() {
@@ -193,86 +131,111 @@ function savedLook() {
   }
 }
 
-const STYLE_LOOK_ID = 'budget-style-piece-look'
+/** The web shell fixture's capsule, saved a day before the look. */
+function savedCapsule() {
+  const created = '2026-11-19T12:00:00.000Z'
+  return {
+    id: CAPSULE_ID,
+    ownerUserId: MEMBER,
+    name: 'Office week',
+    description: null,
+    occasions: ['work' as const],
+    isFavorite: false,
+    revision: 0,
+    availabilityStatus: 'ready' as const,
+    unavailableGarmentCount: 0,
+    garments: [0, 1].map((index) => ({
+      id: `budget-garment-${index + 1}`,
+      category: (['top', 'bottom'] as const)[index]!,
+      material: 'cotton' as const,
+      comfortRange: 'mild' as const,
+      imageAccess: { url: pixel, expiresAt: '2099-12-31T00:00:00.000Z' },
+      availabilityStatus: 'ready' as const,
+      garmentOrder: index,
+    })),
+    createdAt: created,
+    updatedAt: created,
+  }
+}
 
-/**
- * A Style this piece look the editor reopens exactly, anchored on the populated fixture's first
- * garment (`budget-garment-1`, a mild top): the anchor plus its generated companions.
- */
-function stylePieceSavedLook(): SavedLookContract {
-  const anchor = createReadyGarmentFixture({
-    id: 'budget-garment-1',
-    category: 'top',
-    comfortRange: 'mild',
-    imageAccess: {
-      url: 'https://example.test/budget.png',
-      expiresAt: '2099-12-31T00:00:00.000Z',
+/** The entitled (populated) member's planner week: seven ready days from 2026-11-20. */
+function plannerWeek() {
+  const days: PlannerReadyDay[] = Array.from({ length: 7 }, (_, index) => ({
+    status: 'ready',
+    planDate: `2026-11-${String(20 + index).padStart(2, '0')}`,
+    version: 1,
+    weather: {
+      confidence: 'hourly',
+      freshness: 'fresh',
+      condition: 'clear',
+      temperatureLow: 12,
+      temperatureHigh: 20,
+    },
+    isStarterWardrobe: false,
+    outfits: (['morning', 'midday', 'evening'] as const).map((scenario) => ({
+      id: `outfit-${index}-${scenario}`,
+      scenario,
+      garmentIds: ['budget-garment-1'],
+      reasoningBadges: [],
+      comfortNotes: `${scenario} comfort notes`,
+      capsuleId: null,
+      capsuleName: null,
+      autoFilledGarmentIds: [],
+      displayGarments: [{ id: 'budget-garment-1', category: 'top', imageAccess: null }],
+      shopThisLook: null,
+    })),
+  }))
+  return plannerResponseSchema.parse({
+    data: {
+      locationId: 'budget-home',
+      timezone: 'America/Chicago',
+      anchorDate: days[0]!.planDate,
+      daysReady: 7,
+      days,
     },
   })
-  const selection = stylePieceAnchor(anchor)!
-  const generated = stylePieceLooks(selection, 'warm-rainy', SAMPLE_CATALOG).looks[0]!
-  return savedLookListResponseSchema.parse({
-    data: [
-      {
-        ...savedLook(),
-        id: STYLE_LOOK_ID,
-        source: 'style_piece',
-        lookId: generated.recipe.lookId,
-        weather: 'warm-rainy',
-        anchorGarmentId: anchor.id,
-        anchorSnapshot: {
-          garmentId: anchor.id,
-          category: selection.category,
-          comfortRange: selection.comfortRange,
-        },
-        composition: [
-          {
-            slotIndex: 0,
-            category: selection.category,
-            kind: 'garment',
-            itemId: anchor.id,
-            label: null,
-            missing: false,
-            imageAccess: null,
-          },
-          ...generated.companions.map((companion, index) => ({
-            slotIndex: index + 1,
-            category: companion.category,
-            kind: 'catalog' as const,
-            itemId: companion.id,
-            label: null,
-            missing: false,
-            imageAccess: null,
-          })),
-        ],
-        swaps: generated.recipe.swaps,
-        collection: null,
-        comfort: null,
-      },
-    ],
-    total: 1,
-    limit: 50,
-    offset: 0,
-  }).data[0]!
 }
 
 /**
- * The fixture's reads, plus the populated member's one saved look (the shared native fixture
- * serves no saved look, which the Closet's saved looks row below its grid never needed).
+ * The fixture's reads, plus what Looks reads on top: the populated member's one saved look and
+ * one capsule (the shared native fixture serves no saved look and no capsules read), and the
+ * planner, which only the entitled populated member may read.
  */
 function serveLooksFixture(fixture: ScreenBudgetMode) {
   serveScreenBudgetFixture(fixture, MEMBER)
-  if (fixture !== 'populated') return
+  const populated = fixture === 'populated'
   server.use(
     http.get('*/api/v1/wardrobe/saved-looks', () =>
       HttpResponse.json(
         savedLookListResponseSchema.parse({
-          data: [savedLook()],
-          total: 1,
+          data: populated ? [savedLook()] : [],
+          total: populated ? 1 : 0,
           limit: 50,
           offset: 0,
         }) as unknown as Record<string, unknown>
       )
+    ),
+    http.get('*/api/v1/wardrobe/:ownerUserId/capsules', () =>
+      HttpResponse.json(
+        outfitCapsuleListResponseSchema.parse({
+          data: populated ? [savedCapsule()] : [],
+          total: populated ? 1 : 0,
+          limit: 50,
+          offset: 0,
+        }) as unknown as Record<string, unknown>
+      )
+    ),
+    http.get('*/api/v1/commerce/premium/planner', () =>
+      populated
+        ? HttpResponse.json(plannerWeek() as unknown as Record<string, unknown>)
+        : HttpResponse.json(
+            {
+              statusCode: 403,
+              message: 'Premium subscription required.',
+              error: 'Forbidden',
+            },
+            { status: 403 }
+          )
     )
   )
 }
@@ -294,34 +257,56 @@ function renderLooks(
   )
 }
 
-/** The Looks gate (the first saved looks page) is open and the list or the empty line shows. */
-async function looksSettled(fixture: ScreenBudgetMode) {
+/** The gate is open on `segment` and its first content shows what that segment opens with. */
+async function looksSettled(fixture: ScreenBudgetMode, segment: Segment) {
   await waitFor(() =>
     expect(screen.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
   )
   expect(screen.queryByTestId('screen-placeholder')).toBeNull()
-  const first = await screen.findByTestId('looks-first-content')
-  if (fixture === 'populated')
-    await waitFor(() =>
-      expect(within(first).getByTestId(`saved-look-card-${SAVED_LOOK_ID}`)).toBeVisible()
+  await waitFor(() =>
+    expect(screen.getByTestId(`looks-segment-${segment}`)).toHaveAttribute(
+      'aria-selected',
+      'true'
     )
-  else await waitFor(() => expect(first).toBeVisible())
+  )
+  const first = await screen.findByTestId('looks-first-content')
+  if (segment === 'saved') {
+    if (fixture === 'populated')
+      await waitFor(() =>
+        expect(
+          within(first).getByTestId(`saved-look-card-${SAVED_LOOK_ID}`)
+        ).toBeVisible()
+      )
+    else
+      await waitFor(() =>
+        expect(within(first).getByTestId('looks-filter-empty')).toBeVisible()
+      )
+  }
+  if (segment === 'ideas')
+    await waitFor(() =>
+      expect(within(first).getByTestId('looks-ideas-grid')).toBeVisible()
+    )
+  if (segment === 'plan') {
+    if (fixture === 'populated')
+      await waitFor(() =>
+        expect(first.querySelector('[data-testid^="planner-day-"]')).not.toBeNull()
+      )
+    else
+      await waitFor(() =>
+        expect(within(first).getByTestId('plan-free-preview')).toBeVisible()
+      )
+  }
   return first
 }
 
-/** The Capsules and Plan rows, after the first content, in that order. */
-function expectLooksRowsAfter(first: HTMLElement) {
-  const capsules = screen.getByTestId('looks-capsules-row')
-  const plan = screen.getByTestId('looks-plan-row')
-  expect(capsules).toHaveTextContent(i18n.t('looks.capsules'))
-  expect(plan).toHaveTextContent(i18n.t('looks.plan'))
-  expect(capsules.getBoundingClientRect().top).toBeGreaterThanOrEqual(
-    first.getBoundingClientRect().bottom - 0.5
-  )
-  expect(plan.getBoundingClientRect().top).toBeGreaterThanOrEqual(
-    capsules.getBoundingClientRect().bottom - 0.5
-  )
-  return { capsules, plan }
+/** The segment labels, and on Saved the filter labels: the only text above the first content. */
+function controlLabels(segment: Segment) {
+  const labels = SEGMENTS.map((id) => i18n.t(`looks.segments.${id}`))
+  if (segment === 'saved')
+    labels.push(
+      ...['all', 'today', 'capsules'].map((id) => i18n.t(`looks.filters.${id}`))
+    )
+  return labels
 }
 
 describe('Screen budget and first content: native Looks', () => {
@@ -336,6 +321,7 @@ describe('Screen budget and first content: native Looks', () => {
   beforeEach(async () => {
     await i18n.changeLanguage('en-US')
     await setBudgetViewport()
+    tabParams.current = {}
     restoreToken = setMobileAccessTokenResolver(() => 'member-token')
     setMobileApplicationUserId(MEMBER)
   })
@@ -348,135 +334,159 @@ describe('Screen budget and first content: native Looks', () => {
     vi.clearAllMocks()
   })
 
-  it('[P0] [7.11-BUD-001] the budget audits Looks with its own first-content anchor', () => {
+  it('[P0] [7.11-BUD-001] [7.12-BUD-002] the budget audits Looks with its own first-content anchor and tile selectors', () => {
     expect(screenBudget.screens).toContain('looks')
     expect(screenBudget.fixtures).toEqual(['empty', 'populated', 'guardian-pending'])
     expect(screenBudget.selectors.native.looksAnchors).toEqual([
       '[data-testid="looks-first-content"]',
     ])
     expect(screenBudget.tabBarSelectors.native).toContain('[data-testid="tab-looks"]')
+    // D13: the new tiles count as tiles, not as targets.
+    expect(screenBudget.tileSelectors.native).toEqual(
+      expect.arrayContaining([
+        '[data-testid^="saved-look-card-"]',
+        '[data-testid^="looks-capsule-card-"]',
+        '[data-testid^="looks-idea-card-"]',
+      ])
+    )
   })
 
-  for (const [id, fixture] of AUDITS) {
-    it(`[P0] [${id}] native looks (${fixture}) is within the screen budget`, async () => {
-      serveLooksFixture(fixture)
-      renderLooks(WithTabHeader)
-      const first = await looksSettled(fixture)
+  for (const fixture of SCREEN_BUDGET_MODES)
+    for (const segment of SEGMENTS)
+      it(`[P0] [7.12-BUD-002] native looks ${segment} (${fixture}) is within the screen budget`, async () => {
+        tabParams.current = { segment }
+        serveLooksFixture(fixture)
+        renderLooks(WithTabHeader)
+        const first = await looksSettled(fixture, segment)
 
-      const measurement = await measureNativeScreen('looks')
-      expectNativeMeasureFloors(measurement, 'looks')
-      // The checked-in anchor renders once and is the first content, above the fold.
-      const anchors = screenBudget.selectors.native.looksAnchors.flatMap((selector) =>
-        Array.from(document.querySelectorAll(selector))
-      )
-      expect(anchors, 'one rendered native Looks anchor').toEqual([first])
-      expect(first.getBoundingClientRect().top).toBeLessThan(
-        screenBudget.measure.viewport.height
-      )
-      // D8: Looks has no primary action of its own; its rows are counted targets.
-      expect(measurement.primaryButtons).toEqual([])
-      const targets = measurement.targetsAboveFold.map((target) => target.key)
-      expect(targets).toEqual(
-        expect.arrayContaining(['looks-capsules-row', 'looks-plan-row'])
-      )
-      expectNativeWithinBudget('looks', fixture, measurement)
-    }, 30_000)
-  }
+        const measurement = await measureNativeScreen('looks')
+        expectNativeMeasureFloors(measurement, 'looks')
+        // The checked-in anchor renders once and is the open segment's first content.
+        const anchors = screenBudget.selectors.native.looksAnchors.flatMap((selector) =>
+          Array.from(document.querySelectorAll(selector))
+        )
+        expect(anchors, 'one rendered native Looks anchor').toEqual([first])
+        expect(first.getBoundingClientRect().top).toBeLessThan(
+          screenBudget.measure.viewport.height
+        )
+        const targets = measurement.targetsAboveFold.map((target) => target.key)
+        // D1: the three segments are counted targets on every segment.
+        expect(targets).toEqual(
+          expect.arrayContaining([
+            'looks-segment-saved',
+            'looks-segment-ideas',
+            'looks-segment-plan',
+          ])
+        )
+        // The CC-7.11 rows are gone (D1, D6).
+        expect(targets).not.toContain('looks-capsules-row')
+        expect(targets).not.toContain('looks-plan-row')
+        // D10: the free Plan's Upgrade is the screen's one primary; elsewhere there is none.
+        const free = segment === 'plan' && fixture !== 'populated'
+        expect(
+          measurement.primaryButtons.map((button) => button.key),
+          'primary buttons'
+        ).toEqual(free ? ['plan-upgrade'] : [])
+        expectNativeWithinBudget('looks', fixture, measurement)
+      }, 30_000)
 
-  for (const [id, fixture] of FOLD_CASES) {
-    it(`[P0] [${id}] native looks (${fixture}) opens on its own content inside the 360 x 640 fold`, async () => {
-      await setFoldViewport()
-      serveLooksFixture(fixture)
-      renderLooks(WithFoldScene)
-      const first = await looksSettled(fixture)
+  for (const fixture of SCREEN_BUDGET_MODES)
+    for (const segment of SEGMENTS)
+      it(`[P0] [7.12-NAT-010] [7.11-NAT-0${fixture === 'guardian-pending' ? '40' : '10'}] native looks ${segment} (${fixture}) opens on its first content inside the 360 x 640 fold`, async () => {
+        await setFoldViewport()
+        tabParams.current = { segment }
+        serveLooksFixture(fixture)
+        renderLooks(WithFoldScene)
+        const first = await looksSettled(fixture, segment)
 
-      expectFirstContentInFold(first, 'Looks first content')
-      expect(chromeBefore(first), 'banners, alerts or setup before Looks').toEqual([])
-      expect(textBefore(first), 'text before Looks').toEqual([])
-      expectLooksRowsAfter(first)
-    }, 30_000)
-  }
+        expectFirstContentInFold(first, `Looks ${segment} first content`)
+        expect(chromeBefore(first), 'banners, alerts or setup before Looks').toEqual([])
+        // Only the segment control (and Saved's filter chips) sit between the bar and the content.
+        const labels = controlLabels(segment)
+        expect(
+          textBefore(first).filter((text) => !labels.includes(text)),
+          'text before Looks'
+        ).toEqual([])
 
-  it('[P1] [7.11-NAT-014] lists the saved looks first, then Capsules and Plan, which open their screens', async () => {
+        if (segment === 'saved' && fixture === 'populated') {
+          // The first tile shows whole inside the band (AC6).
+          const tile = within(first).getByTestId(`saved-look-card-${SAVED_LOOK_ID}`)
+          const band = foldBand()
+          const box = tile.getBoundingClientRect()
+          expect(box.top).toBeGreaterThanOrEqual(band.top - 1)
+          expect(box.bottom).toBeLessThanOrEqual(band.bottom + 1)
+        }
+        if (segment === 'plan' && fixture !== 'populated') {
+          // TEA P4: a member who never scrolls sees what Premium adds and its one Upgrade.
+          const upgrade = within(first).getByTestId('plan-upgrade')
+          const band = foldBand()
+          const box = upgrade.getBoundingClientRect()
+          expect(box.top, 'Upgrade top').toBeGreaterThanOrEqual(band.top - 1)
+          expect(box.bottom, 'Upgrade bottom inside the band').toBeLessThanOrEqual(
+            band.bottom + 1
+          )
+          expect(box.height).toBeGreaterThanOrEqual(44)
+        }
+      }, 30_000)
+
+  it('[P1] [7.12-NAT-001] (was 7.11-NAT-014) with no segment, the populated member opens Saved: the look, then the capsule, no rows', async () => {
     serveLooksFixture('populated')
     renderLooks(WithTabHeader)
-    const first = await looksSettled('populated')
+    const first = await looksSettled('populated', 'saved')
 
-    // The saved looks list is the Looks content itself: open, with no toggle or count row.
-    const list = within(first).getByTestId('closet-saved-looks-list')
-    expect(within(list).getByTestId(`saved-look-card-${SAVED_LOOK_ID}`)).toBeVisible()
-    expect(within(first).queryByTestId('closet-saved-looks-row')).toBeNull()
-    expect(first).not.toHaveTextContent(i18n.t('looks.empty'))
-
-    const { capsules, plan } = expectLooksRowsAfter(first)
-    fireEvent.click(capsules)
-    expect(routerMock.push).toHaveBeenLastCalledWith('/wardrobe-capsules')
-    fireEvent.click(plan)
-    expect(routerMock.push).toHaveBeenLastCalledWith('/planner')
-    expect(routerMock.push).toHaveBeenCalledTimes(2)
-  })
-
-  it('[P1] [Codex 7.11 #8] [7.11-NAT-031] a look reopened in Style this piece returns focus to its Reopen when the editor closes', async () => {
-    serveScreenBudgetFixture('populated', MEMBER)
-    server.use(
-      http.get('*/api/v1/wardrobe/saved-looks', () =>
-        HttpResponse.json({
-          data: [stylePieceSavedLook()],
-          total: 1,
-          limit: 50,
-          offset: 0,
-        })
+    const grid = within(first).getByTestId('looks-saved-grid')
+    const tiles = Array.from(
+      grid.querySelectorAll(
+        '[data-testid^="saved-look-card-"], [data-testid^="looks-capsule-card-"]'
       )
-    )
-    renderLooks(WithTabHeader)
-    await looksSettled('empty')
-    const card = await screen.findByTestId(`saved-look-card-${STYLE_LOOK_ID}`)
-    // The editor needs the anchor piece: Reopen waits for the closet read to land.
-    const reads = vi.mocked(listGarmentsFromMobile)
-    await waitFor(() => expect(reads).toHaveBeenCalled())
-    await act(async () => {
-      await reads.mock.results.at(-1)!.value
-    })
-    const reopen = within(card).getByTestId('saved-look-reopen')
-
-    await userEvent.click(reopen)
-    const panel = await screen.findByTestId('style-piece-panel')
-    // The editor took the press, not the look's detail layer.
-    expect(screen.queryByTestId('saved-look-detail-modal')).toBeNull()
-    await userEvent.click(within(panel).getByTestId('style-piece-close'))
-
-    await waitFor(() => expect(screen.queryByTestId('style-piece-panel')).toBeNull())
-    await waitFor(() => expect(reopen).toHaveFocus())
+    ).map((tile) => tile.getAttribute('data-testid'))
+    expect(tiles).toEqual([
+      `saved-look-card-${SAVED_LOOK_ID}`,
+      `looks-capsule-card-${CAPSULE_ID}`,
+    ])
+    // D1, D6: Capsules is a filter and Plan a segment; the CC-7.11 rows and list are gone.
+    expect(screen.queryByTestId('looks-capsules-row')).toBeNull()
+    expect(screen.queryByTestId('looks-plan-row')).toBeNull()
+    expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
+    // The Reopen that sat in the CC-7.11 list lives on the saved look's screen now (D5, T3).
+    expect(within(grid).queryByTestId('saved-look-reopen')).toBeNull()
+    expect(routerMock.setParams).not.toHaveBeenCalled()
   })
 
-  it('[P1] [7.11-NAT-014] with no saved look shows one line, then Capsules and Plan', async () => {
+  it('[P1] [7.12-NAT-001] (was 7.11-NAT-014) with no saved look, Looks opens on Ideas with one line', async () => {
     serveLooksFixture('empty')
     renderLooks(WithTabHeader)
-    const first = await looksSettled('empty')
+    const first = await looksSettled('empty', 'ideas')
 
-    expect(first.textContent).toBe('Save a look to see it here')
+    const line = within(first).getByTestId('looks-ideas-empty-line')
+    expect(line.textContent).toBe('Save a look to see it here')
     expect(i18n.t('looks.empty')).toBe('Save a look to see it here')
-    expect(screen.queryByTestId('closet-saved-looks-list')).toBeNull()
-    expectLooksRowsAfter(first)
+    expect(screen.queryByTestId('looks-capsules-row')).toBeNull()
+    expect(screen.queryByTestId('looks-plan-row')).toBeNull()
   })
 
-  it('[P1] [7.11-NAT-014] signed out opens at once on the empty line and both rows', async () => {
+  it('[P1] [7.12-NAT-001] (was 7.11-NAT-014) signed out opens at once on Ideas and reads no saved look or capsule', async () => {
     restoreToken?.()
     restoreToken = setMobileAccessTokenResolver(() => undefined)
     setMobileApplicationUserId(null)
-    let savedLookReads = 0
+    let reads = 0
     server.use(
       http.get('*/api/v1/wardrobe/saved-looks', () => {
-        savedLookReads += 1
+        reads += 1
+        return HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
+      }),
+      http.get('*/api/v1/wardrobe/:ownerUserId/capsules', () => {
+        reads += 1
         return HttpResponse.json({ data: [], total: 0, limit: 50, offset: 0 })
       })
     )
     renderLooks(WithTabHeader)
 
-    const first = await looksSettled('empty')
-    expect(first.textContent).toBe(i18n.t('looks.empty'))
-    expectLooksRowsAfter(first)
+    const first = await looksSettled('empty', 'ideas')
+    expect(within(first).getByTestId('looks-ideas-empty-line')).toHaveTextContent(
+      i18n.t('looks.empty')
+    )
     // With no member there is nothing to read.
-    expect(savedLookReads).toBe(0)
+    expect(reads).toBe(0)
   })
 })

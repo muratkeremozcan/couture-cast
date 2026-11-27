@@ -1,8 +1,12 @@
-# Navigate to the outfit capsule library: Looks tab, then its Capsules row.
+# Navigate to the outfit capsule library: Looks tab, Saved segment, Capsules filter, then
+# Manage capsules.
 #
 # Story CC-7.11 D8: Capsules left the Closet header (`wardrobe-capsules-link` is gone) and lives
-# on the Looks tab as `looks-capsules-row`. This subflow opens Looks itself, so callers no longer
-# open the wardrobe tab first.
+# on the Looks tab. This subflow opens Looks itself, so callers no longer open the wardrobe tab
+# first.
+# Story CC-7.12 (Step 69): the CC-7.11 `looks-capsules-row` is gone. Capsules is a Saved filter
+# (`looks-filter-capsules`), and its `looks-manage-capsules` row opens the library. A member with
+# nothing saved opens Looks on Ideas, so the flow selects Saved first.
 #
 # Same reasoning as `open-wardrobe-tab.yaml` and `open-settings.yaml`: pair the
 # tap with an assertion on the destination and retry the pair, rather than
@@ -17,16 +21,21 @@ appId: ${MAESTRO_APP_ID}
 - retry:
     maxRetries: 3
     commands:
-      # Scroll rather than tap straight in: `looks-first-content` can mount before the rows
-      # below it paint, and the row sits after the saved looks list (D8).
+      - tapOn:
+          id: 'looks-segment-saved'
+          label: 'Open the Saved segment'
+      - tapOn:
+          id: 'looks-filter-capsules'
+          label: 'Filter Saved to capsules'
+      # The manage row renders under the filter's first read, below the capsule tiles.
       - scrollUntilVisible:
           element:
-            id: 'looks-capsules-row'
+            id: 'looks-manage-capsules'
           direction: DOWN
           timeout: 15000
-          label: 'Looks Capsules row is on screen'
+          label: 'Manage capsules row is on screen'
       - tapOn:
-          id: 'looks-capsules-row'
+          id: 'looks-manage-capsules'
           label: 'Open the outfit capsule library'
       - extendedWaitUntil:
           visible:

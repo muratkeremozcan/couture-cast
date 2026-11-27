@@ -2,14 +2,19 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-34-premium-subscription-lifecycle
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-UNIT-071, the Planner lock keys are absent (WEB-03, WEB-08).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Story 5.2 Task 7 owner: ten-locale parity for the `commerce.premium.*` tree.
 //
 // The premium namespace lives under `commerce.premium` (Decision 12a), but its
 // parity harness is this file: `commerce-locales.spec.ts` pins the 5.1 key set
 // exactly and excludes this subtree. The key list below is the
-// Decision 12a enumeration: the shared surface keys plus the three web-only
-// keys (`signedOutHint`, `plannerLocked.title`, `plannerLocked.cta`). The
-// mobile-only `unavailableInBuild` key deliberately has no web entry.
+// Decision 12a enumeration: the shared surface keys plus the web-only
+// `signedOutHint` (Story CC-7.12 removed the web-only `plannerLocked.title` and
+// `plannerLocked.cta` with the Planner lock). The mobile-only
+// `unavailableInBuild` key deliberately has no web entry.
 //
 // All non-English values are machine-translation drafts pending human review
 // before release (AC 7 / PRD NFR Localization 1). The parity checks hold the
@@ -141,8 +146,8 @@ describe('5.2 premium locale parity (web)', () => {
       'pendingApproval',
       'planAnnual',
       'planMonthly',
-      'plannerLocked.cta',
-      'plannerLocked.title',
+      // Story CC-7.12 D10, 7.12-UNIT-071: `plannerLocked.title` and `plannerLocked.cta` left with
+      // the Planner lock panel; the free preview's strings live under `looks.freePlan`.
       'portalLagHint',
       'restore',
       'sectionTitle',
@@ -213,6 +218,16 @@ describe('5.2 premium locale parity (web)', () => {
         disclosure.includes('CoutureCast'),
         `${locale} disclosure names the product`
       ).toBe(true)
+    }
+  })
+
+  it('7.12-UNIT-071 5.2-I18N-WEB-08 ships no Planner lock string in any locale', () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const keys = [...flatten(premiumTree(CATALOGS[locale])).keys()]
+      expect(
+        keys.filter((key) => key.startsWith('plannerLocked')),
+        locale
+      ).toEqual([])
     }
   })
 })

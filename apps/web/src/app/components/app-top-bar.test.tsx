@@ -6,6 +6,11 @@
 // layout are 7.9-E2E-001; this pins the structure every screen relies on.
 // Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md
 // Story CC-7.11 test owner (TEA): 7.11-UNIT-020 (history-aware back, D11), five desktop tabs (D1).
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12: the Looks sub-screens in these cases are the saved look detail and the capsules
+// manager (D5, D6); the CC-7.11 Plan route is gone.
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md
 // Test design: _bmad-output/test-artifacts/test-design-7-11-five-tab-navigation-back-pattern.md
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -138,10 +143,16 @@ describe('7.9-CMP-001 AppTopBar', () => {
     ])
   })
 
-  it('7.11-CMP-TOPBAR-02 marks Looks on a Looks sub-screen whose path sits under another tab', () => {
-    navigation.pathname = '/wardrobe/capsules'
+  // CC-7.12 D6: the capsules manager moved from /wardrobe/capsules to /looks/capsules.
+  it('7.11-CMP-TOPBAR-02 marks Looks, not Closet, on the capsules manager', () => {
+    navigation.pathname = '/looks/capsules'
     try {
-      render(<AppTopBar title="Outfit capsules" parentHref="/looks" />)
+      render(
+        <AppTopBar
+          title="Outfit capsules"
+          parentHref="/looks?segment=saved&filter=capsules"
+        />
+      )
       const primary = screen.getByRole('navigation', { name: 'Main navigation' })
       expect(within(primary).getByTestId('nav-looks')).toHaveAttribute(
         'aria-current',
@@ -183,8 +194,8 @@ describe('7.11-UNIT-020 AppTopBar history-aware back', () => {
   })
 
   it('with in-app history below, back calls router.back() and not replace', () => {
-    push('/looks/plan')
-    render(<AppTopBar title="Plan" parentHref="/looks" />)
+    push('/looks/saved/sl-1')
+    render(<AppTopBar title="Rainy commute" parentHref="/looks?segment=saved" />)
 
     const reachedDefault = clickReachesDefault(screen.getByTestId('app-top-bar-back'))
 
@@ -219,11 +230,11 @@ describe('7.11-UNIT-020 AppTopBar history-aware back', () => {
     expect(router.back).not.toHaveBeenCalled()
   })
 
-  it('[Codex 7.11 #1] Plan opened directly, then Today, then Plan: back steps back to Today, never replaces to Looks', async () => {
-    replace('/looks/plan')
+  it('[Codex 7.11 #1] a saved look opened directly, then Today, then the look: back steps back to Today, never replaces to Looks', async () => {
+    replace('/looks/saved/sl-1')
     push('/')
-    push('/looks/plan')
-    render(<AppTopBar title="Plan" parentHref="/looks" />)
+    push('/looks/saved/sl-1')
+    render(<AppTopBar title="Rainy commute" parentHref="/looks?segment=saved" />)
 
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
     expect(router.back).toHaveBeenCalledTimes(1)
@@ -234,11 +245,11 @@ describe('7.11-UNIT-020 AppTopBar history-aware back', () => {
     await settle()
     window.history.back()
     await settle()
-    expect(window.location.pathname).toBe('/looks/plan')
+    expect(window.location.pathname).toBe('/looks/saved/sl-1')
     fireEvent.click(screen.getByTestId('app-top-bar-back'))
     expect(router.back).toHaveBeenCalledTimes(1)
     expect(router.replace).toHaveBeenCalledTimes(1)
-    expect(router.replace).toHaveBeenCalledWith('/looks')
+    expect(router.replace).toHaveBeenCalledWith('/looks?segment=saved')
   })
 
   it('never calls both back and replace across repeated presses', () => {
@@ -263,8 +274,8 @@ describe('7.11-UNIT-020 AppTopBar history-aware back', () => {
   ] as const)(
     'a %s click keeps the link default and neither steps back nor replaces',
     (_name, init) => {
-      push('/looks/plan')
-      render(<AppTopBar title="Plan" parentHref="/looks" />)
+      push('/looks/saved/sl-1')
+      render(<AppTopBar title="Rainy commute" parentHref="/looks?segment=saved" />)
 
       const reachedDefault = clickReachesDefault(
         screen.getByTestId('app-top-bar-back'),

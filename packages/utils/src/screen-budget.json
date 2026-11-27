@@ -35,12 +35,16 @@
     "web": [
       "[data-testid^=\"garment-card-\"]",
       "[data-testid^=\"saved-look-card-\"]",
+      "[data-testid^=\"looks-capsule-card-\"]",
+      "[data-testid^=\"looks-idea-card-\"]",
       "article[data-testid*=\"lookbook-card-\"]"
     ],
     "native": [
       "[data-testid^=\"garment-card-\"]",
       "[data-testid^=\"garment-tile-\"]",
       "[data-testid^=\"saved-look-card-\"]",
+      "[data-testid^=\"looks-capsule-card-\"]",
+      "[data-testid^=\"looks-idea-card-\"]",
       "[data-testid^=\"community-post-card-\"]",
       "[data-testid^=\"highlighted-community-card-\"]"
     ]

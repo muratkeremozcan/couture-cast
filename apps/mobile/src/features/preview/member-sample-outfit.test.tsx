@@ -1,5 +1,11 @@
 // Learning path Step 60: Saved looks follow the account.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-60-saved-looks-follow-the-account
+// Learning path Step 69: Looks tab for saved looks, ideas and plans.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
+// Story CC-7.12 test owner (TEA): 7.12-NAT-023 (D7: the Home sample save confirmation gains View,
+// which opens the saved look's own screen) and 7.12-NAT-031 (D11: Plan your week opens the Looks
+// tab on Plan in one press).
+// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { userEvent } from 'vitest/browser'
@@ -74,9 +80,13 @@ describe('MemberSampleOutfit (mobile)', () => {
       </SaveFeedbackProvider>
     )
 
-    // Planner, add-garment, and location navigation actions work.
+    // Planner, add-garment, and location navigation actions work. [7.12-NAT-031] Plan your week
+    // opens Looks on Plan in one press; the old planner route is never pushed.
     fireEvent.click(screen.getByTestId('home-plan-week'))
-    expect(routerMock.push).toHaveBeenCalledWith('/planner')
+    expect(routerMock.navigate.mock.calls).toEqual([
+      [{ pathname: '/looks', params: { segment: 'plan' } }],
+    ])
+    expect(routerMock.push).not.toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('home-add-garment'))
     expect(routerMock.navigate).toHaveBeenCalledWith('/wardrobe?entry=add')
     fireEvent.click(screen.getByTestId('hero-add-location'))
@@ -254,6 +264,39 @@ describe('MemberSampleOutfit (mobile)', () => {
     fireEvent.click(screen.getByTestId('hero-retry'))
     expect(onRetry).toHaveBeenCalledTimes(1)
     await view.unmount()
+  })
+
+  it('[P1] [7.12-NAT-023] the save confirmation View opens the saved look screen of the look just saved', async () => {
+    const { store, handlers } = createSavedLooksMswHandlers()
+    server.use(...handlers)
+
+    await render(
+      <SaveFeedbackProvider>
+        <MemberSampleOutfit
+          owner="mobile-member-1"
+          error={null}
+          busy={false}
+          onRetry={vi.fn()}
+        />
+      </SaveFeedbackProvider>
+    )
+
+    fireEvent.click(await screen.findByTestId('sample-save-look'))
+    await waitFor(() => expect(store.items).toHaveLength(1))
+    const view = await screen.findByTestId('status-bar-action-view')
+    expect(view).toHaveTextContent('View')
+    expect(routerMock.push).not.toHaveBeenCalled()
+
+    fireEvent.click(view)
+    // D7: View names the look, with no `from`: the screen below is Today, not a Saved filter.
+    expect(routerMock.push.mock.calls).toEqual([
+      [
+        {
+          pathname: '/saved-look/[savedLookId]',
+          params: { savedLookId: store.items[0]!.id },
+        },
+      ],
+    ])
   })
 
   it('merges slow initial GET with early Save and handles 409 SAVED_LOOK_ALREADY_REMOVED and GET errors', async () => {

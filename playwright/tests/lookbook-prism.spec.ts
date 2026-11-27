@@ -3,6 +3,7 @@
 // Learning path Step 44: Community city spotlight.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-44-community-city-spotlight
 // Story 3.5 Task 6 step 4 owner: E2E smoke test responsive layout boundaries across viewports in `playwright/tests/lookbook-prism.spec.ts`
+// Story CC-7.12 (Step 69): Today's Plan week control links to the Looks Plan segment.
 import { log } from '@seontechnologies/playwright-utils/log'
 import { test as guestTest } from '../support/fixtures/merged-fixtures'
 import { communityTest, expect } from '../support/helpers/community-session'
@@ -26,7 +27,7 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
         },
       })
 
-      // Story CC-7.11 D9: Today no longer holds the planner (Plan is the `/looks/plan` route),
+      // Story CC-7.12 D11: Today no longer holds the planner (Plan is a Looks segment),
       // so this layout spec makes no planner read and needs no planner stub.
 
       await log.step('Set tablet viewport (1024x900) and verify stacked grid')
@@ -74,11 +75,11 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
       }
       await expect.poll(() => evenColumns(1280)).toBe(true)
       // Story CC-7.11 D9: the drawer that opened here is gone. Today carries no planner at any
-      // width, and its Plan week control is a link to the Plan route under Looks.
+      // width, and its Plan week control is a link to the Looks Plan segment (CC-7.12 D11).
       const plannerRail = page.getByRole('complementary', { name: /planner rail/i })
       const openControl = page.getByTestId('planner-open-control')
       await expect(plannerRail).toHaveCount(0)
-      await expect(openControl).toHaveAttribute('href', '/looks/plan')
+      await expect(openControl).toHaveAttribute('href', '/looks?segment=plan')
 
       await log.step('Set wide desktop viewport (1440x900) and verify no planner column')
       await page.setViewportSize({ width: 1440, height: 900 })

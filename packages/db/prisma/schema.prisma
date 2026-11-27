@@ -1402,6 +1402,7 @@ model OutfitCapsule {
   @@unique([user_id, idempotency_key])
   @@index([user_id])
   @@index([user_id, is_favorite(sort: Desc), updated_at(sort: Desc), id(sort: Asc)])
+  @@index([user_id, created_at(sort: Desc), id(sort: Asc)])
   @@index([user_id, updated_at(sort: Desc)])
   @@index([user_id, name])
   /// Leading-wildcard case-insensitive search cannot use a btree index.
@@ -2401,6 +2402,7 @@ model SavedLook {
   @@unique([id, user_id])
   @@unique([user_id, idempotency_key])
   @@index([user_id, deleted_at, updated_at(sort: Desc), id(sort: Asc)])
+  @@index([user_id, created_at(sort: Desc), id(sort: Asc)])
   @@index([user_id, source, anchor_garment_id])
   @@map("SavedLook")
 }

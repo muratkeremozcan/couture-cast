@@ -22,7 +22,6 @@ import { I18nextProvider, useTranslation } from 'react-i18next'
 import type {
   GarmentItemContract,
   GarmentWithColor,
-  SavedLookContract,
   WardrobeOnboardingStatus,
 } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
@@ -44,7 +43,6 @@ import {
   currentWebSessionBearer,
   currentWebSessionOwner,
   currentWebSessionScope,
-  UNVERIFIED_BEARER_OWNER,
   useHydrating,
   useWebSessionOwner,
 } from '../../lib/use-web-session'
@@ -57,12 +55,7 @@ import {
   scheduleStylePiecePhotoExpiry,
   type StylePieceSelection,
 } from '@couture/utils'
-import {
-  listSavedLooksPageFromWeb,
-  subscribeSavedLooksChanged,
-} from '../../lib/saved-looks'
 import { StylePieceEntry, StylePiecePanel } from './style-piece-panel'
-import { ClosetSavedLooksRow } from './saved-looks-row'
 import { ClosetMoreMenu } from './closet-more-menu'
 import { GarmentDetail, garmentPhotoAlt, type ClosetGarment } from './garment-detail'
 import { useGarmentDeletion, type GarmentDeleteMode } from './garment-deletion'
@@ -405,18 +398,6 @@ function readLiveWebBearer(): string | null {
   )
 }
 
-function resolveEffectiveSavedLooksOwner(
-  owner: string | null,
-  profileOwner: { id: string; bearer: string | null } | null,
-  liveBearer: string | null
-): string | null {
-  if (owner && owner !== UNVERIFIED_BEARER_OWNER) return owner
-  if (profileOwner && profileOwner.bearer && profileOwner.bearer === liveBearer) {
-    return profileOwner.id
-  }
-  return null
-}
-
 function withoutPendingDeletes(
   garments: ClosetGarment[],
   pendingIds: ReadonlySet<string>
@@ -521,8 +502,6 @@ type ClosetSnapshot = {
   onboardingStatusError: boolean
   userId: string | null
   userIdError: boolean
-  savedLooks: SavedLookContract[]
-  savedLooksTotal: number
 }
 
 const CLOSET_SNAPSHOT_PART = 'closet'
@@ -533,8 +512,6 @@ const EMPTY_CLOSET: ClosetSnapshot = {
   onboardingStatusError: false,
   userId: null,
   userIdError: false,
-  savedLooks: [],
-  savedLooksTotal: 0,
 }
 
 /**
@@ -559,8 +536,8 @@ function useClosetStart(owner: string | null): {
 }
 
 /**
- * Story CC-7.7 D3: the Closet body appears once the closet and the saved looks have answered for
- * the member. Story CC-7.11 (TEA d): the setup progress only names the More menu's Closet setup
+ * Story CC-7.7 D3: the Closet body appears once the closet has answered for the member (CC-7.12
+ * D8: saved looks left the Closet for Looks). Story CC-7.11 (TEA d): the setup progress only names the More menu's Closet setup
  * item, which updates in place in the top bar, and the account and setup notices sit below the
  * closet, so neither read holds the grid back and nothing is inserted above it afterwards.
  */
@@ -568,13 +545,8 @@ function closetGateReady(reads: {
   owner: string | null
   hasLoaded: boolean
   loadError: string | null
-  savedLooksSettled: boolean
 }): boolean {
-  return (
-    reads.owner !== null &&
-    (reads.hasLoaded || reads.loadError !== null) &&
-    reads.savedLooksSettled
-  )
+  return reads.owner !== null && (reads.hasLoaded || reads.loadError !== null)
 }
 
 /**
@@ -656,22 +628,8 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     start.onboardingStatusError
   )
   const [userId, setUserId] = useState<string | null>(start.userId)
-  const [profileOwnerBinding, setProfileOwnerBinding] = useState<{
-    id: string
-    bearer: string | null
-  } | null>(null)
   const [userIdError, setUserIdError] = useState(start.userIdError)
   const [styleSelection, setStyleSelection] = useState<StylePieceSelection | null>(null)
-  const [initialSavedLook, setInitialSavedLook] = useState<SavedLookContract | null>(null)
-  const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>(start.savedLooks)
-  const [savedLooksTotal, setSavedLooksTotal] = useState(start.savedLooksTotal)
-  // Story CC-7.7 D4: the Closet gate waits for the saved looks row's first read too, so the row
-  // (below the grid since CC-7.11) is in place at reveal.
-  const [savedLooksSettled, setSavedLooksSettled] = useState(restored)
-  const [savedLooksLoading, setSavedLooksLoading] = useState(false)
-  const [savedLooksLoadingMore, setSavedLooksLoadingMore] = useState(false)
-  const [savedLooksError, setSavedLooksError] = useState<string | null>(null)
-  const [savedLooksAttempt, setSavedLooksAttempt] = useState(0)
   const styleInvoker = useRef<HTMLButtonElement | null>(null)
   const styleLabels = getStylePieceStrings(i18n.language)
   const [, updatePhotoClock] = useState(0)
@@ -723,8 +681,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     useGarmentDetailRoute(garmentOpenRefs)
 
   const handleDetailTagsSaved = (updated: GarmentWithColor, startedVersion?: number) => {
-    // A saved look's Ready or Needs review status follows its anchor's live tags.
-    setSavedLooksAttempt((attempt) => attempt + 1)
     // A closet read that landed while the save was in flight is newer than this answer for
     // every other field, so keep it and read again instead of applying a stale row.
     if (startedVersion !== undefined && startedVersion !== inventoryVersion.current) {
@@ -750,8 +706,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     onCommitted: (garmentId) => {
       inventoryVersion.current++
       setGarments((current) => current.filter((item) => item.id !== garmentId))
-      // A saved look holding the piece now shows it as missing (CC-7.2).
-      setSavedLooksAttempt((attempt) => attempt + 1)
     },
   })
   // A piece inside its Undo window, or being sent, is hidden from the grid and the detail.
@@ -812,7 +766,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
    */
   useEffect(() => {
     const controller = new AbortController()
-    const capturedBearer = readLiveWebBearer()
     // Codex review P2-1, like the closet read: an answer read for a session scope the tab no
     // longer holds (a fixture bearer switch) is dropped and read again for the one it holds now.
     const scope = currentWebSessionScope()
@@ -822,15 +775,10 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
       return false
     }
     setUserIdError(false)
-    setProfileOwnerBinding(null)
     void resolveCurrentUserId()
       .then((id) => {
         if (!controller.signal.aborted && sameScope()) {
           setUserId(id)
-          const liveBearer = readLiveWebBearer()
-          if (id && capturedBearer && liveBearer === capturedBearer) {
-            setProfileOwnerBinding({ id, bearer: capturedBearer })
-          }
         }
       })
       .catch(() => {
@@ -901,129 +849,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
   }, [sessionAttempt, missedSession, loadAttempt, loadInventory])
 
   useEffect(() => () => pollingControllerRef.current?.abort(), [])
-
-  const savedLooksLoadEpochRef = useRef(0)
-  const effectiveSavedLooksOwner = resolveEffectiveSavedLooksOwner(
-    owner,
-    profileOwnerBinding,
-    readLiveWebBearer()
-  )
-
-  useEffect(() => {
-    const loadEpoch = ++savedLooksLoadEpochRef.current
-    setSavedLooksLoadingMore(false)
-    if (!owner) {
-      setSavedLooks([])
-      setSavedLooksTotal(0)
-      setSavedLooksError(null)
-      setSavedLooksLoading(false)
-      setSavedLooksSettled(true)
-      return
-    }
-    const controller = new AbortController()
-    // Codex review P2-1: a page read for a session scope the tab no longer holds is dropped and
-    // read again, and the row does not count as settled on it.
-    const scope = currentWebSessionScope()
-    let superseded = false
-    const sameScope = () => {
-      if (scope === currentWebSessionScope()) return true
-      superseded = true
-      setSavedLooksAttempt((attempt) => attempt + 1)
-      return false
-    }
-    setSavedLooksLoading(true)
-    void listSavedLooksPageFromWeb({
-      owner: effectiveSavedLooksOwner,
-      limit: 50,
-      offset: 0,
-      signal: controller.signal,
-    })
-      .then((page) => {
-        if (
-          controller.signal.aborted ||
-          savedLooksLoadEpochRef.current !== loadEpoch ||
-          currentWebSessionOwner() !== owner ||
-          !sameScope()
-        ) {
-          return
-        }
-        setSavedLooks(page.data)
-        setSavedLooksTotal(page.total)
-        setSavedLooksError(null)
-      })
-      .catch((error: unknown) => {
-        if (
-          controller.signal.aborted ||
-          savedLooksLoadEpochRef.current !== loadEpoch ||
-          !sameScope()
-        ) {
-          return
-        }
-        setSavedLooksError(
-          error instanceof Error ? error.message : 'Unable to load your saved looks.'
-        )
-        missedSession()
-      })
-      .finally(() => {
-        if (
-          !controller.signal.aborted &&
-          !superseded &&
-          savedLooksLoadEpochRef.current === loadEpoch
-        ) {
-          setSavedLooksLoading(false)
-          setSavedLooksSettled(true)
-        }
-      })
-    return () => controller.abort()
-  }, [owner, effectiveSavedLooksOwner, sessionAttempt, missedSession, savedLooksAttempt])
-
-  useEffect(() => {
-    if (!owner) return
-    return subscribeSavedLooksChanged((changedOwner) => {
-      if (changedOwner === owner || changedOwner === effectiveSavedLooksOwner) {
-        setSavedLooksAttempt((attempt) => attempt + 1)
-      }
-    })
-  }, [owner, effectiveSavedLooksOwner])
-
-  const loadMoreSavedLooks = useCallback(() => {
-    if (
-      !owner ||
-      savedLooksLoading ||
-      savedLooksLoadingMore ||
-      savedLooks.length >= savedLooksTotal
-    )
-      return
-    setSavedLooksLoadingMore(true)
-    const offset = savedLooks.length
-    const startLoadEpoch = savedLooksLoadEpochRef.current
-    void listSavedLooksPageFromWeb({ limit: 50, offset })
-      .then((page) => {
-        if (
-          savedLooksLoadEpochRef.current !== startLoadEpoch ||
-          currentWebSessionOwner() !== owner
-        ) {
-          return
-        }
-        setSavedLooks((current) => {
-          const seen = new Set(current.map((item) => item.id))
-          return [...current, ...page.data.filter((item) => !seen.has(item.id))]
-        })
-        setSavedLooksTotal(page.total)
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (savedLooksLoadEpochRef.current === startLoadEpoch) {
-          setSavedLooksLoadingMore(false)
-        }
-      })
-  }, [
-    owner,
-    savedLooks.length,
-    savedLooksLoading,
-    savedLooksLoadingMore,
-    savedLooksTotal,
-  ])
 
   const openCapture = (invoker: HTMLElement) => {
     captureInvokerRef.current = invoker
@@ -1157,12 +982,11 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     owner,
     hasLoaded,
     loadError,
-    savedLooksSettled,
   })
 
   // Story CC-7.7 D5: what a return to the Closet shows first, for this member only.
   useEffect(() => {
-    if (!owner || !hasLoaded || !savedLooksSettled) return
+    if (!owner || !hasLoaded) return
     // Under the scope its closet read started in; the store drops it once that scope left.
     screenSnapshot.remember(shownScopeRef.current, 'closet', CLOSET_SNAPSHOT_PART, {
       garments,
@@ -1170,8 +994,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
       onboardingStatusError,
       userId,
       userIdError,
-      savedLooks,
-      savedLooksTotal,
     } satisfies ClosetSnapshot)
   }, [
     garments,
@@ -1179,9 +1001,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
     onboardingStatus,
     onboardingStatusError,
     owner,
-    savedLooks,
-    savedLooksSettled,
-    savedLooksTotal,
     userId,
     userIdError,
   ])
@@ -1391,35 +1210,6 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
                   </div>
                 )}
               </section>
-              {/* D4: the saved looks row moved below the grid; CC-7.12 deletes it. */}
-              <div className="mt-8">
-                <ClosetSavedLooksRow
-                  owner={owner}
-                  savedLooks={savedLooks}
-                  totalCount={savedLooksTotal}
-                  hasMore={savedLooks.length < savedLooksTotal}
-                  isLoadingMore={savedLooksLoadingMore}
-                  onLoadMore={loadMoreSavedLooks}
-                  isLoading={savedLooksLoading}
-                  loadError={savedLooksError}
-                  garments={garments}
-                  onRetry={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-                  onChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
-                  onReopenStylePiece={(look, invoker) => {
-                    const anchor = garments.find(
-                      (item) => item.id === look.anchorGarmentId
-                    )
-                    if (!anchor || !anchor.category || !anchor.comfortRange) return
-                    styleInvoker.current = invoker as HTMLButtonElement
-                    setInitialSavedLook(look)
-                    setStyleSelection({
-                      id: anchor.id,
-                      category: anchor.category,
-                      comfortRange: anchor.comfortRange,
-                    })
-                  }}
-                />
-              </div>
               <ClosetAccountNotices {...noticeProps} />
             </div>
           </ScreenGate>
@@ -1447,16 +1237,13 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
       {owner && styleSelection && (
         <StylePiecePanel
           selection={styleSelection}
-          initialSavedLook={initialSavedLook}
           inWardrobe={garments.some(({ id }) => id === styleSelection.id)}
           loadInventory={loadInventory}
           owner={owner}
           locale={i18n.language}
           invoker={styleInvoker}
-          onSavedLooksChanged={() => setSavedLooksAttempt((attempt) => attempt + 1)}
           onClose={() => {
             setStyleSelection(null)
-            setInitialSavedLook(null)
           }}
         />
       )}

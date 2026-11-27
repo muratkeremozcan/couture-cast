@@ -119,6 +119,7 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
   assert.deepEqual(Object.keys(masks).sort(), [
     'community',
     'home',
+    'looks',
     'profile',
     'wardrobe',
   ])
@@ -132,6 +133,8 @@ test('[7.9-NVIS-U14b] masked rectangles are ignored, only for their own tab, and
   assert.deepEqual(masksFor('dark-wardrobe', masks), [strip])
   assert.equal(masksFor('light-profile', masks).length, 2)
   assert.equal(masksFor('light-community', masks).length, 2)
+  // Story CC-7.12 (Step 69): the seeded capsule's "Saved <date>" line changes every day.
+  assert.deepEqual(masksFor('dark-looks', masks), [[40, 814, 220, 36], strip])
   for (const entries of Object.values(masks))
     for (const { rect, reason } of entries) {
       assert.equal(rect.length, 4)

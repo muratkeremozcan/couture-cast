@@ -1,4 +1,6 @@
 # Story 5.5 Task 10: the 7-day outfit planner screen (Decision 7).
+# Story CC-7.12 (Step 69): the settings row opens Looks on Plan, and the locked panel became the
+# free preview (`plan-free-preview`, one `plan-upgrade`, `plan-free-day-0..6`).
 #
 # Honest scope, stated the same way premium-subscription.yaml and
 # palette-advisor.yaml state their own. `run-maestro.mjs` signs up a FRESH
@@ -6,7 +8,7 @@
 # `EXPO_PUBLIC_E2E_ACCESS_TOKEN` before the Expo server starts; no Maestro flow
 # in this repo signs in through the UI, and the app has no runtime token
 # override. The harness user therefore has no Premium entitlement, so this
-# flow can verify exactly one branch of the planner: the locked upsell
+# flow can verify exactly one branch of the planner: the free preview
 # (`screenState === 'locked'`, same panel `signed_out` renders), plus the
 # settings entry point and navigation that reach it.
 #
@@ -22,12 +24,12 @@
 # the seeded entitled user with a live API and database.
 #
 # What IS deterministic and asserted below: the premium settings block carries
-# a link row to the planner; the row navigates; and the planner screen renders
-# its localized title, its intro, and the locked panel with the upsell CTA --
+# a link row to the planner; the row opens Looks on Plan; and Plan renders the
+# localized tab title, the free preview's line, Upgrade and sample week --
 # never a day card, weather line, or reshuffle control, all of which the
 # entitlement guard rejects pre-handler.
 appId: ${MAESTRO_APP_ID}
-name: '7-day planner locked state'
+name: '7-day planner free preview'
 tags:
   - e2e
   - commerce
@@ -74,42 +76,47 @@ tags:
     retryTapIfNoChange: true
     label: 'Open the 7-day planner'
 
+# Story CC-7.12 (Step 69): the row opens the Looks tab on its Plan segment (the planner screen is
+# no longer pushed), and a non-entitled reader sees the free preview: one line, one Upgrade and
+# a sample week. The CC-7.11 locked panel (`planner-locked`, `planner-locked-cta`) is gone.
 - extendedWaitUntil:
     visible:
-      id: 'planner-screen'
+      id: 'plan-free-preview'
     timeout: 15000
-    label: 'Planner screen is the one on top'
+    label: 'Looks opens on Plan with the free preview after the entitlement check'
 
 # --- AC 7: the screen renders from the locale catalogs, not from literals -----
 
-# CC-7.9 D6: the stack's shared top bar carries the localized title; the body heading is gone.
-# By id: Android reports the bar's title beside app-top-bar, not under it, so childOf never matches.
+# CC-7.9 D6: the shared top bar carries the localized title. Plan is a Looks segment now, so the
+# bar names the tab and the Plan segment is the selected tab inside it.
 - assertVisible:
     id: 'app-top-bar-title'
-    # Story CC-7.11 D9, D10: Plan is a sub-screen of Looks, titled looks.plan.
-    text: 'Plan'
-    label: 'Localized screen title in the top bar'
+    text: 'Looks'
+    label: 'Localized tab title in the top bar'
+- assertVisible:
+    id: 'looks-segment-plan'
+    selected: true
+    label: 'The Plan segment is the open one'
 
 - assertVisible:
-    text: "See a starter outfit for each of the next seven days, built from your saved location's weather and wardrobe."
-    label: 'Intro copy renders in full'
+    text: 'Premium plans your whole week around your forecast.'
+    label: 'The one line on what Premium adds renders in full'
 
-# --- AC 5: a non-entitled reader sees the locked upsell and nothing else ------
-
-- extendedWaitUntil:
-    visible:
-      id: 'planner-locked'
-    timeout: 15000
-    label: 'Locked panel rendered after the entitlement check'
+# --- AC 5 (CC-7.12 D10): a non-entitled reader sees the free preview and no lock --
 
 - assertVisible:
-    text: 'The 7-Day Planner is a Premium feature'
-    label: 'Locked title names Premium'
-
+    id: 'plan-upgrade'
+    text: 'Upgrade'
+    label: 'One Upgrade, which opens Profile, not a dead control'
 - assertVisible:
+    id: 'plan-free-day-0'
+    label: 'The sample week starts today'
+- assertNotVisible:
+    id: 'planner-locked'
+- assertNotVisible:
     id: 'planner-locked-cta'
-    text: 'Get Premium'
-    label: 'Locked CTA routes to Settings, not a dead control'
+- assertNotVisible:
+    text: 'The 7-Day Planner is a Premium feature'
 
 # No day card, weather, or reshuffle control ever renders pre-entitlement --
 # the guard rejects the request before the handler runs.
@@ -121,12 +128,11 @@ tags:
     id: 'planner-load-error'
 
 - takeScreenshot:
-    path: maestro/artifacts/premium-planner-locked
+    path: maestro/artifacts/premium-planner-free-preview
 
-# Leave the stack as this flow found it. `open-settings.yaml` can pop a pushed
-# route on Android, but its iOS path cannot, so a flow that pushes has to
-# clean up after itself or the next flow on the same device starts on this
-# screen.
+# Leave the device as this flow found it. `open-settings.yaml` can pop a pushed
+# route on Android, but its iOS path cannot. CC-7.12: the row now switches tabs
+# instead of pushing, so this back only steps the Android tab history back.
 - runFlow:
     when:
       platform: Android

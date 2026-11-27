@@ -373,6 +373,18 @@ export const stateHandlers: StateHandlers = {
     configureProviderCapsuleState({ ownerUserId: userId, scenario: 'capsule-list' })
     return Promise.resolve({ description: 'Configured owner capsule list' })
   },
+  // Story CC-7.12 D3 (7.12-PACT-002): the Looks tab lists capsules newest saved first.
+  'Capsules exist for owner in created order': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderCapsuleState({
+      ownerUserId: userId,
+      scenario: 'capsule-list',
+      sort: 'created_desc',
+    })
+    return Promise.resolve({
+      description: 'Configured owner capsule list in created order',
+    })
+  },
   'A capsule exists for owner': (parameters?: unknown) => {
     const { userId, capsuleId } = (parameters ?? {}) as {
       userId?: string
@@ -1210,11 +1222,29 @@ export const stateHandlers: StateHandlers = {
     }
     configureProviderSavedLookState({
       scenario: 'ready',
+      sort: null,
       ...(userId ? { userId } : {}),
       ...(savedLookId ? { savedLookId } : {}),
     })
     return Promise.resolve({
       description: 'Configured account saved looks for member',
+    })
+  },
+
+  // Story CC-7.12 D3 (7.12-PACT-001): the Looks tab lists saved looks newest saved first.
+  'Member has account saved looks in created order': (parameters?: unknown) => {
+    const { userId, savedLookId } = (parameters ?? {}) as {
+      userId?: string
+      savedLookId?: string
+    }
+    configureProviderSavedLookState({
+      scenario: 'ready',
+      sort: 'created_desc',
+      ...(userId ? { userId } : {}),
+      ...(savedLookId ? { savedLookId } : {}),
+    })
+    return Promise.resolve({
+      description: 'Configured account saved looks for member in created order',
     })
   },
 }
