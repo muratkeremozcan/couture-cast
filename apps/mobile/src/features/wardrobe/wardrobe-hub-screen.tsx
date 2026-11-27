@@ -171,7 +171,11 @@ function showFirstReadSpinner(
 }
 
 export function WardrobeHubScreen(props: WardrobeHubScreenProps = {}) {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   const sessionSeen = useSessionSeen(mobileApplicationUserId())
   return (
     <MemberWardrobeHub key={epoch} epoch={epoch} sessionSeen={sessionSeen} {...props} />
@@ -866,7 +870,7 @@ const styles = StyleSheet.create({
   categoryChip: {
     justifyContent: 'center',
     minHeight: 44,
-    maxWidth: 180,
+    maxWidth: 280,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderWidth: 1,

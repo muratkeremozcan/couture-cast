@@ -22378,7 +22378,9 @@ Profile moves settings to seven titled destinations and keeps Sign out at the en
   [acceptance plan](../test-artifacts/test-design-7-16-calm-closet-profile.md).
 - [Web acceptance](../../playwright/tests/calm-closet-profile.spec.ts),
   [native Profile](../../apps/mobile/src/screens/screen-budget-profile.test.tsx), and
-  [native Closet](../../apps/mobile/src/features/wardrobe/five-tab-closet.test.tsx).
+  [native Closet](../../apps/mobile/src/features/wardrobe/wardrobe-hub-screen.test.tsx).
+  The [native Closet budget](../../apps/mobile/src/features/wardrobe/screen-budget-closet.test.tsx)
+  measures the space before the category row and garment grid.
 - [Android enlarged-text journey](../../maestro/subflows/calm-closet-profile-enlarged-text.yaml).
 - [Step 67](#step-67-screen-budget-guard) explains the screen limits and the ratchet.
   [Step 68](#step-68-five-tab-navigation-and-back-pattern) explains Back and the tab shell.

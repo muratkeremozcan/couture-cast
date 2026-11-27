@@ -4,8 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-68-five-tab-navigation-and-back-pattern
 'use client'
 
-import { I18nextProvider, useTranslation } from 'react-i18next'
-import { getI18n } from '../../../i18n'
+import { useTranslation } from 'react-i18next'
 import { NavRow } from '../../components/nav-row'
 import { SettingsDestination } from '../settings-destination'
 
@@ -35,10 +34,8 @@ function StyleRows() {
 /** D10: the top bar with back; a direct entry goes back to Profile. */
 export default function SettingsStylePage() {
   return (
-    <I18nextProvider i18n={getI18n()}>
-      <SettingsDestination topic="style">
-        <StyleRows />
-      </SettingsDestination>
-    </I18nextProvider>
+    <SettingsDestination topic="style">
+      <StyleRows />
+    </SettingsDestination>
   )
 }

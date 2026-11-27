@@ -207,7 +207,11 @@ function TopicBody({
 }
 
 function OwnerSettings({ children }: { children: ReactNode }) {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   return <View key={epoch}>{children}</View>
 }
 
@@ -283,9 +287,11 @@ export function AboutSettingsScreen() {
         <Pressable
           key={topic}
           accessibilityRole="link"
-          onPress={() =>
-            void Linking.openURL(`https://couture-cast-web.vercel.app/${topic}`)
-          }
+          onPress={() => {
+            void Linking.openURL(`https://couture-cast-web.vercel.app/${topic}`).catch(
+              () => undefined
+            )
+          }}
           style={[styles.actionButton, tone.actionButton]}
         >
           <Text style={styles.actionText}>{t(`settings.profile.${topic}`)}</Text>
@@ -1674,42 +1680,58 @@ function ProfileAccountHeader() {
   const [account, setAccount] = useState<{
     displayName: string | null
     email: string
-  } | null>(null)
+  } | null>()
   useFocusEffect(
     useCallback(() => {
       if (!signedIn) return
       const identity = mobileIdentityEpoch()
       const controller = new AbortController()
+      const stillCurrent = () =>
+        !controller.signal.aborted && identity === mobileIdentityEpoch()
       const scopedFetch: typeof fetch = (input, init) =>
         fetch(input, { ...init, signal: controller.signal })
       void getUserProfileFromMobile(scopedFetch)
         .then(({ user }) => {
-          if (controller.signal.aborted || identity !== mobileIdentityEpoch()) return
+          if (!stillCurrent()) return
           setAccount({ displayName: user.displayName?.trim() || null, email: user.email })
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (stillCurrent()) setAccount((previous) => previous ?? null)
+        })
       return () => controller.abort()
     }, [signedIn])
   )
 
+  const loading = signedIn === null || (signedIn && account === undefined)
+  const shownAccount = signedIn ? account : null
   return (
-    <View style={[styles.settingsSection, styles.accountHeader]} testID="profile-account">
+    <View
+      style={[styles.settingsSection, styles.accountHeader]}
+      testID="profile-account"
+      accessibilityState={{ busy: loading }}
+    >
       <Text style={[styles.accountCaption, tone.helpText]}>
         {t('settings.profile.account')}
       </Text>
-      {account?.displayName ? (
+      {shownAccount?.displayName ? (
         <Text style={styles.accountName} testID="profile-account-name">
-          {account?.displayName}
+          {shownAccount.displayName}
         </Text>
       ) : null}
-      <Text
-        style={
-          account?.displayName ? [styles.accountEmail, tone.helpText] : styles.accountName
-        }
-        testID="profile-account-email"
-      >
-        {account?.email ?? t('settings.profile.unavailable')}
-      </Text>
+      {loading ? (
+        <View testID="profile-account-reserved" style={styles.accountReserved} />
+      ) : (
+        <Text
+          style={
+            shownAccount?.displayName
+              ? [styles.accountEmail, tone.helpText]
+              : styles.accountName
+          }
+          testID="profile-account-email"
+        >
+          {shownAccount?.email ?? t('settings.profile.unavailable')}
+        </Text>
+      )}
     </View>
   )
 }
@@ -1736,6 +1758,7 @@ const styles = StyleSheet.create({
   accountHeader: {
     gap: 2,
   },
+  accountReserved: { minHeight: 22 },
   accountCaption: {
     fontSize: 12,
     fontWeight: '600',

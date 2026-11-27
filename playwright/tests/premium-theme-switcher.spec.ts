@@ -68,7 +68,7 @@ async function openThemeSettings(
 ): Promise<ThemeExchange> {
   const load = watchThemeCall(interceptNetworkCall, 'GET')
 
-  await page.goto('/settings')
+  await page.goto('/settings/premium')
 
   const exchange = await load
   await waitForAccessibilityReady(page)
@@ -141,7 +141,7 @@ anonymousTest.describe('Story 5.3 premium theme switcher, signed out', () => {
       })
 
       await log.step('Load settings signed out')
-      await page.goto('/settings')
+      await page.goto('/settings/premium')
       await waitForAccessibilityReady(page)
 
       await log.step('Assert the locked panel shows the signed-out copy, no gallery')
@@ -350,7 +350,7 @@ premiumSeededTest.describe(
           },
         })
 
-        await page.goto('/settings')
+        await page.goto('/settings/premium')
         const stubbed = await stubbedLoad
         expect(stubbed.status).toBe(200)
         await waitForAccessibilityReady(page)

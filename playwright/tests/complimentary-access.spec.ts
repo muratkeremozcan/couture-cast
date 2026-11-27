@@ -191,7 +191,7 @@ async function openSettings(
   interceptNetworkCall: InterceptNetworkCallFn
 ): Promise<unknown> {
   const access = interceptNetworkCall({ method: 'GET', url: `**${ACCESS_PATH}` })
-  await page.goto('/settings')
+  await page.goto('/settings/premium')
   const answered = await access
   expect(answered.status).toBe(200)
   await waitForAccessibilityReady(page)

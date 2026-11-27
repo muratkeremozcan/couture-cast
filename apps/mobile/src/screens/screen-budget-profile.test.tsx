@@ -153,6 +153,9 @@ describe('Screen budget: native Profile', () => {
       await profileSettled()
 
       const measurement = await measureNativeScreen('profile')
+      expect(screen.getByTestId('profile-notifications-row')).toHaveAccessibleName(
+        fixture === 'populated' ? 'Notifications, On' : 'Notifications, Off'
+      )
       expectNativeMeasureFloors(measurement, 'profile')
       expectNativeWithinBudget('profile', fixture, measurement)
     }, 30_000)

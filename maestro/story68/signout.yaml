@@ -7,11 +7,14 @@ appId: ${MAESTRO_APP_ID}
     direction: DOWN
     timeout: 15000
 - tapOn: ${MAESTRO_SIGNOUT}
-# Sign out returns to Settings, whose shopping section reads the signed-out session.
+# Profile returns first, then About and privacy shows the signed-out shopping state.
 - extendedWaitUntil:
     visible:
       id: settings-screen
     timeout: 15000
+- runFlow:
+    file: ../subflows/open-profile-topic.yaml
+    env: { PROFILE_TOPIC: 'about' }
 - scrollUntilVisible:
     element:
       id: commerce-settings-signed-out

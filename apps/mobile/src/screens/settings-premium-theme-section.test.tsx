@@ -14,6 +14,7 @@
 import { http, HttpResponse } from 'msw'
 import { act, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
 import {
@@ -484,6 +485,8 @@ describe('SettingsScreen interface palettes section', () => {
     serveTheme(themeResponse({ isEntitled: false }))
     await renderSettings()
 
+    expect(screen.queryByTestId('premium-theme-disclosure')).toBeNull()
+    await userEvent.click(await screen.findByTestId('settings-learn-more'))
     const disclosure = await screen.findByTestId('premium-theme-disclosure')
     expect(disclosure.textContent).toContain('Premium feature')
     expect(disclosure.textContent).toContain('analytics provider')
@@ -494,7 +497,7 @@ describe('SettingsScreen interface palettes section', () => {
   // Story CC-7.7 D3 (7.7-NAT-004): the provider answered at launch; Profile opening re-reads
   // the palette. The gate waits for that read, never the launch answer, so the locked panel
   // never shows first and turns into the gallery under the member's finger.
-  it('7.7-NAT-004 the Profile gate waits for the palette read it started, not the launch answer', async () => {
+  it('7.7-NAT-004 Premium waits for its palette read before showing the gallery or the locked panel', async () => {
     let themeReads = 0
     let releaseEntryRead!: () => void
     const entryReadHeld = new Promise<void>((resolve) => {
@@ -540,17 +543,12 @@ describe('SettingsScreen interface palettes section', () => {
       </AppThemeProvider>
     )
     await waitFor(() => expect(themeReads).toBe(2))
-    // Every other gate read answered; the launch answer (not entitled) is still applied.
-    expect(await screen.findByTestId('profile-account')).not.toBeVisible()
-    expect(await screen.findByTestId('premium-unavailable')).not.toBeVisible()
-    expect(await screen.findByTestId('commerce-opt-out-toggle')).not.toBeVisible()
-    expect(screen.getByTestId('premium-theme-locked')).not.toBeVisible()
-    expect(screen.getByTestId('screen-placeholder')).toBeVisible()
+    expect(screen.queryByTestId('premium-theme-locked')).toBeNull()
+    expect(screen.queryByTestId('premium-theme-gallery')).toBeNull()
 
     act(() => releaseEntryRead())
 
     await waitFor(() => expect(screen.getByTestId('premium-theme-gallery')).toBeVisible())
     expect(screen.queryByTestId('premium-theme-locked')).toBeNull()
-    expect(screen.queryByTestId('screen-placeholder')).toBeNull()
   })
 })

@@ -151,7 +151,7 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       const lines = lineCount(control)
       // Tab labels and full-sentence actions can use two lines on narrow phones.
       const canWrap = control.closest(
-        '[data-testid="sticky-bottom-nav"], [data-testid="guest-preview-entry"], [data-testid="commerce-opt-out-label"], [data-testid="closet-empty-state"]'
+        '[data-testid="sticky-bottom-nav"], [data-testid="guest-preview-entry"], [data-testid="commerce-opt-out-label"], [data-testid="closet-empty-state"], [data-testid^="profile-"][data-testid$="-row"], [data-testid="closet-setup-progress-link"]'
       )
       const maxLines = canWrap ? 2 : 1
       if (lines > maxLines) problems.push(`"${name}" wraps onto ${lines} lines`)

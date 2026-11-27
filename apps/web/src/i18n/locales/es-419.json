@@ -1049,6 +1049,7 @@
       "language": "Idioma",
       "about": "Acerca de y privacidad",
       "unavailable": "No disponible",
+      "notSet": "Sin configurar",
       "premiumActive": "Activo",
       "premiumFree": "Gratis",
       "on": "Activadas",

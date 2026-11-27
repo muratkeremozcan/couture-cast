@@ -107,6 +107,7 @@ describe('Profile and navigation locale parity (web)', () => {
       'settings.profile.language': 'Language',
       'settings.profile.about': 'About and privacy',
       'settings.profile.unavailable': 'Unavailable',
+      'settings.profile.notSet': 'Not set',
       'settings.profile.premiumActive': 'Active',
       'settings.profile.premiumFree': 'Free',
       'settings.profile.on': 'On',

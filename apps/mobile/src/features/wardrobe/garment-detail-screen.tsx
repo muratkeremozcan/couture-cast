@@ -55,6 +55,7 @@ import {
   useStatusBar,
 } from '@/components/save-feedback'
 import { createSchemeStyles } from '@/components/themed'
+import { underModalAccessibility } from '@/components/edge-to-edge-modal'
 import {
   mobileApplicationUserId,
   mobileIdentityEpoch,
@@ -101,7 +102,11 @@ export function GarmentDetailScreen({
   /** Story CC-7.6 D10: test seam; defaults to the app's one garment deletion. */
   deletion?: MobileGarmentDeletion
 }) {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   // The root provider's floating bar sits under a pushed native stack screen on Android, so the
   // detail always owns its bar. It floats over this screen (the route zeroes the tab bar
   // clearance) and forwards announcements to the root provider when one is mounted. Keyed by
@@ -251,7 +256,10 @@ function MemberGarmentDetail({
 
   return (
     <>
-      <View style={[styles.screen, themed.screen]}>
+      <View
+        style={[styles.screen, themed.screen]}
+        {...underModalAccessibility(Boolean(styleSelection))}
+      >
         {header}
         <ScrollView contentContainerStyle={styles.content} testID="garment-detail">
           <GarmentDetailPhoto garment={garment} label={title} onRefresh={closet.reload} />

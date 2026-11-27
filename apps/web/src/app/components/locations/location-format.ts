@@ -80,19 +80,23 @@ const HOME_PATH = '/'
 /**
  * The guided path's return target. No target means stay here (`null`). A target
  * must be a plain same-origin path: it is resolved against `origin` and kept only
- * when it stays on that origin. A backslash, or a percent-encoded slash,
- * backslash or percent sign anywhere (which a browser or a later decode can turn
- * into `//other.host`), is refused. A refused target returns home.
+ * when its canonical pathname starts with a single slash. Refuse control
+ * characters, backslashes and encoded separators before parsing. A refused
+ * target returns home.
  */
 export function safeReturnPath(value: string | null, origin: string): string | null {
   if (!value) return null
-  if (!value.startsWith(HOME_PATH) || /\\|%(2f|5c|25)/i.test(value)) return HOME_PATH
-  let resolved: URL
+  if (!value.startsWith(HOME_PATH) || /\\|%(2f|5c|25)|\p{Cc}/iu.test(value))
+    return HOME_PATH
   try {
-    resolved = new URL(value, origin)
+    const resolved = new URL(value, origin)
+    if (
+      resolved.origin !== new URL(origin).origin ||
+      !/^\/(?!\/)/.test(resolved.pathname)
+    )
+      return HOME_PATH
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`
   } catch {
     return HOME_PATH
   }
-  if (resolved.origin !== new URL(origin).origin) return HOME_PATH
-  return `${resolved.pathname}${resolved.search}${resolved.hash}`
 }

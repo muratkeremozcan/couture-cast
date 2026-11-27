@@ -274,7 +274,12 @@ test.describe('CC-7.11 Closet opens on its grid @local-lane', () => {
     const empty = page.getByTestId('closet-empty-state')
     await expectInFold(page, empty.getByRole('button'), 'empty-state Add')
     await expect(page.getByTestId('wardrobe-actions')).toHaveCount(0)
-    await expect(page.locator('main a[href="/wardrobe/onboarding"]')).toHaveCount(0)
+    const progress = page.getByTestId('closet-setup-progress-link')
+    await expect(progress).toHaveAttribute('href', '/wardrobe/onboarding')
+    const emptyBox = (await empty.boundingBox())!
+    expect((await progress.boundingBox())!.y).toBeGreaterThanOrEqual(
+      emptyBox.y + emptyBox.height - 1
+    )
     await expect(page.getByRole('button', { name: /^Silhouette$/ })).toHaveCount(0)
   })
 })

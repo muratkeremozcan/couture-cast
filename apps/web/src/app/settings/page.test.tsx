@@ -625,6 +625,20 @@ describe('Web settings page', () => {
     expect(screen.queryByTestId('profile-account-name')).toBeNull()
   })
 
+  it('7.16 distinguishes an unset name and primary place from a failed read', async () => {
+    signIn()
+    useMswHandlers(
+      profileHandler({ displayName: null, email: 'jade@example.test' }),
+      ...profileSummaryHandlers()
+    )
+    render(<SettingsPage />)
+
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-account-row')).toHaveTextContent('Not set')
+    )
+    expect(screen.getByTestId('profile-places-row')).toHaveTextContent('Not set')
+  })
+
   it('PROFILE-WEB-03 offers Profile destinations to a visitor without requesting member data', async () => {
     const asked = vi.fn()
     useMswHandlers(profileHandler(undefined, asked))

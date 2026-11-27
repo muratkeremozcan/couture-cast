@@ -11,6 +11,7 @@
 import { http, HttpResponse } from 'msw'
 import type { z } from 'zod'
 import {
+  communityNotificationPreferencesResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   garmentListWireResponseSchema,
@@ -120,6 +121,19 @@ export function serveScreenBudgetFixture(mode: ScreenBudgetMode, memberId: strin
     : []
 
   server.use(
+    http.get('*/api/v1/community/notification-preferences', () =>
+      parsed(communityNotificationPreferencesResponseSchema, {
+        data: {
+          enabled: populated,
+          pushEnabled: populated,
+          quietHoursEnabled: false,
+          quietHoursStart: '22:00',
+          quietHoursEnd: '07:00',
+          timezone: 'America/Chicago',
+          revision: 'budget-notification-preferences',
+        },
+      })
+    ),
     http.get('*/api/v1/ritual', () =>
       populated
         ? parsed(ritualResponseSchema, mockRitualResponse)

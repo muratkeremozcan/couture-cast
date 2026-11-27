@@ -3,14 +3,14 @@ title: 'Story CC-7.16: Calm Closet and Profile'
 type: feature
 ticket: '7-16-calm-closet-profile'
 created: '2026-11-27'
-status: in-review
+status: built
 baseline_revision: 'd64216fa612b494fbad164e264068f453f9b60f8'
 route: full
 route_source: auto
 risk: high
 review: thorough
 review_source: pinned
-lenses_ran: []
+lenses_ran: [independent-full-review, codex-security-diff]
 review_loop_iteration: 0
 context:
   - '_bmad-output/planning-artifacts/epics.md'
@@ -112,9 +112,35 @@ existing preference read accepts an abort signal for the summary.
 The new labels cover all ten locales on each client. About and privacy holds Shopping
 and partners on both clients. The disclosure remains above its switch.
 
+A completed read with an empty display name or location list shows Not set.
+If saved places have no primary, Profile names the first saved place. Account reserves
+the email line while it loads. Guided Places keeps a normalized return path only when it
+is a same-origin path with a single leading slash.
+
 ## Plan change log
 
 ## Review triage log
+
+The independent review compared `d64216fa612b494fbad164e264068f453f9b60f8` with
+`8a4ccc2bfcb5b2a4e26c642573ff5e6c6b3a0770`. Codex Security completed 104
+static worklist receipts, with 25 inventory exclusions and zero reportable findings.
+The review identified four high, six medium and three low items.
+
+| Finding | Verdict | Action                                                                                                   |
+| ------- | ------- | -------------------------------------------------------------------------------------------------------- |
+| P1-1    | High    | Assert the More accessible name and the full Learn more disclosure trigger.                              |
+| P1-2    | High    | Migrate native route, fold, Premium, and ready-card assertions.                                          |
+| P1-3    | High    | Migrate web settings callers and inspect updated baselines from CI.                                      |
+| P1-4    | High    | Route Maestro sign-out and Premium journeys through the topic rows.                                      |
+| P2-1    | Medium  | Validate the final origin-relative Places pathname after normalization.                                  |
+| P2-2    | Medium  | Provide the server snapshot for native identity stores.                                                  |
+| P2-3    | Medium  | Mask native garment detail during Style dismissal and provide web destination i18n explicitly.           |
+| P2-4    | Medium  | Distinguish empty, loading and failed account values. Both bearer helpers use the same storage fallback. |
+| P2-5    | Medium  | Handle legal link failures and widen large-text native chips.                                            |
+| P2-6    | Medium  | Test a real notification preference value and click through a garment status.                            |
+| P3-1    | Low     | Correct Step 73's native Closet references.                                                              |
+| P3-2    | Low     | Remove the unused browser guidance from native locale catalogs and update the test comment.              |
+| P3-3    | Low     | Restore German visual fixture changes during Maestro cleanup.                                            |
 
 ## Screen budget decisions
 

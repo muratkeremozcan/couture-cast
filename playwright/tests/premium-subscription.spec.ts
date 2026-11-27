@@ -164,7 +164,7 @@ premiumSeededTest.describe('Story 5.2 web settings, seeded active subscriber', (
       expect(loaded.responseJson?.data.purchasesEnabled).toBe(true)
 
       await log.step('Assert the section frame: title and processor disclosure')
-      await expect(page.getByRole('heading', { name: 'Premium' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Premium', level: 2 })).toBeVisible()
       const disclosure = page.getByTestId('premium-disclosure')
       await expect(disclosure).toContainText('RevenueCat')
       await expect(disclosure).toContainText('Stripe')
@@ -397,7 +397,7 @@ anonymousTest.describe('Story 5.2 web settings and planner rail signed out', () 
       await page.goto('/settings/premium')
       await waitForAccessibilityReady(page)
 
-      await expect(page.getByRole('heading', { name: 'Premium' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Premium', level: 2 })).toBeVisible()
       await expect(page.getByTestId('premium-disclosure')).toBeVisible()
       await expect(page.getByTestId('premium-signed-out-hint')).toHaveText(
         'Sign in to subscribe or manage Premium'

@@ -34,7 +34,11 @@ type Summary = {
 }
 
 export default function SettingsScreen() {
-  const epoch = useSyncExternalStore(subscribeMobileApplicationUser, mobileIdentityEpoch)
+  const epoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch,
+    mobileIdentityEpoch
+  )
   const analytics = useMobileAnalytics()
   useEffect(() => {
     analytics.capture('tab_two_viewed')
@@ -87,7 +91,8 @@ function MemberProfile({ epoch }: { epoch: number }) {
           if (account.status === 'fulfilled')
             next.name = account.value.user.displayName?.trim() || null
           if (places.status === 'fulfilled') {
-            const primary = places.value.find((place) => place.isPrimary)
+            const primary =
+              places.value.find((place) => place.isPrimary) ?? places.value[0]
             next.place = primary?.city || primary?.label || null
           }
           if (setup.status === 'fulfilled') next.setup = setup.value.status
@@ -108,9 +113,18 @@ function MemberProfile({ epoch }: { epoch: number }) {
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
   const neutral = t('settings.profile.unavailable')
+  const notSet = t('settings.profile.notSet')
   const rows = [
-    ['account', '/settings-account', summary?.name || neutral],
-    ['places', '/locations', summary?.place || neutral],
+    [
+      'account',
+      '/settings-account',
+      summary?.name === null ? notSet : (summary?.name ?? neutral),
+    ],
+    [
+      'places',
+      '/locations',
+      summary?.place === null ? notSet : (summary?.place ?? neutral),
+    ],
     [
       'style',
       '/settings-style',

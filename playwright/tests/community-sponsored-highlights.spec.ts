@@ -586,7 +586,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         method: 'GET',
         url: `**${COMMERCE_PREFERENCES_PATH}`,
       })
-      await page.goto('/settings')
+      await page.goto('/settings/about')
       await loaded
       const saved = interceptNetworkCall({
         method: 'PUT',

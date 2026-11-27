@@ -766,10 +766,17 @@ describe('WardrobeHubScreen', () => {
     render(<GarmentDetailScreen garmentId={garmentA.id} />)
 
     await expectDetailPhoto(garmentA.imageAccess!.url)
+    const detail = screen.getByTestId('garment-detail')
+    expect(
+      detail.closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toBeNull()
     await browserUser.click(
       await screen.findByRole('button', { name: 'Style this piece' })
     )
     const panel = await screen.findByTestId('style-piece-panel')
+    expect(
+      detail.closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toHaveAttribute('aria-hidden', 'true')
     const [firstLook] = await within(panel).findAllByTestId('style-piece-look')
     await browserUser.click(within(firstLook!).getByRole('button', { name: 'Save look' }))
     expect(await within(panel).findByTestId('style-piece-reopen')).toHaveAccessibleName(
@@ -782,6 +789,11 @@ describe('WardrobeHubScreen', () => {
     })
     await expectDetailPhoto(garmentB.imageAccess.url)
     expect(screen.queryByTestId('style-piece-panel')).toBeNull()
+    expect(
+      screen
+        .getByTestId('garment-detail')
+        .closest('[data-important-for-accessibility="no-hide-descendants"]')
+    ).toBeNull()
     await browserUser.click(screen.getByRole('button', { name: 'Style this piece' }))
     const otherPanel = await screen.findByTestId('style-piece-panel')
     const otherAnchors = await within(otherPanel).findAllByTestId('style-piece-anchor')

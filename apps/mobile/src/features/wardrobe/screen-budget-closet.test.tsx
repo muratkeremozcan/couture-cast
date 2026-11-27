@@ -257,7 +257,14 @@ describe('Screen budget: native Closet', () => {
       expect(chromeBefore(anchor), 'banners, alerts or setup before the closet').toEqual(
         []
       )
-      expect(textBefore(anchor), 'text before the closet').toEqual([])
+      const labelsStart =
+        fixture === 'populated' ? screen.getByTestId('closet-category-filters') : anchor
+      expect(textBefore(labelsStart), 'text before the Closet controls').toEqual([])
+      if (fixture === 'populated') {
+        expect(labelsStart.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+          anchor.getBoundingClientRect().top + 1
+        )
+      }
 
       const bar = screen.getByTestId('app-top-bar')
       const add = screen.getByTestId(ADD)

@@ -11,9 +11,9 @@
 // Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in apps/mobile/src/screens/tab-two-screen.test.tsx
 // Learning path Step 69: Looks tab for saved looks, ideas and plans.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-69-looks-tab-for-saved-looks-ideas-and-plans
-// Story CC-7.12 test owner (TEA): 7.12-NAT-031 (D11), Profile's `planner-link` opens the Looks
-// tab on Plan in one press.
-// Test design: _bmad-output/test-artifacts/test-design-7-12-looks-tab-saved-looks-ideas-plans.md.
+// Learning path Step 73: Calm Closet and Profile.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
+// Test design: _bmad-output/test-artifacts/test-design-7-16-calm-closet-profile.md.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { TAB_BODY_INSET } from '@/src/theme/tokens'

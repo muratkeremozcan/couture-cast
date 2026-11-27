@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-73-calm-closet-and-profile
 // Test design: _bmad-output/test-artifacts/test-design-7-16-calm-closet-profile.md.
 import type { Locator, Page } from '@playwright/test'
+import { suggestGarmentTagsWireResponseSchema } from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   FIXED_NOW,
@@ -151,7 +152,9 @@ test.describe('CC-7.16 Calm Closet and Profile @local-lane', () => {
     const header = page.getByTestId('app-header')
     await expect(header.getByRole('heading', { name: 'Closet' })).toBeVisible()
     await expect(header.getByTestId('garment-capture-open')).toHaveText(/Add/)
-    await expect(header.getByTestId('closet-more-menu')).toHaveAccessibleName('More')
+    await expect(header.getByTestId('closet-more-menu')).toHaveAccessibleName(
+      'More closet options'
+    )
 
     const filters = page.getByTestId('closet-category-filters')
     const grid = page.getByTestId('closet-garment-grid')
@@ -191,6 +194,34 @@ test.describe('CC-7.16 Calm Closet and Profile @local-lane', () => {
     await expect(bottom).toHaveCount(0)
     await filters.getByTestId('closet-category-all').click()
     await expect(bottom).toBeVisible()
+
+    const tagRead = interceptNetworkCall({
+      method: 'POST',
+      url: '**/api/v1/wardrobe/garments/awaiting_tags/suggest-tags',
+      fulfillResponse: {
+        status: 200,
+        body: suggestGarmentTagsWireResponseSchema.parse({
+          data: { mode: 'manual', garmentId: 'awaiting_tags' },
+        }),
+      },
+    })
+    await grid.getByRole('button', { name: 'Needs tags' }).click()
+    expect((await tagRead).status).toBe(200)
+    await expect(
+      page.getByRole('dialog', { name: 'Organize Garment Tags' })
+    ).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await grid.getByRole('button', { name: /^Failed\./ }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    await top.getByTestId('garment-open-ready-top').click()
+    await expect(
+      page.getByTestId('garment-detail').getByTestId('style-piece-open')
+    ).toBeEnabled()
   })
 
   test('[P1] [7.16-CLO-003] incomplete setup appears once below the garment grid and opens setup', async ({
@@ -239,7 +270,13 @@ test.describe('CC-7.16 Calm Closet and Profile @local-lane', () => {
       SHELL_PROFILE_NAME
     )
     await expect(places).toContainText('Chicago')
+    await expect(page.getByTestId('profile-style-row')).toContainText('Complete')
+    await expect(page.getByTestId('profile-premium-row')).toContainText('Active')
+    await expect(
+      page.getByTestId('profile-notifications-row').getByText('On', { exact: true })
+    ).toBeVisible()
     await expect(page.getByTestId('profile-language-row')).toContainText('English')
+    await expect(page.getByTestId('profile-about-row')).toContainText('CoutureCast')
     const signOut = page.getByTestId('profile-sign-out')
     await expect(signOut).toBeVisible()
     const lastRow = (await rows.last().boundingBox())!
@@ -264,6 +301,24 @@ test.describe('CC-7.16 Calm Closet and Profile @local-lane', () => {
     }
   })
 
+  test('[P0] [7.16-PRO-002] a saved guided Places link still opens the city search', async ({
+    page,
+    interceptNetworkCall,
+  }) => {
+    await openFixtureShell(page, interceptNetworkCall, {
+      mode: 'empty',
+      screen: 'profile',
+    })
+    await page.goto('/settings?addLocation=1&returnTo=%2Fcommunity#locations')
+
+    await expect(page).toHaveURL(
+      /settings\/places\?addLocation=1&returnTo=%2Fcommunity#locations$/
+    )
+    await expect(
+      page.getByTestId('locations-section').getByRole('combobox')
+    ).toBeFocused()
+  })
+
   test('[P1] [7.16-ACC-001] Language offers expandable help in place', async ({
     page,
     interceptNetworkCall,
@@ -276,7 +331,7 @@ test.describe('CC-7.16 Calm Closet and Profile @local-lane', () => {
 
     const help = page.getByTestId('settings-learn-more')
     const details = page.locator('details').filter({ has: help })
-    await expect(help).toHaveText('Learn more')
+    await expect(help).toHaveText(/Your browser sets the language\.\s*Learn more/)
     await expect(details).toHaveJSProperty('open', false)
     await help.press('Enter')
     await expect(details).toHaveJSProperty('open', true)
