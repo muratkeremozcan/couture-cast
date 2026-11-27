@@ -22,7 +22,7 @@ env:
   UNDERAGE_BIRTHDATE: '2016-06-01'
   ADULT_BIRTHDATE: '1990-05-05'
   UNDERAGE_ERROR: 'You must be 13 or older'
-  SAMPLE_LABEL: 'Sample looks and weather. Your closet and live weather stay separate.'
+  SAMPLE_LABEL: 'Sample looks and weather'
   ONE_REVIEWED: '1 of 9 reviewed'
 ---
 - launchApp:
@@ -146,7 +146,6 @@ env:
     element:
       id: 'sample-save-look'
     direction: UP
-    centerElement: true
 - tapOn:
     id: 'sample-save-look'
 - assertVisible:

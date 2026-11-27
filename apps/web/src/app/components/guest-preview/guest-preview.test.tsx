@@ -212,7 +212,7 @@ describe('guest preview surfaces', () => {
   it('shows the label, a complete outfit, sample weather and why it works (AC1, D4)', async () => {
     const outfit = await passGate()
     expect(screen.getByTestId('guest-preview-label').textContent).toBe(
-      en.chrome.sampleLabel
+      en.firstRun.sampleLabel
     )
     expect(garmentIds()).toEqual([
       'sample:g:oxford-shirt',
@@ -280,6 +280,25 @@ describe('guest preview surfaces', () => {
     expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
     expect(garmentIds()).toEqual(pieces)
   })
+
+  it.each(['create-account', 'sign-in'] as const)(
+    'stores a first-run intent when the guest chooses %s in the account sheet',
+    async (door) => {
+      await passGate()
+      fireEvent.click(screen.getByTestId('sample-save-look'))
+      const sheet = await screen.findByTestId('guest-preview-save-sheet')
+      const link = within(sheet).getByTestId(`guest-preview-${door}`)
+      fireEvent.click(link, { ctrlKey: true })
+      expect(JSON.parse(adapter.value() ?? '{}')).not.toHaveProperty('conversion')
+      fireEvent.click(link)
+      await waitFor(() =>
+        expect(JSON.parse(adapter.value() ?? '{}')).toHaveProperty(
+          'conversion.intent',
+          'guest-preview-save-look'
+        )
+      )
+    }
+  )
 
   it('reports no alternative when only one look suits', async () => {
     const store = useStore()

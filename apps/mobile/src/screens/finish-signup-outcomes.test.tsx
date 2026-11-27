@@ -49,7 +49,7 @@ const flow = vi.hoisted(() => ({
   finish: vi.fn(),
   read: vi.fn(),
   params: {} as Record<string, string>,
-  router: { back: vi.fn(), replace: vi.fn(), push: vi.fn() },
+  router: { back: vi.fn(), replace: vi.fn(), push: vi.fn(), dismissTo: vi.fn() },
   setOptions: vi.fn(),
   awaiting: vi.fn<(token: string) => Promise<string | null>>(),
   signOut: vi.fn<() => Promise<void>>(),
@@ -72,9 +72,16 @@ vi.mock('expo-localization', () => ({
   getCalendars: () => [{ timeZone: 'America/Chicago' }],
   getLocales: () => [{ languageTag: 'en-US' }],
 }))
-import { createGuestPreviewStore, SAMPLE_CATALOG } from '@couture/utils'
+import {
+  beginGuestLookSave,
+  createGuestPreviewStore,
+  SAMPLE_CATALOG,
+  selectSampleOutfit,
+  toSampleSelectionInput,
+} from '@couture/utils'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { setMobileGuestPreviewStoreForTests } from '@/src/lib/guest-preview-store'
+import { mobileGuestPreviewBirthdate } from '@/src/lib/guest-preview-birthdate'
 import SignupFinishRoute from '../../app/signup-finish'
 
 async function submit(birthdate: string) {
@@ -114,6 +121,64 @@ const headerTitle = () =>
   (flow.setOptions.mock.calls.at(-1)?.[0] as { title?: string } | undefined)?.title
 
 describe('finish step outcomes', () => {
+  it('CC-7.21 reuses the birthdate and lets a pending teen continue to the look review', async () => {
+    let stored: string | null = null
+    const store = createGuestPreviewStore({
+      catalog: SAMPLE_CATALOG,
+      adapter: {
+        read: () => Promise.resolve(stored),
+        write: (value) => {
+          stored = value
+          return Promise.resolve()
+        },
+        remove: () => {
+          stored = null
+          return Promise.resolve()
+        },
+      },
+    })
+    setMobileGuestPreviewStoreForTests(store)
+    try {
+      const birthdate = '2012-05-17'
+      const guest = store.start()
+      mobileGuestPreviewBirthdate.remember(guest, birthdate)
+      store.update((state) =>
+        beginGuestLookSave(
+          state,
+          selectSampleOutfit(toSampleSelectionInput(state), SAMPLE_CATALOG)
+        )
+      )
+      await store.flush()
+      flow.params = { from: 'preview', door: 'signup' }
+      flow.finish.mockResolvedValue({
+        kind: 'created',
+        account: {
+          userId: 'teen-1',
+          age: 14,
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      })
+      await render(
+        <AccessibilityAnnouncerProvider>
+          <SignupFinishRoute />
+        </AccessibilityAnnouncerProvider>
+      )
+      const field = await screen.findByTestId('finish-signup-birthdate')
+      await waitFor(() => expect(field).toHaveValue(birthdate))
+      await userEvent.click(screen.getByTestId('finish-signup-create'))
+      await userEvent.click(await screen.findByTestId('guardian-step-continue'))
+      await waitFor(() =>
+        expect(flow.router.replace).toHaveBeenCalledWith('/preview-continue')
+      )
+      expect(flow.finish).toHaveBeenCalledExactlyOnceWith(birthdate, true)
+      expect(flow.signOut).not.toHaveBeenCalled()
+    } finally {
+      mobileGuestPreviewBirthdate.clear()
+      setMobileGuestPreviewStoreForTests(undefined)
+    }
+  })
+
   it('keeps the under-13 refusal after the identity is signed out', async () => {
     flow.finish.mockImplementation(() => {
       // The refusal signs out locally: from here on there is no identity to read.

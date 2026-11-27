@@ -5,9 +5,16 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+// CC-7.21: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-78-first-look-and-account-save
 import { ResponseError } from '@couture/api-client'
+import type * as ApiClient from '@couture/api-client'
+import type * as SavedLooks from '../../../lib/saved-looks'
 import {
+  beginGuestLookSave,
   createGuestPreviewStore,
+  GUEST_PREVIEW_SAVE_INTENT,
+  selectSampleOutfit,
+  toSampleSelectionInput,
   GUEST_PREVIEW_CONVERSION_INTENT,
   GUEST_PREVIEW_GARMENT_INTENT,
   GUEST_PREVIEW_STRINGS,
@@ -51,6 +58,28 @@ vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
   resolveWebNextStep: api.nextStep,
 }))
 
+const lookApi = vi.hoisted(() => ({
+  read: vi.fn(),
+  style: vi.fn(),
+  save: vi.fn(),
+}))
+vi.mock('@couture/api-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof ApiClient>()),
+  requestStyleProfile: lookApi.read,
+}))
+vi.mock('../../../lib/use-web-session', () => ({
+  currentWebStyleScope: () => member.id,
+  captureWebStyleBearer: (scope: string) => (scope === member.id ? member.token : null),
+  subscribeWebStyleScope: () => () => undefined,
+}))
+vi.mock('../../../lib/style-profile', () => ({
+  saveWebStyleProfileForScope: lookApi.style,
+}))
+vi.mock('../../../lib/saved-looks', async (importOriginal) => ({
+  ...(await importOriginal<typeof SavedLooks>()),
+  createSavedLookFromWeb: lookApi.save,
+}))
+
 const en = GUEST_PREVIEW_STRINGS['en-US']
 const ACCOUNT: SampleComfort = {
   runsColdWarm: 'neutral',
@@ -86,19 +115,33 @@ async function seedProposal(
   intent:
     | typeof GUEST_PREVIEW_CONVERSION_INTENT
     | typeof GUEST_PREVIEW_GARMENT_INTENT
+    | typeof GUEST_PREVIEW_SAVE_INTENT
     | false = GUEST_PREVIEW_CONVERSION_INTENT
 ) {
   adapter = memoryAdapter()
   store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
   setWebGuestPreviewStoreForTests(store)
   store.start()
-  store.update((state) => ({
-    ...state,
-    comfort: PROPOSAL,
-    votes: { 'sample:l:city-wool': 'like' },
-    ...(intent ? { conversion: { intent } } : {}),
-  }))
+  const snapshot = store.update((state) => {
+    const draft = {
+      ...state,
+      comfort: PROPOSAL,
+      votes: { 'sample:l:city-wool': 'like' as const },
+    }
+    if (intent === GUEST_PREVIEW_SAVE_INTENT) {
+      const styled = {
+        ...draft,
+        preferences: { style: 'cozy', palette: 'colorful' },
+      } as const
+      return beginGuestLookSave(
+        styled,
+        selectSampleOutfit(toSampleSelectionInput(styled), SAMPLE_CATALOG)
+      )
+    }
+    return { ...draft, ...(intent ? { conversion: { intent } } : {}) }
+  })
   await store.flush()
+  return snapshot?.conversion
 }
 
 function server(initial: SampleComfort = ACCOUNT) {
@@ -376,5 +419,75 @@ describe('preview carryover review (D8)', () => {
     server()
     fireEvent.click(screen.getByRole('button', { name: en.chrome.retry }))
     expect(await screen.findByTestId('guest-preview-review-use')).toBeInTheDocument()
+  })
+})
+
+describe('CC-7.21 first-run look review', () => {
+  beforeEach(() => {
+    lookApi.read.mockReset().mockResolvedValue(null)
+    lookApi.style.mockReset().mockResolvedValue(undefined)
+    lookApi.save.mockReset().mockResolvedValue({ id: 'look-saved' })
+  })
+
+  it.each(['use', 'keep'] as const)(
+    'stores the exact look after the visitor chooses %s',
+    async (choice) => {
+      const conversion = await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+      if (conversion?.intent !== GUEST_PREVIEW_SAVE_INTENT)
+        throw new Error('Missing review')
+      const client = server()
+      render(<GuestPreviewReview />)
+      const proposed = await screen.findByTestId('guest-preview-review-proposed')
+      expect(proposed).toHaveTextContent('Cozy')
+      expect(proposed).toHaveTextContent('Colorful')
+      expect(lookApi.save).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByTestId(`guest-preview-review-${choice}`))
+      await waitFor(() =>
+        expect(navigation.replace).toHaveBeenCalledWith('/looks?segment=saved')
+      )
+      expect(lookApi.save).toHaveBeenCalledExactlyOnceWith(conversion.look, {
+        accessToken: 'token-a',
+        idempotencyKey: conversion.key,
+      })
+      if (choice === 'use') {
+        expect(client.write).toHaveBeenCalledWith(PROPOSAL)
+        expect(lookApi.style.mock.calls[0]?.[1]).toEqual({
+          mood: 'cozy',
+          palette: 'colorful',
+        })
+      } else {
+        expect(client.write).not.toHaveBeenCalled()
+        expect(lookApi.style).not.toHaveBeenCalled()
+      }
+      await waitFor(() => expect(adapter.value()).toBeNull())
+    }
+  )
+
+  it('cancels review without saving either the look or preferences', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    const client = server()
+    render(<GuestPreviewReview />)
+    fireEvent.click(await screen.findByTestId('guest-preview-review-cancel'))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    expect(client.write).not.toHaveBeenCalled()
+    expect(lookApi.save).not.toHaveBeenCalled()
+    await waitFor(() => expect(adapter.value()).toBeNull())
+  })
+
+  it('retries the same chosen operation after a lost save response', async () => {
+    await seedProposal(GUEST_PREVIEW_SAVE_INTENT)
+    lookApi.save.mockRejectedValueOnce(new Error('Response lost'))
+    const client = server()
+    render(<GuestPreviewReview />)
+    fireEvent.click(await screen.findByTestId('guest-preview-review-use'))
+    await screen.findByTestId('guest-preview-review-failed')
+    expect(screen.getByTestId('guest-preview-review-keep')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('guest-preview-review-use'))
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith('/looks?segment=saved')
+    )
+    expect(lookApi.save).toHaveBeenCalledTimes(2)
+    expect(lookApi.save.mock.calls[1]).toEqual(lookApi.save.mock.calls[0])
+    expect(client.write).toHaveBeenCalledOnce()
   })
 })

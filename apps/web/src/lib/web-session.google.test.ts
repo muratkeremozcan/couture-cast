@@ -55,14 +55,14 @@ function session(principal: string, token: string): Session {
   }
 }
 
-function profile(id: string) {
+function profile(id: string, role = 'guardian') {
   return {
     user: {
       id,
       email: `${id}@synthetic.test`,
       displayName: null,
       birthdate: null,
-      role: 'guardian',
+      role,
     },
     linkedGuardians: [],
     linkedTeens: [],
@@ -321,25 +321,30 @@ describe('completeWebOAuth: one outcome per callback, never a throw', () => {
     expect(sdk.signOut).toHaveBeenCalledTimes(1)
   })
 
-  // Owner's production loop (2026-11-15): the guardian lock answers a pending teen's profile
-  // check 403. The status names awaiting_guardian, so the session stays and nothing refuses.
-  it('awaiting_guardian: a teen the guardian lock refuses keeps the session and is not refused', async () => {
-    const seen = profileAnswers(json({ message: 'Guardian consent required' }, 403))
-    const federated = federatedAnswer(
-      json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
-    )
-    const auth = await load()
-    await expect(auth.completeWebOAuth(params('code=pending-teen'))).resolves.toEqual({
-      kind: 'awaiting_guardian',
-    })
-    expect(seen).toHaveLength(1)
-    expect(federated).toHaveLength(1)
-    expect(sdk.signOut).not.toHaveBeenCalled()
-    expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
-    await expect(auth.fetchWebAwaitingGuardianAccount('signed-google')).resolves.toBe(
-      'teen-pending-1'
-    )
-  })
+  it.each([403, 200])(
+    'awaiting_guardian preserves the identity when the profile responds %i',
+    async (status) => {
+      const seen = profileAnswers(
+        status === 200
+          ? json(profile('teen-pending-1', 'teen'))
+          : json({ message: 'Guardian consent required' }, status)
+      )
+      const federated = federatedAnswer(
+        json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
+      )
+      const auth = await load()
+      await expect(auth.completeWebOAuth(params('code=pending-teen'))).resolves.toEqual({
+        kind: 'awaiting_guardian',
+      })
+      expect(seen).toHaveLength(1)
+      expect(federated).toHaveLength(1)
+      expect(sdk.signOut).not.toHaveBeenCalled()
+      expect(sessionStorage.getItem(FINISH_MARKER)).toBeNull()
+      await expect(auth.fetchWebAwaitingGuardianAccount('signed-google')).resolves.toBe(
+        'teen-pending-1'
+      )
+    }
+  )
 
   it('complete then a 200 re-verify answers member', async () => {
     const seen = profileAnswers(unauthorized, json(profile('app-member-raced')))

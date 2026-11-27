@@ -155,12 +155,8 @@ test.describe('Jade first use on a phone', () => {
     const outfit = page.getByTestId('guest-preview-outfit')
     const nextLook = outfit.getByRole('button', { name: 'Shuffle', exact: true })
     await expect(outfit.getByRole('heading', { name: 'School day' })).toBeVisible()
-    await expect(
-      page.getByText(
-        'Sample looks and weather. Your closet and live weather stay separate.'
-      )
-    ).toBeVisible()
-    await expect(outfit.getByText('Drawings of clothes')).toBeVisible()
+    await expect(page.getByText('Sample looks and weather')).toBeVisible()
+    await expect(outfit.getByTestId('guest-preview-garment')).toHaveCount(3)
     await nextLook.click()
     await expect(outfit.getByRole('heading', { name: 'Silk midi' })).toBeVisible()
 

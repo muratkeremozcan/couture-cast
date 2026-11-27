@@ -611,10 +611,10 @@ describe('the lane runs the tests of its guardian consent policy', () => {
     ).toBe('required_13_15')
   })
 
-  it('expects sixty-five tests under off and five under required_13_15', () => {
-    expect(expectedRealSessionTests('off')).toBe(65)
-    expect(expectedRealSessionTests('required_13_15')).toBe(5)
-    expect(EXPECTED_CONSENT_REQUIRED_TESTS).toBe(5)
+  it('counts both first-run save cases in each consent policy lane', () => {
+    expect(expectedRealSessionTests('off')).toBe(67)
+    expect(expectedRealSessionTests('required_13_15')).toBe(7)
+    expect(EXPECTED_CONSENT_REQUIRED_TESTS).toBe(7)
   })
 
   it('keeps each lane to its own tests, tags included in the matched title', () => {

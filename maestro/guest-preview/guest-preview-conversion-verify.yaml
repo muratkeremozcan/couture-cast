@@ -59,7 +59,6 @@ env:
     element:
       id: 'guest-preview-review-use'
     direction: DOWN
-    centerElement: true
 - tapOn:
     id: 'guest-preview-review-use'
 - extendedWaitUntil:

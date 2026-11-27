@@ -25,7 +25,7 @@ import {
 } from '../support/helpers/commerce-session'
 
 const STORAGE_KEY = 'couturecast.guest-preview'
-const LABEL = 'Sample looks and weather. Your closet and live weather stay separate.'
+const LABEL = 'Sample looks and weather'
 
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
@@ -330,6 +330,55 @@ test.describe('Guest preview (signed out)', () => {
     await expect(sneakers).toBeVisible()
     expect(await garmentIds(page)).toEqual(editedPieces)
   })
+
+  for (const [door, path] of [
+    ['create-account', '/signup'],
+    ['sign-in', '/signin'],
+  ] as const) {
+    test(`[P0] [7.21-PRIVACY] leaving ${path} clears the date and keeps the guest look`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1100, height: 820 })
+      await page.goto('/')
+      const origin = await page.evaluate(() => performance.timeOrigin)
+      const entry = page.getByTestId('guest-preview-entry')
+      await entry.click()
+      await passGate(page)
+      await page.getByTestId('guest-preview-swap-shoes').click()
+      await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
+      const shoe = page.getByTestId('guest-preview-outfit').getByText('White sneakers', {
+        exact: true,
+      })
+      await expect(shoe).toBeVisible()
+      const pieces = await garmentIds(page)
+      const save = page.getByTestId('sample-save-look')
+      const sheet = page.getByTestId('guest-preview-save-sheet')
+      await save.click()
+      await sheet.getByTestId(`guest-preview-${door}`).click()
+      await expect(page).toHaveURL(`${path}?from=preview`)
+      if (door === 'create-account') {
+        await expect(page.getByLabel('Birthdate')).toHaveValue('2000-01-15')
+        await page.getByTestId('primary-nav').getByTestId('nav-ritual').click()
+      } else {
+        const legal = page.getByRole('navigation', { name: 'Legal', exact: true })
+        await legal.getByRole('link', { name: 'Privacy Policy', exact: true }).click()
+        await expect(page).toHaveURL('/privacy')
+        expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+        await legal.getByRole('link', { name: 'Home', exact: true }).click()
+      }
+      await expect(page).toHaveURL('/')
+      // Keep the same document so a reload cannot clear the memory on the test's behalf.
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+      await entry.click()
+      await expect(shoe).toBeVisible()
+      expect(await garmentIds(page)).toEqual(pieces)
+      await save.click()
+      await sheet.getByTestId('guest-preview-create-account').click()
+      await expect(page).toHaveURL('/signup?from=preview')
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(origin)
+      await expect(page.getByLabel('Birthdate')).toHaveValue('')
+    })
+  }
 
   test('[P1] [UX-FIRST-004] the first outfit actions fit at 320 px with enlarged text', async ({
     page,

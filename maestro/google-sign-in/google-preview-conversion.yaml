@@ -60,14 +60,12 @@ env:
     element:
       id: 'guest-preview-nav-preferences'
     direction: UP
-    centerElement: true
 - tapOn:
     id: 'guest-preview-nav-preferences'
 - scrollUntilVisible:
     element:
       id: 'guest-preview-garment-create-account'
     direction: DOWN
-    centerElement: true
 - tapOn:
     id: 'guest-preview-garment-create-account'
 - extendedWaitUntil:
@@ -77,7 +75,10 @@ env:
     label: 'Signup opened from the preview'
 - runFlow: steps/continue-with-google.yaml
 - runFlow: steps/finish-step.yaml
-- runFlow: steps/enter-birthdate.yaml
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'finish-signup-create'
 - extendedWaitUntil:
     visible:
       id: 'guest-preview-review-proposed'

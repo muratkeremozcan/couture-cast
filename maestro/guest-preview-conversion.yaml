@@ -86,7 +86,6 @@ env:
     element:
       id: 'sample-save-look'
     direction: UP
-    centerElement: true
 - tapOn:
     id: 'sample-save-look'
 - assertVisible:

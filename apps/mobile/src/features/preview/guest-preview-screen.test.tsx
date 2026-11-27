@@ -287,7 +287,7 @@ describe('mobile guest preview gate (M-GATE-*)', () => {
     await waitFor(() => expect(adapter.value()).not.toBeNull())
     expect(adapter.value()).not.toContain('2000-01-15')
     expect(screen.getByTestId('guest-preview-label').textContent).toBe(
-      en.chrome.sampleLabel
+      en.firstRun.sampleLabel
     )
     expect(analytics.capture).toHaveBeenCalledWith('guest_preview_started', {
       platform: expect.stringMatching(/^(ios|android)$/) as string,
