@@ -512,6 +512,7 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       )
       await page.goto('/community')
       await refused
+      await expect(page.getByTestId('screen-gate')).toHaveAttribute('data-ready', 'true')
       await expect(page.getByTestId('community-feed-signed-out')).toBeVisible()
 
       const signIn = page.getByTestId('community-page').getByRole('link', {

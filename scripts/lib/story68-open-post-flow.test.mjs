@@ -28,11 +28,11 @@ test('every way the post can be missing fails with its own named reason', () => 
 })
 
 test('the walk restores the list position upward, then walks down, both bounded and both named', () => {
-  const [up, down, opener] = repeats
-  assert.equal(repeats.length, 3)
+  const [up, down] = repeats
+  assert.equal(repeats.length, 2)
   assert.equal(up.target, AUTHOR)
   assert.equal(down.target, AUTHOR)
-  assert.ok(up.at < down.at && down.at < opener.at)
+  assert.ok(up.at < down.at)
   // The upward drag moves toward the top: it ends lower on the screen than it starts.
   const upDrag = /start: 50%, (\d+)%\n\s*end: 50%, (\d+)%/.exec(
     flow.slice(up.at, down.at)
@@ -43,6 +43,13 @@ test('the walk restores the list position upward, then walks down, both bounded 
   assert.match(
     flow,
     new RegExp(`label: 'post_not_within_${up.times}_up_${down.times}_down_swipes'`)
+  )
+})
+
+test('the feed title opens post detail before the Share control is reached', () => {
+  assert.match(
+    flow,
+    /- tapOn:\n\s+id: community-card-title-\$\{MAESTRO_POST_ID\}\n- extendedWaitUntil:\n\s+visible:\n\s+id: community-post-detail\n\s+timeout: \d+\n- scrollUntilVisible:\n\s+element:\n\s+id: community-share-card-open-\$\{MAESTRO_POST_ID\}/
   )
 })
 

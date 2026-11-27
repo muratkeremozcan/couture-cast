@@ -76,10 +76,7 @@ export interface UseCommunitySpotlightOptions<Token = number> {
     token: Token
   ) => CommunitySpotlightItem[]
   /** Visible candidates for paging feedback. The ranked read and cursor remain intact. */
-  visiblePage?: (
-    items: CommunitySpotlightItem[],
-    append: boolean
-  ) => CommunitySpotlightItem[]
+  visiblePage?: (items: CommunitySpotlightItem[]) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
   /**
    * Story CC-7.7 D5: the state a return to the tab starts from (its last settled spotlight for
@@ -245,7 +242,7 @@ export function useCommunitySpotlight<Token = number>({
             loadingMore: false,
             moreFailed: false,
             focusTargetId: restarted
-              ? ((visiblePageRef.current?.(merged, false) ?? merged)[0]?.id ?? null)
+              ? ((visiblePageRef.current?.(merged) ?? merged)[0]?.id ?? null)
               : null,
           }
         })
@@ -280,7 +277,7 @@ export function useCommunitySpotlight<Token = number>({
         stateRef.current.items,
         reconcileRef.current(page.items, ticket)
       )
-      const visible = visiblePageRef.current?.(added, true) ?? added
+      const visible = visiblePageRef.current?.(added) ?? added
       setState((current) => {
         const currentById = new Map(current.items.map((item) => [item.id, item]))
         const incoming = newEntries(current.items, added).map((item) =>
@@ -297,9 +294,8 @@ export function useCommunitySpotlight<Token = number>({
           focusTargetId: visible[0]?.id ?? null,
         }
       })
-      // A page whose posts were all filtered or already shown changes nothing
-      // the reader can hear, so it stays silent and View more stays for the
-      // cursor it returned.
+      // The announcement counts additions to the ranked section, including
+      // looks promoted from the ordinary feed.
       if (visible.length > 0)
         announceRef.current({
           key: 'community.spotlight.announceLoadedMore',

@@ -5,6 +5,7 @@
 // full-page contrast scans. Test design:
 // _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 // Story CC-7.12 (Step 69): Plan week opens the Looks Plan segment (/looks?segment=plan).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
@@ -155,7 +156,15 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
             expectedSurface
           )
           await measureThroughOverlays(page)
+          const actions = card.getByTestId('community-card-actions')
+          const report = card.getByRole('button', { name: enUS.community.card.report })
+          await expect(report).toBeHidden()
           expect(await textContrastFailures(card), `${name} text`).toEqual([])
+          await actions.click()
+          await expect(report).toBeVisible()
+          expect(await textContrastFailures(report), `${name} Report`).toEqual([])
+          await actions.press('Escape')
+          await expect(report).toBeHidden()
         }
 
         // The planner, reached from Home in the same document. Story CC-7.12 D11: Plan week links

@@ -786,6 +786,13 @@ function enumerate(root: Locator): Promise<Target[]> {
     const clippedAway = (el: Element) => {
       let escapeTo: Element | 'all' | null = null
       for (let node: Element | null = el; node; node = node.parentElement) {
+        if (
+          node !== el &&
+          node instanceof HTMLDetailsElement &&
+          !node.open &&
+          !node.querySelector(':scope > summary')?.contains(el)
+        )
+          return true
         const style = getComputedStyle(node)
         if (clipsAll(style)) return true
         if (node === escapeTo) escapeTo = null
@@ -981,7 +988,8 @@ async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailur
  * Every visible text run, filled field and closed select inside `root` whose painted text is
  * below its WCAG minimum, not painted at all, or painted over a background that is not uniform
  * (refused: the best pixel would not stand for the run). Disabled controls are skipped (WCAG 1.4.3
- * exempts an inactive control), and so is visually hidden text: a 1 px box (`sr-only`), or
+ * exempts an inactive control). Collapsed details content and visually hidden text are skipped:
+ * a 1 px box (`sr-only`), or
  * text inside one, clipped by clip rect(0 0 0 0), clip-path inset(50%) or a 1 px overflow box.
  * An empty field is refused: the caller fills it, and measures its placeholder with
  * `placeholderContrastFailures` first. A target re-rendered mid-measurement is found again by

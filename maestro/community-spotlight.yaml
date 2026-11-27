@@ -56,7 +56,6 @@ tags:
     element:
       id: 'community-spotlight-view-more'
     direction: DOWN
-    centerElement: true
     timeout: 60000
 - tapOn:
     id: 'community-spotlight-view-more'

@@ -2930,12 +2930,9 @@ export function CommunityLookbookGrid({
           : []
       })
     },
-    visiblePage: (page, append) => {
+    visiblePage: (page) => {
       if (!communityAvailable || bannedSanction || rowsMode !== currentMode) return []
-      const matching = mergeCommunityLooks(page, [], climate, teaserTarget)
-      if (!append) return matching
-      const shown = new Set(renderedItemsRef.current.map((item) => item.id))
-      return matching.filter((item) => !shown.has(item.id))
+      return mergeCommunityLooks(page, [], climate, teaserTarget)
     },
     announce: (message) => {
       setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })

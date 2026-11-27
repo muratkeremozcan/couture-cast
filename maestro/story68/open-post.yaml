@@ -3,6 +3,7 @@ appId: ${MAESTRO_APP_ID}
 # Opens the owned post's Share card from the Community feed card. The walk is bounded and
 # every way the post can be missing fails with its own label instead of a kill at the
 # Maestro budget. The budget is derived from this file in story68-flow-timeouts.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-72-calm-community-with-an-empty-state
 - tapOn:
     id: tab-community
 - extendedWaitUntil:
@@ -70,7 +71,6 @@ appId: ${MAESTRO_APP_ID}
       id: community-share-card-open-${MAESTRO_POST_ID}
     direction: DOWN
     timeout: 30000
-    centerElement: true
 # AX can count the opener under the tab bar, and Maestro reports a tap on that edge as
 # completed although the app never received the press (run 40984431884: the opener spanned
 # the tab bar edge and no press reached the app). Each attempt lifts the list a short

@@ -647,11 +647,9 @@ for (const locale of supportedLocales)
       await expect(opener).toBeFocused()
       await opener.click()
       await expect(preview).toHaveAttribute('data-loaded', 'true')
-      await opener.evaluate((el) => el.remove())
+      await opener.evaluate((el) => el.setAttribute('disabled', ''))
       await page.keyboard.press('Escape')
-      await expect(
-        page.locator('[data-share-card-focus-fallback="community"]')
-      ).toBeFocused()
+      await expect(detailModal(page).getByTestId('app-top-bar-back')).toBeFocused()
     })
   })
 test('P-BOOTSTRAP: the rebuilt own feed post is verified before the initial feed response arrives', async ({
@@ -1306,18 +1304,21 @@ test('P-CANCEL-SAVE: closing during held save authorization prevents browser han
     await navigationGate.started
     const navigationCancelled = cancellationWitness(page, navigationGate.request!)
     const layerUrl = page.url()
-    // Story CC-7.11 D13: the composer owns one same-URL history entry, so the first browser
-    // back closes the layer on this page (and cancels the held save); the second leaves.
+    // Share and post detail each own a same-URL history entry.
     await page.goBack()
     await expect(dialog).not.toBeVisible()
     expect(page.url(), 'back closed the layer without leaving the page').toBe(layerUrl)
-    await expect(page.getByTestId('share-card-save')).toHaveCount(0)
+    await expect(detailModal(page)).toBeVisible()
+    await expect(opener).toBeFocused()
     navigationGate.release()
     await navigationGate.finished
     expect(
       await navigationCancelled,
       'closed save authorization request was cancelled'
     ).toBe(true)
+    await page.goBack()
+    await expect(detailModal(page)).toHaveCount(0)
+    expect(page.url(), 'back closed the detail without leaving the page').toBe(layerUrl)
     await page.goBack()
     await expect(page).toHaveURL('/')
     await sameDocument()

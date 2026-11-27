@@ -126,8 +126,7 @@ export function useCommunitySpotlight({
   onRefreshFailed?: (retry: () => void) => void
   /** Selects visible paging feedback without dropping ranked reads or their cursor. */
   visiblePage?: (
-    items: CommunityReactionSpotlightItem[],
-    append: boolean
+    items: CommunityReactionSpotlightItem[]
   ) => CommunityReactionSpotlightItem[]
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
@@ -240,7 +239,7 @@ export function useCommunitySpotlight({
         })
         setNextCursor(page.nextCursor)
         if (restarted) {
-          const visible = visiblePageRef.current?.(shown, false) ?? shown
+          const visible = visiblePageRef.current?.(shown) ?? shown
           focusSerialRef.current += 1
           setFocusRequest({
             kind: 'refreshed',
@@ -317,9 +316,9 @@ export function useCommunitySpotlight({
         })
         // View more stays for the cursor this page returned.
         setNextCursor(page.nextCursor)
-        // A page whose posts were all filtered or already shown changes nothing
-        // the reader can hear, so it moves no focus and stays silent.
-        const visible = visiblePageRef.current?.(added, true) ?? added
+        // Count additions to the ranked section, including looks promoted from
+        // the ordinary feed.
+        const visible = visiblePageRef.current?.(added) ?? added
         const first = visible[0]
         if (first) {
           focusSerialRef.current += 1

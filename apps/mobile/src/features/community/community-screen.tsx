@@ -302,7 +302,6 @@ export function CommunityScreen() {
     intent: number
     scope: string
   } | null>(null)
-  const visibleFeedRows = useRef<readonly CommunityFeedItem[]>([])
   const newPostButtonRef = useRef<View>(null)
   const cardRefs = useRef(new Map<string, View>())
   const [deepLinkPost, setDeepLinkPost] = useState<CommunityFeedItem | null>(null)
@@ -463,12 +462,9 @@ export function CommunityScreen() {
     sponsorships,
     postTextLedger,
     onBanned: setBannedSanction,
-    visiblePage: (page, append) => {
-      if (!communityAvailable || (append && feedState !== 'ready')) return []
-      const matching = mergeCommunityLooks(page, [], climate, teaserTarget)
-      if (!append) return matching
-      const shown = new Set(visibleFeedRows.current.map((item) => item.id))
-      return matching.filter((item) => !shown.has(item.id))
+    visiblePage: (page) => {
+      if (!communityAvailable || feedState !== 'ready') return []
+      return mergeCommunityLooks(page, [], climate, teaserTarget)
     },
     onRefreshFailed: (retry) => {
       statusBar.showNotice({
@@ -1826,7 +1822,6 @@ export function CommunityScreen() {
     spotlightItems,
     teaserTarget,
   ])
-  visibleFeedRows.current = feedRows
   const climateEmpty = climate !== null && feedRows.length === 0 && Boolean(sessionScope)
   // Story CC-7.7 D3: the Community gate waits for the first feed page and the City Spotlight,
   // so the Spotlight never arrives above a feed the member is already reading. A Spotlight

@@ -46,12 +46,11 @@ export const EXPO_GO_OPEN_WORST_CASE_MS =
   EXPO_GO_TAPS * EXPO_GO_TAP_MS
 
 /**
- * open-post.yaml on iOS (its slower platform): 10 s + 20 s + 20 s of declared waits, and 13
- * budgeted steps outside the guarded opener tap: 2 feed-state checks, 3 up and 5 down walk
- * iterations, 2 opener iterations and the post assertion. The opener tap is a retry of
- * maxRetries 2 (3 attempts); an attempt is the composer-title guard check, the lift swipe, the
- * guard check before the tap and the 5 s wait for the composer title. Every named failure fires inside this budget, so a
- * missing post is reported, not killed.
+ * open-post.yaml waits for Community (10 s), the feed (20 s), the title scroll (30 s),
+ * the detail (15 s), the Share control scroll (30 s) and the preview (20 s). The slower
+ * iOS path also budgets 11 steps: two feed-state checks, eight walk iterations and the
+ * post assertion. Each of the three Share attempts budgets two title guards, the iOS
+ * lift swipe and a 5 s wait for the composer title.
  */
 export const OPEN_POST_TAP_ATTEMPTS = 3
 export const OPEN_POST_PRESS_WAIT_MS = 5_000
@@ -59,8 +58,8 @@ export const OPEN_POST_PRESS_WAIT_MS = 5_000
 export const OPEN_POST_ATTEMPT_STEPS = 3
 export const OPEN_POST_WORST_CASE_MS =
   FLOW_STARTUP_MS +
-  50_000 +
-  13 * CONDITION_CHECK_MS +
+  125_000 +
+  11 * CONDITION_CHECK_MS +
   OPEN_POST_TAP_ATTEMPTS *
     (OPEN_POST_PRESS_WAIT_MS + OPEN_POST_ATTEMPT_STEPS * CONDITION_CHECK_MS)
 

@@ -595,7 +595,14 @@ export function ShareCardDialog({
       closeLabel={t('shareCard.close')}
       invokingElementRef={opener}
       initialFocusRef={titleRef}
-      fallbackFocusSelector={`[data-share-card-focus-fallback="${source.kind === 'outfit' ? 'hero' : 'community'}"]`}
+      fallbackFocusSelector={
+        source.kind === 'outfit'
+          ? '[data-share-card-focus-fallback="hero"]'
+          : [
+              '[data-modal-overlay][aria-labelledby="community-detail-title"] [data-testid="app-top-bar-back"]',
+              '[data-share-card-focus-fallback="community"]',
+            ]
+      }
       ariaLiveMessage={message ? t(`shareCard.${message}`) : null}
       errorMessage={error ? t(`shareCard.${error}`) : null}
     >
