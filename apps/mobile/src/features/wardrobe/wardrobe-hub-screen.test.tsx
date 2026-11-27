@@ -1138,6 +1138,7 @@ describe('WardrobeHubScreen', () => {
       ...ready,
       imageAccess: { ...ready.imageAccess!, url: 'data:image/png;base64,AA==' },
     }
+    const detailReload = { ...ready, imageAccess: fixtureWardrobePhoto('#335522') }
     const renewal = { ...ready, imageAccess: fixtureWardrobePhoto('#563312') }
     let garment: typeof ready = unsigned
     const verification = deferred()
@@ -1151,6 +1152,11 @@ describe('WardrobeHubScreen', () => {
         const current = garment
         const pending = heldRead
         heldRead = undefined
+        if (pending === verification) {
+          // The broken image also renders in the detail behind the dialog. Its automatic
+          // reload must finish before the test reserves a response for the panel's Retry.
+          garment = detailReload
+        }
         if (pending === unsignedRetry) requestedUnsigned(current)
         if (pending === renewalReply) requestedRenewal(current)
         await pending?.promise
@@ -1188,6 +1194,7 @@ describe('WardrobeHubScreen', () => {
 
       expect(await within(panel).findByTestId('style-piece-unavailable')).toBeVisible()
       await waitFor(() => expect(nativeStyleRuntime.focus).toHaveBeenLastCalledWith(83))
+      await expectDetailPhoto(detailReload.imageAccess.url)
       const retryControl = page
         .getByTestId('style-piece-panel')
         .getByTestId('style-piece-refresh')

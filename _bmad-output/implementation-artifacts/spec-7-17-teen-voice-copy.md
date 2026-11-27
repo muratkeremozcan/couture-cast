@@ -102,8 +102,9 @@ The four Today browser baselines come from the reviewed
 [browser captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46011774720).
 At 320 px with 200% text, the German first-look top bar, weather choices and account details
 wrap within the viewport. The browser checks the page width and painted text in both themes.
+[German browser captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46016643070/artifacts/15206883683)
 The Android flow scrolls to the top of Looks on re-entry before checking the stacked tabs and
-full sample names in both themes. [Android captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46011774510/artifacts/15206262643)
+full sample names in both themes. [Android captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46016643066/artifacts/15206807761)
 
 ## Review triage log
 

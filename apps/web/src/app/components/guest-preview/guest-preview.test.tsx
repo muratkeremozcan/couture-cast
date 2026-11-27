@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 W-GATE-*, W-* functional, W-STORAGE-DENIED, W-OFFLINE-AFTER-LOAD and
 // L-CROSS-TAB-* for the web guest preview, through the real store and policy.
+// CC-7.17 sample copy: _bmad-output/project-knowledge/learning-path-step-by-step.md#step-74-teen-voice-and-copy
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -264,6 +265,23 @@ describe('guest preview surfaces', () => {
     expect(screen.getByTestId('guest-preview-announcement').textContent).toContain(
       'Outfit updated'
     )
+  })
+
+  it('saves School day in the preview and can reopen and remove it', async () => {
+    const outfit = await passGate()
+    fireEvent.click(screen.getByTestId('sample-save-look'))
+    const saved = await screen.findByTestId('sample-saved-looks')
+    const schoolDay = within(saved).getByRole('button', { name: 'School day' })
+
+    fireEvent.click(within(outfit).getByTestId('guest-preview-try-another'))
+    expect(within(outfit).getByRole('heading', { name: 'Silk midi' })).toBeVisible()
+    fireEvent.click(schoolDay)
+
+    const heading = within(outfit).getByRole('heading', { name: 'School day' })
+    await waitFor(() => expect(heading).toHaveFocus())
+    fireEvent.click(within(saved).getByRole('button', { name: 'Remove School day' }))
+    expect(screen.queryByTestId('sample-saved-looks')).not.toBeInTheDocument()
+    expect(heading).toBeVisible()
   })
 
   it('reports no alternative when only one look suits', async () => {
