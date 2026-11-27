@@ -9,7 +9,7 @@
 import { router, type Href } from 'expo-router'
 import type { ReactNode } from 'react'
 import { useTokens } from '@/src/theme/tokens'
-import { AppTopBar } from './app-top-bar-view'
+import { AppTopBar, type AppTopBarProps } from './app-top-bar-view'
 
 export { AppTopBar, type AppTopBarProps } from './app-top-bar-view'
 
@@ -39,7 +39,8 @@ function NavigatorTopBar({
   route,
   navigation,
   showBack,
-}: NavigatorHeaderProps & { showBack: boolean }) {
+  backRef,
+}: NavigatorHeaderProps & { showBack: boolean; backRef?: AppTopBarProps['backRef'] }) {
   const { colors } = useTokens()
   const title =
     typeof options.headerTitle === 'string'
@@ -67,6 +68,7 @@ function NavigatorTopBar({
       }
       trailing={trailing}
       onBack={showBack ? () => navigation.goBack() : undefined}
+      backRef={backRef}
     />
   )
 }
@@ -165,7 +167,10 @@ function hasCallerBelow(props: NavigatorHeaderProps) {
  * The root stack's `header`: the screen title and a back control to the caller below it, or to
  * the parent tab on a direct entry.
  */
-export function renderStackTopBar(props: NavigatorHeaderProps) {
+export function renderStackTopBar(
+  props: NavigatorHeaderProps,
+  backRef?: AppTopBarProps['backRef']
+) {
   if (props.options.headerBackVisible === false) {
     return <NavigatorTopBar {...props} showBack={false} />
   }
@@ -184,6 +189,11 @@ export function renderStackTopBar(props: NavigatorHeaderProps) {
     else router.replace(parent)
   }
   return (
-    <NavigatorTopBar {...props} navigation={{ ...props.navigation, goBack }} showBack />
+    <NavigatorTopBar
+      {...props}
+      navigation={{ ...props.navigation, goBack }}
+      showBack
+      backRef={backRef}
+    />
   )
 }

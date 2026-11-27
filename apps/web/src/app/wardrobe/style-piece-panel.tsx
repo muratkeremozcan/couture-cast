@@ -125,6 +125,7 @@ export function StylePiecePanel({
   owner,
   locale,
   invoker,
+  fallbackFocusSelector = "[data-testid='garment-capture-open']",
   onSavedLooksChanged,
   onClose,
 }: {
@@ -135,6 +136,7 @@ export function StylePiecePanel({
   owner: string
   locale: string
   invoker: RefObject<HTMLElement | null>
+  fallbackFocusSelector?: string
   onSavedLooksChanged?: () => void
   onClose: () => void
 }) {
@@ -244,7 +246,7 @@ export function StylePiecePanel({
       title={labels.start}
       closeLabel={samples.chrome.close}
       invokingElementRef={invoker}
-      fallbackFocusSelector="[data-testid='garment-capture-open']"
+      fallbackFocusSelector={fallbackFocusSelector}
     >
       <div
         ref={panelRef}

@@ -1320,6 +1320,7 @@ function WardrobeHubView({ owner, visitor }: { owner: string | null; visitor: bo
           owner={owner}
           locale={i18n.language}
           invoker={styleInvoker}
+          fallbackFocusSelector="[data-testid='app-top-bar-back']"
           onClose={() => {
             setStyleSelection(null)
           }}

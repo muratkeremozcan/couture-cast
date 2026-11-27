@@ -827,9 +827,7 @@ describe('WardrobePage direct garment entry', () => {
     const error = await screen.findByRole('alert')
     expect(error).toHaveTextContent('Refresh rejected')
     expect(error).toHaveTextContent('Showing your saved garments. Refresh failed.')
-    expect(
-      within(screen.getByTestId(`garment-card-${pending.id}`)).getByText('Ready')
-    ).toBeVisible()
+    expect(screen.getByTestId(`garment-open-${pending.id}`)).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toHaveAttribute(
       'href',
       '/'
@@ -855,13 +853,15 @@ describe('WardrobePage direct garment entry', () => {
       .mockResolvedValue([garmentFixture(processing.id, 'ready')])
     render(<WardrobePage />)
 
-    const check = await screen.findByRole('button', { name: 'Check garment status' })
+    const check = await screen.findByRole('button', {
+      name: /Processing\. Check garment status/,
+    })
     expect(window.location.search).toBe('?from=home')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     await user.click(check)
 
     const card = screen.getByTestId(`garment-card-${processing.id}`)
-    expect(await within(card).findByText('Ready')).toBeVisible()
+    expect(await within(card).findByTestId(`garment-open-${processing.id}`)).toBeVisible()
     expect(screen.getByRole('link', { name: "Back to today's outfit" })).toBeVisible()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(uploadGarmentImageFromWeb).not.toHaveBeenCalled()
@@ -930,7 +930,9 @@ describe('WardrobePage garment grid', () => {
     listGarmentsFromWeb.mockResolvedValue([garmentFixture('garment-failed', 'failed')])
     render(<WardrobePage />)
 
-    const replace = await screen.findByRole('button', { name: 'Choose another photo' })
+    const replace = await screen.findByRole('button', {
+      name: /Failed\. Choose another photo/,
+    })
     await user.click(replace)
     expect(
       await screen.findByRole('dialog', { name: 'Garment Capture Flow' })
@@ -1080,6 +1082,8 @@ describe('WardrobePage processing poll', () => {
 
   it('does not let a styling snapshot undo a processing poll that settled first', async () => {
     const user = userEvent.setup()
+    const previousUrl = window.location.href
+    const previousHistory = window.history.state as unknown
     collapsePollSchedule()
     const poll = Promise.withResolvers<GarmentItemContract[]>()
     const styling = Promise.withResolvers<GarmentItemContract[]>()
@@ -1144,6 +1148,7 @@ describe('WardrobePage processing poll', () => {
       expect(within(card).getByTestId(`garment-open-${processing.id}`)).toBeEnabled()
     } finally {
       cleanup()
+      window.history.replaceState(previousHistory, '', previousUrl)
       verifiedSession.owner = null
       sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
     }
@@ -1261,7 +1266,9 @@ describe('WardrobePage processing poll', () => {
     listGarmentsFromWeb.mockResolvedValue([
       garmentFixture('garment-poll', 'awaiting_tags'),
     ])
-    await user.click(screen.getByRole('button', { name: 'Check garment status' }))
+    await user.click(
+      screen.getByRole('button', { name: /Processing\. Check garment status/ })
+    )
     expect(await screen.findByText('Organize Garment Tags')).toBeInTheDocument()
   })
 

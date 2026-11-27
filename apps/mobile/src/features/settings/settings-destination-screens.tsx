@@ -1353,6 +1353,34 @@ function usePaletteNameList(): string {
   )
 }
 
+function usePremiumThemeEntry(returns: number) {
+  const theme = useAppTheme()
+  const { status, reading, refresh } = theme
+  const [entryReadFinished, setEntryReadFinished] = useState(false)
+  const [hasShownTheme, setHasShownTheme] = useState(false)
+  const owner = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
+  useEffect(() => {
+    let active = true
+    void refresh().then(() => {
+      if (active) setEntryReadFinished(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [refresh, owner, returns])
+  // The provider can hold the launch answer during this destination's first read.
+  // Once the destination has shown its own answer, keep it visible on warm refresh.
+  const entryReady = entryReadFinished && !reading && status !== 'loading'
+  useEffect(() => {
+    if (entryReady) setHasShownTheme(true)
+  }, [entryReady])
+  return { ...theme, status: hasShownTheme || entryReady ? status : ('loading' as const) }
+}
+
 /**
  * Interface palettes (Story 5.3 Task 6), a sibling section immediately after the
  * Premium one, which is where its locked copy points: "subscribe with the
@@ -1392,36 +1420,16 @@ function PremiumThemeSection({ returns = 0 }: { returns?: number }) {
     isEntitled,
     themesEnabled,
     status,
-    refresh,
     applyResolvedTheme,
     applyFailure,
-  } = useAppTheme()
+  } = usePremiumThemeEntry(returns)
   const palettes = usePaletteNameList()
 
   /** The `id` of the card whose save is in flight, or null when idle. */
   const [savingId, setSavingId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  /**
-   * The in-flight save, so leaving the screen cancels it. Without this a save
-   * started here would run to completion and re-color the app from a section
-   * that no longer exists.
-   */
+  // Leaving the screen retires the pending save and its theme application.
   const saveControllerRef = useRef<AbortController | null>(null)
-
-  // Story CC-7.7 D3: the member the palette is read for. A sign-in or an account switch with
-  // Profile mounted reads it again, so the Profile gate never opens on another member's answer.
-  const owner = useSyncExternalStore(
-    subscribeMobileApplicationUser,
-    mobileApplicationUserId,
-    mobileApplicationUserId
-  )
-  useEffect(() => {
-    // Entering settings re-reads the preference. The provider's own read happens
-    // once at app launch, and entitlement or the kill switch can have changed in
-    // the hours since. `refresh` is a stable callback, so this runs on entry, on a
-    // member change and on each return to the tab (CC-7.7 D5), never on every render.
-    void refresh()
-  }, [refresh, owner, returns])
   useEffect(() => () => saveControllerRef.current?.abort(), [])
 
   const showGallery = status === 'ready' && isEntitled

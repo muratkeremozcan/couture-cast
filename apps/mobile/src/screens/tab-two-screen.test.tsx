@@ -577,7 +577,7 @@ describe('SettingsScreen', () => {
     analyticsDistinctIdMock.mockReturnValue('')
     setMobileAnalyticsDiagnosticsEnabled(true)
 
-    await render(<AccountScreen />)
+    const account = await render(<AccountScreen />)
 
     // Story CC-7.7: the Profile body shows once its gate reads settle.
     fireEvent.click(
@@ -588,6 +588,8 @@ describe('SettingsScreen', () => {
       expect.objectContaining({ user_id: 'mobile-anonymous-user' })
     )
 
+    await account.unmount()
+    await render(<LanguageScreen />)
     fireEvent.click(screen.getByTestId('locale-btn-tr-TR'))
     await waitFor(() => {
       expect(analyticsCaptureMock).toHaveBeenCalledWith(

@@ -71,7 +71,9 @@ function page(overrides: Partial<CommunityReactionSpotlight> = {}) {
   )
 }
 
-function serveSpotlight(respond: (url: URL, request: Request) => Response) {
+function serveSpotlight(
+  respond: (url: URL, request: Request) => Response | Promise<Response>
+) {
   const urls: URL[] = []
   const requests: Request[] = []
   server.use(
@@ -712,10 +714,18 @@ export function registerCommunitySpotlightCases() {
   })
 
   it('6.6-MOB-036 a View more page that adds nothing announces nothing and keeps View more while a cursor remains (R11)', async () => {
-    const urls = serveSpotlight((url) => {
+    let releaseEmptyPage!: () => void
+    const emptyPage = new Promise<void>((resolve) => {
+      releaseEmptyPage = resolve
+    })
+    onTestFinished(() => releaseEmptyPage())
+    const urls = serveSpotlight(async (url) => {
       const cursor = url.searchParams.get('cursor')
       if (cursor === null) return page({ nextCursor: 'cursor-2' })
-      if (cursor === 'cursor-2') return page({ items: [], nextCursor: 'cursor-3' })
+      if (cursor === 'cursor-2') {
+        await emptyPage
+        return page({ items: [], nextCursor: 'cursor-3' })
+      }
       return page({ items: [rankedLook('spot-9', 9)], nextCursor: null })
     }).urls
     await render(<CommunityScreen />)
@@ -726,16 +736,26 @@ export function registerCommunitySpotlightCases() {
         'cursor-2',
       ])
     )
+    const viewMore = screen.getByTestId('community-spotlight-view-more')
     await waitFor(() =>
-      expect(screen.queryByTestId('community-spotlight-loading-more')).toBeNull()
+      expect(viewMore).toHaveTextContent(enUS.community.spotlight.loadingMore)
     )
+    await act(async () => {
+      releaseEmptyPage()
+      await emptyPage
+    })
+    await waitFor(() => {
+      expect(viewMore).toHaveTextContent(enUS.community.spotlight.viewMore)
+      expect(viewMore).not.toHaveAttribute('aria-disabled', 'true')
+    })
     expect(
       vi
         .mocked(AccessibilityInfo.announceForAccessibility)
         .mock.calls.filter(([text]) => /^Loaded/.test(String(text)))
     ).toEqual([])
 
-    press(await screen.findByTestId('community-spotlight-view-more'))
+    await browserUser.click(viewMore)
+    await waitFor(() => expect(urls.at(-1)?.searchParams.get('cursor')).toBe('cursor-3'))
     await screen.findByTestId('community-spotlight-item-spot-9')
     await waitFor(() =>
       expect(announcementsOf('Loaded 1 more spotlight look.')).toHaveLength(1)
