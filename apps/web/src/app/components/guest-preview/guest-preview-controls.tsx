@@ -38,7 +38,7 @@ export function GuestPreviewControls({
       aria-labelledby="guest-preview-controls-heading"
       data-testid="guest-preview-controls"
       data-surface="card"
-      className="space-y-5 rounded-xl border border-line bg-card p-5"
+      className="min-w-0 space-y-5 rounded-xl border border-line bg-card p-3 [overflow-wrap:anywhere] min-[361px]:p-5"
     >
       <div className="space-y-1">
         <h2

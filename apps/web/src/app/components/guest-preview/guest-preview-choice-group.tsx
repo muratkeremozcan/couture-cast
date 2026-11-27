@@ -21,7 +21,7 @@ export function GuestPreviewChoiceGroup<T extends string>({
   const id = useId()
   return (
     <fieldset data-testid={testId} className="min-w-0 space-y-2">
-      <legend className="mb-2 text-xs uppercase tracking-[0.12em] text-ink-muted">
+      <legend className="mb-2 max-w-full text-xs uppercase tracking-[0.12em] text-ink-muted [overflow-wrap:anywhere]">
         {legend}
       </legend>
       <div className="flex flex-wrap gap-2">
@@ -34,7 +34,7 @@ export function GuestPreviewChoiceGroup<T extends string>({
             <label
               key={option.value}
               htmlFor={optionId}
-              className={`flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus-essential has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-focus ${
+              className={`flex min-h-11 min-w-0 max-w-full cursor-pointer items-center rounded-full border px-2 text-sm min-[361px]:px-4 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus-essential has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-focus ${
                 checked
                   ? 'border-inverse bg-inverse text-on-inverse'
                   : 'border-line-strong bg-page text-ink hover:border-ink'
@@ -50,7 +50,9 @@ export function GuestPreviewChoiceGroup<T extends string>({
                 data-testid={`${testId}-${option.value}`}
                 className="sr-only"
               />
-              {option.label}
+              <span className="min-w-0 hyphens-auto [overflow-wrap:anywhere]">
+                {option.label}
+              </span>
             </label>
           )
         })}

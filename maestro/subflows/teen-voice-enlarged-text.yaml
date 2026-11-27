@@ -6,6 +6,13 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     id: 'tab-looks'
     retryTapIfNoChange: true
+# Looks retains its scroll position between the light and dark passes.
+- scrollUntilVisible:
+    element:
+      id: 'looks-segment-saved'
+    direction: UP
+    visibilityPercentage: 100
+    timeout: 15000
 - extendedWaitUntil:
     visible:
       id: 'looks-segment-plan'

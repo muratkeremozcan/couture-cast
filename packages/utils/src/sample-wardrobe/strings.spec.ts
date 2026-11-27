@@ -151,7 +151,7 @@ describe('guest preview strings (U-CATALOG-STRINGS)', () => {
     )
     expect(enUS.chrome.supporting).toBe('Try a new setting.')
     expect(enUS.chrome.conversion).toBe(
-      'Make an account to add your clothes. Once you sign in, you can keep your fit and weather settings. Your sample pieces and likes stay here.'
+      'Make an account to add your clothes. Once you sign in, you can keep your weather settings. Your sample pieces and likes stay here.'
     )
     expect(enUS.gate.underage).toBe(AGE_GATE_MESSAGES.underage)
     expect(enUS.gate.invalid).toBe(INVALID_BIRTHDATE_MESSAGE)

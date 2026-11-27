@@ -21,13 +21,13 @@ export function GuestPreviewConversion({
       aria-labelledby="guest-preview-conversion-heading"
       data-testid="guest-preview-conversion"
       data-surface="card"
-      className="space-y-4 rounded-xl border border-line bg-card p-5"
+      className="min-w-0 space-y-4 rounded-xl border border-line bg-card p-3 hyphens-auto [overflow-wrap:anywhere] min-[361px]:p-5"
     >
       <h2 id="guest-preview-conversion-heading" className="text-lg font-semibold">
         {detail.garmentHeading}
       </h2>
       <p className="text-sm text-ink">{strings.chrome.conversion}</p>
-      <dl className="grid gap-3 text-sm sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
         <div>
           <dt className="font-semibold text-ink">{detail.canSave}</dt>
           <dd className="text-ink-soft">{detail.canSaveBody}</dd>

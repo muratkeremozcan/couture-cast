@@ -644,7 +644,7 @@ describe('GarmentCaptureModal crop controls', () => {
     const uploadGarment = vi.fn().mockRejectedValue(new Error('storage unavailable'))
     render(<GarmentCaptureModal isOpen onClose={vi.fn()} uploadGarment={uploadGarment} />)
 
-    expect(screen.getByText('Kleidungsstück erfassen')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Teil hinzufügen' })).toBeInTheDocument()
     await user.upload(
       screen.getByLabelText('Bilddatei des Kleidungsstücks'),
       new File(['fixture-image'], 'garment.png', { type: 'image/png' })

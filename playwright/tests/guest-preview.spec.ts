@@ -178,7 +178,7 @@ test.describe('Guest preview (signed out)', () => {
 
         test('[7.17-I18N-001/LAYOUT-001] the age check and first look fit at 320 px', async ({
           page,
-        }) => {
+        }, testInfo) => {
           await page.addInitScript(() => {
             document.addEventListener('DOMContentLoaded', () => {
               document.documentElement.style.fontSize = '200%'
@@ -197,6 +197,7 @@ test.describe('Guest preview (signed out)', () => {
           await expectReadable(entry)
           await entry.click()
 
+          await expectReadable(page.getByRole('heading', { name: de.chrome.entry }))
           const gate = page.getByTestId('guest-preview-gate')
           await expectReadable(gate.getByRole('heading', { name: de.gate.heading }))
           await expectReadable(gate.getByText(de.gate.body, { exact: true }))
@@ -208,10 +209,30 @@ test.describe('Guest preview (signed out)', () => {
           const outfit = page.getByTestId('guest-preview-outfit')
           const firstLook = de.looks['office-oxford']
           await expect(outfit).toHaveAttribute('data-look-id', 'sample:l:office-oxford')
+          await expectReadable(outfit.getByText(de.outfit.heading, { exact: true }))
           await expectReadable(outfit.getByRole('heading', { name: firstLook.name }))
           await expectReadable(outfit.getByText(firstLook.description, { exact: true }))
           await expectReadable(outfit.getByTestId('guest-preview-try-another'))
           await expectPageFitsWidth(page, 320)
+          await testInfo.attach('german-first-look', {
+            body: await page.screenshot({ animations: 'disabled' }),
+            contentType: 'image/png',
+          })
+
+          const conversion = page.getByTestId('guest-preview-conversion')
+          await expectReadable(
+            conversion.getByText(de.conversionDetail.canSave, { exact: true })
+          )
+          await expectReadable(
+            page
+              .getByTestId('guest-preview-thermal')
+              .getByText(de.values.runsColdWarm.neutral, { exact: true })
+          )
+          await expectReadable(
+            page
+              .getByTestId('guest-preview-rain')
+              .getByText(de.values.precipPreparedness.medium, { exact: true })
+          )
         })
       })
     }

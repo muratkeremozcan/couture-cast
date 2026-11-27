@@ -43,7 +43,7 @@ export const deDE: GuestPreviewStrings = {
     outfitIdea: 'Outfitidee',
   },
   chrome: {
-    entry: 'Beispieloutfits testen',
+    entry: 'Looks testen',
     exampleLabel: 'Beispiel',
     welcomeHeading: 'Outfits für das Wetter von heute',
     welcomeBody:
@@ -83,9 +83,9 @@ export const deDE: GuestPreviewStrings = {
     exit: 'Zur Startseite',
   },
   outfit: {
-    heading: 'Beispieloutfit',
+    heading: 'Beispiel',
     whyThisWorks: 'Darum passt es',
-    tryAnother: 'Anderen Look ausprobieren',
+    tryAnother: 'Nächster Look',
     noAlternative:
       'Nur dieses Outfit passt. Probiere anderes Wetter oder ändere eine Einstellung.',
     browseWardrobe: 'Beispielschrank ansehen',
@@ -138,7 +138,7 @@ export const deDE: GuestPreviewStrings = {
   conversionDetail: {
     garmentHeading: 'Deine Kleidung hinzufügen',
     canSave: 'Nach der Anmeldung speicherbar',
-    canSaveBody: 'Ihre drei Komforteinstellungen.',
+    canSaveBody: 'Deine drei Vorlieben fürs Wetter.',
     previewOnly: 'Nur in der Vorschau',
     previewOnlyBody:
       'Beispielteile, Outfits, Likes, der Kollektionsfilter und getauschte Teile.',

@@ -3,7 +3,7 @@ title: 'Story CC-7.17: Teen voice and copy'
 type: feature
 ticket: '7-17-teen-voice-copy'
 created: '2026-11-27'
-status: built
+status: done
 baseline_revision: 'a80ed17fda2d24ff748219c3983e01ed937bd384'
 route: full
 route_source: auto
@@ -68,11 +68,11 @@ Preserve the existing layout test IDs. Confirm effective content on both clients
       US grade six or below and button labels use up to three words.
 - [x] Given a member opens Home, browseable samples or a share card, then the copy uses everyday
       settings such as school, weekends and going out.
-- [ ] Given a member uses any of the ten supported locales, then changed strings load in that
+- [x] Given a member uses any of the ten supported locales, then changed strings load in that
       locale, and long labels can wrap at 320 px or dp in both themes.
-- [ ] Integrate the [acceptance plan](../test-artifacts/test-design-7-17-teen-voice-copy.md),
+- [x] Integrate the [acceptance plan](../test-artifacts/test-design-7-17-teen-voice-copy.md),
       review the pinned diff, and link coverage in learning path Step 74.
-- [ ] Mark the spec and sprint done before the final push.
+- [x] Mark the spec and sprint done before the final push.
 
 ## Implementation notes
 
@@ -98,6 +98,12 @@ can be checked even when a copy change stays within the baseline tolerance.
 Its 320 dp captures showed truncated sample look names in Plan. At enlarged text sizes, the
 Looks controls stack and each sample day puts the full look name below the weekday.
 The six Android Home and Community baselines come from the pixel-reviewed first run.
+The four Today browser baselines come from the reviewed
+[browser captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46011774720).
+At 320 px with 200% text, the German first-look top bar, weather choices and account details
+wrap within the viewport. The browser checks the page width and painted text in both themes.
+The Android flow scrolls to the top of Looks on re-entry before checking the stacked tabs and
+full sample names in both themes. [Android captures](https://github.com/muratkeremozcan/couture-cast/actions/runs/46011774510/artifacts/15206262643)
 
 ## Review triage log
 
