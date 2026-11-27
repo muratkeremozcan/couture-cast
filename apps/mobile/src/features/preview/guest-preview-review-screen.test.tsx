@@ -360,14 +360,19 @@ describe('mobile carryover review (D8)', () => {
 })
 
 describe('CC-7.21 first-run look review', () => {
+  const originalApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+
   beforeEach(() => {
-    vi.stubEnv('EXPO_PUBLIC_API_BASE_URL', window.location.origin)
+    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     lookApi.read.mockReset().mockResolvedValue(null)
     lookApi.style.mockReset().mockResolvedValue(undefined)
     lookApi.save.mockReset().mockResolvedValue({ id: 'look-saved' })
   })
 
-  afterEach(() => vi.unstubAllEnvs())
+  afterEach(() => {
+    if (originalApiBaseUrl === undefined) delete process.env.EXPO_PUBLIC_API_BASE_URL
+    else process.env.EXPO_PUBLIC_API_BASE_URL = originalApiBaseUrl
+  })
 
   it.each(['use', 'keep'] as const)(
     'stores the exact look after the visitor chooses %s',
@@ -380,6 +385,9 @@ describe('CC-7.21 first-run look review', () => {
       const proposed = await screen.findByTestId('guest-preview-review-proposed')
       expect(proposed).toHaveTextContent('Cozy')
       expect(proposed).toHaveTextContent('Colorful')
+      expect(lookApi.read).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+        method: 'GET',
+      })
       expect(lookApi.save).not.toHaveBeenCalled()
       const action = screen.getByTestId(`guest-preview-review-${choice}`)
       expect(action).toBeEnabled()
@@ -415,6 +423,9 @@ describe('CC-7.21 first-run look review', () => {
     await render(<GuestPreviewReviewScreen />)
 
     expect(await screen.findByTestId('guest-preview-review-use')).toBeDisabled()
+    expect(lookApi.read).toHaveBeenCalledExactlyOnceWith(expect.anything(), {
+      method: 'GET',
+    })
     const keep = screen.getByTestId('guest-preview-review-keep')
     expect(keep).toBeEnabled()
     press(keep)
