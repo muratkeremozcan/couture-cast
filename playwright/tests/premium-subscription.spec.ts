@@ -101,7 +101,7 @@ async function openLookbookUltrawide(
   })
   await page.setViewportSize(ULTRAWIDE_VIEWPORT)
   await page.goto('/')
-  await page.getByTestId('planner-open-control').click()
+  await page.getByTestId('home-plan-week').click()
   // Story CC-7.12 D11: Plan week links to the Looks Plan segment, where the rail renders inline.
   await expect(page).toHaveURL('/looks?segment=plan')
 }

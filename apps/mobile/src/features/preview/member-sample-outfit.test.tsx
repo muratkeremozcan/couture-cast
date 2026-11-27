@@ -80,17 +80,9 @@ describe('MemberSampleOutfit (mobile)', () => {
       </SaveFeedbackProvider>
     )
 
-    // Planner, add-garment, and location navigation actions work. [7.12-NAT-031] Plan your week
-    // opens Looks on Plan in one press; the old planner route is never pushed.
-    fireEvent.click(screen.getByTestId('home-plan-week'))
-    expect(routerMock.navigate.mock.calls).toEqual([
-      [{ pathname: '/looks', params: { segment: 'plan' } }],
-    ])
-    expect(routerMock.push).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByTestId('home-add-garment'))
-    expect(routerMock.navigate).toHaveBeenCalledWith('/wardrobe?entry=add')
-    fireEvent.click(screen.getByTestId('hero-add-location'))
-    expect(routerMock.push).toHaveBeenCalledWith('/locations?guided=1')
+    fireEvent.click(screen.getByTestId('home-set-city'))
+    expect(routerMock.push).toHaveBeenCalledWith('/locations')
+    fireEvent.click(screen.getByTestId('home-edit-sample'))
 
     // Shuffle -> Undo restores prior look.
     const tryAnother = await screen.findByTestId('guest-preview-try-another')
@@ -168,6 +160,8 @@ describe('MemberSampleOutfit (mobile)', () => {
       })
 
     // Save look -> persisted to API -> re-save is non-destructive no-op without Undo.
+    if (!screen.queryByTestId('guest-preview-try-another'))
+      fireEvent.click(screen.getByTestId('home-edit-sample'))
     const saveBtn = await screen.findByTestId('sample-save-look')
     fireEvent.click(saveBtn)
     await saved(1)
@@ -281,6 +275,7 @@ describe('MemberSampleOutfit (mobile)', () => {
       </SaveFeedbackProvider>
     )
 
+    fireEvent.click(screen.getByTestId('home-edit-sample'))
     fireEvent.click(await screen.findByTestId('sample-save-look'))
     await waitFor(() => expect(store.items).toHaveLength(1))
     const view = await screen.findByTestId('status-bar-action-view')
@@ -355,6 +350,8 @@ describe('MemberSampleOutfit (mobile)', () => {
     )
 
     // Initial GET failed -> unavailable state shown, but explicit Save still works and handles 409 tombstone.
+    if (!screen.queryByTestId('guest-preview-try-another'))
+      fireEvent.click(screen.getByTestId('home-edit-sample'))
     const saveBtn = await screen.findByTestId('sample-save-look')
     let return409Once = true
     store.nextPostError = () => {
@@ -412,6 +409,7 @@ describe('MemberSampleOutfit (mobile)', () => {
         />
       </SaveFeedbackProvider>
     )
+    fireEvent.click(screen.getByTestId('home-edit-sample'))
     // While initial GET is in flight, Save stays disabled/hidden until loading completes; after release, the existing look appears.
     await waitFor(() => expect(heldGet).toBe(true))
     // The held GET is this view's only list request, so nothing else can mark storage ready.

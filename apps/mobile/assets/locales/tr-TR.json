@@ -1098,6 +1098,16 @@
     }
   },
   "home": {
+    "today": {
+      "outfit": "Bugünün kombini",
+      "starterOutfit": "Başlangıç kombini",
+      "outfitDetails": "Kombin ayrıntıları",
+      "sampleLook": "Örnek kombin",
+      "editSample": "Örneği düzenle",
+      "addFirstPiece": "İlk parçanı ekle",
+      "weatherUnavailable": "Hava durumu bilgisi yok",
+      "recentPieces": "Son eklenen parçalar"
+    },
     "spotlightTeaser": {
       "heading": "{{label}} öne çıkan kombini",
       "reactions": "{{count}} tepki",
@@ -1202,6 +1212,11 @@
     "hideList": "Kaydedilen kombinleri gizle"
   },
   "shell": {
+    "legal": {
+      "label": "Yasal",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Hizmet Şartları"
+    },
     "back": "Geri",
     "notFound": {
       "title": "Ekran bulunamadı",

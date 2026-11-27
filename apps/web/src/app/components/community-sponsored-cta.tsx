@@ -81,6 +81,7 @@ export interface CommunitySponsoredCtaProps {
   language: string
   t: Translate
   shown: SponsoredShownRegistry
+  isCurrent?: () => boolean
   /** Hands one message key to the host's polite live region. */
   announce: (key: string) => void
 }
@@ -100,6 +101,7 @@ export function CommunitySponsoredCta({
   language,
   t,
   shown,
+  isCurrent,
   announce,
 }: CommunitySponsoredCtaProps) {
   const [state, setState] = useState<CtaState>('idle')
@@ -136,7 +138,7 @@ export function CommunitySponsoredCta({
   const activate = async () => {
     // `aria-disabled` keeps the focused button focusable while a mint is in
     // flight; a second press returns here.
-    if (stateRef.current === 'loading') return
+    if (stateRef.current === 'loading' || isCurrent?.() === false) return
     // Claimed before the first await, while the press still counts as a user
     // gesture. A blocked tab mints nothing.
     const handoff = beginAffiliatePartnerHandoff()
@@ -154,7 +156,11 @@ export function CommunitySponsoredCta({
         surface,
         platform: 'web',
       })
-      // Only a recorded click navigates.
+      if (isCurrent?.() === false) {
+        handoff.cancel()
+        move('idle')
+        return
+      }
       handoff.navigate(redirectUrl)
       move('idle')
     } catch {

@@ -1098,6 +1098,16 @@
     }
   },
   "home": {
+    "today": {
+      "outfit": "Visual de hoje",
+      "starterOutfit": "Visual inicial",
+      "outfitDetails": "Detalhes do visual",
+      "sampleLook": "Visual de exemplo",
+      "editSample": "Editar o exemplo",
+      "addFirstPiece": "Adicione a sua primeira peça",
+      "weatherUnavailable": "Previsão meteorológica indisponível",
+      "recentPieces": "Peças recentes"
+    },
     "spotlightTeaser": {
       "heading": "Visual em destaque em {{label}}",
       "reactions": "{{count}} reações",
@@ -1202,6 +1212,11 @@
     "hideList": "Ocultar conjuntos guardados"
   },
   "shell": {
+    "legal": {
+      "label": "Informação legal",
+      "privacy": "Política de Privacidade",
+      "terms": "Termos de Serviço"
+    },
     "back": "Voltar",
     "notFound": {
       "title": "Ecrã não encontrado",

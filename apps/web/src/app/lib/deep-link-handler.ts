@@ -18,11 +18,23 @@ import { isCommunityPostVisibleFromWeb } from '../../lib/community'
 import type { ChipCategory } from '../components/chip-navigation'
 import type { FilterCategory } from '../components/community-lookbook-grid'
 
+// An activation in this tab belongs to the member who tapped the teaser.
+let spotlightActivation: { token: string; scope: string } | undefined
+
+export function rememberWebSpotlightActivation(token: string, scope: string) {
+  spotlightActivation = { token, scope }
+}
+
+export function canFocusWebSpotlightActivation(token: string, scope: string) {
+  return spotlightActivation?.token !== token || spotlightActivation.scope === scope
+}
+
 export interface ApplyDeepLinkOptions {
   rawParams: Record<string, unknown>
   scenarioContext: DeepLinkScenarioContext
   setChipCategory: (category: ChipCategory) => void
   setActiveTab: (tab: FilterCategory) => void
+  setScenario?: (scenario: ReturnType<typeof resolveDeepLinkScenario>) => void
   setFocusedWeatherAlert: (alert: WeatherAlertDeepLinkTarget | null) => void
   setHighlightedCardId: (id: string | undefined) => void
   setLiveAnnouncement: (announcement: string | null) => void
@@ -50,8 +62,9 @@ const SCENARIO_DESTINATIONS: Record<
 }
 
 function handleWidgetDeepLink(slot: DeepLinkSlot, options: ApplyDeepLinkOptions) {
-  const destination =
-    SCENARIO_DESTINATIONS[resolveDeepLinkScenario(slot, options.scenarioContext)]
+  const scenario = resolveDeepLinkScenario(slot, options.scenarioContext)
+  const destination = SCENARIO_DESTINATIONS[scenario]
+  options.setScenario?.(scenario)
   options.setChipCategory(destination.chip)
   options.setActiveTab(destination.filter)
 }
@@ -88,12 +101,14 @@ async function handleWeatherNotification(
 ) {
   let alert: WeatherAlertDeepLinkTarget | undefined
   try {
-    const response = await pollWebEvents()
+    const response = await pollWebEvents(undefined, undefined, options.signal)
     alert = resolveWeatherAlertDeepLinkTarget(response.events, payload.alertId)
   } catch {
+    if (options.signal?.aborted) return
     invalidDeepLink(options, 'Weather alert target could not be loaded')
     return
   }
+  if (options.signal?.aborted) return
   if (!alert) {
     invalidDeepLink(options, 'Weather alert target was not found')
     return
@@ -138,6 +153,7 @@ export async function processWebDeepLink(options: ApplyDeepLinkOptions) {
     // the reader on an unrelated filter with nothing highlighted and made the
     // invalid-link branch below unreachable.
     const isVisible = await isCommunityPostVisibleFromWeb(payload.cardId, options.signal)
+    if (options.signal?.aborted) return
     if (!isVisible) {
       invalidDeepLink(options, 'Community card target was not found')
       return

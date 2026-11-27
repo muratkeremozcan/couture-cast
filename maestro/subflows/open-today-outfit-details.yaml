@@ -1,0 +1,15 @@
+# CC-7.13: expose Today's share, swap and affiliate controls.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: 'today-primary-action'
+    direction: UP
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible:
+        id: 'outfit-comfort-notes'
+    commands:
+      - tapOn:
+          id: 'today-primary-action'

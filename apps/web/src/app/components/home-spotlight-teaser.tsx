@@ -6,12 +6,14 @@
 import React, {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   SPOTLIGHT_TEASER_EXPIRY_MS,
   SpotlightTeaserState,
@@ -26,13 +28,12 @@ import {
   sponsorshipOf,
 } from '../../lib/community'
 import { getI18n } from '../../i18n'
-import { spotlightCardElementId } from './community-spotlight'
+import { rememberWebSpotlightActivation } from '../lib/deep-link-handler'
 import {
   CommunitySponsoredCta,
   useSponsoredShownRegistry,
   type SponsoredShownRegistry,
 } from './community-sponsored-cta'
-import type { SpotlightFocusIntent } from './community-lookbook-grid'
 import { useScreenGateScreen } from './screen-gate'
 import { HOME_TEASER_SNAPSHOT_PART, screenSnapshot } from '../../lib/screen-snapshot'
 import {
@@ -112,6 +113,7 @@ export interface HomeSpotlightTeaserLifecycle {
  * height it rendered at.
  */
 type TeaserSnapshot = {
+  scope: string
   memberId: string
   value: SpotlightTeaserValue | null
   height?: number
@@ -141,6 +143,26 @@ function reservedTeaserHeight(
  * are inactive and issue no teaser read; entering stacked is a trigger under
  * the shared 60-second floor, as is the page becoming visible again.
  */
+function scopedTeaserValue(
+  value: SpotlightTeaserValue | null,
+  sameMember: boolean,
+  sameScope: boolean
+): SpotlightTeaserValue | null {
+  return sameMember && sameScope ? value : null
+}
+
+function teaserReadHasSettled(
+  member: string | null | undefined,
+  settledFor: string | null | undefined,
+  sameScope: boolean
+): boolean {
+  return member !== undefined && settledFor === member && sameScope
+}
+
+function snapshotForScope(snapshot: TeaserSnapshot | undefined, scope: string | null) {
+  return snapshot?.scope === scope ? snapshot : undefined
+}
+
 export function useHomeSpotlightTeaser({
   stacked,
 }: {
@@ -171,6 +193,7 @@ export function useHomeSpotlightTeaser({
             // gate never opens on the settled flag before the value is there to render.
             if (!signal.aborted)
               setTimeout(() => {
+                if (signal.aborted || currentWebSessionScope() !== readScope) return
                 shownScopeRef.current = readScope
                 setSettledFor(readFor)
               }, 0)
@@ -188,7 +211,6 @@ export function useHomeSpotlightTeaser({
    * render, before the effect points `state` at the next member (CI 7.7-E2E-009 on d67800d2).
    */
   const [stateMember, setStateMember] = useState(member)
-  const liveValue = stateMember === member ? storedValue : null
   const visible = usePageVisible()
 
   // Story CC-7.7 D5: a return to Home shows the teaser it last showed this member (or none)
@@ -214,15 +236,22 @@ export function useHomeSpotlightTeaser({
     )
     return () => clearTimeout(timer)
   }, [snapshot, snapshotExpired])
-  const memberSettled = member !== undefined && settledFor === member
-  const snapshotLive =
+  const fromCurrentRead = shownScopeRef.current === scope
+  const liveValue = scopedTeaserValue(
+    storedValue,
+    stateMember === member,
+    fromCurrentRead
+  )
+  const memberSettled = teaserReadHasSettled(member, settledFor, fromCurrentRead)
+  const scopedSnapshot = snapshotForScope(snapshot, scope)
+  const snapshotLive = Boolean(
     !snapshotDropped &&
-    !memberSettled &&
-    member !== undefined &&
-    member !== null &&
-    snapshot?.memberId === member
-  const value =
-    liveValue ?? (snapshotLive && !snapshotExpired ? (snapshot?.value ?? null) : null)
+      !memberSettled &&
+      scopedSnapshot &&
+      scopedSnapshot.memberId === member
+  )
+  const rememberedValue = snapshotLive && !snapshotExpired ? scopedSnapshot?.value : null
+  const value = liveValue ?? rememberedValue ?? null
   const settled = member === null || visible === false || memberSettled || snapshotLive
   /*
    * CodeRabbit r2 #7: a return whose remembered teaser expired shows none, and a return opens
@@ -231,7 +260,7 @@ export function useHomeSpotlightTeaser({
    * answers (`snapshotLive` ends then), and the answer takes that place.
    */
   const reservedHeight = reservedTeaserHeight(
-    snapshot,
+    scopedSnapshot,
     snapshotLive,
     snapshotExpired,
     liveValue
@@ -251,6 +280,7 @@ export function useHomeSpotlightTeaser({
     // Under the scope its read started in; the store drops it once that scope left, and while
     // Community access is revoked (P3-1).
     screenSnapshot.remember(shownScopeRef.current, screen, HOME_TEASER_SNAPSHOT_PART, {
+      scope,
       memberId: member,
       value: liveValue,
       height: liveValue ? height : undefined,
@@ -279,41 +309,34 @@ export function useHomeSpotlightTeaser({
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
-  /** The latest activation, resolved in page by the community section. */
-  focusIntent: SpotlightFocusIntent | null
-  open: () => void
+  open: (focusToken: string) => boolean
+  isCurrent: () => boolean
 }
 
-/**
- * The teaser as one link: each activation is a fresh focus intent and one
- * home_teaser open for analytics.
- */
-export function useHomeSpotlightTeaserLink({
-  stacked,
-}: {
-  stacked: boolean
-}): HomeSpotlightTeaserLink {
-  const teaser = useHomeSpotlightTeaser({ stacked })
-  const [focusIntent, setFocusIntent] = useState<SpotlightFocusIntent | null>(null)
-  const serialRef = useRef(0)
-  const value = teaser.value
-  const open = useCallback(() => {
-    if (!value) return
-    serialRef.current += 1
-    setFocusIntent({
-      cardId: value.item.id,
-      focusToken: `teaser-${serialRef.current}-${Date.now().toString(36)}`,
-    })
-    // Measurement only: a failed record never blocks the focus move.
-    void openCommunitySpotlightPostFromWeb(
-      value.item.id,
-      value.item.rank,
-      value.level,
-      undefined,
-      'home_teaser'
-    ).catch(() => undefined)
-  }, [value])
-  return { ...teaser, focusIntent, open }
+export function useHomeSpotlightTeaserLink(): HomeSpotlightTeaserLink {
+  const teaser = useHomeSpotlightTeaser({ stacked: true })
+  const { value } = teaser
+  const scope = useWebSessionScope()
+  const isCurrent = useCallback(
+    () => scope !== null && currentWebSessionScope() === scope,
+    [scope]
+  )
+  const open = useCallback(
+    (focusToken: string) => {
+      if (!value || !scope || !isCurrent()) return false
+      rememberWebSpotlightActivation(focusToken, scope)
+      void openCommunitySpotlightPostFromWeb(
+        value.item.id,
+        value.item.rank,
+        value.level,
+        undefined,
+        'home_teaser'
+      ).catch(() => undefined)
+      return true
+    },
+    [isCurrent, scope, value]
+  )
+  return { ...teaser, open, isCurrent }
 }
 
 /** The existing card rule: the viewer reads "You", a blank name the fallback. */
@@ -327,7 +350,8 @@ export interface HomeSpotlightTeaserProps {
   value: SpotlightTeaserValue
   t: Translate
   sponsoredShown: SponsoredShownRegistry
-  onOpen: () => void
+  onOpen: (focusToken: string) => boolean
+  isCurrent: () => boolean
   onImageError: () => void
   /** Called when the teaser leaves while its link holds focus. */
   onLeaveWhileFocused: () => void
@@ -340,6 +364,7 @@ export function HomeSpotlightTeaser({
   t,
   sponsoredShown,
   onOpen,
+  isCurrent,
   onImageError,
   onLeaveWhileFocused,
   onMeasure,
@@ -348,6 +373,14 @@ export function HomeSpotlightTeaser({
   const leaveRef = useRef(onLeaveWhileFocused)
   leaveRef.current = onLeaveWhileFocused
   const { item, label } = value
+  const focusToken = useId()
+  const destination = new URLSearchParams({
+    source: 'app',
+    type: 'community',
+    cardId: item.id,
+    focus: 'spotlight',
+    focusToken,
+  })
   const count = item.reactions?.total ?? 0
   const author = teaserAuthorName(value, t)
   // Story 6.7b: the block exactly as the live teaser read returned it.
@@ -378,14 +411,13 @@ export function HomeSpotlightTeaser({
       data-testid="home-spotlight-teaser"
       className="flex flex-col gap-3"
     >
-      <a
-        href={`#${spotlightCardElementId(item.id)}`}
+      <Link
+        href={`/community?${destination.toString()}`}
+        prefetch={false}
         data-testid="home-spotlight-teaser-link"
         onClick={(event) => {
-          event.preventDefault()
-          onOpen()
+          if (!onOpen(focusToken)) event.preventDefault()
         }}
-        // Story CC-7.9 D7: the teaser sits inside the hero card, so it is a section, not a card.
         className="group flex min-h-11 items-center gap-4 border-t border-line pt-4 text-left"
       >
         <Image
@@ -443,7 +475,7 @@ export function HomeSpotlightTeaser({
             {t('home.spotlightTeaser.cta')}
           </span>
         </span>
-      </a>
+      </Link>
       {/*
         Story 6.7b: a sibling of the link, so activating the CTA leaves focus
         here and records no spotlight open.
@@ -459,6 +491,7 @@ export function HomeSpotlightTeaser({
             language={getI18n().language}
             t={t}
             shown={sponsoredShown}
+            isCurrent={isCurrent}
             announce={(key) => {
               announcementIdRef.current += 1
               setAnnouncement({ key, id: announcementIdRef.current })
@@ -485,17 +518,14 @@ export function HomeSpotlightTeaser({
  * renders nothing, except the held place of an expired teaser on a return (CodeRabbit r2 #7).
  */
 export function HomeSpotlightTeaserSlot({
-  stacked,
   teaser,
   t,
   onLeaveWhileFocused,
 }: {
-  stacked: boolean
   teaser: HomeSpotlightTeaserLink
   t: Translate
   onLeaveWhileFocused: () => void
 }) {
-  if (!stacked) return null
   if (!teaser.value)
     return teaser.reservedHeight ? (
       <div
@@ -510,6 +540,7 @@ export function HomeSpotlightTeaserSlot({
       t={t}
       sponsoredShown={teaser.sponsoredShown}
       onOpen={teaser.open}
+      isCurrent={teaser.isCurrent}
       onImageError={teaser.removeValue}
       onLeaveWhileFocused={onLeaveWhileFocused}
       onMeasure={teaser.measure}

@@ -40,6 +40,9 @@ import {
  *   Story CC-7.12 (Step 69): Looks reads saved looks and capsules (both `sort=created_desc`) before
  *   its gate opens, and a Saved tile opens the one-look read (`saved-look`).
  *   ritual-503 populated, the ritual read answers 503 (the matrix's "Ritual fails" row)
+ *   empty-closet populated except for the garment list, so Today can test an empty closet
+ *                independently of weather and Community
+ *   closet-503 populated, but the user's recent garments read fails
  *   guardian-pending  Story CC-7.10 D1: a 14 year old teen whose one linked guardian is still
  *              `pending`. Under the production consent policy `off` the API lets a teen waiting on
  *              a guardian through on every read (`teenAccessBlocked(prefs, 'off')` is false), so
@@ -48,6 +51,8 @@ import {
  */
 export type ShellMode =
   | 'empty'
+  | 'empty-closet'
+  | 'closet-503'
   | 'populated'
   | 'delayed'
   | 'late'
@@ -114,15 +119,11 @@ export function readKey(url: string, method: string) {
 }
 
 /**
- * Spec D3 (as built, 2026-11-25): the reads each screen's gate waits for. Home waits for the
- * City Spotlight page one because it sits above the Home feed (D4); the teaser read happens only
- * while stacked, which 390 px always is. Story CC-7.12 (Step 69): the Closet saved looks row is
- * gone, so Closet waits on its closet read only, and Looks waits on both lists its Saved grid
- * merges.
+ * Reads that gate each tab. CC-7.13 Today waits on the ritual, the city label, the closet read and the
+ * eligible Spotlight teaser. The separate Community Spotlight read belongs to the Community tab.
  */
 export const GATE_READS: Record<ShellScreen, string[]> = {
-  // The ritual read counts as settled only once its city line (`locations`) answered too.
-  home: ['ritual', 'locations', 'home-teaser', 'community-spotlight'],
+  home: ['ritual', 'locations', 'garments', 'home-teaser'],
   // Story CC-7.11: the onboarding read only labels the More menu now, outside the gate.
   closet: ['profile', 'garments'],
   // Story CC-7.12 D1, D3: Looks opens on Saved or Ideas only once both lists answered. The
@@ -597,6 +598,9 @@ export function createShellRouter(options: {
     if (key === 'community-resolve') return { json: resolve(request) }
     if (key === 'ritual' && !populated) return { status: 400, json: NO_CITY }
     if (key === 'ritual' && mode === 'ritual-503')
+      return { status: 503, json: { statusCode: 503, message: 'Unavailable' } }
+    if (key === 'garments' && mode === 'empty-closet') return { json: { data: [] } }
+    if (key === 'garments' && mode === 'closet-503')
       return { status: 503, json: { statusCode: 503, message: 'Unavailable' } }
     if (key === 'saved-look' && savedLookMissing(request, populated))
       return { status: 404, json: SAVED_LOOK_NOT_FOUND }

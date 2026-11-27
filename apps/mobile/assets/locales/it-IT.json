@@ -1098,6 +1098,16 @@
     }
   },
   "home": {
+    "today": {
+      "outfit": "Outfit di oggi",
+      "starterOutfit": "Outfit di base",
+      "outfitDetails": "Dettagli dell’outfit",
+      "sampleLook": "Outfit di esempio",
+      "editSample": "Modifica l’esempio",
+      "addFirstPiece": "Aggiungi il tuo primo capo",
+      "weatherUnavailable": "Meteo non disponibile",
+      "recentPieces": "Capi recenti"
+    },
     "spotlightTeaser": {
       "heading": "Look in evidenza a {{label}}",
       "reactions": "{{count}} reazioni",
@@ -1202,6 +1212,11 @@
     "hideList": "Nascondi look salvati"
   },
   "shell": {
+    "legal": {
+      "label": "Note legali",
+      "privacy": "Informativa sulla privacy",
+      "terms": "Termini di servizio"
+    },
     "back": "Indietro",
     "notFound": {
       "title": "Schermata non trovata",

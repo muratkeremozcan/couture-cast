@@ -35,11 +35,11 @@ tags:
 # --- The hero explains the missing location and offers the guided action -----
 - extendedWaitUntil:
     visible:
-      id: 'hero-no-location-state'
+      id: 'member-sample-outfit'
     timeout: 30000
     label: 'Hero opens on the no-location state'
 - tapOn:
-    id: 'hero-add-location'
+    id: 'home-set-city'
     label: 'Open Locations from the hero'
 
 # --- Search, pick and save -------------------------------------------------------
@@ -115,14 +115,22 @@ tags:
     id: 'location-save-button'
     label: 'Save the location'
 
-# --- The save returns to the hero, which shows a ritual on the saved forecast ---
+- extendedWaitUntil:
+    visible:
+      id: 'location-label-0'
+      text: 'Home'
+    timeout: 15000
+- tapOn:
+    id: 'app-top-bar-back'
+
+# --- Today shows a ritual based on the saved forecast ---
 - extendedWaitUntil:
     visible:
       id: 'outfit-recommendation-card'
     timeout: 30000
     label: 'Hero shows a ritual without a manual reload'
 - assertNotVisible:
-    id: 'hero-no-location-state'
+    id: 'member-sample-outfit'
 - assertVisible:
     id: 'current-temperature'
     text: '${LOCATION_SENTINEL_TEMP_F}°F'

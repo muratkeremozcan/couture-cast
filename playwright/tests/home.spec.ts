@@ -12,7 +12,7 @@ const healthResponseSchema = z.object({
 test.describe('Web smoke', () => {
   test.use({ authSessionEnabled: false })
 
-  test('hero renders with healthy services and passes accessibility scan', async ({
+  test('guest Today renders with healthy services and passes accessibility scan', async ({
     apiRequest,
     page,
     validateSchema,
@@ -38,11 +38,9 @@ test.describe('Web smoke', () => {
     // Signed out: the events poll requires an account, so none is sent.
     await page.goto('/')
 
-    await expect(page.getByTestId('hero-headline')).toContainText(
-      'Plan confident outfits'
-    )
+    await expect(page.getByTestId('guest-preview-entry')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Try a sample look' })).toHaveCount(1)
     await expect(page.getByTestId('primary-nav')).toBeVisible()
-    await expect(page.getByTestId('hero-cta-group')).toBeVisible()
     await expect(page.getByTestId('health-indicator')).toHaveCount(0)
 
     await page.addScriptTag({ path: require.resolve('axe-core') })

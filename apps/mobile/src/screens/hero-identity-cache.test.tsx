@@ -119,7 +119,7 @@ describe('TabOneScreen identity change on a shared device', () => {
     {
       status: 400,
       message: 'No location preferences found for user',
-      action: 'hero-add-location',
+      action: 'home-set-city',
     },
     { status: 503, message: 'Unavailable', action: 'hero-retry' },
   ])(

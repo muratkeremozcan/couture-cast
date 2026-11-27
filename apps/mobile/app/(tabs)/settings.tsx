@@ -13,7 +13,7 @@ import { router, useFocusEffect } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { formatLocalizedList } from '@couture/utils'
+import { formatLocalizedList, getGuestPreviewStrings } from '@couture/utils'
 import {
   defaultSupportedLocale,
   resolveSupportedLocale,
@@ -659,6 +659,24 @@ export default function SettingsScreen() {
             <PaletteAdvisorLinkRow />
 
             <PlannerLinkRow />
+
+            {signedIn === true && (
+              <Pressable
+                testID="profile-sign-out"
+                accessibilityRole="button"
+                style={[styles.actionButton, tone.actionButton]}
+                onPress={() => {
+                  void import('../../src/lib/native-session.js')
+                    .then(({ signOutNativeSession }) => signOutNativeSession())
+                    .then(() => router.navigate('/'))
+                    .catch(() => undefined)
+                }}
+              >
+                <Text style={styles.actionText}>
+                  {getGuestPreviewStrings(i18n.language).chrome.signOut}
+                </Text>
+              </Pressable>
+            )}
 
             {isMobileAnalyticsDiagnosticsEnabled ? (
               <>

@@ -403,7 +403,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     try {
       await page.setViewportSize(NARROW)
       await page.goto('/')
-      await settledSpotlight(page)
 
       await log.step('The teaser link carries the disclosure')
       const link = page.getByTestId('home-spotlight-teaser-link')
@@ -446,7 +445,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       const shownEvents = await recordShownEvents(page)
       await page.setViewportSize(NARROW)
       await page.goto('/')
-      await settledSpotlight(page)
       await expect(
         page.getByTestId(`home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`)
       ).toBeVisible()
@@ -495,7 +493,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       })
       await page.setViewportSize(NARROW)
       await page.goto('/')
-      await settledSpotlight(page)
 
       await log.step('Activation records the click and opens the partner')
       const ctaId = `home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`
@@ -537,7 +534,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       })
       const pages: string[] = []
       page.context().on('page', (opened) => pages.push(opened.url()))
-      await page.goto('/')
+      await page.goto('/community')
       await settledSpotlight(page)
 
       const ctaId = `spotlight-sponsored-cta-${SPONSORED_POST_ID}`
@@ -581,9 +578,8 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     const preferencesUrl = `${communitySession.apiBaseUrl}${COMMERCE_PREFERENCES_PATH}`
     try {
       await page.goto('/')
-      await settledSpotlight(page)
       await expect(
-        page.getByTestId(`spotlight-sponsored-cta-${SPONSORED_POST_ID}`)
+        page.getByTestId(`home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`)
       ).toBeVisible()
 
       await log.step('Turn the opt-out off in settings')
@@ -603,24 +599,22 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       expect((await saved).status).toBe(200)
 
       await log.step('The next community read carries no block and renders no CTA')
-      const spotlightRead = page.waitForResponse((response) => {
-        const url = new URL(response.url())
-        return (
-          url.pathname.endsWith('/api/v1/community/spotlight') &&
-          !url.searchParams.has('surface')
-        )
+      const spotlightRead = interceptNetworkCall({
+        method: 'GET',
+        url: '**/api/v1/community/spotlight?**surface=home_teaser**',
       })
       await page.goto('/')
-      const read = (await (await spotlightRead).json()) as {
-        data: { items: Record<string, unknown>[] }
-      }
+      const { responseJson } = await spotlightRead
+      const read = responseJson as { data: { items: Record<string, unknown>[] } }
       expect(read.data.items.map((item) => item.id)).toContain(SPONSORED_POST_ID)
       expect(read.data.items.filter((item) => 'sponsorship' in item)).toEqual([])
-      await settledSpotlight(page)
-      await expect(
-        page.getByTestId(`spotlight-lookbook-card-${SPONSORED_POST_ID}`)
-      ).toBeVisible()
-      await expect(page.locator('[data-testid*="sponsored-badge-"]')).toHaveCount(0)
+      await expect(page.getByTestId('home-spotlight-teaser-link')).toHaveAttribute(
+        'href',
+        new RegExp(
+          `^/community\\?.*cardId=${SPONSORED_POST_ID}&focus=spotlight&focusToken=.+`
+        )
+      )
+      await expect(page.getByTestId('home-spotlight-teaser-sponsored')).toHaveCount(0)
       await expect(page.getByRole('button', { name: /Shop this look/ })).toHaveCount(0)
     } finally {
       await page.goto('about:blank')

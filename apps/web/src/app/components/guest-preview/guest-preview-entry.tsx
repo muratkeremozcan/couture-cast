@@ -13,6 +13,7 @@ export function GuestPreviewEntry() {
   return (
     <section
       data-landing="guest"
+      data-testid="today-first-content"
       aria-labelledby="home-sample-heading"
       data-surface="card"
       className="space-y-3 rounded-xl border border-line bg-card p-5"
@@ -80,35 +81,20 @@ function useHydrated() {
   )
 }
 
-// The document's pre-paint session marker also keeps member actions out of the guest UI.
-export function MemberWardrobeActions() {
+export function ProfileSignOut() {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getGuestPreviewStrings(i18n.language)
   const hydrated = useHydrated()
   return (
-    <>
-      <Link
-        href="/wardrobe"
-        data-testid="landing-open-wardrobe"
-        data-landing="member"
-        // Story CC-7.9 D3: a member's one main action on Home.
-        data-gold="primary"
-        className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 py-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-on-primary"
-      >
-        {strings.chrome.openWardrobe}
-      </Link>
-      <button
-        type="button"
-        data-testid="landing-sign-out"
-        data-landing="member"
-        // Sign out is the one landing action that needs script; until hydration it is disabled,
-        // so a tap waits for a control that works (Open wardrobe is a plain link).
-        disabled={!hydrated}
-        onClick={() => void signOutWebSession().catch(() => undefined)}
-        className="inline-flex min-h-11 items-center rounded-full px-0 py-3 sm:px-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-ink underline underline-offset-4"
-      >
-        {strings.chrome.signOut}
-      </button>
-    </>
+    <button
+      type="button"
+      data-testid="profile-sign-out"
+      data-landing="sign-out"
+      disabled={!hydrated}
+      onClick={() => void signOutWebSession().catch(() => undefined)}
+      className="inline-flex min-h-11 items-center py-3 text-sm font-semibold text-ink underline underline-offset-4"
+    >
+      {strings.chrome.signOut}
+    </button>
   )
 }

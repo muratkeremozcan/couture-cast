@@ -4568,7 +4568,7 @@ export function CommunityLookbookGrid({
   const spotlightItems = spotlight.state.items
   const focusSpotlightEntry = spotlight.focusEntry
   useEffect(() => {
-    if (!pendingFocus) return
+    if (!gateOpen || !pendingFocus) return
     const report = (key: SpotlightNoticeKey) => {
       setPendingFocus(null)
       spotlightNoticeSerialRef.current += 1
@@ -4602,6 +4602,7 @@ export function CommunityLookbookGrid({
   }, [
     communityAvailable,
     focusSpotlightEntry,
+    gateOpen,
     pendingFocus,
     spotlightItems,
     spotlightLevel,

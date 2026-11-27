@@ -175,7 +175,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
 
     await renderScreen()
     await waitFor(() => {
-      expect(screen.getByTestId('hero-error-state')).toBeTruthy()
+      expect(screen.getByTestId('hero-retry')).toBeTruthy()
     })
 
     server.use(countingRitualHandler())
@@ -185,7 +185,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     await waitFor(() => {
       expect(screen.getByTestId('weather-header')).toBeTruthy()
     })
-    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+    expect(screen.queryByTestId('hero-retry')).toBeNull()
     // Only a user-initiated refresh announces; the initial load must stay
     // silent or every app open would interrupt a screen reader.
     await waitFor(() => {

@@ -1,6 +1,5 @@
 // Learning path Step 8: Shared analytics contracts and event tracking.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
-import { ritualCreatedPropertiesSchema } from '@couture/api-client/types/analytics-events'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
@@ -11,9 +10,10 @@ type PostHogCaptureRequest = {
 
 const POSTHOG_FLAGS_ROUTE = '**/ingest/flags/**'
 
-test.describe('Home analytics capture', () => {
+test.describe('Today analytics capture', () => {
+  test.use({ authSessionEnabled: false })
   test(
-    '[P0] sends ritual_created to PostHog when the primary CTA is clicked',
+    '[P0] records a real signup CTA and opens signup',
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page, interceptNetworkCall, recurse }) => {
       const pageErrors: string[] = []
@@ -54,7 +54,7 @@ test.describe('Home analytics capture', () => {
       // A signed-out visitor has no events feed to poll; the signed-in poll is
       // covered by home-analytics-resilience.spec.ts.
       await page.goto('/')
-      await expect(page.getByTestId('hero-headline')).toBeVisible()
+      await expect(page.getByTestId('landing-sign-up')).toBeVisible()
 
       await log.step('Wait for analytics bindings to hydrate before clicking the CTA.')
       await recurse(
@@ -85,11 +85,12 @@ test.describe('Home analytics capture', () => {
       })
 
       await log.step(
-        'Click the primary CTA and assert ritual_created is sent to PostHog.'
+        'Click Create account and assert that signup opens and its click is recorded.'
       )
-      await page.getByTestId('cta-primary').click()
+      await page.getByTestId('landing-sign-up').click()
+      await expect(page).toHaveURL(/\/signup$/)
 
-      const capturedRitualCreatedEvent = await recurse(
+      const capturedSignupClick = await recurse(
         () =>
           page.evaluate(() => {
             const browserWindow = window as Window & {
@@ -98,7 +99,7 @@ test.describe('Home analytics capture', () => {
 
             return (
               browserWindow.__capturedAnalyticsEvents?.find(
-                (capturedEvent) => capturedEvent.event === 'ritual_created'
+                (capturedEvent) => capturedEvent.event === 'cta_clicked'
               ) ?? null
             )
           }),
@@ -115,22 +116,13 @@ test.describe('Home analytics capture', () => {
       expect(pageErrors).toEqual([])
       expect(consoleErrors).toEqual([])
 
-      const trackedEvent = capturedRitualCreatedEvent
+      const trackedEvent = capturedSignupClick
       expect(trackedEvent).not.toBeNull()
-      expect(trackedEvent?.event).toBe('ritual_created')
-
-      const parsedProperties = ritualCreatedPropertiesSchema.safeParse(
-        trackedEvent?.properties ?? {}
-      )
-
-      expect(
-        parsedProperties.success,
-        parsedProperties.success ? undefined : parsedProperties.error.message
-      ).toBe(true)
+      expect(trackedEvent?.event).toBe('cta_clicked')
       expect(trackedEvent?.properties ?? {}).toEqual(
         expect.objectContaining({
-          ritual_type: 'daily_outfit',
-          weather_context: 'hero_cta',
+          cta_label: 'Start signup',
+          cta_type: 'secondary',
         })
       )
     }

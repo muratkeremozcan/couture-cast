@@ -14,6 +14,8 @@ import {
   pushLookUndoSnapshot,
   reopenMemberSampleOutfit,
   rotateMemberSampleOutfit,
+  sampleGarmentText,
+  sampleLookText,
   sampleSwapCandidates,
   SAMPLE_CATALOG,
   savedLookMatchesHomeSample,
@@ -31,7 +33,6 @@ import {
   getNetworkOnline,
   hasReliableBrowserOnline,
   reportNetworkOffline,
-  setMobilePrimaryActionClearance,
   useStatusBar,
 } from '@/components/save-feedback'
 import {
@@ -51,7 +52,14 @@ import {
   subscribeMobileSavedLooksChanged,
 } from '@/src/lib/saved-looks'
 import { savedLookRoute } from '@/src/features/looks/looks-routes'
-import { PreviewButton, PreviewOutfit, PreviewSwapSheet } from './guest-preview-parts'
+import { NavRow } from '@/src/components/nav-row'
+import { TAB_BODY_INSET } from '@/src/theme/tokens'
+import {
+  PreviewButton,
+  PreviewOutfit,
+  PreviewSwapSheet,
+  SampleGarmentArt,
+} from './guest-preview-parts'
 import { SampleIdeaControls } from './sample-idea-controls'
 
 function buildMobileSampleAttemptKey(
@@ -129,42 +137,14 @@ async function ensureMobileOnlineForAction(
   return checkNetworkOnlineForAction()
 }
 
-export function HomeAddGarment() {
-  const { i18n } = useTranslation()
-  const strings = getGuestPreviewStrings(i18n.language)
-  const palette = useHeroPalette()
-  useEffect(() => () => setMobilePrimaryActionClearance(0), [])
-  return (
-    <View
-      testID="home-add-garment-container"
-      onLayout={(event) => {
-        const height = Math.ceil(event.nativeEvent.layout.height)
-        if (height > 0) {
-          setMobilePrimaryActionClearance(height + 8)
-        }
-      }}
-    >
-      <PreviewButton
-        label={strings.firstUse.addGarment}
-        testID="home-add-garment"
-        palette={palette}
-        onPress={() => router.navigate('/wardrobe?entry=add')}
-        primary
-      />
-    </View>
-  )
-}
-
 /** Story CC-7.12 D11: Plan your week opens the Looks tab on Plan in one tap. */
 export function HomePlannerLink() {
   const { t } = useTranslation()
-  const palette = useHeroPalette()
   return (
     <View style={styles.plan}>
-      <PreviewButton
+      <NavRow
         label={t('commerce.premium.planner.openControl')}
         testID="home-plan-week"
-        palette={palette}
         onPress={() =>
           router.navigate({ pathname: '/looks', params: { segment: 'plan' } })
         }
@@ -190,6 +170,7 @@ export function MemberSampleOutfit({
   const strings = getGuestPreviewStrings(locale)
   const palette = useHeroPalette()
   const [result, setResult] = useState(createMemberSampleOutfit)
+  const [editorOpen, setEditorOpen] = useState(false)
   const [category, setCategory] = useState<SampleGarmentCategory | null>(null)
   const [savedLooks, setSavedLooks] = useState<SavedLookContract[]>([])
   const [bookmarkRevision, setBookmarkRevision] = useState(0)
@@ -366,44 +347,14 @@ export function MemberSampleOutfit({
   const currentId = result.garments.find((garment) => garment.category === category)?.id
   const garmentsSignature = result.garments.map((garment) => garment.id).join(',')
 
-  return (
-    <View testID="member-sample-outfit" style={styles.sample}>
-      <Text style={{ color: palette.inkMuted }}>{strings.chrome.sampleLabel}</Text>
+  const editor = (
+    <>
       <PreviewOutfit
         result={result}
         strings={strings}
         palette={palette}
         locale={locale}
         heading={strings.firstUse.outfitIdea}
-        continuation={
-          <>
-            <HomeAddGarment />
-            {error === 'no-location' && (
-              <View testID="hero-no-location-state">
-                <PreviewButton
-                  label={strings.firstUse.setCity}
-                  testID="hero-add-location"
-                  palette={palette}
-                  onPress={() => router.push('/locations?guided=1')}
-                />
-              </View>
-            )}
-            {error === 'generic' && (
-              <View testID="hero-error-state">
-                <Text accessibilityLiveRegion="polite" style={{ color: palette.ink }}>
-                  {strings.firstUse.outfitFailed}
-                </Text>
-                <PreviewButton
-                  label={strings.chrome.retry}
-                  testID="hero-retry"
-                  palette={palette}
-                  disabled={busy}
-                  onPress={onRetry}
-                />
-              </View>
-            )}
-          </>
-        }
         noAlternative={result.eligibleLookIds.length < 2}
         onTryAnother={() =>
           pushUndoAndUpdate(
@@ -721,11 +672,75 @@ export function MemberSampleOutfit({
         }}
         onClose={() => setCategory(null)}
       />
+    </>
+  )
+  return (
+    <View
+      testID="member-sample-outfit"
+      style={[
+        styles.sample,
+        { backgroundColor: palette.card, borderColor: palette.line },
+      ]}
+    >
+      <Text testID="member-sample-label" style={{ color: palette.inkMuted }}>
+        {t('home.today.sampleLook')}
+      </Text>
+      <Text
+        accessibilityRole="header"
+        style={[styles.sampleTitle, { color: palette.ink }]}
+      >
+        {result.look
+          ? sampleLookText(result.look, strings).name
+          : strings.firstUse.outfitIdea}
+      </Text>
+      <View style={styles.sampleArt}>
+        {result.garments.map((garment) => (
+          <SampleGarmentArt
+            key={garment.id}
+            garment={garment}
+            label={sampleGarmentText(garment, strings).description}
+            size={40}
+          />
+        ))}
+      </View>
+      <PreviewButton
+        label={strings.firstUse.setCity}
+        testID="home-set-city"
+        palette={palette}
+        onPress={() => router.push('/locations')}
+        primary
+        todayPrimary
+      />
+      {error === 'generic' && (
+        <PreviewButton
+          label={strings.chrome.retry}
+          testID="hero-retry"
+          palette={palette}
+          disabled={busy}
+          onPress={onRetry}
+        />
+      )}
+      <PreviewButton
+        label={t('home.today.editSample')}
+        testID="home-edit-sample"
+        palette={palette}
+        expanded={editorOpen}
+        onPress={() => setEditorOpen((open) => !open)}
+      />
+      {editorOpen && editor}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  sample: { marginHorizontal: 16, marginTop: 12, gap: 8 },
-  plan: { marginHorizontal: 16, marginTop: 8 },
+  sample: {
+    marginHorizontal: TAB_BODY_INSET,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  sampleTitle: { fontSize: 20, fontWeight: '700' },
+  sampleArt: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  plan: { marginHorizontal: TAB_BODY_INSET },
 })

@@ -147,6 +147,11 @@ function renderHome() {
   )
 }
 
+async function openSampleEditor() {
+  const edit = await screen.findByText('Edit sample', { exact: true })
+  if (!edit.closest('details')?.open) await userEvent.setup().click(edit)
+}
+
 beforeEach(async () => {
   router.push.mockReset()
   session.owner = null
@@ -167,6 +172,7 @@ it('persists Home sample saves and removals to the account API across remounts',
   publishMember(owner)
   const view = renderHome()
   try {
+    await openSampleEditor()
     await user.click(await screen.findByRole('button', { name: 'Save example look' }))
     await waitFor(() =>
       expect(store.items.map(({ lookId }) => lookId)).toEqual([first.look?.id])
@@ -189,6 +195,7 @@ it('persists Home sample saves and removals to the account API across remounts',
     view.unmount()
     const remounted = renderHome()
     try {
+      await openSampleEditor()
       const saved = await screen.findByRole('region', { name: 'Saved on this device' })
       expect(within(saved).getByRole('button', { name: 'Office oxford' })).toBeVisible()
     } finally {
@@ -214,9 +221,11 @@ it('scopes account saved looks by member and drops late responses after switchin
   publishMember(owner)
   const view = renderHome()
   try {
+    await openSampleEditor()
     await user.click(await screen.findByRole('button', { name: 'Save example look' }))
     await postStarted.promise
     publishMember(nextOwner)
+    await openSampleEditor()
     expect(await screen.findByRole('button', { name: 'Save example look' })).toBeVisible()
     await act(async () => {
       delayedPost.resolve()
@@ -256,6 +265,7 @@ it('blocks signed-in Home Save while offline and prevents a stale GET from overw
     })
     window.dispatchEvent(new Event('offline'))
     try {
+      await openSampleEditor()
       await user.click(await screen.findByRole('button', { name: 'Save example look' }))
       expect(postCount).toBe(0)
     } finally {
@@ -298,6 +308,7 @@ it('saves and reopens Home sample looks even when browser localStorage is blocke
   publishMember(owner)
   try {
     renderHome()
+    await openSampleEditor()
     await user.click(await screen.findByRole('button', { name: 'Save example look' }))
     const saved = await screen.findByRole('region', { name: 'Saved on this device' })
     expect(store.items).toHaveLength(1)
@@ -341,6 +352,7 @@ it('reuses the same Idempotency-Key when retrying a failed Home sample save', as
   publishMember(owner)
   const view = renderHome()
   try {
+    await openSampleEditor()
     const saveButton = await screen.findByRole('button', { name: 'Save example look' })
     await user.click(saveButton)
     await waitFor(() => expect(seenKeys).toHaveLength(1))
@@ -410,6 +422,7 @@ it('revalidates cached Home looks on re-save after remote deletion and merges sl
   const view = renderHome()
   try {
     // Save before the initial GET finishes, then release GET -> both looks are present.
+    await openSampleEditor()
     const saveButton = await screen.findByRole('button', { name: 'Save example look' })
     await user.click(saveButton)
     await waitFor(() => expect(store.items).toHaveLength(2))
@@ -579,14 +592,15 @@ it('shows the city and garment entry links beside an editable sample when the me
     'href',
     '/settings?addLocation=1&returnTo=%2F#locations'
   )
-  expect(screen.getByRole('link', { name: 'Add one garment' })).toHaveAttribute(
+  expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
-  expect(screen.getByText(/^Sample wardrobe\./)).toBeVisible()
+  expect(screen.getByTestId('member-sample-label')).toHaveTextContent('Sample look')
   expect(screen.queryByTestId('share-card-open')).toBeNull()
   expect(reads).toHaveBeenCalledExactlyOnceWith('Bearer bearer-sample-member')
 
+  await openSampleEditor()
   const look = () => screen.getByTestId('guest-preview-look-name').textContent
   const initial = look()
   await user.click(screen.getByRole('button', { name: 'Try another look' }))
@@ -637,15 +651,18 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
   publishMember('live-member')
   renderHome()
 
-  expect(await screen.findByText("Unable to load today's outfit.")).toBeVisible()
+  expect(await screen.findByTestId('home-outfit-retry')).toBeVisible()
   expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
-  expect(screen.queryByRole('link', { name: 'Set your city' })).toBeNull()
+  expect(screen.getByRole('link', { name: 'Set your city' })).toBeVisible()
   available = true
   await user.click(screen.getByRole('button', { name: 'Try again' }))
 
   const live = await screen.findByTestId('home-live-outfit')
-  expect(await within(live).findByText(homeCity.label)).toBeVisible()
-  expect(within(live).getByText('70°F')).toBeVisible()
+  expect(
+    await within(screen.getByTestId('weather-header')).findByText(homeCity.label)
+  ).toBeVisible()
+  expect(within(screen.getByTestId('weather-header')).getByText('70°F')).toBeVisible()
+  await user.click(within(live).getByTestId('today-primary-action'))
   expect(within(live).queryByRole('button', { name: 'Morning' })).toBeNull()
   expect(within(live).getByRole('button', { name: 'Midday' })).toHaveAttribute(
     'aria-pressed',
@@ -654,7 +671,7 @@ it('retries a failed recommendation, shows the verified city, and keeps the chos
   expect(within(live).getByText('Outerwear')).toBeVisible()
   expect(within(live).getByText('Outfit')).toBeVisible()
   expect(within(live).queryByText('uncategorized-id')).toBeNull()
-  expect(within(live).getByText('Wind advisory')).toBeVisible()
+  expect(screen.getByText('Wind advisory')).toBeVisible()
   await user.click(within(live).getByRole('button', { name: 'Evening' }))
   expect(within(live).getByText('evening comfort note')).toBeVisible()
   expect(within(live).getByTestId('share-card-open')).toBeVisible()
@@ -685,8 +702,9 @@ it('shows the starter wardrobe entry even when saved-city lookup fails', async (
   publishMember('starter-member')
   renderHome()
 
+  await userEvent.setup().click(await screen.findByTestId('today-primary-action'))
   expect(await screen.findByText('Starter wardrobe pick')).toBeVisible()
-  expect(screen.getByRole('link', { name: 'Add one garment' })).toHaveAttribute(
+  expect(await screen.findByTestId('home-add-garment')).toHaveAttribute(
     'href',
     '/wardrobe?entry=add'
   )
@@ -777,6 +795,7 @@ it('shows inline Needs review badge for unresolved Home saved looks and avoids s
   )
   publishMember(owner)
   const view = renderHome()
+  await openSampleEditor()
 
   try {
     await waitFor(() => expect(store.items).toHaveLength(1))
@@ -857,7 +876,7 @@ it('7.7-CMP-004 a failed ritual shows the sample with the failure copy and Retry
   publishMember('failed-ritual-member')
   renderHome()
 
-  expect(await screen.findByText("Unable to load today's outfit.")).toBeVisible()
+  expect(await screen.findByTestId('home-outfit-retry')).toBeVisible()
   expect(screen.getByTestId('member-sample-outfit')).toBeVisible()
   expect(screen.getByTestId('home-outfit-retry')).toBeVisible()
 })

@@ -1,5 +1,7 @@
 # Learning path Step 66: One app shell and visual system.
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-66-one-app-shell-and-visual-system
+# Learning path Step 70: Calm Today with one primary job.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-70-calm-today-with-one-primary-job
 # Story CC-7.9 test owner (TEA): 7.9-NVIS-001..008, AC2 and AC6, spec D11.
 # Test design: _bmad-output/test-artifacts/test-design-7-9-one-app-shell-visual-system.md.
 #
@@ -47,3 +49,24 @@ onFlowComplete:
 - runFlow:
     file: subflows/shell-visual-tabs.yaml
     env: { SCHEME: 'dark' }
+
+# 7.13-NAT-003. The closed Today PNGs above are the PR visual evidence. Open the ribbon
+# after all captures so a failure still leaves every baseline available for diagnosis.
+- tapOn:
+    id: 'tab-home'
+- extendedWaitUntil:
+    visible:
+      id: 'weather-header'
+    timeout: 15000
+- tapOn:
+    id: 'weather-header'
+- extendedWaitUntil:
+    visible:
+      id: 'hourly-forecast-ribbon'
+    timeout: 10000
+- tapOn:
+    id: 'weather-header'
+- extendedWaitUntil:
+    notVisible:
+      id: 'hourly-forecast-ribbon'
+    timeout: 10000

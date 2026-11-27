@@ -15,23 +15,11 @@ tags:
 
 - runFlow: subflows/open-app.yaml
 
-# Verify chip selection is available on the mobile Home screen
+# CC-7.13 keeps category controls on Community and the tab bar on Today.
 - assertVisible:
-    id: 'chip-personal'
-- assertVisible:
-    id: 'chip-community'
-- assertVisible:
-    id: 'chip-sponsored'
-
-- tapOn:
-    id: 'chip-community'
-
-- takeScreenshot:
-    path: maestro/artifacts/chip-navigation-community-selected
-
-- assertVisible:
-    id: 'chip-community'
-    selected: true
+    id: 'tab-home'
+- assertNotVisible:
+    id: 'mobile-chip-navigation'
 
 - assertVisible:
     id: 'tab-wardrobe'

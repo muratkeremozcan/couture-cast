@@ -28,21 +28,19 @@ tags:
 - assertVisible:
     id: 'tab-settings'
 
-- assertVisible:
-    id: 'chip-personal'
-    selected: true
-- tapOn:
-    id: 'chip-community'
-- assertVisible:
-    id: 'chip-community'
-    selected: true
-
 - tapOn:
     id: 'tab-community'
 - assertVisible:
     id: 'community-screen'
 - tapOn:
     id: 'tab-home'
+
+- extendedWaitUntil:
+    visible:
+      id: 'today-primary-action'
+    timeout: 15000
+- tapOn:
+    id: 'today-primary-action'
 
 # Garment swap: selector state and modal dismissal.
 #

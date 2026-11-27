@@ -165,7 +165,7 @@ test.describe('CC-7.9 premium palette follows the system scheme (7.9-E2E-008) @l
         await expect(page).toHaveURL(/\/$/)
         await waitForShellSettled(page, router)
         await expect(html).toHaveAttribute('data-theme', palette)
-        await page.getByTestId('planner-open-control').click()
+        await page.getByTestId('home-plan-week').click()
         await expect(page).toHaveURL('/looks?segment=plan')
         await expect(html).toHaveAttribute('data-theme', palette)
         expect((await plannerRead).status).toBe(200)

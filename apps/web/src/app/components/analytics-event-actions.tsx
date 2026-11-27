@@ -79,7 +79,7 @@ function readSignedInAccount(): string | null {
   return commentSessionIdentity(readWebEventsAccessToken())
 }
 
-export function AnalyticsEventActions() {
+export function AnalyticsEventActions({ pollOnly = false }: { pollOnly?: boolean }) {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   useEffect(() => {
     if (window.__enableAnalyticsTestHook) {
@@ -182,6 +182,8 @@ export function AnalyticsEventActions() {
       }
     }
   }, [])
+
+  if (pollOnly) return null
 
   const handleRitualCreated = (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()

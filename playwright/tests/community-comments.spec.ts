@@ -224,7 +224,7 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   trackThreadReads(page)
   const grid = page.getByTestId('community-card-grid')
   const initialFeed = completedCommunityFeed(page)
-  await page.goto('/')
+  await page.goto('/community')
   expect((await initialFeed).status).toBe(200)
   await expect(grid).toHaveAttribute('aria-busy', 'false')
   const allFeed = completedCommunityFeed(page, 'all')

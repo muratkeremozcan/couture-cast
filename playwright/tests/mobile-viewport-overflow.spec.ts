@@ -160,7 +160,7 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
         ? []
         : [`page scrolls sideways: scrollWidth ${scrollWidth} > ${width}`]
     const controls = document.querySelectorAll<HTMLElement>(
-      'header a, header button, [data-testid="hero-section"] a, [data-testid="hero-section"] button, [data-testid="hero-section"] label, [data-testid="sticky-bottom-nav"] a'
+      'header a, header button, main a, main button, main label, [data-testid="sticky-bottom-nav"] a'
     )
     for (const control of Array.from(controls)) problems.push(...controlProblems(control))
     return problems

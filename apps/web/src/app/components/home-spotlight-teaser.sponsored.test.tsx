@@ -16,7 +16,6 @@ import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { stubPartnerTab, type PartnerTabStub } from '../../test-utils/partner-tab'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { CLICKS_PATH, SPONSORSHIP } from '../../test-utils/community-lookbook-grid'
-import { setViewport } from '../../test-utils/home-spotlight-teaser'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
@@ -116,10 +115,6 @@ function shownEvents() {
   return (window.__capturedAnalyticsEvents ?? []).filter(
     (event) => event.event === 'affiliate_cta_shown'
   )
-}
-
-function teaserShownEvents() {
-  return shownEvents().filter((event) => event.properties.surface === 'home_teaser')
 }
 
 describe('6.7b web Home teaser sponsored CTA', () => {
@@ -298,26 +293,6 @@ describe('6.7b web Home teaser sponsored CTA', () => {
       ])
     )
     expect(events).toHaveLength(2)
-  })
-
-  it('6.7b-WEB-035 a teaser that unmounts on a layout change and remounts with the same block reports it once', async () => {
-    signIn()
-    useSpotlight(spotlightItem({ sponsorship: SPONSORSHIP }))
-    render(<LookbookPrismLayout />)
-
-    await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-    await waitFor(() => expect(teaserShownEvents()).toHaveLength(1))
-
-    // Side by side, the teaser slot unmounts; the layout keeps the value.
-    act(() => setViewport(1440))
-    await waitFor(() =>
-      expect(screen.queryByTestId('home-spotlight-teaser')).not.toBeInTheDocument()
-    )
-    // Stacked again inside the read floor: the same block mounts again.
-    act(() => setViewport(1024))
-    await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
-
-    expect(teaserShownEvents()).toHaveLength(1)
   })
 
   it('6.7b-WEB-036 the CTA is its own Tab stop after the teaser link, and Enter mints', async () => {

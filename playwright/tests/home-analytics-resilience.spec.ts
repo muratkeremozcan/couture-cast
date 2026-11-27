@@ -1,7 +1,6 @@
 // Learning path Step 8: Shared analytics contracts and event tracking.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 import type { Page } from '@playwright/test'
-import { log } from '@seontechnologies/playwright-utils/log'
 import { test, expect } from '../support/fixtures/merged-fixtures'
 import {
   buildUniqueId,
@@ -15,19 +14,7 @@ import {
 } from '../support/helpers/community-session'
 import { cleanupUserTestData } from '../support/helpers/user-test-data'
 
-async function expectKeyInteractionsWork(page: Page) {
-  const initialUrl = page.url()
-  await page.getByTestId('cta-primary').click()
-
-  await log.step(
-    'Primary CTA should capture analytics but avoid navigation side-effects.'
-  )
-  await expect(page).toHaveURL(initialUrl)
-  await expect(page.getByTestId('hero-headline')).toBeVisible()
-
-  await page.getByTestId('cta-secondary').click()
-  await expect(page).toHaveURL(/#wardrobe$/)
-
+async function expectCommunityNavigation(page: Page) {
   await page.getByTestId('nav-community').click()
   await expect(page).toHaveURL(/\/community$/)
   await expect(page.getByTestId('community-page')).toBeVisible()
@@ -41,7 +28,11 @@ test.describe('Home analytics resilience', () => {
     { annotation: [{ type: 'skipNetworkMonitoring' }] },
     async ({ page }) => {
       await page.goto('/')
-      await expectKeyInteractionsWork(page)
+      await expect(page.getByTestId('guest-preview-entry')).toHaveAttribute(
+        'href',
+        '/preview'
+      )
+      await expectCommunityNavigation(page)
     }
   )
 
@@ -93,7 +84,9 @@ test.describe('Home analytics resilience', () => {
         expect(pollCall.status).toBe(503)
         expect(pollCall.request?.headers().authorization).toBe(`Bearer ${accessToken}`)
 
-        await expectKeyInteractionsWork(page)
+        await expect(page.getByTestId('member-sample-outfit')).toBeVisible()
+        await expect(page.getByTestId('home-set-city')).toBeVisible()
+        await expectCommunityNavigation(page)
       } finally {
         await cleanupUserTestData(userId)
       }

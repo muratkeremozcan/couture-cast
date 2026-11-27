@@ -294,9 +294,9 @@ test.describe('6.14 complimentary full access, member flags off globally', () =>
       await page.getByTestId('premium-theme-option-default').click()
       expect((await reset).status).toBe(200)
 
-      await log.step('The community feed loads on the home page')
+      await log.step('The community feed loads on the Community tab')
       const feed = interceptNetworkCall({ method: 'GET', url: `**${FEED_PATH}*` })
-      await page.goto('/')
+      await page.goto('/community')
       expect((await feed).status).toBe(200)
       await expect(page.getByTestId('community-card-grid')).toBeAttached()
       await expect(

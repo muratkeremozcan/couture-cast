@@ -1038,6 +1038,29 @@
     }
   },
   "home": {
+    "today": {
+      "outfit": "Visual de hoje",
+      "starterOutfit": "Visual inicial",
+      "outfitDetails": "Detalhes do visual",
+      "sampleLook": "Visual de exemplo",
+      "editSample": "Editar o exemplo",
+      "addFirstPiece": "Adicione a sua primeira peça",
+      "weatherUnavailable": "Previsão meteorológica indisponível",
+      "recentPieces": "Peças recentes",
+      "conditions": {
+        "clear": "Céu limpo",
+        "partly_cloudy": "Parcialmente nublado",
+        "cloudy": "Nublado",
+        "fog": "Nevoeiro",
+        "drizzle": "Chuvisco",
+        "rain": "Chuva",
+        "sleet": "Água-neve",
+        "snow": "Neve",
+        "thunderstorm": "Trovoada",
+        "wind": "Ventoso",
+        "unknown": "Desconhecido"
+      }
+    },
     "spotlightTeaser": {
       "heading": "Visual em destaque em {{label}}",
       "reactions": "{{count}} reações",

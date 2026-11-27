@@ -276,42 +276,7 @@ test.describe('Story 3.8 interaction states', () => {
     await expect(page.locator('main#main-content')).toBeFocused()
   })
 
-  test('chip keys preserve button semantics and Tab exits the group', async ({
-    page,
-    interceptNetworkCall,
-  }) => {
-    await openStablePage(page, '/', interceptNetworkCall)
-    const personal = page.getByTestId('chip-personal')
-    const community = page.getByTestId('chip-community')
-    const sponsored = page.getByTestId('chip-sponsored')
-
-    await personal.focus()
-    await page.keyboard.press('ArrowRight')
-    await expect(community).toBeFocused()
-    await expect(community).toHaveAttribute('aria-pressed', 'true')
-    await page.keyboard.press('ArrowLeft')
-    await expect(personal).toBeFocused()
-    await page.keyboard.press('End')
-    await expect(sponsored).toBeFocused()
-    await page.keyboard.press('Home')
-    await expect(personal).toBeFocused()
-    await page.keyboard.press('End')
-    await page.keyboard.press('Tab')
-    await expect(page.locator(':focus')).not.toHaveAttribute('data-testid', /chip-/)
-
-    /*
-     * The `article[id^="lookbook-card-"]` half of this assertion moved to
-     * `community-feed.spec.ts`, which owns the community focus contract. What
-     * survives is the half that never needed a card: a non-card child of a
-     * scrolling region must NOT be focusable, which is the property that keeps the
-     * tab order short.
-     */
-    await expect(
-      page.locator('[data-testid="outfit-scroll"] > div').first()
-    ).not.toHaveAttribute('tabindex')
-  })
-
-  test('selected chips and an information banner pass axe', async ({
+  test('the invalid-link information banner and Today pass axe', async ({
     page,
     interceptNetworkCall,
   }) => {
@@ -321,11 +286,6 @@ test.describe('Story 3.8 interaction states', () => {
       interceptNetworkCall
     )
     await expect(page.getByTestId('deep-link-info-banner')).toBeVisible()
-    await page.getByTestId('chip-community').click()
-    await expect(page.getByTestId('chip-community')).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
     await checkA11y(page)
   })
 
@@ -405,15 +365,17 @@ test.describe('Story 3.8 interaction states', () => {
   test('reduced motion and forced colors preserve immediate visible focus', async ({
     page,
     interceptNetworkCall,
+    communitySession,
   }) => {
+    expect(communitySession.userId).toBeTruthy()
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.setViewportSize(viewports[0])
     await openStablePage(page, '/', interceptNetworkCall)
 
     // Story CC-7.12 D11: the "Plan week" control links to the Looks Plan segment, where the
     // planner renders as the inline rail. Plan is a tab with no back arrow, so browser back
-    // returns to Today, where the chips checked below live.
-    await page.getByTestId('planner-open-control').click()
+    // returns to Today, where the Plan link remains focusable.
+    await page.getByTestId('home-plan-week').click()
     await expect(page).toHaveURL('/looks?segment=plan')
     const planner = page.getByRole('complementary', { name: 'Planner Rail' })
     await expect(planner).toBeVisible()
@@ -423,23 +385,23 @@ test.describe('Story 3.8 interaction states', () => {
     ).toHaveCount(0)
     await page.goBack()
     await expect(page).toHaveURL('/')
-    const chip = page.getByTestId('chip-personal')
-    const transitionDuration = await chip.evaluate(
+    const planLink = page.getByTestId('home-plan-week')
+    const transitionDuration = await planLink.evaluate(
       (node) => getComputedStyle(node).transitionDuration
     )
     expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001)
 
     await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' })
-    // The `planner-open-control` mouse click above leaves Chromium's
+    // The `home-plan-week` mouse click above leaves Chromium's
     // `:focus-visible` heuristic in its pointer-interaction state, so a plain
-    // `chip.focus()` stopped matching `:focus-visible` and `outlineStyle` came back
+    // `planLink.focus()` stopped matching `:focus-visible` and `outlineStyle` came back
     // `'none'` where the assertion below wants `'solid'`. One real keyboard event
     // resets that heuristic before the script-triggered focus, matching how a
     // keyboard user reaches this element; confirmed by removing it and reproducing
     // the failure.
     await page.keyboard.press('Tab')
-    await chip.focus()
-    const forcedStyles = await chip.evaluate((node) => {
+    await planLink.focus()
+    const forcedStyles = await planLink.evaluate((node) => {
       const styles = getComputedStyle(node)
       return { boxShadow: styles.boxShadow, outlineStyle: styles.outlineStyle }
     })
@@ -447,7 +409,7 @@ test.describe('Story 3.8 interaction states', () => {
     expect(forcedStyles.outlineStyle).toBe('solid')
   })
 
-  test('rendered top bar, chip, selected chip, and alert focus outlines meet 3:1 in both schemes', async ({
+  test('rendered top bar, Today Plan, and alert focus outlines meet 3:1 in both schemes', async ({
     page,
     interceptNetworkCall,
     communitySession,
@@ -468,13 +430,9 @@ test.describe('Story 3.8 interaction states', () => {
       expect(navBackdrop.surface, `${colorScheme} top bar tab`).toBe('page')
 
       await expectVisibleFocusRing(
-        page.getByTestId('chip-community'),
-        `${colorScheme} chip`
+        page.getByTestId('home-plan-week'),
+        `${colorScheme} Today Plan`
       )
-      // Story CC-7.9 D3: the selected chip is `inverse`, no longer gold; its ring still shows.
-      const selected = page.getByTestId('chip-personal')
-      await expect(selected).toHaveAttribute('aria-pressed', 'true')
-      await expectVisibleFocusRing(selected, `${colorScheme} selected chip`)
     }
 
     // The alert stub answers every later events poll, so the alert pages run after the Home ones.

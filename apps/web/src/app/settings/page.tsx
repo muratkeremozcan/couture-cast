@@ -8,6 +8,7 @@ import { getI18n } from '../../i18n'
 import { AppPage, APP_MAIN_NARROW_CLASS } from '../components/app-page'
 import { AppTopBar } from '../components/app-top-bar'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
+import { ProfileSignOut } from '../components/guest-preview/guest-preview-entry'
 import { NavRow } from '../components/nav-row'
 import { LocationsSection } from '../components/locations/locations-section'
 import { PremiumThemeSection } from '../components/premium-theme-section'
@@ -55,6 +56,7 @@ export default function SettingsPage() {
             <SubscriptionSection />
             <PremiumThemeSection />
           </ScreenGate>
+          <ProfileSignOut />
         </main>
         <StickyBottomNav />
       </AppPage>

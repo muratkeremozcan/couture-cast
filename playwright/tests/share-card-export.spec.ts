@@ -754,7 +754,7 @@ test('P-FOREIGN P-IDENTITY: a second genuine account has no export action or acc
   const secondary = await identify(context, 1)
   const profile = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
   const feed = interceptNetworkCall({ method: 'GET', url: '**/api/v1/community/feed*' })
-  await page.goto('/')
+  await page.goto('/community')
   const verified = await profile
   expect(verified.status).toBe(200)
   expect(userProfileResponseSchema.parse(verified.responseJson).user.id).toBe(
@@ -1000,7 +1000,7 @@ test('P-OUTFIT P-CANCEL: all persisted scenarios render, and reopening retains e
     `Bearer ${member.access_token}`
   )
   const live = page.getByTestId('home-live-outfit')
-  await expect(live).toBeVisible()
+  await live.getByTestId('today-primary-action').click()
   for (const label of ['Morning', 'Midday', 'Evening']) {
     const scenario = live.getByRole('button', { name: label, exact: true })
     await scenario.click()
@@ -1077,6 +1077,7 @@ test('P-OFFLINE: an outfit card refuses export offline, keeps its preview, and t
   const ritual = interceptNetworkCall({ method: 'GET', url: '**/api/v1/ritual?*' })
   await page.goto('/')
   expect((await ritual).status).toBe(200)
+  await page.getByTestId('today-primary-action').click()
   await page.getByTestId('home-live-outfit').getByTestId('share-card-open').click()
   const dialog = modal(page)
   const preview = dialog.getByTestId('share-card-preview')
@@ -1126,7 +1127,7 @@ test('P-CANCEL P-IDENTITY: an open dialog drops its held preview across same-doc
       else await holdThenFulfill(route, request, gate)
     },
   })
-  await page.goto('/')
+  await page.goto('/community')
   const sameDocument = await markDocument(page)
   const opener = page
     .locator(`[data-testid$="lookbook-card-${fixture.postId}"]`)

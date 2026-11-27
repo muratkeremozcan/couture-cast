@@ -688,8 +688,8 @@ test.describe('7.7 signed-in shell layout shift at 390 x 844 @local-lane', () =>
         await go('closet')
       } else {
         if (path === 'sign-out-then-sign-in') {
-          await go('home')
-          await page.getByTestId('landing-sign-out').click()
+          await go('profile')
+          await page.getByTestId('profile-sign-out').click()
         }
         // Home is not mounted here, so the window starts before the switch itself.
         switchedAt = await meterNow(page)

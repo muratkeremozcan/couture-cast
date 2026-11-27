@@ -314,7 +314,7 @@ test.describe('CC-7.12 no Planner lock outside Plan @local-lane', () => {
 })
 
 test.describe('CC-7.12 one click to Plan and the old addresses @local-lane', () => {
-  const members = ['free', 'premium', 'signed out'] as const
+  const members = ['free', 'premium'] as const
   for (const member of members) {
     test(
       `[P0] [7.12-E2E-034] ${member}: Today's Plan your week opens Looks on Plan in one click`,
@@ -328,16 +328,14 @@ test.describe('CC-7.12 one click to Plan and the old addresses @local-lane', () 
         const fixture =
           member === 'free'
             ? await openFreeMember(page, interceptNetworkCall)
-            : member === 'premium'
-              ? await openLooksFixture(page, interceptNetworkCall, { looks: LOOKS })
-              : null
-        fixture?.setScreen('home')
+            : await openLooksFixture(page, interceptNetworkCall, { looks: LOOKS })
+        fixture.setScreen('home')
         await page.goto('/')
-        if (fixture) await waitForShellSettled(page, fixture.router)
+        await waitForShellSettled(page, fixture.router)
 
-        const control = page.getByTestId('planner-open-control')
+        const control = page.getByTestId('home-plan-week')
         await expect(control).toHaveAttribute('href', '/looks?segment=plan')
-        fixture?.setScreen('looks')
+        fixture.setScreen('looks')
         await control.click()
         await expect(page).toHaveURL(/\/looks\?segment=plan$/)
         await expect(segment(page, 'plan')).toHaveAttribute('aria-selected', 'true')
